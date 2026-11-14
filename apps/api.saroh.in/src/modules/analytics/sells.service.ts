@@ -5,8 +5,8 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { businessTimezone } from "../bookings/staff-availability";
 import { allows, authorize } from "../organizations/organization-policy";
 import { businessCurrency } from "../stores/currency";
-import type { InsightsPeriod } from "./period";
-import { daysBetween, periodWindows } from "./period";
+import type { SellsPeriod } from "./period";
+import { daysBetween, periodWindows, spanWindows } from "./period";
 import type {
     BookedRow,
     BusyRow,
@@ -39,8 +39,10 @@ import { firstSaleSql } from "./takings.sql";
 export class SellsService {
     async read(
         ctx: OrganizationContext,
-        period: InsightsPeriod,
+        period: SellsPeriod,
         now: Date = new Date(),
+        /** Days someone named instead (Ask AI), first and last, YYYY-MM-DD. */
+        span?: { from: string; to: string },
     ): Promise<SellsRead> {
         authorize(ctx, "analytics:read");
         const money = allows(ctx, "payment:read");
@@ -51,7 +53,9 @@ export class SellsService {
             businessTimezone(prisma, organizationId),
             businessCurrency(prisma, organizationId),
         ]);
-        const w = periodWindows(period, now, zone);
+        const w = span
+            ? spanWindows(period, span.from, span.to, now, zone)
+            : periodWindows(period, now, zone);
 
         const [first, org, sold, bookedRows, busyRows, people] =
             await Promise.all([

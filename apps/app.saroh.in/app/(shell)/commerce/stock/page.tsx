@@ -21,6 +21,7 @@ import {
     getStockTracking,
 } from "@/lib/stock/service";
 import { listStorefronts } from "@/lib/stores/storefronts";
+import { dateRangeAsk, readDateRange } from "@/lib/views/date-range";
 
 export const metadata = { title: "Stock" };
 
@@ -110,7 +111,9 @@ export default async function StockPage({
         log: logSize,
         checks: checksSize,
     });
+    const dates = readDateRange(query);
     const address: StockAddress = {
+        ...dates,
         tab,
         show,
         q,
@@ -151,6 +154,7 @@ export default async function StockPage({
                           ? logStore
                           : undefined,
                       product: logProduct,
+                      ...dateRangeAsk(dates),
                       ...pages.log,
                   }),
               )
@@ -196,6 +200,7 @@ export default async function StockPage({
                     kind,
                     store: logStore ?? "all",
                     product: logProduct ?? "",
+                    ...dates,
                 }}
                 products={products.map((p) => ({ id: p.id, name: p.name }))}
                 canWrite={levels.canWrite}

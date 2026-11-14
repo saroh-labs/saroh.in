@@ -33,6 +33,8 @@ const HOLD_AWARE: Record<string, string> = {
         "Leaves out a held business's customer sessions, sign-in codes and store logs, and its members' sign-in sessions.",
     "analytics/analytics-retention.handler.ts":
         "Leaves a held business's events out of the read and of the delete.",
+    "ai/history/retention.job.ts":
+        "Leaves a held business's Ask AI conversations out of the read and of the delete.",
 };
 
 /**

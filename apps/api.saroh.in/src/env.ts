@@ -185,6 +185,12 @@ const envSchema = z.object({
     // NODE_ENV=production (below), and honoured only in a test run, as
     // DOMAIN_HOSTING_FAKE is (`payments/providers/stripe-fake.ts`).
     STRIPE_FAKE: z.enum(["1"]).optional(),
+    // TEST ONLY. `1`: Ask AI answers from a script instead of a model (the
+    // Ask AI browser spec): a known question streams its scripted words, a
+    // tool or a draft first where the script says; nothing calls Anthropic.
+    // Refused at boot under NODE_ENV=production (below), and honoured only in
+    // a test run, as STRIPE_FAKE is (`ai/providers/fake-script.ts`).
+    AI_PROVIDER_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -322,6 +328,13 @@ const envSchema = z.object({
     // All five encryption keys may be a ring, `v2:<key>,v1:<key>` (DEC-214).
     APIKEY_ENC_KEY: z.string().optional(),
     WEBHOOK_SECRET_KEY: z.string().optional(),
+    // Ask AI (DEC-220): seals conversation and report text. Its own 32-byte
+    // key or ring, checked at use like the keys above; never logged.
+    AI_TEXT_ENC_KEY: z.string().optional(),
+    // Ask AI's provider (DEC-220): Anthropic's API key. Optional at boot;
+    // read only by `modules/ai/providers/ai-sdk.adapter.ts`, which refuses
+    // a call without it. Never logged, never in an example file with a value.
+    ANTHROPIC_API_KEY: z.string().optional(),
     // Durable public-API rate limits (U4, `modules/rate-limits/`). Unset, or
     // Redis down: each replica limits in process at the cap / API_REPLICAS.
     REDIS_URL: z.url().optional(),
@@ -446,6 +459,7 @@ const TEST_ONLY = [
     "LINK_PREVIEW_TEST_HOSTS",
     "DOMAIN_HOSTING_FAKE",
     "STRIPE_FAKE",
+    "AI_PROVIDER_FAKE",
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {

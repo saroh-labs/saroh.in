@@ -45,7 +45,7 @@ export interface RoleView {
 }
 
 /** What a built-in is called, before a business ever stores a row for it. */
-const BUILT_IN_LABEL: Record<OrgRole, string> = {
+export const BUILT_IN_LABEL: Record<OrgRole, string> = {
     OWNER: "Owner",
     ADMIN: "Admin",
     MEMBER: "Member",

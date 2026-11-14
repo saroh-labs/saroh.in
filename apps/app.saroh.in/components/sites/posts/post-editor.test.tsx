@@ -404,3 +404,60 @@ describe("PostEditor's Share (#1375, boards SGShareBlog*)", () => {
         expect(labels()).not.toContain("Share");
     });
 });
+
+describe("PostEditor, started from an Ask AI blog draft (owner, 14 Nov)", () => {
+    const draft = {
+        title: "Our new eco packing range",
+        body: "<h2>Paper, not plastic</h2><p>Every order ships in paper.</p>",
+        excerpt: "Paper, not plastic.",
+    };
+
+    it("prefills an unsaved new post, saves nothing until asked, and says so once", async () => {
+        createPost.mockResolvedValue({ ok: true, data: { id: "p7" } });
+        act(() =>
+            root.render(
+                <PostEditor siteId="s1" categories={[]} fromAskAi={draft} />,
+            ),
+        );
+        expect(field("Post title").value).toBe(draft.title);
+        expect(field("Post body").value).toBe(draft.body);
+        expect(container.textContent).toContain(
+            "Started from Ask AI. Nothing is saved until you save.",
+        );
+        // No autosave of an untouched prefill, but Save draft takes it.
+        await settle(() => vi.advanceTimersByTime(5000));
+        expect(createPost).not.toHaveBeenCalled();
+        const saveButton = Array.from(
+            container.querySelectorAll("button"),
+        ).find((b) => b.textContent.trim() === "Save draft");
+        expect(saveButton?.disabled).toBe(false);
+
+        // The editor's normal flow saves it, with the excerpt, then the line goes.
+        act(() => type(field("Post body"), `${draft.body}<p>More.</p>`));
+        await settle(() => vi.advanceTimersByTime(2600));
+        expect(createPost).toHaveBeenCalledTimes(1);
+        expect(createPost.mock.calls[0]?.[1]).toMatchObject({
+            title: draft.title,
+            excerpt: draft.excerpt,
+        });
+        expect(container.textContent).not.toContain("Started from Ask AI");
+    });
+
+    it("a draft that can't be read opens the normal empty post with one quiet line", () => {
+        act(() =>
+            root.render(
+                <PostEditor siteId="s1" categories={[]} fromAskAi={null} />,
+            ),
+        );
+        expect(field("Post title").value).toBe("");
+        expect(container.textContent).toContain(
+            "That Ask AI draft isn't available any more.",
+        );
+        expect(container.textContent).not.toContain("Started from Ask AI");
+    });
+
+    it("without from, neither line shows", () => {
+        act(() => root.render(<PostEditor siteId="s1" categories={[]} />));
+        expect(container.textContent).not.toContain("Ask AI");
+    });
+});

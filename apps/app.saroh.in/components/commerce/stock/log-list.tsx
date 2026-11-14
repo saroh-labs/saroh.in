@@ -8,6 +8,10 @@ import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
+import type { DateRange } from "@/lib/views/date-range";
+import { dateRangeOn } from "@/lib/views/date-range";
+
 import { productHref } from "@/lib/products/links";
 import type { StockHref, StockListPage } from "@/lib/stock/list-query";
 import { STOCK_LISTS, STOCK_PAGES_LABEL } from "@/lib/stock/list-query";
@@ -70,7 +74,7 @@ export function LogList({
     paging,
 }: {
     log: StockLog | "failed";
-    filter: { kind: LogKindId; store: string; product: string };
+    filter: { kind: LogKindId; store: string; product: string } & DateRange;
     storefronts: { id: string; name: string }[];
     products: { id: string; name: string }[];
     /** The screen's address with these changed. */
@@ -79,6 +83,17 @@ export function LogList({
     paging: StockListPage;
 }) {
     const router = useRouter();
+    const narrowed =
+        filter.kind !== "all" ||
+        filter.store !== "all" ||
+        !!filter.product ||
+        dateRangeOn(filter);
+    const cleared = href({
+        kind: undefined,
+        store: undefined,
+        product: undefined,
+        date: undefined,
+    });
 
     // The one list toolbar, in one row: the kind of change, the location
     // and the product are its dropdown filters, and how many entries the
@@ -147,21 +162,18 @@ export function LogList({
                             })
                         }
                     />
+                    {/* The day of the change: on its own line on a phone. */}
+                    <DateRangeFilter
+                        value={filter}
+                        onChange={(patch) =>
+                            router.push(href(patch), { scroll: false })
+                        }
+                    />
                 </>
             }
             onClear={
-                filter.kind !== "all" ||
-                filter.store !== "all" ||
-                filter.product
-                    ? () =>
-                          router.push(
-                              href({
-                                  kind: undefined,
-                                  store: undefined,
-                                  product: undefined,
-                              }),
-                              { scroll: false },
-                          )
+                narrowed
+                    ? () => router.push(cleared, { scroll: false })
                     : undefined
             }
             count={
@@ -372,9 +384,7 @@ export function LogList({
                     </div>
                 ) : null}
                 {days.length === 0 ? (
-                    filter.kind === "all" &&
-                    filter.store === "all" &&
-                    !filter.product ? (
+                    !narrowed ? (
                         <EmptyState
                             size="panel"
                             title="No stock changes yet"
@@ -387,11 +397,7 @@ export function LogList({
                             things="stock changes"
                             cause="filters"
                             title="No stock changes match these filters"
-                            clearHref={href({
-                                kind: undefined,
-                                store: undefined,
-                                product: undefined,
-                            })}
+                            clearHref={cleared}
                         />
                     )
                 ) : null}

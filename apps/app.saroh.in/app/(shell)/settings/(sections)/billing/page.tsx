@@ -11,6 +11,7 @@ import {
     SettingsPanelHeader,
 } from "@/components/settings/page/settings-panel";
 import { AddonsCard } from "@/components/settings/plan-billing/addons-card";
+import { AskAiUsageRow } from "@/components/settings/plan-billing/ask-ai-usage-row";
 import { BillingProfilePanel } from "@/components/settings/plan-billing/billing-profile-panel";
 import { CurrentPlanCard } from "@/components/settings/plan-billing/current-plan-card";
 import { FreeNote } from "@/components/settings/plan-billing/free-note";
@@ -22,6 +23,8 @@ import type { YourPlanProps } from "@/components/settings/plan-billing/your-plan
 import { YourPlan } from "@/components/settings/plan-billing/your-plan";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
+import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan, mayOpenPlan } from "@/lib/billing/plan-access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
@@ -128,15 +131,18 @@ export default async function PlanBillingPage({
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
 
-    const [basics, invoices, addons, usage, billedTo] = await Promise.all([
-        readPlanBasics(),
-        settle(listSarohInvoices()),
-        settle(listAddons()),
-        getPlanUsage(),
-        canChange
-            ? settle(getBillingProfileView())
-            : Promise.resolve(undefined),
-    ]);
+    const [basics, invoices, addons, usage, billedTo, askAi] =
+        await Promise.all([
+            readPlanBasics(),
+            settle(listSarohInvoices()),
+            settle(listAddons()),
+            getPlanUsage(),
+            canChange
+                ? settle(getBillingProfileView())
+                : Promise.resolve(undefined),
+            // Ask AI's questions this period, when its screens are on (U11).
+            askAiOn() ? settle(getAskAiState()) : Promise.resolve(null),
+        ]);
     if (basics === null) {
         return <SettingsPanel header={header}>{DENIED}</SettingsPanel>;
     }
@@ -226,6 +232,15 @@ export default async function PlanBillingPage({
                             <Link href={PLANS_HREF}>{planLabel()}</Link>
                         </Button>
                     </p>
+                ) : null}
+                {askAi?.usage ? (
+                    <AskAiUsageRow
+                        used={askAi.usage.used}
+                        limit={askAi.usage.limit}
+                        canOpen={
+                            org?.actions?.includes("module:manage") ?? false
+                        }
+                    />
                 ) : null}
                 {billedTo === null ? (
                     <BillingProfilePanel view={null} />

@@ -195,6 +195,17 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "webhooks.max",
         legacyEntitlementKey: null,
     },
+    /**
+     * Ask AI (DEC-220): questions a month, counted over the billing period
+     * (DEC-219). Locked where the catalogue leaves it off; the allowance is
+     * the catalogue's number, raised by an `ask-ai` add-on (Request more).
+     * Under no registry module: its rollout is the `ASK_AI` flag.
+     */
+    "ask-ai": {
+        registry: null,
+        limitKey: "aiQuestionsPerMonth",
+        legacyEntitlementKey: null,
+    },
 };
 
 /**

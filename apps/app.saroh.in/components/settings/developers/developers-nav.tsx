@@ -10,6 +10,7 @@ import { DEVELOPERS_HREF, developersTabOf } from "@/lib/settings/developers";
 
 /** What each tab holds, in the phone's list. */
 const LINES: Record<DevelopersTabItem["tab"], string> = {
+    "ask-ai": "Questions about your business, answered in Saroh",
     ai: "Claude, ChatGPT and other assistants",
     keys: "For your own website and software",
     webhooks: "Tell your systems when something happens",
@@ -41,7 +42,13 @@ export function DevelopersNav({
 }) {
     const pathname = usePathname();
     const at = developersTabOf(pathname);
-    const current = at === "index" ? "ai" : at;
+    // The desk's default is AI assistants, or the first tab when it is off.
+    const current =
+        at !== "index"
+            ? at
+            : tabs.some((t) => t.tab === "ai")
+              ? "ai"
+              : (tabs[0]?.tab ?? "ai");
     const open = tabs.find((t) => t.tab === current);
     return (
         <>

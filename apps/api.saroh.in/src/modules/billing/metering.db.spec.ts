@@ -31,7 +31,7 @@ import { FlagKey } from "../feature-flags/flags";
 import { ImpactService } from "../pricing/impact.service";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
-import { countUsage, firstDayOf, monthWindow } from "./metering";
+import { countUsage, firstDayOf, meterWindow, monthWindow } from "./metering";
 import { countUsageAcross } from "./metering-across";
 import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
 import {
@@ -235,6 +235,32 @@ async function views(
             type: "site.view",
             count,
             ...over,
+        },
+    });
+}
+
+/** A finished Ask AI turn (AiUsage_finished_check: finished, so it may count). */
+async function aiTurn(
+    organizationId: string,
+    startedAt: Date,
+    counted: boolean,
+) {
+    const window = await meterWindow(prisma, organizationId, startedAt);
+    return prisma.aiUsage.create({
+        data: {
+            organizationId,
+            userId: "user",
+            turnId: uniq("turn"),
+            agent: "ask-ai",
+            agentVersion: "v",
+            model: "claude-haiku-5-5",
+            effort: "low",
+            windowStart: window.start,
+            windowKey: window.key,
+            startedAt,
+            finishedAt: startedAt,
+            outcome: counted ? "ANSWERED" : "FAILED",
+            counted,
         },
     });
 }
@@ -693,6 +719,12 @@ describe("what each limit counts (DB, U13)", () => {
                 ),
                 4,
             );
+            // Ask AI counts from the business's own window: one counted in it,
+            // one not counted, one counted before it.
+            const ai = await meterWindow(prisma, b.orgId, new Date());
+            await aiTurn(b.orgId, new Date(ai.start.getTime() + MINUTE), true);
+            await aiTurn(b.orgId, new Date(ai.start.getTime() + MINUTE), false);
+            await aiTurn(b.orgId, new Date(ai.start.getTime() - MINUTE), true);
         }
         const ids = [india.orgId, newYork.orgId, quiet.orgId];
         const keys: MeteredLimitKey[] = [
@@ -706,6 +738,7 @@ describe("what each limit counts (DB, U13)", () => {
             "sites",
             "storageGb",
             "visitsPerMonth",
+            "aiQuestionsPerMonth",
         ];
         for (const key of keys) {
             const across = await countUsageAcross(prisma, key, ids);
@@ -724,6 +757,7 @@ describe("what each limit counts (DB, U13)", () => {
         );
         expect([...measured].sort()).toEqual(
             [
+                "ask-ai",
                 "blog",
                 "bookings",
                 "integrations",
@@ -741,6 +775,7 @@ describe("what each limit counts (DB, U13)", () => {
             products: 1,
             orders: 1,
             bookings: 1,
+            "ask-ai": 1,
         });
     });
 });

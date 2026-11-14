@@ -10,6 +10,7 @@ import { fallbackZone } from "../bookings/staff-availability";
 import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
+    countedQuestions,
     countSeats,
     firstDayOf,
     loginlessStaff,
@@ -355,6 +356,25 @@ export async function countUsageAcross(
                     const n = r._sum.count ?? 0;
                     if (n > 0) out.set(r.organizationId, n);
                 }
+            }
+            return out;
+        }
+        case "aiQuestionsPerMonth": {
+            const byStart = await groupByWindow(db, ids, now, (w) => w.start);
+            const out = new Map<string, number>();
+            for (const [at, orgs] of byStart) {
+                tally(
+                    await db.aiUsage.groupBy({
+                        by: ["organizationId"],
+                        where: {
+                            organizationId: { in: orgs },
+                            ...countedQuestions(new Date(at)),
+                        },
+                        _count: { _all: true },
+                    }),
+                    "organizationId",
+                    out,
+                );
             }
             return out;
         }

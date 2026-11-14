@@ -1,0 +1,45 @@
+[
+    {
+        "id": "lists-01",
+        "business": "bakery",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "List all orders from the last 3 months",
+        "expect": {
+            "numbers": ["orders:last_3_months"],
+            "period": "last_3_months",
+            "card": ["table"],
+            "maxRows": 20,
+            "note": "A big list: the exact number of orders placed in the period and its dates, a card with the first orders, and a pointer to Orders (where the full list can be seen and exported) rather than every order in the text."
+        }
+    },
+    {
+        "id": "lists-02",
+        "business": "clinic",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Show me all customers",
+        "expect": {
+            "numbers": ["customers:count"],
+            "card": ["table"],
+            "maxRows": 20,
+            "note": "The exact number of customers, a card with the first ones, and a pointer to Customers for the full list; not every customer written out."
+        }
+    },
+    {
+        "id": "lists-03",
+        "business": "clinic",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Saare unpaid bills dikhao",
+        "expect": {
+            "numbers": ["owed:count"],
+            "card": ["table"],
+            "maxRows": 20,
+            "note": "In Hinglish: how many bills are unpaid (with how many are overdue), a card with them and a link to Invoices; not more than 20 listed in the text."
+        }
+    }
+]

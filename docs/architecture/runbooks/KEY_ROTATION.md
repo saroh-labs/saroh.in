@@ -1,7 +1,8 @@
 # Key rotation: replacing one of the API's encryption keys
 
 > **Read when:** replacing `PAYMENTS_ENC_KEY`, `STAFF_PII_ENC_KEY`,
-> `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY` or `WEBHOOK_SECRET_KEY`, on a
+> `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY` or
+> `AI_TEXT_ENC_KEY`, on a
 > schedule or because one leaked. Decision: DEC-214. Code:
 > `apps/api.saroh.in/src/common/crypto.ts`, re-seal
 > `apps/api.saroh.in/src/cli/keys-reseal.ts`.
@@ -38,6 +39,7 @@ database. A database copy alone opens nothing either.
 | `MESSAGING_ENC_KEY`  | A WhatsApp send's number and words while it waits to be accepted (cleared after)                                                       | The few messages queued at that moment                                                                              |
 | `WEBHOOK_SECRET_KEY` | Businesses' outbound webhook signing secrets                                                                                           | The secrets: someone could sign fake events to a business's receiver                                                |
 | `APIKEY_ENC_KEY`     | Fingerprints of public API keys and visitor tokens (never the token)                                                                   | Nothing usable: a token is 32 random bytes and can't be guessed from its fingerprint                                |
+| `AI_TEXT_ENC_KEY`    | Ask AI's messages and conversation titles (DEC-220), each bound to its business, conversation and row                                  | People's questions and the answers, up to 90 days of them, with the customer details the answers named              |
 
 **The API key exception.** An API key's fingerprint can't be re-made, because
 the token is never stored. It moves to the newest key by itself the next time
@@ -148,6 +150,8 @@ leaked with the key, also replace what the key protected:
   were queued.
 - `APIKEY_ENC_KEY`: nothing to replace; removing the old id makes unused keys
   stop working.
+- `AI_TEXT_ENC_KEY`: nothing to replace; record the exposure of the
+  conversations kept at that moment (at most 90 days of them).
 
 Then follow `devops-secrets.md`: check access logs for the window, and write
 up the incident (`DEPLOY_ROLLBACK_INCIDENT.md`).

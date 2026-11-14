@@ -19,6 +19,8 @@ import {
 
 import type { HandPaymentMethod } from "../invoices/invoice-state";
 import { HAND_PAYMENT_METHODS } from "../invoices/invoice-state";
+import type { DatePreset } from "./date-presets";
+import { DATE_PRESETS } from "./date-presets";
 import type { CounterPayment } from "./new-order.dto";
 import {
     COUNTER_PAYMENTS,
@@ -497,12 +499,9 @@ const blankToUndefined = ({ value }: { value: unknown }) => {
 };
 const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-/**
- * The Orders list's date presets (B4), read in the business's zone:
- * today, yesterday, the last 7 days (today included) and this month.
- */
-export const DATE_PRESETS = ["today", "yesterday", "7d", "month"] as const;
-export type DatePreset = (typeof DATE_PRESETS)[number];
+// The Orders list's date presets (B4) are every list's (`date-presets.ts`).
+export { DATE_PRESETS } from "./date-presets";
+export type { DatePreset } from "./date-presets";
 
 /**
  * `GET organizations/:org/orders` (plan B, B1): every filter applies and the

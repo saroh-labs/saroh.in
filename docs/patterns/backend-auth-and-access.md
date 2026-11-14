@@ -134,6 +134,18 @@ what the API allows.
   drawn only through `organizations/:id/share/book/image` (`social:read`);
   the public share picture never draws words from its address.
   `share-posts.permissions.spec.ts`, `share-cards.controller.spec.ts`.
+- **Current** (DEC-220, plan 2026-11-13-001 U7) — **Ask AI follows `ai:use`
+  and the plan.** `ai:use` ("Use Ask AI") is its own group, Ask AI: Owner
+  and Admin by default, never a Reviewer's, grantable to a role or a person;
+  everyone holding it shares the business's question allowance. It is not
+  a tool's action, so no outside AI app reaches Ask AI with it. A turn
+  start asks, in order: the Saroh-wide halt, `ASK_AI`, the plan's `ask-ai`
+  row (fails closed: off the catalogue is locked), `ai:use`, the business's
+  switch, then on one locked transaction the allowance, the business's and
+  Saroh's day (all usage rows' cost plus a turn's maximum per RUNNING row),
+  one running turn a person and the per-person rate (`ai/access/`). Drafts'
+  Confirm, Undo and Draft again ask the first five again. Request more is
+  `billing:read`; Saroh grants it as `ask-ai` add-on packs.
 - **Current** (DEC-170, owner 19 Oct) — **Hours are their own power.**
   `hours:write` ("Set hours and time off") covers a person's weekly hours,
   extra hours and time off; adding or removing people, their services, the
@@ -746,6 +758,17 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   `organization:pii:read`. It is read-only and adds no permission. The
   public write (`POST /public/contact-messages`) is guardless, rate-limited
   per visitor and answers nothing back; rows go after 12 months.
+- **Current** (DEC-220, U8) — **Ask AI in the console** (`/admin/ask-ai/*`,
+  `ai/ops/ai-admin.controller.ts`, registered by the admin module).
+  `ai-settings:write` (Platform owners only) sets an AI setting (a reason,
+  the value checked against its key's schema), the Saroh-wide halt, a
+  business's override, and grants or declines Request more (one pack of
+  the plan's Ask AI add-on, this period only); each write is on the admin
+  ledger, settings in the same transaction. `ai-reports:read` (Platform
+  owners and Support: it is personal data) lists and opens Report this
+  answer's reports; every list and every report opened is on the ledger.
+  The summary, the settings and their history read with `platform:read`,
+  Request more's list with `organization:read`.
 - **Current** (DEC-179) — **Saroh's own billing across businesses**
   (`/admin/billing/*`: every Saroh invoice, its PDF, the month's GST CSV,
   every business's Saroh subscription, its checkouts and the provider's

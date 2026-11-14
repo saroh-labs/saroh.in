@@ -237,6 +237,7 @@ describe("which rows metering counts", () => {
             sites: "sites",
             storage: "storageGb",
             visits: "visitsPerMonth",
+            "ask-ai": "aiQuestionsPerMonth",
         });
         expect(meteredKeyOf("roles")).toBeNull();
     });

@@ -1308,6 +1308,41 @@ export async function sendManagerSignalsEmail(
     }
 }
 
+/**
+ * An Ask AI alarm to one of Saroh's platform owners (DEC-220, plan
+ * 2026-11-13-001 U8): Saroh's fixed words and numbers, plain text, never a
+ * question or an answer. Awaited, like the managers' email. Without SMTP it
+ * prints the subject only in development; elsewhere nothing leaves.
+ */
+export async function sendAiOwnerAlertEmail(
+    to: { email: string; name: string | null },
+    alert: { subject: string; lines: string[] },
+): Promise<EmailOutcome> {
+    if (!transporter) {
+        if (env.NODE_ENV === "development") {
+            console.info(`[Ask AI alert] (no SMTP) ${alert.subject}`);
+            return "sent";
+        }
+        return "not-configured";
+    }
+    const base = adminBase(env);
+    try {
+        await send("INDIA", {
+            to: to.email,
+            subject: alert.subject,
+            text: [
+                `Hi ${to.name ?? "there"},`,
+                "",
+                ...alert.lines,
+                ...(base ? ["", `${base}/ask-ai`] : []),
+            ].join("\n"),
+        });
+        return "sent";
+    } catch {
+        return "failed";
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Site sign-in codes (ADR-011; round-2 plan A, A2)
 // ---------------------------------------------------------------------------

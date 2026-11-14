@@ -422,3 +422,46 @@ export const restoreSiteDraftTool = {
         links: siteLinks,
     }),
 };
+
+/**
+ * A blog post written for the business's website (owner, 14 Nov): saved as
+ * a DRAFT post only. Nothing here publishes; the person publishes it from
+ * the editor after reading it.
+ */
+export const draftBlogPostTool = {
+    input: z
+        .object({
+            request_id: z
+                .string()
+                .max(100)
+                .describe(
+                    "New and unique per post (a UUID); reuse it on a retry.",
+                ),
+            site_id: siteId
+                .optional()
+                .describe("Leave out when the business has one website."),
+            title: z.string().trim().min(1).max(120),
+            body: z
+                .string()
+                .trim()
+                .min(1)
+                .max(20_000)
+                .describe(
+                    "The post in simple Markdown: paragraphs, ## headings, - or 1. lists, **bold**, *italic*.",
+                ),
+            excerpt: z
+                .string()
+                .trim()
+                .max(300)
+                .optional()
+                .describe("One or two sentences shown in the blog's list."),
+        })
+        .strict(),
+    output: z.object({
+        post_id: z.string(),
+        site_id: z.string(),
+        title: z.string(),
+        status: z.literal("draft"),
+        editor_url: z.string(),
+    }),
+};

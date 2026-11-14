@@ -785,6 +785,11 @@ jobs:
       # this stack. The same throwaway key the API specs use; it opens
       # nothing — the seeded connections are fakes.
       PAYMENTS_ENC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
+      # Ask AI on a script (the Ask AI spec): questions stream scripted words
+      # and drafts, nothing calls Anthropic. Test only, as above. Its text
+      # key is a throwaway too: it seals only this stack's test conversations.
+      AI_PROVIDER_FAKE: "1"
+      AI_TEXT_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
 
     steps:
       - uses: actions/checkout@v4

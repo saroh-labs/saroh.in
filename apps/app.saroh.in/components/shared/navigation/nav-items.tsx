@@ -24,6 +24,7 @@ import {
     Users,
 } from "lucide-react";
 
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { mayAddWebsite } from "@/lib/business-limits";
 import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
@@ -1346,7 +1347,14 @@ export function mayOpenSettingsPage(
         return false;
     }
     if (page.notForReviewer && actor.role === "REVIEWER") return false;
-    if (page.href === API_AREA_HREF && !apiAreaOn()) return false;
+    // Ask AI's tab opens the area too, for whoever may switch it (U11).
+    if (
+        page.href === API_AREA_HREF &&
+        !apiAreaOn() &&
+        !(askAiOn() && actor.actions?.includes("module:manage"))
+    ) {
+        return false;
+    }
     return true;
 }
 

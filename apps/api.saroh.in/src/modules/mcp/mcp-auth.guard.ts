@@ -57,6 +57,24 @@ export type McpConnection =
           businesses: [string];
           /** The key's scope ∩ its creator's live role, never for AI. */
           context: OrganizationContext;
+      }
+    | {
+          /**
+           * Saroh's own agent (Ask AI, plan 2026-11-13-001 U4), run
+           * in-process by `ai/tools/tool-bridge.ts` only: this guard never
+           * builds one and {@link McpAuthGuard.contextIn} refuses one. It
+           * covers exactly the business the person has open; its actions
+           * are their live role's, minus {@link NEVER_FOR_AI}, read again
+           * on every call. `API_MCP` doesn't apply (`ASK_AI` does).
+           */
+          kind: "app";
+          /** `<agent>:<userId>`: what activity rows and request ids key on. */
+          id: string;
+          /** The agent's key ("ask-ai"). */
+          agent: string;
+          clientName: string;
+          userId: string;
+          businesses: [string];
       };
 
 export interface McpRequest extends Request {
@@ -88,6 +106,8 @@ export interface McpRequest extends Request {
 export class McpAuthGuard implements CanActivate {
     private readonly logger = new Logger(McpAuthGuard.name);
     private readonly touched = new Map<string, number>();
+    /** The latest `lastUsedAt` write, so a spec can await it; nothing in the request path does. */
+    touching: Promise<unknown> = Promise.resolve();
 
     constructor(
         private readonly organizations: OrganizationContextService,
@@ -158,6 +178,8 @@ export class McpAuthGuard implements CanActivate {
         organizationId: string,
         host: string | undefined,
     ): Promise<OrganizationContext | null> {
+        // Never over HTTP: an agent's calls are built in-process.
+        if (connection.kind === "app") return null;
         if (!(connection.businesses as string[]).includes(organizationId)) {
             return null;
         }
@@ -315,7 +337,7 @@ export class McpAuthGuard implements CanActivate {
         if (last !== undefined && t - last < TOUCH_EVERY_MS) return;
         if (this.touched.size >= 10_000) this.touched.clear();
         this.touched.set(consentId, t);
-        void prisma.oauthConsent
+        this.touching = prisma.oauthConsent
             .update({ where: { id: consentId }, data: { lastUsedAt: now } })
             .catch((error: unknown) => {
                 this.logger.warn(

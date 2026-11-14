@@ -202,7 +202,12 @@ export type OrgAction =
     // `social:read`. Today they cover Create post's own posts; Saroh Social
     // (channels, scheduling) asks the same two when it exists.
     | "social:read"
-    | "social:post";
+    | "social:post"
+    // Ask AI (DEC-220, plan 2026-11-13-001 U7): ask questions and get
+    // drafts to confirm. Owner and Admin by default, grantable to a role or
+    // a person; the business's question allowance is shared by everyone who
+    // holds it. Not a tool's action, so no AI app can reach Ask AI with it.
+    | "ai:use";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -305,4 +310,6 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     // Posts (#1378).
     "social:read",
     "social:post",
+    // Ask AI (DEC-220).
+    "ai:use",
 ];

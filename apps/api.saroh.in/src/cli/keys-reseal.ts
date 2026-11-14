@@ -3,6 +3,7 @@ import { Prisma, prisma } from "@saroh/database";
 import type { EncryptedSecret, EncryptionKey } from "../common/crypto";
 import { newestKeyId, resealWithKey, storedKeyId } from "../common/crypto";
 import { staffPiiKey } from "../modules/admin/staff-profile";
+import { aiTextKey } from "../modules/ai/history/sealing";
 import { apiKeyEncKey, isUsable } from "../modules/api-keys/api-keys.service";
 import { MESSAGE_SEND_TYPE } from "../modules/communications/message-send.handler";
 import { messagingKey } from "../modules/messaging/messaging-records";
@@ -181,6 +182,88 @@ export const RESEAL_TARGETS: AnyTarget[] = [
                         taxIdIv: must(next).iv,
                         taxIdAuthTag: must(next).authTag,
                         updatedAt: r.updatedAt,
+                    },
+                })
+            ).count === 1,
+    }),
+    target({
+        // The envelope is moved whole, so its binding to the row stays.
+        label: "Ask AI messages",
+        key: aiTextKey,
+        page: (cursor) =>
+            prisma.aiMessage.findMany({
+                ...page,
+                where: after(cursor),
+                select: {
+                    id: true,
+                    bodyCiphertext: true,
+                    bodyIv: true,
+                    bodyAuthTag: true,
+                },
+            }),
+        values: (r) => [sealed(r.bodyCiphertext, r.bodyIv, r.bodyAuthTag)],
+        write: async (r, [next]) =>
+            (
+                await prisma.aiMessage.updateMany({
+                    where: { id: r.id, bodyCiphertext: r.bodyCiphertext },
+                    data: {
+                        bodyCiphertext: must(next).ciphertext,
+                        bodyIv: must(next).iv,
+                        bodyAuthTag: must(next).authTag,
+                    },
+                })
+            ).count === 1,
+    }),
+    target({
+        label: "Ask AI conversation titles",
+        key: aiTextKey,
+        page: (cursor) =>
+            prisma.aiConversation.findMany({
+                ...page,
+                where: { ...after(cursor), titleCiphertext: { not: null } },
+                select: {
+                    id: true,
+                    titleCiphertext: true,
+                    titleIv: true,
+                    titleAuthTag: true,
+                },
+            }),
+        values: (r) => [sealed(r.titleCiphertext, r.titleIv, r.titleAuthTag)],
+        write: async (r, [next]) =>
+            (
+                await prisma.aiConversation.updateMany({
+                    where: { id: r.id, titleCiphertext: r.titleCiphertext },
+                    data: {
+                        titleCiphertext: must(next).ciphertext,
+                        titleIv: must(next).iv,
+                        titleAuthTag: must(next).authTag,
+                    },
+                })
+            ).count === 1,
+    }),
+    target({
+        label: "Ask AI drafts",
+        key: aiTextKey,
+        page: (cursor) =>
+            prisma.askAiDraft.findMany({
+                ...page,
+                where: after(cursor),
+                select: {
+                    id: true,
+                    bodyCiphertext: true,
+                    bodyIv: true,
+                    bodyAuthTag: true,
+                },
+            }),
+        values: (r) => [sealed(r.bodyCiphertext, r.bodyIv, r.bodyAuthTag)],
+        write: async (r, [next]) =>
+            (
+                await prisma.askAiDraft.updateMany({
+                    where: { id: r.id, bodyCiphertext: r.bodyCiphertext },
+                    data: {
+                        bodyCiphertext: must(next).ciphertext,
+                        bodyIv: must(next).iv,
+                        bodyAuthTag: must(next).authTag,
                     },
                 })
             ).count === 1,

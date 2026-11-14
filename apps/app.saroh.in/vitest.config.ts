@@ -29,6 +29,7 @@ export default defineConfig({
             NEXT_PUBLIC_PLANS: "on",
             NEXT_PUBLIC_API_AREA: "on",
             NEXT_PUBLIC_SHARE_POSTS: "on",
+            NEXT_PUBLIC_ASK_AI: "on",
         },
         // A component test that opens a few sheets passes 5s on a busy CI
         // runner and leaves its dialog open for the tests after it (23 Oct:

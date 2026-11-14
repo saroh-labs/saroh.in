@@ -35,6 +35,7 @@ export const CAPABILITY_GROUPS = [
     "messaging",
     "insights",
     "social",
+    "ai",
 ] as const;
 
 export type CapabilityGroup = (typeof CAPABILITY_GROUPS)[number];
@@ -451,6 +452,14 @@ export const CAPABILITIES: readonly Capability[] = [
         group: "social",
         label: "Make and share posts",
         note: "Posts about the business, with its pictures and words. Whoever can make posts can also see them.",
+    },
+
+    // — Ask AI ————————————————————————————————————————————————
+    {
+        action: "ai:use",
+        group: "ai",
+        label: "Use Ask AI",
+        note: "Questions come out of the business's shared allowance for the month. Answers only show what this person can already see, and a change it drafts is saved only when they confirm it.",
     },
 ];
 

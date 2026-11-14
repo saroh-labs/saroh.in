@@ -24,9 +24,12 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import { CatalogueV1Controller } from "../../public-api/catalogue.v1.controller";
 import {
     productsPage,
+    productsTotal,
     serviceById,
     servicesPage,
 } from "../../public-api/v1-reads";
+import { shelfNeed } from "../../stock/stock-words";
+import { COUNTING_ROWS } from "../../stock/tracking";
 import { businessCurrency } from "../../stores/currency";
 import type { McpCall, McpTool, ToolHints } from "../tool-registry";
 import {
@@ -35,7 +38,7 @@ import {
     READ_ONLY,
     ToolError,
 } from "../tool-registry";
-import { money, PAGE, toMinor, v1Body, viaV1 } from "./v1-bridge";
+import { money, PAGE, toMinor, totalLine, v1Body, viaV1 } from "./v1-bridge";
 
 /** A create: a retry with the same request_id makes nothing new. */
 export const CREATE: ToolHints = {
@@ -95,6 +98,65 @@ const toClock = (minute: number) =>
 const toMinute = (clock: string) =>
     Number(clock.slice(0, 2)) * 60 + Number(clock.slice(3, 5));
 
+type Shelf = Awaited<ReturnType<typeof shelvesOf>>[number];
+
+/**
+ * Units on hand across every store, and every variant when the product
+ * counts them: a per-variant product's own shelf holds nothing (it said
+ * "Stock: 0" above a list of sizes in stock, 14 Nov).
+ */
+export function stockOnHand(
+    shelves: readonly Pick<Shelf, "variant_id" | "on_hand">[],
+    counted: number | null,
+): number | null {
+    if (!shelves.some((r) => r.variant_id)) return counted;
+    return shelves
+        .filter((r) => r.variant_id)
+        .reduce((n, r) => n + r.on_hand, 0);
+}
+
+/**
+ * A product's shelves: on hand per store, and per variant when it counts
+ * them, with the Stock screen's need (`shelfNeed`). A per-variant product's
+ * own shelf sells nothing and is named only when it is short. None when
+ * stock isn't counted.
+ */
+export async function shelvesOf(organizationId: string, productId: string) {
+    const rows = await prisma.stockLevel.findMany({
+        where: { organizationId, productId, ...COUNTING_ROWS },
+        orderBy: [{ variant: { position: "asc" } }, { store: { name: "asc" } }],
+        select: {
+            onHand: true,
+            promised: true,
+            lowStockAlert: true,
+            variant: { select: { id: true, title: true } },
+            store: { select: { id: true, name: true } },
+        },
+    });
+    const perVariant = rows.some((r) => r.variant);
+    return rows.flatMap((r) => {
+        const sells = !perVariant || r.variant !== null;
+        const need = shelfNeed(r, sells);
+        if (!sells && !need) return [];
+        return [
+            {
+                variant_id: r.variant?.id ?? null,
+                variant: r.variant?.title ?? null,
+                location_id: r.store.id,
+                location: r.store.name,
+                on_hand: r.onHand,
+                alert_at: r.lowStockAlert,
+                need,
+            },
+        ];
+    });
+}
+
+const NEED_WORDS = { short: "short for orders", out: "out", low: "low" };
+
+const shelfLine = (r: Shelf) =>
+    `${r.variant ? `${JSON.stringify(r.variant)} at ` : ""}${JSON.stringify(r.location)} (location_id ${r.location_id}): ${r.on_hand}${r.need ? `, ${NEED_WORDS[r.need]}` : ""}${r.need === "low" ? ` (alert at ${r.alert_at})` : ""}`;
+
 /** The catalogue tools; `catalogue` is U8's `/v1` handler. */
 export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
     async function productDetail(ctx: OrganizationContext, p: ProductView) {
@@ -138,19 +200,29 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
             module: "COMMERCE",
             hints: READ_ONLY,
             async run(input, { ctx }: McpCall) {
-                const page = await productsPage(ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
-                    query: input.query,
-                });
+                const filters = { query: input.query };
+                const [page, total] = await Promise.all([
+                    productsPage(ctx.organizationId, {
+                        ...filters,
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                    }),
+                    productsTotal(ctx.organizationId, filters),
+                ]);
                 return {
                     text: [
-                        `${page.data.length} products.`,
+                        totalLine(
+                            total,
+                            page.data.length,
+                            "products",
+                            !!input.cursor,
+                        ),
                         ...page.data.map((p) => `- ${productLine(p)}`),
                         more(page.nextCursor),
                     ].join("\n"),
                     data: {
                         products: page.data.map(productItem),
+                        total,
                         next_cursor: page.nextCursor,
                     },
                 };
@@ -160,17 +232,30 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
             name: "get_product",
             title: "Get a product",
             description:
-                'Use this when the person asks about one product: its price, description, variants and units in stock. Example: "how many sourdough loaves are left?" Find the product_id with list_products first.',
+                'Use this when the person asks about one product: its price, description, variants and units in stock, per store and per size or colour, low or out. Example: "how many sourdough loaves are left?", "is the M kurta in stock at Satellite?" Find the product_id with list_products first.',
             contract: getProductTool,
             capability: "store:read",
             module: "COMMERCE",
             hints: READ_ONLY,
             async run({ product_id }, { ctx }: McpCall) {
                 const view = await catalogue.getProduct(ctx, product_id);
-                const product = await productDetail(ctx, view);
+                const [product, shelves] = await Promise.all([
+                    productDetail(ctx, view),
+                    shelvesOf(ctx.organizationId, view.id),
+                ]);
+                const stock = stockOnHand(shelves, product.stock);
+                const byVariant = shelves.some((r) => r.variant_id);
                 return {
-                    text: `${productLine(view)}. Stock: ${product.stock ?? "not counted"}.`,
-                    data: { product },
+                    text: [
+                        `${productLine(view)}. Stock: ${stock ?? "not counted"}${byVariant ? " in all, by size or colour below" : ""}.`,
+                        ...(shelves.length
+                            ? [
+                                  `On hand by store${view.variants.length ? " and variant" : ""}:`,
+                                  ...shelves.map((r) => `- ${shelfLine(r)}`),
+                              ]
+                            : []),
+                    ].join("\n"),
+                    data: { product: { ...product, stock, shelves } },
                 };
             },
         }),

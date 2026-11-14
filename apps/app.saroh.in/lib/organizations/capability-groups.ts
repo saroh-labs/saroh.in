@@ -15,4 +15,5 @@ export const CAPABILITY_GROUP_LABEL: Readonly<Record<string, string>> = {
     messaging: "Messaging",
     insights: "Insights",
     social: "Social",
+    ai: "Ask AI",
 };

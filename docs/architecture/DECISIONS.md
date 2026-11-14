@@ -159,7 +159,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-015 AI provider abstraction
 
-**Status: Deferred — revisit after Stages 0–7 are operating**
+**Status: Superseded by DEC-220 (2026-11-13)** · was Deferred — revisit after Stages 0–7 are operating
 
 - Context: AI is roadmap-only.
 - Options considered for later: direct SDK per feature; generic text endpoint; job-based AI domain with provider adapters.
@@ -2958,3 +2958,19 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - A yearly plan's monthly limits still reset every month, on its anniversary day (the day its period starts), not once a year. A period that starts on a day a short month hasn't got (the 31st) resets on that month's last day.
 - A limit notice is told once per window, so a new period (or a move between Free and a paid plan) can tell it again; its "resets on" date is the window's end, in the business's zone.
 - One rule for every limit, in one place: `meterWindow` in `apps/api.saroh.in/src/modules/billing/metering.ts`. Enforcement, usage on Plan and billing, limit notices and the admin's impact counts all read it.
+
+## DEC-220 Saroh's AI layer and Ask AI (replaces DEC-015)
+
+**Status: Accepted — 2026-11-13** · owner
+
+- Context: DEC-015 deferred all AI work until the core platform was operating. It is, and businesses ask for answers about their own data in their own words, in English, Hinglish and Hindi.
+- Decision: build one **AI layer** in the API (`modules/ai/`) that every agent uses, and **Ask AI** as its first agent, in the Saroh app only, on paying plans.
+    - The agent loop runs on the Vercel AI SDK core, pinned and kept inside the module behind Saroh's own stream events. Claude comes from Anthropic directly; Saroh chooses each agent's model as an admin setting; merchants never choose a model or bring keys.
+    - Answers come only from Saroh's own MCP v1 tool functions, called in-process with the asker's permissions, plus summary tools that share Home and Insights figures. No AI-written SQL, no screen APIs.
+    - The AI never saves. A write is a draft validated by the forms' own rules; the person's Confirm runs the normal action, audited "via Ask AI". No deletes, cancels or refunds.
+    - Access follows the permission matrix ("Use Ask AI") and the plan; answers cover only what the person may see; customer-written text is never an instruction.
+    - Conversations are kept for 90 days, visible only to the person who had them, encrypted at rest; logs hold no text. Data is processed by Anthropic outside India, disclosed in the privacy policy and the sub-processor list.
+    - Usage is counted per question per billing period (DEC-219), with per-person records; cost guards per question, per business per day, and Saroh-wide with an automatic off switch.
+    - A quality test of real questions with fixed pass marks must pass before the merchant screens are built, and again before any model or instruction change reaches businesses.
+- Consequences: one module, one event stream and one tool registry serve every later agent; switching a provider later touches only the module. Prices, allowances and cost limits live in the plan catalogue and admin settings, not in the code.
+- Supersedes: DEC-015.

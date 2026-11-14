@@ -218,4 +218,31 @@ describe("OriginGuard (B3 CSRF origin check)", () => {
             ),
         ).toBe(true);
     });
+
+    it("guards Ask AI's Confirm, Undo and Draft again like every other write", () => {
+        for (const action of ["confirm", "undo", "redraft"]) {
+            const path = `/organizations/o1/ask-ai/drafts/d1/${action}`;
+            expect(() =>
+                guard.canActivate(ctx({ method: "POST", path })),
+            ).toThrow(ForbiddenException);
+            expect(() =>
+                guard.canActivate(
+                    ctx({
+                        method: "POST",
+                        path,
+                        headers: { origin: "https://evil.com" },
+                    }),
+                ),
+            ).toThrow(ForbiddenException);
+            expect(
+                guard.canActivate(
+                    ctx({
+                        method: "POST",
+                        path,
+                        headers: { origin: "https://app.saroh.in" },
+                    }),
+                ),
+            ).toBe(true);
+        }
+    });
 });

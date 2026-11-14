@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { HttpException, Injectable, Logger, Optional } from "@nestjs/common";
 import type { Job } from "@saroh/database";
-import { prisma, runInOrgContext } from "@saroh/database";
+import { prisma, rolledBack, runInOrgContext } from "@saroh/database";
 import { z } from "zod";
 
 import { nulPath } from "../../common/pipes/zod-contract.pipe";
@@ -372,6 +372,46 @@ export class McpToolRegistry {
         return server;
     }
 
+    /**
+     * A call made in-process (Ask AI's bridge), not by the MCP server: the
+     * SDK checks a remote call's input against the contract, so here the
+     * registry does, and refuses before the tool runs. `business` is
+     * dropped: the call's business is the one `target` names.
+     */
+    async callInProcess(tool: McpTool, input: unknown, target: McpCall) {
+        const parsed = parseInProcess(tool, input);
+        if (parsed instanceof ToolError) return toolError(parsed, tool.name);
+        return this.call(tool, parsed, target, null);
+    }
+
+    /**
+     * A write tool run as it would run, through the same checks and
+     * services, then rolled back (Ask AI's drafts, plan 2026-11-13-001
+     * U5): nothing is saved, no activity is recorded, and the business's
+     * lifecycle isn't asked (a draft writes nothing). `inspect` reads what
+     * the write would leave, inside the same transaction. A refusal is
+     * returned as the error the tool threw, for the caller to word.
+     */
+    async dryRun<T>(
+        tool: McpTool,
+        input: Record<string, unknown>,
+        target: McpCall,
+        inspect: (result: ToolResult<Record<string, unknown>>) => Promise<T>,
+    ): Promise<{ ok: true; value: T } | { ok: false; error: unknown }> {
+        try {
+            const own = await this.checked(tool, input, target, null);
+            const orgId = target.ctx.organizationId;
+            const value = await runInOrgContext(orgId, () =>
+                rolledBack(prisma, async () =>
+                    inspect(await tool.run(own, target)),
+                ),
+            );
+            return { ok: true, value };
+        } catch (error) {
+            return { ok: false, error };
+        }
+    }
+
     /** One tool call with every guardrail; never throws. */
     async call(
         tool: McpTool,
@@ -380,38 +420,8 @@ export class McpToolRegistry {
         limited: McpLimit | null,
     ) {
         try {
-            if (target instanceof ToolError) throw target;
-            const call = target;
-            // The tool's own input: `business` was the registry's to read.
-            const { business: _business, ...own } = input;
-            const nul = nulPath(own);
-            if (nul) {
-                throw new ToolError(
-                    `${nul.join(".") || "The input"} contains a NUL character, which Saroh doesn't take.`,
-                    "Remove it and call again.",
-                );
-            }
-            if (limited) {
-                throw new ToolError(
-                    "Too many requests from this connection right now.",
-                    `Wait ${limited.retryAfterSeconds} seconds, then try again.`,
-                );
-            }
-            if (!this.allows(tool, call.ctx)) {
-                throw new ToolError(
-                    `This connection may not use ${tool.name}: the person's role, or what they allowed this app when connecting it, doesn't include it.`,
-                    "Tell the person; they can do it in the Saroh app, or reconnect the app and allow it.",
-                );
-            }
-            if (
-                tool.module &&
-                (await this.modulesOff(call.ctx, tool.module)).has(tool.module)
-            ) {
-                throw new ToolError(
-                    `${tool.name} works with a part of Saroh that is off for this business.`,
-                    "Tell the person; an owner or admin can turn it on in the Saroh app's settings.",
-                );
-            }
+            const own = await this.checked(tool, input, target, limited);
+            const call = target as McpCall;
             const write = !tool.hints.readOnlyHint;
             const orgId = call.ctx.organizationId;
             const result = await runInOrgContext(orgId, async () => {
@@ -445,6 +455,78 @@ export class McpToolRegistry {
             return toolError(error, tool.name, this.logger);
         }
     }
+
+    /** The checks before any tool runs; the tool's own input, or a throw. */
+    private async checked(
+        tool: McpTool,
+        input: Record<string, unknown>,
+        target: McpCall | ToolError,
+        limited: McpLimit | null,
+    ): Promise<Record<string, unknown>> {
+        if (target instanceof ToolError) throw target;
+        const call = target;
+        // The tool's own input: `business` was the registry's to read.
+        const { business: _business, ...own } = input;
+        const nul = nulPath(own);
+        if (nul) {
+            throw new ToolError(
+                `${nul.join(".") || "The input"} contains a NUL character, which Saroh doesn't take.`,
+                "Remove it and call again.",
+            );
+        }
+        if (limited) {
+            throw new ToolError(
+                "Too many requests from this connection right now.",
+                `Wait ${limited.retryAfterSeconds} seconds, then try again.`,
+            );
+        }
+        if (!this.allows(tool, call.ctx)) {
+            // Saroh's own agent runs as the person, nothing to reconnect: their role is the only reason.
+            if (call.connection.kind === "app") {
+                throw new ToolError(
+                    `Not shown: this person's role doesn't include ${tool.name}.`,
+                    "Tell them plainly in one line that their role doesn't show this, give no other figures they didn't ask for, and end with one or two things their role lets them ask about (the business facts list them).",
+                );
+            }
+            throw new ToolError(
+                `This connection may not use ${tool.name}: the person's role, or what they allowed this app when connecting it, doesn't include it.`,
+                "Tell the person; they can do it in the Saroh app, or reconnect the app and allow it.",
+            );
+        }
+        if (
+            tool.module &&
+            (await this.modulesOff(call.ctx, tool.module)).has(tool.module)
+        ) {
+            throw new ToolError(
+                `${tool.name} works with a part of Saroh that is off for this business.`,
+                "Tell the person; an owner or admin can turn it on in the Saroh app's settings.",
+            );
+        }
+        return own;
+    }
+}
+
+/**
+ * An in-process call's input checked against the tool's contract, with
+ * `business` dropped; or the refusal saying what doesn't fit.
+ */
+export function parseInProcess(
+    tool: McpTool,
+    input: unknown,
+): Record<string, unknown> | ToolError {
+    const own =
+        input && typeof input === "object" && !Array.isArray(input)
+            ? { ...(input as Record<string, unknown>) }
+            : null;
+    delete own?.business;
+    const parsed = tool.contract.input.safeParse(own);
+    if (parsed.success) return parsed.data;
+    return new ToolError(
+        `That input doesn't fit ${tool.name}: ${parsed.error.issues
+            .map((i) => `${i.path.join(".") || "input"}: ${i.message}`)
+            .join("; ")}.`,
+        "Fix the input and call the tool again.",
+    );
 }
 
 /** The live context of every business the connection reaches, in its order. */

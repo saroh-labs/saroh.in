@@ -317,6 +317,16 @@ model Organization {
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
   sharePosts           SharePost[]
+  // Ask AI (DEC-220): conversations, their usage, and the business's settings.
+  aiConversations      AiConversation[]
+  aiMessages           AiMessage[]
+  aiUsages             AiUsage[]
+  aiSettingOverrides   AiSettingOverride[]
+  aiBusinessSetting    AiBusinessSetting?
+  aiPersonSettings     AiPersonSetting[]
+  askAiDrafts          AskAiDraft[]
+  aiRequests           AiRequest[]
+  aiReports            AiReport[]
   siteLinks            SiteLink[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
@@ -9861,4 +9871,368 @@ model McpPublishCode {
 
   @@index([organizationId, expiresAt])
   @@index([siteId])
+}
+
+// ---------------------------------------------------------------------------
+// Ask AI (DEC-220, plan 2026-11-13-001 U3). Every text a person or the model
+// wrote is sealed with AI_TEXT_ENC_KEY (`modules/ai/history/sealing.ts`),
+// bound to its business, conversation and row; no column holds it plain.
+// ---------------------------------------------------------------------------
+
+enum AiMessageRole {
+  USER
+  ASSISTANT
+  TOOL
+}
+
+/// How a turn ended. RUNNING until it does; the turn runner (U13) maps each
+/// to counted or not.
+enum AiTurnOutcome {
+  RUNNING
+  ANSWERED
+  DRAFT
+  STOPPED_BEFORE
+  STOPPED_AFTER
+  FAILED
+  CUT_OFF
+  DAILY_LIMIT
+  NO_ACCESS
+}
+
+/// The language a person wants answers in. MATCH answers in the question's own.
+enum AiLanguage {
+  MATCH
+  ENGLISH
+  HINGLISH
+  HINDI
+}
+
+// One person's conversation with an agent, readable only by that person.
+// Deleted 90 days after its last message (`ai.retention`).
+model AiConversation {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Its owner: the only person who may read it.
+  userId         String
+
+  // The agent's key ("ask-ai") and the fingerprint of its instructions and
+  // tools when the conversation started.
+  agent        String
+  agentVersion String
+  // Model and effort read from the AI settings at the start, kept for its life.
+  model        String
+  effort       String
+  language     AiLanguage?
+
+  // The title, sealed (it is made from the first question).
+  titleCiphertext String?
+  titleIv         String?
+  titleAuthTag    String?
+
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  messages AiMessage[]
+  usages   AiUsage[]
+  drafts   AskAiDraft[]
+
+  @@index([organizationId, userId, lastMessageAt])
+  @@index([lastMessageAt])
+}
+
+// One message in a conversation. Its body (text and any card) is sealed.
+model AiMessage {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  role AiMessageRole
+
+  // `{ text, card? }` sealed: a card shows customers' names and words, so
+  // it is never kept apart in the clear.
+  bodyCiphertext String
+  bodyIv         String
+  bodyAuthTag    String
+
+  // Set on the assistant's message that ends a turn.
+  outcome AiTurnOutcome?
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId, createdAt])
+  @@index([organizationId])
+}
+
+// One turn's usage: written at the start (RUNNING) and finished at the end.
+// Numbers only, never text. Outlives its conversation (the link goes null).
+model AiUsage {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  conversationId String?
+  conversation   AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  turnId         String          @unique
+
+  agent        String
+  agentVersion String
+  model        String
+  effort       String
+
+  // The billing period it counts in (DEC-219 `meterWindow`): its start and
+  // its key ("2026-11" or the start's date).
+  windowStart DateTime
+  windowKey   String
+
+  // Raw token counts as the provider reported them, summed over the rounds.
+  inputTokens        Int     @default(0)
+  cacheReadTokens    Int     @default(0)
+  cacheWrite5mTokens Int     @default(0)
+  cacheWrite1hTokens Int     @default(0)
+  outputTokens       Int     @default(0)
+  thinkingTokens     Int     @default(0)
+  // What the turn cost Saroh, in millionths of a US dollar (the provider's
+  // currency), worked out from the price table in the AI settings.
+  costMicroUsd       Int     @default(0)
+  // A round's prompt went past 100K tokens (priced higher by some models).
+  over100k           Boolean @default(false)
+
+  outcome       AiTurnOutcome @default(RUNNING)
+  counted       Boolean       @default(false)
+  stopped       Boolean       @default(false)
+  // A provider failure reason (`AiFailureReason`), never the provider's words.
+  failureReason String?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([organizationId, windowStart])
+  @@index([organizationId, userId, windowStart])
+  @@index([organizationId, startedAt])
+  @@index([conversationId])
+}
+
+// Saroh-wide AI settings (model, effort, caps, prices, the halt), written
+// once each: a change is a new row, and the newest in effect wins. Values
+// are checked against the key's schema in `ai-settings.service.ts`; no
+// value is ever in the repo.
+model AiSetting {
+  id String @id @default(cuid())
+
+  key           String
+  value         Json
+  reason        String
+  setByUserId   String
+  effectiveFrom DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  @@index([key, effectiveFrom])
+}
+
+// One business's override of an AI setting, for trying a change there
+// first. Written once; the newest in effect decides, and one already
+// expired, or with no value (an early end), means "no override".
+model AiSettingOverride {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  key           String
+  value         Json?
+  reason        String
+  setByUserId   String
+  effectiveFrom DateTime  @default(now())
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([organizationId, key, effectiveFrom])
+}
+
+// The business's own Ask AI switch. No row: on.
+model AiBusinessSetting {
+  id String @id @default(cuid())
+
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  askAiOn         Boolean  @default(true)
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/// Where a Request more is: waiting for Saroh, granted (an `ask-ai` add-on
+/// added), or declined.
+enum AiRequestStatus {
+  OPEN
+  GRANTED
+  DECLINED
+}
+
+// Request more (DEC-220, plan 2026-11-13-001 U7): an Owner or Admin at the
+// question allowance asks Saroh for more questions this period. One open
+// request a business; Saroh's console lists them and grants one by adding
+// `ask-ai` add-on packs, which raise the allowance and bill after the period.
+model AiRequest {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Who asked.
+  userId         String
+  // The billing period it was asked in (`meterWindow`'s key).
+  windowKey      String
+  status         AiRequestStatus @default(OPEN)
+
+  // Set when Saroh decides: who, when, why, and the packs added.
+  decidedByUserId String?
+  decidedAt       DateTime?
+  reason          String?
+  packs           Int?
+  // A grant is for its period only (owner, 13 Nov): the packs come off at
+  // packsEndAt (`ai.grant.end`), and packsRemovedAt says it was done.
+  packsEndAt      DateTime?
+  packsRemovedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, status])
+  @@index([status, createdAt])
+}
+
+/// Why a person reported an answer (U8).
+enum AiReportReason {
+  WRONG_NUMBER
+  DIDNT_UNDERSTAND
+  SOMETHING_ELSE
+}
+
+enum AiReportStatus {
+  OPEN
+  RESOLVED
+}
+
+// Report this answer (DEC-220, plan 2026-11-13-001 U8): the one question and
+// answer the person chose, copied at report time and sealed with their note
+// (`{ question, answer, note }`, field "report", bound to this row). Read in
+// the console with ai-reports:read, each read on the admin ledger. Deleted
+// 90 days after it was made (`ai.retention`), whatever its conversation does.
+model AiReport {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  // Where it came from; no foreign keys, so the report outlives them.
+  conversationId String
+  messageId      String       @unique
+
+  reason AiReportReason
+
+  bodyCiphertext String
+  bodyIv         String
+  bodyAuthTag    String
+
+  status           AiReportStatus @default(OPEN)
+  resolvedByUserId String?
+  resolvedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([organizationId])
+}
+
+// Saroh's own AI alarms (U8): one row per alarm and window, written before
+// its email, so each is sent once ("spend-warn"/"spend-halt" per UTC month,
+// "failures" per UTC hour).
+model AiAlert {
+  id String @id @default(cuid())
+
+  kind      String
+  windowKey String
+  createdAt DateTime @default(now())
+
+  @@unique([kind, windowKey])
+}
+
+// One person's Ask AI settings in one business. No row: MATCH.
+model AiPersonSetting {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+
+  language  AiLanguage @default(MATCH)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([organizationId, userId])
+}
+
+/// Where an Ask AI draft is (U5). DRAFTED until the person confirms it;
+/// REFUSED when Saroh wouldn't save it (the card says why).
+enum AskAiDraftStatus {
+  DRAFTED
+  CONFIRMED
+  UNDONE
+  EXPIRED
+  REFUSED
+  // A blog post opened in the editor unsaved (owner, 14 Nov): saved there, not here.
+  HANDED_OFF
+}
+
+// A change Ask AI drafted for the person to confirm (DEC-220, plan
+// 2026-11-13-001 U5), unrelated to website drafts (DEC-043). Confirm and
+// Undo name only its id, looked up with the business and person from the
+// request. Deleted with its conversation (the 90-day sweep).
+model AskAiDraft {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  // Its owner: the only person who may confirm or undo it.
+  userId         String
+  conversationId String
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  turnId         String
+
+  // The write tool it saves through ("update_product").
+  tool    String
+  status  AskAiDraftStatus @default(DRAFTED)
+  // Why it was refused: plan-limit, duplicate, missing, changed or other.
+  refusal String?
+
+  // The record an edit touches (null for a create until it is confirmed,
+  // then what it made), and its updatedAt when drafted, then after the save.
+  targetId        String?
+  targetUpdatedAt DateTime?
+
+  // `{ input, previous, card, applied? }` sealed: the validated input, the
+  // values before, the card shown and the values after the save carry
+  // names and words customers wrote.
+  bodyCiphertext String
+  bodyIv         String
+  bodyAuthTag    String
+
+  // Draft again: the draft this one was made from.
+  redraftOfId String?
+
+  // The end of the business's day it was drafted on: no Confirm or Undo after.
+  expiresAt   DateTime
+  confirmedAt DateTime?
+  undoneAt    DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([organizationId, userId, createdAt])
+  @@index([conversationId])
 }

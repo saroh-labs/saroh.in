@@ -18,13 +18,16 @@ module.exports = {
     // gate's quick run) sat at 0% CPU until killed (DEV_LEARNINGS, 10 Oct
     // 2026). The plain file crawl is a second slower and always returns.
     watchman: false,
-    // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
-    // them natively; Jest's CommonJS runtime needs them transformed too.
+    // sanitize-html 2.17.7 uses ESM-only HTML parser packages, and the AI SDK
+    // (`ai`, `@ai-sdk/*` and two of its dependencies, DEC-220) ships ESM only,
+    // and loads zod's locale by its ESM file (zod's own `.cjs` files never
+    // match the transform, so only that is transformed). Node 24 loads them natively; Jest's CommonJS runtime needs them
+    // transformed too.
     transform: {
         "^.+\\.[tj]s$": ["ts-jest", { tsconfig: { allowJs: true } }],
     },
     transformIgnorePatterns: [
-        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)(?:@|/))",
+        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|ai|@ai-sdk[+/][^/]+|@vercel[+/]oidc|@workflow[+/]serde|zod)(?:@|/))",
     ],
     testEnvironment: "node",
     rootDir: ".",
@@ -523,6 +526,9 @@ module.exports = {
         "<rootDir>/src/modules/messaging/**/*.spec.ts",
         // Phone sign-in's options (DEC-196): mocked services, no database.
         "<rootDir>/src/modules/account-phone/**/*.spec.ts",
+        // The AI layer (DEC-220): the provider adapter with the SDK's mock
+        // model, and later specs with the fake provider. No DB.
+        "<rootDir>/src/modules/ai/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

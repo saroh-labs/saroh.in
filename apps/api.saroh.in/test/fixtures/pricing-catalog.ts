@@ -385,3 +385,33 @@ export function fakePaymentsRow(
     if (!row) throw new Error(`no ${moduleId} row`);
     return row;
 }
+
+/**
+ * {@link fakeMeteredCatalog} with Ask AI (DEC-220, plan 2026-11-13-001 U7):
+ * `ask-ai` locked on `free`, 3 questions a month on `grow` and 5 on `pro`,
+ * and its add-on `more-questions` (2 a pack), how Request more is granted.
+ * Made up, as the rest: never Saroh's allowance or price.
+ */
+export function fakeAskAiCatalog(edit?: (c: Catalog) => void): Catalog {
+    return fakeMeteredCatalog((c) => {
+        c.modules.push({
+            id: "ask-ai",
+            name: "Ask AI",
+            group: "g",
+            cells: {
+                free: { inc: false, off: "locked" },
+                grow: { inc: true, text: "3 a month", limit: 3, per: "month" },
+                pro: { inc: true, text: "5 a month", limit: 5, per: "month" },
+            },
+        } as unknown as Catalog["modules"][number]);
+        c.addons.push({
+            id: "more-questions",
+            kind: "ask-ai",
+            name: "More questions",
+            pricePaise: 100,
+            mode: "pack",
+            qty: 2,
+        } as Catalog["addons"][number]);
+        edit?.(c);
+    });
+}

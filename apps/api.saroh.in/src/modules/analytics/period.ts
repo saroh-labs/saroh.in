@@ -34,8 +34,18 @@ export function isInsightsPeriod(value: unknown): value is InsightsPeriod {
     );
 }
 
+/**
+ * Calendar months, for a question that names one ("top products this
+ * month", Ask AI): this month is its 1st to today, last month the whole
+ * month; each against the same number of days just before it. Insights'
+ * page keeps its rolling periods.
+ */
+export const CALENDAR_MONTHS = ["this_month", "last_month"] as const;
+export type CalendarMonth = (typeof CALENDAR_MONTHS)[number];
+export type SellsPeriod = InsightsPeriod | CalendarMonth;
+
 export interface PeriodWindows {
-    period: InsightsPeriod;
+    period: SellsPeriod;
     /** How many days the period, and the one before it, hold. */
     days: number;
     /** 00:00 on the period's first day, in the zone. */
@@ -59,8 +69,12 @@ export interface PeriodWindows {
     beforeSoFar: Date;
 }
 
-function firstDay(today: DateTime, period: InsightsPeriod): DateTime {
+function firstDay(today: DateTime, period: SellsPeriod): DateTime {
     switch (period) {
+        case "this_month":
+        case "last_month":
+            // For last month, `today` is already its last day.
+            return today.startOf("month");
         case "7d":
             return today.minus({ days: 6 });
         case "4w":
@@ -72,12 +86,16 @@ function firstDay(today: DateTime, period: InsightsPeriod): DateTime {
 
 /** The period around `now`, and the one before it, in `zone`'s calendar. */
 export function periodWindows(
-    period: InsightsPeriod,
+    period: SellsPeriod,
     now: Date,
     zone: string,
 ): PeriodWindows {
     const at = DateTime.fromJSDate(now, { zone });
-    const today = at.startOf("day");
+    // A whole last month ends on its last day; every other period today.
+    const today =
+        period === "last_month"
+            ? at.startOf("month").minus({ days: 1 })
+            : at.startOf("day");
     const from = firstDay(today, period);
     // Counted on the calendar, so a clock change inside the period does not
     // make it a day short.
@@ -102,7 +120,44 @@ export function periodWindows(
         beforeLastStart: from.minus({ days: 1 }).toJSDate(),
         // By the zone's calendar, so a clock change between the two still
         // compares 10:00 with 10:00.
-        beforeSoFar: at.minus({ days }).toJSDate(),
+        beforeSoFar:
+            period === "last_month"
+                ? from.toJSDate()
+                : at.minus({ days }).toJSDate(),
+    };
+}
+
+/**
+ * A span of days someone named (Ask AI's shared period, `mcp/tools/period.ts`),
+ * from `fromDate` to `toDate` inclusive, against the same number of days
+ * just before it, as {@link periodWindows} gives a named period.
+ */
+export function spanWindows(
+    period: SellsPeriod,
+    fromDate: string,
+    toDate: string,
+    now: Date,
+    zone: string,
+): PeriodWindows {
+    const from = DateTime.fromISO(fromDate, { zone }).startOf("day");
+    const end = DateTime.fromISO(toDate, { zone })
+        .startOf("day")
+        .plus({ days: 1 });
+    const days = daysBetween(fromDate, toDate) + 1;
+    const beforeFrom = from.minus({ days });
+    const at = DateTime.fromJSDate(now, { zone });
+    return {
+        period,
+        days,
+        from: from.toJSDate(),
+        to: end.toJSDate(),
+        beforeFrom: beforeFrom.toJSDate(),
+        fromDate,
+        toDate,
+        beforeFromDate: beforeFrom.toISODate() ?? "",
+        beforeToDate: from.minus({ days: 1 }).toISODate() ?? "",
+        beforeLastStart: from.minus({ days: 1 }).toJSDate(),
+        beforeSoFar: at < end ? at.minus({ days }).toJSDate() : from.toJSDate(),
     };
 }
 

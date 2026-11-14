@@ -950,6 +950,58 @@ describe("Stock API (DB)", () => {
             expect(next.nextCursor).toBeNull();
         });
 
+        it("narrows the log to the days asked, Orders' ?from=/?to=, and refuses a backwards range", async () => {
+            const id = await product("Lardy cake", 1);
+            await api.adjust(owner(), {
+                storeId: hill,
+                productId: id,
+                units: 2,
+            });
+            await api.adjust(owner(), {
+                storeId: hill,
+                productId: id,
+                units: 3,
+            });
+            const made = await prisma.stockEntry.findMany({
+                where: { productId: id },
+                orderBy: { createdAt: "asc" },
+                select: { id: true },
+            });
+            // Midday UTC: the same day in any business's zone near India.
+            const days = ["2026-03-01", "2026-03-10", "2026-03-20"];
+            for (const [i, e] of made.entries()) {
+                await prisma.stockEntry.update({
+                    where: { id: e.id },
+                    data: { createdAt: new Date(`${days[i]}T06:00:00Z`) },
+                });
+            }
+            const march = await api.log(owner(), {
+                product: id,
+                from: "2026-03-05",
+                to: "2026-03-20",
+            });
+            expect(
+                march.entries.map((e) =>
+                    e.createdAt.toISOString().slice(0, 10),
+                ),
+            ).toEqual(["2026-03-20", "2026-03-10"]);
+            expect(march.total).toBe(2);
+            await expect(
+                api.log(owner(), {
+                    product: id,
+                    from: "2026-03-20",
+                    to: "2026-03-05",
+                }),
+            ).rejects.toThrow("The range ends before it starts.");
+            await expect(
+                api.log(owner(), {
+                    product: id,
+                    date: "7d",
+                    from: "2026-03-05",
+                }),
+            ).rejects.toThrow("Pick a date range or a preset, not both.");
+        });
+
         it("reads any page of the log by its number, at the size asked", async () => {
             const id = await product("Crumpet", 1);
             // The first count is an entry too: 24 more make 25.

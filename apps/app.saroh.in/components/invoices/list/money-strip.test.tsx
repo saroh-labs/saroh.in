@@ -48,6 +48,9 @@ const ALL: ListQuery = {
     cheques: false,
     paidFrom: null,
     q: "",
+    date: null,
+    from: null,
+    to: null,
 };
 
 const s = stage();

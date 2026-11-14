@@ -2,6 +2,7 @@ import { HttpException } from "@nestjs/common";
 import type { Money } from "@saroh/api-contract";
 import type { z } from "zod";
 
+import { moneyWordsMinor } from "../../../common/words-format";
 import type { KeyedRequest } from "../../api-keys/api-key.guard";
 import type { McpCall } from "../tool-registry";
 import { ToolError } from "../tool-registry";
@@ -53,9 +54,8 @@ export function v1Body<S extends z.ZodType>(
 /** A price set in the main unit (180.5) as minor units (18050). */
 export const toMinor = (price: number) => Math.round(price * 100);
 
-/** Money as a person reads it: "INR 180.00". */
-export const money = (m: Money) =>
-    `${m.currency} ${(m.amountMinor / 100).toFixed(2)}`;
+/** Money as a person reads it, with its sign and grouping: "₹1,20,000", "₹180.50". */
+export const money = (m: Money) => moneyWordsMinor(m.amountMinor, m.currency);
 
 /** An instant in a time zone, as a person reads it: "Thu 14 Nov, 15:30". */
 export function when(at: string | Date, timezone: string): string {
@@ -100,4 +100,20 @@ export function instantOf(value: string, field: string): Date {
         );
     }
     return at;
+}
+
+/**
+ * A list's first line: the exact total of matches (counted with the same
+ * filters) and how many this page shows, so a big list is answered with
+ * its count and the card's link rather than paged through.
+ */
+export function totalLine(
+    total: number,
+    shown: number,
+    noun: string,
+    later = false,
+): string {
+    if (total === 0) return `No ${noun}.`;
+    if (shown >= total && !later) return `${total} ${noun} in all.`;
+    return `${total} ${noun} in all; showing ${later ? `${shown} more` : `the first ${shown}`}.`;
 }

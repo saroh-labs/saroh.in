@@ -399,6 +399,8 @@ e2e_stack() {
     export NEXT_PUBLIC_API_AREA=on
     # Share as a post and Create post on, as CI (DEC-217): app and API.
     export NEXT_PUBLIC_SHARE_POSTS=on SHARE_POSTS=on
+    # Ask AI's screens on, as CI (DEC-220).
+    export NEXT_PUBLIC_ASK_AI=on
     local web_filter=""
     case " $(echo $specs) " in *marketing.spec.ts* | *link-preview.spec.ts* | *qr-code-maker.spec.ts* | *resources.spec.ts* | *search-pages-content.spec.ts* | *help.spec.ts* | *privacy.spec.ts*) web_filter=--filter=web ;; esac
     local admin_filter=""
@@ -442,6 +444,10 @@ e2e_stack() {
     # the stripe-checkout spec runs when the runner sees it too.
     export STRIPE_FAKE=1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
+    # Ask AI on a script, as CI: nothing calls Anthropic. Test only, as above;
+    # the text key is a throwaway for this stack's test conversations.
+    export AI_PROVIDER_FAKE=1
+    export AI_TEXT_ENC_KEY=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
 
     # The run's database is a copy of a seeded template, "<name>-template",
     # when the template was seeded from the same migrations, schema and seed

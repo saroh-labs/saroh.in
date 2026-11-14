@@ -1,3 +1,10 @@
+import type { DateRange } from "@/lib/views/date-range";
+import {
+    dateRangeOn,
+    dateRangeWords,
+    readDateRange,
+    writeDateRange,
+} from "@/lib/views/date-range";
 import type { SearchParams } from "@/lib/views/search-params";
 
 import type { Invoice } from "./service";
@@ -17,11 +24,14 @@ import type { FigureKey, SummaryFilter } from "./summary";
  * - `?paidFrom=2026-10-01` is the strip's Paid this month: money received
  *   from that day, part payments included.
  * - `?q=` is the search: a name, part of a number, or an amount.
+ * - `?date=` (a preset, or `custom` with `?from=` and `?to=`) is the day it
+ *   was issued, Orders' date filter (`lib/views/date-range.ts`). It sits
+ *   on top of the status and the figures, and the API answers it.
  *
  * Owed, the cheques and Paid this month are one figure at a time, and
  * none of them is a status: picking a status puts them down.
  */
-export interface ListQuery {
+export interface ListQuery extends DateRange {
     tab: InvoiceTab;
     owed: boolean;
     cheques: boolean;
@@ -53,12 +63,18 @@ export function listQueryFrom(params: SearchParams): ListQuery {
         // A hand-edited date is no filter, never an empty list.
         paidFrom: paidFrom && DAY.test(paidFrom) ? paidFrom : null,
         q,
+        ...readDateRange(params),
     };
 }
 
 /** The query needs the API to answer it: the newest page can't. */
 export function readsOnServer(query: ListQuery): boolean {
-    return query.q !== "" || query.cheques || query.paidFrom !== null;
+    return (
+        query.q !== "" ||
+        query.cheques ||
+        query.paidFrom !== null ||
+        dateRangeOn(query)
+    );
 }
 
 /** Narrowed past the status: a figure or a search. */
@@ -68,7 +84,8 @@ export function narrowed(query: ListQuery): boolean {
         query.owed ||
         query.cheques ||
         query.paidFrom !== null ||
-        query.q !== ""
+        query.q !== "" ||
+        dateRangeOn(query)
     );
 }
 
@@ -140,6 +157,16 @@ export function withTab(
     return next;
 }
 
+/** The address with the issued-date filter set, or cleared with none. */
+export function withDateRange(
+    params: URLSearchParams,
+    range: DateRange,
+): URLSearchParams {
+    const next = new URLSearchParams(params.toString());
+    writeDateRange(range, next);
+    return next;
+}
+
 /** The address with the search set, or cleared with "". */
 export function withSearch(
     params: URLSearchParams,
@@ -195,9 +222,10 @@ export function shownRows<T extends Row>(
 }
 
 /**
- * What an empty list says for a figure: "No invoices owed to you", "No
- * cheques waiting for the bank", "No money in since 1 Oct". Null for a
- * status or a search, which say their own.
+ * What an empty list says for a figure or the issued date: "No invoices
+ * owed to you", "No cheques waiting for the bank", "No money in since 1
+ * Oct", "No invoices issued this month". Null for a status or a search,
+ * which say their own.
  */
 export function figureEmptyLine(
     query: ListQuery,
@@ -208,5 +236,6 @@ export function figureEmptyLine(
     if (query.paidFrom) {
         return `No money in since ${day(query.paidFrom)}`;
     }
-    return null;
+    const issued = dateRangeWords(query);
+    return issued ? `No invoices issued ${issued}` : null;
 }

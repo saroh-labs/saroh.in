@@ -220,7 +220,7 @@ describe("MCP catalogue tools (U12)", () => {
         const made = await use(call, "create_product", args);
         expect(made.isError).toBe(false);
         expect(made.text).toContain("Sourdough loaf");
-        expect(made.text).toContain("INR 180.00");
+        expect(made.text).toContain("₹180");
         const product = (made.data.product as { product_id: string })
             .product_id;
 
@@ -256,7 +256,7 @@ describe("MCP catalogue tools (U12)", () => {
                 product_id: product,
                 name: "Sourdough loaf",
                 status: "draft",
-                price: "INR 180.00",
+                price: "₹180",
             }),
         ]);
         expect(list.text).toContain(`product_id ${product}`);
@@ -273,7 +273,7 @@ describe("MCP catalogue tools (U12)", () => {
             stock: 12,
         });
         expect(changed.data.product).toMatchObject({
-            price: "INR 200.00",
+            price: "₹200",
             status: "published",
             stock: 12,
         });
@@ -473,7 +473,7 @@ describe("MCP day-to-day tools (U12)", () => {
             notes: unknown;
             total: string;
         };
-        expect(order.total).toBe("INR 240.00");
+        expect(order.total).toBe("₹240");
         // The customer's note is data, labelled so.
         expect(order.notes).toEqual({
             untrusted: true,

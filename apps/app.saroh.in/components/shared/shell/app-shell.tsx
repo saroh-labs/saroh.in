@@ -1,6 +1,7 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { AskAiHost } from "@/components/ask-ai/ask-ai-host";
 import { PausedBanner } from "@/components/billing/paused-banner";
 import { PaymentDueBanner } from "@/components/billing/payment-due-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
@@ -26,6 +27,8 @@ import {
 import { PageContainer } from "@/components/shared/page/page-container";
 import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
 import { accountsUrl } from "@/lib/accounts";
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
+import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHomeRail } from "@/lib/home/service";
@@ -120,6 +123,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // Whether session recording is switched on for this environment
     // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
     const recordingOn = recordingSwitchedOn();
+    const askAiShown =
+        askAiOn() && !!activeOrg && activeOrg.role !== "REVIEWER";
 
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
@@ -146,6 +151,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         closing,
         usageSharing,
         accountManager,
+        askAiState,
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
@@ -200,6 +206,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         // Who at Saroh looks after this business (DEC-169, U26), for the
         // account menu's card. Null without a manager or when unread.
         activeOrg ? accountManagerOrNull(activeOrg.id) : null,
+        // Ask AI (U10): what the button and panel open on. A Reviewer has
+        // no Ask AI at all; null when unread, and the panel says so.
+        askAiShown ? getAskAiState().catch(() => null) : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14). None while
@@ -304,6 +313,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 organizations={organizations}
                 activeOrg={activeOrg}
                 accountManager={accountManager}
+                askAi={
+                    askAiShown
+                        ? {
+                              locked: askAiState?.reason === "locked",
+                              upgradeTo: askAiState?.upgradeTo ?? null,
+                          }
+                        : null
+                }
                 moduleKeys={moduleKeys}
                 unread={
                     navCan({ role, actions }, NOTIFICATIONS_NAV.action)
@@ -416,6 +433,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             {/* A write the plan refused, shown as its notice (U14). */}
             <PlanRefusalHost />
+            {activeOrg && askAiShown ? (
+                <AskAiHost
+                    state={askAiState}
+                    businessName={activeOrg.name}
+                    zone={businessZone(activeOrg)}
+                />
+            ) : null}
             {/* Below 760px, the rail's place is taken by this. */}
             <TabBar
                 unread={unread}

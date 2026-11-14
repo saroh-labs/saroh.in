@@ -39,6 +39,9 @@ const NAMES = [
     "MESSAGING_ENC_KEY",
     "WEBHOOK_SECRET_KEY",
     "APIKEY_ENC_KEY",
+    // Ask AI's text (DEC-220): nothing sealed here; its own re-seal is in
+    // `modules/ai/ai.db.spec.ts`. Set so every target reads its ring.
+    "AI_TEXT_ENC_KEY",
 ] as const;
 const mutableEnv = env as Partial<Record<(typeof NAMES)[number], string>>;
 const before = { ...mutableEnv };

@@ -40,11 +40,14 @@ import { OrdersV1Controller } from "../../public-api/orders.v1.controller";
 import { orderStage } from "../../public-api/v1-enums";
 import {
     bookingsPage,
+    bookingsTotal,
     customersPage,
+    customersTotal,
     enquiriesPage,
     enquiryById,
     orderById,
     ordersPage,
+    ordersTotal,
     serviceById,
 } from "../../public-api/v1-reads";
 import type { McpCall, McpTool, ToolHints } from "../tool-registry";
@@ -63,6 +66,7 @@ import {
     isRefusal,
     money,
     PAGE,
+    totalLine,
     v1Body,
     viaV1,
     when,
@@ -77,6 +81,13 @@ const quoted = (s: string | null) => (s ? JSON.stringify(s) : "someone");
 /** A customer typed their own name, so it is labelled like any outside text. */
 const customer = (s: string | null) =>
     s ? quoteUntrusted("Customer", s) : "someone";
+/**
+ * Whether a result carries customers' phone numbers and emails: when the
+ * call asks, else for an outside AI app but not for Ask AI (plan
+ * 2026-11-13-001, U4), whose model sees them only for a question that needs them.
+ */
+export const withContact = (call: McpCall, asked: boolean | undefined) =>
+    asked ?? call.connection.kind !== "app";
 const gone = (what: string, id: string, list: string) =>
     new ToolError(
         `There is no ${what} ${id} in this business.`,
@@ -85,7 +96,11 @@ const gone = (what: string, id: string, list: string) =>
 
 // ── Bookings ────────────────────────────────────────────────────────────────
 
-async function bookingItems(organizationId: string, views: BookingView[]) {
+async function bookingItems(
+    organizationId: string,
+    views: BookingView[],
+    contact = true,
+) {
     const services = await prisma.service.findMany({
         where: {
             organizationId,
@@ -103,8 +118,8 @@ async function bookingItems(organizationId: string, views: BookingView[]) {
         status: b.status,
         customer_id: b.contactId,
         customer_name: b.booker.name ? untrusted(b.booker.name) : null,
-        customer_email: b.booker.email,
-        customer_phone: b.booker.phone,
+        customer_email: contact ? b.booker.email : null,
+        customer_phone: contact ? b.booker.phone : null,
         staff_id: b.staffId,
     }));
 }
@@ -169,13 +184,13 @@ function orderText(
 const nameOf = (c: CustomerView) =>
     [c.firstName, c.lastName].filter(Boolean).join(" ") || null;
 /** Name, company and address are typed by the customer or for them: labelled. */
-const customerItem = (c: CustomerView) => {
+const customerItem = (c: CustomerView, contact = true) => {
     const name = nameOf(c);
     return {
         customer_id: c.id,
         name: name ? untrusted(name) : null,
-        email: c.email,
-        phone: c.phone,
+        email: contact ? c.email : null,
+        phone: contact ? c.phone : null,
         company: c.company ? untrusted(c.company) : null,
     };
 };
@@ -188,8 +203,10 @@ const customerDetail = (c: CustomerView) => {
         address: address ? untrusted(address) : null,
     };
 };
-const customerLine = (c: CustomerView) =>
-    `${customer(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`;
+const customerLine = (c: CustomerView, contact = true) =>
+    contact
+        ? `${customer(nameOf(c))} <${c.email}>${c.phone ? `, ${c.phone}` : ""} (customer_id ${c.id})`
+        : `${customer(nameOf(c))} (customer_id ${c.id})`;
 
 // ── Enquiries ───────────────────────────────────────────────────────────────
 
@@ -308,33 +325,43 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "list_bookings",
             title: "List bookings",
             description:
-                "Use this when the person asks who is booked, for a day, a service or a customer. Example: \"what's on tomorrow?\" → from and to around tomorrow, with the business's offset. Not for open times; use find_free_slots.",
+                "Use this when the person asks who is booked, for a day, a service, a customer, a staff member or a location (staff_id, location_id from list_staff). Example: \"what's on tomorrow?\" → from and to around tomorrow, with the business's offset. Not for open times; use find_free_slots.",
             contract: listBookingsTool,
             capability: "booking:read",
             hints: READ_ONLY,
-            async run(input, { ctx }: McpCall) {
-                const page = await bookingsPage(ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
+            async run(input, call: McpCall) {
+                const { ctx } = call;
+                const filters = {
                     status: input.status,
                     serviceId: input.service_id,
                     contactId: input.customer_id,
+                    staffId: input.staff_id,
+                    storeId: input.location_id,
                     from: input.from
                         ? instantOf(input.from, "from")
                         : undefined,
                     to: input.to ? instantOf(input.to, "to") : undefined,
-                });
+                };
+                const [page, total] = await Promise.all([
+                    bookingsPage(ctx.organizationId, {
+                        ...filters,
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                    }),
+                    bookingsTotal(ctx.organizationId, filters),
+                ]);
                 const bookings = await bookingItems(
                     ctx.organizationId,
                     page.data,
+                    withContact(call, input.include_contact),
                 );
                 return {
                     text: [
-                        `${bookings.length} bookings, newest made first.`,
+                        `${totalLine(total, bookings.length, "bookings", !!input.cursor)} Newest made first.`,
                         ...bookings.map((b) => `- ${bookingLine(b)}`),
                         more(page.nextCursor),
                     ].join("\n"),
-                    data: { bookings, next_cursor: page.nextCursor },
+                    data: { bookings, total, next_cursor: page.nextCursor },
                 };
             },
         }),
@@ -346,10 +373,13 @@ export function dayTools(d: DayDeps): McpTool[] {
             contract: getBookingTool,
             capability: "booking:read",
             hints: READ_ONLY,
-            async run({ booking_id }, { ctx }: McpCall) {
-                const [booking] = await bookingItems(ctx.organizationId, [
-                    await d.bookingsV1.get(ctx, booking_id),
-                ]);
+            async run({ booking_id }, call: McpCall) {
+                const { ctx } = call;
+                const [booking] = await bookingItems(
+                    ctx.organizationId,
+                    [await d.bookingsV1.get(ctx, booking_id)],
+                    withContact(call, undefined),
+                );
                 return { text: `${bookingLine(booking)}.`, data: { booking } };
             },
         }),
@@ -357,7 +387,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "find_free_slots",
             title: "Find free times",
             description:
-                "Use this when the person asks when a service is free, and always before create_booking or move_booking. Example: service_id, from 2026-11-14T00:00:00+05:30 for that day. Shows up to 20 starts; narrow from/to for others. Not for the weekly hours (get_hours).",
+                "Use this when the person asks when a service is free, or before create_booking or move_booking when they haven't named an exact time. Example: service_id, from 2026-11-14T00:00:00+05:30 for that day. Shows up to 20 starts; narrow from/to for others. Not for the weekly hours (get_hours).",
             contract: findFreeSlotsTool,
             capability: "service:read",
             module: "APPOINTMENTS",
@@ -373,13 +403,19 @@ export function dayTools(d: DayDeps): McpTool[] {
                 const end = to
                     ? instantOf(to, "to")
                     : new Date(start.getTime() + 86_400_000);
-                const slots = await d.bookings.availability(
-                    ctx,
-                    service_id,
-                    start.toISOString(),
-                    end.toISOString(),
-                    staff_id,
+                // `to` is the last start asked about: a slot only has to start before it, not end.
+                const reach = new Date(
+                    end.getTime() + service.durationMinutes * 60_000,
                 );
+                const slots = (
+                    await d.bookings.availability(
+                        ctx,
+                        service_id,
+                        start.toISOString(),
+                        reach.toISOString(),
+                        staff_id,
+                    )
+                ).filter((s) => s.startAt <= end);
                 const shown = slots.slice(0, PAGE).map((s) => ({
                     starts_at: s.startAt.toISOString(),
                     when: when(s.startAt, service.timezone),
@@ -401,7 +437,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                                     ]
                                   : []),
                           ].join("\n")
-                        : `${JSON.stringify(service.name)} has no free time then. Try other days, or check get_hours.`,
+                        : `${JSON.stringify(service.name)} has no free time then${staff_id ? " with that staff member" : ""}. This doesn't say why: to tell the person, call list_bookings for that time${staff_id ? " and staff_id" : ""} (already booked) or get_hours (closed then).`,
                     data: {
                         service_id,
                         timezone: service.timezone,
@@ -415,7 +451,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "create_booking",
             title: "Book a service",
             description:
-                'Use this when the person books a customer in. Take starts_at from find_free_slots; name the customer by customer_id (list_customers) or by customer_email. The customer is sent the booking. Example: "book Priya for a haircut Thursday 3:30". Never for moving one; use move_booking.',
+                "Use this when the person books a customer in. Take starts_at from the exact time the person named (with the business's offset), else from find_free_slots; a taken time is refused, so don't check first. Name the customer by customer_id (list_customers) or by customer_email. The customer is sent the booking. Example: \"book Priya for a haircut Thursday 3:30\". Never for moving one; use move_booking.",
             contract: createBookingTool,
             capability: "booking:write",
             module: "APPOINTMENTS",
@@ -471,7 +507,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "move_booking",
             title: "Move a booking",
             description:
-                'Use this when the person moves a booking to another time. Example: "move Priya to 4pm". Take starts_at from find_free_slots for the booking\'s service; a taken time is refused with free times near it. The customer is told. Not for cancelling, which is done in the Saroh app.',
+                "Use this when the person moves a booking to another time. Example: \"move Priya to 4pm\". Take booking_id from list_bookings (no get_booking needed) and starts_at from the time the person named (with the business's offset), else from find_free_slots; a taken time is refused with free times near it, so don't check first. The customer is told. Not for cancelling, which is done in the Saroh app.",
             contract: moveBookingTool,
             capability: "booking:write",
             module: "APPOINTMENTS",
@@ -512,28 +548,46 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "list_orders",
             title: "List orders",
             description:
-                'Use this when the person asks about orders: newest first with number, total, payment and step. Example: status "pending" for ones not yet sent. For one order\'s items and note use get_order.',
+                'Use this when the person asks about orders: newest first with number, total, payment and step; filter by number, status, store (location_id) or when placed (from, to). Example: number "ORD-014", or status "pending" for ones not yet sent. For one order\'s items and note use get_order.',
             contract: listOrdersTool,
             capability: "order:read",
             hints: READ_ONLY,
             async run(input, { ctx }: McpCall) {
-                const page = await ordersPage(
-                    ctx.organizationId,
-                    {
-                        limit: input.limit ?? PAGE,
-                        cursor: input.cursor,
-                        status: input.status,
-                    },
-                    ctx,
-                );
+                const filters = {
+                    status: input.status,
+                    number: input.number,
+                    from: input.from
+                        ? instantOf(input.from, "from")
+                        : undefined,
+                    to: input.to ? instantOf(input.to, "to") : undefined,
+                    storeId: input.location_id,
+                };
+                const [page, total] = await Promise.all([
+                    ordersPage(
+                        ctx.organizationId,
+                        {
+                            ...filters,
+                            limit: input.limit ?? PAGE,
+                            cursor: input.cursor,
+                        },
+                        ctx,
+                    ),
+                    ordersTotal(ctx.organizationId, filters, ctx),
+                ]);
                 return {
                     text: [
-                        `${page.data.length} orders.`,
+                        totalLine(
+                            total,
+                            page.data.length,
+                            "orders",
+                            !!input.cursor,
+                        ),
                         ...page.data.map((o) => `- ${orderLine(o)}`),
                         more(page.nextCursor),
                     ].join("\n"),
                     data: {
                         orders: page.data.map(orderItem),
+                        total,
                         next_cursor: page.nextCursor,
                     },
                 };
@@ -657,20 +711,35 @@ export function dayTools(d: DayDeps): McpTool[] {
             contract: listCustomersTool,
             capability: "contact:read",
             hints: READ_ONLY,
-            async run(input, { ctx }: McpCall) {
-                const page = await customersPage(ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
-                    query: input.query,
-                });
+            async run(input, call: McpCall) {
+                const filters = { query: input.query };
+                const [page, total] = await Promise.all([
+                    customersPage(call.ctx.organizationId, {
+                        ...filters,
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                    }),
+                    customersTotal(call.ctx.organizationId, filters),
+                ]);
+                const contact = withContact(call, input.include_contact);
                 return {
                     text: [
-                        `${page.data.length} customers.`,
-                        ...page.data.map((c) => `- ${customerLine(c)}`),
+                        totalLine(
+                            total,
+                            page.data.length,
+                            "customers",
+                            !!input.cursor,
+                        ),
+                        ...page.data.map(
+                            (c) => `- ${customerLine(c, contact)}`,
+                        ),
                         more(page.nextCursor),
                     ].join("\n"),
                     data: {
-                        customers: page.data.map(customerItem),
+                        customers: page.data.map((c) =>
+                            customerItem(c, contact),
+                        ),
+                        total,
                         next_cursor: page.nextCursor,
                     },
                 };

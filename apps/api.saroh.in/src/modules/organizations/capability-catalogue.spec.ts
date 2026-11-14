@@ -4,7 +4,7 @@ import {
     CAPABILITY_GROUPS,
     grantableCapabilities,
 } from "./capability-catalogue";
-import { isNeverExtra, ORG_ACTIONS } from "./organization-policy";
+import { can, isNeverExtra, ORG_ACTIONS } from "./organization-policy";
 
 /**
  * The catalogue is what an owner picks permissions from, and `ORG_ACTIONS` is
@@ -271,5 +271,23 @@ describe("the Social powers (#1378, owner 12 Nov 2026)", () => {
             expect(grantable).toContain(action);
             expect(isNeverExtra(action)).toBe(false);
         }
+    });
+});
+
+describe("the Ask AI power (DEC-220, plan 2026-11-13-001 U7)", () => {
+    it("lists Use Ask AI under its own group, grantable, Owner and Admin by default", () => {
+        expect(CAPABILITY_GROUPS).toContain("ai");
+        expect(CAPABILITY_BY_ACTION.get("ai:use")).toMatchObject({
+            group: "ai",
+            label: "Use Ask AI",
+        });
+        expect(grantableCapabilities().map((c) => c.action)).toContain(
+            "ai:use",
+        );
+        expect(isNeverExtra("ai:use")).toBe(false);
+        expect(can("OWNER", "ai:use")).toBe(true);
+        expect(can("ADMIN", "ai:use")).toBe(true);
+        expect(can("MEMBER", "ai:use")).toBe(false);
+        expect(can("REVIEWER", "ai:use")).toBe(false);
     });
 });

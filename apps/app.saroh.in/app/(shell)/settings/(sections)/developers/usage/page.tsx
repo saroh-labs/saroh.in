@@ -1,3 +1,5 @@
+import { notFound } from "next/navigation";
+
 import { Usage } from "@/components/settings/developers/usage";
 import { readApiUsage } from "@/lib/api-keys/service";
 import { upgradeHref } from "@/lib/billing/access";
@@ -7,6 +9,7 @@ import {
 } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
 
 /**
  * Settings › API and AI apps › Usage (R14): this business's own caps and
@@ -15,6 +18,7 @@ import { requireSession } from "@/lib/session";
 export const metadata = { title: "Usage · API and AI apps · Settings" };
 
 export default async function UsagePage() {
+    if (!apiAreaOn()) notFound();
     await requireSession();
     const [usage, org, billing, zone] = await Promise.all([
         readApiUsage(),

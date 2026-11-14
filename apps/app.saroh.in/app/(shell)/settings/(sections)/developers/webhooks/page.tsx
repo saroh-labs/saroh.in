@@ -12,6 +12,7 @@ import {
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { eventsFor } from "@/lib/webhooks/events";
 import { listWebhooks } from "@/lib/webhooks/service";
 
@@ -25,6 +26,7 @@ export const metadata = {
 };
 
 export default async function WebhooksPage() {
+    if (!apiAreaOn()) notFound();
     await requireSession();
     const [org, usage] = await Promise.all([
         resolveActiveOrganization(),

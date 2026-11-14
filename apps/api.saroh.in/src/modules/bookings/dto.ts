@@ -19,6 +19,8 @@ import {
 
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
+import type { DatePreset } from "../orders/date-presets";
+import { DATE_PRESETS } from "../orders/date-presets";
 import type { DeskMethod } from "./desk-take";
 import { DESK_METHODS } from "./desk-take";
 
@@ -611,13 +613,29 @@ export class RecordOutcomeDto {
 /**
  * The bookings calendar's range (U4): `[from, to)` as ISO instants, and
  * optionally one person's diary. Query text, so nothing is converted.
+ *
+ * All bookings' date filter asks by day instead (Orders' params): `from`
+ * and `to` as YYYY-MM-DD in the business's zone, `to` included, either
+ * one left out, or `date` a preset. A booking is then listed by the day it
+ * starts (`calendarBookings`). Both are checked there, so either form may
+ * leave the other out.
  */
 export class BookingsRangeQueryDto {
+    @IsOptional()
     @IsISO8601()
-    from!: string;
+    from?: string;
 
+    @IsOptional()
     @IsISO8601()
-    to!: string;
+    to?: string;
+
+    /** A preset in the business's zone (Orders'); not with `from`/`to`. */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(DATE_PRESETS, { message: "Unknown date range" })
+    date?: DatePreset;
 
     @IsOptional()
     @IsString()

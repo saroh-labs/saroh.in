@@ -11,7 +11,7 @@ import type { CatalogueV1Controller } from "../../public-api/catalogue.v1.contro
 import type { McpActivityService } from "../activity.service";
 import type { McpCall, McpTool } from "../tool-registry";
 import { McpToolRegistry } from "../tool-registry";
-import { catalogueTools } from "./catalogue.tools";
+import { catalogueTools, stockOnHand } from "./catalogue.tools";
 import type { DayDeps } from "./day.tools";
 import { dayTools } from "./day.tools";
 
@@ -207,5 +207,26 @@ describe("module gating", () => {
         ]);
         expect(await listedNames(registry)).toHaveLength(tools.length);
         expect(evaluate).not.toHaveBeenCalled();
+    });
+});
+
+describe("a product's stock line", () => {
+    it("sums every variant at every store; a per-variant product's own shelf counts nothing", () => {
+        expect(
+            stockOnHand(
+                [
+                    { variant_id: null, on_hand: 0 },
+                    { variant_id: "s", on_hand: 4 },
+                    { variant_id: "m", on_hand: 3 },
+                    { variant_id: "m", on_hand: 2 },
+                ],
+                0,
+            ),
+        ).toBe(9);
+    });
+
+    it("keeps the product's own count without variants, and null when not counted", () => {
+        expect(stockOnHand([{ variant_id: null, on_hand: 5 }], 5)).toBe(5);
+        expect(stockOnHand([], null)).toBeNull();
     });
 });

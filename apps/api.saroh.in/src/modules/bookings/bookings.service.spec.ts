@@ -2970,6 +2970,72 @@ describe("the bookings calendar in one read (U4)", () => {
         expect(bookingFindMany).not.toHaveBeenCalled();
     });
 
+    describe("by day: All bookings' date filter (Orders' params)", () => {
+        it("lists the bookings starting on those days, the last one included", async () => {
+            staffFindMany.mockResolvedValue([PT]);
+            bookingFindMany.mockResolvedValue([row()]);
+            const res = await new BookingsService().calendarBookings(ctx(), {
+                from: "2026-08-01",
+                to: "2026-08-31",
+            });
+            // The business's zone here is UTC: its days are UTC days.
+            expect(bookingFindMany).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: {
+                        organizationId: "org_SVC",
+                        startAt: {
+                            gte: new Date("2026-08-01T00:00:00Z"),
+                            lt: new Date("2026-09-01T00:00:00Z"),
+                        },
+                    },
+                }),
+            );
+            expect(res.from).toBe("2026-08-01T00:00:00.000Z");
+            expect(res.to).toBe("2026-09-01T00:00:00.000Z");
+        });
+
+        it("reads a preset in the business's zone", async () => {
+            staffFindMany.mockResolvedValue([PT]);
+            bookingFindMany.mockResolvedValue([]);
+            await new BookingsService().calendarBookings(ctx(), {
+                date: "today",
+            });
+            const where = (
+                bookingFindMany.mock.calls[0][0] as {
+                    where: { startAt: { gte: Date; lt: Date } };
+                }
+            ).where;
+            expect(
+                where.startAt.lt.getTime() - where.startAt.gte.getTime(),
+            ).toBe(86_400_000);
+        });
+
+        it("a day left out reaches as far as a range may from the other", async () => {
+            staffFindMany.mockResolvedValue([PT]);
+            bookingFindMany.mockResolvedValue([]);
+            const res = await new BookingsService().calendarBookings(ctx(), {
+                from: "2026-08-01",
+            });
+            expect(res.from).toBe("2026-08-01T00:00:00.000Z");
+            expect(res.to).toBe("2028-07-31T00:00:00.000Z");
+        });
+
+        it("refuses a preset with days, a day with an instant, a backwards or over-long range", async () => {
+            const service = new BookingsService();
+            for (const ask of [
+                { date: "7d" as const, from: "2026-08-01" },
+                { from: "2026-08-01", to: "2026-08-31T00:00:00Z" },
+                { from: "2026-08-31", to: "2026-08-01" },
+                { from: "2024-01-01", to: "2026-08-01" },
+            ]) {
+                await expect(
+                    service.calendarBookings(ctx(), ask),
+                ).rejects.toBeInstanceOf(BadRequestException);
+            }
+            expect(bookingFindMany).not.toHaveBeenCalled();
+        });
+    });
+
     it("a reviewer, who reads no bookings, is refused", async () => {
         await expect(
             new BookingsService().calendarBookings(

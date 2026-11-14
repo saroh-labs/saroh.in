@@ -225,6 +225,10 @@ export async function getStockLog(
         storefront?: string;
         product?: string;
         variant?: string;
+        /** Changes made in a preset, or between two days (`dateRangeAsk`). */
+        date?: string;
+        from?: string;
+        to?: string;
         /** The page by its number, from 1, at `size` entries. */
         page?: number;
         size?: number;

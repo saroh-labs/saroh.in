@@ -22,6 +22,7 @@ import { invoiceZone } from "@/lib/invoices/zone";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
+import { dateRangeAsk } from "@/lib/views/date-range";
 import { sinceParam } from "@/lib/views/since";
 
 export const metadata = { title: "Invoices" };
@@ -33,7 +34,8 @@ export const metadata = { title: "Invoices" };
  * page can't (`readsOnServer`): a search (`?q=`), the cheques not in the
  * bank (`?view=cheques`, Home's link) and Paid this month (`?paidFrom=`),
  * however old the invoice. `?pack=` or `?course=` (Pack and Course
- * Detail) asks for that one's invoices (D18).
+ * Detail) asks for that one's invoices (D18). `?date=` (or `?date=custom`
+ * with `?from=`/`?to=`) is the day it was issued, also the API's.
  *
  * The money strip is its own read (`GET invoices/summary`): when it
  * fails, the strip says so and the list still loads.
@@ -54,6 +56,10 @@ export default async function InvoicesPage({
         course?: string;
         q?: string;
         paidFrom?: string;
+        /** The issued date: a preset, or `custom` with `from`/`to`. */
+        date?: string;
+        from?: string;
+        to?: string;
     }>;
 }) {
     await requireSession();
@@ -74,6 +80,7 @@ export default async function InvoicesPage({
               q: query.q,
               view: query.cheques ? "cheques" : undefined,
               paidFrom: query.paidFrom ?? undefined,
+              ...dateRangeAsk(query),
               ...(only?.kind === "pack" ? { packId: only.id } : {}),
               ...(only?.kind === "course" ? { courseId: only.id } : {}),
           })
