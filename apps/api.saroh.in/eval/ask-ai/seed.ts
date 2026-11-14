@@ -32,13 +32,13 @@ const MODULES = [
     "COMMERCE",
 ] as const;
 // ORG_AUTHORIZATION as in production: without it a store takes the older per-store checks, and a draft order fails "Location not found".
-const flagsOf = (modules: readonly string[]) => [
+export const flagsOf = (modules: readonly string[]) => [
     ...modules.map((m) => `MODULE_${m}`),
     "ASK_AI",
     "ORG_AUTHORIZATION",
 ];
 /** Every business's modules, its own extras after the shared ones. */
-const modulesOf = (biz: BusinessPlan) => [
+export const modulesOf = (biz: BusinessPlan) => [
     ...MODULES,
     ...(biz.extraModules ?? []),
 ];
@@ -67,7 +67,7 @@ export const EVAL_QUESTIONS = 100000;
  * (it fails closed). Give every plan on the businesses' version the row,
  * with {@link EVAL_QUESTIONS}: only ever in an `-eval` database.
  */
-async function addAskAiRow(version: number): Promise<void> {
+export async function addAskAiRow(version: number): Promise<void> {
     const row = await prisma.pricingCatalogVersion.findUnique({
         where: { version },
         select: { catalog: true },
@@ -148,7 +148,7 @@ export async function main(): Promise<number> {
     return 0;
 }
 
-async function seedBusiness(
+export async function seedBusiness(
     biz: BusinessPlan,
     anchor: Date,
     planId: string | null,

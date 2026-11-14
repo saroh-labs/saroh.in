@@ -147,15 +147,15 @@ describe("products card", () => {
 describe("table card", () => {
     it("draws the mini table with its heads, +N more and the Open in link", () => {
         render(TABLE);
-        const heads = Array.from(host.querySelectorAll("th")).map(
-            (th) => th.textContent,
-        );
+        const heads = Array.from(
+            host.querySelectorAll('[role="columnheader"]'),
+        ).map((th) => th.textContent);
         expect(heads).toEqual(["Bill", "Customer", "Left to pay", "Due"]);
-        const cells = Array.from(host.querySelectorAll("td")).map(
+        const cells = Array.from(host.querySelectorAll('[role="cell"]')).map(
             (td) => td.textContent,
         );
         expect(cells).toEqual(["INV-1", "Asha", "INR 500.00", "13 days late"]);
-        expect(host.querySelectorAll("td")[2].className).toContain(
+        expect(host.querySelectorAll('[role="cell"]')[2].className).toContain(
             "text-right",
         );
         expect(host.textContent).toContain("+4 more");
@@ -175,8 +175,8 @@ describe("table card", () => {
                 link: undefined,
             },
         });
-        const rows = host.querySelectorAll("tbody tr");
-        const first = rows[0].querySelector("td a");
+        const rows = host.querySelectorAll('[role="rowgroup"] [role="row"]');
+        const first = rows[0].querySelector('[role="cell"] a');
         expect(first?.getAttribute("href")).toBe("/billing/invoices/inv1");
         expect(first?.textContent).toBe("INV-1");
         // Only the first cell links; a row without a record has none.

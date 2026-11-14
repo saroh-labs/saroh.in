@@ -52,7 +52,7 @@ import {
 import { quoteUntrusted, untrusted } from "../untrusted";
 import { withContact } from "./day.tools";
 import { resolveSpan } from "./period";
-import { money, PAGE } from "./v1-bridge";
+import { money, PAGE, totalLine } from "./v1-bridge";
 
 /**
  * The summary tools (plan 2026-11-13-001, U4): what Home and Insights
@@ -332,6 +332,8 @@ interface LapsedRow {
     email: string | null;
     phone: string | null;
     lastSeenAt: Date;
+    /** Every lapsed customer, before the page (`COUNT(*) OVER ()`). */
+    total: bigint;
 }
 
 /**
@@ -367,7 +369,7 @@ function lapsedSql(
         ),
         last AS (SELECT id, MAX(at) AS at FROM seen GROUP BY id)
         SELECT c.id, c."firstName", c."lastName", c.email, c.phone,
-            last.at AS "lastSeenAt"
+            last.at AS "lastSeenAt", COUNT(*) OVER () AS total
         FROM last
         JOIN "Contact" c ON c.id = last.id
         WHERE c."organizationId" = ${organizationId}
@@ -569,7 +571,9 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                                   (p) =>
                                       `${JSON.stringify(p.name)} (product_id ${p.product_id}) ${p.sold} sold (${p.sold_before} before)${p.amount ? `, ${p.amount}` : ""}`,
                               )
-                              .join("; ")}.`
+                              .join(
+                                  "; ",
+                              )}. Best sellers count units on paid orders, on the day paid, less refunds. Answer with: at least the top 3 with units.`
                         : noSalesLine(period, data.last_sale_on),
                     `Booked most: ${
                         data.booked.length
@@ -805,7 +809,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 const text = [
                     total === 0
                         ? "No unpaid bills."
-                        : `${total} unpaid bills in all: ${overdue} overdue (past their due date), ${total - overdue} not due yet. Oldest due first; ${offset + 1} to ${offset + bills.length} here.`,
+                        : `${total} unpaid bills in all: ${overdue} overdue (past their due date), ${total - overdue} not due yet. Oldest due first; ${offset === 0 ? (bills.length < total ? `showing the first ${bills.length}` : "all here") : `${offset + 1} to ${offset + bills.length} here`}.`,
                     ...bills.map(
                         (b) =>
                             `- ${b.number ?? "Bill"} (invoice_id ${b.invoice_id}), ${b.customer ? quoteUntrusted("Customer", b.customer.text) : "no customer named"}${b.left_to_pay ? `, ${b.left_to_pay} left to pay` : ""}, ${
@@ -859,6 +863,8 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 const page = rows.slice(0, limit);
                 const next =
                     rows.length > limit ? String(offset + limit) : null;
+                // shortcut: a cursor past the end reads no row to count on, so the total is the offset; fine for a stale cursor.
+                const total = rows[0] ? Number(rows[0].total) : offset;
                 const contact = withContact(call, input.include_contact);
                 const customers = page.map((c) => {
                     const name =
@@ -873,7 +879,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                     };
                 });
                 const text = [
-                    `${customers.length} customers not seen for ${days} days or more, most recently seen first.`,
+                    `${totalLine(total, customers.length, `customers not seen for ${days} days or more`, offset > 0)} Most recently seen first.`,
                     ...customers.map(
                         (c) =>
                             `- ${c.name ? quoteUntrusted("Customer", c.name.text) : "someone"} (customer_id ${c.customer_id}), last seen ${c.last_seen_at.slice(0, 10)}${c.email ? `, ${c.email}` : ""}${c.phone ? `, ${c.phone}` : ""}`,
@@ -884,7 +890,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 ].join("\n");
                 return {
                     text,
-                    data: { days, customers, next_cursor: next },
+                    data: { days, customers, total, next_cursor: next },
                 };
             },
         }),

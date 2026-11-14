@@ -141,6 +141,7 @@ export function resolveQuestion(
               }
             : null,
         card: e.card ?? null,
+        maxRows: e.maxRows ?? null,
         numbers: (e.numbers ?? []).map(num),
         mentions: (e.mentions ?? []).map((key) => ({ key, value: words(key) })),
         draft: e.draft

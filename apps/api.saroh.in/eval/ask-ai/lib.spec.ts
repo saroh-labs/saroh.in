@@ -9,6 +9,7 @@ import {
     graderPrompt,
     hasNumber,
     leakedFigure,
+    listedRows,
     loadQuestions,
     mentions,
     mentionsDate,
@@ -426,6 +427,35 @@ describe("the seed's facts", () => {
         ]);
     });
 
+    it("counts products ordered (not cancelled) apart from best sellers (paid)", () => {
+        const biz = {
+            ...plan[3],
+            orders: [
+                {
+                    ...plan[3].orders[0],
+                    at: now,
+                    paid: false,
+                    cancelled: false,
+                    items: [{ product: plan[3].products[0].key, qty: 5 }],
+                },
+                {
+                    ...plan[3].orders[0],
+                    at: now,
+                    paid: true,
+                    cancelled: true,
+                    items: [{ product: plan[3].products[1].key, qty: 9 }],
+                },
+            ],
+        };
+        const [first, second] = plan[3].products.map((p) => p.name);
+        expect(resolveFact(biz, "top-products:this_month:1", now)).toEqual([
+            first,
+        ]);
+        expect(resolveFact(biz, "best-sellers:this_month:1", now)).toEqual([
+            second,
+        ]);
+    });
+
     it("keeps the lists a tool pages through under one page", () => {
         for (const biz of plan)
             expect(resolveFact(biz, "lapsed:60", now)).toBeLessThan(20);
@@ -531,6 +561,14 @@ describe("summaries: the period and the card", () => {
             true,
         );
         expect(mentionsDate("१५ अगस्त से १४ नवंबर", "2026-08-15")).toBe(true);
+        // Hindi's short months, as run 4 wrote them.
+        expect(mentionsDate("(15 अग॰ से 14 नव॰ 2026)", "2026-08-15")).toBe(
+            true,
+        );
+        expect(mentionsDate("(15 अग॰ से 14 नव॰ 2026)", "2026-11-14")).toBe(
+            true,
+        );
+        expect(mentionsDate("15 नवंबर", "2026-08-15")).toBe(false);
         expect(mentionsDate("15/08 to 14/11", "2026-08-15")).toBe(true);
         expect(mentionsDate("(2026-08-15 to 2026-11-14)", "2026-08-15")).toBe(
             true,
@@ -657,9 +695,9 @@ describe("questions that need a tool", () => {
 describe("the question files", () => {
     const questions = loadQuestions(join(__dirname, "questions"));
 
-    it("holds the 60 and the 25 added", () => {
-        expect(questions).toHaveLength(85);
-        for (const prefix of ["clothing", "yoga", "period", "blog"]) {
+    it("holds the 60, the 25 added and the 3 big lists", () => {
+        expect(questions).toHaveLength(88);
+        for (const prefix of ["clothing", "yoga", "period", "blog", "lists"]) {
             expect(questions.some((q) => q.id.startsWith(`${prefix}-`))).toBe(
                 true,
             );
@@ -767,5 +805,57 @@ describe("the clothing shop and the yoga studio", () => {
                 [-31, -30].includes(dayOffset(anchorFor(now), b.start)),
             ),
         ).toEqual([]);
+    });
+});
+
+describe("listedRows and maxRows", () => {
+    it("counts bullet, numbered and table body rows, not a table's head", () => {
+        expect(
+            listedRows("You have 9,012 orders.\n- ORD-1\n* ORD-2\n3. ORD-3"),
+        ).toBe(3);
+        expect(
+            listedRows(
+                "| Order | Total |\n|---|---:|\n| ORD-1 | ₹1 |\n| ORD-2 | ₹2 |",
+            ),
+        ).toBe(2);
+        expect(listedRows("No list here; 20 orders in all.")).toBe(0);
+    });
+
+    it("fails a run that writes out more rows than allowed", () => {
+        const q = {
+            id: "lists-01",
+            business: "bakery",
+            role: "owner",
+            language: "en",
+            kind: "answer",
+            question: "List all orders",
+            expect: { maxRows: 2 },
+            resolved: {
+                question: "List all orders",
+                card: null,
+                maxRows: 2,
+                numbers: [],
+                mentions: [],
+                draft: null,
+                forbiddenFigures: [],
+                forbiddenText: [],
+                forbiddenTools: [],
+            },
+        } as unknown as Question & { resolved: Resolved };
+        const run = (text: string) =>
+            ({
+                questionId: "lists-01",
+                run: 1,
+                turnId: null,
+                text,
+                statuses: [],
+                toolCalls: [],
+                card: null,
+                changed: [],
+            }) as unknown as RunRecord;
+        expect(gradeRun(q, run("- a\n- b"), null).missing).toEqual([]);
+        expect(gradeRun(q, run("- a\n- b\n- c"), null).missing).toEqual([
+            "listed 3 rows in text (at most 2)",
+        ]);
     });
 });

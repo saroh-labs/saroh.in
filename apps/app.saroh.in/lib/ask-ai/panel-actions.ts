@@ -13,6 +13,7 @@ import type { AskAiReportBody } from "./panel-service";
 import {
     askAiReportBody,
     confirmAskAiDraft,
+    handOffAskAiDraft,
     redraftAskAiDraft,
     reportAskAiAnswer,
     requestMoreAskAi,
@@ -98,4 +99,9 @@ export async function undoDraft(draftId: string) {
 export async function redraftDraft(draftId: string) {
     if (!draftId) return INVALID;
     return redraftAskAiDraft(draftId);
+}
+
+export async function handOffDraft(draftId: string) {
+    if (!draftId) return INVALID;
+    return handOffAskAiDraft(draftId);
 }

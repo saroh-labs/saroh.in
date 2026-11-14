@@ -26,7 +26,7 @@ import {
 import { quoteUntrusted, untrusted } from "../untrusted";
 import type { Span } from "./period";
 import { resolveSpan } from "./period";
-import { PAGE, when } from "./v1-bridge";
+import { PAGE, totalLine, when } from "./v1-bridge";
 
 /**
  * The class reads (14 Nov): how full classes are, who waits for a full
@@ -219,34 +219,38 @@ export async function waitlist(
             lt: day.plus({ days: 1 }).toJSDate(),
         };
     }
-    // shortcut: the first 200 places in line; page it if a business ever waitlists more.
-    const rows = await prisma.classWaitlistEntry.findMany({
-        where: {
-            organizationId: org,
-            status: { in: ["WAITING", "OFFERED"] },
-            startAt,
-            AND: [
-                input.service_id ? { serviceId: input.service_id } : {},
-                { service: ownServices(own) },
-            ],
-        },
-        orderBy: [
-            { startAt: "asc" },
-            { serviceId: "asc" },
-            { position: "asc" },
+    const where: Prisma.ClassWaitlistEntryWhereInput = {
+        organizationId: org,
+        status: { in: ["WAITING", "OFFERED"] },
+        startAt,
+        AND: [
+            input.service_id ? { serviceId: input.service_id } : {},
+            { service: ownServices(own) },
         ],
-        take: 200,
-        select: {
-            serviceId: true,
-            startAt: true,
-            position: true,
-            status: true,
-            offeredUntil: true,
-            contactId: true,
-            service: { select: { name: true } },
-            contact: { select: { firstName: true, lastName: true } },
-        },
-    });
+    };
+    // The first 200 places in line are named; every one is counted.
+    const [rows, people] = await Promise.all([
+        prisma.classWaitlistEntry.findMany({
+            where,
+            orderBy: [
+                { startAt: "asc" },
+                { serviceId: "asc" },
+                { position: "asc" },
+            ],
+            take: 200,
+            select: {
+                serviceId: true,
+                startAt: true,
+                position: true,
+                status: true,
+                offeredUntil: true,
+                contactId: true,
+                service: { select: { name: true } },
+                contact: { select: { firstName: true, lastName: true } },
+            },
+        }),
+        prisma.classWaitlistEntry.count({ where }),
+    ]);
     const sessions: {
         service_id: string;
         service: string;
@@ -289,11 +293,10 @@ export async function waitlist(
                     : null,
         });
     }
-    const people = rows.length;
     const text = [
         people === 0
             ? `Nobody is waiting for a place${input.date ? ` on ${input.date}` : " in any coming class"}.`
-            : `${people} waiting for a place, in ${sessions.length} session${sessions.length === 1 ? "" : "s"}, first in line first (${zone}).`,
+            : `${people} waiting for a place, in ${sessions.length}${rows.length < people ? " or more" : ""} session${sessions.length === 1 ? "" : "s"}, first in line first (${zone})${rows.length < people ? `; showing the first ${rows.length}` : ""}.`,
         ...sessions.flatMap((x) => [
             `- ${JSON.stringify(x.service)} (service_id ${x.service_id}), ${x.when}:`,
             ...x.waiting.map(
@@ -405,7 +408,9 @@ export async function classPacks(
                 `- ${p.customer ? quoteUntrusted("Customer", p.customer.text) : "someone"} (customer_id ${p.customer_id}): ${JSON.stringify(p.pack)}, ${p.used} of ${p.classes} used, ${p.left} left, use by ${p.use_by}, ${STANDING_WORDS[p.standing]}`,
         ),
         ...(data.total > packs.length
-            ? [`${packs.length} of ${data.total} named; the card links to all.`]
+            ? [
+                  `${totalLine(data.total, packs.length, "packs")} The card links to all.`,
+              ]
             : []),
     ].join("\n");
     return { text, data };

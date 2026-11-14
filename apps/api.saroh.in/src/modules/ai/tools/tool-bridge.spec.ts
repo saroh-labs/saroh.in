@@ -26,7 +26,7 @@ import type { OrgAction } from "../../organizations/organization-actions";
 import type { OrganizationContextService } from "../../organizations/organization-context.service";
 import type { AgentDefinition } from "../agents/agent-definition";
 import type { DraftsService } from "../drafts/drafts.service";
-import { CARD_SHOWN, ToolBridge } from "./tool-bridge";
+import { CARD_SHOWN, cardShown, ToolBridge } from "./tool-bridge";
 
 const ORG = "org_a";
 const asker: OrganizationContext = {
@@ -357,5 +357,18 @@ describe("ToolBridge", () => {
             expect(run).toMatchObject({ isError: true });
             expect(d.draft).not.toHaveBeenCalled();
         });
+    });
+});
+
+describe("cardShown", () => {
+    it("says how many rows the card draws when its link holds more", () => {
+        expect(
+            cardShown({ kind: "table", data: { rows: [[], []], more: 40 } }),
+        ).toBe(
+            `${CARD_SHOWN} The card shows the first 2 and links to the rest.`,
+        );
+        expect(cardShown({ kind: "table", data: { rows: [[]] } })).toBe(
+            CARD_SHOWN,
+        );
     });
 });

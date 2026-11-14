@@ -240,6 +240,8 @@ export const findLapsedCustomersTool = {
                 phone: z.string().nullable(),
             }),
         ),
+        /** Every match of the filters, across pages (counted whole). */
+        total: z.number(),
         next_cursor: nextCursor,
     }),
 };

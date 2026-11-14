@@ -4,9 +4,10 @@ import type {
     AskAiTableCard,
 } from "@saroh/api-contract";
 import { cn } from "@saroh/ui/lib/utils";
-import { listTable } from "@saroh/ui/list-table";
+import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { Info } from "lucide-react";
 import Link from "next/link";
+import type * as React from "react";
 
 import { initials } from "@/lib/products/catalogue";
 
@@ -149,46 +150,67 @@ function ProductsCard({ card }: { card: AskAiProductsCard }) {
 function TableCard({ card }: { card: AskAiTableCard }) {
     const numeric = new Set(card.numeric ?? []);
     const rowHref = (r: number) => appHref(card.hrefs?.[r] ?? undefined);
+    // One grid for the table, the head and rows on its columns (subgrid),
+    // so every row lines up. The first column takes the room it needs; on a
+    // phone the rest are narrow (cut, the card scrolls sideways), at the
+    // desk they share what's left.
+    const cols = {
+        "--cols": Math.max(1, card.columns.length - 1),
+    } as React.CSSProperties;
+    const onColumns = "col-span-full grid grid-cols-subgrid";
+    const cell = (i: number, last: boolean) =>
+        cn(
+            "px-2 first:pl-3 last:pr-3 sm:px-2.5",
+            numeric.has(i) && listTable.numeric,
+            !numeric.has(i) && i > 0 && !last && "truncate",
+        );
     return (
         <section className="flex flex-col gap-2">
-            <div className={cn(listTable.frame, "overflow-x-auto")}>
-                <table
+            <ListTable scroll className="overflow-x-auto">
+                <div
+                    role="table"
                     aria-label={card.title}
-                    className="w-full border-collapse text-[13px]"
+                    style={cols}
+                    className="grid min-w-max grid-cols-[max-content_repeat(var(--cols),minmax(56px,112px))] text-[13px] sm:min-w-0 sm:grid-cols-[minmax(max-content,1.3fr)_repeat(var(--cols),minmax(0,1fr))]"
                 >
-                    <thead>
-                        <tr className={listTable.headRow}>
-                            {card.columns.map((c, i) => (
-                                <th
-                                    key={c}
-                                    scope="col"
-                                    className={cn(
-                                        listTable.th,
-                                        "px-2 first:pl-3 last:pr-3 sm:px-2.5",
-                                        numeric.has(i) && listTable.numeric,
-                                    )}
-                                >
-                                    {c}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
+                    <ListTableHead
+                        role="row"
+                        className={cn(onColumns, "px-0 py-0")}
+                    >
+                        {card.columns.map((c, i) => (
+                            <span
+                                key={c}
+                                role="columnheader"
+                                className={cell(
+                                    i,
+                                    i === card.columns.length - 1,
+                                )}
+                            >
+                                {c}
+                            </span>
+                        ))}
+                    </ListTableHead>
+                    <div role="rowgroup" className="contents">
                         {card.rows.map((row, r) => (
-                            <tr key={r} className={listTable.tr}>
-                                {row.map((cell, i) => (
-                                    <td
+                            <div
+                                key={r}
+                                role="row"
+                                className={cn(
+                                    listTable.row,
+                                    onColumns,
+                                    "items-center px-0 py-2",
+                                )}
+                            >
+                                {row.map((value, i) => (
+                                    <span
                                         key={i}
-                                        title={cell}
+                                        role="cell"
+                                        title={value}
                                         className={cn(
                                             // One line a row: a long name is cut, never wrapped to three.
-                                            "whitespace-nowrap px-2 py-2 align-middle first:pl-3 last:pr-3 sm:px-2.5",
-                                            numeric.has(i)
-                                                ? listTable.numeric
-                                                : i === 0
-                                                  ? "font-medium"
-                                                  : i < row.length - 1 &&
-                                                    "max-w-[64px] truncate sm:max-w-[112px]",
+                                            "whitespace-nowrap",
+                                            cell(i, i === row.length - 1),
+                                            i === 0 && "font-medium",
                                         )}
                                     >
                                         {/* The first cell carries the row's link, as DataView's rows. */}
@@ -197,18 +219,18 @@ function TableCard({ card }: { card: AskAiTableCard }) {
                                                 href={rowHref(r) ?? ""}
                                                 className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                                             >
-                                                {cell}
+                                                {value}
                                             </Link>
                                         ) : (
-                                            cell
+                                            value
                                         )}
-                                    </td>
+                                    </span>
                                 ))}
-                            </tr>
+                            </div>
                         ))}
-                    </tbody>
-                </table>
-            </div>
+                    </div>
+                </div>
+            </ListTable>
             <Foot more={card.more} link={card.link} />
         </section>
     );

@@ -15,8 +15,12 @@
  *   orders counted as placed (cancelled included, as `get_business_summary`);
  *   standing ones are those not cancelled, and the comparison with the
  *   period before is on them; their money is the totals, after discount;
- *   products and variants sold are units on orders not cancelled; bills
- *   by issue date; bookings by start, standing and cancelled apart.
+ *   products and variants ordered (`top-*`) are units on orders not
+ *   cancelled, by the day placed (`summarise_orders`); best sellers
+ *   (`best-sellers`, `get_whats_selling`, Insights' What sells) are units
+ *   on paid orders by the day paid; bills by issue date, unpaid meaning
+ *   not paid now of those issued in the period; bookings by start,
+ *   standing and cancelled apart.
  * - stock: per store shelf; a shelf is low at or under its alert.
  * Periods are the business's calendar in Kolkata, weeks from Monday;
  * `last_3_months` is Insights' "3m" (the day after this date three months
@@ -83,7 +87,7 @@ function orderTotal(
     );
 }
 
-/** Units sold per label (product name, or "name variant") on orders not cancelled, most first, ties by name. */
+/** Units per label (product name, or "name variant") on these orders, most first, ties by name. */
 function unitsSold(
     biz: BusinessPlan,
     orders: OrderPlan[],
@@ -91,7 +95,6 @@ function unitsSold(
 ): [string, number][] {
     const units = new Map<string, number>();
     for (const o of orders) {
-        if (o.cancelled) continue;
         for (const i of o.items) {
             const p = product(biz, i.product);
             const v = p.variants?.find((x) => x.key === i.variant);
@@ -232,11 +235,18 @@ export function resolveFact(
             break;
         }
         case "top-products":
-        case "top-variants": {
+        case "top-variants":
+        case "best-sellers": {
             const w = windowOf(a, now);
+            // best-sellers is Insights' rule (get_whats_selling): paid
+            // orders, on the day paid (the seed pays on the day placed).
             const sold = unitsSold(
                 biz,
-                biz.orders.filter((o) => inWindow(o.at, w)),
+                biz.orders.filter((o) =>
+                    kind === "best-sellers"
+                        ? o.paid && inWindow(o.at, w)
+                        : !o.cancelled && inWindow(o.at, w),
+                ),
                 kind === "top-variants",
             );
             // Ties at the cut are in too: either is a right answer, so both are asked for.
@@ -339,6 +349,12 @@ export function resolveFact(
             return biz.products
                 .filter((p) => p.onHand <= p.lowAlert)
                 .map((p) => p.name);
+        case "customers":
+            // lists.json (big lists): every contact, the customers and the people who sent an enquiry.
+            return new Set([
+                ...biz.customers.map((p) => p.key),
+                ...biz.enquiries.map((e) => e.person.key),
+            ]).size;
         case "lapsed": {
             const cutoff = new Date(now.getTime() - Number(a) * DAY_MS);
             return [...lastSeen(biz).values()].filter((at) => at < cutoff)

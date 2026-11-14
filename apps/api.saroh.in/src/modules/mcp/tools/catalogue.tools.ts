@@ -24,6 +24,7 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import { CatalogueV1Controller } from "../../public-api/catalogue.v1.controller";
 import {
     productsPage,
+    productsTotal,
     serviceById,
     servicesPage,
 } from "../../public-api/v1-reads";
@@ -37,7 +38,7 @@ import {
     READ_ONLY,
     ToolError,
 } from "../tool-registry";
-import { money, PAGE, toMinor, v1Body, viaV1 } from "./v1-bridge";
+import { money, PAGE, toMinor, totalLine, v1Body, viaV1 } from "./v1-bridge";
 
 /** A create: a retry with the same request_id makes nothing new. */
 export const CREATE: ToolHints = {
@@ -184,19 +185,29 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
             module: "COMMERCE",
             hints: READ_ONLY,
             async run(input, { ctx }: McpCall) {
-                const page = await productsPage(ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
-                    query: input.query,
-                });
+                const filters = { query: input.query };
+                const [page, total] = await Promise.all([
+                    productsPage(ctx.organizationId, {
+                        ...filters,
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                    }),
+                    productsTotal(ctx.organizationId, filters),
+                ]);
                 return {
                     text: [
-                        `${page.data.length} products.`,
+                        totalLine(
+                            total,
+                            page.data.length,
+                            "products",
+                            !!input.cursor,
+                        ),
                         ...page.data.map((p) => `- ${productLine(p)}`),
                         more(page.nextCursor),
                     ].join("\n"),
                     data: {
                         products: page.data.map(productItem),
+                        total,
                         next_cursor: page.nextCursor,
                     },
                 };

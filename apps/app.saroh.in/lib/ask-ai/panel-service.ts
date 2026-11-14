@@ -1,4 +1,8 @@
-import type { AskAiConfirmBody, AskAiDraftResult } from "@saroh/api-contract";
+import type {
+    AskAiConfirmBody,
+    AskAiDraftResult,
+    AskAiHandOff,
+} from "@saroh/api-contract";
 import { z } from "zod";
 
 import type { CrmResult } from "@/lib/api/http";
@@ -44,6 +48,18 @@ export function redraftAskAiDraft(
         "POST",
         {},
         "That wasn't drafted again. Try again.",
+    );
+}
+
+/** Open in editor: marks a blog draft handed off; answers its website. */
+export function handOffAskAiDraft(
+    draftId: string,
+): Promise<CrmResult<AskAiHandOff>> {
+    return mutate(
+        draftPath(draftId, "hand-off"),
+        "POST",
+        {},
+        "That didn't open. Try again.",
     );
 }
 

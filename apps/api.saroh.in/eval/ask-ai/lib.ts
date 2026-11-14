@@ -58,6 +58,8 @@ const expectSchema = z
         period: z.string().optional(),
         /** A read card of one of these kinds (`table`, `products`) must be shown, with its link. */
         card: z.array(z.string()).min(1).optional(),
+        /** A big list: at most this many rows listed in the text (the card and its link hold the rest). */
+        maxRows: z.number().int().min(1).optional(),
         /** For the AI grader: what a right answer says. */
         note: z.string().optional(),
     })
@@ -175,6 +177,8 @@ export interface Resolved {
     period?: { key: string; from: string; to: string } | null;
     /** Card kinds accepted. */
     card?: string[] | null;
+    /** Rows the text may list at most (absent in results from before it existed). */
+    maxRows?: number | null;
     numbers: { key: string; value: number }[];
     mentions: { key: string; value: string[] }[];
     draft: { tool: string; input: unknown; inputMentions: string[][] } | null;
@@ -361,23 +365,24 @@ export function mentions(text: string, value: string): boolean {
 }
 
 const MONTHS = [
-    ["jan", "january", "जनवरी"],
-    ["feb", "february", "फ़रवरी", "फरवरी"],
+    ["jan", "january", "जनवरी", "जन"],
+    ["feb", "february", "फ़रवरी", "फरवरी", "फ़र", "फर"],
     ["mar", "march", "मार्च"],
     ["apr", "april", "अप्रैल"],
     ["may", "मई"],
     ["jun", "june", "जून"],
-    ["jul", "july", "जुलाई"],
-    ["aug", "august", "अगस्त"],
-    ["sep", "sept", "september", "सितंबर", "सितम्बर"],
-    ["oct", "october", "अक्टूबर"],
-    ["nov", "november", "नवंबर", "नवम्बर"],
-    ["dec", "december", "दिसंबर", "दिसम्बर"],
+    ["jul", "july", "जुलाई", "जुल"],
+    ["aug", "august", "अगस्त", "अग"],
+    ["sep", "sept", "september", "सितंबर", "सितम्बर", "सित"],
+    ["oct", "october", "अक्टूबर", "अक्तूबर", "अक्टू", "अक्तू"],
+    ["nov", "november", "नवंबर", "नवम्बर", "नव"],
+    ["dec", "december", "दिसंबर", "दिसम्बर", "दिस"],
 ];
 
 /**
  * Whether the day `iso` ("2026-08-15") is in the text as people write it:
- * 15 Aug, August 15th, 15 अगस्त, 15/08, 2026-08-15 (Devanagari digits too).
+ * 15 Aug, August 15th, 15 अगस्त, 15 अग॰ (Hindi's short form), 15/08,
+ * 2026-08-15 (Devanagari digits too).
  * The year may be left out.
  */
 export function mentionsDate(text: string, iso: string): boolean {
@@ -389,8 +394,8 @@ export function mentionsDate(text: string, iso: string): boolean {
     const names = MONTHS[m - 1].join("|");
     const day = `0?${d}(?:st|nd|rd|th)?`;
     return [
-        `${edge}${day}\\s+(?:${names})\\.?${end}`,
-        `${edge}(?:${names})\\.?\\s+${day}${end}`,
+        `${edge}${day}\\s+(?:${names})[.॰]?${end}`,
+        `${edge}(?:${names})[.॰]?\\s+${day}${end}`,
         `${edge}0?${d}[/.-]0?${m}(?:[/.-](?:${y}|${y % 100}))?${end}`,
     ].some((re) => new RegExp(re, "iu").test(t));
 }
@@ -506,6 +511,24 @@ export function checkDraft(
     return { ok: problems.length === 0, problems };
 }
 
+/**
+ * Rows an answer lists in its text: bullet or numbered lines, and a
+ * Markdown table's body rows (its head and rule left out).
+ */
+export function listedRows(text: string): number {
+    const lines = text.split("\n");
+    let rows = 0;
+    lines.forEach((line, i) => {
+        if (/^\s*(?:[-*•]|\d+[.)])\s+\S/.test(line)) rows++;
+        else if (/^\s*\|.*\|\s*$/.test(line)) {
+            const rule = (l: string | undefined) =>
+                !!l && /^\s*\|[\s:|-]+\|\s*$/.test(l);
+            if (!rule(line) && !rule(lines[i + 1])) rows++;
+        }
+    });
+    return rows;
+}
+
 /** A read card of an accepted kind was shown, and it links to the list in Saroh. */
 export function checkCard(
     kinds: readonly string[],
@@ -567,6 +590,9 @@ export function gradeRun(
         // Results from before cards were all kept: the one card recorded.
         ...(r.card
             ? checkCard(r.card, run.cards ?? (run.card ? [run.card] : []))
+            : []),
+        ...(r.maxRows && listedRows(text) > r.maxRows
+            ? [`listed ${listedRows(text)} rows in text (at most ${r.maxRows})`]
             : []),
     ];
     const hasFacts =
@@ -935,6 +961,7 @@ function expectedLines(q: Question & { resolved: Resolved }): string[] {
         ...(r.card
             ? [`Shows a ${r.card.join(" or ")} card with its link`]
             : []),
+        ...(r.maxRows ? [`Lists at most ${r.maxRows} rows in its text`] : []),
         ...(r.before?.length
             ? [`Asked first: ${r.before.map((b) => `"${b}"`).join(", ")}`]
             : []),

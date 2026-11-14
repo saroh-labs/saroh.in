@@ -67,6 +67,8 @@ export const listProductsTool = {
         .strict(),
     output: z.object({
         products: z.array(productItem),
+        /** Every match of the filters, across pages (counted whole). */
+        total: z.number(),
         next_cursor: nextCursor,
     }),
 };

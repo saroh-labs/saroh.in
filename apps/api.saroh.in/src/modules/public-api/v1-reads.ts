@@ -363,7 +363,7 @@ export const bookingView = (b: BookingRow): BookingView => ({
     createdAt: b.createdAt.toISOString(),
 });
 
-type BookingFilters = {
+interface BookingFilters {
     status?: BookingView["status"];
     serviceId?: string;
     contactId?: string;
@@ -372,7 +372,7 @@ type BookingFilters = {
     storeId?: string;
     from?: Date;
     to?: Date;
-};
+}
 
 const bookingsWhere = (organizationId: string, q: BookingFilters) => ({
     organizationId,
@@ -522,7 +522,7 @@ const orderView = (o: OrderRow): OrderView => ({
 /** Who reads: a location's team reads its own storefronts' (DEC-074). */
 type OrderViewer = Pick<OrganizationContext, "roleKey" | "userId">;
 
-type OrderFilters = {
+interface OrderFilters {
     status?: OrderView["status"];
     /** The order number ("ORD-014"), any case, a leading "#" ignored. */
     number?: string;
@@ -530,7 +530,7 @@ type OrderFilters = {
     to?: Date;
     /** One store's orders (within what the viewer may see). */
     storeId?: string;
-};
+}
 
 function ordersWhere(
     organizationId: string,

@@ -136,6 +136,10 @@ describe("summarise_invoices", () => {
         });
         expect(r.text).toMatch(/Invoices: 5/);
         expect(r.text).toMatch(/Overdue 1/);
+        // Not paid is said as one figure, of the bills issued in the period.
+        expect(r.text).toMatch(
+            /Of the 5 issued in these days: paid 3; not paid now 1 \(overdue 1, not due yet 0\)/,
+        );
 
         db.$queryRaw.mockResolvedValueOnce([
             {
@@ -227,6 +231,18 @@ describe("summarise_orders", () => {
         expect(r.text).toMatch(/3 standing \(₹900\), 1 cancelled/);
         expect(r.text).toMatch(/up 50% on before \(2\)/);
         expect(r.text).toMatch(/Compared with/);
+    });
+
+    it("says the standing orders before even when the change rounds to 0%", async () => {
+        read([{ status: "DELIVERED", n: 295 }], 294);
+        const r = await tool("summarise_orders").run(
+            { period: "last_3_months" },
+            callAs("order:read", "payment:read"),
+        );
+        expect(r.text).toMatch(
+            /Period before \(\d{4}-\d\d-\d\d to \d{4}-\d\d-\d\d\): 294 standing \(₹400\); standing orders the same as before/,
+        );
+        expect(r.text).toMatch(/Answer with: the orders placed \(295\)/);
     });
 
     it("leaves money out without payment:read and names it", async () => {

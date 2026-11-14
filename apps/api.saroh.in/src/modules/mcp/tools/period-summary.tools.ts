@@ -309,7 +309,8 @@ async function summariseOrders(ctx: OrganizationContext, s: Span) {
         spanLine(s, "Orders placed"),
         orders === 0
             ? "No orders were placed in this period."
-            : `- Orders: ${orders}: ${data.standing} standing${sayAmounts(data.amount)}, ${cancelled} cancelled. Standing orders ${change(data.standing, before)}${data.before.amount ? `; before: ${data.before.amount.join(", ") || "nothing"}` : ""}.`,
+            : // The count before is said even when the change rounds to 0%.
+              `- Orders placed: ${orders}: ${data.standing} standing${sayAmounts(data.amount)}, ${cancelled} cancelled. Period before (${s.before.firstDay} to ${s.before.lastDay}): ${before} standing${sayAmounts(data.before.amount)}; standing orders ${change(data.standing, before)}.`,
         ...(orders
             ? [
                   `- By status: ${data.by_status.map((g) => `${human(g.key)} ${g.count}`).join(", ")}.`,
@@ -338,7 +339,13 @@ async function summariseOrders(ctx: OrganizationContext, s: Span) {
               ]
             : []),
         ...(orders
-            ? [cardHolds("the newest orders", "Orders filtered to these days")]
+            ? [
+                  cardHolds(
+                      "the newest orders",
+                      "Orders filtered to these days",
+                  ),
+                  `Answer with: the orders placed (${orders}), standing with their money, cancelled, the standing orders in the period before (${before}), and the 3 most ordered products by name.`,
+              ]
             : []),
         ...notShownLine(data.not_shown),
     ]
@@ -494,6 +501,8 @@ async function summariseInvoices(
         })
         .filter((g) => g.count > 0);
     const invoices = byStatus.reduce((n, g) => n + g.count, 0);
+    const countOf = (k: InvoiceStatusKey) =>
+        byStatus.find((g) => g.status === k)?.count ?? 0;
     const notShown = money ? [] : ["payments"];
     const data = {
         ...empty,
@@ -535,6 +544,12 @@ async function summariseInvoices(
         invoices === 0
             ? "No invoices were issued in this period."
             : `- Invoices: ${invoices}${sayAmounts(of((r) => r.amount))}. ${byStatus.map((g) => `${INVOICE_WORDS[g.status]} ${g.count}${sayAmounts(g.amount)}`).join("; ")}.`,
+        ...(invoices && !status
+            ? [
+                  `- Of the ${invoices} issued in these days: paid ${countOf("paid")}; not paid now ${countOf("overdue") + countOf("unpaid")} (overdue ${countOf("overdue")}, not due yet ${countOf("unpaid")}). Bills not paid from any day are list_unpaid_bills.`,
+                  "Answer with: the invoices issued, how many are paid and how many not paid (overdue and not due yet), and their money.",
+              ]
+            : []),
         ...(invoices && money
             ? [
                   `- Of these, collected ${listOr(data.collected)}; still owed ${listOr(data.owed)}.`,
@@ -746,6 +761,12 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
         ...(data.top.length
             ? [cardHolds("the products with the most on hand", "Stock")]
             : []),
+        // The card lists products, not these shelves: the answer names them.
+        ...(data.needs.length
+            ? [
+                  "Asked what is low or out: name each shelf above in the answer, with its size or colour and store; never point to the card for them.",
+              ]
+            : []),
         ...notShownLine(notShown),
     ].join("\n");
     return { text, data };
@@ -910,7 +931,12 @@ async function summariseBookings(ctx: OrganizationContext, s: Span) {
         spanLine(s, "Bookings"),
         bookings === 0 && cancelled === 0
             ? "No bookings in this period."
-            : `- Bookings: ${bookings} (came ${came}, no-show ${noShow}, not marked yet ${data.not_marked}), ${change(bookings, before)}; ${cancelled} cancelled.`,
+            : `- Bookings: ${bookings} (came ${came}, no-show ${noShow}, not marked yet ${data.not_marked}); ${cancelled} cancelled. Period before (${s.before.firstDay} to ${s.before.lastDay}): ${before} bookings; ${change(bookings, before)}.`,
+        ...(bookings || cancelled
+            ? [
+                  `Answer with: the bookings (${bookings}), came (${came}), no-shows (${noShow}), not marked yet, cancelled (${cancelled}), and the first and last day as dates.`,
+              ]
+            : []),
         ...(data.by_service.length
             ? [`- By service: ${list(data.by_service)}.`]
             : []),

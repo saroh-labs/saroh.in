@@ -10187,6 +10187,8 @@ enum AskAiDraftStatus {
   UNDONE
   EXPIRED
   REFUSED
+  // A blog post opened in the editor unsaved (owner, 14 Nov): saved there, not here.
+  HANDED_OFF
 }
 
 // A change Ask AI drafted for the person to confirm (DEC-220, plan

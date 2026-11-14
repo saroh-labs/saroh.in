@@ -26,10 +26,10 @@
         "kind": "answer",
         "question": "Products sold in the last 3 months",
         "expect": {
-            "mentions": ["top-products:last_3_months:3"],
+            "mentions": ["best-sellers:last_3_months:3"],
             "period": "last_3_months",
             "card": ["products", "table"],
-            "note": "The products sold, most first, with units; a products card linking each product and to the list for the period."
+            "note": "The products sold (Insights' What sells: units on paid orders, by the day paid), most first, naming at least the top three with units; a products card linking each product and to the list for the period."
         }
     },
     {

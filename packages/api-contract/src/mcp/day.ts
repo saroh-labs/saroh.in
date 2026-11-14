@@ -69,6 +69,8 @@ export const listBookingsTool = {
         .strict(),
     output: z.object({
         bookings: z.array(bookingItem),
+        /** Every match of the filters, across pages (counted whole). */
+        total: z.number(),
         next_cursor: nextCursor,
     }),
 };
@@ -167,7 +169,12 @@ export const listOrdersTool = {
             ...listInput,
         })
         .strict(),
-    output: z.object({ orders: z.array(orderItem), next_cursor: nextCursor }),
+    output: z.object({
+        orders: z.array(orderItem),
+        /** Every match of the filters, across pages (counted whole). */
+        total: z.number(),
+        next_cursor: nextCursor,
+    }),
 };
 
 export const getOrderTool = {
@@ -246,6 +253,8 @@ export const listCustomersTool = {
         .strict(),
     output: z.object({
         customers: z.array(customerItem),
+        /** Every match of the filters, across pages (counted whole). */
+        total: z.number(),
         next_cursor: nextCursor,
     }),
 };

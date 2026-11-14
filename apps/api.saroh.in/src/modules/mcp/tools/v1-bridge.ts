@@ -101,3 +101,19 @@ export function instantOf(value: string, field: string): Date {
     }
     return at;
 }
+
+/**
+ * A list's first line: the exact total of matches (counted with the same
+ * filters) and how many this page shows, so a big list is answered with
+ * its count and the card's link rather than paged through.
+ */
+export function totalLine(
+    total: number,
+    shown: number,
+    noun: string,
+    later = false,
+): string {
+    if (total === 0) return `No ${noun}.`;
+    if (shown >= total && !later) return `${total} ${noun} in all.`;
+    return `${total} ${noun} in all; showing ${later ? `${shown} more` : `the first ${shown}`}.`;
+}

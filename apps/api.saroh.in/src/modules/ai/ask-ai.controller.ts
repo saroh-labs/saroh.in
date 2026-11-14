@@ -54,7 +54,7 @@ export const KEEPALIVE_MS = 15_000;
  * through the admin routes with this header, not through these, so this
  * refuses the request that carries it here.
  */
-function refuseStaff(session: string | undefined): void {
+export function refuseStaff(session: string | undefined): void {
     if (session) {
         throw new ForbiddenException("Ask AI isn't open to a support session.");
     }

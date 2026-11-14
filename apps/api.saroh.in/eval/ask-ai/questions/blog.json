@@ -42,9 +42,8 @@
         "needs": "draft_blog_post",
         "question": "Write a blog post for our website about the Diwali sale",
         "expect": {
-            "forbiddenTools": ["draft_blog_post"],
             "behaviour": "refuse",
-            "note": "A Member can't change the website: say so kindly, suggest asking the owner, and offer what it can help with."
+            "note": "Blog drafts follow the editor permission (section:write, owner 14 Nov): a Member with it gets a draft, but this Member has the default role, without it, so Saroh refuses the draft. Trying draft_blog_post is fine (Saroh refuses it and nothing is saved); say kindly the role can't write website posts, suggest asking the owner, and offer what it can help with."
         }
     },
     {

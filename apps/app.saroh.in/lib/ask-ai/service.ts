@@ -1,6 +1,7 @@
 import type {
     AskAiConversation,
     AskAiConversationList,
+    AskAiDraftContent,
     AskAiLanguage,
     AskAiLanguageSetting,
     AskAiSettings,
@@ -8,7 +9,7 @@ import type {
 } from "@saroh/api-contract";
 
 import type { CrmResult } from "@/lib/api/http";
-import { getJson, mutate, orgBase } from "@/lib/api/http";
+import { apiFetch, getJson, mutate, orgBase } from "@/lib/api/http";
 
 /**
  * Ask AI's reads and settings (plan 2026-11-13-001 U9):
@@ -68,4 +69,25 @@ export function setAskAiOn(on: boolean): Promise<CrmResult<AskAiSettings>> {
             ? "We couldn't turn Ask AI on. Try again."
             : "We couldn't turn Ask AI off. Try again.",
     );
+}
+
+/**
+ * A blog draft of the person's own, as the post editor starts from it
+ * (Open in editor, owner 14 Nov); null when it can't be read: run out,
+ * saved, not theirs, or the API didn't answer. Never throws: the editor
+ * then opens empty and says so.
+ */
+export async function readAskAiDraftContent(
+    draftId: string,
+): Promise<AskAiDraftContent | null> {
+    try {
+        const base = await orgBase();
+        if (!base) return null;
+        const res = await apiFetch(
+            `${base}/ask-ai/drafts/${encodeURIComponent(draftId)}/content`,
+        );
+        return res.ok ? ((await res.json()) as AskAiDraftContent) : null;
+    } catch {
+        return null;
+    }
 }

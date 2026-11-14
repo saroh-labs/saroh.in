@@ -1,11 +1,12 @@
 # Ask AI quality test
 
-The gate before Ask AI's screens are built (plan `2026-11-13-001`, U6): 85
+The gate before Ask AI's screens are built (plan `2026-11-13-001`, U6): 88
 questions, run three times each, through the real `TurnRunner` and the real
 provider, as real people of seven made-up businesses, then graded. The
 first 60 (salon, gym, clinic, bakery, coach) are the original set; the
 25 after them add a clothing shop, a yoga studio, summaries over long
-periods and blog drafts.
+periods and blog drafts, and the last 3 ask for big lists (a count, the
+card and its link, never every row).
 
 **Run by hand, never in CI. It costs money**: every turn calls the provider,
 and so does the AI grader. The runner and the grader both stop at the budget
@@ -13,15 +14,15 @@ in the targets file.
 
 ## Files
 
-| File               | What it is                                                                                                                                                                                         |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `plan.ts`          | The seven businesses (salon, gym, clinic, bakery, coach, clothing, yoga) as data: a pure function of the run date and a fixed seed                                                                 |
-| `seed.ts`          | Writes the plan into the eval database with Prisma                                                                                                                                                 |
-| `facts.ts`         | The right answers, read from the same plan (`bookings:this_week`, `moneyin:today`, `orders:last_3_months:amount`, …)                                                                               |
-| `questions/*.json` | The 85 questions: business, person, language, kind, words, and what is expected, as fact keys; one file per trade, plus `periods.json` (summaries over long periods) and `blog.json` (blog drafts) |
-| `run.ts`           | Runs them, records each run                                                                                                                                                                        |
-| `grade.ts`         | Code grading, the AI grader, the pass marks                                                                                                                                                        |
-| `lib.ts`           | The pure parts (figures in Indian formats, draft matching, budget, marks); `lib.spec.ts` tests them                                                                                                |
+| File               | What it is                                                                                                                                                                                                                                                  |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `plan.ts`          | The seven businesses (salon, gym, clinic, bakery, coach, clothing, yoga) as data: a pure function of the run date and a fixed seed                                                                                                                          |
+| `seed.ts`          | Writes the plan into the eval database with Prisma                                                                                                                                                                                                          |
+| `facts.ts`         | The right answers, read from the same plan (`bookings:this_week`, `moneyin:today`, `orders:last_3_months:amount`, …)                                                                                                                                        |
+| `questions/*.json` | The 88 questions: business, person, language, kind, words, and what is expected, as fact keys; one file per trade, plus `periods.json` (summaries over long periods) `blog.json` (blog drafts) and `lists.json` (big lists: a count, the card and its link) |
+| `run.ts`           | Runs them, records each run                                                                                                                                                                                                                                 |
+| `grade.ts`         | Code grading, the AI grader, the pass marks                                                                                                                                                                                                                 |
+| `lib.ts`           | The pure parts (figures in Indian formats, draft matching, budget, marks); `lib.spec.ts` tests them                                                                                                                                                         |
 
 ## "Today"
 

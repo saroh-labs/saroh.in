@@ -54,6 +54,11 @@ function appRoutePatterns(dir = APP_DIR) {
     const patterns = [];
     for (const file of walk(dir)) {
         if (!/[/\\]page\.tsx?$/.test(file)) continue;
+        // A catch-all that only says "not found" (`(shell)/[...missing]`)
+        // is a 404 inside the shell, not a page: counting it would let
+        // every address resolve.
+        if (/\bnotFound\(\);\s*\}\s*$/.test(readFileSync(file, "utf8")))
+            continue;
         const segments = relative(dir, file)
             .replace(/[/\\]page\.tsx?$/, "")
             .split(/[/\\]/)
@@ -142,7 +147,8 @@ function emittedConsoleHrefs() {
 function inAppLinks() {
     const found = [];
     for (const file of walk(APP_ROOT)) {
-        if (!/\.tsx?$/.test(file) || /\.spec\.tsx?$/.test(file)) continue;
+        if (!/\.tsx?$/.test(file) || /\.(spec|test)\.tsx?$/.test(file))
+            continue;
         if (/[/\\](node_modules|\.next)[/\\]/.test(file)) continue;
         const lines = readFileSync(file, "utf8").split("\n");
         lines.forEach((line, i) => {
@@ -209,6 +215,50 @@ async function redirectPatterns(routes) {
     return landing;
 }
 
+/**
+ * Ask AI's links (14 Nov): every page its answer cards may link to (the
+ * closed list in the API's `ai/tools/app-links.ts`, `route:` keys, `:id`
+ * a record) and every page a draft card's "Open it" or the full Ask page
+ * opens (`recordHref` in the app's `components/ask-ai/words.ts`, its
+ * template literals' `${…}` a record, and `ASK_PAGE`). Each source must
+ * yield something: a moved file fails here rather than checking nothing.
+ */
+function askAiLinks() {
+    const sources = [
+        {
+            file: join(API_SRC, "modules/ai/tools/app-links.ts"),
+            re: /\broute:\s*"(\/[^"]*)"/g,
+        },
+        {
+            file: join(APP_ROOT, "components/ask-ai/words.ts"),
+            re: /return\s+`(\/[^`]*)`/g,
+        },
+        {
+            file: join(APP_ROOT, "components/ask-ai/ask-ai-panel.tsx"),
+            re: /\bASK_PAGE\s*=\s*"(\/[^"]*)"/g,
+        },
+    ];
+    const found = [];
+    for (const { file, re } of sources) {
+        const text = readFileSync(file, "utf8");
+        const before = found.length;
+        for (const m of text.matchAll(re)) {
+            found.push({
+                href: m[1].replace(/:id\b/g, "x").replace(/\$\{[^}]*\}/g, "x"),
+                file: relative(ROOT, file),
+                line: text.slice(0, m.index).split("\n").length,
+            });
+        }
+        if (found.length === before) {
+            console.error(
+                `check-app-routes: no Ask AI links found in ${relative(ROOT, file)}; update askAiLinks() if they moved.`,
+            );
+            process.exit(1);
+        }
+    }
+    return found;
+}
+
 const routes = appRoutePatterns();
 if (routes.length === 0) {
     console.error(`No routes found under ${relative(ROOT, APP_DIR)}.`);
@@ -226,6 +276,7 @@ const NOT_APP_ROUTES = [
 const all = [
     ...emittedHrefs().map((h) => ({ ...h, source: "api.saroh.in" })),
     ...inAppLinks().map((h) => ({ ...h, source: "app.saroh.in" })),
+    ...askAiLinks().map((h) => ({ ...h, source: "Ask AI cards and drafts" })),
 ];
 
 /** Compare paths only; a query string or fragment does not change the route. */

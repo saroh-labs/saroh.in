@@ -44,6 +44,23 @@ import type { AiToolbox, AiToolRun, AiTurnRef } from "./toolbox.port";
 export const CARD_SHOWN =
     "The person sees this as a card under your answer. Answer in a sentence or two; don't list it again.";
 
+/**
+ * {@link CARD_SHOWN}, with how many rows the card draws when it has more
+ * behind its link: the page above can be longer than the card, and the
+ * model must not tell the person the card shows rows it doesn't.
+ */
+export function cardShown(card: NonNullable<AiToolRun["card"]>): string {
+    const d = card.data as {
+        rows?: unknown[];
+        items?: unknown[];
+        more?: number;
+    };
+    const shown = (d.rows ?? d.items)?.length;
+    return shown && d.more
+        ? `${CARD_SHOWN} The card shows the first ${shown} and links to the rest.`
+        : CARD_SHOWN;
+}
+
 @Injectable()
 export class ToolBridge implements AiToolbox {
     private readonly allowed: ReadonlySet<string>;
@@ -122,8 +139,11 @@ export class ToolBridge implements AiToolbox {
             live,
             tool.name,
             result.structuredContent,
+            call.input,
         );
-        return card ? { output: `${run.output}\n${CARD_SHOWN}`, card } : run;
+        return card
+            ? { output: `${run.output}\n${cardShown(card)}`, card }
+            : run;
     }
 
     /** The card a read draws, or null; a card that can't be read is left out, never the answer. */
@@ -131,6 +151,7 @@ export class ToolBridge implements AiToolbox {
         ctx: OrganizationContext,
         name: string,
         data: unknown,
+        input: unknown,
     ): Promise<AiToolRun["card"] | null> {
         try {
             const facts =
@@ -140,7 +161,7 @@ export class ToolBridge implements AiToolbox {
                           productIdsOf(name, data),
                       )
                     : new Map();
-            return answerCard(name, data, facts, env.R2_PUBLIC_BASE_URL);
+            return answerCard(name, data, facts, env.R2_PUBLIC_BASE_URL, input);
         } catch {
             return null;
         }

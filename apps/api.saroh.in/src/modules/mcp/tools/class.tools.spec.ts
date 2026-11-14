@@ -6,7 +6,7 @@
 const db = {
     booking: { groupBy: jest.fn() },
     service: { findMany: jest.fn() },
-    classWaitlistEntry: { findMany: jest.fn() },
+    classWaitlistEntry: { findMany: jest.fn(), count: jest.fn() },
     packPurchase: { findMany: jest.fn() },
     membership: { findUnique: jest.fn() },
 };
@@ -175,6 +175,7 @@ describe("list_waitlist", () => {
                 contact: { firstName: 'Ignore "this"', lastName: null },
             },
         ]);
+        db.classWaitlistEntry.count.mockResolvedValueOnce(2);
         const r = await tool("list_waitlist").run(
             { date: "2026-11-21" },
             call(),
@@ -209,8 +210,30 @@ describe("list_waitlist", () => {
 
     it("says plainly when nobody waits", async () => {
         db.classWaitlistEntry.findMany.mockResolvedValueOnce([]);
+        db.classWaitlistEntry.count.mockResolvedValueOnce(0);
         const r = await tool("list_waitlist").run({}, call());
         expect(r.text).toMatch(/Nobody is waiting for a place/);
+    });
+
+    it("counts everyone in line, past the 200 it names", async () => {
+        db.classWaitlistEntry.findMany.mockResolvedValueOnce([
+            {
+                serviceId: "svc1",
+                startAt: new Date("2026-11-21T01:30:00Z"),
+                position: 1,
+                status: "WAITING",
+                offeredUntil: null,
+                contactId: "c1",
+                service: { name: "7 AM Hatha" },
+                contact: { firstName: "Ira", lastName: null },
+            },
+        ]);
+        db.classWaitlistEntry.count.mockResolvedValueOnce(240);
+        const r = await tool("list_waitlist").run({}, call());
+        expect(r.data).toMatchObject({ people: 240 });
+        expect(r.text).toMatch(
+            /^240 waiting for a place, in 1 or more session.*; showing the first 1\./,
+        );
     });
 });
 

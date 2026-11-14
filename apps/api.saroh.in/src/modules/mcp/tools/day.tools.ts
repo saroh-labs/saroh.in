@@ -40,11 +40,14 @@ import { OrdersV1Controller } from "../../public-api/orders.v1.controller";
 import { orderStage } from "../../public-api/v1-enums";
 import {
     bookingsPage,
+    bookingsTotal,
     customersPage,
+    customersTotal,
     enquiriesPage,
     enquiryById,
     orderById,
     ordersPage,
+    ordersTotal,
     serviceById,
 } from "../../public-api/v1-reads";
 import type { McpCall, McpTool, ToolHints } from "../tool-registry";
@@ -63,6 +66,7 @@ import {
     isRefusal,
     money,
     PAGE,
+    totalLine,
     v1Body,
     viaV1,
     when,
@@ -327,9 +331,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             hints: READ_ONLY,
             async run(input, call: McpCall) {
                 const { ctx } = call;
-                const page = await bookingsPage(ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
+                const filters = {
                     status: input.status,
                     serviceId: input.service_id,
                     contactId: input.customer_id,
@@ -339,7 +341,15 @@ export function dayTools(d: DayDeps): McpTool[] {
                         ? instantOf(input.from, "from")
                         : undefined,
                     to: input.to ? instantOf(input.to, "to") : undefined,
-                });
+                };
+                const [page, total] = await Promise.all([
+                    bookingsPage(ctx.organizationId, {
+                        ...filters,
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                    }),
+                    bookingsTotal(ctx.organizationId, filters),
+                ]);
                 const bookings = await bookingItems(
                     ctx.organizationId,
                     page.data,
@@ -347,11 +357,11 @@ export function dayTools(d: DayDeps): McpTool[] {
                 );
                 return {
                     text: [
-                        `${bookings.length} bookings, newest made first.`,
+                        `${totalLine(total, bookings.length, "bookings", !!input.cursor)} Newest made first.`,
                         ...bookings.map((b) => `- ${bookingLine(b)}`),
                         more(page.nextCursor),
                     ].join("\n"),
-                    data: { bookings, next_cursor: page.nextCursor },
+                    data: { bookings, total, next_cursor: page.nextCursor },
                 };
             },
         }),
@@ -543,29 +553,41 @@ export function dayTools(d: DayDeps): McpTool[] {
             capability: "order:read",
             hints: READ_ONLY,
             async run(input, { ctx }: McpCall) {
-                const page = await ordersPage(
-                    ctx.organizationId,
-                    {
-                        limit: input.limit ?? PAGE,
-                        cursor: input.cursor,
-                        status: input.status,
-                        number: input.number,
-                        from: input.from
-                            ? instantOf(input.from, "from")
-                            : undefined,
-                        to: input.to ? instantOf(input.to, "to") : undefined,
-                        storeId: input.location_id,
-                    },
-                    ctx,
-                );
+                const filters = {
+                    status: input.status,
+                    number: input.number,
+                    from: input.from
+                        ? instantOf(input.from, "from")
+                        : undefined,
+                    to: input.to ? instantOf(input.to, "to") : undefined,
+                    storeId: input.location_id,
+                };
+                const [page, total] = await Promise.all([
+                    ordersPage(
+                        ctx.organizationId,
+                        {
+                            ...filters,
+                            limit: input.limit ?? PAGE,
+                            cursor: input.cursor,
+                        },
+                        ctx,
+                    ),
+                    ordersTotal(ctx.organizationId, filters, ctx),
+                ]);
                 return {
                     text: [
-                        `${page.data.length} orders.`,
+                        totalLine(
+                            total,
+                            page.data.length,
+                            "orders",
+                            !!input.cursor,
+                        ),
                         ...page.data.map((o) => `- ${orderLine(o)}`),
                         more(page.nextCursor),
                     ].join("\n"),
                     data: {
                         orders: page.data.map(orderItem),
+                        total,
                         next_cursor: page.nextCursor,
                     },
                 };
@@ -690,15 +712,24 @@ export function dayTools(d: DayDeps): McpTool[] {
             capability: "contact:read",
             hints: READ_ONLY,
             async run(input, call: McpCall) {
-                const page = await customersPage(call.ctx.organizationId, {
-                    limit: input.limit ?? PAGE,
-                    cursor: input.cursor,
-                    query: input.query,
-                });
+                const filters = { query: input.query };
+                const [page, total] = await Promise.all([
+                    customersPage(call.ctx.organizationId, {
+                        ...filters,
+                        limit: input.limit ?? PAGE,
+                        cursor: input.cursor,
+                    }),
+                    customersTotal(call.ctx.organizationId, filters),
+                ]);
                 const contact = withContact(call, input.include_contact);
                 return {
                     text: [
-                        `${page.data.length} customers.`,
+                        totalLine(
+                            total,
+                            page.data.length,
+                            "customers",
+                            !!input.cursor,
+                        ),
                         ...page.data.map(
                             (c) => `- ${customerLine(c, contact)}`,
                         ),
@@ -708,6 +739,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                         customers: page.data.map((c) =>
                             customerItem(c, contact),
                         ),
+                        total,
                         next_cursor: page.nextCursor,
                     },
                 };

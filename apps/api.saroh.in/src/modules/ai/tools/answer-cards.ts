@@ -18,13 +18,20 @@ import type {
     summariseOrdersTool,
     summariseStockTool,
 } from "@saroh/api-contract";
-import { ASK_AI_CARD_ITEMS, askAiAppHref } from "@saroh/api-contract";
+import { ASK_AI_CARD_ITEMS } from "@saroh/api-contract";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 import type { z } from "zod";
 
 import { moneyWords } from "../../../common/words-format";
 import { COUNTING_ROWS } from "../../stock/tracking";
+import {
+    appLink,
+    dateFilter,
+    INSIGHTS_PERIOD,
+    instantSpan,
+    pageLink,
+} from "./app-links";
 
 /**
  * Ask AI's answer cards (14 Nov): what a read tool found, drawn under the
@@ -77,17 +84,15 @@ export function ownMediaUrl(
     }
 }
 
-/** A record's page in the app; null unless it is an app route. */
-const route = (base: string, id: string | null | undefined) => {
-    if (!id) return null;
-    const href = `${base}/${encodeURIComponent(id)}`;
-    return askAiAppHref.safeParse(href).success ? href : null;
-};
-const productHref = (id: string) => route("/commerce/products", id) ?? "";
-const invoiceHref = (id: string) => route("/billing/invoices", id);
-const orderHref = (id: string) => route("/commerce/orders", id);
-const bookingHref = (id: string) => route("/bookings", id);
-const contactHref = (id: string | null) => route("/contacts", id);
+const productHref = (id: string) => appLink("product", {}, id) ?? "";
+const invoiceHref = (id: string) => appLink("invoice", {}, id);
+const orderHref = (id: string) => appLink("order", {}, id);
+const bookingHref = (id: string) => appLink("booking", {}, id);
+const contactHref = (id: string | null) => appLink("customer", {}, id);
+
+/** The Orders screen with list_orders' days. */
+export const ordersHref = (input: { from?: string; to?: string } | undefined) =>
+    pageLink("orders", dateFilter(instantSpan(input)));
 
 /** The Invoices screen's tab for a summary's status, where it has one. */
 const INVOICE_TAB: Record<string, string> = {
@@ -95,10 +100,15 @@ const INVOICE_TAB: Record<string, string> = {
     unpaid: "due",
     overdue: "overdue",
 };
-export const invoicesHref = (status?: string) =>
-    status && INVOICE_TAB[status]
-        ? `/billing/invoices?tab=${INVOICE_TAB[status]}`
-        : "/billing/invoices";
+/** The Invoices screen: a status's tab, issued in the period's days. */
+export const invoicesHref = (
+    status?: string,
+    span?: { period?: string; from?: string; to?: string },
+) =>
+    pageLink("invoices", {
+        tab: status ? INVOICE_TAB[status] : undefined,
+        ...dateFilter(span ?? {}),
+    });
 
 // shortcut: an instant is read on its own offset (the tools send UTC), so near midnight it can be the business's next or last day; pass the zone in if that matters.
 function day(iso: string | null): string {
@@ -171,6 +181,8 @@ export function answerCard(
     data: unknown,
     facts: ReadonlyMap<string, ProductFacts>,
     mediaBase: string | undefined,
+    /** What the tool was called with: a list's link carries its filters. */
+    input?: unknown,
 ): AskAiInfoCard | null {
     const fact = (id: string) => facts.get(id);
     const image = (id: string) => ownMediaUrl(fact(id)?.image, mediaBase);
@@ -190,7 +202,13 @@ export function answerCard(
                     href: productHref(p.product_id),
                 })),
                 d.best_sellers.length,
-                { label: "Open in Insights", href: "/analytics?tab=sells" },
+                {
+                    label: "Open in Insights",
+                    href: pageLink("insights", {
+                        tab: "sells",
+                        period: INSIGHTS_PERIOD[d.period],
+                    }),
+                },
             );
         }
         case "list_products": {
@@ -207,8 +225,11 @@ export function answerCard(
                     stock: fact(p.product_id)?.stock ?? null,
                     href: productHref(p.product_id),
                 })),
-                d.products.length,
-                { label: "Open in Products", href: "/commerce/products" },
+                d.total,
+                {
+                    label: "Open in Products",
+                    href: pageLink("products"),
+                },
             );
         }
         case "get_product": {
@@ -263,7 +284,7 @@ export function answerCard(
                     numeric: numericOf(t.columns, ["Owed"]),
                     link: {
                         label: "Open in Invoices",
-                        href: "/billing/invoices?view=owed",
+                        href: pageLink("invoices", { view: "owed" }),
                     },
                 },
                 t.rows,
@@ -291,10 +312,15 @@ export function answerCard(
                     title: "Orders",
                     columns: t.columns,
                     numeric: numericOf(t.columns, ["Total"]),
-                    link: { label: "Open in Orders", href: "/commerce/orders" },
+                    link: {
+                        label: "Open in Orders",
+                        href: ordersHref(
+                            input as z.infer<(typeof listOrdersTool)["input"]>,
+                        ),
+                    },
                 },
                 t.rows,
-                d.orders.length,
+                d.total,
                 d.orders.map((o) => orderHref(o.order_id)),
             );
         }
@@ -320,10 +346,22 @@ export function answerCard(
                 {
                     title: "Bookings",
                     columns: t.columns,
-                    link: { label: "Open in Bookings", href: "/bookings" },
+                    link: {
+                        label: "Open in Bookings",
+                        href: pageLink(
+                            "bookings",
+                            dateFilter(
+                                instantSpan(
+                                    input as
+                                        | { from?: string; to?: string }
+                                        | undefined,
+                                ),
+                            ),
+                        ),
+                    },
                 },
                 t.rows,
-                d.bookings.length,
+                d.total,
                 d.bookings.map((b) => bookingHref(b.booking_id)),
             );
         }
@@ -345,10 +383,13 @@ export function answerCard(
                 {
                     title: `Not seen for ${d.days} days or more`,
                     columns: t.columns,
-                    link: { label: "Open in Customers", href: "/contacts" },
+                    link: {
+                        label: "Open in Customers",
+                        href: pageLink("customers"),
+                    },
                 },
                 t.rows,
-                d.customers.length,
+                d.total,
                 d.customers.map((c) => contactHref(c.customer_id)),
             );
         }
@@ -370,10 +411,13 @@ export function answerCard(
                 {
                     title: "Customers",
                     columns: t.columns,
-                    link: { label: "Open in Customers", href: "/contacts" },
+                    link: {
+                        label: "Open in Customers",
+                        href: pageLink("customers"),
+                    },
                 },
                 t.rows,
-                d.customers.length,
+                d.total,
                 d.customers.map((c) => contactHref(c.customer_id)),
             );
         }
@@ -399,7 +443,7 @@ export function answerCard(
                     numeric: numericOf(t.columns, ["Total"]),
                     link: {
                         label: "Open in Orders",
-                        href: `/commerce/orders?date=custom&from=${d.span.from}&to=${d.span.to}`,
+                        href: pageLink("orders", dateFilter(d.span)),
                     },
                 },
                 t.rows,
@@ -428,10 +472,9 @@ export function answerCard(
                     title: `Invoices, ${day(d.span.from)} to ${day(d.span.to)}`,
                     columns: t.columns,
                     numeric: numericOf(t.columns, ["Amount"]),
-                    // The list has no issued-date filter: a status tab only.
                     link: {
                         label: "Open in Invoices",
-                        href: invoicesHref(only?.status),
+                        href: invoicesHref(only?.status, d.span),
                     },
                 },
                 t.rows,
@@ -459,12 +502,13 @@ export function answerCard(
                     numeric: numericOf(t.columns, ["On hand", "Value"]),
                     link: {
                         label: "Open in Stock",
-                        href: "/commerce/stock?tab=levels",
+                        // On hand is now: the levels, not the period's log.
+                        href: pageLink("stock", { tab: "levels" }),
                     },
                 },
                 t.rows,
                 d.products,
-                d.top.map((p) => route("/commerce/products", p.product_id)),
+                d.top.map((p) => appLink("product", {}, p.product_id)),
             );
         }
         case "summarise_bookings": {
@@ -485,13 +529,9 @@ export function answerCard(
                 {
                     title: `Bookings, ${day(d.span.from)} to ${day(d.span.to)}`,
                     columns: t.columns,
-                    // The list has no date range; one day opens that day.
                     link: {
                         label: "Open in Bookings",
-                        href:
-                            d.span.from === d.span.to
-                                ? `/bookings?date=${d.span.from}`
-                                : "/bookings/all?view=all",
+                        href: pageLink("bookings", dateFilter(d.span)),
                     },
                 },
                 t.rows,
@@ -509,7 +549,10 @@ export function answerCard(
                     link: {
                         label: "Open in Calendar",
                         // The week view from the period's first day.
-                        href: `/calendar?view=week&day=${d.span.from}`,
+                        href: pageLink("calendar", {
+                            view: "week",
+                            day: d.span.from,
+                        }),
                     },
                 },
                 d.classes.map((c) => [
@@ -535,7 +578,10 @@ export function answerCard(
                     title: "Waitlist",
                     columns: ["Class", "When", "Place", "Customer", "Status"],
                     numeric: [2],
-                    link: { label: "Open in Bookings", href: "/bookings" },
+                    link: {
+                        label: "Open in Bookings",
+                        href: pageLink("bookings"),
+                    },
                 },
                 rows.map((w) => [
                     w.service,
@@ -544,7 +590,7 @@ export function answerCard(
                     w.name?.text ?? "",
                     w.status === "offered" ? "Offered a place" : "Waiting",
                 ]),
-                rows.length,
+                d.people,
                 rows.map((w) => contactHref(w.customer_id)),
             );
         }
@@ -559,7 +605,7 @@ export function answerCard(
                     numeric: [2],
                     link: {
                         label: "Open in Class packs",
-                        href: "/class-packs/purchases",
+                        href: pageLink("classPacks"),
                     },
                 },
                 d.packs.map((p) => [
