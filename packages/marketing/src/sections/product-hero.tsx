@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
 
+import type { ChatWords } from "../content/types";
 import { Container } from "../layout/container";
 import { ScreenshotFrame } from "../media/screenshot-frame";
 import type { ShotView } from "../media/shot";
 import type { Crumb } from "../nav/breadcrumbs";
 import { Breadcrumbs } from "../nav/breadcrumbs";
+import { ChatExchange } from "./chat-exchange";
 
 /**
  * A feature or solution page's opening (DEC-195, A5): the breadcrumb, the
  * headline, the sub, the site's buttons (`actions`), the free-plan line,
  * then the page's screenshot, which enlarges on click, and its note. A page
- * with no screen captured yet has neither.
+ * with no screen captured yet has neither. A hero in another company's app
+ * (`chat`, AI apps) is drawn in place of the screenshot, not shot.
  */
 export function ProductHero({
     section,
@@ -22,6 +25,7 @@ export function ProductHero({
     today,
     freeLine,
     shot,
+    chat,
     note,
 }: {
     /** The crumb before the page's own name: "Features", "Solutions". */
@@ -38,6 +42,8 @@ export function ProductHero({
     /** The free-plan line, from the site's read of its plans. */
     freeLine?: string;
     shot?: ShotView;
+    /** Drawn in place of `shot` when given. */
+    chat?: ChatWords;
     note?: string;
 }) {
     return (
@@ -67,7 +73,17 @@ export function ProductHero({
                     </p>
                 ) : null}
             </Container>
-            {shot ? (
+            {chat ? (
+                <Container className="pt-14">
+                    {/* The wash the boards set a drawn screen on (as /developers). */}
+                    <div className="rounded-mk-band border border-border bg-muted p-4 sm:p-7">
+                        <ChatExchange
+                            words={chat}
+                            className="mx-auto max-w-mk-article"
+                        />
+                    </div>
+                </Container>
+            ) : shot ? (
                 <Container className="pt-14">
                     <ScreenshotFrame
                         shot={shot}

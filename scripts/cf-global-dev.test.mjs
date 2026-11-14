@@ -17,6 +17,12 @@ test("the site: no public workers.dev address, and the gate's cookie", () => {
     assert.equal(out.workers_dev, false);
     assert.equal(out.vars.DEV_ACCESS_COOKIE_DOMAIN, `.${DOMAIN}`);
     assert.equal(out.vars.API_URL, `https://api.${DOMAIN}`);
+    // Global's launch set on, and what waits for paid plans off.
+    assert.equal(out.vars.NEXT_PUBLIC_AI_APPS, "on");
+    assert.equal(out.vars.NEXT_PUBLIC_SOCIAL, "on");
+    assert.equal(out.vars.NEXT_PUBLIC_TEMPLATES, "on");
+    assert.equal(out.vars.NEXT_PUBLIC_ASK_AI, undefined);
+    assert.equal(out.vars.NEXT_PUBLIC_DEVELOPERS, undefined);
 });
 
 for (const [dir, sub] of [

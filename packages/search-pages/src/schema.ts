@@ -39,7 +39,12 @@ export const ALSO_ICONS = [
     "person",
     "layers",
     "lock",
+    "chat",
+    "ask",
+    "share",
 ] as const;
+/** What an ask to an AI app does: changes at once, leaves a site draft, or only answers. */
+export const AI_OUTCOMES = ["at_once", "draft", "answer"] as const;
 
 const tile = z.object({ title: text, line: text, phoneLine: text });
 const time = z.object({
@@ -90,6 +95,41 @@ const order = z.object({
     payLabel: text.optional(),
     detail: text.optional(),
 });
+
+/**
+ * "Ask your AI assistant" (plan 2026-11-13-002, U13): three asks, one of
+ * each outcome, each only what the MCP tools do
+ * (packages/api-contract/src/mcp), plus the Ask AI and Share lines under
+ * them. `also` words the three new "Also in Saroh" items for this trade
+ * (AI apps, Ask AI, Share, in that order); without it they take the
+ * shape's words (`NEW_ALSO` in parts.tsx).
+ */
+const aiSchema = z
+    .object({
+        lead: text,
+        asks: z
+            .array(
+                z.object({
+                    ask: text,
+                    reply: text,
+                    outcome: z.enum(AI_OUTCOMES),
+                    title: text,
+                    line: text,
+                }),
+            )
+            .length(3)
+            .refine(
+                (asks) => new Set(asks.map((a) => a.outcome)).size === 3,
+                "one ask of each outcome: at_once, draft and answer",
+            ),
+        askAiLine: text,
+        shareLine: text,
+        also: z
+            .array(z.object({ title: text, line: text }))
+            .length(3)
+            .optional(),
+    })
+    .strict();
 
 export const sceneSchema = z.object({
     business: text,
@@ -246,6 +286,7 @@ export const frontmatterSchema = z
             )
             .min(1),
         ctaTitle: text,
+        ai: aiSchema.optional(),
         scene: sceneSchema,
     })
     .strict()
@@ -273,6 +314,8 @@ export type Shape = Frontmatter["shape"];
 export type Family = Frontmatter["family"];
 export type ChipIcon = (typeof CHIP_ICONS)[number];
 export type AlsoIcon = (typeof ALSO_ICONS)[number];
+export type AiOutcome = (typeof AI_OUTCOMES)[number];
+export type AiBlock = NonNullable<Frontmatter["ai"]>;
 
 export interface Question {
     question: string;

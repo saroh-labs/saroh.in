@@ -16,6 +16,7 @@ import {
 } from "./help";
 import type { HelpFrontmatter } from "./help-frontmatter";
 import { helpFrontmatter } from "./help-frontmatter";
+import { liveIntegrations } from "./integrations";
 import { dayStartsAt } from "./resources";
 import { CAPTURED } from "./shots.captured";
 import { helpErrors } from "./validate";
@@ -44,7 +45,7 @@ describe("the real Help articles", () => {
     it("Add your first product has its five captured screens, all live on 17 Oct", () => {
         expect(first.steps).toHaveLength(5);
         for (const step of first.steps) {
-            expect(CAPTURED[step.shot].src).toMatch(/^\/shots\/help\//);
+            expect(CAPTURED[step.shot ?? ""].src).toMatch(/^\/shots\/help\//);
         }
         expect(first.publishOn).toBe(HELP_PUBLISH_ON);
         expect(first.area).toBe("Products");
@@ -131,6 +132,141 @@ describe("helpErrors catches", () => {
         expect(errs([article(), article()])).toEqual([
             "help add-your-first-product: two articles",
         ]);
+    });
+});
+
+describe("a step's picture: a captured shot, a drawn panel, or app cards", () => {
+    const form = {
+        kind: "form",
+        app: "Claude",
+        address: "claude.ai",
+        title: "Add a custom connector",
+        fields: [{ label: "Name", value: "Saroh" }],
+        button: "Add",
+    };
+    const parse = (step: Record<string, unknown>) =>
+        helpFrontmatter.safeParse({
+            ...first,
+            steps: [{ title: "S", body: "B", caption: "C", ...step }],
+        });
+
+    it("a step with a drawn panel and no shot validates", () => {
+        expect(parse({ panel: form }).success).toBe(true);
+    });
+
+    it("a step with neither fails, and one with both fails", () => {
+        expect(parse({}).success).toBe(false);
+        expect(parse({ shot: "help-add-product-1", panel: form }).success).toBe(
+            false,
+        );
+    });
+
+    it("a step of app cards needs no picture and no caption", () => {
+        const apps = [{ id: "n8n", name: "n8n", how: "Add the node." }];
+        expect(
+            helpFrontmatter.safeParse({
+                ...first,
+                steps: [{ title: "S", body: "B", apps }],
+            }).success,
+        ).toBe(true);
+        expect(parse({ apps, shot: "help-add-product-1" }).success).toBe(false);
+    });
+
+    it("a panel of an unknown kind fails", () => {
+        expect(parse({ panel: { ...form, kind: "photo" } }).success).toBe(
+            false,
+        );
+    });
+
+    it("troubles default to none; feature must be a release switch", () => {
+        const ok = helpFrontmatter.parse({ ...first, feature: "ai-apps" });
+        expect(ok.troubles).toEqual([]);
+        expect(
+            helpFrontmatter.safeParse({ ...first, feature: "rockets" }).success,
+        ).toBe(false);
+    });
+
+    it("an uncaptured shot is pending only in an article waiting on a switch", () => {
+        const pending = { ...first.steps[0], shot: "help-nothing-1" };
+        expect(
+            helpErrors({
+                articles: [article({ steps: [pending], feature: "ai-apps" })],
+                captured: CAPTURED,
+            }),
+        ).toEqual([]);
+        expect(
+            helpErrors({
+                articles: [article({ steps: [pending] })],
+                captured: CAPTURED,
+            }),
+        ).toHaveLength(1);
+    });
+
+    it("checks a panel's, an app card's and a trouble's words for prices", () => {
+        const a = article({
+            steps: [
+                {
+                    title: "S",
+                    body: "B",
+                    caption: "C",
+                    panel: { ...form, button: "Pay ₹10" },
+                } as HelpFrontmatter["steps"][number],
+            ],
+            troubles: [{ title: "T", body: "Up to 5 products." }],
+        });
+        expect(helpErrors({ articles: [a], captured: CAPTURED })).toHaveLength(
+            2,
+        );
+    });
+});
+
+describe("an article waiting on a switch", () => {
+    it("is not live while its switch is off", () => {
+        const list = [sum({ slug: "w", feature: "ai-apps" }), sum({})];
+        const ctx = { ...at("2026-11-01T00:00:00Z"), off: ["ai-apps"] };
+        expect(liveArticles(list, ctx).map((a) => a.slug)).toEqual(["s"]);
+        expect(
+            liveArticles(list, { ...ctx, off: [] }).map((a) => a.slug),
+        ).toEqual(["w", "s"]);
+    });
+
+    it("every new article waits on one, and the summary carries it", () => {
+        const waiting = real.filter((a) => a.feature).map((a) => a.slug);
+        expect(waiting.sort()).toEqual([
+            "api-keys-and-webhooks",
+            "ask-ai",
+            "connect-chatgpt",
+            "connect-claude",
+            "connect-other-ai-apps",
+            "share-a-post",
+        ]);
+        const claude = real.find((a) => a.slug === "connect-claude");
+        expect(claude && summarise(claude).feature).toBe("ai-apps");
+    });
+});
+
+describe("Connect other AI apps", () => {
+    it("has an anchor for every Integrations card that links into it", () => {
+        const other = real.find((a) => a.slug === "connect-other-ai-apps");
+        const ids = new Set(
+            (other?.steps ?? []).flatMap((s) => [
+                ...(s.anchor ? [s.anchor] : []),
+                ...(s.apps ?? []).map((app) => app.id),
+            ]),
+        );
+        const wanted = liveIntegrations
+            .map((c) => c.href)
+            .filter((h) => h.startsWith("/help/connect-other-ai-apps#"))
+            .map((h) => h.split("#")[1]);
+        expect(wanted).toEqual([
+            "perplexity",
+            "le-chat",
+            "zapier",
+            "make",
+            "n8n",
+            "coding-tools",
+        ]);
+        for (const id of wanted) expect(ids).toContain(id);
     });
 });
 

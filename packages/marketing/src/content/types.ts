@@ -5,7 +5,11 @@
  * sentences: this file reaches browser bundles.
  */
 
-/** The nine feature pages, in the menu's order. */
+/**
+ * Every feature page, in the menu's order. What a build shows is
+ * `shownFeatures` (`feature-switches.ts`): read the list through it, never
+ * directly, so a switched-off feature is never built or linked.
+ */
 export const FEATURE_SLUGS = [
     "dashboard",
     "products",
@@ -16,8 +20,16 @@ export const FEATURE_SLUGS = [
     "billing",
     "website",
     "insights",
+    "ai-apps",
+    "ask-ai",
+    "social",
 ] as const;
 export type FeatureSlug = (typeof FEATURE_SLUGS)[number];
+
+/** A `[slug]` route's props: both sites' feature pages take the same. */
+export interface SlugPageProps {
+    params: Promise<{ slug: string }>;
+}
 
 /** The four solution pages, in the menu's order. */
 export const SOLUTION_SLUGS = ["shops", "salons", "gyms", "clinics"] as const;
@@ -69,6 +81,23 @@ export const SHOT_KEYS = [
     "l-customer",
     "l-invoice",
     "l-site",
+    // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until
+    // U3 to U5 capture or draw them; never built while their switch is off.
+    "ai-hero",
+    "ai-connect",
+    "ai-consent",
+    "ai-ask",
+    "ai-activity",
+    "ask-hero",
+    "ask-start",
+    "ask-answer",
+    "ask-confirm",
+    "ask-history",
+    "sh-sheet",
+    "sh-button",
+    "sh-cards",
+    "sh-phone",
+    "sh-post",
 ] as const;
 export type ShotKey = (typeof SHOT_KEYS)[number];
 
@@ -108,6 +137,29 @@ export interface SearchWords {
     seoDescription: string;
 }
 
+/**
+ * What a change asked of an AI app does in Saroh (plan 2026-11-13-002): made
+ * at once, left as a website draft to publish, or only answered. The pill's
+ * words come from code (`chat-exchange.tsx`), not from each page.
+ */
+export type ChatOutcome = "at_once" | "draft" | "answer";
+
+/**
+ * A chat in another company's AI app, drawn in text because it can't be
+ * captured (`ChatExchange`): the ask, the reply and what came of it.
+ */
+export interface ChatWords {
+    /** What the drawing shows, for its caption: "Drawing of a chat in …". */
+    caption: string;
+    ask: string;
+    /** The Saroh tools the app called, as the app lists them. */
+    tools?: string;
+    reply: string;
+    outcome: ChatOutcome;
+    /** The record it made or changed, as a small card under the reply. */
+    result?: { title: string; line: string };
+}
+
 export interface FeatureStep extends ShotRef {
     title: string;
     body: string;
@@ -115,6 +167,16 @@ export interface FeatureStep extends ShotRef {
     who: string;
     /** A part of a feature that can't be used yet: the page marks it. */
     notYet?: boolean;
+    /** A step in another company's app: drawn as this chat, not `shot`. */
+    chat?: ChatWords;
+}
+
+/** AI apps' "Apps you can use": the cards come from the site's Integrations list. */
+export interface FeatureAppList {
+    title: string;
+    lead: string;
+    /** The apps named in one line, without cards. */
+    also: string;
 }
 
 export interface Point {
@@ -127,6 +189,23 @@ export interface Point {
     openNote?: string;
     /** A part of a feature that can't be used yet: the page marks it. */
     notYet?: boolean;
+}
+
+/**
+ * The Website page's "Pick a template for your trade" (DEC-216, board
+ * VSWebsite): drawn between How it works and What it does, only while the
+ * site's templates switch is on.
+ */
+export interface FeatureTemplates {
+    title: string;
+    lead: string;
+    /** Gallery template slugs the drawn picker shows; the first is suggested. */
+    picks: string[];
+    /** The picker's first chip and the suggested card's line ("Suggested for salons"). */
+    suggested: string;
+    points: Point[];
+    /** The link to the gallery's words ("See every template"). */
+    linkLabel: string;
 }
 
 export interface Feature extends SearchWords {
@@ -142,9 +221,15 @@ export interface Feature extends SearchWords {
     headline: string;
     sub: string;
     hero: ShotRef;
+    /** A hero in another company's app: drawn as this chat, not `hero`'s shot. */
+    heroChat?: ChatWords;
     howTitle: string;
     steps: FeatureStep[];
+    /** Website only: the templates section, while templates are on. */
+    templates?: FeatureTemplates;
     points: Point[];
+    /** AI apps only: "Apps you can use", after What it does. */
+    apps?: FeatureAppList;
     worksLead: string;
     /** Other features, by slug; the test fails on a missing one. */
     worksWith: FeatureSlug[];

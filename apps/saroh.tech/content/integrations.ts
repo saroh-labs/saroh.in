@@ -6,6 +6,29 @@ import {
 } from "./coming";
 
 /**
+ * The AI apps whose sign-in has been walked on dev (saroh.in's `liveOnDev`,
+ * ticket 11): Integrations lists them and the AI apps page draws them as
+ * cards, both only while `NEXT_PUBLIC_AI_APPS` is on. Each card opens its
+ * help article here: this site has no provider pages.
+ */
+export const AI_APP_CARDS = [
+    {
+        name: "Claude",
+        kind: "AI assistant",
+        line: "Ask Claude to add a product, move a booking or draft a page on your site. Website changes wait for you to publish them in Saroh.",
+        cta: "Connect Claude",
+        href: "/help/connect-claude",
+    },
+    {
+        name: "ChatGPT",
+        kind: "AI assistant",
+        line: "The same from ChatGPT: your products, bookings, orders and customers, and your site as a draft, in your own words.",
+        cta: "Connect ChatGPT",
+        href: "/help/connect-chatgpt",
+    },
+] as const;
+
+/**
  * /integrations: only what works for a business outside India today, then the
  * one list of what's coming, marked as saroh.in marks its own, with no dates.
  */
@@ -39,6 +62,13 @@ export const INTEGRATIONS = {
             where: "Find it in Settings › Your data",
         },
     ],
+    /** Drawn first, only while `NEXT_PUBLIC_AI_APPS` is on. */
+    aiApps: AI_APP_CARDS.map((app) => ({
+        name: app.name,
+        category: "AI apps",
+        line: app.line,
+        where: "Find it in Settings › API and AI apps",
+    })),
     plannedTitle: COMING_TITLE,
     plannedIntro: COMING_INTRO,
     notYet: NOT_AVAILABLE_YET,

@@ -91,7 +91,29 @@ export const HELP_ARTICLES = [
         slug: "verify-your-site-and-add-analytics",
         title: "Verify your site and add analytics",
     },
+    // Each waits on its saroh.in release switch (plan 2026-11-13-002, U9):
+    // a 404 there until then, so the command menu leaves out any entry
+    // with `waitsFor`. The release commit drops it as the switch turns on.
+    { slug: "connect-claude", title: "Connect Claude", waitsFor: "ai-apps" },
+    { slug: "connect-chatgpt", title: "Connect ChatGPT", waitsFor: "ai-apps" },
+    {
+        slug: "connect-other-ai-apps",
+        title: "Connect other AI apps",
+        waitsFor: "ai-apps",
+    },
+    { slug: "ask-ai", title: "Ask AI about your business", waitsFor: "ask-ai" },
+    { slug: "share-a-post", title: "Share a post", waitsFor: "social" },
+    {
+        slug: "api-keys-and-webhooks",
+        title: "API keys and webhooks",
+        waitsFor: "developers",
+    },
 ] as const;
+
+/** The articles the app may link to now: none still waiting on a switch. */
+export const LINKED_HELP_ARTICLES = HELP_ARTICLES.filter(
+    (a) => !("waitsFor" in a),
+);
 
 export type HelpArticle = (typeof HELP_ARTICLES)[number]["slug"];
 

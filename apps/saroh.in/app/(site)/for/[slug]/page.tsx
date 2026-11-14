@@ -9,7 +9,9 @@ import { PricingCards } from "@/components/pricing/pricing-cards";
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { FREE_PLAN_LINE } from "@/content/home";
+import { env } from "@/env";
 import { demoHref, demoTradeOf } from "@/lib/demos";
+import { featuresOff } from "@/lib/feature-switches";
 import { cta, LAUNCH_MODE } from "@/lib/links";
 import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
@@ -95,7 +97,11 @@ export default async function ForPage({ params }: Props) {
                         demo: demo ?? undefined,
                         hub: FOR_HUB.path,
                         page: (s) => (built.has(s) ? `/for/${s}` : undefined),
+                        // Only switched-on features are linked, and their pages follow the same switches.
+                        feature: (f) => `/features/${f}`,
                     }}
+                    // The AI section and the new Also items follow the release switches (U13).
+                    off={featuresOff(env)}
                     freeLine={
                         free && free !== FREE_PLAN_LINE.fallback
                             ? free

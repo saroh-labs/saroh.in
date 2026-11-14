@@ -1,0 +1,79 @@
+---
+# The words are board VHApi's (release visibility, approved 13 Nov 2026),
+# each label checked against the code. Sources, from the repo root:
+#   KEYS   apps/app.saroh.in/components/settings/developers/keys.tsx (New
+#          key, Kind of key, Website key (read-only), Server key, Name, What
+#          it can do, Let AI apps use this key, Stops working, Create key;
+#          the key's sheet: Replace key, Revoke, Edit what it can do)
+#   ONCE   apps/app.saroh.in/components/settings/developers/secret-once.tsx
+#          (Copy your key now, Copy key, I've saved it)
+#   HOOKS  apps/app.saroh.in/components/settings/developers/webhooks.tsx (Add
+#          an address, Address, Name, Tell it when, Add address, Copy your
+#          signing secret now, Latest messages, Send a test)
+#   TABS   apps/app.saroh.in/lib/settings/developers.ts (Connections, API
+#          keys; Notifications to your systems, webhooks; who sees them)
+#   DOCS   apps/docs.saroh.in/content/api/keys.mdx and webhooks.mdx
+#          (pk_live_/sk_live_, X-Saroh-Signature, 5 minutes, raw body, ping,
+#          24 hours)
+# Shots are captured on Northwind Supply, with a sample key, before
+# NEXT_PUBLIC_DEVELOPERS is turned on.
+title: API keys and webhooks
+slug: api-keys-and-webhooks
+area: AI apps and API
+group: Use AI apps and the API
+order: 50
+feature: developers
+intro: "A key lets your developer's server, a tool like n8n, or your own website work with your business. A webhook tells your systems the moment something happens, like a new order. You only need these if a developer asks for them."
+description: "Make an API key for your developer or your website, copy it once, replace or revoke it, and send your systems a webhook when something happens in Saroh."
+readMinutes: 5
+updated: "2026-11-14"
+steps:
+    # TABS, KEYS.
+    - title: Open Connections and make a key
+      body: "In Saroh, open Settings › API and AI apps, then the Connections tab (API keys). Only the owner sees it. Press New key."
+      shot: help-api-keys-and-webhooks-1
+      caption: "Connections at Northwind Supply (a demo shop), before any key."
+      marker: New key
+    # KEYS.
+    - title: Choose the kind and what it can do
+      body: "Under Kind of key, pick Website key (read-only) for your own website: it only reads products, times, posts and plans, and needs the websites it works on. Or pick Server key for your developer's server or a tool like n8n. Give it a Name. For a server key, tick See or Change for each area under What it can do; Change includes See. Leave Let AI apps use this key off unless your developer is connecting an AI tool. Choose when it Stops working, and press Create key."
+      shot: help-api-keys-and-webhooks-2
+      caption: "A server key for stock sync at Northwind Supply (a demo shop)."
+      tip: "Live keys act on your real business: there's no test mode yet. A key can do only what both the key and its maker's role allow."
+      marker: Create key
+    # ONCE.
+    - title: Copy it once
+      body: "Copy your key now shows the whole key, once. Press Copy key, give it only to your developer, then press I've saved it. Saroh keeps only a fingerprint, so nobody can show it to you again. The list shows how each key starts, like sk_live_ for a server key or pk_live_ for a website key."
+      shot: help-api-keys-and-webhooks-3
+      caption: "The key, shown once, at Northwind Supply (a demo shop, sample key)."
+      marker: Copy key
+    # KEYS.
+    - title: Replace or revoke a key
+      body: "Open a key from the list. Replace key gives you a new one; the old one keeps working for 24 hours while you switch. Revoke stops it at once: anything using it is refused, and it can't be undone. Edit what it can do changes its name and areas without a new key."
+      shot: help-api-keys-and-webhooks-4
+      caption: "A key's sheet at Northwind Supply (a demo shop)."
+    # HOOKS, TABS.
+    - title: Add a webhook address
+      body: "Open the Notifications to your systems tab (webhooks) and press Add an address. Paste an https address on your own server, give it a Name like Order sync, and under Tell it when tick what it should hear about, like New order and Order paid. Press Add address. Copy your signing secret now shows its secret once: give it to your developer."
+      shot: help-api-keys-and-webhooks-5
+      caption: "A webhook for order sync at Northwind Supply (a demo shop)."
+      marker: Add address
+    # HOOKS, DOCS.
+    - title: Send a test and check the signature
+      body: "Open the address and press Send a test. Saroh sends a ping, and Latest messages shows it as Delivered, or Failed with the reason. Your developer checks the X-Saroh-Signature header on every message with the signing secret, as the developer docs show."
+      shot: help-api-keys-and-webhooks-6
+      caption: "A delivered test at Northwind Supply (a demo shop)."
+      marker: Send a test
+troubles:
+    - title: There's no Connections or Notifications tab.
+      body: "Keys are made by the owner, and webhooks by people the owner allows. Neither comes with every plan."
+    - title: Calls with the key are refused.
+      body: "The key was revoked or has stopped working, or the person who made it left the business or is paused. Make a new key. A key works only on the Saroh it was made on."
+    - title: An address was turned off.
+      body: "Saroh stops sending after too many messages in a row fail. Fix your end, open the address and press Send a test: once one gets through, it turns back on."
+    - title: The signature doesn't match.
+      body: "Check it against the raw body exactly as it arrived, not re-written JSON, and refuse only times more than 5 minutes off. After you replace the secret, the old and new one both sign for 24 hours."
+next: [connect-other-ai-apps, connect-claude, connect-razorpay]
+---
+
+Your developer's side, with code, is in [Saroh for developers](/developers) and the developer docs it links to.

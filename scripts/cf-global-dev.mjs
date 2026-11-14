@@ -34,6 +34,12 @@ export function globalDevConfig(config, dir, domain) {
                 API_URL: `https://api.${domain}`,
                 DEV_ACCESS_COOKIE_DOMAIN: `.${domain}`,
                 NEXT_PUBLIC_EDITION: "GLOBAL",
+                // What Global gets at its launch (plan 2026-11-13-002, U16),
+                // on here to check before then. Ask AI and Developers wait
+                // for Global's paid plans, so stay off.
+                NEXT_PUBLIC_AI_APPS: "on",
+                NEXT_PUBLIC_SOCIAL: "on",
+                NEXT_PUBLIC_TEMPLATES: "on",
             },
         };
     }

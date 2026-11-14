@@ -36,6 +36,12 @@ export const BUSINESSES = {
         site: "pulse-fitness",
     },
     kavi: { id: "seed_sc_kavi_org", name: "Kavi Dental", site: "kavi-dental" },
+    /** The demo salon (`salon-data.ts`, NOOR): Share and, later, Ask AI. */
+    gulmohar: {
+        id: "seed_sc_ns_org",
+        name: "Gulmohar Salon & Bridal",
+        site: "gulmohar-salon",
+    },
     northwind: {
         id: "seed_org",
         name: "Northwind Supply",
@@ -1437,6 +1443,144 @@ const PAYMENT_SHOTS: Shot[] = [
     },
 ];
 
+/* ── Share and posts (plan 2026-11-13-002, U4; board VFSocial) ─────────
+ *
+ * The Share button on a live product or service and its sheet, and Create
+ * post. Opening the sheet, picking a card or a size and typing a headline
+ * only change the page's own state: nothing is downloaded, shared or
+ * saved. Needs Share on (`NEXT_PUBLIC_SHARE_POSTS`, unset reads on under
+ * `next dev`) and the API's `SHARE_POSTS`. A phone's own share sheet is
+ * the phone's, never captured: `sh-phone` is Saroh's sheet at phone width.
+ */
+const RYE_SOURDOUGH_PAGE =
+    "/commerce/products/seed_sc_rc_product_0?storefront=seed_sc_rc_store";
+/** The visible Share button: a product page draws a second one for phones. */
+const OPEN_SHARE: Step[] = [
+    { click: "button[data-share-item]:visible" },
+    { waitFor: '[role="dialog"] [role="radiogroup"]' },
+];
+const PHONE: Viewport = { width: 390, height: 844 };
+
+const SHARE_SHOTS: Shot[] = [
+    {
+        key: "sh-sheet",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH_PAGE,
+        viewport: DESK,
+        steps: [
+            ...OPEN_SHARE,
+            { click: '[role="dialog"] [data-card="price"]' },
+            { waitFor: '[role="dialog"] [data-preview] img' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        alt: "The Share sheet for the Sourdough loaf at Rye & Co. (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
+        caption:
+            "The Share sheet for Rye & Co.'s Cardamom bun box: a large Price tag card in the bakery's brown and cream, four card styles, Post, Square and Story, an editable caption with the shop link, and Download image, Copy caption, Send on WhatsApp and Share on Facebook",
+        gap: "The seed's Rye & Co. has no Cardamom bun box; the Sourdough loaf is shown.",
+    },
+    {
+        key: "sh-button",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH_PAGE,
+        viewport: DESK,
+        alt: "The Sourdough loaf's page at Rye & Co. (demo bakery), live on the shop, with the Share button beside QR",
+        caption:
+            "A live product page in Saroh, Cardamom bun box, with the Share button beside QR",
+        gap: "The Sourdough loaf, not a Cardamom bun box.",
+    },
+    {
+        key: "sh-cards",
+        business: "gulmohar",
+        role: "owner",
+        route: "/services/seed_sc_ns_service_hair-spa",
+        viewport: DESK,
+        steps: [
+            ...OPEN_SHARE,
+            { click: '[role="dialog"] button:has-text("Square")' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        alt: "Card styles for Hair spa at Gulmohar Salon & Bridal (demo salon) in the salon's own look, with Square chosen",
+        caption:
+            "Card styles for Kesar Salon's Hair spa in the salon's own plum colours, Square chosen, and the Offer card greyed out because there's no live offer",
+        gap: "The board's Kesar Salon is the seed's Gulmohar Salon & Bridal; with no live offer the Offer card is not offered at all.",
+    },
+    {
+        key: "sh-phone",
+        business: "pulse",
+        role: "owner",
+        // HIIT class (`data.ts`, PULSE services[1]).
+        route: "/services/seed_sc_pulse_service_1",
+        viewport: PHONE,
+        steps: OPEN_SHARE,
+        alt: "The Share sheet on a phone for a class at Pulse Fitness (demo gym), with Share now",
+        caption:
+            "A phone share sheet with a Morning HIIT card in Pulse Fitness's navy, a note saying the caption is copied for Instagram, and WhatsApp, Instagram, Facebook and More",
+        gap: "The phone's own share sheet can't be captured; this is Saroh's sheet before Share now opens it.",
+    },
+    {
+        key: "sh-post",
+        business: "rye",
+        role: "owner",
+        route: "/social/new",
+        viewport: DESK,
+        steps: [
+            { click: '[data-own-post] button:has-text("Text only")' },
+            { waitFor: "[data-own-headline]" },
+            {
+                fill: "[data-own-headline]",
+                value: "We're hiring a morning baker",
+            },
+            // Out of the field, so no focus ring is in the picture.
+            { click: "main h1" },
+        ],
+        alt: "Create post at Rye & Co. (demo bakery): Text only, the headline We're hiring a morning baker, a link and the card drawn in the bakery's look",
+        caption:
+            "Create post with Text only chosen, the headline We're hiring a morning baker, a link to the Work with us page, and the card drawn in the bakery's green",
+        gap: "The link is left as offered; the seed may have no Work with us page.",
+    },
+];
+
+/* ── AI apps (plan 2026-11-13-002, U3; board VFAiApps) ─────────────────
+ *
+ * Only Saroh's own screens: the AI app's chat and its Add a connector form
+ * are another company's, drawn on the page or left out, never captured.
+ * Both wait for state the showcase seed doesn't make, so each waits for a
+ * control only the real screen has and fails rather than shoot the wrong
+ * one (see `gap`). Read-only: the consent screen is shot before Allow, and
+ * opening a connection's sheet only changes the page.
+ */
+const AI_APPS_SHOTS: Shot[] = [
+    {
+        key: "ai-consent",
+        business: "rye",
+        role: "owner",
+        route: "accounts:/oauth/consent",
+        viewport: DESK,
+        steps: [{ waitFor: 'button:has-text("Don\'t allow")' }],
+        alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
+        caption:
+            "An AI app wants to use Saroh as you: two of three businesses ticked, what it may do and what it can't, and Allow",
+        gap: "The page needs the signed query of a sign-in an AI app started (its /oauth/authorize redirect); append it to the route by hand for the run. The seed has one Rye & Co., not three.",
+    },
+    {
+        key: "ai-activity",
+        business: "rye",
+        role: "owner",
+        route: "/settings/developers/ai",
+        viewport: DESK,
+        steps: [
+            { click: 'button[aria-label^="Open "]' },
+            { waitFor: '[role="dialog"]' },
+        ],
+        alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
+        caption:
+            "Settings › API and AI apps › AI assistants: Claude connected to two businesses, its last three changes, and Roll back site draft and Disconnect",
+        gap: "The seed connects no AI app: connect one to Rye & Co. on the capture database and make a change or two through it first.",
+    },
+];
+
 export const SHOTS: Shot[] = [
     // ── Rye & Co. ──────────────────────────────────────────────────────
     {
@@ -1837,4 +1981,6 @@ export const SHOTS: Shot[] = [
     ...PAYMENT_SHOTS,
     ...SIZES_SHOTS,
     ...STOCK_SHOTS,
+    ...SHARE_SHOTS,
+    ...AI_APPS_SHOTS,
 ];

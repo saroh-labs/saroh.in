@@ -948,6 +948,108 @@
     }
 }
 
+/* ---- "Ask your AI assistant" and the new Also items (plan 2026-11-13-002, U13) */
+.sp .sp-go {
+    color: var(--sp-amber-text);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+.sp .sp-go-ink {
+    color: var(--sp-ink);
+}
+/* The New pill keeps its own case beside the uppercase eyebrow. */
+.sp-eyebrow .vc-pill {
+    text-transform: none;
+    letter-spacing: normal;
+}
+.sp .sp-ai-lead {
+    margin: 0;
+    max-width: 60ch;
+}
+.sp-ai .sp-bento {
+    margin-top: 32px;
+}
+.sp .sp-ai-chat {
+    margin: 0;
+    justify-content: flex-start;
+    gap: 10px;
+}
+.sp .sp-ai-sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+.sp .sp-ai-ask {
+    align-self: flex-end;
+    max-width: 88%;
+    margin: 0;
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+    border-radius: 14px 14px 4px 14px;
+    padding: 10px 13px;
+    font-size: 14px;
+    line-height: 1.45;
+}
+.sp .sp-ai-reply {
+    align-self: flex-start;
+    max-width: 92%;
+    background: var(--sp-white);
+    border: 1px solid var(--sp-line);
+    border-radius: 14px 14px 14px 4px;
+    padding: 10px 13px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+}
+.sp .sp-ai-reply p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--sp-ink);
+}
+.sp .sp-ai-lines {
+    list-style: none;
+    margin: 40px 0 0;
+    padding: 0;
+    display: grid;
+    /* Also in Saroh's columns (board VTForC): each line a third wide. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 24px 40px;
+}
+.sp .sp-ai-lines li {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+}
+@media (max-width: 899.98px) {
+    /* As "What gets easier" on a phone (board VTForC). */
+    .sp-ai .sp-bento {
+        margin-top: 64px;
+    }
+    .sp .sp-ai-lines {
+        margin-top: 32px;
+        display: flex;
+        flex-direction: column;
+    }
+    /* Collapsed, the new items come first, so they are within the three shown. */
+    .sp-also ul:not([data-all]) li[data-new] {
+        order: -1;
+    }
+    .sp-also ul[data-new="1"]:not([data-all]) li:nth-child(n + 3),
+    .sp-also ul[data-new="2"]:not([data-all]) li:nth-child(n + 2),
+    .sp-also ul[data-new="3"]:not([data-all]) li {
+        display: none;
+    }
+    .sp-also ul[data-new]:not([data-all]) li[data-new] {
+        display: flex;
+    }
+}
+
 /* ---- the /for/ list (ForHub, for-hub-finder.tsx) */
 .sp-fh {
     max-width: 1280px;

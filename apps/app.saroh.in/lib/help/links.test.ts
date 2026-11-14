@@ -12,6 +12,7 @@ import {
     helpHasMoved,
     helpHomeUrl,
     helpUrl,
+    LINKED_HELP_ARTICLES,
     TOPIC_ARTICLE,
 } from "./links";
 
@@ -58,6 +59,15 @@ describe("the articles the app links to", () => {
         for (const a of HELP_ARTICLES) {
             expect(onSite.find((s) => s.slug === a.slug)?.title).toBe(a.title);
         }
+    });
+
+    it("leave out of the app's links an article waiting on a switch", () => {
+        const linked = LINKED_HELP_ARTICLES.map((a) => a.slug);
+        expect(linked).toContain("add-your-first-product");
+        expect(linked).not.toContain("connect-claude");
+        expect(linked).toHaveLength(
+            HELP_ARTICLES.filter((a) => !("waitsFor" in a)).length,
+        );
     });
 
     it("keep the old site's topics real until the move", () => {

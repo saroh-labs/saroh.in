@@ -5,6 +5,9 @@
  * what Free leaves out. `tools` is the one section saroh.in's home doesn't have.
  */
 import type { PlanTeaser, ShotRef } from "@saroh/marketing/content-types";
+import { countWord } from "@saroh/marketing/feature-switches";
+
+import { featureList } from "./features";
 
 /** The day this module's words last changed: Home's `updated`. */
 export const UPDATED = "2026-11-04";
@@ -35,7 +38,8 @@ export const home = {
     chips: ["Nine currencies", "Your own tax line", "No card to start"],
     worksFor: "Works for",
     featuresEyebrow: "Everything in Saroh",
-    featuresTitle: "Nine parts, one workspace.",
+    /** "Nine parts, one workspace.": counts the features this build shows. */
+    featuresTitle: `${countWord(featureList.length)} parts, one workspace.`,
     solutionsTitle: "Solutions",
     pricingTitle: "Pricing",
     pricingCompare: "See pricing",

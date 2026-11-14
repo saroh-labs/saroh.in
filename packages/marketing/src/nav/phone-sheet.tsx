@@ -11,6 +11,7 @@ import { useFocusTrap } from "../layout/use-focus-trap";
 import { TextLink } from "../links/text-link";
 import { ring } from "../ring";
 import { ColumnHeading } from "./column-heading";
+import { MenuItemText } from "./menu-item-text";
 import type { MenuLink, NavItem, NavSection } from "./nav-types";
 import { menuColumns } from "./nav-types";
 
@@ -218,14 +219,10 @@ export function PhoneSheet({
                                         }
                                         className={`-mx-2.5 grid min-h-11 cursor-pointer content-center gap-0.5 rounded-lg px-2.5 py-2 text-foreground no-underline hover:bg-mk-hover hover:text-foreground aria-[current=page]:bg-card ${ring({ offset: "inset" })}`}
                                     >
-                                        <span className="text-base font-semibold">
-                                            {item.name}
-                                        </span>
-                                        {item.line ? (
-                                            <span className="text-mk-note leading-[1.4] text-muted-foreground">
-                                                {item.line}
-                                            </span>
-                                        ) : null}
+                                        <MenuItemText
+                                            item={item}
+                                            nameClass="text-base"
+                                        />
                                     </Link>
                                 ))}
                             </div>

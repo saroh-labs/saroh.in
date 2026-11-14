@@ -66,6 +66,14 @@
         // The Templates gallery's switch (DEC-135): "on" here. Production
         // leaves it out, which is off: no /templates and no link to it.
         "NEXT_PUBLIC_TEMPLATES": "on",
+        // The release switches (plan 2026-11-13-002): AI apps, Ask AI,
+        // Share, /developers, and docs.saroh.in being live. "on" here.
+        // Production leaves them out, which is off.
+        "NEXT_PUBLIC_AI_APPS": "on",
+        "NEXT_PUBLIC_ASK_AI": "on",
+        "NEXT_PUBLIC_SOCIAL": "on",
+        "NEXT_PUBLIC_DEVELOPERS": "on",
+        "NEXT_PUBLIC_DOCS": "on",
         // The floating WhatsApp button (#1188): on here only. The number is
         // a PLACEHOLDER until Saroh's own WhatsApp number is connected.
         "NEXT_PUBLIC_WHATSAPP_CHAT": "on",
@@ -120,6 +128,15 @@
                 "LAUNCH_AT": "2026-10-17T08:00:00+05:30",
                 // The Templates gallery is off while this is left out
                 // (DEC-135). To bring it back: "NEXT_PUBLIC_TEMPLATES": "on".
+                // The release switches (plan 2026-11-13-002) are off while
+                // left out: no page, link or list entry for the feature.
+                // A release is one of these plus one deploy-frontends run,
+                // in the order the release runbook gives:
+                // "NEXT_PUBLIC_AI_APPS": "on" (/features/ai-apps),
+                // "NEXT_PUBLIC_SOCIAL": "on" (/features/social),
+                // "NEXT_PUBLIC_ASK_AI": "on" (/features/ask-ai),
+                // "NEXT_PUBLIC_DOCS": "on" once docs.saroh.in answers, then
+                // "NEXT_PUBLIC_DEVELOPERS": "on" (/developers).
                 // The WhatsApp button (#1188) is off while these are left
                 // out. Once Saroh's real number is connected, turn it on with
                 // "NEXT_PUBLIC_WHATSAPP_CHAT": "on" and

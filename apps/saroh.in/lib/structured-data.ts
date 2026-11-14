@@ -253,7 +253,8 @@ export function howToLd(input: {
     description: string;
     url: string;
     totalMinutes: number;
-    steps: { name: string; text: string; url: string; image: string }[];
+    /** A step's image only when it has a captured one (not a drawing). */
+    steps: { name: string; text: string; url: string; image?: string }[];
 }): JsonLdObject {
     return {
         "@context": "https://schema.org",
@@ -268,7 +269,7 @@ export function howToLd(input: {
             name: s.name,
             text: s.text,
             url: s.url,
-            image: s.image,
+            ...(s.image && { image: s.image }),
         })),
     };
 }

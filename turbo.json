@@ -135,6 +135,13 @@
         "GLOBAL_PRODUCTION_HOSTS",
         "NEXT_PUBLIC_EDITION",
         "NEXT_PUBLIC_TEMPLATES",
+        // saroh.in's and saroh.tech's release switches (plan
+        // 2026-11-13-002): read at build, so each one is hashed.
+        "NEXT_PUBLIC_AI_APPS",
+        "NEXT_PUBLIC_ASK_AI",
+        "NEXT_PUBLIC_SOCIAL",
+        "NEXT_PUBLIC_DEVELOPERS",
+        "NEXT_PUBLIC_DOCS",
         "NEXT_PUBLIC_API_AREA",
         // Share as a post and Create post (DEC-217): the app's switch, read at
         // build, and the api's, which answers 404 while it is off.
