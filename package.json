@@ -38,6 +38,7 @@
         "check:routes": "node scripts/check-app-routes.mjs",
         "check:words": "node --test scripts/check-words.test.mjs && node scripts/check-words.mjs",
         "check:content-dates": "node --test scripts/check-content-dates.test.mjs && node scripts/check-content-dates.mjs",
+        "check:feature-release": "node --test scripts/check-feature-release.test.mjs && node scripts/check-feature-release.mjs",
         "prepush": "bash scripts/prepush.sh",
         "db:migrate:deploy": "turbo run db:migrate:deploy",
         "db:push": "turbo run db:push",

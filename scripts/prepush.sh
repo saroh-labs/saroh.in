@@ -976,6 +976,9 @@ bg_step tag-strip pnpm run check:tag-strip
 bg_step titles pnpm run check:titles
 bg_step words pnpm run check:words
 bg_step content-dates pnpm run check:content-dates "$BASE"
+# Production's release switches: each on one is ready (pages, shots,
+# claims rows), and nothing behind an off one is dated ahead (U15).
+bg_step feature-release pnpm run check:feature-release
 bg_step formats pnpm run check:formats
 bg_step copy pnpm run check:copy
 bg_step dupes pnpm run check:dupes
