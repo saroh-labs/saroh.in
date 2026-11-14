@@ -45,7 +45,8 @@ when:
 - `docs/architecture/MARKETING_CLAIMS.md` §17 has no rows for it, or one
   row is **Not backed**;
 - the app's `HELP_ARTICLES` still has an entry that `waitsFor` it;
-- `developers` is on while `docs` is off.
+- `developers` is on while `docs` is off;
+- `README.md` has no section for it yet (AI apps, Ask AI, Share, Developers).
 
 Whatever is on, it also fails when a changelog entry, help article or
 Resources page behind an off switch carries a future `publishOn` (legal
@@ -86,7 +87,13 @@ One commit on the batch branch, for one feature, after the owner's go:
    that is Not backed is fixed in the code or dropped from the words.
 6. **Legal.** For AI apps and Ask AI, the owner-approved clauses (plan
    U12) go in with the same commit, `publishOn` moved to the release day.
-7. Run `pnpm prepush`, then the check with `--feature <key>`.
+7. **README.** Add the feature's section to `README.md` in the same
+   commit: "From your AI assistant" (with the MCP address), "Ask AI",
+   "Share and posts", or "Build on Saroh" (API keys, webhooks, a link to
+   the docs). The README is public the day it merges, so it never names a
+   feature before its switch is on. At the Global launch, the headline and
+   the opening paragraph name both editions, saroh.in and saroh.tech.
+8. Run `pnpm prepush`, then the check with `--feature <key>`.
 
 ## 2. Release, per feature (owner)
 

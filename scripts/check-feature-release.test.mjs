@@ -187,6 +187,7 @@ function ready(over = {}) {
         ledger: LEDGER(),
         appHelp: `export const HELP_ARTICLES = [\n    { slug: "orders", title: "Orders" },\n] as const;`,
         appAiApps: APP_AI(),
+        readme: "### From your AI assistant\nAdd https://mcp.saroh.in/mcp\n### Ask AI\n### Share and posts\n## Build on Saroh\n",
         help: [
             help("connect-claude", "ai-apps", ["help-a-1"]),
             help(
@@ -357,4 +358,23 @@ test("switches come from wrangler's JSONC vars", () => {
     const sw = releaseSwitches(SWITCHES);
     assert.deepEqual(switchesOn(w.vars, sw), ["ai-apps"]);
     assert.deepEqual(switchesOn(w.env.production.vars, sw), ["docs"]);
+});
+
+test("an on switch needs its README section; templates and docs need none", () => {
+    const errors = checkRelease(ready({ readme: "# Saroh\n" }), ALL, TODAY);
+    for (const key of ["ai-apps", "ask-ai", "social", "developers"]) {
+        assert.ok(
+            errors.some(
+                (e) =>
+                    e.startsWith(`${key}:`) &&
+                    /README\.md has no section/.test(e),
+            ),
+            key,
+        );
+    }
+    assert.ok(!errors.some((e) => /^(templates|docs):.*README/.test(e)));
+    assert.deepEqual(
+        checkRelease(ready({ readme: "# Saroh\n" }), [], TODAY),
+        [],
+    );
 });

@@ -40,6 +40,7 @@ export const FILES = {
     ledger: "docs/architecture/MARKETING_CLAIMS.md",
     appHelp: "apps/app.saroh.in/lib/help/links.ts",
     appAiApps: "apps/app.saroh.in/lib/ai-connections/mcp-address.ts",
+    readme: "README.md",
 };
 
 /** Pages besides a feature page that a switch builds. */
@@ -50,6 +51,16 @@ const PAGES = {
     ],
     developers: [`${SITE}/app/(site)/developers/page.tsx`],
     templates: [`${SITE}/app/(site)/templates/page.tsx`],
+};
+/**
+ * What the public README must say once a switch is on: it lands in the
+ * release commit, never before (the README is public the day it merges).
+ */
+const README_MARKS = {
+    "ai-apps": /mcp\.saroh\.in\/mcp/,
+    "ask-ai": /^### Ask AI$/m,
+    social: /^### Share and posts$/m,
+    developers: /^## Build on Saroh$/m,
 };
 /** The switches that must ship with help articles and a changelog entry. */
 const ANNOUNCED = ["ai-apps", "ask-ai", "social", "developers"];
@@ -242,6 +253,12 @@ export function checkRelease(src, on, today) {
         for (const page of PAGES[key] ?? []) {
             if (!src.exists(page)) errors.push(`${at} ${page} is missing`);
         }
+        // The README section.
+        if (README_MARKS[key] && !README_MARKS[key].test(src.readme ?? "")) {
+            errors.push(
+                `${at} ${FILES.readme} has no section for it yet (runbook: the release commit adds it)`,
+            );
+        }
         // Help and shots.
         const help = articles.filter((a) => a.feature === key);
         if (ANNOUNCED.includes(key) && help.length === 0) {
@@ -374,6 +391,7 @@ export function readSources(root) {
         ledger: read(FILES.ledger),
         appHelp: read(FILES.appHelp),
         appAiApps: read(FILES.appAiApps),
+        readme: read(FILES.readme),
         help: readdirSync(helpDir)
             .filter((f) => f.endsWith(".mdx"))
             .map((f) => readFileSync(join(helpDir, f), "utf8")),
