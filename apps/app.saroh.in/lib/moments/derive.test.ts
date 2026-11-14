@@ -9,10 +9,12 @@ import {
     homeMayHaveFirstBooking,
     homeMayHaveFirstOrder,
     MOMENT_FRESH_MS,
+    newFeatureMoment,
     orderFact,
     ordersMoment,
     unseen,
 } from "./derive";
+import type { MomentKey } from "./keys";
 import { MOMENT_KEYS } from "./keys";
 
 const NOW = new Date("2026-10-10T10:00:00.000Z");
@@ -330,6 +332,62 @@ describe("shown once", () => {
             "orders-100",
             "defaults-suggestions",
             "shared-booking-link",
+            "new-ai-apps",
+            "new-share",
+            "new-ask-ai",
         ]);
+    });
+});
+
+describe("Home's New card", () => {
+    const ALL = { "new-ai-apps": true, "new-share": true, "new-ask-ai": true };
+    const seen = (...keys: MomentKey[]) => new Set<MomentKey>(keys);
+
+    it("shows AI apps first, then Share, then Ask AI, then nothing", () => {
+        expect(newFeatureMoment(ALL, seen())?.key).toBe("new-ai-apps");
+        expect(newFeatureMoment(ALL, seen("new-ai-apps"))?.key).toBe(
+            "new-share",
+        );
+        expect(
+            newFeatureMoment(ALL, seen("new-ai-apps", "new-share"))?.key,
+        ).toBe("new-ask-ai");
+        expect(
+            newFeatureMoment(
+                ALL,
+                seen("new-ai-apps", "new-share", "new-ask-ai"),
+            ),
+        ).toBeNull();
+    });
+
+    it("skips a feature that is off or not open to this person", () => {
+        expect(
+            newFeatureMoment({ ...ALL, "new-ai-apps": false }, seen())?.key,
+        ).toBe("new-share");
+        expect(
+            newFeatureMoment(
+                {
+                    "new-ai-apps": false,
+                    "new-share": false,
+                    "new-ask-ai": false,
+                },
+                seen(),
+            ),
+        ).toBeNull();
+    });
+
+    it("is not shown when what was seen can't be read", () => {
+        expect(newFeatureMoment(ALL, null)).toBeNull();
+    });
+
+    it("is a New card with one button, in the business's slot", () => {
+        const card = newFeatureMoment(ALL, seen());
+        expect(card).toMatchObject({
+            news: true,
+            title: "Use Saroh from Claude or ChatGPT",
+            action: {
+                label: "Connect an assistant",
+                href: "/settings/developers/ai",
+            },
+        });
     });
 });

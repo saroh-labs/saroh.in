@@ -25,6 +25,12 @@
             "preview_urls": false,
             // Without it a build uses the local API (site.config.ts). Give it to
             // the build with scripts/cf-env.mjs, as deploy-frontends.yml does.
+            // The release switches (plan 2026-11-13-002) are off while left
+            // out, the only thing that hides a feature page here. At Global's
+            // launch steps (ticket 10) add "NEXT_PUBLIC_AI_APPS": "on",
+            // "NEXT_PUBLIC_SOCIAL": "on" and "NEXT_PUBLIC_TEMPLATES": "on"
+            // (Global dev has them: scripts/cf-global-dev.mjs); "NEXT_PUBLIC_ASK_AI" and
+            // "NEXT_PUBLIC_DEVELOPERS" wait for Global's paid plans.
             "vars": { "GLOBAL_PRODUCTION_HOSTS": "on" },
             "assets": {
                 "directory": "out",

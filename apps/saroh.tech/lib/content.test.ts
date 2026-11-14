@@ -7,7 +7,10 @@ import { SHOT_KEYS, SOLUTION_FAQ_IDS } from "@saroh/marketing/content-types";
 
 import { officeLine } from "../../saroh.in/content/company";
 import { faqs as inFaqs } from "../../saroh.in/content/faq";
-import { featureList as inFeatures } from "../../saroh.in/content/features";
+import {
+    features as inAllFeatures,
+    featureList as inFeatures,
+} from "../../saroh.in/content/features";
 import { home as inHome } from "../../saroh.in/content/home";
 import { solutionList as inSolutions } from "../../saroh.in/content/solutions";
 
@@ -17,9 +20,9 @@ import { CONTACT, REGISTERED_OFFICE, SUPPORT_EMAIL } from "@/content/contact";
 import { faqs, HOME_FAQ, solutionFaq } from "@/content/faq";
 import { featureList, features } from "@/content/features";
 import { GUIDE_CONTENT, guideSteps } from "@/content/guides";
-import { HELP, HELP_FAQS } from "@/content/help";
+import { ALL_HELP, HELP_FAQS } from "@/content/help";
 import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
-import { INTEGRATIONS } from "@/content/integrations";
+import { AI_APP_CARDS, INTEGRATIONS } from "@/content/integrations";
 import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
 import { SAROH_SOCIAL } from "@/content/social";
 import { solutionList, solutions } from "@/content/solutions";
@@ -64,7 +67,8 @@ describe("saroh.tech has saroh.in's shape", () => {
     });
 
     it("every field saroh.in's pages have", () => {
-        for (const f of inFeatures) {
+        // Every feature, shown or not: a switched-off page is still a twin.
+        for (const f of Object.values(inAllFeatures)) {
             expect(missing(f, features[f.slug]), f.slug).toEqual([]);
         }
         for (const s of inSolutions) {
@@ -152,8 +156,9 @@ describe("saroh.tech's words", () => {
         home,
         FREE_PLAN_LINE,
         CTA_BAND,
-        HELP,
+        HELP: ALL_HELP,
         HELP_FAQS,
+        AI_APP_CARDS,
     };
     const sold = words(all);
 
@@ -184,7 +189,7 @@ describe("saroh.tech's words", () => {
         expect(words(rest).replace(stripe, "")).not.toMatch(banned);
         expect(
             words(
-                HELP.filter((a) => a.group !== "Free tools").map(
+                ALL_HELP.filter((a) => a.group !== "Free tools").map(
                     ({ related: _related, ...a }) => a,
                 ),
             ),
@@ -260,6 +265,18 @@ describe("saroh.tech's words", () => {
         expect(insights).not.toMatch(/\b(site )?views\b/i);
         expect(insights).toContain("Am I making more money?");
         expect(words(features.insights)).toContain("Paid orders and bookings");
+    });
+
+    it("name no paid plan while Global is Free only (plan 2026-11-13-002, U16)", () => {
+        expect(words({ ...all, INTEGRATIONS })).not.toMatch(
+            /\bpaid plans?\b|\bupgrade\b|\b(Grow|Pro)( and Pro)? plans?\b|comes with (Grow|Pro)/i,
+        );
+    });
+
+    it("give Global's MCP address, never saroh.in's", () => {
+        const text = words(all);
+        expect(text).toContain("https://mcp.saroh.tech/mcp");
+        expect(text).not.toContain("mcp.saroh.in");
     });
 
     it("have no marker left", () => {

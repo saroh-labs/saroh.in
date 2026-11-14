@@ -1,15 +1,18 @@
 import type { ReactNode } from "react";
 
 import type { SearchPageData } from "../schema";
+import { AiAsks, NewMark } from "./ai-asks";
 import { AlsoSvg } from "./icons";
 import { AlsoList, Carousel, StartBar } from "./interactive";
 import { ClosingBand, Crumbs, Questions, StartButton } from "./page-parts";
+import type { NewFeature } from "./parts";
 import {
     bigTile,
     carouselLabels,
     FrameDesk,
     FramePhone,
     HeroPicture,
+    newAlso,
     PRESETS,
     ProofCard,
     smallKeys,
@@ -32,6 +35,8 @@ export interface SearchPageLinks {
     hub?: string;
     /** A related trade's page (a slug from `related`), or undefined when it isn't on the site. */
     page?: (slug: string) => string | undefined;
+    /** A feature's page ("ai-apps" → /features/ai-apps). */
+    feature?: (slug: NewFeature) => string | undefined;
 }
 
 export interface SearchPageProps {
@@ -43,6 +48,13 @@ export interface SearchPageProps {
     freeLine?: ReactNode;
     /** The plan cards, from the live catalogue; without them there is no Pricing section. */
     pricing?: ReactNode;
+    /**
+     * The release switches that are off (plan 2026-11-13-002, U13). The
+     * "Ask your AI assistant" section and the new Also items follow them;
+     * left out, every one counts as off, so a caller that doesn't pass it
+     * draws the page as before the switches.
+     */
+    off?: readonly string[];
 }
 
 /** The trades the product seeds starter services for (apps/api trade-presets.ts: SALON, GYM). */
@@ -94,7 +106,10 @@ export function SearchPage({
     links = {},
     freeLine,
     pricing,
+    off,
 }: SearchPageProps) {
+    const isOn = (f: NewFeature) => off !== undefined && !off.includes(f);
+    const extra = newAlso(p, isOn);
     const s = p.scene;
     const pre = PRESETS[p.shape];
     const T = s.tiles;
@@ -277,7 +292,10 @@ export function SearchPage({
 
                 <section className="sp-also sp-sec">
                     <h2 className="sp-also-h">Also in Saroh</h2>
-                    <AlsoList count={s.also.length}>
+                    <AlsoList
+                        count={s.also.length + extra.length}
+                        newCount={extra.length}
+                    >
                         {s.also.map((it, i) => (
                             <li key={it.title}>
                                 <span className="va-icon">
@@ -295,8 +313,33 @@ export function SearchPage({
                                 </span>
                             </li>
                         ))}
+                        {extra.map((it) => (
+                            <li key={it.feature} data-new="">
+                                <span className="va-icon">
+                                    <AlsoSvg icon={it.icon} />
+                                </span>
+                                <span className="sp-also-t">
+                                    <span className="sp-also-tt">
+                                        <a
+                                            className="sp-go sp-go-ink"
+                                            href={links.feature?.(it.feature)}
+                                        >
+                                            {it.title} →
+                                        </a>
+                                        <NewMark />
+                                    </span>
+                                    <span className="sp-also-tl">
+                                        {it.line}
+                                    </span>
+                                </span>
+                            </li>
+                        ))}
                     </AlsoList>
                 </section>
+
+                {p.ai && isOn("ai-apps") ? (
+                    <AiAsks ai={p.ai} isOn={isOn} feature={links.feature} />
+                ) : null}
 
                 <section className="sp-starter sp-sec">
                     <div className="sp-starter-copy">

@@ -310,6 +310,12 @@ jobs:
       - name: One copy of each block
         run: pnpm run check:dupes
 
+      # Production's release switches (plan 2026-11-13-002, U15): each one
+      # on is ready (pages, captured shots, claims rows), and nothing behind
+      # an off one is dated ahead. Repo files only.
+      - name: Feature release
+        run: pnpm run check:feature-release
+
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
       - name: Browser spec coverage keys
@@ -724,6 +730,13 @@ jobs:
       # Templates on (DEC-135): saroh.in's gallery and the app's template
       # picker, which the templates specs open. Unset, as production, is off.
       NEXT_PUBLIC_TEMPLATES: "on"
+      # saroh.in's release switches (plan 2026-11-13-002): every feature page
+      # and link on, so the specs see them. Unset, as production, is off.
+      NEXT_PUBLIC_AI_APPS: "on"
+      NEXT_PUBLIC_ASK_AI: "on"
+      NEXT_PUBLIC_SOCIAL: "on"
+      NEXT_PUBLIC_DEVELOPERS: "on"
+      NEXT_PUBLIC_DOCS: "on"
       # Settings › API and AI apps, which the role specs list. Unset, as
       # production, hides it until the area ships (#1357).
       NEXT_PUBLIC_API_AREA: "on"

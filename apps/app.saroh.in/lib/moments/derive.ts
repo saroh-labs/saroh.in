@@ -181,3 +181,54 @@ export function unseen(
     if (!moment || !seen) return null;
     return seen.has(moment.key) ? null : moment;
 }
+
+/**
+ * Home's "New" cards (release visibility U14, board VAHome): one new
+ * feature at a time, in this order, each shown until anyone in the
+ * business puts it away or follows its button. Only its own words: every
+ * action it names is a real MCP tool or Share step (claims ledger).
+ */
+export const NEW_FEATURE_MOMENTS = [
+    {
+        key: "new-ai-apps",
+        title: "Use Saroh from Claude or ChatGPT",
+        fact: "Connect your AI assistant and ask in your own words: add a product, change your hours, see who’s booked on Saturday.",
+        action: {
+            label: "Connect an assistant",
+            href: "/settings/developers/ai",
+        },
+        news: true,
+    },
+    {
+        key: "new-share",
+        title: "Make a post from anything you sell",
+        fact: "Pick a product, a service or a blog post, choose a card and a caption, and share it.",
+        action: { label: "Make a post", href: "/social/new" },
+        news: true,
+    },
+    {
+        key: "new-ask-ai",
+        title: "Ask AI about your business",
+        fact: "Ask a question in your own words and get an answer from your own records.",
+        action: { label: "Ask a question", href: "/ask" },
+        news: true,
+    },
+] as const satisfies readonly (MomentView & { key: NewFeatureKey })[];
+
+export type NewFeatureKey = "new-ai-apps" | "new-share" | "new-ask-ai";
+
+/**
+ * The one "New" card to show: the first, in order, that is switched on
+ * and open to this person (`open`) and that the business hasn't seen.
+ * Null when every one is seen or closed, or when what was seen can't be
+ * read (shown twice is worse than not shown).
+ */
+export function newFeatureMoment(
+    open: Readonly<Record<NewFeatureKey, boolean>>,
+    seen: ReadonlySet<MomentKey> | null,
+): MomentView | null {
+    if (!seen) return null;
+    return (
+        NEW_FEATURE_MOMENTS.find((m) => open[m.key] && !seen.has(m.key)) ?? null
+    );
+}

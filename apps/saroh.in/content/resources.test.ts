@@ -248,6 +248,43 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
     });
 });
 
+describe("the release switches' Resources pages (plan 2026-11-13-002)", () => {
+    const now = at("2026-11-20T00:00:00Z", [...ALL_ROUTES, "/developers"]);
+
+    it("Developers is listed under Resources after Templates only while its switch is on", () => {
+        const ids = (ctx: PublishContext) =>
+            shownResources(ctx).map((p) => p.id);
+        expect(ids(now)).toEqual([
+            "help",
+            "integrations",
+            "changelog",
+            "templates",
+            "developers",
+        ]);
+        const off = { ...now, preview: true, off: ["developers"] };
+        expect(ids(off)).not.toContain("developers");
+        expect(resourcePaths(off)).not.toContain("/developers");
+        expect(indexedPaths("waitlist", off)).not.toContain("/developers");
+        expect(indexedPaths("waitlist", now)).toContain("/developers");
+        expect(linkShown("/developers", off)).toBe(false);
+    });
+
+    it("Claude's and ChatGPT's pages are listed and linked only while AI apps is on", () => {
+        const off = { ...now, off: ["ai-apps"] };
+        for (const href of ["/integrations/claude", "/integrations/chatgpt"]) {
+            expect(resourcePaths(now)).toContain(href);
+            expect(linkShown(href, now)).toBe(true);
+            expect(resourcePaths(off)).not.toContain(href);
+            expect(indexedPaths("waitlist", off)).not.toContain(href);
+            expect(linkShown(href, off)).toBe(false);
+        }
+        // Only those: Integrations and its other pages stay.
+        expect(resourcePaths(off)).toContain("/integrations");
+        expect(resourcePaths(off)).toContain("/integrations/razorpay");
+        expect(linkShown("/integrations/razorpay", off)).toBe(true);
+    });
+});
+
 describe("a page shows only once its route is built", () => {
     // This branch alone: no Integrations or link preview routes yet.
     const ownRoutes = ALL_ROUTES.filter(

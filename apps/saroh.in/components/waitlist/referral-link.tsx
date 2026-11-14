@@ -1,13 +1,10 @@
 "use client";
 
-import { copyText } from "@saroh/ui/copy-button";
-import { useEffect, useRef, useState } from "react";
+import { selectContents, useCopy } from "@saroh/ui/copy-button";
+import { useRef } from "react";
 
 import { track } from "@/lib/analytics";
 import { ring } from "@saroh/marketing/ring";
-
-/** How long "Copied" stays before the button reads "Copy" again. */
-const COPIED_MS = 2000;
 
 /**
  * "Know another owner? Send them your link." (Waitlist design, done state):
@@ -16,28 +13,12 @@ const COPIED_MS = 2000;
  * refused, the link is selected instead so it can be copied by hand.
  */
 export function ReferralLink({ href, shown }: { href: string; shown: string }) {
-    const [copied, setCopied] = useState(false);
+    const { copied, copy } = useCopy();
     const text = useRef<HTMLSpanElement>(null);
-    const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-    useEffect(() => () => clearTimeout(timer.current), []);
-
-    async function copy() {
-        if (await copyText(href)) {
-            setCopied(true);
-            clearTimeout(timer.current);
-            timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-            track("referral_copy", {});
-            return;
-        }
-        const node = text.current;
-        const selection = window.getSelection();
-        if (node && selection) {
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
+    async function onCopy() {
+        if (await copy(href)) track("referral_copy", {});
+        else selectContents(text.current);
     }
 
     return (
@@ -57,7 +38,7 @@ export function ReferralLink({ href, shown }: { href: string; shown: string }) {
                 </span>
                 <button
                     type="button"
-                    onClick={copy}
+                    onClick={onCopy}
                     className={`flex h-10 shrink-0 cursor-pointer items-center rounded-mk-control border border-[rgba(28,28,26,0.2)] bg-white px-4 text-[14px] font-medium text-foreground transition-[background-color,transform] duration-fast ease-out hover:bg-muted ${ring({ color: "ink" })} active:scale-[0.97]`}
                 >
                     {copied ? "Copied" : "Copy"}

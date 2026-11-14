@@ -1,0 +1,101 @@
+---
+# The words are board VHOtherApps's (release visibility, approved 13 Nov
+# 2026). Saroh's side is checked against the code:
+#   AI      apps/app.saroh.in/components/settings/developers/ai-apps.tsx
+#           ("Using another AI app? Paste this address into it", Copy)
+#   APPS    apps/app.saroh.in/lib/ai-connections/mcp-address.ts (AI_APPS:
+#           one anchor per app, the same keys Integrations links to,
+#           content/integrations.ts; help.test.ts holds them equal)
+#   PICK    apps/accounts.saroh.in/lib/oauth-sign-in.ts (Continue, Allow,
+#           "Unverified app")
+# Each app's own menus come from its docs as of Nov 2026 and stay unconfirmed
+# until its dev sign-in walk (ticket 11), so the cards name no menu of the
+# app's own, as Integrations' cards don't. The mcp.json and the claude mcp
+# add line are each tool's documented form. Saroh shots: Kavi Dental.
+title: Connect other AI apps
+slug: connect-other-ai-apps
+area: AI apps and API
+group: Use AI apps and the API
+order: 30
+feature: ai-apps
+intro: "Saroh works with more AI apps than Claude and ChatGPT: Perplexity and Le Chat for chat, Zapier, Make and n8n for automations, and Cursor, VS Code and Claude Code for building. Each one adds Saroh by the same address, then you sign in and pick your businesses."
+description: "Connect Perplexity, Le Chat, Zapier, Make, n8n, Cursor, VS Code or Claude Code to your business on Saroh, by one address and Saroh's sign-in."
+readMinutes: 5
+updated: "2026-11-14"
+steps:
+    # AI.
+    - title: Copy Saroh's address
+      body: "In Saroh, open Settings › API and AI apps. On the AI assistants tab, under Using another AI app? Paste this address into it, press Copy. The address is https://mcp.saroh.in/mcp."
+      shot: help-connect-other-ai-apps-1
+      caption: "The MCP server address at Kavi Dental (a demo clinic), with Copy."
+      marker: Copy
+    # APPS: perplexity, le-chat.
+    - title: "Chat apps: Perplexity and Le Chat"
+      body: "Add Saroh as a custom connector, paste the address, and choose OAuth if it asks how to sign in."
+      apps:
+          - id: perplexity
+            name: Perplexity
+            how: "Open your connectors, add a custom connector, choose MCP if it asks, and paste the address. Sign-in: OAuth."
+            who: "A Perplexity account that can add custom connectors. In a company account, an admin may need to turn them on first."
+          - id: le-chat
+            name: Le Chat by Mistral
+            how: "Open your connectors and add a custom MCP connector with the address. Le Chat finds Saroh's sign-in by itself."
+            who: "Only the account's admin can add one. On a personal account, that's you."
+    # APPS: zapier, make, n8n.
+    - title: "Automations: Zapier, Make and n8n"
+      body: "These run Saroh steps inside your automations, like “when a new enquiry comes in, add a row to my sheet”."
+      apps:
+          - id: zapier
+            name: Zapier
+            how: "In a Zap, add an MCP client step and make a new connection: paste the address as the server URL and sign in with OAuth."
+            who: "A Zapier account that has MCP client steps."
+          - id: make
+            name: Make
+            how: "In a scenario, add an MCP client module and create a connection with the address. Make signs in to Saroh with OAuth."
+            who: "A Make account that has MCP client modules."
+          - id: n8n
+            name: n8n
+            how: "In a workflow with an AI agent, add an MCP client tool. Choose HTTP Streamable and OAuth, and paste the address."
+            who: "n8n's cloud or your own n8n."
+    # APPS: coding-tools, one anchor for the three.
+    - title: "Coding tools: Cursor, VS Code and Claude Code"
+      anchor: coding-tools
+      body: "For you or your developer, building on Saroh from an editor or a terminal."
+      apps:
+          - id: cursor
+            name: Cursor
+            how: "Add a custom MCP server in Cursor's settings, or put this in mcp.json. When Cursor asks you to sign in, do."
+            code: '{ "mcpServers": { "saroh": { "url": "https://mcp.saroh.in/mcp" } } }'
+          - id: vs-code
+            name: VS Code with GitHub Copilot
+            how: "Add an MCP server from the Command Palette, choose HTTP, paste the address and name it saroh. Sign in when VS Code asks."
+            who: "A company's GitHub settings can turn MCP off."
+          - id: claude-code
+            name: Claude Code
+            how: "In a terminal, add Saroh, then type /mcp in Claude Code and pick saroh to sign in."
+            code: "claude mcp add --transport http saroh https://mcp.saroh.in/mcp"
+      tip: "A tool that can only send a key, not sign in? Your business owner can make a server key with Let AI apps use this key turned on. See API keys and webhooks."
+    # PICK.
+    - title: Sign in, pick your businesses, and allow it
+      body: "The app opens a Saroh window. Sign in, tick the businesses it should work with, press Continue, read what it may do, and press Allow. If Saroh doesn't know who makes the app, it says Unverified app: only allow it if you added it yourself."
+      shot: help-connect-other-ai-apps-5
+      caption: "Allowing n8n at Kavi Dental (a demo clinic), marked Unverified app."
+      marker: Allow
+    # AI.
+    - title: See it in Saroh
+      body: "The app is listed on the AI assistants tab under Connected to your business, by the name it gave Saroh. Open it to see what it changed, or disconnect it."
+      shot: help-connect-other-ai-apps-6
+      caption: "n8n connected to Kavi Dental (a demo clinic)."
+troubles:
+    - title: The app says it can't connect or finds no tools.
+      body: "Check the address is exactly https://mcp.saroh.in/mcp, and pick HTTP or Streamable HTTP if it asks, not SSE."
+    - title: There's no way to add a custom connector.
+      body: "Your app's admin may need to turn custom connectors on first, as some team accounts require."
+    - title: Saroh says it can't connect this app.
+      body: "Its name copies Saroh's or another AI company's, so Saroh refuses it and nothing is shared. Rename it in your tool if you set the name yourself, or use the app's own listing."
+    - title: The app doesn't see something Saroh added.
+      body: "Some apps read Saroh's list of tools only when you add it. Remove the connector and add it again."
+next: [connect-claude, connect-chatgpt, api-keys-and-webhooks]
+---
+
+Every app acts as you, so it can only do what you can do in Saroh. What it reads goes to the company that runs it, under its own terms.

@@ -37,6 +37,30 @@ const NOUN: Record<LimitKind, [string, string]> = {
 };
 
 /**
+ * Rows counted over the billing period with no add-on to buy (plan
+ * 2026-11-13-002, U10): the catalogue's id, the words, and the release
+ * switch that hides the row until the feature ships. Ask AI shows no price
+ * for more ("Request more" only); the API shows its allowance only.
+ */
+const PERIOD_ROWS: Partial<Record<string, { label: string; switch: string }>> =
+    {
+        "ask-ai-questions": { label: "Ask AI questions", switch: "ask-ai" },
+        "api-requests": { label: "API requests", switch: "developers" },
+    };
+
+/** One plan's cell for a billing-period row: the allowance, nothing to buy. */
+export function periodCell(
+    module: CatalogModule,
+    planId: string,
+    count: (n: number) => string,
+): string {
+    const c = cellOf(module, planId);
+    if (!c.inc) return NOT_INCLUDED;
+    if (c.limit === null) return "No limit";
+    return `${count(c.limit)} each billing period included`;
+}
+
+/**
  * Add-ons are bought on a paid plan billed through the provider
  * (`PRICING_ROLLOUT.md` › Add-ons), so a free plan offers none whatever the
  * add-on names.
@@ -96,12 +120,15 @@ export function moduleCell(input: {
  * The rows: every catalogue row the pricing page shows that some offered
  * paid plan can add to, by group and in catalogue order: a capped row with
  * a pack or unit of its kind, or a row a plan leaves out with an add-on
- * that switches it on. A row nobody can grow past is left out.
+ * that switches it on. A row nobody can grow past is left out, except a
+ * billing-period row (`PERIOD_ROWS`), which shows unless its switch is in
+ * `off`, so admin can fill it in before release.
  */
 export function usageRows(
     catalog: Catalog,
     withTax: boolean,
     site: PricingSite,
+    off: readonly string[] = [],
 ): { rows: UsageRow[]; modules: CatalogModule[] } {
     const money = (p: number) =>
         site.money(withTax && site.tax ? site.tax.add(p) : p);
@@ -112,6 +139,18 @@ export function usageRows(
         const lines: UsageRow[] = [];
         for (const m of catalog.modules) {
             if (m.group !== g.id || m.pricing === "hidden") continue;
+            const period = PERIOD_ROWS[m.id];
+            if (period) {
+                if (off.includes(period.switch)) continue;
+                lines.push({
+                    kind: "line",
+                    label: period.label,
+                    what: m.what,
+                    cells: plans.map((p) => periodCell(m, p.id, site.count)),
+                });
+                modules.push(m);
+                continue;
+            }
             const match = (a: Addon) =>
                 a.kind === "module" ? a.module === m.id : a.kind === m.id;
             const addons = plans.map((p) => addonFor(catalog, p, match));
@@ -213,8 +252,9 @@ export function usageView(
     catalog: Catalog,
     withTax: boolean,
     site: PricingSite,
+    off: readonly string[] = [],
 ): UsageView | null {
-    const { rows, modules } = usageRows(catalog, withTax, site);
+    const { rows, modules } = usageRows(catalog, withTax, site, off);
     if (!rows.length) return null;
     return { rows, notes: usageNotes(catalog, modules, withTax, site) };
 }

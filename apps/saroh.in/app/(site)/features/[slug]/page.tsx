@@ -1,3 +1,5 @@
+import { AppList } from "@saroh/marketing/app-list";
+import type { SlugPageProps as Props } from "@saroh/marketing/content-types";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -8,15 +10,20 @@ import {
     FeatureWorksWith,
 } from "@/components/feature/feature-related";
 import { FeatureSteps } from "@/components/feature/feature-steps";
+import { FeatureTemplates } from "@/components/feature/feature-templates";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { featureHelpLinks } from "@/content/feature-help";
-import { featureHref, features, isFeatureSlug } from "@/content/features";
+import {
+    featureHref,
+    featureList,
+    features,
+    isFeatureSlug,
+} from "@/content/features";
 import { summarise } from "@/content/help";
-import { FEATURE_SLUGS } from "@/content/types";
+import { shownIntegrations } from "@/content/integrations";
 import { helpArticles } from "@/lib/help-docs";
 import { LAUNCH_MODE } from "@/lib/links";
-import { freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
@@ -28,18 +35,17 @@ import { breadcrumbLd } from "@/lib/structured-data";
  * other slug is a 404. The "How to …" links to Help (plan U7) follow the
  * publish date: they are drawn by the first deploy made on or after the day
  * Help opens (`app/layout.tsx`; nothing rebuilds the site on a schedule).
- * The hero's free-plan line reads the pricing catalogue once the launch
+ * The hero's plan line reads the pricing catalogue once the launch
  * switch is open (KTD-10); before that it is the line with no plan details
- * (`freePlanLine(null)`, Gate W).
+ * (`heroPlanLine`, Gate W). Website's templates section follows
+ * `NEXT_PUBLIC_TEMPLATES` (DEC-135, DEC-216). AI apps' "Apps you can use"
+ * lists the Integrations cards this build shows as live (plan U3, U7).
  */
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return FEATURE_SLUGS.map((slug) => ({ slug }));
-}
-
-interface Props {
-    params: Promise<{ slug: string }>;
+    // Only the shown features: a switched-off one is never built (404).
+    return featureList.map((f) => ({ slug: f.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -61,11 +67,8 @@ export default async function FeaturePage({ params }: Props) {
     if (!isFeatureSlug(slug)) notFound();
     const feature = features[slug];
     const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
-    const help = featureHelpLinks(
-        slug,
-        helpArticles().map(summarise),
-        resourcesContext(),
-    );
+    const context = resourcesContext();
+    const help = featureHelpLinks(slug, helpArticles().map(summarise), context);
     return (
         <>
             {/* The trail the hero draws: Features / {name}. */}
@@ -75,9 +78,20 @@ export default async function FeaturePage({ params }: Props) {
                     { name: feature.name, path: featureHref(slug) },
                 ])}
             />
-            <FeatureHero feature={feature} freeLine={freePlanLine(catalog)} />
+            <FeatureHero feature={feature} catalog={catalog} />
             <FeatureSteps feature={feature} help={help} />
+            {feature.templates && !context.off?.includes("templates") ? (
+                <FeatureTemplates words={feature.templates} />
+            ) : null}
             <FeaturePoints feature={feature} mode={LAUNCH_MODE} />
+            {feature.apps ? (
+                <AppList
+                    words={feature.apps}
+                    apps={shownIntegrations(context.off ?? []).filter(
+                        (c) => c.category === "AI apps",
+                    )}
+                />
+            ) : null}
             <FeatureWorksWith feature={feature} />
             <FeatureUsedBy feature={feature} />
             <CtaBand

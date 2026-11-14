@@ -95,6 +95,25 @@ describe("searchPageChecks", () => {
             (p) => p.scene.booking && delete p.scene.booking.depositBy,
         ],
         ["long title", "seo-title", (p) => (p.title = "x".repeat(60))],
+        [
+            "an AI ask that sends a reminder",
+            "claims",
+            (p) =>
+                p.ai &&
+                (at(p.ai.asks, 0).reply = "Done, and it sends a reminder."),
+        ],
+        [
+            "a WhatsApp reminder",
+            "claims",
+            (p) => p.ai && (p.ai.shareLine = "Send a WhatsApp reminder too."),
+        ],
+        [
+            "an AI ask sent on WhatsApp",
+            "claims",
+            (p) =>
+                p.ai &&
+                (at(p.ai.asks, 2).line = "The answer is sent on WhatsApp."),
+        ],
     ];
     it.each(breaks)("fires on %s", (_, id, brk) => {
         const p = structuredClone(salons);

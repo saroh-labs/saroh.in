@@ -1,7 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import { pct, rupee } from "../money";
-import type { Scene, SearchPageData } from "../schema";
+import type { AlsoIcon, Scene, SearchPageData } from "../schema";
 import { ChipSvg } from "./icons";
 
 /**
@@ -69,6 +69,87 @@ export const PRESETS = {
         close: "Set up your website for free, and move up when you need more.",
     },
 } as const;
+
+/** The release switches a /for/ page follows (`RELEASE_SWITCHES` in @saroh/marketing). */
+export type NewFeature = "ai-apps" | "ask-ai" | "social";
+
+/**
+ * The three "Also in Saroh" items each page gains as its feature turns on
+ * (plan 2026-11-13-002, U13), after the page's own six. A page's `ai.also`
+ * words them for its trade; these are the shape's words otherwise.
+ */
+export const NEW_ALSO: Record<
+    keyof typeof PRESETS,
+    { feature: NewFeature; icon: AlsoIcon; title: string; line: string }[]
+> = {
+    appointments: [
+        {
+            feature: "ai-apps",
+            icon: "chat",
+            title: "From your AI assistant",
+            line: "Ask Claude or ChatGPT to move a booking or add a service. Changes to your site wait until you publish them.",
+        },
+        {
+            feature: "ask-ai",
+            icon: "ask",
+            title: "Ask AI",
+            line: "Ask inside Saroh how the month went, from your own records. On Grow and Pro.",
+        },
+        {
+            feature: "social",
+            icon: "share",
+            title: "Share a service",
+            line: "Turn a service or your booking page into a ready post in your site's colours, then post it yourself.",
+        },
+    ],
+    classes: [
+        {
+            feature: "ai-apps",
+            icon: "chat",
+            title: "From your AI assistant",
+            line: "Ask Claude or ChatGPT to move a booking or look up a customer. Changes to your site wait until you publish them.",
+        },
+        {
+            feature: "ask-ai",
+            icon: "ask",
+            title: "Ask AI",
+            line: "Ask inside Saroh how the month went, from your own records. On Grow and Pro.",
+        },
+        {
+            feature: "social",
+            icon: "share",
+            title: "Share your booking page",
+            line: "Turn your booking page into a ready post in your site's colours, then post it yourself.",
+        },
+    ],
+    orders: [
+        {
+            feature: "ai-apps",
+            icon: "chat",
+            title: "From your AI assistant",
+            line: "Ask Claude or ChatGPT to look up an order or add a product. Changes to your site wait until you publish them.",
+        },
+        {
+            feature: "ask-ai",
+            icon: "ask",
+            title: "Ask AI",
+            line: "Ask inside Saroh how the month went, from your own records. On Grow and Pro.",
+        },
+        {
+            feature: "social",
+            icon: "share",
+            title: "Share a product",
+            line: "Turn a product into a ready post in your site's colours, then post it yourself.",
+        },
+    ],
+};
+
+/** The new items a page shows: its shape's (or its own words), each only while its switch is on. */
+export function newAlso(p: SearchPageData, isOn: (f: NewFeature) => boolean) {
+    return NEW_ALSO[p.shape]
+        .map((it, i) => ({ ...it, ...p.ai?.also?.[i] }))
+        .filter((it) => isOn(it.feature));
+}
 
 export type SmallKey =
     "deposit" | "today" | "customer" | "bill" | "website" | "stock";

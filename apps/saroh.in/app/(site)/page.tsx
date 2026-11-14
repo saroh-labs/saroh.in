@@ -6,7 +6,7 @@ import { PricingSection } from "@/components/pricing/pricing-section";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { HOME_FAQ } from "@/content/faq";
-import { featureHref, featureList } from "@/content/features";
+import { featureHref, featureList, NEW_FEATURES } from "@/content/features";
 import { home } from "@/content/home";
 import { solutionList } from "@/content/solutions";
 import { LAUNCH_MODE } from "@/lib/links";
@@ -82,6 +82,7 @@ export default async function HomePage() {
                     href: featureHref(f.slug),
                     title: f.name,
                     body: f.homeBody,
+                    isNew: NEW_FEATURES.includes(f.slug),
                 }))}
             />
 

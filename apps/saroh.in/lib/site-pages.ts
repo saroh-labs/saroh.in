@@ -10,7 +10,15 @@ import {
     UPDATED as CONTACT_UPDATED,
 } from "@/content/contact-page";
 import { UPDATED as CUSTOMERS_UPDATED } from "@/content/customers";
-import { featureHref, UPDATED as FEATURES_UPDATED } from "@/content/features";
+import {
+    DEVELOPERS_PATH,
+    UPDATED as DEVELOPERS_UPDATED,
+} from "@/content/developers";
+import {
+    featureHref,
+    featureList,
+    UPDATED as FEATURES_UPDATED,
+} from "@/content/features";
 import {
     HELP_PATH,
     UPDATED as HELP_UPDATED,
@@ -44,7 +52,7 @@ import {
     TEMPLATES_PATH,
     UPDATED as TEMPLATES_UPDATED,
 } from "@/content/templates";
-import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
+import { SOLUTION_SLUGS } from "@/content/types";
 import { UPDATED as WAITLIST_UPDATED } from "@/content/waitlist";
 import { docPages } from "@/lib/docs-pages";
 import { helpArticles } from "@/lib/help-docs";
@@ -122,7 +130,7 @@ export function indexedPaths(
     return [
         "/",
         ...(mode === "open" ? ["/pricing", "/pricing.md"] : []),
-        ...FEATURE_SLUGS.map(featureHref),
+        ...featureList.map((f) => featureHref(f.slug)),
         ...SOLUTION_SLUGS.map(solutionHref).filter(
             (path) =>
                 !forPages.includes(path.replace(/^\/solutions\//, "/for/")),
@@ -158,7 +166,7 @@ const indiaDayOf = (iso: string) =>
 const PAGE_DAYS: Readonly<Record<string, string>> = {
     "/": HOME_UPDATED,
     ...Object.fromEntries(
-        FEATURE_SLUGS.map((s) => [featureHref(s), FEATURES_UPDATED]),
+        featureList.map((f) => [featureHref(f.slug), FEATURES_UPDATED]),
     ),
     ...Object.fromEntries(
         SOLUTION_SLUGS.map((s) => [solutionHref(s), SOLUTIONS_UPDATED]),
@@ -171,6 +179,7 @@ const PAGE_DAYS: Readonly<Record<string, string>> = {
     [INTEGRATIONS_PATH]: INTEGRATIONS_UPDATED,
     "/changelog": CHANGELOG_UPDATED,
     [TEMPLATES_PATH]: TEMPLATES_UPDATED,
+    [DEVELOPERS_PATH]: DEVELOPERS_UPDATED,
     "/tools/link-preview": LINK_PREVIEW_UPDATED,
     "/tools/qr-code-maker": QR_CODE_MAKER_UPDATED,
 };
@@ -271,7 +280,14 @@ export function lastModified(
                   isPublished(e.publishOn, now),
               ).map((e) => e.publishOn)
             : path === HELP_PATH
-              ? helpArticles().map((a) => a.updated)
+              ? helpArticles()
+                    // An article waiting on a switch that is off isn't there.
+                    .filter(
+                        (a) =>
+                            !a.feature ||
+                            !resourcesContext(now).off?.includes(a.feature),
+                    )
+                    .map((a) => a.updated)
               : [];
     return dayInIndia([day, ...under].sort().at(-1) ?? day);
 }

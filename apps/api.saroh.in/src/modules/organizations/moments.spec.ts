@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
 
 // A mocked Prisma: the service never touches a real Postgres here.
@@ -47,6 +50,21 @@ describe("seenMoments", () => {
         for (const stored of [null, undefined, "x", 3, ["first-order"]]) {
             expect(seenMoments(stored)).toEqual({});
         }
+    });
+
+    it("keeps the same list as the workspace's keys.ts", () => {
+        const app = readFileSync(
+            join(__dirname, "../../../../app.saroh.in/lib/moments/keys.ts"),
+            "utf8",
+        );
+        const list = /MOMENT_KEYS = \[([\s\S]*?)\] as const/.exec(app)?.[1];
+        const keys = [...(list ?? "").matchAll(/^\s*"([a-z0-9-]+)",/gm)].map(
+            (m) => m[1],
+        );
+        expect(keys).toEqual([...MOMENT_KEYS]);
+        expect(MOMENT_KEYS).toEqual(
+            expect.arrayContaining(["new-ai-apps", "new-share", "new-ask-ai"]),
+        );
     });
 
     it("knows its own keys and no others", () => {

@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { byComingGroup, COMING, COMING_GROUPS } from "./coming";
+import { featuresOff } from "@/lib/feature-switches";
+import {
+    byComingGroup,
+    COMING,
+    COMING_GROUPS,
+    COMING_ITEMS,
+    shownComing,
+} from "./coming";
+
 import { plannedIntegrations } from "./integrations";
 
 /**
@@ -10,7 +18,7 @@ import { plannedIntegrations } from "./integrations";
  * plan or a price, and the two pages never disagree about a row.
  */
 const lists = [
-    ["Coming next", COMING],
+    ["Coming next", COMING_ITEMS],
     ["Planned integrations", plannedIntegrations],
 ] as const;
 
@@ -69,10 +77,14 @@ describe.each(lists)("%s", (_title, rows) => {
 
     it("is words only: a group, a name and a line, and never a link", () => {
         for (const row of rows) {
-            // `integration` only says which page lists it too.
+            // `integration` only says which page lists it too, and
+            // `hiddenWhenOn` which switch ships it.
             expect(
                 Object.keys(row)
-                    .filter((key) => key !== "integration")
+                    .filter(
+                        (key) =>
+                            key !== "integration" && key !== "hiddenWhenOn",
+                    )
                     .sort(),
             ).toEqual(["group", "line", "name"]);
             expect(`${row.name} ${row.line}`).not.toMatch(/https?:|www\.|\//);
@@ -104,10 +116,11 @@ describe.each(lists)("%s", (_title, rows) => {
         }
     });
 
-    it("has Saroh Social coming next, and Canva later (owner, 4 Nov 2026)", () => {
+    it("has posting to social networks coming next, and Canva later (owner, 4 Nov 2026; renamed 13 Nov)", () => {
         const groupOf = (name: string) =>
             rows.find((row) => row.name === name)?.group;
-        expect(groupOf("Saroh Social")).toBe("next");
+        expect(groupOf("Posting to social networks")).toBe("next");
+        expect(groupOf("Saroh Social")).toBe(undefined);
         expect(groupOf("Canva")).toBe("later");
     });
 
@@ -121,7 +134,7 @@ describe.each(lists)("%s", (_title, rows) => {
 describe("the two lists together", () => {
     it("say each integration in the changelog's words, in its group", () => {
         for (const row of plannedIntegrations) {
-            const coming = COMING.find((item) => item.line === row.line);
+            const coming = COMING_ITEMS.find((item) => item.line === row.line);
             expect(coming, row.name).toBeTruthy();
             expect(coming?.group, row.name).toBe(row.group);
         }
@@ -132,7 +145,7 @@ describe("the two lists together", () => {
             "Automatic WhatsApp messages",
             "Google Calendar sync",
             "Google Meet and Zoom links",
-            "Saroh Social",
+            "Posting to social networks",
             "Shopify import",
             "PhonePe",
             "Shiprocket",
@@ -141,7 +154,7 @@ describe("the two lists together", () => {
             "Canva",
         ]);
         const planned = plannedIntegrations.map((row) => row.line);
-        const ownWork = COMING.filter(
+        const ownWork = COMING_ITEMS.filter(
             (item) => !planned.includes(item.line),
         ).map((item) => item.name);
         expect(ownWork).toEqual([
@@ -160,6 +173,33 @@ describe("the two lists together", () => {
     it("never promise a booking reminder: none is sent on any channel yet", () => {
         for (const item of COMING) {
             expect(item.line).not.toMatch(/reminder/i);
+        }
+    });
+});
+
+describe("the rows follow the release switches (plan 2026-11-13-002, U11)", () => {
+    const names = (off: string[]) => shownComing(off).map((row) => row.name);
+
+    it("lists API keys and webhooks as coming only while Developers is off", () => {
+        expect(names(["developers"])).toContain("API keys and webhooks");
+        expect(names([])).not.toContain("API keys and webhooks");
+        // Nothing else moves.
+        expect(names([])).toEqual(
+            names(["developers"]).filter((n) => n !== "API keys and webhooks"),
+        );
+    });
+
+    it("builds its list from this build's switches", () => {
+        expect(COMING.map((row) => row.name)).toEqual(
+            shownComing(featuresOff()).map((row) => row.name),
+        );
+    });
+
+    it("never says Saroh posts for you", () => {
+        for (const row of COMING_ITEMS) {
+            expect(`${row.name} ${row.line}`).not.toMatch(
+                /posts? (it )?for you|automatically post|auto-?post|on its own/i,
+            );
         }
     });
 });

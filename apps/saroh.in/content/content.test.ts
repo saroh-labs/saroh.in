@@ -74,7 +74,7 @@ describe("contentErrors", () => {
 });
 
 describe("feature pages", () => {
-    it("has exactly the nine slugs, keyed by their own slug", () => {
+    it("states every feature slug, shown or not, keyed by its own slug", () => {
         expect(Object.keys(features).sort()).toEqual([...FEATURE_SLUGS].sort());
         for (const [key, f] of Object.entries(features)) {
             expect(f.slug).toBe(key);
@@ -283,6 +283,63 @@ describe("the shot manifest", () => {
  * The repo is public: no prices and no plan limits in content (MKT brief).
  * Plans appear by name only; prices render a placeholder.
  */
+describe("Share and Ask AI say only what's true (MARKETING_CLAIMS.md)", () => {
+    const words = (slug: "social" | "ask-ai") => JSON.stringify(features[slug]);
+
+    it("Share claims no posting for you and no plan line", () => {
+        const w = words("social");
+        expect(w).not.toMatch(
+            /automatic(ally)? post|posts? for you|publish(es)? for you|schedul/i,
+        );
+        expect(w).not.toMatch(/\b(Saroh|it) posts? (to|on)\b/i);
+        // "Free on every plan" waits on the catalogue, not this file.
+        expect(w).not.toMatch(/every plan|\bFree\b/);
+    });
+
+    it("Ask AI names no plan, allowance or model provider", () => {
+        const w = words("ask-ai");
+        expect(w).not.toMatch(
+            /\b(Free|Grow|Pro)\b|questions each|Anthropic|Claude|train/,
+        );
+    });
+});
+
+describe("AI apps says only what's true (MARKETING_CLAIMS.md)", () => {
+    const w = JSON.stringify(features["ai-apps"]);
+
+    it("claims no posting or publishing for you, and no plan or price", () => {
+        expect(w).not.toMatch(
+            /automatic(ally)? post|posts? for you|publish(es)? for you|schedul/i,
+        );
+        expect(w).not.toMatch(/\b(Free|Grow|Pro)\b|every plan|\d+ ?%/);
+    });
+
+    it("says website changes stay a draft and other changes happen at once, logged", () => {
+        const step = features["ai-apps"].steps.find((s) => s.chat);
+        expect(step?.body).toMatch(/change at once/);
+        expect(step?.body).toMatch(/AI activity in Settings, kept for 90 days/);
+        expect(step?.body).toMatch(/stay a draft until you publish/);
+        // `move_booking` tells the customer (apps/api.saroh.in mcp day tools).
+        expect(step?.body).toMatch(
+            /When a booking moves, the customer is told/,
+        );
+        expect(features["ai-apps"].heroChat?.outcome).toBe("draft");
+        expect(step?.chat?.outcome).toBe("at_once");
+    });
+
+    it("names the four apps without cards in one line", () => {
+        const also = features["ai-apps"].apps?.also ?? "";
+        for (const name of [
+            "Gemini CLI",
+            "Copilot Studio",
+            "Windsurf",
+            "Notion",
+        ]) {
+            expect(also).toContain(name);
+        }
+    });
+});
+
 describe("no prices or plan limits", () => {
     const everything = JSON.stringify({
         features,

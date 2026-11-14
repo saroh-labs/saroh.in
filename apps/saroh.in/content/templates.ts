@@ -15,7 +15,7 @@ import { numberWord } from "@/lib/format/number-words";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-14";
 
 /**
  * The Templates gallery (Resources plan U6, industry templates plan U13):
@@ -215,6 +215,8 @@ export interface GalleryTemplate {
     type: string;
     fonts: { heading: string; body: string };
     colourways: string[];
+    /** Each colourway's accent, where it carries a palette: the preview's swatches. */
+    swatches: string[];
     colours: PreviewColours;
     pages: PreviewPage[];
 }
@@ -369,6 +371,9 @@ function toGallery(t: TemplateManifest): GalleryTemplate {
             body: pair ? fontStack(pair.body) : "inherit",
         },
         colourways: (t.styles ?? []).map((s) => s.name),
+        swatches: (t.styles ?? []).flatMap((s) =>
+            s.style.palette?.accent ? [s.style.palette.accent] : [],
+        ),
         colours: previewColours(t, slug),
         pages,
     };

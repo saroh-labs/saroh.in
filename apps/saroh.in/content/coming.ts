@@ -1,3 +1,7 @@
+import type { ReleaseSwitch } from "@saroh/marketing/feature-switches";
+
+import { featuresOff } from "@/lib/feature-switches";
+
 /**
  * How near planned work is, as the changelog's and the Integrations page's
  * Planned lists both say it: "Coming next", then "Later", with no date to
@@ -52,9 +56,16 @@ export interface ComingItem {
     line: string;
     /** It connects Saroh to another service: the Integrations page lists it too. */
     integration?: true;
+    /**
+     * The release switch that ships it (plan 2026-11-13-002, U11): the row
+     * leaves both lists the moment that switch is on, for its changelog
+     * entry, with no date in the repo.
+     */
+    hiddenWhenOn?: ReleaseSwitch;
 }
 
-export const COMING: readonly ComingItem[] = [
+/** Every planned row, shown or not. */
+export const COMING_ITEMS: readonly ComingItem[] = [
     {
         group: "next",
         // A business can already connect WhatsApp in Settings › Providers
@@ -104,12 +115,16 @@ export const COMING: readonly ComingItem[] = [
         group: "next",
         name: "API keys and webhooks",
         line: "Connect Saroh to your own tools, n8n and AI assistants, with keys you control.",
+        hiddenWhenOn: "developers",
     },
     {
         group: "next",
-        name: "Saroh Social",
+        // Share and posts (DEC-217) makes the picture and caption and the
+        // merchant posts them; posting from Saroh to a network is what's
+        // still to come (board VSIntegrations, ticket 12).
+        name: "Posting to social networks",
         integration: true,
-        line: "Make posts from your products and offers in your brand, and post them to Instagram, Facebook, LinkedIn and X.",
+        line: "Post what you make in Saroh straight to Instagram, Facebook, LinkedIn and X.",
     },
     {
         group: "later",
@@ -151,3 +166,13 @@ export const COMING: readonly ComingItem[] = [
         line: "Open any post in Canva to edit it, or bring in designs you've made there, then schedule them from Saroh.",
     },
 ];
+
+/** The rows planned now: one whose switch is on has shipped, and leaves. */
+export function shownComing(off: readonly string[]): ComingItem[] {
+    return COMING_ITEMS.filter(
+        (item) => !item.hiddenWhenOn || off.includes(item.hiddenWhenOn),
+    );
+}
+
+/** The rows this build lists, on the changelog and the Integrations page. */
+export const COMING: readonly ComingItem[] = shownComing(featuresOff());

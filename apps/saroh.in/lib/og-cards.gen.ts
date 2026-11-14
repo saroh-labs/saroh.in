@@ -15,9 +15,29 @@ export const HELP_CARDS: Record<
         area: "Billing",
         title: "Add your GSTIN",
     },
+    "api-keys-and-webhooks": {
+        area: "AI apps and API",
+        title: "API keys and webhooks",
+    },
+    "ask-ai": {
+        area: "AI apps and API",
+        title: "Ask AI about your business",
+    },
     "connect-cashfree": {
         area: "Payments",
         title: "Connect Cashfree",
+    },
+    "connect-chatgpt": {
+        area: "AI apps and API",
+        title: "Connect ChatGPT",
+    },
+    "connect-claude": {
+        area: "AI apps and API",
+        title: "Connect Claude",
+    },
+    "connect-other-ai-apps": {
+        area: "AI apps and API",
+        title: "Connect other AI apps",
     },
     "connect-razorpay": {
         area: "Payments",
@@ -47,6 +67,10 @@ export const HELP_CARDS: Record<
         area: "Bookings",
         title: "Set your team's hours",
     },
+    "share-a-post": {
+        area: "Share and posts",
+        title: "Share a post",
+    },
     "take-a-deposit-when-they-book": {
         area: "Bookings",
         title: "Take a deposit when they book",
@@ -68,6 +92,14 @@ export const INTEGRATION_CARDS: Record<
     cashfree: {
         name: "Cashfree",
         intro: "Saroh's Cashfree integration takes payments through your own Cashfree account, for a business that already uses Cashfree. Customers pay by UPI, card or the other methods your account has switched on, and the money goes straight to you. Saroh never holds it.",
+    },
+    chatgpt: {
+        name: "ChatGPT",
+        intro: "Connect ChatGPT to your business on Saroh and ask in your own words: add a product, look up Saturday's bookings, or start a new page for your site. ChatGPT acts as you, so it can only do what you can do in Saroh.",
+    },
+    claude: {
+        name: "Claude",
+        intro: "Connect Claude to your business on Saroh and ask in your own words: add a product, look up Saturday's bookings, or start a new page for your site. Claude acts as you, so it can only do what you can do in Saroh.",
     },
     email: {
         name: "Your own email",

@@ -14,6 +14,7 @@ import {
     liveIntegrations,
     PLACEHOLDER_BUSINESS_ID,
     plannedIntegrations,
+    shownIntegrationSlugs,
 } from "./integrations";
 import { integrationErrors } from "./validate";
 
@@ -37,12 +38,16 @@ describe("the integration pages", () => {
         expect(integrationErrors(real)).toEqual([]);
     });
 
-    it("has a page for every live card and a card for every page", () => {
-        expect(liveIntegrations.map((i) => i.slug)).toEqual([
-            ...INTEGRATION_SLUGS,
-        ]);
+    it("has a page for every card that links to one, and a card for every page", () => {
+        expect(
+            liveIntegrations
+                .filter((i) => i.href.startsWith("/integrations/"))
+                .map((i) => i.slug),
+        ).toEqual([...INTEGRATION_SLUGS]);
         expect(INTEGRATION_PATHS).toEqual([
             "/integrations",
+            "/integrations/claude",
+            "/integrations/chatgpt",
             "/integrations/razorpay",
             "/integrations/cashfree",
             "/integrations/email",
@@ -151,6 +156,87 @@ describe("the integration pages", () => {
         expect(plannedIntegrations.map((row) => row.name)).not.toContain(
             "CSV import",
         );
+    });
+});
+
+describe("the AI apps group (plan 2026-11-13-002, U7)", () => {
+    it("lists Claude and ChatGPT walked, and every other app waiting for its walk", () => {
+        const ai = liveIntegrations.filter((i) => i.category === "AI apps");
+        expect(ai.map((i) => [i.slug, i.liveOnDev])).toEqual([
+            ["claude", true],
+            ["chatgpt", true],
+            ["perplexity", false],
+            ["le-chat", false],
+            ["zapier", false],
+            ["make", false],
+            ["n8n", false],
+            ["coding-tools", false],
+        ]);
+    });
+
+    it("links a card without a page to its part of the other-apps help article", () => {
+        for (const card of liveIntegrations) {
+            if (card.href.startsWith("/integrations/")) continue;
+            expect(card.href).toBe(`/help/connect-other-ai-apps#${card.slug}`);
+        }
+    });
+
+    it("fails an AI card that says nothing of its walk, or links elsewhere", () => {
+        const card = {
+            slug: "perplexity",
+            name: "Perplexity",
+            category: "AI apps",
+            href: "/somewhere",
+        };
+        expect(integrationErrors({ ...real, live: [card] })).toEqual([
+            "integration perplexity: says nothing of its dev sign-in walk",
+            "integration perplexity: links to /somewhere",
+        ]);
+    });
+
+    it("fails a page in another group than its card", () => {
+        const fm = pages.claude.frontmatter;
+        const broken = {
+            ...pages,
+            claude: {
+                source: pages.claude.source,
+                frontmatter: { ...fm, category: "Email" as const },
+            },
+        };
+        expect(integrationErrors({ ...real, pages: broken })).toEqual([
+            "integration claude: page is in Email",
+        ]);
+    });
+
+    it("validates an AI apps page with no webhook path, and its steps' own breadcrumbs", () => {
+        const fm = pages.claude.frontmatter;
+        expect(fm.category).toBe("AI apps");
+        expect(fm.webhookPath).toBeUndefined();
+        expect(fm.steps.map((s) => s.panelPath ?? fm.panelPath)).toEqual([
+            ["Claude", "Connectors"],
+            ["Saroh", "Sign in"],
+            ["Saroh", "Connect an app"],
+            ["Saroh", "Allow an app"],
+        ]);
+    });
+
+    it("still fails a payments page without its webhook path", () => {
+        const broken = integrationSource("cashfree").replace(
+            /^webhookPath: .*$/m,
+            "",
+        );
+        expect(() => splitIntegration("cashfree.mdx", broken)).toThrow(
+            /webhookPath: a payments page names its webhook path and events/,
+        );
+    });
+
+    it("hides Claude's and ChatGPT's pages while the switch is off", () => {
+        expect(shownIntegrationSlugs(["ai-apps"])).toEqual([
+            "razorpay",
+            "cashfree",
+            "email",
+        ]);
+        expect(shownIntegrationSlugs([])).toEqual([...INTEGRATION_SLUGS]);
     });
 });
 
