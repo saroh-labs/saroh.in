@@ -50,5 +50,9 @@
         "MessagingUsage": "Saroh's own sender, India only for now",
         "MessagingContactWindow": "Saroh's own sender, India only for now",
         "MessagingWebhookEvent": "Saroh's own sender, India only for now"
+    },
+    "ai": {
+        "AiSetting": "Saroh-wide Ask AI settings (model, caps, the halt); per-business tries are AiSettingOverride",
+        "AiAlert": "Saroh's own Ask AI spend and failure alarms, sent once per window"
     }
 }

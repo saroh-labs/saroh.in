@@ -286,9 +286,12 @@ export const POST_PREVIEW = 400;
 
 /** A post's stored HTML as plain words, for the card. */
 export function postPreview(html: string): string {
-    const text = html
-        .replace(/<\/(p|h\d|li|blockquote)>/g, " ")
-        .replace(/<[^>]*>/g, "")
+    let bare = html.replace(/<\/(p|h\d|li|blockquote)>/g, " ");
+    for (let before = ""; before !== bare;) {
+        before = bare;
+        bare = bare.replace(/<[^>]*>/g, "");
+    }
+    const text = bare
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")
         .replace(/&quot;/g, '"')

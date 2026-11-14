@@ -3,6 +3,7 @@ import type {
     AskAiProductsCard,
     AskAiTableCard,
 } from "@saroh/api-contract";
+import { MEDIA } from "@saroh/auth/security-headers";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { Info } from "lucide-react";
@@ -18,11 +19,8 @@ import { initials } from "@/lib/products/catalogue";
  * links are the app's own pages; anything else is dropped here too.
  */
 
-/** Where business media is served from: the CSP's img-src media (`@saroh/auth/security-headers`). */
-export const MEDIA_ORIGINS = [
-    "https://media.saroh.in",
-    "https://media.saroh.io",
-];
+/** Where business media is served from: the CSP's own list, so the two can't drift. */
+export const MEDIA_ORIGINS: readonly string[] = MEDIA;
 
 /** A cover on Saroh's media host, else null. */
 export function mediaSrc(url: string | null): string | null {

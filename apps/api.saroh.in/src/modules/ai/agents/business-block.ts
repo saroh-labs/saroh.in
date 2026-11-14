@@ -3,6 +3,7 @@ import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import { moneyWordsWhole } from "../../../common/words-format";
 import { businessTimezone } from "../../bookings/staff-availability";
 import type { ModuleKey } from "../../capabilities/module-keys";
 import { MODULE_BY_KEY } from "../../capabilities/module-registry";
@@ -80,7 +81,8 @@ export function formatBusinessBlock(f: BusinessFacts): string {
     return [
         `Business: ${JSON.stringify(f.name)}`,
         `Kind of business: ${f.trade ?? "not said"}`,
-        `Currency: ${f.currency ?? "not set yet"}`,
+        // The example comes from the currency, so a house rule never names one edition's format.
+        `Currency: ${f.currency ? `${f.currency}, written like ${moneyWordsWhole(120000, f.currency)}` : "not set yet"}`,
         `Time zone: ${f.zone}`,
         `Today: ${today}`,
         `The person asking is: ${f.role}`,

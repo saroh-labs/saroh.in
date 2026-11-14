@@ -188,6 +188,7 @@ function pageSecurityHeaders(options = {}) {
 }
 
 module.exports = {
+    MEDIA,
     contentSecurityPolicy,
     permissionsPolicy,
     pageSecurityHeaders,

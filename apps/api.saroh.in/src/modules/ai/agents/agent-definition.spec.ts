@@ -85,7 +85,7 @@ describe("business block", () => {
             [
                 'Business: "Rye & Co."',
                 "Kind of business: salon",
-                "Currency: INR",
+                "Currency: INR, written like ₹1,20,000",
                 "Time zone: Asia/Kolkata",
                 // 01:30 the next day in the business's zone.
                 "Today: Saturday, 14 Nov 2026",

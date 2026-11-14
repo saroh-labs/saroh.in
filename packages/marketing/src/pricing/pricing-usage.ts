@@ -34,6 +34,7 @@ const NOUN: Record<LimitKind, [string, string]> = {
     // Online ones only (DEC-095): the team's own bookings are never capped.
     bookings: ["online booking", "online bookings"],
     integrations: ["connection", "connections"],
+    "ask-ai": ["question", "questions"],
 };
 
 /**
