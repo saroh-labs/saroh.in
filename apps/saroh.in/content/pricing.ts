@@ -12,7 +12,8 @@ export const PRICING_COPY = {
     closer: "Start your site for free.",
     /** Below the plan cards, after Vercel's usage table (owner, 14 Oct 2026). */
     usageTitle: "Usage beyond your plan",
-    usageLead: "What each plan includes, and what more costs a month.",
+    usageLead:
+        "What each plan includes, and what more costs each billing period.",
 } as const;
 
 /** The search-result line: what each plan is for, never what it costs. */
