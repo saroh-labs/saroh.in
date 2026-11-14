@@ -105,6 +105,18 @@ describe("withLiveAdditions (DEC-186)", () => {
         expect(cell(own, "roles", "b").inc).toBe(false);
     });
 
+    it("gives an older version a row that is new since, as the live one has it", () => {
+        const own = edit(fixture(), (c) => {
+            c.modules = c.modules.filter((m) => m.id !== "roles");
+        });
+        const live = fixture();
+
+        const out = withLiveAdditions(own, live);
+
+        expect(mod(out, "roles")).toEqual(mod(live, "roles"));
+        expect(out.modules).toHaveLength(live.modules.length);
+    });
+
     it("returns the same rows when the live version adds nothing", () => {
         const own = fixture();
         expect(withLiveAdditions(own, fixture()).modules).toEqual(own.modules);

@@ -71,7 +71,8 @@ export function moveDateFor(
  * a row its plan has gained since is its at once (DEC-186, owner 24 Oct
  * 2026): a cell off on its own version and included on the live one reads
  * as the live cell. Only additions: no row is taken away, no included
- * row's limit changes, and the price stays its own version's.
+ * row's limit changes, and the price stays its own version's. A row new
+ * since its version (Ask AI's, say) is the live row as it stands.
  */
 export function withLiveAdditions(own: Catalog, live: Catalog): Catalog {
     const modules = own.modules.map((m) => {
@@ -86,5 +87,7 @@ export function withLiveAdditions(own: Catalog, live: Catalog): Catalog {
         }
         return cells === m.cells ? m : { ...m, cells };
     });
-    return { ...own, modules };
+    const known = new Set(own.modules.map((m) => m.id));
+    const added = live.modules.filter((m) => !known.has(m.id));
+    return { ...own, modules: [...modules, ...added] };
 }
