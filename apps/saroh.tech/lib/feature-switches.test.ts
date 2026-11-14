@@ -10,6 +10,7 @@ const NAMES = [
     "NEXT_PUBLIC_AI_APPS",
     "NEXT_PUBLIC_ASK_AI",
     "NEXT_PUBLIC_SOCIAL",
+    "NEXT_PUBLIC_TEMPLATES",
 ] as const;
 
 async function builtWith(on: readonly string[]) {
@@ -20,7 +21,12 @@ async function builtWith(on: readonly string[]) {
     const { home } = await import("@/content/home");
     const { PAGES } = await import("./site-map");
     const { generateStaticParams } = await import("@/app/features/[slug]/page");
+    const { HELP_GROUPS } = await import("@/content/help");
     return {
+        help: PAGES.filter((p) => p.path.startsWith("/help/")).map(
+            (p) => p.path,
+        ),
+        helpGroups: HELP_GROUPS,
         slugs: featureList.map((f) => f.slug),
         nav: FEATURES.length,
         title: home.featuresTitle,
@@ -45,6 +51,28 @@ describe("saroh.tech's feature switches", () => {
         expect(built.nav).toBe(9);
         expect(built.pages).not.toContain("/features/ai-apps");
         expect(built.title).toBe("Nine parts, one workspace.");
+        expect(built.help).not.toContain("/help/connect-claude");
+        expect(built.help).not.toContain("/help/share-a-post");
+        expect(built.helpGroups).not.toContain("AI apps");
+        expect(built.helpGroups).not.toContain("Share and posts");
+    });
+
+    it("AI apps on: its page and help, with Global's address and no India words", async () => {
+        const built = await builtWith(["NEXT_PUBLIC_AI_APPS"]);
+        expect(built.params).toContain("ai-apps");
+        expect(built.params).not.toContain("ask-ai");
+        expect(built.help).toContain("/help/connect-claude");
+        expect(built.help).not.toContain("/help/share-a-post");
+        const { features } = await import("@/content/features");
+        const { HELP } = await import("@/content/help");
+        const page = JSON.stringify([
+            features["ai-apps"],
+            HELP.filter((a) => a.feature === "ai-apps"),
+        ]);
+        expect(page).toContain("https://mcp.saroh.tech/mcp");
+        expect(page).not.toMatch(
+            /mcp\.saroh\.in|₹|\b(India|Indian|GST|UPI|Hinglish|Hindi|Diwali|Razorpay)\b/,
+        );
     });
 
     it("all on: twelve everywhere", async () => {

@@ -554,6 +554,33 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 shot: "g-book",
             },
         ],
+        /*
+         * Drawn only while `NEXT_PUBLIC_TEMPLATES` is on (DEC-216). This
+         * site has no gallery of website templates to draw a picker from or
+         * link to, so it draws the words and points alone: no `picks`, and
+         * `linkLabel` is kept for the shared shape, never drawn.
+         */
+        templates: {
+            title: "Pick a template for your trade.",
+            lead: "Tell Saroh what kind of place it is when you set up, and the templates made for your trade come first. Each one is already wired to your services, products or classes, with its own type and colours.",
+            picks: [],
+            suggested: "Suggested for bakeries",
+            points: [
+                {
+                    title: "Your trade first",
+                    body: "Setup asks what kind of place it is: a salon, gym, clinic, coach, food, shop or creator. The templates made for it come first, and All is one press away.",
+                },
+                {
+                    title: "See your own site before you choose",
+                    body: "Press a template to see it with your business's name and details, on a computer and a phone, in each of its colourways. Choosing is a separate press.",
+                },
+                {
+                    title: "Change it later",
+                    body: "Pick another template in the editor. Saroh shows you the preview first, then asks before it replaces any pages.",
+                },
+            ],
+            linkLabel: "See every template",
+        },
         points: [
             {
                 title: "Draft, then publish",
@@ -659,10 +686,13 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         closer: "See how your business is doing.",
     },
     /*
-     * AI apps, Ask AI and Share (plan 2026-11-13-002): the shared type asks
-     * every site to state them. Never built while their switch is off
-     * (`lib/feature-switches.ts`), which it is until Global's launch steps
-     * (ticket 10). U16 writes the full pages, worded for Global.
+     * AI apps, Ask AI and Share (plan 2026-11-13-002, U16): saroh.in's pages
+     * line by line, worded for one person on Free outside India, with
+     * Global's own MCP address. Never built while their switch is off
+     * (`lib/feature-switches.ts`): AI apps and Share turn on at Global's
+     * launch steps (ticket 10). Ask AI stays this short and off until
+     * Global's paid plans. Every step is at Thistlewick Bakery, whose shots
+     * these keys will be (`PENDING_SHOTS` until then).
      */
     "ai-apps": {
         slug: "ai-apps",
@@ -677,26 +707,91 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         homeBody:
             "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
         headline: "Use Saroh from your AI assistant.",
-        sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words. Nothing on your website goes live until you publish it.",
+        sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up an order or move it along. It can do only what you can do in Saroh, and nothing on your website goes live until you publish it.",
+        // The hero and step 3 happen in another company's app: drawn, never
+        // captured (`ChatExchange`). `ai-hero` stays the share card's key.
         hero: { shot: "ai-hero" },
+        heroChat: {
+            caption:
+                "Drawing of a chat in an AI assistant: the owner of Thistlewick Bakery (demo bakery) asks for a holiday offer section on the home page, and it comes back as a draft with a preview",
+            ask: "Add a holiday offer section to my home page for our gift boxes, till Sunday.",
+            tools: "Saroh · Thistlewick Bakery · edit_page, preview_publish",
+            reply: "Done. I added a holiday offer section near the top of your home page, with a button to your gift boxes. It's a draft: your live site hasn't changed. Open the preview to check it, then publish it in Saroh.",
+            outcome: "draft",
+            result: {
+                title: "Draft · Home page",
+                line: "1 section added · Preview the draft",
+            },
+        },
         howTitle: "Connected in a minute. In charge after.",
         steps: [
             {
                 title: "Add Saroh to your AI app",
-                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector.",
+                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector: https://mcp.saroh.tech/mcp. Each app's help article shows where.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-connect",
             },
+            {
+                title: "Sign in and allow it",
+                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick your business and allow it.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ai-consent",
+            },
+            {
+                title: "Ask in your own words",
+                body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in AI activity in Settings, kept for 90 days. Website changes stay a draft until you publish them in Saroh.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ai-ask",
+                chat: {
+                    caption:
+                        "Drawing of a chat in an AI assistant: the owner of Thistlewick Bakery (demo bakery) marks a customer's order ready for pick-up, and it changes at once",
+                    ask: "Mark Maya Thompson's order ready for pick-up.",
+                    tools: "Saroh · Thistlewick Bakery · list_orders, update_order_status",
+                    reply: "Done. Maya Thompson's order is now Ready, waiting for her to pick it up.",
+                    outcome: "at_once",
+                    result: {
+                        title: "Order for Maya Thompson",
+                        line: "Ready · changed just now",
+                    },
+                },
+            },
+            {
+                title: "See everything it did",
+                body: "Settings lists each AI app you connected and every change it made. Put the website draft back as it was before the app's changes, or disconnect it at any time.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ai-activity",
+            },
         ],
         points: [
+            {
+                title: "Your website, by asking",
+                body: "Build and change pages, sections, the look, the menu and the footer, and add images. Or start a site from a template.",
+            },
+            {
+                title: "Your catalogue",
+                body: "Products, services, prices, stock and opening hours.",
+            },
+            {
+                title: "Your day",
+                body: "Find free times, make and move bookings, make orders and move them along, and read enquiries and customers.",
+            },
+            {
+                title: "Only what you can do",
+                body: "It acts as you. It can't cancel bookings, give refunds or touch billing, and it never sees sensitive customer details.",
+            },
             {
                 title: "Nothing goes live by itself",
                 body: "You publish website changes in Saroh. The app can't.",
             },
         ],
+        apps: {
+            title: "Apps you can use",
+            lead: "Saroh connects through MCP, the open standard AI apps use to reach other tools. Each app has a short guide.",
+            also: "Also works with Gemini CLI, Microsoft Copilot Studio, Windsurf and Notion, and other apps that connect to MCP servers with a sign-in. Some apps add connectors only on an account of their own that allows it.",
+        },
         worksLead:
             "Your AI assistant works on the same records as the rest of Saroh, so a change it makes is a change everywhere.",
-        worksWith: ["website", "products", "bookings"],
+        worksWith: ["website", "products", "bookings", "orders"],
         usedBy: ["shops", "salons", "gyms", "clinics"],
         closer: "Do your Saroh work by asking.",
     },
@@ -749,7 +844,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         homeBody:
             "Share a product, service, offer or post as a card in your look, or make a post of your own.",
         headline: "Turn what you sell into a post in a minute.",
-        sub: "Social media posts made from what you sell, drawn in your website's own colours, fonts and logo. Pick a card, check the caption, then post it yourself from your phone or computer.",
+        sub: "Social media posts made from what you sell. Share a product, a service or class, an offer, a blog post or your booking page as a ready post, drawn in your website's own colours, fonts and logo. Pick a card, check the caption, then post it yourself on WhatsApp, Instagram or Facebook from your phone or computer.",
         hero: { shot: "sh-sheet" },
         howTitle: "From your page to their feed.",
         steps: [
@@ -759,11 +854,43 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "sh-button",
             },
+            {
+                title: "Pick a card and a size",
+                body: "Photo, Price tag, Offer or Simple, as a post, a square or a story. A card only shows what the item has: no live offer, no Offer card.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "sh-cards",
+            },
+            {
+                title: "Post it from your phone",
+                body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "sh-phone",
+            },
+            {
+                title: "Or make your own post",
+                body: "In Social, Create post takes a headline, your own photo or both, and a link to any page on your site. Your own posts are saved, so you can share them again.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "sh-post",
+            },
         ],
+        // saroh.in's "Indian scripts drawn right" is left out: no other
+        // script has been checked on a card.
         points: [
+            {
+                title: "In your look, not ours",
+                body: "Cards use your website's colours, fonts and logo.",
+            },
+            {
+                title: "The right size for each place",
+                body: "Post, square and story. Stories keep words clear of the top and bottom.",
+            },
             {
                 title: "You post, from your own accounts",
                 body: "Saroh makes the picture and the caption. You share them, so there's nothing to connect and no password to give.",
+            },
+            {
+                title: "Links that sell",
+                body: "Every post links to the item's live page, where people can book or buy.",
             },
         ],
         worksLead:
