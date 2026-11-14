@@ -304,6 +304,42 @@ describe("Share and Ask AI say only what's true (MARKETING_CLAIMS.md)", () => {
     });
 });
 
+describe("AI apps says only what's true (MARKETING_CLAIMS.md)", () => {
+    const w = JSON.stringify(features["ai-apps"]);
+
+    it("claims no posting or publishing for you, and no plan or price", () => {
+        expect(w).not.toMatch(
+            /automatic(ally)? post|posts? for you|publish(es)? for you|schedul/i,
+        );
+        expect(w).not.toMatch(/\b(Free|Grow|Pro)\b|every plan|\d+ ?%/);
+    });
+
+    it("says website changes stay a draft and other changes happen at once, logged", () => {
+        const step = features["ai-apps"].steps.find((s) => s.chat);
+        expect(step?.body).toMatch(/change at once/);
+        expect(step?.body).toMatch(/AI activity in Settings, kept for 90 days/);
+        expect(step?.body).toMatch(/stay a draft until you publish/);
+        // `move_booking` tells the customer (apps/api.saroh.in mcp day tools).
+        expect(step?.body).toMatch(
+            /When a booking moves, the customer is told/,
+        );
+        expect(features["ai-apps"].heroChat?.outcome).toBe("draft");
+        expect(step?.chat?.outcome).toBe("at_once");
+    });
+
+    it("names the four apps without cards in one line", () => {
+        const also = features["ai-apps"].apps?.also ?? "";
+        for (const name of [
+            "Gemini CLI",
+            "Copilot Studio",
+            "Windsurf",
+            "Notion",
+        ]) {
+            expect(also).toContain(name);
+        }
+    });
+});
+
 describe("no prices or plan limits", () => {
     const everything = JSON.stringify({
         features,

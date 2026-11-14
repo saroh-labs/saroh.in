@@ -1542,6 +1542,45 @@ const SHARE_SHOTS: Shot[] = [
     },
 ];
 
+/* ── AI apps (plan 2026-11-13-002, U3; board VFAiApps) ─────────────────
+ *
+ * Only Saroh's own screens: the AI app's chat and its Add a connector form
+ * are another company's, drawn on the page or left out, never captured.
+ * Both wait for state the showcase seed doesn't make, so each waits for a
+ * control only the real screen has and fails rather than shoot the wrong
+ * one (see `gap`). Read-only: the consent screen is shot before Allow, and
+ * opening a connection's sheet only changes the page.
+ */
+const AI_APPS_SHOTS: Shot[] = [
+    {
+        key: "ai-consent",
+        business: "rye",
+        role: "owner",
+        route: "accounts:/oauth/consent",
+        viewport: DESK,
+        steps: [{ waitFor: 'button:has-text("Don\'t allow")' }],
+        alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
+        caption:
+            "An AI app wants to use Saroh as you: two of three businesses ticked, what it may do and what it can't, and Allow",
+        gap: "The page needs the signed query of a sign-in an AI app started (its /oauth/authorize redirect); append it to the route by hand for the run. The seed has one Rye & Co., not three.",
+    },
+    {
+        key: "ai-activity",
+        business: "rye",
+        role: "owner",
+        route: "/settings/developers/ai",
+        viewport: DESK,
+        steps: [
+            { click: 'button[aria-label^="Open "]' },
+            { waitFor: '[role="dialog"]' },
+        ],
+        alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
+        caption:
+            "Settings › API and AI apps › AI assistants: Claude connected to two businesses, its last three changes, and Roll back site draft and Disconnect",
+        gap: "The seed connects no AI app: connect one to Rye & Co. on the capture database and make a change or two through it first.",
+    },
+];
+
 export const SHOTS: Shot[] = [
     // ── Rye & Co. ──────────────────────────────────────────────────────
     {
@@ -1943,4 +1982,5 @@ export const SHOTS: Shot[] = [
     ...SIZES_SHOTS,
     ...STOCK_SHOTS,
     ...SHARE_SHOTS,
+    ...AI_APPS_SHOTS,
 ];

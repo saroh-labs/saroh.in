@@ -130,7 +130,9 @@ const designed = {
         "Memberships at Pulse Fitness (demo gym) with their next charge",
     ),
     // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until
-    // captured. Share's specs are in `e2e/marketing-shots/shots.config.ts`;
+    // captured. Share's and AI apps' Saroh screens (consent, AI activity)
+    // have specs in `e2e/marketing-shots/shots.config.ts`; AI apps' hero and
+    // `ai-ask` are another company's chat, drawn on the page instead;
     // Ask AI's wait for its screens (plan 2026-11-13-001), and the release
     // check refuses its switch while any is a placeholder. Not built while
     // their switch is off. The demo salon is the seed's Gulmohar.
@@ -144,7 +146,7 @@ const designed = {
         "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
     ),
     "ai-ask": pending(
-        "An AI assistant moving a booking at Kesar Salon (demo salon)",
+        "An AI assistant moving a booking at Gulmohar Salon & Bridal (demo salon)",
     ),
     "ai-activity": pending(
         "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",

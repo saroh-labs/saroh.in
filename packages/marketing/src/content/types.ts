@@ -132,6 +132,29 @@ export interface SearchWords {
     seoDescription: string;
 }
 
+/**
+ * What a change asked of an AI app does in Saroh (plan 2026-11-13-002): made
+ * at once, left as a website draft to publish, or only answered. The pill's
+ * words come from code (`chat-exchange.tsx`), not from each page.
+ */
+export type ChatOutcome = "at_once" | "draft" | "answer";
+
+/**
+ * A chat in another company's AI app, drawn in text because it can't be
+ * captured (`ChatExchange`): the ask, the reply and what came of it.
+ */
+export interface ChatWords {
+    /** What the drawing shows, for its caption: "Drawing of a chat in …". */
+    caption: string;
+    ask: string;
+    /** The Saroh tools the app called, as the app lists them. */
+    tools?: string;
+    reply: string;
+    outcome: ChatOutcome;
+    /** The record it made or changed, as a small card under the reply. */
+    result?: { title: string; line: string };
+}
+
 export interface FeatureStep extends ShotRef {
     title: string;
     body: string;
@@ -139,6 +162,16 @@ export interface FeatureStep extends ShotRef {
     who: string;
     /** A part of a feature that can't be used yet: the page marks it. */
     notYet?: boolean;
+    /** A step in another company's app: drawn as this chat, not `shot`. */
+    chat?: ChatWords;
+}
+
+/** AI apps' "Apps you can use": the cards come from the site's Integrations list. */
+export interface FeatureAppList {
+    title: string;
+    lead: string;
+    /** The apps named in one line, without cards. */
+    also: string;
 }
 
 export interface Point {
@@ -183,11 +216,15 @@ export interface Feature extends SearchWords {
     headline: string;
     sub: string;
     hero: ShotRef;
+    /** A hero in another company's app: drawn as this chat, not `hero`'s shot. */
+    heroChat?: ChatWords;
     howTitle: string;
     steps: FeatureStep[];
     /** Website only: the templates section, while templates are on. */
     templates?: FeatureTemplates;
     points: Point[];
+    /** AI apps only: "Apps you can use", after What it does. */
+    apps?: FeatureAppList;
     worksLead: string;
     /** Other features, by slug; the test fails on a missing one. */
     worksWith: FeatureSlug[];

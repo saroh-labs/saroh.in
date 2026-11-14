@@ -208,6 +208,69 @@ describe("/features/[slug]", () => {
         }
     });
 
+    describe("/features/ai-apps (board VFAiApps)", () => {
+        it("is not built while AI apps is off", () => {
+            expect(generateStaticParams()).not.toContainEqual({
+                slug: "ai-apps",
+            });
+        });
+
+        it("draws the hero and step 3 as chats, the rest as shots", async () => {
+            env.NEXT_PUBLIC_AI_APPS = "on";
+            const { container } = render(await FeaturePage(params("ai-apps")));
+            const chats = container.querySelectorAll("figure[data-chat]");
+            expect(chats).toHaveLength(2);
+            expect(chats[0].textContent).toContain("Draft to publish");
+            expect(chats[1].textContent).toContain("Changed at once");
+            expect(container.querySelector('[data-shot="ai-hero"]')).toBeNull();
+            const how = found(
+                screen
+                    .getByRole("heading", {
+                        name: features["ai-apps"].howTitle,
+                    })
+                    .closest("section"),
+            );
+            expect(how.querySelectorAll("ol > li")).toHaveLength(4);
+            expect(how.querySelectorAll("[data-shot]")).toHaveLength(3);
+        });
+
+        it("lists only the live AI apps under Apps you can use", async () => {
+            env.NEXT_PUBLIC_AI_APPS = "on";
+            const { liveIntegrations, shownIntegrations } =
+                await import("@/content/integrations");
+            render(await FeaturePage(params("ai-apps")));
+            const s = found(
+                screen
+                    .getByRole("heading", {
+                        level: 2,
+                        name: "Apps you can use",
+                    })
+                    .closest("section"),
+            );
+            const live = shownIntegrations([]).filter(
+                (c) => c.category === "AI apps",
+            );
+            const hrefs = Array.from(s.querySelectorAll("li a")).map((a) =>
+                a.getAttribute("href"),
+            );
+            expect(hrefs).toEqual(live.map((c) => c.href));
+            // A card not walked on dev is never listed.
+            for (const c of liveIntegrations.filter(
+                (x) => x.category === "AI apps" && !x.liveOnDev,
+            )) {
+                expect(hrefs).not.toContain(c.href);
+            }
+            expect(s.textContent).toContain("Gemini CLI");
+        });
+
+        it("other feature pages have no app list", async () => {
+            render(await FeaturePage(params("bookings")));
+            expect(
+                screen.queryByRole("heading", { name: "Apps you can use" }),
+            ).toBeNull();
+        });
+    });
+
     it("Works with never links a switched-off feature", async () => {
         // Ask AI works with AI apps; with AI apps off the card is not drawn.
         expect(features["ask-ai"].worksWith).toContain("ai-apps");

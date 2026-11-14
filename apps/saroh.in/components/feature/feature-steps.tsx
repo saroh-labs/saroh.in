@@ -1,3 +1,4 @@
+import { ChatExchange } from "@saroh/marketing/chat-exchange";
 import { FeatureSteps as Steps } from "@saroh/marketing/feature-steps";
 
 import type { FeatureHelpLink } from "@/content/feature-help";
@@ -20,7 +21,10 @@ export function FeatureSteps({
                 title: step.title,
                 body: step.body,
                 who: step.who,
-                shot: shotView(step.shot, step.alt),
+                // A step in another company's app is drawn, not captured.
+                ...(step.chat
+                    ? { drawn: <ChatExchange words={step.chat} /> }
+                    : { shot: shotView(step.shot, step.alt) }),
             }))}
             help={help}
         />
