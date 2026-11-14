@@ -109,6 +109,13 @@ describe("reading figures", () => {
                 "owed:count",
             ),
         ).toBe(true);
+        expect(
+            hasNumber(
+                "Dr. Arun ke kal (15 Nov) koi appointment nahin hai.",
+                0,
+                "staff-bookings:arun:tomorrow",
+            ),
+        ).toBe(true);
         // "kar do" is not 2, and "no-show" is not none.
         expect(hasNumber("Mark kar do.", 2, "orders:today")).toBe(false);
         expect(hasNumber("3 no-shows today.", 0, "noshow:today")).toBe(false);

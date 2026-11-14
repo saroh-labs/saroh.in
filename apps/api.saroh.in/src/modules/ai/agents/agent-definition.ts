@@ -97,6 +97,25 @@ export function languageOf(question: string): Exclude<AiLanguage, "MATCH"> {
     return HINGLISH_WORDS.test(question) ? "HINGLISH" : "ENGLISH";
 }
 
+const LANGUAGE_TAIL: Record<Exclude<AiLanguage, "MATCH">, string> = {
+    ENGLISH: "write the whole answer in English.",
+    HINGLISH:
+        "write the whole answer in Hinglish: Hindi in Latin letters, mixed with English as people speak, never Devanagari.",
+    HINDI: "write the whole answer in Hindi in Devanagari, month names too (नवंबर, never Nov); only names and short English business words stay in Latin letters.",
+};
+
+/**
+ * The question as sent, with the language this turn answers in at its tail:
+ * after the cache breakpoint, so a turn's language never changes the prefix.
+ */
+export function withLanguageTail(
+    question: string,
+    language: AiLanguage,
+): string {
+    const said = language === "MATCH" ? languageOf(question) : language;
+    return `${question}\n\n(From Saroh, not the person: ${LANGUAGE_TAIL[said]})`;
+}
+
 /** The instructions before the cache breakpoint: the same for every business. */
 export const sharedInstructions = (agent: AgentDefinition) =>
     `${agent.houseRules}\n\n${agent.job}`;

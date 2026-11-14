@@ -254,9 +254,9 @@ const COUNT_WORDS = new Map<string, number>(
 );
 COUNT_WORDS.set("पांच", 5).set("छः", 6).set("char", 4).set("panch", 5);
 
-/** "None" said in words: "no appointments", "koi bhi invoice … nahi", "कोई नहीं". */
+/** "None" said in words: "no appointments", "koi bhi invoice … nahi", "koi appointment nahin", "कोई नहीं". */
 const NONE =
-    /\b(?:no(?!-)|none|zero|nothing|nobody|koi bhi|koi nahi)\b|कोई|शून्य/i;
+    /\b(?:no(?!-)|none|zero|nothing|nobody|koi bhi|koi (?:\w+ ){0,3}nahi?n?)\b|कोई|शून्य/i;
 
 export function hasNumber(text: string, value: number, key = ""): boolean {
     const tolerance = isMoneyKey(key) ? 0.5 : 0;

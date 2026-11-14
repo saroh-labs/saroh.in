@@ -267,7 +267,7 @@ describe("Ask AI's tool bridge (U4)", () => {
         const list = await ask(ctx, "list_unpaid_bills", { limit: 2 });
         expect(list.isError).toBeUndefined();
         expect(list.output).toMatch(
-            /^3 unpaid bills, \d+ of them overdue \(past their due date\), oldest due first/,
+            /^3 unpaid bills in all: \d+ overdue \(past their due date\), \d+ not due yet\. Oldest due first/,
         );
         const lines = list.output.split("\n").filter((l) => l.startsWith("- "));
         expect(lines).toHaveLength(2);

@@ -303,6 +303,20 @@ async function seedBusiness(
                 serviceId: id("service", s.key),
             })),
         });
+        // Someone with no weekly hours never works, so a one-to-one can't be
+        // booked or moved with them: each works their services' open hours.
+        await prisma.staffHours.createMany({
+            data: s.staff.flatMap((staff) =>
+                s.days.map((dayOfWeek) => ({
+                    id: id("staffhours", `${staff}_${s.key}_${dayOfWeek}`),
+                    organizationId: orgId,
+                    staffId: id("staff", staff),
+                    dayOfWeek,
+                    startMinute: s.opens,
+                    endMinute: s.closes,
+                })),
+            ),
+        });
     }
 
     // --- customers: a contact each, and a shop customer where it sells

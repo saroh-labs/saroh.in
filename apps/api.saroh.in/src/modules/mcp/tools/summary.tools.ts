@@ -695,7 +695,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
             name: "list_unpaid_bills",
             title: "Unpaid bills",
             description:
-                "Use this when the person asks who hasn't paid, who owes them, or which bills are overdue: every unpaid bill with who it's to, what is left to pay, its due date and how late, oldest due first. Example: \"who hasn't paid?\" Not for totals (get_business_summary).",
+                "Use this when the person asks who hasn't paid, who owes them, how many bills or invoices are pending or unpaid, or which are overdue: every unpaid bill with who it's to, what is left to pay, its due date and how late, oldest due first. Example: \"who hasn't paid?\" Not for totals (get_business_summary).",
             contract: listUnpaidBillsTool,
             // Without invoice:read it says so rather than refusing.
             capability: null,
@@ -776,7 +776,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 const text = [
                     total === 0
                         ? "No unpaid bills."
-                        : `${total} unpaid bills, ${overdue} of them overdue (past their due date), oldest due first; ${offset + 1} to ${offset + bills.length} here.`,
+                        : `${total} unpaid bills in all: ${overdue} overdue (past their due date), ${total - overdue} not due yet. Oldest due first; ${offset + 1} to ${offset + bills.length} here.`,
                     ...bills.map(
                         (b) =>
                             `- ${b.number ?? "Bill"} (invoice_id ${b.invoice_id}), ${b.customer ? quoteUntrusted("Customer", b.customer.text) : "no customer named"}${b.left_to_pay ? `, ${b.left_to_pay} left to pay` : ""}, ${

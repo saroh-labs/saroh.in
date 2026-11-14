@@ -23,6 +23,7 @@ import type { FeatureFlagService } from "../../feature-flags/feature-flags.servi
 import type { AskAiRefusal } from "../access/ask-ai-access";
 import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
+import { withLanguageTail } from "../agents/agent-definition";
 import { FakeAiProvider } from "../providers/fake.provider";
 import type { AiEvent, AiMessage, AiUsage } from "../providers/provider.port";
 import type { AiSettingsService } from "../settings/ai-settings.service";
@@ -329,6 +330,18 @@ describe("TurnRunner", () => {
         );
     });
 
+    it("sends the question with this turn's language at its tail; the question is kept as asked", async () => {
+        const t = setup({ rounds: [[text("Kal 3."), done()]] });
+        await collect(t.turn());
+        expect(last(t.provider.requests[0].messages)).toEqual({
+            role: "user",
+            text: `${QUESTION}\n\n(From Saroh, not the person: write the whole answer in Hinglish: Hindi in Latin letters, mixed with English as people speak, never Devanagari.)`,
+        });
+        expect(t.store.started).toEqual([
+            expect.objectContaining({ question: QUESTION }),
+        ]);
+    });
+
     it("lays the request out for the cache and turns retries off", async () => {
         const t = setup({ rounds: [toolRound(), [text("Ok"), done()]] });
         await collect(t.turn());
@@ -517,7 +530,7 @@ describe("TurnRunner", () => {
             // The old exchange went; the question and the newest results stayed.
             expect(second.messages[0]).toEqual({
                 role: "user",
-                text: QUESTION,
+                text: withLanguageTail(QUESTION, "MATCH"),
             });
             expect(last(events)).toMatchObject({ outcome: "ANSWERED" });
         });

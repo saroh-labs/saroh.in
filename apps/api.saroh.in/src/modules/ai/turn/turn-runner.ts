@@ -11,6 +11,7 @@ import {
     inLanguage,
     sharedInstructions,
     statusWordsFor,
+    withLanguageTail,
 } from "../agents/agent-definition";
 import type {
     AiMessage,
@@ -303,7 +304,13 @@ export class TurnRunner {
                 { text: block },
             ],
             tools: this.toolbox.definitions(agent.tools),
-            messages: [...history, { role: "user", text: input.question }],
+            messages: [
+                ...history,
+                {
+                    role: "user",
+                    text: withLanguageTail(input.question, language),
+                },
+            ],
         };
     }
 

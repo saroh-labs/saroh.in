@@ -333,7 +333,7 @@ describe("list_unpaid_bills", () => {
         expect(one.data.total).toBe(5);
         // Overdue counted whole, not just on this page: a, b and r.
         expect(one.text).toMatch(
-            /^5 unpaid bills, 3 of them overdue \(past their due date\)/,
+            /^5 unpaid bills in all: 3 overdue \(past their due date\), 2 not due yet\./,
         );
         expect(one.data.next_cursor).toBe("2");
         expect(bills[0].customer).toEqual({
