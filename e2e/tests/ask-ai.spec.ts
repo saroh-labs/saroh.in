@@ -107,7 +107,8 @@ test.describe("Ask AI: the way in and out", () => {
 
 async function ask(panel: Locator, question: string) {
     await panel.getByRole("textbox", { name: "Ask a question" }).fill(question);
-    await panel.getByRole("button", { name: "Ask" }).click();
+    // Exact: "Close Ask AI" also contains "Ask".
+    await panel.getByRole("button", { name: "Ask", exact: true }).click();
 }
 
 test.describe("Ask AI: asking", { tag: "@serial" }, () => {
