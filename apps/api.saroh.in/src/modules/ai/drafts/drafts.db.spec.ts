@@ -38,7 +38,7 @@ import type { FeatureFlagService } from "../../feature-flags/feature-flags.servi
 import { FlagKey } from "../../feature-flags/flags";
 import { McpActivityService } from "../../mcp/activity.service";
 import { McpToolRegistry } from "../../mcp/tool-registry";
-import { blogTools } from "../../mcp/tools/blog.tools";
+import { blogTools, markdownToHtml } from "../../mcp/tools/blog.tools";
 import { catalogueTools } from "../../mcp/tools/catalogue.tools";
 import { dayTools } from "../../mcp/tools/day.tools";
 import { OrderKitchenService } from "../../orders/order-kitchen.service";
@@ -56,6 +56,7 @@ import { BookingsV1Controller } from "../../public-api/bookings.v1.controller";
 import { CatalogueV1Controller } from "../../public-api/catalogue.v1.controller";
 import { CustomersV1Controller } from "../../public-api/customers.v1.controller";
 import { OrdersV1Controller } from "../../public-api/orders.v1.controller";
+import { sanitizeRichHtml } from "../../sites/sanitize";
 import { StoresService } from "../../stores/stores.service";
 import { AskAiAccess } from "../access/ask-ai-access";
 import { ASK_AI_AGENT } from "../agents/ask-ai.agent";
@@ -1089,5 +1090,111 @@ describe("Draft again", () => {
         expect(
             (await drafts.confirm(owner, again.card.draftId, {})).outcome,
         ).toBe("done");
+    });
+});
+
+describe("Open in editor (owner, 14 Nov)", () => {
+    const body =
+        "## Paper, not plastic\n\nEvery order ships in **recycled** paper.";
+
+    async function blogDraft() {
+        const org = await business();
+        const owner = await asIn(org.id, org.ownerId);
+        const site = await prisma.site.create({
+            data: { organizationId: org.id, name: "Rye", slug: uniq("site") },
+        });
+        const { card } = await draft(owner, "draft_blog_post", {
+            title: "Our new eco packing range",
+            body,
+            excerpt: "Paper, not plastic.",
+        });
+        return { org, owner, site, id: card?.draftId ?? "" };
+    }
+
+    it("reads the draft as the editor's HTML, hands it off, saves no post, and Save as draft is then refused", async () => {
+        const { org, owner, site, id } = await blogDraft();
+        const content = await drafts.content(owner, id);
+        expect(content).toEqual({
+            siteId: site.id,
+            title: "Our new eco packing range",
+            body: sanitizeRichHtml(markdownToHtml(body)),
+            excerpt: "Paper, not plastic.",
+        });
+        expect(content.body).toContain("<h2>Paper, not plastic</h2>");
+        expect(content.body).toContain("<strong>recycled</strong>");
+
+        const handed = await drafts.handOff(owner, id);
+        expect(handed).toMatchObject({
+            siteId: site.id,
+            card: { draftId: id, status: "handed_off" },
+        });
+        expect(
+            (await prisma.askAiDraft.findUniqueOrThrow({ where: { id } }))
+                .status,
+        ).toBe("HANDED_OFF");
+        // Re-opening still works, and the editor can still read it.
+        expect((await drafts.handOff(owner, id)).siteId).toBe(site.id);
+        expect((await drafts.content(owner, id)).title).toBe(
+            "Our new eco packing range",
+        );
+        expect(await drafts.confirm(owner, id, {})).toMatchObject({
+            outcome: "refused",
+            card: { status: "handed_off" },
+            words: "This was opened in the editor. Save it there.",
+        });
+        expect(await prisma.post.count({ where: { siteId: site.id } })).toBe(0);
+        expect(
+            await prisma.mcpActivity.count({
+                where: { organizationId: org.id },
+            }),
+        ).toBe(0);
+    });
+
+    it("another member's draft, or another business's, is a 404", async () => {
+        const { org, id } = await blogDraft();
+        const other = await asIn(org.id, await person(org.id, "ADMIN"));
+        await expect(drafts.content(other, id)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        await expect(drafts.handOff(other, id)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+        const b = await business();
+        await prisma.membership.create({
+            data: { organizationId: b.id, userId: org.ownerId, role: "OWNER" },
+        });
+        await expect(
+            drafts.content(await asIn(b.id, org.ownerId), id),
+        ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("a draft that isn't a blog post, or has run out, or was saved, is a 404", async () => {
+        const org = await business();
+        const owner = await asIn(org.id, org.ownerId);
+        const { card } = await draft(owner, "create_product", {
+            name: "Not a post",
+            price: 10,
+        });
+        await expect(
+            drafts.content(owner, card?.draftId ?? ""),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            drafts.handOff(owner, card?.draftId ?? ""),
+        ).rejects.toBeInstanceOf(NotFoundException);
+
+        const ran = await blogDraft();
+        await prisma.askAiDraft.update({
+            where: { id: ran.id },
+            data: { expiresAt: new Date(Date.now() - 1000) },
+        });
+        await expect(drafts.content(ran.owner, ran.id)).rejects.toBeInstanceOf(
+            NotFoundException,
+        );
+
+        const saved = await blogDraft();
+        await drafts.confirm(saved.owner, saved.id, {});
+        await expect(
+            drafts.handOff(saved.owner, saved.id),
+        ).rejects.toBeInstanceOf(NotFoundException);
     });
 });

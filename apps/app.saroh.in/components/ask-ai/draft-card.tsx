@@ -5,8 +5,9 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
-import { Check, Info, TriangleAlert, Undo2 } from "lucide-react";
+import { Check, Info, PenLine, TriangleAlert, Undo2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
@@ -14,13 +15,14 @@ import { useCanChangePlan } from "@/components/billing/plan-way";
 import { runAction } from "@/lib/api/run-action";
 import {
     confirmDraft,
+    handOffDraft,
     redraftDraft,
     undoDraft,
 } from "@/lib/ask-ai/panel-actions";
 import { upgradeHref } from "@/lib/billing/access";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
-import { draftWords, recordHref, valueText } from "./words";
+import { draftWords, editorHref, recordHref, valueText } from "./words";
 
 /**
  * A draft Ask AI made, for the person to check (boards 4, 5, 14, 15, 16).
@@ -29,6 +31,10 @@ import { draftWords, recordHref, valueText } from "./words";
  * with every value kept. After Confirm: an edit is Done with Undo until the
  * business's day ends; a create is Added with Open it, never Undo. Every
  * value is drawn as text.
+ *
+ * A blog post can also go to the post editor unsaved (Open in editor,
+ * owner 14 Nov): the draft is marked handed off, so the card says so and
+ * no longer offers Save as draft (one post, saved from the editor).
  */
 
 /** Fields typed on the card are numbers when the tool takes a number. */
@@ -48,6 +54,7 @@ export function DraftCard({
     const [typed, setTyped] = useState<Record<string, string>>({});
     const [cancelled, setCancelled] = useState(false);
     const [busy, setBusy] = useState(false);
+    const router = useRouter();
     const words = draftWords(card);
     const big = phone ? "coarse:h-11 h-11" : "";
 
@@ -86,6 +93,18 @@ export function DraftCard({
         settle(await runAction(() => undoDraft(card.draftId), { setBusy }));
     const redraft = async () =>
         settle(await runAction(() => redraftDraft(card.draftId), { setBusy }));
+    const openEditor = async () => {
+        const res = await runAction(() => handOffDraft(card.draftId), {
+            setBusy,
+        });
+        if (!res) return;
+        if (!res.ok) {
+            reportFailure(res);
+            return;
+        }
+        setCard(res.data.card);
+        router.push(editorHref(res.data.siteId, card.draftId));
+    };
 
     if (cancelled) {
         return (
@@ -137,7 +156,9 @@ export function DraftCard({
                             className={big}
                         >
                             <Link href={recordHref(openKind, openId)}>
-                                {create ? "Open it" : words.open}
+                                {create
+                                    ? (words.editor ?? "Open it")
+                                    : words.open}
                             </Link>
                         </Button>
                     ) : null}
@@ -161,6 +182,34 @@ export function DraftCard({
                         {card.note}
                     </p>
                 ) : null}
+            </div>
+        );
+    }
+
+    if (card.status === "handed_off" && words.editor) {
+        return (
+            <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card px-3.5 py-3">
+                <div className="flex items-start gap-2.5" role="status">
+                    <span className="inline-flex size-[26px] shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                        <PenLine className="size-[14px]" aria-hidden />
+                    </span>
+                    <b className="min-w-0 text-sm [overflow-wrap:anywhere]">
+                        {words.handedOff} · {card.targetName}
+                    </b>
+                </div>
+                <div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={big}
+                        onClick={openEditor}
+                        disabled={busy}
+                        aria-busy={busy}
+                    >
+                        {words.editor}
+                    </Button>
+                </div>
             </div>
         );
     }
@@ -298,6 +347,18 @@ export function DraftCard({
                         >
                             {words.confirm}
                         </Button>
+                        {words.editor ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className={big}
+                                onClick={openEditor}
+                                disabled={busy}
+                                aria-busy={busy}
+                            >
+                                {words.editor}
+                            </Button>
+                        ) : null}
                     </>
                 ) : null}
                 {refused ? (

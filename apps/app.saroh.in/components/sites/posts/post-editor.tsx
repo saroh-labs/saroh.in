@@ -80,6 +80,11 @@ export function adoptPostAddress(path: string): void {
     window.history.replaceState(null, "", path);
 }
 
+/** Open in editor from an Ask AI blog draft (owner, 14 Nov): one quiet line. */
+export const FROM_ASK_AI =
+    "Started from Ask AI. Nothing is saved until you save.";
+export const ASK_AI_GONE = "That Ask AI draft isn't available any more.";
+
 /** Long enough to be worth saying, short enough not to nag. */
 const AUTOSAVE_MS = 2500;
 
@@ -91,7 +96,14 @@ export function PostEditor({
     readOnly = false,
     feedback,
     share = null,
+    fromAskAi,
 }: {
+    /**
+     * A new post started from an Ask AI blog draft, unsaved: its title,
+     * body (the editor's HTML) and excerpt; null when the draft couldn't be
+     * read, and the post starts empty. Saving is the editor's own.
+     */
+    fromAskAi?: { title: string; body: string; excerpt: string | null } | null;
     /**
      * Share as a post (#1375, boards SGShareBlog*): the live site and the
      * post's live address. Shown only while the post is live.
@@ -125,10 +137,14 @@ export function PostEditor({
     const [postId, setPostId] = useState(post?.id ?? null);
     const [confirmDelete, setConfirmDelete] = useState(false);
 
-    const [title, setTitle] = useState(post?.title ?? "");
-    const [content, setContent] = useState(post?.content ?? "");
+    const [title, setTitle] = useState(post?.title ?? fromAskAi?.title ?? "");
+    const [content, setContent] = useState(
+        post?.content ?? fromAskAi?.body ?? "",
+    );
     const [slug, setSlug] = useState(post?.slug ?? "");
-    const [excerpt, setExcerpt] = useState(post?.excerpt ?? "");
+    const [excerpt, setExcerpt] = useState(
+        post?.excerpt ?? fromAskAi?.excerpt ?? "",
+    );
     const [categoryId, setCategoryId] = useState(post?.categoryId ?? "");
     const [image, setImage] = useState(post?.image ?? "");
 
@@ -431,7 +447,11 @@ export function PostEditor({
                             <Button
                                 variant="ghost"
                                 size="xs"
-                                disabled={paused || !dirty}
+                                // An Ask AI prefill is unsaved though untouched: Save takes it.
+                                disabled={
+                                    paused ||
+                                    (!dirty && !(fromAskAi && !postId))
+                                }
                                 busy={saving}
                                 busyLabel="Saving…"
                                 onClick={() => void save()}
@@ -466,6 +486,13 @@ export function PostEditor({
                 <PausedNote className="mx-4 mt-3 sm:mx-6">
                     {pausedWords("post")}
                 </PausedNote>
+            ) : fromAskAi !== undefined && !postId ? (
+                <p
+                    role="status"
+                    className="mx-4 mb-0 mt-3 text-[13px] text-muted-foreground sm:mx-6"
+                >
+                    {fromAskAi ? FROM_ASK_AI : ASK_AI_GONE}
+                </p>
             ) : null}
 
             <div className="flex min-h-0 flex-1">

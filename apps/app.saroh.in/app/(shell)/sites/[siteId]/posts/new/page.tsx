@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { PostEditor } from "@/components/sites/posts/post-editor";
 import { deniedFor } from "@/lib/access/require-can";
+import { readAskAiDraftContent } from "@/lib/ask-ai/service";
 import { listPostCategories } from "@/lib/content/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
@@ -17,10 +18,13 @@ export const metadata = { title: "New post · Website" };
  */
 export default async function NewPostPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ siteId: string }>;
+    searchParams?: Promise<{ from?: string | string[] }>;
 }) {
     const { siteId } = await params;
+    const { from } = (await searchParams) ?? {};
     await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();
@@ -36,7 +40,27 @@ export default async function NewPostPage({
         });
     }
 
-    const categories = await listPostCategories(siteId);
+    /*
+     * Open in editor (owner, 14 Nov): `?from=<draftId>` starts the post from
+     * an Ask AI blog draft, unsaved. A draft for another website, or one
+     * that can't be read (run out, saved, not the person's), starts empty.
+     */
+    const draftId = typeof from === "string" && from ? from : null;
+    const [categories, draft] = await Promise.all([
+        listPostCategories(siteId),
+        draftId ? readAskAiDraftContent(draftId) : null,
+    ]);
+    const fromAskAi = draftId
+        ? draft?.siteId === siteId
+            ? draft
+            : null
+        : undefined;
 
-    return <PostEditor siteId={siteId} categories={categories} />;
+    return (
+        <PostEditor
+            siteId={siteId}
+            categories={categories}
+            fromAskAi={fromAskAi}
+        />
+    );
 }

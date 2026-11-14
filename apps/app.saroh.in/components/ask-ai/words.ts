@@ -94,6 +94,9 @@ export function draftWords(card: AskAiDraftCard) {
             state: card.status === "refused" ? "Not saved" : "Not saved yet",
             cancelled: "Not saved",
             open: "Open blog post",
+            // Open in editor (owner, 14 Nov): unsaved, or once saved.
+            editor: "Open in editor",
+            handedOff: "Opened in the editor",
         };
     }
     const create = card.action === "create";
@@ -117,6 +120,8 @@ export function draftWords(card: AskAiDraftCard) {
                     : "Not changed yet",
         cancelled: create ? "Not added" : "Not changed",
         open: `Open ${noun}`,
+        editor: null,
+        handedOff: null,
     };
 }
 
@@ -141,6 +146,11 @@ export function recordHref(kind: AskAiDraftKind, id: string): string {
             return `/sites/${encodeURIComponent(site)}/posts/${encodeURIComponent(post)}`;
         }
     }
+}
+
+/** The post editor's new post, started from an Ask AI blog draft, unsaved. */
+export function editorHref(siteId: string, draftId: string): string {
+    return `/sites/${encodeURIComponent(siteId)}/posts/new?from=${encodeURIComponent(draftId)}`;
 }
 
 /** A field's value as text: the card never draws a value as markup. */

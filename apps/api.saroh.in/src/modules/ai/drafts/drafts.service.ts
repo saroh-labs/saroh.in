@@ -4,9 +4,11 @@ import { HttpException, Injectable, NotFoundException } from "@nestjs/common";
 import type {
     AskAiConfirmBody,
     AskAiDraftCard,
+    AskAiDraftContent,
     AskAiDraftField,
     AskAiDraftRefusal,
     AskAiDraftResult,
+    AskAiHandOff,
 } from "@saroh/api-contract";
 import type { AskAiDraft, AskAiDraftStatus } from "@saroh/database";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
@@ -27,8 +29,11 @@ import {
     ToolError,
     toolError,
 } from "../../mcp/tool-registry";
+import { markdownToHtml } from "../../mcp/tools/blog.tools";
+import { siteIdOf } from "../../mcp/tools/site.tools";
 import { OrderKitchenService } from "../../orders/order-kitchen.service";
 import { assertWorkspaceWrite } from "../../organizations/organization-lifecycle.gate";
+import { sanitizeRichHtml } from "../../sites/sanitize";
 import type { AskAiRefusal } from "../access/ask-ai-access";
 import { AskAiAccess } from "../access/ask-ai-access";
 import { openDraftBody, sealDraftBody } from "../history/sealing";
@@ -66,6 +71,7 @@ const STATUS: Record<AskAiDraftStatus, AskAiDraftCard["status"]> = {
     UNDONE: "undone",
     EXPIRED: "expired",
     REFUSED: "refused",
+    HANDED_OFF: "handed_off",
 };
 
 /** Why a draft can't be acted on, in the card's words; null when it can. */
@@ -464,11 +470,17 @@ export class DraftsService {
     ): Promise<AskAiDraftResult> {
         const { row, kept, tool } = await this.find(ctx, draftId);
         const org = ctx.organizationId;
-        if (row.status === "CONFIRMED" || row.status === "UNDONE") {
+        if (
+            row.status === "CONFIRMED" ||
+            row.status === "UNDONE" ||
+            row.status === "HANDED_OFF"
+        ) {
             return refusedResult(
                 kept.card,
                 row.status,
-                "This was saved already. Ask again for a new change.",
+                row.status === "HANDED_OFF"
+                    ? alreadyWords(row)
+                    : "This was saved already. Ask again for a new change.",
             );
         }
         let cap: number;
@@ -523,6 +535,75 @@ export class DraftsService {
             canUndo: false,
             open: null,
         };
+    }
+
+    /**
+     * Open in editor (owner, 14 Nov): a blog draft goes to the post editor
+     * unsaved, and is marked so Save as draft isn't offered again (one post,
+     * saved from the editor). Again on a handed-off draft re-opens it.
+     */
+    async handOff(
+        ctx: OrganizationContext,
+        draftId: string,
+    ): Promise<AskAiHandOff> {
+        const { row, kept, siteId } = await this.openable(ctx, draftId);
+        if (row.status === "DRAFTED") {
+            await this.move(row, "DRAFTED", { status: "HANDED_OFF" });
+        }
+        return { siteId, card: { ...kept.card, status: "handed_off" } };
+    }
+
+    /** What the post editor starts from: the body as the editor's HTML. */
+    async content(
+        ctx: OrganizationContext,
+        draftId: string,
+    ): Promise<AskAiDraftContent> {
+        const { kept, siteId } = await this.openable(ctx, draftId);
+        const text = (v: unknown) => (typeof v === "string" ? v : "");
+        return {
+            siteId,
+            title: text(kept.input.title),
+            body: sanitizeRichHtml(markdownToHtml(text(kept.input.body))),
+            excerpt: text(kept.input.excerpt) || null,
+        };
+    }
+
+    /**
+     * The asker's own blog draft, not saved, not refused and not run out,
+     * with the website it goes on; any other is a 404.
+     */
+    private async openable(ctx: OrganizationContext, draftId: string) {
+        const found = await this.find(ctx, draftId);
+        const { row, spec, kept } = found;
+        if (
+            spec.kind !== "blog_post" ||
+            (row.status !== "DRAFTED" && row.status !== "HANDED_OFF") ||
+            Date.now() >= row.expiresAt.getTime()
+        ) {
+            throw new NotFoundException("That draft isn't available any more");
+        }
+        const given = kept.input.site_id;
+        const siteId = await asBusiness(ctx.organizationId, async () => {
+            const id = await siteIdOf(
+                ctx,
+                typeof given === "string" ? given : undefined,
+            ).catch(() => null);
+            const site =
+                id &&
+                (await prisma.site.findFirst({
+                    where: {
+                        id,
+                        organizationId: ctx.organizationId,
+                        deletedAt: null,
+                    },
+                    select: { id: true },
+                }));
+            return site ? site.id : null;
+        });
+        if (!siteId) {
+            throw new NotFoundException("That draft isn't available any more");
+        }
+        return { ...found, siteId };
     }
 
     /** Ask AI may act here now, and this person may make this change; else why not. */
@@ -948,6 +1029,8 @@ function alreadyWords(row: AskAiDraft): string {
             return "This draft was replaced or ran out. Ask again to draft it fresh.";
         case "REFUSED":
             return "Saroh won't save this one. Draft it again to see it as it is now.";
+        case "HANDED_OFF":
+            return "This was opened in the editor. Save it there.";
         default:
             return "This draft is waiting for you to confirm it.";
     }

@@ -1,12 +1,19 @@
 import {
     Body,
     Controller,
+    Get,
+    Headers,
     HttpCode,
     Param,
     Post,
     UseGuards,
 } from "@nestjs/common";
-import type { AskAiConfirmBody, AskAiDraftResult } from "@saroh/api-contract";
+import type {
+    AskAiConfirmBody,
+    AskAiDraftContent,
+    AskAiDraftResult,
+    AskAiHandOff,
+} from "@saroh/api-contract";
 import { askAiConfirmBody } from "@saroh/api-contract";
 
 import { LifecycleWrite } from "../../../common/decorators/lifecycle-write.decorator";
@@ -15,6 +22,8 @@ import { BetterAuthGuard } from "../../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../../common/guards/organization.guard";
 import { ZodContractPipe } from "../../../common/pipes/zod-contract.pipe";
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import { ACCESS_SESSION_HEADER } from "../../admin/organization-access-session.guard";
+import { refuseStaff } from "../ask-ai.controller";
 import { DraftsService } from "./drafts.service";
 
 /**
@@ -63,5 +72,31 @@ export class AskAiDraftsController {
         @Param("draftId") draftId: string,
     ): Promise<AskAiDraftResult> {
         return this.drafts.redraft(ctx, draftId);
+    }
+
+    /**
+     * Open in editor (owner, 14 Nov): marks a blog draft handed to the
+     * post editor and answers its website. Nothing is saved here.
+     */
+    @Post(":draftId/hand-off")
+    @HttpCode(200)
+    handOff(
+        @Headers(ACCESS_SESSION_HEADER) session: string | undefined,
+        @OrgContext() ctx: OrganizationContext,
+        @Param("draftId") draftId: string,
+    ): Promise<AskAiHandOff> {
+        refuseStaff(session);
+        return this.drafts.handOff(ctx, draftId);
+    }
+
+    /** A blog draft as the post editor starts from it. */
+    @Get(":draftId/content")
+    content(
+        @Headers(ACCESS_SESSION_HEADER) session: string | undefined,
+        @OrgContext() ctx: OrganizationContext,
+        @Param("draftId") draftId: string,
+    ): Promise<AskAiDraftContent> {
+        refuseStaff(session);
+        return this.drafts.content(ctx, draftId);
     }
 }

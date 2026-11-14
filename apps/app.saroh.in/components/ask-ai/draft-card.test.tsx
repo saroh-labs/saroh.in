@@ -16,8 +16,11 @@ const actions = vi.hoisted(() => ({
     confirmDraft: vi.fn(),
     undoDraft: vi.fn(),
     redraftDraft: vi.fn(),
+    handOffDraft: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({
     default: ({
         href,
@@ -279,7 +282,44 @@ describe("a blog post", () => {
         note: "It's saved as a draft; nothing is published.",
     };
 
-    it("shows title, preview and website; Save as draft → Added, Open it to the editor, no Undo", async () => {
+    it("offers Save as draft, Open in editor and Cancel", () => {
+        render(POST);
+        expect(button("Save as draft")).toBeDefined();
+        expect(button("Open in editor")).toBeDefined();
+        expect(button("Cancel")).toBeDefined();
+    });
+
+    it("Open in editor saves nothing, goes to a new post from the draft, and the card says so", async () => {
+        actions.handOffDraft.mockResolvedValue({
+            ok: true,
+            data: { siteId: "site_1", card: { ...POST, status: "handed_off" } },
+        });
+        render(POST);
+        act(() => button("Open in editor")?.click());
+        await settle();
+        expect(actions.handOffDraft).toHaveBeenCalledWith("d3");
+        expect(actions.confirmDraft).not.toHaveBeenCalled();
+        expect(router.push).toHaveBeenCalledWith(
+            "/sites/site_1/posts/new?from=d3",
+        );
+        expect(text()).toContain(
+            "Opened in the editor · Our new eco packing range",
+        );
+        expect(button("Save as draft")).toBeUndefined();
+        // Re-opening still works.
+        act(() => button("Open in editor")?.click());
+        await settle();
+        expect(router.push).toHaveBeenCalledTimes(2);
+    });
+
+    it("read back handed off: no Save as draft, Open in editor again", () => {
+        render({ ...POST, status: "handed_off" });
+        expect(text()).toContain("Opened in the editor");
+        expect(button("Save as draft")).toBeUndefined();
+        expect(button("Open in editor")).toBeDefined();
+    });
+
+    it("shows title, preview and website; Save as draft → Added, Open in editor, no Undo", async () => {
         actions.confirmDraft.mockResolvedValue(
             result(
                 { ...POST, status: "confirmed", targetId: "site_1:post_9" },
@@ -304,15 +344,16 @@ describe("a blog post", () => {
             "It's saved as a draft; nothing is published.",
         );
         expect(text()).not.toContain("recycled paper");
-        expect(link("Open it")?.getAttribute("href")).toBe(
+        expect(link("Open in editor")?.getAttribute("href")).toBe(
             "/sites/site_1/posts/post_9",
         );
+        expect(link("Open it")).toBeUndefined();
         expect(button("Undo")).toBeUndefined();
     });
 
     it("read back from history, still opens the editor", () => {
         render({ ...POST, status: "confirmed", targetId: "site_1:post_9" });
-        expect(link("Open it")?.getAttribute("href")).toBe(
+        expect(link("Open in editor")?.getAttribute("href")).toBe(
             "/sites/site_1/posts/post_9",
         );
     });

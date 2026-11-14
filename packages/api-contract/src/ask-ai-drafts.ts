@@ -50,7 +50,15 @@ export const askAiDraftCard = z.object({
     tool: z.string(),
     kind: askAiDraftKind,
     action: z.enum(["create", "edit"]),
-    status: z.enum(["drafted", "confirmed", "undone", "expired", "refused"]),
+    /** handed_off: a blog post opened in the editor unsaved (owner, 14 Nov). */
+    status: z.enum([
+        "drafted",
+        "confirmed",
+        "undone",
+        "expired",
+        "refused",
+        "handed_off",
+    ]),
     /** The record an edit changes, or the one a confirmed create made. */
     targetId: z.string().nullable(),
     targetName: z.string(),
@@ -96,3 +104,24 @@ export const askAiDraftResult = z.object({
     open: z.object({ kind: askAiDraftKind, id: z.string() }).nullable(),
 });
 export type AskAiDraftResult = z.infer<typeof askAiDraftResult>;
+
+/**
+ * Open in editor (owner, 14 Nov): a blog draft handed to the post editor
+ * unsaved. `POST …/drafts/:draftId/hand-off` marks it so Save as draft
+ * isn't offered again and answers the website to open; `GET
+ * …/drafts/:draftId/content` answers what the editor starts from.
+ */
+export const askAiHandOff = z.object({
+    siteId: z.string(),
+    card: askAiDraftCard,
+});
+export type AskAiHandOff = z.infer<typeof askAiHandOff>;
+
+/** A blog draft as the editor starts it: the body is the editor's HTML. */
+export const askAiDraftContent = z.object({
+    siteId: z.string(),
+    title: z.string(),
+    body: z.string(),
+    excerpt: z.string().nullable(),
+});
+export type AskAiDraftContent = z.infer<typeof askAiDraftContent>;
