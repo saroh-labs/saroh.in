@@ -154,8 +154,48 @@ export type AskAiLanguageSetting = z.infer<typeof askAiLanguageSetting>;
 export const askAiSettingsBody = z.strictObject({ on: z.boolean() });
 export type AskAiSettingsBody = z.infer<typeof askAiSettingsBody>;
 
-export const askAiSettings = z.object({ on: z.boolean() });
+/** This period's questions for the business. `limit` null: no cap. */
+export const askAiUsage = z.object({
+    used: z.number(),
+    limit: z.number().nullable(),
+    resetsAt: z.string(),
+});
+export type AskAiUsage = z.infer<typeof askAiUsage>;
+
+/**
+ * The switch, and this period's total whether or not it is on or the
+ * reader may ask. `usage` null only when the plan doesn't include Ask AI.
+ */
+export const askAiSettings = z.object({
+    on: z.boolean(),
+    usage: askAiUsage.nullable(),
+});
 export type AskAiSettings = z.infer<typeof askAiSettings>;
+
+/**
+ * Who asked this period (Owner and Admin): every member, with their count
+ * and when they last asked. Counts only, never what anyone asked.
+ */
+export const askAiPersonUsage = z.object({
+    userId: z.string(),
+    name: z.string(),
+    /** The role's name as the business calls it ("Owner", "Front desk"). */
+    role: z.string(),
+    /** "Use Ask AI" given to this person beyond their role. */
+    givenAskAi: z.boolean(),
+    /** Whether their permissions include "Use Ask AI". */
+    canUse: z.boolean(),
+    questions: z.number(),
+    lastAskedAt: z.string().nullable(),
+});
+export type AskAiPersonUsage = z.infer<typeof askAiPersonUsage>;
+
+export const askAiPeopleUsage = z.object({
+    periodStart: z.string(),
+    resetsAt: z.string(),
+    people: z.array(askAiPersonUsage),
+});
+export type AskAiPeopleUsage = z.infer<typeof askAiPeopleUsage>;
 
 /**
  * What the panel needs before a question: whether the person may ask and,
@@ -171,13 +211,7 @@ export const askAiState = z.object({
     /** For `locked`: the first plan with Ask AI ("" none). */
     upgradeTo: z.string().nullable(),
     /** This period's questions, when the person may ask. `limit` null: no cap. */
-    usage: z
-        .object({
-            used: z.number(),
-            limit: z.number().nullable(),
-            resetsAt: z.string(),
-        })
-        .nullable(),
+    usage: askAiUsage.nullable(),
     /** Whether this person may ask Saroh for more at the limit. */
     requestMore: z.boolean(),
     /** The owner, for "ask …", to someone who can't see the plan. */

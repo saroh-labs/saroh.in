@@ -17,7 +17,7 @@ jest.mock("../../common/guards/better-auth.guard", () => ({
     BetterAuthGuard: class BetterAuthGuard {},
 }));
 
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
@@ -27,6 +27,7 @@ import type { Response } from "express";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import type { CatalogueAccessService } from "../billing/catalogue-access.service";
+import { meterWindow } from "../billing/metering";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { AskAiAccess } from "./access/ask-ai-access";
 import { statusWordsFor } from "./agents/agent-definition";
@@ -582,7 +583,11 @@ describe("the business's switch", () => {
         expect(
             await controller.setSettings(b.owner, undefined, { on: false }),
         ).toEqual({ on: false });
-        expect(await controller.settings(b.owner)).toEqual({ on: false });
+        // The total stays with the switch off.
+        expect(await controller.settings(b.owner)).toEqual({
+            on: false,
+            usage: { used: 1, limit: null, resetsAt: expect.any(String) },
+        });
         const res = await ask(controller, b.owner, "Ab?");
         expect(res.frames()[1]?.data).toMatchObject({
             type: "refused",
@@ -600,5 +605,134 @@ describe("the business's switch", () => {
         await expect(
             controller.setSettings(member, undefined, { on: false }),
         ).rejects.toThrow();
+    });
+});
+
+describe("who asked this period", () => {
+    /** A usage row for `ctx`, as the access spec writes them. */
+    async function asked(
+        ctx: OrganizationContext,
+        over: { counted?: boolean; running?: boolean; startedAt?: Date } = {},
+    ) {
+        const startedAt = over.startedAt ?? new Date(Date.now() - 60_000);
+        const window = await meterWindow(prisma, ctx.organizationId, startedAt);
+        const running = over.running ?? false;
+        await prisma.aiUsage.create({
+            data: {
+                organizationId: ctx.organizationId,
+                userId: ctx.userId,
+                turnId: randomUUID(),
+                agent: "ask-ai",
+                agentVersion: "v",
+                model: "claude-haiku-5-5",
+                effort: "low",
+                windowStart: window.start,
+                windowKey: window.key,
+                startedAt,
+                outcome: running ? "RUNNING" : "ANSWERED",
+                finishedAt: running ? null : startedAt,
+                counted: running ? false : (over.counted ?? true),
+            },
+        });
+        return startedAt;
+    }
+
+    it("counts each person's questions in the period, every member listed, no text", async () => {
+        const b = await business();
+        const memberUser = await prisma.user.create({
+            data: { email: `${uniq("ask-user")}@example.test`, name: "Neha" },
+        });
+        await prisma.membership.create({
+            data: {
+                organizationId: b.org,
+                userId: memberUser.id,
+                role: "MEMBER",
+            },
+        });
+        const window = await meterWindow(prisma, b.org, new Date());
+
+        await asked(b.owner);
+        const latest = await asked(b.owner);
+        await asked(b.owner, {
+            running: true,
+            startedAt: new Date(latest.getTime() - 1),
+        });
+        await asked(b.owner, { counted: false }); // a refusal: not counted
+        // Before the period: not counted.
+        await asked(b.owner, {
+            startedAt: new Date(window.start.getTime() - 60_000),
+        });
+        await asked(b.admin);
+        // Another business's question: not here.
+        const other = await business();
+        await asked(other.owner);
+
+        const { controller } = build([]);
+        const out = await controller.peopleUsage(b.owner, undefined);
+        expect(out.resetsAt).toBe(window.end.toISOString());
+        expect(out.periodStart).toBe(window.start.toISOString());
+        const byUser = new Map(out.people.map((p) => [p.userId, p]));
+        expect(out.people).toHaveLength(3);
+        expect(byUser.get(b.owner.userId)).toEqual({
+            userId: b.owner.userId,
+            name: "OWNER",
+            role: "Owner",
+            givenAskAi: false,
+            canUse: true,
+            questions: 3,
+            lastAskedAt: latest.toISOString(),
+        });
+        expect(byUser.get(b.admin.userId)).toMatchObject({ questions: 1 });
+        expect(byUser.get(memberUser.id)).toMatchObject({
+            role: "Member",
+            canUse: false,
+            questions: 0,
+            lastAskedAt: null,
+        });
+        expect(byUser.has(other.owner.userId)).toBe(false);
+        // Counts only: no question, answer or title anywhere in it.
+        expect(Object.keys(out).sort()).toEqual([
+            "people",
+            "periodStart",
+            "resetsAt",
+        ]);
+        for (const p of out.people) {
+            expect(Object.keys(p).sort()).toEqual([
+                "canUse",
+                "givenAskAi",
+                "lastAskedAt",
+                "name",
+                "questions",
+                "role",
+                "userId",
+            ]);
+        }
+    });
+
+    it("a Member can't read it", async () => {
+        const b = await business();
+        const member: OrganizationContext = { ...b.admin, role: "MEMBER" };
+        const { controller } = build([]);
+        await expect(
+            controller.peopleUsage(member, undefined),
+        ).rejects.toMatchObject({ status: 403 });
+    });
+
+    it("refuses a staff support session", async () => {
+        const b = await business();
+        const { controller } = build([]);
+        expect(() =>
+            controller.peopleUsage(b.owner, "access-session-id"),
+        ).toThrow(ForbiddenException);
+    });
+
+    it("keeps no total when the plan doesn't include Ask AI", async () => {
+        const b = await business();
+        planState = "off";
+        const { controller } = build([]);
+        expect(await controller.settings(b.owner)).toEqual({
+            on: true,
+            usage: null,
+        });
     });
 });

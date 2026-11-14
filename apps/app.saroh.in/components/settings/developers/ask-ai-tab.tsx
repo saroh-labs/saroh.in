@@ -6,6 +6,10 @@ import { upgradeHref } from "@/lib/billing/access";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { requireSession } from "@/lib/session";
+import {
+    getAskAiPeopleUsage,
+    getAskAiSettingsWithUsage,
+} from "@/lib/settings/ask-ai-usage";
 
 import { AskAiSettingsView } from "./ask-ai-settings";
 import { DevelopersLocked } from "./locked";
@@ -23,7 +27,11 @@ export async function AskAiTab() {
         return <PermissionDeniedState {...whoCanChange({ thing: "Ask AI" })} />;
     }
     const business = org?.name ?? "your business";
-    const state = await getAskAiState();
+    const [state, settings, people] = await Promise.all([
+        getAskAiState(),
+        getAskAiSettingsWithUsage(),
+        getAskAiPeopleUsage(),
+    ]);
     if (state?.reason === "locked") {
         return (
             <DevelopersLocked
@@ -36,5 +44,14 @@ export async function AskAiTab() {
             />
         );
     }
-    return <AskAiSettingsView business={business} state={state} />;
+    return (
+        <AskAiSettingsView
+            business={business}
+            state={state}
+            // The settings' total stays while the switch is off; the
+            // panel's state drops it then.
+            usage={settings?.usage ?? state?.usage ?? null}
+            people={people}
+        />
+    );
 }

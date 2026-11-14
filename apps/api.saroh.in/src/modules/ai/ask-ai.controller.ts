@@ -20,6 +20,7 @@ import type {
     AskAiConversationsQuery,
     AskAiLanguageBody,
     AskAiLanguageSetting,
+    AskAiPeopleUsage,
     AskAiSettings,
     AskAiSettingsBody,
     AskAiState,
@@ -195,6 +196,16 @@ export class AskAiController {
     @Get("settings")
     settings(@OrgContext() ctx: OrganizationContext): Promise<AskAiSettings> {
         return this.askAi.settings(ctx);
+    }
+
+    /** Who asked this period, counts only: Owner and Admin (`module:manage`). */
+    @Get("usage/people")
+    peopleUsage(
+        @OrgContext() ctx: OrganizationContext,
+        @Headers(ACCESS_SESSION_HEADER) session: string | undefined,
+    ): Promise<AskAiPeopleUsage> {
+        refuseStaff(session);
+        return this.askAi.peopleUsage(ctx);
     }
 
     @Put("settings")

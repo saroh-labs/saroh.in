@@ -3,6 +3,9 @@ import type {
     AskAiConversationList,
     AskAiEvent,
     AskAiLanguage,
+    AskAiPeopleUsage,
+    AskAiPersonUsage,
+    AskAiSettings,
     AskAiState,
     AskAiTurnBody,
 } from "@saroh/api-contract";
@@ -10,7 +13,14 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { meterWindow } from "../billing/metering";
-import { allows, authorize } from "../organizations/organization-policy";
+import {
+    allows,
+    authorize,
+    extraActionsFor,
+    isBuiltInRole,
+    resolveCapabilities,
+} from "../organizations/organization-policy";
+import { BUILT_IN_LABEL } from "../organizations/organization-roles.service";
 import { AskAiAccess, questionsUsed } from "./access/ask-ai-access";
 import type { AskAiRefusal } from "./access/refusal";
 import { ASK_AI_AGENT } from "./agents/ask-ai.agent";
@@ -163,19 +173,85 @@ export class AskAiService {
         return { language };
     }
 
-    /** The business's switch: `module:manage` (Owner and Admin), as a module's. */
-    async settings(ctx: OrganizationContext): Promise<{ on: boolean }> {
+    /**
+     * The business's switch: `module:manage` (Owner and Admin), as a
+     * module's; and this period's total, kept while the switch is off and
+     * whether or not the reader may ask. `usage` null: not on the plan.
+     */
+    async settings(
+        ctx: OrganizationContext,
+        now: Date = new Date(),
+    ): Promise<AskAiSettings> {
         authorize(ctx, "module:manage");
-        return { on: await this.store.businessOn(ctx.organizationId) };
+        const org = ctx.organizationId;
+        const [on, row] = await Promise.all([
+            this.store.businessOn(org),
+            this.access.planRow(org, now),
+        ]);
+        if (row?.state !== "on") return { on, usage: null };
+        const window = await meterWindow(prisma, org, now);
+        return {
+            on,
+            usage: {
+                used: await questionsUsed(prisma, org, window.start),
+                limit: row.limit,
+                resetsAt: window.end.toISOString(),
+            },
+        };
     }
 
     async setSettings(
         ctx: OrganizationContext,
         on: boolean,
-    ): Promise<{ on: boolean }> {
+    ): Promise<AskAiSettings> {
         authorize(ctx, "module:manage");
         await this.store.setBusinessOn(ctx, on);
-        return { on };
+        return this.settings(ctx);
+    }
+
+    /**
+     * Who asked this period (`module:manage`): every member, with the
+     * questions that count as `questionsUsed` does, grouped by person.
+     * Counts and times only; no conversation is read.
+     */
+    async peopleUsage(
+        ctx: OrganizationContext,
+        now: Date = new Date(),
+    ): Promise<AskAiPeopleUsage> {
+        authorize(ctx, "module:manage");
+        const org = ctx.organizationId;
+        const window = await meterWindow(prisma, org, now);
+        const [members, roles, counts] = await Promise.all([
+            prisma.membership.findMany({
+                where: { organizationId: org },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    userId: true,
+                    role: true,
+                    extraActions: true,
+                    user: { select: { name: true, email: true } },
+                },
+            }),
+            prisma.organizationRole.findMany({
+                where: { organizationId: org },
+                select: { key: true, label: true, actions: true },
+            }),
+            prisma.aiUsage.groupBy({
+                by: ["userId"],
+                where: {
+                    organizationId: org,
+                    startedAt: { gte: window.start },
+                    OR: [{ counted: true }, { outcome: "RUNNING" }],
+                },
+                _count: { _all: true },
+                _max: { startedAt: true },
+            }),
+        ]);
+        return {
+            periodStart: window.start.toISOString(),
+            resetsAt: window.end.toISOString(),
+            people: personUsage(members, roles, counts),
+        };
     }
 
     /** What the panel shows before a question. */
@@ -218,6 +294,52 @@ export class AskAiService {
             language,
         };
     }
+}
+
+/**
+ * One row a member: their role's name, whether their permissions hold
+ * `ai:use` (as the request gate resolves them) and whether that is an
+ * extra given to them beyond the role, and their count.
+ */
+export function personUsage(
+    members: readonly {
+        userId: string;
+        role: string;
+        extraActions: readonly string[];
+        user: { name: string | null; email: string };
+    }[],
+    roles: readonly {
+        key: string;
+        label: string;
+        actions: readonly string[];
+    }[],
+    counts: readonly {
+        userId: string;
+        _count: { _all: number };
+        _max: { startedAt: Date | null };
+    }[],
+): AskAiPersonUsage[] {
+    const roleOf = new Map(roles.map((r) => [r.key, r]));
+    const countOf = new Map(counts.map((c) => [c.userId, c]));
+    return members.map((m) => {
+        const row = roleOf.get(m.role);
+        const byRole = resolveCapabilities(m.role, row?.actions).has("ai:use");
+        const given =
+            !byRole &&
+            extraActionsFor(m.role, m.extraActions).includes("ai:use");
+        const c = countOf.get(m.userId);
+        return {
+            userId: m.userId,
+            name: m.user.name ?? m.user.email,
+            role:
+                row?.label ??
+                (isBuiltInRole(m.role) ? BUILT_IN_LABEL[m.role] : m.role),
+            givenAskAi: given,
+            canUse: byRole || given,
+            questions: c?._count._all ?? 0,
+            lastAskedAt: c?._max.startedAt?.toISOString() ?? null,
+        };
+    });
 }
 
 /** An event as one server-sent event frame. */

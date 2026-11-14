@@ -227,7 +227,7 @@ export class AskAiAccess {
     }
 
     /** Ask AI's catalogue row for the business, or null when the catalogue doesn't reach it. */
-    private async planRow(
+    async planRow(
         organizationId: string,
         now: Date,
     ): Promise<ModuleAccess | null> {
