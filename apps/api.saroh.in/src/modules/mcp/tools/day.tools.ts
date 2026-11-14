@@ -538,7 +538,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "list_orders",
             title: "List orders",
             description:
-                'Use this when the person asks about orders: newest first with number, total, payment and step; filter by number, status or when placed (from, to). Example: number "ORD-014", or status "pending" for ones not yet sent. For one order\'s items and note use get_order.',
+                'Use this when the person asks about orders: newest first with number, total, payment and step; filter by number, status, store (location_id) or when placed (from, to). Example: number "ORD-014", or status "pending" for ones not yet sent. For one order\'s items and note use get_order.',
             contract: listOrdersTool,
             capability: "order:read",
             hints: READ_ONLY,
@@ -554,6 +554,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                             ? instantOf(input.from, "from")
                             : undefined,
                         to: input.to ? instantOf(input.to, "to") : undefined,
+                        storeId: input.location_id,
                     },
                     ctx,
                 );

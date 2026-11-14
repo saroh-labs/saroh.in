@@ -487,3 +487,136 @@ describe("period summary cards", () => {
         }
     });
 });
+
+describe("class read cards", () => {
+    it("class fill: each class's totals, linked to the calendar's week", () => {
+        const card = answerCard(
+            "get_class_fill",
+            {
+                span: {
+                    period: "this_week",
+                    timezone: "Asia/Kolkata",
+                    from: "2026-11-09",
+                    to: "2026-11-15",
+                },
+                booked: 60,
+                places: 84,
+                full_percent: 71,
+                classes: [
+                    {
+                        service_id: "s1",
+                        name: "7 AM Hatha",
+                        capacity: 12,
+                        sessions: 7,
+                        places: 84,
+                        booked: 60,
+                        full_percent: 71,
+                        session_list: [],
+                    },
+                ],
+            },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.rows[0]).toEqual([
+            "7 AM Hatha",
+            "7",
+            "60",
+            "84",
+            "71%",
+        ]);
+        expect(card.data.link?.href).toBe("/calendar?view=week&day=2026-11-09");
+        expect(askAiInfoCard.parse(card)).toEqual(card);
+    });
+
+    it("waitlist: one row a person, in line, each opening the customer", () => {
+        const card = answerCard(
+            "list_waitlist",
+            {
+                people: 2,
+                sessions: [
+                    {
+                        service_id: "s1",
+                        service: "7 AM Hatha",
+                        starts_at: "2026-11-21T01:30:00.000Z",
+                        when: "Sat 21 Nov, 07:00",
+                        waiting: [
+                            {
+                                position: 1,
+                                customer_id: "c1",
+                                name: who("Ira Sen"),
+                                status: "waiting",
+                                offered_until: null,
+                            },
+                            {
+                                position: 2,
+                                customer_id: "c2",
+                                name: who("Kunal Shah"),
+                                status: "offered",
+                                offered_until: "Fri 20 Nov, 17:30",
+                            },
+                        ],
+                    },
+                ],
+            },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.rows).toEqual([
+            ["7 AM Hatha", "Sat 21 Nov, 07:00", "1", "Ira Sen", "Waiting"],
+            [
+                "7 AM Hatha",
+                "Sat 21 Nov, 07:00",
+                "2",
+                "Kunal Shah",
+                "Offered a place",
+            ],
+        ]);
+        expect(card.data.hrefs).toEqual(["/contacts/c1", "/contacts/c2"]);
+    });
+
+    it("class packs: who, what's left and the use-by, the rest counted, linked to holders", () => {
+        const card = answerCard(
+            "list_class_packs",
+            {
+                span: {
+                    period: "this_month",
+                    from: "2026-11-01",
+                    to: "2026-11-30",
+                },
+                total: 12,
+                active: 10,
+                used_up: 1,
+                expired: 1,
+                packs: [
+                    {
+                        purchase_id: "pp1",
+                        pack: "4-class pack",
+                        customer_id: "c1",
+                        customer: who("Meera Joshi"),
+                        classes: 4,
+                        used: 1,
+                        left: 3,
+                        use_by: "2026-11-30",
+                        standing: "active",
+                    },
+                ],
+            },
+            new Map(),
+            MEDIA,
+        );
+        if (card?.kind !== "table") throw new Error("no table");
+        expect(card.data.rows[0]).toEqual([
+            "Meera Joshi",
+            "4-class pack",
+            "3 of 4",
+            "30 Nov",
+            "Active",
+        ]);
+        expect(card.data.hrefs).toEqual(["/contacts/c1"]);
+        expect(card.data.more).toBe(11);
+        expect(card.data.link?.href).toBe("/class-packs/purchases");
+    });
+});

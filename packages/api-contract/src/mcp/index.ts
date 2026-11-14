@@ -1,4 +1,5 @@
 export * from "./catalogue";
+export * from "./classes";
 export * from "./core";
 export * from "./day";
 export * from "./periods";

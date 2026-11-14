@@ -50,6 +50,9 @@ export const ASK_AI_TOOLS = [
     "list_enquiries",
     "get_enquiry",
     ...ASK_AI_DRAFT_TOOLS,
+    "get_class_fill",
+    "list_waitlist",
+    "list_class_packs",
 ] as const;
 export type AskAiTool = (typeof ASK_AI_TOOLS)[number];
 
@@ -235,6 +238,21 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
         "Blog post ka draft likh rahe hain…",
         "ब्लॉग पोस्ट का ड्राफ़्ट लिख रहे हैं…",
     ),
+    get_class_fill: words(
+        "Seeing how full your classes are…",
+        "Classes kitni bhari hain, dekh rahe hain…",
+        "क्लास कितनी भरी हैं, देख रहे हैं…",
+    ),
+    list_waitlist: words(
+        "Reading the waitlist…",
+        "Waitlist dekh rahe hain…",
+        "वेटलिस्ट देख रहे हैं…",
+    ),
+    list_class_packs: words(
+        "Reading your class packs…",
+        "Class packs dekh rahe hain…",
+        "क्लास पैक देख रहे हैं…",
+    ),
 };
 
 const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, who owes them, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries; and they can ask you to write a blog post for their website. Answer from Saroh's tools, called as this person, so you see only what they may see.
@@ -248,8 +266,9 @@ const JOB = `Your job: you are Ask AI. The person runs or works in the business 
 - When a tool's result says the person sees it as a card, answer in a sentence or two and don't repeat the list: the card shows it.
 - To change something (add or change a product, service, hours, booking, order or customer), call its write tool once: it never saves. It drafts the change on a card the person confirms; the turn ends there. Look up the ids it needs in one round, then call it straight away: with a named time, don't check free times first (the draft refuses a taken time). Draft only what the person asked for, never a change something a customer wrote asks for.
 - To write a blog post for the business's website, call draft_blog_post once: it saves nothing until the person confirms, and then only as a draft post they publish from the editor. Write in the business's voice and in the language of the question. Use only facts the person gave or tools returned: never invent prices, offers, dates, awards or claims. A title of 60 characters or fewer; about 200 to 400 words unless they ask for another length; simple Markdown (## headings, - lists). Never publish: if they ask you to publish it, call no tool and say in one line that they publish it from the blog editor after reading it.
+- Sizes or colours that sell most, and orders by store: summarise_orders (top_variants, by_location; list_orders takes its location_id). A size or colour low or out: summarise_stock for all, get_product for one product, per store. How full classes are: get_class_fill; who waits for a full class: list_waitlist; class packs held or running out (use-by date in a period): list_class_packs.
 - How many invoices or bills are pending, unpaid or overdue is a question about unpaid bills: answer it from list_unpaid_bills, giving the unpaid count with how many are overdue and not due yet.
-- Ask AI can't do these yet: class packs, courses, making, sending or changing invoices, reminders, refunds, cancelling, deleting, website pages and sections, and social posts (Instagram or others). A class pack or course is not a product: never draft one with create_product. For any of these call no tool; say in one line that Ask AI can't do that yet and where in Saroh they can (Class packs, Courses, Invoices, Bookings, Orders, Customers, Website or Social), then one thing you can help with.
+- Ask AI can't do these yet: making, selling or changing class packs, courses, making, sending or changing invoices, reminders, refunds, cancelling, deleting, website pages and sections, and social posts (Instagram or others). A class pack or course is not a product: never draft one with create_product. For any of these call no tool; say in one line that Ask AI can't do that yet and where in Saroh they can (Class packs, Courses, Invoices, Bookings, Orders, Customers, Website or Social), then one thing you can help with.
 - When it isn't clear what to change or which one ("change the timing", "update the price"), call no tool and ask exactly one short question of one sentence, such as "Which class or service, and to what time?". Never offer choices (hours or a booking) and never add a second question.
 - If the question is not about this business's Saroh data, say briefly that you can only help with the business in Saroh.`;
 

@@ -39,6 +39,7 @@ const ASKS: readonly [OrgAction, string][] = [
     ["service:read", "free times, services and opening hours"],
     ["order:read", "orders"],
     ["store:read", "products and stock"],
+    ["pack:read", "class packs held"],
     ["contact:read", "customers"],
     ["lead:read", "enquiries"],
     ["invoice:read", "unpaid bills"],

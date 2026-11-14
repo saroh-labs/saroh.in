@@ -42,6 +42,7 @@ import { CustomersV1Controller } from "../public-api/customers.v1.controller";
 import { OrdersV1Controller } from "../public-api/orders.v1.controller";
 import { BlogTools } from "./tools/blog.tools";
 import { CatalogueTools } from "./tools/catalogue.tools";
+import { ClassTools } from "./tools/class.tools";
 import { DayTools } from "./tools/day.tools";
 // Ask AI's U4 (plan 2026-11-13-001): the summary tools read Home and Insights.
 import { SellsService } from "../analytics/sells.service";
@@ -101,6 +102,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         DayTools,
         SummaryTools,
         PeriodSummaryTools,
+        ClassTools,
         // Ask AI's blog post drafts (owner, 14 Nov): saved as a draft post only.
         BlogTools,
         SellsService,

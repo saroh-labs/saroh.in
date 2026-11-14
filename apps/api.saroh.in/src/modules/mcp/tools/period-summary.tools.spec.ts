@@ -173,7 +173,12 @@ describe("summarise_invoices", () => {
 });
 
 describe("summarise_orders", () => {
-    function read(now: { status: string; n: number }[], before: number) {
+    function read(
+        now: { status: string; n: number }[],
+        before: number,
+        variants: unknown[] = [],
+        stores: unknown[] = [],
+    ) {
         db.order.groupBy
             .mockResolvedValueOnce(
                 now.map((g) => ({ status: g.status, _count: { _all: g.n } })),
@@ -181,7 +186,11 @@ describe("summarise_orders", () => {
             .mockResolvedValueOnce([{ currency: "INR", _sum: { total: 900 } }])
             .mockResolvedValueOnce([{ currency: "INR", _sum: { total: 400 } }]);
         db.order.count.mockResolvedValueOnce(before);
-        db.$queryRaw.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+        db.$queryRaw
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce([])
+            .mockResolvedValueOnce(variants)
+            .mockResolvedValueOnce(stores);
         db.order.findMany.mockResolvedValueOnce([
             {
                 id: "o1",
@@ -234,6 +243,55 @@ describe("summarise_orders", () => {
         expect(r.text).not.toMatch(/₹/);
     });
 
+    it("names the best sizes or colours, and splits by store only when there are several", async () => {
+        read(
+            [{ status: "DELIVERED", n: 5 }],
+            0,
+            [
+                {
+                    id: "p1",
+                    name: "Cotton kurta",
+                    variant_id: "v1",
+                    variant: "M",
+                    sold: 7,
+                },
+            ],
+            [
+                { id: "s1", name: "Navrangpura", orders: 3, standing: 3 },
+                { id: "s2", name: "Satellite", orders: 2, standing: 1 },
+            ],
+        );
+        const r = await tool("summarise_orders").run(
+            { period: "today" },
+            callAs("order:read"),
+        );
+        expect(r.data).toMatchObject({
+            top_variants: [
+                { product_id: "p1", variant_id: "v1", variant: "M", sold: 7 },
+            ],
+            by_location: [
+                { location_id: "s1", orders: 3 },
+                { location_id: "s2", orders: 2, standing: 1 },
+            ],
+        });
+        expect(r.text).toMatch(/"Cotton kurta M" 7/);
+        expect(r.text).toMatch(
+            /By store: "Navrangpura" \(location_id s1\) 3 \(3 standing\); "Satellite" \(location_id s2\) 2 \(1 standing\)/,
+        );
+
+        read(
+            [{ status: "DELIVERED", n: 1 }],
+            0,
+            [],
+            [{ id: "s1", name: "Navrangpura", orders: 1, standing: 1 }],
+        );
+        const one = await tool("summarise_orders").run(
+            {},
+            callAs("order:read"),
+        );
+        expect(one.text).not.toMatch(/By store/);
+    });
+
     it("says an empty period plainly", async () => {
         read([], 0);
         const r = await tool("summarise_orders").run(
@@ -254,6 +312,60 @@ describe("summarise_stock", () => {
         expect(r.data).toMatchObject({ tracked: false });
         expect(r.text).toMatch(/isn't tracked/);
         expect(db.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it("names each shelf needing stock, with its size or colour and store", async () => {
+        db.businessProfile.findUnique.mockResolvedValueOnce(null);
+        db.$queryRaw
+            .mockResolvedValueOnce([
+                {
+                    id: "p1",
+                    name: "Cotton kurta",
+                    currency: "INR",
+                    on_hand: 20,
+                    value: null,
+                    low: 1,
+                    short: 0,
+                    out: 1,
+                },
+            ])
+            .mockResolvedValueOnce([
+                {
+                    product_id: "p1",
+                    name: "Cotton kurta",
+                    variant_id: "v4",
+                    variant: "XL",
+                    location_id: "s2",
+                    location: "Satellite",
+                    on_hand: 0,
+                    alert_at: 3,
+                    need: "out",
+                },
+                {
+                    product_id: "p1",
+                    name: "Cotton kurta",
+                    variant_id: "v2",
+                    variant: "M",
+                    location_id: "s2",
+                    location: "Satellite",
+                    on_hand: 1,
+                    alert_at: 3,
+                    need: "low",
+                },
+            ]);
+        db.stockEntry.groupBy.mockResolvedValueOnce([]);
+        const r = await tool("summarise_stock").run({}, callAs("store:read"));
+        expect(r.data).toMatchObject({
+            low: 1,
+            out: 1,
+            needs: [
+                { variant: "XL", need: "out" },
+                { variant: "M", on_hand: 1, need: "low" },
+            ],
+        });
+        expect(r.text).toMatch(
+            /"Cotton kurta XL" at "Satellite" out; "Cotton kurta M" at "Satellite" low, 1 left \(alert at 3\)/,
+        );
     });
 });
 

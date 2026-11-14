@@ -3,13 +3,16 @@ import type {
     AskAiProductsCard,
     AskAiTableCard,
     findLapsedCustomersTool,
+    getClassFillTool,
     getProductTool,
     getWhatsSellingTool,
     listBookingsTool,
+    listClassPacksTool,
     listCustomersTool,
     listOrdersTool,
     listProductsTool,
     listUnpaidBillsTool,
+    listWaitlistTool,
     summariseBookingsTool,
     summariseInvoicesTool,
     summariseOrdersTool,
@@ -494,6 +497,80 @@ export function answerCard(
                 t.rows,
                 d.bookings + d.cancelled,
                 d.first.map((b) => bookingHref(b.booking_id)),
+            );
+        }
+        case "get_class_fill": {
+            const d = data as Out<typeof getClassFillTool>;
+            return table(
+                {
+                    title: `Classes, ${day(d.span.from)} to ${day(d.span.to)}`,
+                    columns: ["Class", "Sessions", "Booked", "Places", "Full"],
+                    numeric: [1, 2, 3, 4],
+                    link: {
+                        label: "Open in Calendar",
+                        // The week view from the period's first day.
+                        href: `/calendar?view=week&day=${d.span.from}`,
+                    },
+                },
+                d.classes.map((c) => [
+                    c.name,
+                    String(c.sessions),
+                    String(c.booked),
+                    String(c.places),
+                    c.full_percent === null ? "" : `${c.full_percent}%`,
+                ]),
+            );
+        }
+        case "list_waitlist": {
+            const d = data as Out<typeof listWaitlistTool>;
+            const rows = d.sessions.flatMap((x) =>
+                x.waiting.map((w) => ({
+                    ...w,
+                    service: x.service,
+                    when: x.when,
+                })),
+            );
+            return table(
+                {
+                    title: "Waitlist",
+                    columns: ["Class", "When", "Place", "Customer", "Status"],
+                    numeric: [2],
+                    link: { label: "Open in Bookings", href: "/bookings" },
+                },
+                rows.map((w) => [
+                    w.service,
+                    w.when,
+                    String(w.position),
+                    w.name?.text ?? "",
+                    w.status === "offered" ? "Offered a place" : "Waiting",
+                ]),
+                rows.length,
+                rows.map((w) => contactHref(w.customer_id)),
+            );
+        }
+        case "list_class_packs": {
+            const d = data as Out<typeof listClassPacksTool>;
+            return table(
+                {
+                    title: d.span
+                        ? `Class packs to use by ${day(d.span.from)} to ${day(d.span.to)}`
+                        : "Class packs held",
+                    columns: ["Customer", "Pack", "Left", "Use by", "Status"],
+                    numeric: [2],
+                    link: {
+                        label: "Open in Class packs",
+                        href: "/class-packs/purchases",
+                    },
+                },
+                d.packs.map((p) => [
+                    p.customer?.text ?? "",
+                    p.pack,
+                    `${p.left} of ${p.classes}`,
+                    day(p.use_by),
+                    words(p.standing),
+                ]),
+                d.total,
+                d.packs.map((p) => contactHref(p.customer_id)),
             );
         }
         default:

@@ -159,6 +159,11 @@ export const listOrdersTool = {
                 .describe('The order number, like "ORD-014".'),
             from: instant.optional().describe("Placed at or after."),
             to: instant.optional().describe("Placed before."),
+            location_id: toolId
+                .optional()
+                .describe(
+                    "A store's location_id (summarise_orders by_location).",
+                ),
             ...listInput,
         })
         .strict(),

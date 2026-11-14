@@ -83,6 +83,25 @@ export const summariseOrdersTool = {
                 sold: z.number(),
             }),
         ),
+        /** A product's size or colour, by units on standing orders. */
+        top_variants: z.array(
+            z.object({
+                product_id: z.string(),
+                variant_id: z.string(),
+                name: z.string(),
+                variant: z.string(),
+                sold: z.number(),
+            }),
+        ),
+        /** Orders placed at each store (location), cancelled included. */
+        by_location: z.array(
+            z.object({
+                location_id: z.string(),
+                name: z.string(),
+                orders: z.number(),
+                standing: z.number(),
+            }),
+        ),
         first: z.array(
             z.object({
                 order_id: z.string(),
@@ -159,6 +178,20 @@ export const summariseStockTool = {
                 name: z.string(),
                 on_hand: z.number(),
                 value: z.string().nullable(),
+            }),
+        ),
+        /** Shelves (a product or one variant, at one store) needing stock, worst first; the first 40. */
+        needs: z.array(
+            z.object({
+                product_id: z.string(),
+                variant_id: z.string().nullable(),
+                name: z.string(),
+                variant: z.string().nullable(),
+                location_id: z.string(),
+                location: z.string(),
+                on_hand: z.number(),
+                alert_at: z.number(),
+                need: z.enum(["short", "out", "low"]),
             }),
         ),
         /** Units in and out in the period, from the stock log. */

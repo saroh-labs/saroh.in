@@ -73,7 +73,22 @@ export const listProductsTool = {
 
 export const getProductTool = {
     input: z.object({ product_id: toolId }).strict(),
-    output: oneProduct,
+    output: z.object({
+        product: oneProduct.shape.product.extend({
+            /** Each shelf: the product, or one variant, at one store; empty when stock isn't counted. */
+            shelves: z.array(
+                z.object({
+                    variant_id: z.string().nullable(),
+                    variant: z.string().nullable(),
+                    location_id: z.string(),
+                    location: z.string(),
+                    on_hand: z.number(),
+                    alert_at: z.number(),
+                    need: z.enum(["short", "out", "low"]).nullable(),
+                }),
+            ),
+        }),
+    }),
 };
 
 export const createProductTool = {

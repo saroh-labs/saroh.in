@@ -512,6 +512,8 @@ export async function ordersPage(
         number?: string;
         from?: Date;
         to?: Date;
+        /** One store's orders (within what the viewer may see). */
+        storeId?: string;
     },
     viewer: OrderViewer,
 ) {
@@ -520,6 +522,7 @@ export async function ordersPage(
         where: {
             organizationId,
             ...orderLocationWhere(viewer),
+            ...(q.storeId ? { storeId: q.storeId } : {}),
             ...(q.status ? { status: orderStatus.in(q.status) } : {}),
             ...(number
                 ? { orderId: { equals: number, mode: "insensitive" as const } }

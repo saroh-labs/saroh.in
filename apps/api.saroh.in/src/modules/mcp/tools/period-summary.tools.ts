@@ -145,39 +145,48 @@ async function summariseOrders(ctx: OrganizationContext, s: Span) {
     const sqlWhere = Prisma.sql`o."organizationId" = ${org}
         AND o."createdAt" >= ${ts(s.from)} AND o."createdAt" < ${ts(s.to)}
         AND ${realOrderSql()} ${orderLocationSql(ctx, "o")}`;
-    const [byStatus, sums, before, beforeSums, buckets, top, first] =
-        await Promise.all([
-            prisma.order.groupBy({
-                by: ["status"],
-                where: where(s.from, s.to),
-                _count: { _all: true },
-            }),
-            prisma.order.groupBy({
-                by: ["currency"],
-                where: { ...where(s.from, s.to), status: { not: "CANCELLED" } },
-                _sum: { total: true },
-            }),
-            prisma.order.count({
-                where: {
-                    ...where(s.before.from, s.before.to),
-                    status: { not: "CANCELLED" },
-                },
-            }),
-            prisma.order.groupBy({
-                by: ["currency"],
-                where: {
-                    ...where(s.before.from, s.before.to),
-                    status: { not: "CANCELLED" },
-                },
-                _sum: { total: true },
-            }),
-            prisma.$queryRaw<BucketRow[]>`
+    const [
+        byStatus,
+        sums,
+        before,
+        beforeSums,
+        buckets,
+        top,
+        first,
+        topVariants,
+        byLocation,
+    ] = await Promise.all([
+        prisma.order.groupBy({
+            by: ["status"],
+            where: where(s.from, s.to),
+            _count: { _all: true },
+        }),
+        prisma.order.groupBy({
+            by: ["currency"],
+            where: { ...where(s.from, s.to), status: { not: "CANCELLED" } },
+            _sum: { total: true },
+        }),
+        prisma.order.count({
+            where: {
+                ...where(s.before.from, s.before.to),
+                status: { not: "CANCELLED" },
+            },
+        }),
+        prisma.order.groupBy({
+            by: ["currency"],
+            where: {
+                ...where(s.before.from, s.before.to),
+                status: { not: "CANCELLED" },
+            },
+            _sum: { total: true },
+        }),
+        prisma.$queryRaw<BucketRow[]>`
                 SELECT ${bucketSql(Prisma.sql`o."createdAt"`, s)} AS starts,
                     o.currency, COUNT(*)::int AS count, SUM(o.total)::text AS amount
                 FROM "Order" o
                 WHERE ${sqlWhere} AND o.status <> 'CANCELLED'
                 GROUP BY 1, 2 ORDER BY 1`,
-            prisma.$queryRaw<{ id: string; name: string; sold: number }[]>`
+        prisma.$queryRaw<{ id: string; name: string; sold: number }[]>`
                 SELECT p.id, p.name, SUM(oi.quantity)::int AS sold
                 FROM "Order" o
                 JOIN "OrderItem" oi ON oi."orderId" = o.id
@@ -187,24 +196,54 @@ async function summariseOrders(ctx: OrganizationContext, s: Span) {
                 GROUP BY p.id, p.name
                 ORDER BY sold DESC, p.name
                 LIMIT 5`,
-            prisma.order.findMany({
-                where: where(s.from, s.to),
-                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-                take: FIRST,
-                select: {
-                    id: true,
-                    orderId: true,
-                    status: true,
-                    total: true,
-                    currency: true,
-                    createdAt: true,
-                    walkInName: true,
-                    customer: {
-                        select: { firstName: true, lastName: true },
-                    },
+        prisma.order.findMany({
+            where: where(s.from, s.to),
+            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+            take: FIRST,
+            select: {
+                id: true,
+                orderId: true,
+                status: true,
+                total: true,
+                currency: true,
+                createdAt: true,
+                walkInName: true,
+                customer: {
+                    select: { firstName: true, lastName: true },
                 },
-            }),
-        ]);
+            },
+        }),
+        prisma.$queryRaw<
+            {
+                id: string;
+                name: string;
+                variant_id: string;
+                variant: string;
+                sold: number;
+            }[]
+        >`
+                SELECT p.id, p.name, v.id AS variant_id, v.title AS variant,
+                    SUM(oi.quantity)::int AS sold
+                FROM "Order" o
+                JOIN "OrderItem" oi ON oi."orderId" = o.id
+                JOIN "Product" p ON p.id = oi."productId"
+                JOIN "ProductVariant" v ON v.id = oi."variantId"
+                WHERE ${sqlWhere} AND o.status <> 'CANCELLED'
+                  AND p."organizationId" = ${org}
+                GROUP BY p.id, p.name, v.id, v.title
+                ORDER BY sold DESC, p.name, v.title
+                LIMIT 5`,
+        prisma.$queryRaw<
+            { id: string; name: string; orders: number; standing: number }[]
+        >`
+                SELECT s.id, s.name, COUNT(*)::int AS orders,
+                    (COUNT(*) FILTER (WHERE o.status <> 'CANCELLED'))::int AS standing
+                FROM "Order" o
+                JOIN "Store" s ON s.id = o."storeId"
+                WHERE ${sqlWhere}
+                GROUP BY s.id, s.name
+                ORDER BY orders DESC, s.name`,
+    ]);
     const orders = byStatus.reduce((n, g) => n + g._count._all, 0);
     const cancelled =
         byStatus.find((g) => g.status === "CANCELLED")?._count._all ?? 0;
@@ -233,6 +272,19 @@ async function summariseOrders(ctx: OrganizationContext, s: Span) {
             product_id: p.id,
             name: p.name,
             sold: Number(p.sold),
+        })),
+        top_variants: topVariants.map((v) => ({
+            product_id: v.id,
+            variant_id: v.variant_id,
+            name: v.name,
+            variant: v.variant,
+            sold: Number(v.sold),
+        })),
+        by_location: byLocation.map((l) => ({
+            location_id: l.id,
+            name: l.name,
+            orders: Number(l.orders),
+            standing: Number(l.standing),
         })),
         first: first.map((o) => {
             const who = nameOf(
@@ -267,6 +319,17 @@ async function summariseOrders(ctx: OrganizationContext, s: Span) {
         ...(data.top_products.length
             ? [
                   `- Most ordered products (units on standing orders): ${data.top_products.map((p) => `${JSON.stringify(p.name)} ${p.sold}`).join("; ")}.`,
+              ]
+            : []),
+        ...(data.top_variants.length
+            ? [
+                  `- Most ordered sizes or colours (variants, units on standing orders): ${data.top_variants.map((v) => `${JSON.stringify(`${v.name} ${v.variant}`)} ${v.sold}`).join("; ")}.`,
+              ]
+            : []),
+        // One store says nothing a total doesn't.
+        ...(data.by_location.length > 1
+            ? [
+                  `- By store: ${data.by_location.map((l) => `${JSON.stringify(l.name)} (location_id ${l.location_id}) ${l.orders} (${l.standing} standing)`).join("; ")}.`,
               ]
             : []),
         ...(orders
@@ -507,6 +570,21 @@ interface ShelfProductRow {
     out: number;
 }
 
+/** How many shelves needing stock a stock summary names. */
+const NEEDS_NAMED = 40;
+
+interface NeedRow {
+    product_id: string;
+    name: string;
+    variant_id: string | null;
+    variant: string | null;
+    location_id: string;
+    location: string;
+    on_hand: number;
+    alert_at: number;
+    need: "short" | "out" | "low";
+}
+
 async function summariseStock(ctx: OrganizationContext, s: Span) {
     const org = ctx.organizationId;
     const money = allows(ctx, "payment:read");
@@ -528,6 +606,7 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
         short: 0,
         out: 0,
         top: [],
+        needs: [],
         moved,
         not_shown: notShown,
     };
@@ -540,7 +619,7 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
     // Each shelf by the Stock screen's rule (`shelfNeed`): short for orders,
     // else nothing left to sell, else at or under its own warning level. A
     // per-variant product's own shelf sells nothing, so only short counts.
-    const [rows, entries] = await Promise.all([
+    const [rows, entries, needs] = await Promise.all([
         prisma.$queryRaw<ShelfProductRow[]>`
             WITH shelf AS (
                 SELECT s."productId", s."onHand", s.promised, s."lowStockAlert",
@@ -575,6 +654,32 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
             },
             _sum: { quantity: true },
         }),
+        prisma.$queryRaw<NeedRow[]>`
+            SELECT * FROM (
+                SELECT p.id AS product_id, p.name, v.id AS variant_id,
+                    v.title AS variant, st.id AS location_id, st.name AS location,
+                    s."onHand" AS on_hand, s."lowStockAlert" AS alert_at,
+                    CASE
+                        WHEN s.promised > GREATEST(0, s."onHand") THEN 'short'
+                        WHEN s."variantId" IS NULL AND EXISTS (
+                            SELECT 1 FROM "StockLevel" x
+                            WHERE x."productId" = s."productId" AND x."variantId" IS NOT NULL
+                        ) THEN NULL
+                        WHEN s."onHand" - GREATEST(0, s.promised) <= 0 THEN 'out'
+                        WHEN s."lowStockAlert" > 0
+                            AND s."onHand" - GREATEST(0, s.promised) <= s."lowStockAlert" THEN 'low'
+                    END AS need
+                FROM "StockLevel" s
+                JOIN "Product" p ON p.id = s."productId"
+                JOIN "Store" st ON st.id = s."storeId"
+                LEFT JOIN "ProductVariant" v ON v.id = s."variantId"
+                WHERE s."organizationId" = ${org} AND p."organizationId" = ${org}
+                  AND p."stockTracked" AND p.status <> 'ARCHIVED'
+            ) t
+            WHERE t.need IS NOT NULL
+            ORDER BY CASE t.need WHEN 'short' THEN 0 WHEN 'out' THEN 1 ELSE 2 END,
+                t.name, t.variant NULLS FIRST, t.location
+            LIMIT ${NEEDS_NAMED}`,
     ]);
     const sum = (kind: string) =>
         entries.find((e) => e.kind === kind)?._sum.quantity ?? 0;
@@ -613,8 +718,11 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
                 ? moneyWords(Number(r.value ?? 0).toFixed(2), r.currency)
                 : null,
         })),
+        needs: needs.map((n) => ({ ...n, on_hand: Number(n.on_hand) })),
         moved,
     };
+    const shelfWords = (n: NeedRow) =>
+        `${JSON.stringify(n.variant ? `${n.name} ${n.variant}` : n.name)} at ${JSON.stringify(n.location)} ${n.need === "low" ? `low, ${n.on_hand} left (alert at ${n.alert_at})` : n.need === "out" ? "out" : `short for orders, ${n.on_hand} on hand`}`;
     const text = [
         // Nothing moves in days still to come: the log is said up to today.
         `Stock now, and what moved from ${s.firstDay} to ${[s.lastDay, localDay(new Date(), s.zone)].sort()[0]} (${s.zone}).`,
@@ -622,6 +730,11 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
             ? "- No product counts stock yet."
             : `- On hand now: ${data.units} units across ${data.products} products${data.value ? `, worth ${data.value.join(", ") || "nothing"} at today's prices` : ""}.`,
         `- Shelves (a product at one location, or one variant) short for open orders: ${data.short}; out of stock: ${data.out}; low: ${data.low}.`,
+        ...(data.needs.length
+            ? [
+                  `- Each shelf needing stock${data.short + data.out + data.low > data.needs.length ? ` (the first ${data.needs.length})` : ""}: ${data.needs.map(shelfWords).join("; ")}.`,
+              ]
+            : []),
         ...(data.top.length
             ? [
                   `- Most ${money ? "value" : "units"} on hand: ${data.top.map((t) => `${JSON.stringify(t.name)} ${t.on_hand}${t.value ? ` (${t.value})` : ""}`).join("; ")}.`,
@@ -847,7 +960,7 @@ export function periodSummaryTools(): McpTool[] {
         defineTool({
             name: "summarise_orders",
             title: "Orders over a period",
-            description: `Use this when the person asks about orders over a period: how many, standing vs cancelled, money, by status, by week or month, most ordered products, against the period before, and the newest orders. Example: "summary of orders from the last 3 months" → ${PERIOD_HINT} Not for one order (get_order).`,
+            description: `Use this when the person asks about orders over a period: how many, standing vs cancelled, money, by status, by week or month, by store, most ordered products and sizes or colours (variants), against the period before, and the newest orders. Example: "summary of orders from the last 3 months" → ${PERIOD_HINT} Not for one order (get_order).`,
             contract: summariseOrdersTool,
             capability: "order:read",
             hints: READ_ONLY,
@@ -868,7 +981,7 @@ export function periodSummaryTools(): McpTool[] {
         defineTool({
             name: "summarise_stock",
             title: "Stock summary",
-            description: `Use this when the person asks about stock as a whole: units and value on hand, most stocked products, how many are low, short or out, and what was received, sold or adjusted over a period. Example: "stock summary" → ${PERIOD_HINT} Not for one product (get_product).`,
+            description: `Use this when the person asks about stock as a whole: units and value on hand, most stocked products, which products or sizes and colours are low, short or out at which store, and what was received, sold or adjusted over a period. Example: "stock summary" → ${PERIOD_HINT} Not for one product (get_product).`,
             contract: summariseStockTool,
             capability: "store:read",
             hints: READ_ONLY,
