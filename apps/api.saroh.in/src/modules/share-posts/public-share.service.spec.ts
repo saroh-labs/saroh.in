@@ -37,12 +37,12 @@ const drawn = renderCard as jest.Mock<Promise<Buffer>, [CardRender]>;
 const ORG = "org1";
 const MEDIA = "https://media.saroh.test";
 
-function setup() {
+function setup(org = ORG) {
     const sites = {
         getPublicationBySiteId: jest.fn((siteId: string) =>
             siteId === "site_1"
                 ? Promise.resolve({
-                      organizationId: ORG,
+                      organizationId: org,
                       primaryHost: "rye.saroh.app",
                       icon: null,
                       snapshot: {
@@ -71,7 +71,7 @@ function setup() {
         images: [
             {
                 kind: "photo",
-                url: `${MEDIA}/org/${ORG}/product-image/bun.webp`,
+                url: `${MEDIA}/org/${org.toLowerCase().replace(/_/g, "-")}/product-image/bun.webp`,
                 posterUrl: null,
             },
         ],
@@ -521,6 +521,15 @@ describe("an own post's picture", () => {
 });
 
 describe("photos", () => {
+    it("finds a business's photo in the folder storage names, `_` as `-`", async () => {
+        const { service, storage } = setup("seed_sc_rc_org");
+        await service.item("site_1", "product", "bun", {}, "v");
+        expect(storage.readObjectStart).toHaveBeenCalledWith(
+            "org/seed-sc-rc-org/product-image/bun.webp",
+            expect.any(Number),
+        );
+    });
+
     it("reads only the business's own photos at the address storage gives them", async () => {
         const { service, storage } = setup();
         const { catalogue } = {
