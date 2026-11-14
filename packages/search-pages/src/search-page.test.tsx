@@ -27,6 +27,7 @@ describe("<SearchPage>", () => {
             const { container } = render(
                 <SearchPage
                     page={p}
+                    off={[]}
                     links={{
                         startFree: "/start",
                         demo: "/demo",
@@ -65,7 +66,7 @@ describe("<SearchPage>", () => {
             ).toBe(`/for/${p.related[0]?.slug}`);
             for (const q of p.questions)
                 expect(screen.getByText(q.question)).toBeTruthy();
-            expect(screen.queryByText(/Draft/)).toBeNull();
+            expect(screen.queryByText(/^Draft —/)).toBeNull();
         },
     );
 
@@ -118,6 +119,97 @@ describe("<SearchPage>", () => {
         );
         expect(screen.getByText("Pricing for home bakers")).toBeTruthy();
         expect(screen.getByText("Free for one site")).toBeTruthy();
+    });
+});
+
+describe("<SearchPage> and the release switches (U13)", () => {
+    const salons = loadSearchPage("salons");
+    const bakers = loadSearchPage("home-bakers");
+    if (!salons || !bakers) throw new Error("a page is missing");
+    const also = (c: HTMLElement) =>
+        c.querySelectorAll("#sp-also-list > li").length;
+
+    it("draws the page as before when no switch set is passed, or all are off", () => {
+        for (const off of [undefined, ["ai-apps", "ask-ai", "social"]]) {
+            const { container, unmount } = render(
+                <SearchPage page={salons} off={off} />,
+            );
+            expect(screen.queryByText("Ask your AI assistant.")).toBeNull();
+            expect(also(container)).toBe(6);
+            expect(
+                container
+                    .querySelector("#sp-also-list")
+                    ?.hasAttribute("data-new"),
+            ).toBe(false);
+            expect(
+                screen.getByRole("button", { name: "See all 6" }),
+            ).toBeTruthy();
+            unmount();
+        }
+    });
+
+    it("with AI apps on, shows three asks, each with its outcome in words", () => {
+        const { container } = render(
+            <SearchPage
+                page={salons}
+                off={["ask-ai", "social"]}
+                links={{ feature: (f) => `/features/${f}` }}
+            />,
+        );
+        const sec = screen
+            .getByRole("heading", { name: "Ask your AI assistant." })
+            .closest("section");
+        if (!sec) throw new Error("no section");
+        const w = within(sec);
+        expect(w.getAllByRole("article")).toHaveLength(3);
+        for (const pill of [
+            "Changed at once",
+            "Draft to publish",
+            "Just an answer",
+        ])
+            expect(w.getByText(pill)).toBeTruthy();
+        expect(w.getAllByRole("figure")[0]?.textContent).toMatch(
+            /^Drawing of a chat/,
+        );
+        expect(
+            w.getByRole("link", { name: "See AI apps →" }).getAttribute("href"),
+        ).toBe("/features/ai-apps");
+        // Ask AI and Share are off: neither line nor Also item.
+        expect(
+            w.queryByRole("link", { name: /See Ask AI|See Social/ }),
+        ).toBeNull();
+        expect(also(container)).toBe(7);
+        expect(screen.getByRole("button", { name: "See all 7" })).toBeTruthy();
+    });
+
+    it("all on: 6 + 3 Also items in the trade's words, marked new, and both lines", () => {
+        const { container } = render(
+            <SearchPage
+                page={salons}
+                off={[]}
+                links={{ feature: (f) => `/features/${f}` }}
+            />,
+        );
+        expect(also(container)).toBe(9);
+        const list = container.querySelector("#sp-also-list");
+        expect(list?.getAttribute("data-new")).toBe("3");
+        const added = [
+            ...container.querySelectorAll("#sp-also-list > li[data-new]"),
+        ];
+        expect(
+            added.map((li) => li.querySelector(".sp-also-tl")?.textContent),
+        ).toEqual(salons.ai?.also?.map((a) => a.line));
+        expect(added.every((li) => li.textContent.includes("New"))).toBe(true);
+        expect(screen.getByRole("link", { name: "See Ask AI →" })).toBeTruthy();
+        expect(screen.getByRole("link", { name: "See Social →" })).toBeTruthy();
+    });
+
+    it("a page without an ai block gets the new Also items in its shape's words, and no section", () => {
+        expect(bakers.ai).toBeUndefined();
+        const { container } = render(<SearchPage page={bakers} off={[]} />);
+        expect(screen.queryByText("Ask your AI assistant.")).toBeNull();
+        expect(also(container)).toBe(9);
+        expect(screen.getByText("Share a product →")).toBeTruthy();
     });
 });
 
@@ -204,7 +296,8 @@ describe("class names", () => {
     it.each(allSearchPages().map((p) => [p.slug, p] as const))(
         "%s draws only classes styles.css knows",
         (_, p) => {
-            const { container } = render(<SearchPage page={p} />);
+            // Every switch on, so the AI section and new Also items are held too.
+            const { container } = render(<SearchPage page={p} off={[]} />);
             const unknown = new Set<string>();
             container.querySelectorAll("[class]").forEach((el) => {
                 for (const c of (el.getAttribute("class") ?? "").split(/\s+/)) {
