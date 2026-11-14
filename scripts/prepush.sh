@@ -441,6 +441,10 @@ e2e_stack() {
     # the stripe-checkout spec runs when the runner sees it too.
     export STRIPE_FAKE=1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
+    # Ask AI on a script, as CI: nothing calls Anthropic. Test only, as above;
+    # the text key is a throwaway for this stack's test conversations.
+    export AI_PROVIDER_FAKE=1
+    export AI_TEXT_ENC_KEY=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
 
     # The run's database is a copy of a seeded template, "<name>-template",
     # when the template was seeded from the same migrations, schema and seed

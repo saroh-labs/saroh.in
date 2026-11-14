@@ -6,6 +6,7 @@ import type {
     AskAiState,
     AskAiUsage,
 } from "@saroh/api-contract";
+import { AbsentValue } from "@saroh/ui/absent-value";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, ListTableHead, listTable } from "@saroh/ui/list-table";
 import { ProgressBar } from "@saroh/ui/progress-bar";
@@ -75,7 +76,10 @@ export function AskAiSettingsView({
                         className={`${CARD} order-2`}
                     >
                         <div className="flex flex-wrap items-baseline gap-x-2.5">
-                            <h3 className="flex-1 text-[15px] font-semibold">
+                            <h3
+                                data-ph-unmask=""
+                                className="flex-1 text-[15px] font-semibold"
+                            >
                                 This month
                             </h3>
                             <span className="text-[13px] text-muted-foreground">
@@ -104,7 +108,10 @@ export function AskAiSettingsView({
                                 label={`${usage.used} of ${usage.limit} questions used`}
                             />
                         )}
-                        <p className="mt-1.5 text-pretty text-[12.5px] leading-snug text-muted-foreground">
+                        <p
+                            data-ph-unmask=""
+                            className="mt-1.5 text-pretty text-[12.5px] leading-snug text-muted-foreground"
+                        >
                             Shared by the team. Common questions, refusals and
                             errors don&apos;t count.
                         </p>
@@ -114,15 +121,18 @@ export function AskAiSettingsView({
                     aria-label="Who can use it"
                     className={`${CARD} order-4`}
                 >
-                    <h3 className="text-[15px] font-semibold">
+                    <h3 data-ph-unmask="" className="text-[15px] font-semibold">
                         Who can use it
                     </h3>
-                    <p className="mt-1.5 text-pretty text-[13.5px] leading-normal text-foreground/80">
+                    <p
+                        data-ph-unmask=""
+                        className="mt-1.5 text-pretty text-[13.5px] leading-normal text-foreground/80"
+                    >
                         Owner and Admin, and any role or person given &ldquo;Use
                         Ask AI&rdquo;. Answers only cover what that person can
                         already see.
                     </p>
-                    <p className="mt-2">
+                    <p data-ph-unmask="" className="mt-2">
                         <Link
                             href={ROLES_HREF}
                             className={`${LINK} text-[13px]`}
@@ -131,7 +141,10 @@ export function AskAiSettingsView({
                         </Link>
                     </p>
                 </section>
-                <p className="order-5 text-pretty text-[12.5px] leading-normal text-foreground/80">
+                <p
+                    data-ph-unmask=""
+                    className="order-5 text-pretty text-[12.5px] leading-normal text-foreground/80"
+                >
                     Questions and the business details needed to answer them are
                     processed by Anthropic, outside India.{" "}
                     <a
@@ -163,7 +176,10 @@ function WhoAsked({ people }: { people: AskAiPersonUsage[] }) {
             aria-labelledby="ask-ai-who-asked"
             className="order-3 grid gap-2"
         >
-            <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+            <div
+                data-ph-unmask=""
+                className="flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5"
+            >
                 <h2 id="ask-ai-who-asked" className="text-[15px] font-semibold">
                     Who asked this month
                 </h2>
@@ -172,7 +188,10 @@ function WhoAsked({ people }: { people: AskAiPersonUsage[] }) {
                 </span>
             </div>
             <ListTable>
-                <ListTableHead className={cn("hidden", PEOPLE_COLS)}>
+                <ListTableHead
+                    data-ph-unmask=""
+                    className={cn("hidden", PEOPLE_COLS)}
+                >
                     <span>Person</span>
                     <span>Role</span>
                     <span>Questions</span>
@@ -187,7 +206,7 @@ function WhoAsked({ people }: { people: AskAiPersonUsage[] }) {
                         const last = p.lastAskedAt ? (
                             <ViewerDate iso={p.lastAskedAt} variant="heading" />
                         ) : p.canUse ? (
-                            "—"
+                            <AbsentValue says="Not yet" />
                         ) : (
                             "Can't use it"
                         );
@@ -223,7 +242,7 @@ function WhoAsked({ people }: { people: AskAiPersonUsage[] }) {
                                     data-questions=""
                                     className="font-semibold tabular-nums"
                                 >
-                                    {dash ? "—" : p.questions}
+                                    {dash ? <AbsentValue /> : p.questions}
                                 </span>
                                 <span
                                     data-last-asked=""
@@ -279,6 +298,7 @@ function BusinessSwitch({ business, on }: { business: string; on: boolean }) {
                 </h3>
                 <p
                     id="ask-ai-switch-help"
+                    data-ph-unmask=""
                     className="mt-[3px] text-pretty text-[12.5px] leading-snug text-muted-foreground"
                 >
                     On for everyone whose role has &ldquo;Use Ask AI&rdquo;.

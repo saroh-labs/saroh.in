@@ -386,6 +386,20 @@ const input: CatalogInput = {
             what: "How many API keys the business can hold.",
             cells: { free: X("hidden"), grow: X("hidden"), pro: X("hidden") },
         },
+        // Ask AI (DEC-220): locked on Free, a made-up monthly allowance
+        // elsewhere, Pro's high so no browser spec meets it.
+        {
+            id: "ask-ai",
+            name: "Ask AI",
+            group: "usage",
+            pricing: "hidden",
+            what: "Ask questions about your business and get drafts to confirm.",
+            cells: {
+                free: X(),
+                grow: C("50 questions a month", "", 50, "month"),
+                pro: C("100,000 questions a month", "", 100000, "month"),
+            },
+        },
         {
             id: "webhooks",
             name: "Webhooks",

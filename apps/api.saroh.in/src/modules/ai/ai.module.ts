@@ -1,7 +1,7 @@
 import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
-import { env } from "../../env";
+import { declaredNodeEnv, env } from "../../env";
 import { BillingModule } from "../billing/billing.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -17,6 +17,10 @@ import { AskAiDraftsController } from "./drafts/drafts.controller";
 import { DraftsService } from "./drafts/drafts.service";
 import { AI_RETENTION_TYPE, AiRetentionJob } from "./history/retention.job";
 import { AiSdkAdapter } from "./providers/ai-sdk.adapter";
+import {
+    aiProviderFakeAllowed,
+    ScriptedAiProvider,
+} from "./providers/fake-script";
 import { AI_PROVIDER } from "./providers/provider.port";
 import { AskAiRequestsController } from "./requests/ai-requests.controller";
 import { AiRequestsService } from "./requests/ai-requests.service";
@@ -62,7 +66,17 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AskAiService,
         AiRequestsService,
         DraftsService,
-        { provide: AI_PROVIDER, useFactory: () => new AiSdkAdapter() },
+        {
+            provide: AI_PROVIDER,
+            // The browser-test stack's script (`AI_PROVIDER_FAKE`), never in production.
+            useFactory: () =>
+                aiProviderFakeAllowed(env.AI_PROVIDER_FAKE, {
+                    nodeEnvs: [declaredNodeEnv, env.NODE_ENV],
+                    ci: env.CI,
+                })
+                    ? new ScriptedAiProvider()
+                    : new AiSdkAdapter(),
+        },
         ToolBridge,
         { provide: AI_TOOLBOX, useExisting: ToolBridge },
         { provide: AI_AGENTS, useValue: [ASK_AI_AGENT] },

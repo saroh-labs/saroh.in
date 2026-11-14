@@ -61,6 +61,7 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     // API and AI apps' layout draws the panel, the header and its tabs.
     "settings/(sections)/developers": "full",
     "settings/(sections)/developers/ai": "full",
+    "settings/(sections)/developers/ask-ai": "full",
     "settings/(sections)/developers/keys": "full",
     "settings/(sections)/developers/usage": "full",
     "settings/(sections)/developers/webhooks": "full",

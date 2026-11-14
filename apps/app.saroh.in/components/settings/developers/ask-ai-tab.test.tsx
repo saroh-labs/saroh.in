@@ -171,7 +171,9 @@ describe("Settings › Ask AI", () => {
             rows[i]?.querySelector(`[data-${name}]`)?.textContent;
         expect(cell(0, "questions")).toBe("9");
         expect(rows[1]?.textContent).toContain("Member · given Ask AI");
-        expect(cell(2, "questions")).toBe("—");
+        expect(
+            rows[2]?.querySelector("[data-questions] [data-absent]"),
+        ).not.toBeNull();
         expect(cell(2, "last-asked")).toBe("Can't use it");
     });
 

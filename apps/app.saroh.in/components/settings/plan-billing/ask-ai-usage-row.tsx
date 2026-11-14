@@ -22,7 +22,10 @@ export function AskAiUsageRow({
     const figure = limit === null ? `${used}` : `${used} of ${limit}`;
     const body = (
         <>
-            <span className="min-w-0 flex-1 text-[14px] font-semibold">
+            <span
+                data-ph-unmask=""
+                className="min-w-0 flex-1 text-[14px] font-semibold"
+            >
                 Ask AI questions
             </span>
             <span className="text-[13.5px] tabular-nums text-foreground/80">

@@ -60,6 +60,15 @@ describe("the API's environment", () => {
         ).toEqual([]);
     });
 
+    it("refuses the Ask AI fake in production", () => {
+        expect(missing({ ...DEPLOYED, AI_PROVIDER_FAKE: "1" })).toEqual([
+            "AI_PROVIDER_FAKE",
+        ]);
+        expect(
+            missing({ ...BASE, NODE_ENV: "test", AI_PROVIDER_FAKE: "1" }),
+        ).toEqual([]);
+    });
+
     it("refuses the custom domains' fakes in production", () => {
         expect(missing({ ...DEPLOYED, DOMAIN_HOSTING_FAKE: "1" })).toEqual([
             "DOMAIN_HOSTING_FAKE",

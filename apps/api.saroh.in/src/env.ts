@@ -185,6 +185,12 @@ const envSchema = z.object({
     // NODE_ENV=production (below), and honoured only in a test run, as
     // DOMAIN_HOSTING_FAKE is (`payments/providers/stripe-fake.ts`).
     STRIPE_FAKE: z.enum(["1"]).optional(),
+    // TEST ONLY. `1`: Ask AI answers from a script instead of a model (the
+    // Ask AI browser spec): a known question streams its scripted words, a
+    // tool or a draft first where the script says; nothing calls Anthropic.
+    // Refused at boot under NODE_ENV=production (below), and honoured only in
+    // a test run, as STRIPE_FAKE is (`ai/providers/fake-script.ts`).
+    AI_PROVIDER_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -453,6 +459,7 @@ const TEST_ONLY = [
     "LINK_PREVIEW_TEST_HOSTS",
     "DOMAIN_HOSTING_FAKE",
     "STRIPE_FAKE",
+    "AI_PROVIDER_FAKE",
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {

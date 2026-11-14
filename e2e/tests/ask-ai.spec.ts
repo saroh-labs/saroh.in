@@ -1,7 +1,8 @@
 // @covers app:/open app:/ api:ai
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
+import { stamp } from "../fixtures/own-data";
 import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 import { NORTHWIND_ORG } from "../playwright.config";
@@ -9,30 +10,30 @@ import { NORTHWIND_ORG } from "../playwright.config";
 /**
  * Ask AI's panel (plan 2026-11-13-001 U10), desk and phone.
  *
- * Runs now: the way in and out. The top bar's button (a spark beside
- * Search on a phone) opens the panel over the page, ⌘J toggles it, Esc
- * and Close shut it and give the keyboard back; on a phone it is a
- * full-screen sheet whose controls are 44px. Whatever the business's Ask
- * AI state on the seeded stack (the `ASK_AI` switch is off there, so the
- * panel says it isn't available, or the plan locks it), these hold, and
- * nothing is asked or saved.
+ * The way in and out: the top bar's button (a spark beside Search on a
+ * phone) opens the panel over the page, ⌘J toggles it, Esc and Close shut
+ * it and give the keyboard back; on a phone it is a full-screen sheet
+ * whose controls are 44px.
  *
- * Skipped: asking. A question streams from the API's AI provider, and the
- * API binds the real one (`AiSdkAdapter`, `ai.module.ts`) with no way to
- * put the `FakeAiProvider` in its place on a running stack. To run them:
- *   1. an env switch in `apps/api.saroh.in/src/env.ts` (e.g.
- *      `AI_PROVIDER=fake`, refused in production) that binds a scripted
- *      `FakeAiProvider` in `ai.module.ts`, with scripts keyed by question
- *      text (a status, text deltas, a draft card, a slow answer for Stop);
- *   2. the seed turning `ASK_AI` on for Northwind, its plan's Ask AI row
- *      on, an `AiSetting` row for the agent, and `AI_TEXT_ENC_KEY` set on
- *      CI's API;
- *   3. a second, Free business (`makeBusiness`) for the lock.
+ * Asking: the stack's API answers from a script, never a model
+ * (`AI_PROVIDER_FAKE`, `apps/api.saroh.in/src/modules/ai/providers/
+ * fake-script.ts`, keyed by the questions typed here), and the seed turns
+ * Ask AI on for Northwind with made-up AI settings
+ * (`packages/database/src/seed/ask-ai.ts`). One person runs one turn at a
+ * time, so the asking tests are `@serial`. The lock is read on Asha's
+ * Candles, on the sample catalogue's entry plan, where Ask AI is locked.
  */
 
-async function openPanel(page: Page, isMobile: boolean) {
-    await useSession(page);
-    await page.goto(`/open/${NORTHWIND_ORG}`);
+/** Asha's Candles on the entry plan (`packages/database/src/seed/email-prompt.ts`). */
+const LOCKED_ORG = "seed_org_email-prompt_free";
+
+async function openPanel(
+    page: Page,
+    isMobile: boolean,
+    on: { who?: "founder"; org: string } = { org: NORTHWIND_ORG },
+) {
+    await useSession(page, on.who);
+    await page.goto(`/open/${on.org}`);
     const entry = page
         .getByRole("button", { name: /^Ask AI/ })
         .filter({ visible: true });
@@ -104,27 +105,24 @@ test.describe("Ask AI: the way in and out", () => {
     });
 });
 
-test.describe("Ask AI: asking", () => {
-    test.skip(
-        true,
-        "Needs a fake AI provider the running API can bind, and Ask AI on for a seeded business: see this file's header.",
-    );
+async function ask(panel: Locator, question: string) {
+    await panel.getByRole("textbox", { name: "Ask a question" }).fill(question);
+    await panel.getByRole("button", { name: "Ask" }).click();
+}
 
-    test("the status line first, the answer as it arrives, Stop at once", async ({
+test.describe("Ask AI: asking", { tag: "@serial" }, () => {
+    test("the status line first, then the answer as it arrives", async ({
         page,
         isMobile,
     }) => {
         const { panel } = await openPanel(page, isMobile);
-        await panel
-            .getByRole("textbox", { name: "Ask a question" })
-            .fill("How many bookings this week?");
-        await panel.getByRole("button", { name: "Ask" }).click();
+        await ask(panel, "How many bookings this week?");
         await expect(
             panel.getByRole("button", { name: "Stop the answer" }),
         ).toBeVisible();
-        await expect(panel.getByRole("status").first()).toContainText(
-            "Reading",
-        );
+        await expect(
+            panel.getByRole("status").filter({ hasText: "Adding up" }),
+        ).toBeVisible();
         await expect(panel.locator('[aria-live="polite"]')).toContainText(
             "bookings",
         );
@@ -146,10 +144,7 @@ test.describe("Ask AI: asking", () => {
             }
         });
         const { panel } = await openPanel(page, isMobile);
-        await panel
-            .getByRole("textbox", { name: "Ask a question" })
-            .fill("Show me a picture");
-        await panel.getByRole("button", { name: "Ask" }).click();
+        await ask(panel, "Show me a picture");
         await expect(panel.locator('[aria-live="polite"]')).toContainText("![");
         await expect(panel.locator('[aria-live="polite"] img')).toHaveCount(0);
         await expect(panel.locator('[aria-live="polite"] a')).toHaveCount(0);
@@ -161,13 +156,38 @@ test.describe("Ask AI: asking", () => {
         isMobile,
     }) => {
         const { panel } = await openPanel(page, isMobile);
-        await panel
-            .getByRole("textbox", { name: "Ask a question" })
-            .fill("A slow question");
-        await panel.getByRole("button", { name: "Ask" }).click();
+        await ask(panel, "Stop test");
         await panel.getByRole("button", { name: "Stop the answer" }).click();
         await expect(panel).toContainText(
             "Stopped. This didn't use a question.",
         );
+    });
+
+    test("a draft is added only on Confirm", async ({
+        page,
+        isMobile,
+    }, testInfo) => {
+        // A create is Added with Open it; Undo is for a change (DEC-220).
+        const name = `Ask AI mug ${stamp(testInfo)}`;
+        const { panel } = await openPanel(page, isMobile);
+        await ask(panel, `Add a product called ${name} at 250`);
+        await panel.getByRole("button", { name: "Add product" }).click();
+        await expect(panel.getByText(`Added · ${name}`)).toBeVisible();
+        await expect(
+            panel.getByRole("link", { name: "Open it" }),
+        ).toBeVisible();
+    });
+});
+
+test.describe("Ask AI: on a plan without it", () => {
+    test("the panel says which plan brings it", async ({ page, isMobile }) => {
+        const { panel } = await openPanel(page, isMobile, {
+            who: "founder",
+            org: LOCKED_ORG,
+        });
+        await expect(panel).toContainText("Ask AI comes with");
+        await expect(
+            panel.getByRole("textbox", { name: "Ask a question" }),
+        ).toHaveCount(0);
     });
 });

@@ -1,6 +1,7 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
 import { alignOrderNumberSequence } from "../order-number";
+import { seedAskAi } from "./ask-ai";
 import { seedCalendarOnlyTeammate } from "./calendar-only-teammate";
 import {
     ANALYTICS_DAYS,
@@ -390,6 +391,9 @@ export async function seed(): Promise<void> {
     // Three with no email of their own, Communications rolled out for them
     // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
     await seedEmailPromptBusinesses(prisma, founderId, now);
+    // Ask AI on for Northwind and one entry-plan business, and the AI
+    // settings a turn reads, as made-up test values (`ask-ai.spec.ts`).
+    await seedAskAi(prisma, org.id, user.id);
     // One of Asha's on a plan that ends in ten days (#805;
     // `plan-ending.spec.ts`).
     await seedPlanEndingBusiness(prisma, founderId, now);

@@ -6,8 +6,9 @@ import { env } from "@/env";
  * unset or anything else is off, so a production build that leaves it out
  * shows none of it. Unset counts as on only under `next dev`; `off` there
  * checks the hidden state. It hides; the API's `ASK_AI` flag decides
- * whether a business may ask. Readers: none yet (the panel and the tab,
- * plan 2026-11-13-001 U10–U11). Removed with them once Ask AI has been on
+ * whether a business may ask. Readers: the shell's button and panel, the
+ * nav item, Settings' Ask AI tab, Plan and billing's usage row, and the
+ * panel's `/api/ask-ai` routes. Removed with them once Ask AI has been on
  * in production for a release.
  */
 export function askAiOnFor(
