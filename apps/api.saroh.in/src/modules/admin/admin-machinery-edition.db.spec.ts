@@ -28,6 +28,18 @@ const service = new AdminOperationsService(
     {} as WaitlistInvitesService,
 );
 
+/**
+ * The run `start` sets off without waiting (as in `invites.db.spec.ts`).
+ * Awaited, not run a second time: a second run finds the item claimed by
+ * the first and returns before the first has written anything.
+ */
+let running: Promise<void> = Promise.resolve();
+const run = service.run.bind(service);
+jest.spyOn(service, "run").mockImplementation((id: string) => {
+    running = run(id);
+    return running;
+});
+
 const staff = (edition: Edition | null) => ({
     userId: `staff-machinery-${tag}`,
     platformAdminId: null,
@@ -118,7 +130,7 @@ describe("retrying and cancelling jobs from a console", () => {
         expect(plan.act).toBe(1);
 
         const operation = await start("GLOBAL", "jobs.retry", [job], "gl");
-        await service.run(operation.id);
+        await running;
         expect(
             (await prisma.job.findUniqueOrThrow({ where: { id: job } })).status,
         ).toBe("PENDING");

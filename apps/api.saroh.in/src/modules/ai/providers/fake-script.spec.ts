@@ -1,3 +1,5 @@
+import { withLanguageTail } from "../agents/agent-definition";
+import { LAST_ROUND } from "../turn/turn-runner";
 import { aiProviderFakeAllowed, ScriptedAiProvider } from "./fake-script";
 import type { AiEvent, AiMessage, AiStreamRequest } from "./provider.port";
 
@@ -61,6 +63,22 @@ describe("the scripted Ask AI provider", () => {
             .join("");
         expect(text).toContain("bookings");
         expect(second.at(-1)).toMatchObject({ reason: "stop" });
+    });
+
+    it("matches the question as the turn sends it, with Saroh's notes after it", async () => {
+        const events = await all(
+            ask([
+                {
+                    role: "user",
+                    text: withLanguageTail("Show me a picture", "MATCH"),
+                },
+                { role: "user", text: LAST_ROUND },
+            ]),
+        );
+        const text = events
+            .flatMap((e) => (e.type === "text-delta" ? [e.text] : []))
+            .join("");
+        expect(text).toContain("![a picture]");
     });
 
     it("drafts the product the question names", async () => {

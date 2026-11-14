@@ -106,6 +106,8 @@ export interface McpRequest extends Request {
 export class McpAuthGuard implements CanActivate {
     private readonly logger = new Logger(McpAuthGuard.name);
     private readonly touched = new Map<string, number>();
+    /** The latest `lastUsedAt` write, so a spec can await it; nothing in the request path does. */
+    touching: Promise<unknown> = Promise.resolve();
 
     constructor(
         private readonly organizations: OrganizationContextService,
@@ -335,7 +337,7 @@ export class McpAuthGuard implements CanActivate {
         if (last !== undefined && t - last < TOUCH_EVERY_MS) return;
         if (this.touched.size >= 10_000) this.touched.clear();
         this.touched.set(consentId, t);
-        void prisma.oauthConsent
+        this.touching = prisma.oauthConsent
             .update({ where: { id: consentId }, data: { lastUsedAt: now } })
             .catch((error: unknown) => {
                 this.logger.warn(

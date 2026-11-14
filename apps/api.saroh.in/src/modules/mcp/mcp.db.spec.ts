@@ -297,17 +297,11 @@ describe("McpAuthGuard (U9)", () => {
             clientId: app,
             businesses: [org.id],
         });
-        // lastUsedAt is written without holding the call up: read until it
-        // lands, pausing between reads (tight reads outran it on CI, up to 2s).
-        let touched = await prisma.oauthConsent.findUniqueOrThrow({
+        // lastUsedAt is written without holding the call up: await that write.
+        await guard.touching;
+        const touched = await prisma.oauthConsent.findUniqueOrThrow({
             where: { id: grant.id },
         });
-        for (let i = 0; i < 100 && !touched.lastUsedAt; i++) {
-            await new Promise((r) => setTimeout(r, 20));
-            touched = await prisma.oauthConsent.findUniqueOrThrow({
-                where: { id: grant.id },
-            });
-        }
         expect(touched.lastUsedAt).not.toBeNull();
     });
 

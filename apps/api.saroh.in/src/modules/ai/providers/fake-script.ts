@@ -61,6 +61,9 @@ export const FAKE_SCRIPT: readonly Line[] = [
 
 const OTHERWISE = "This is a test answer.";
 
+/** How the turn runner starts a note of its own (`withLanguageTail`, `LAST_ROUND`). */
+const NOTE = "(From Saroh, not the person:";
+
 /** After a tool's result: long enough for the status line to be seen. */
 const AFTER_TOOL_MS = 1_500;
 const WORD_MS = 40;
@@ -93,11 +96,13 @@ export class ScriptedAiProvider implements AiProvider {
         request: AiStreamRequest,
         signal: AbortSignal,
     ): AsyncIterable<AiEvent> {
-        const question =
-            [...request.messages]
-                .reverse()
-                .find((m) => m.role === "user")
-                ?.text.trim() ?? "";
+        // The person's words: Saroh's own notes (the language tail on the
+        // question, the last-round message) are not part of what the spec typed.
+        const said = [...request.messages]
+            .reverse()
+            .flatMap((m) => (m.role === "user" ? [m.text] : []))
+            .find((text) => !text.startsWith(NOTE));
+        const question = (said?.split(NOTE)[0] ?? "").trim();
         let line: Line | undefined;
         let m: RegExpMatchArray | null = null;
         for (const l of FAKE_SCRIPT) {

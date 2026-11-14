@@ -48,8 +48,10 @@ export const ASK_AI_TEST_SETTINGS: Record<string, Prisma.InputJsonValue> = {
     "askAi.runningTurnsPerBusiness": 100,
     "askAi.questionsPerMinutePerPerson": 100,
     "askAi.turnCostCapMicroUsd": 1_000_000_000,
-    "askAi.businessDayCostCapMicroUsd": 1_000_000_000,
-    "ai.sarohDayCostCapMicroUsd": 1_000_000_000,
+    // A start is refused once the day's spend plus one turn's cap passes the
+    // day's cap, so the day caps sit far above the turn cap (the most allowed).
+    "askAi.businessDayCostCapMicroUsd": 1_000_000_000_000,
+    "ai.sarohDayCostCapMicroUsd": 1_000_000_000_000,
     "ai.prices": {
         "claude-haiku-5-5": ONE,
         "claude-sonnet-5-5": ONE,
