@@ -767,4 +767,22 @@ export const CAPTURED: Record<
         width: 2024,
         height: 1604,
     },
+    "ai-connect": {
+        src: "/shots/v2/ai-connect.webp",
+        alt: "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
+        width: 1118,
+        height: 856,
+    },
+    "ai-consent": {
+        src: "/shots/v2/ai-consent.webp",
+        alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
+        width: 872,
+        height: 1134,
+    },
+    "ai-activity": {
+        src: "/shots/v2/ai-activity.webp",
+        alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
+        width: 896,
+        height: 1800,
+    },
 };

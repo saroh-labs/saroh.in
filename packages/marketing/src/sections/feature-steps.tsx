@@ -156,7 +156,11 @@ const SHAPE: Record<ShotShape, { sizes: string; className: string }> = {
         sizes: "(min-width: 1280px) 560px, 100vw",
         className: "w-full",
     },
-    upright: { sizes: "480px", className: "w-full max-w-[480px]" },
+    // On a phone it is the screen's width less the gutters, not 480.
+    upright: {
+        sizes: "(max-width: 540px) calc(100vw - 32px), 480px",
+        className: "w-full max-w-[480px]",
+    },
     phone: { sizes: "300px", className: "w-full max-w-[300px]" },
 };
 

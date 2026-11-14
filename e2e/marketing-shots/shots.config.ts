@@ -162,6 +162,12 @@ export interface Shot {
      * The image itself stays clean.
      */
     mark?: string;
+    /**
+     * Another product's own screen (Claude's, ChatGPT's), which the stack
+     * can't open: the image is put in place by hand and kept, never taken.
+     * Says where it came from.
+     */
+    supplied?: string;
 }
 
 /** Notices that would only be put away by a write. */
@@ -1592,16 +1598,45 @@ const SHARE_SHOTS: Shot[] = [
  */
 const AI_APPS_SHOTS: Shot[] = [
     {
+        key: "ai-connect",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude's Settings › Connectors › Add custom connector with Saroh's address, shot by the owner (14 Nov 2026)",
+        alt: "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
+        caption:
+            "An AI app's Add a connector form with the name Saroh and Saroh's MCP address filled in",
+    },
+    {
         key: "ai-consent",
         business: "rye",
         role: "owner",
-        route: "accounts:/oauth/consent",
+        // Claude's own sign-in, as claude.ai starts it (its published client
+        // document), through Pick a business to the consent page; shot before
+        // Allow, so no code is issued. The challenge is a fixed, valid one: the
+        // capture never trades a code.
+        route: `api:/api/auth/oauth2/authorize?${new URLSearchParams({
+            response_type: "code",
+            client_id: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+            redirect_uri: "https://claude.ai/api/mcp/auth_callback",
+            scope: "saroh:read saroh:write offline_access",
+            code_challenge: "p7ZuqXBBQMmAPxlhacRYlz9GkdSucYGHKSxCZ05PETA",
+            code_challenge_method: "S256",
+            state: "shots",
+        }).toString()}&resource={mcp}`,
         viewport: DESK,
-        steps: [{ waitFor: 'button:has-text("Don\'t allow")' }],
+        steps: [
+            { click: 'role=checkbox[name="Rye & Co."]' },
+            { click: 'button:has-text("Continue")' },
+            { waitFor: 'button:has-text("Don\'t allow")' },
+        ],
+        // The consent column alone: full page it was a small card in white.
+        clip: { selector: "h1 >> xpath=..", pad: 32 },
         alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
         caption:
             "An AI app wants to use Saroh as you: two of three businesses ticked, what it may do and what it can't, and Allow",
-        gap: "The page needs the signed query of a sign-in an AI app started (its /oauth/authorize redirect); append it to the route by hand for the run. The seed has one Rye & Co., not three.",
+        gap: "The seed's owner ticks Rye & Co. only, not two of three businesses.",
     },
     {
         key: "ai-activity",
@@ -1613,10 +1648,12 @@ const AI_APPS_SHOTS: Shot[] = [
             { click: 'button[aria-label^="Open "]' },
             { waitFor: '[role="dialog"]' },
         ],
+        // The connection's sheet alone; the page behind it is dimmed.
+        clip: { selector: '[role="dialog"]' },
         alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
         caption:
             "Settings › API and AI apps › AI assistants: Claude connected to two businesses, its last three changes, and Roll back site draft and Disconnect",
-        gap: "The seed connects no AI app: connect one to Rye & Co. on the capture database and make a change or two through it first.",
+        gap: "The seed connects no AI app: run `pnpm --filter @saroh/e2e shots:connect-claude` and make a change or two through it first (see that script).",
     },
 ];
 

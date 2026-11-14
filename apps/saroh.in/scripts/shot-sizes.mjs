@@ -37,8 +37,18 @@ const DIRS = ["v2", "help"]
 const WIDTHS = JSON.parse(
     fs.readFileSync(path.join(HOME, "content/shot-widths.json"), "utf8"),
 );
-/** As the capture encodes them, a little higher: these are encoded twice. */
-const WEBP = { quality: 76, effort: 6 };
+/**
+ * Quality by copy (owner, 14 Nov 2026): the small copies a phone fetches are
+ * lighter, the desk copies sharper. A width not listed takes the last one.
+ */
+const QUALITY = { 640: 68, 960: 74, 1280: 80, 1920: 86 };
+const webpAt = (w) => ({
+    quality: QUALITY[w] ?? 86,
+    effort: 6,
+    smartSubsample: true,
+});
+/** The blurred stand-in a page shows while a shot loads: a few hundred bytes. */
+const PLACEHOLDER_WIDTH = 24;
 
 // sharp, borrowed from this app's Next.js, as the capture does: no native
 // dependency of our own.
@@ -51,7 +61,9 @@ let written = 0;
 let removed = 0;
 let bytes = 0;
 
+const placeholders = {};
 for (const SHOTS of DIRS) {
+    const dir = path.basename(SHOTS);
     const SIZED = path.join(SHOTS, "sized");
     fs.mkdirSync(SIZED, { recursive: true });
     const wanted = new Set();
@@ -60,13 +72,28 @@ for (const SHOTS of DIRS) {
         const key = file.slice(0, -".webp".length);
         const source = path.join(SHOTS, file);
         const { width = 0 } = await sharp(source).metadata();
+        const tiny = await sharp(source)
+            .resize({ width: PLACEHOLDER_WIDTH })
+            .webp({ quality: 40 })
+            .toBuffer();
+        placeholders[`${dir}/${key}`] =
+            `data:image/webp;base64,${tiny.toString("base64")}`;
         for (const w of WIDTHS) {
             if (w >= width) continue;
             const name = `${key}-${w}.webp`;
             const out = path.join(SIZED, name);
             wanted.add(name);
             if (force || !fs.existsSync(out)) {
-                await sharp(source).resize({ width: w }).webp(WEBP).toFile(out);
+                // A capture taken at a lower quality (before 14 Nov 2026) can
+                // come out lighter than its own copy: step the copy down.
+                const full = fs.statSync(source).size;
+                for (let q = webpAt(w).quality; ; q -= 8) {
+                    await sharp(source)
+                        .resize({ width: w })
+                        .webp({ ...webpAt(w), quality: q })
+                        .toFile(out);
+                    if (fs.statSync(out).size < full || q <= 40) break;
+                }
                 written += 1;
             }
             bytes += fs.statSync(out).size;
@@ -80,6 +107,11 @@ for (const SHOTS of DIRS) {
     }
     total += wanted.size;
 }
+
+fs.writeFileSync(
+    path.join(APP, "content/shot-placeholders.json"),
+    `${JSON.stringify(placeholders, null, 1)}\n`,
+);
 
 console.log(
     `${total} sized shots (${(bytes / 1024 / 1024).toFixed(2)} MB): ${written} written, ${removed} removed`,

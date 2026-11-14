@@ -73,6 +73,15 @@ export function ShotImage({
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority && !priorityFrom ? "high" : undefined}
             decoding="async"
+            // Its blurred stand-in shows until the picture paints over it.
+            style={
+                shot.placeholder
+                    ? {
+                          backgroundImage: `url(${shot.placeholder})`,
+                          backgroundSize: "cover",
+                      }
+                    : undefined
+            }
             className={cn("block h-auto w-full", className)}
         />
     );

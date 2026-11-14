@@ -140,7 +140,7 @@ const designed = {
         "An AI assistant adding a section to the home page of Rye & Co. (demo bakery) as a draft",
     ),
     "ai-connect": pending(
-        "An AI app's Add a connector form with Saroh's address",
+        "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
     ),
     "ai-consent": pending(
         "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
