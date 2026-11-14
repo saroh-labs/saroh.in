@@ -225,13 +225,16 @@ export function AskAiPanel({
     }, [turns]);
 
     // The page's address names the conversation open, so it can be kept.
+    // A new address is read again on the server, so Back to it (from a
+    // card's link) shows this conversation, not the router's old copy.
     useEffect(() => {
         if (!page) return;
         const href = askPageHref(conversationId);
         if (window.location.pathname + window.location.search !== href) {
             window.history.replaceState(null, "", href);
+            router.refresh();
         }
-    }, [page, conversationId]);
+    }, [page, conversationId, router]);
 
     const loadHistory = useCallback(async () => {
         const list = await runAction(() => readAskAiConversations(), {
@@ -397,8 +400,12 @@ export function AskAiPanel({
             .at(-1);
         if (answer) patch(key, { messageId: answer.id });
         if (fresh) setState(fresh);
-        // A new conversation, or this one moved to the top.
-        if (page) void loadHistory();
+        // A new conversation, or this one moved to the top; and the page read
+        // again, so Back from a card's link shows this turn and its card.
+        if (page) {
+            void loadHistory();
+            router.refresh();
+        }
     };
 
     const openConversation = async (id: string) => {

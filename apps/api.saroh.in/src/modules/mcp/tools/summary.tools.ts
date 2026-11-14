@@ -17,7 +17,10 @@ import { prisma, Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
-import { moneyWords } from "../../../common/words-format";
+import {
+    moneyWordsWhole,
+    moneyWordsWholeMinor,
+} from "../../../common/words-format";
 import type { OwedByAge } from "../../analytics/owed-by-age";
 import { foldOwedByAge, readOwedByAge } from "../../analytics/owed-by-age";
 import type { SellsPeriod } from "../../analytics/period";
@@ -99,7 +102,7 @@ const PERIOD_WORDS: Record<SummaryPeriod, string> = {
     this_month: "This month",
 };
 
-/** Takings rows (major units) as one readable amount per currency. */
+/** Takings rows (major units) as one readable amount per currency, in whole units. */
 function moneyOf(rows: readonly TakingsDayRow[]): string[] {
     const by = new Map<string, number>();
     for (const r of rows) {
@@ -107,12 +110,17 @@ function moneyOf(rows: readonly TakingsDayRow[]): string[] {
     }
     return [...by.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([currency, amount]) => moneyWords(amount.toFixed(2), currency));
+        .map(([currency, amount]) =>
+            moneyWordsWhole(amount.toFixed(2), currency),
+        );
 }
 
 const minorTotals = (
     totals: readonly { currency: string; amountMinor: number }[] | null,
-) => (totals ? totals.map((t) => money(t)) : null);
+) =>
+    totals
+        ? totals.map((t) => moneyWordsWholeMinor(t.amountMinor, t.currency))
+        : null;
 
 /** The person's role doesn't include these: said once, in their words. */
 const notShownLine = (nouns: readonly string[]) =>
@@ -521,7 +529,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                       );
                 const amount = (minor: number | null) =>
                     minor !== null && r.currency
-                        ? money({ currency: r.currency, amountMinor: minor })
+                        ? moneyWordsWholeMinor(minor, r.currency)
                         : null;
                 const data = {
                     period,

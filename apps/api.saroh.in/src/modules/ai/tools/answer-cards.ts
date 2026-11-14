@@ -535,7 +535,7 @@ export function answerCard(
                     },
                 },
                 t.rows,
-                d.bookings + d.cancelled,
+                d.all,
                 d.first.map((b) => bookingHref(b.booking_id)),
             );
         }

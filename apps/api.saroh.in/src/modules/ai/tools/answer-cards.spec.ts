@@ -419,12 +419,14 @@ describe("period summary cards", () => {
         ];
         const card = answerCard(
             "summarise_bookings",
-            { span, bookings: 1, cancelled: 0, first },
+            { span, all: 14, bookings: 11, cancelled: 1, first },
             new Map(),
             MEDIA,
         );
         if (card?.kind !== "table") throw new Error("no table");
         expect(card.data.hrefs).toEqual(["/bookings/b1"]);
+        // Every status counts, as the dated All bookings list does.
+        expect(card.data.more).toBe(13);
         expect(card.data.link?.href).toBe(
             "/bookings/all?date=custom&from=2026-08-15&to=2026-11-14",
         );
@@ -432,6 +434,7 @@ describe("period summary cards", () => {
             "summarise_bookings",
             {
                 span: { ...span, from: "2026-11-14", to: "2026-11-14" },
+                all: 1,
                 bookings: 1,
                 cancelled: 0,
                 first,
@@ -851,6 +854,7 @@ describe("every link a card can carry", () => {
             "summarise_bookings",
             {
                 span,
+                all: 1,
                 bookings: 1,
                 cancelled: 0,
                 first: [

@@ -27,7 +27,12 @@ vi.mock("next/link", () => ({
 }));
 
 import nextConfig from "../../next.config.js";
-import { AnswerCard, MEDIA_ORIGINS, mediaSrc } from "./answer-cards";
+import {
+    AnswerCard,
+    MEDIA_ORIGINS,
+    mediaSrc,
+    phoneLayout,
+} from "./answer-cards";
 
 const item = (id: string, imageUrl: string | null) => ({
     id,
@@ -154,7 +159,13 @@ describe("table card", () => {
         const cells = Array.from(host.querySelectorAll('[role="cell"]')).map(
             (td) => td.textContent,
         );
-        expect(cells).toEqual(["INV-1", "Asha", "INR 500.00", "13 days late"]);
+        // On a phone "Due" folds under the customer (hidden at the desk).
+        expect(cells).toEqual([
+            "INV-1",
+            "Asha13 days late",
+            "INR 500.00",
+            "13 days late",
+        ]);
         expect(host.querySelectorAll('[role="cell"]')[2].className).toContain(
             "text-right",
         );
@@ -200,5 +211,52 @@ describe("table card", () => {
             },
         });
         expect(hrefs()).toEqual([]);
+    });
+});
+
+describe("table card on a phone", () => {
+    it("orders keep number, customer and total; status and day fold under the customer", () => {
+        const columns = ["Order", "Customer", "Total", "Status", "Placed"];
+        const layout = phoneLayout(columns, new Set([2]));
+        expect(layout.shown).toEqual([0, 1, 2]);
+        expect(layout.folded).toEqual([3, 4]);
+        expect(layout.host).toBe(1);
+        // Three tracks for three columns: no sideways scroll.
+        expect(layout.tracks).toBe(
+            "fit-content(40%) minmax(0,1fr) max-content",
+        );
+
+        render({
+            kind: "table",
+            data: {
+                title: "Orders",
+                columns,
+                numeric: [2],
+                rows: [["ORD-1", "Asha", "₹500", "Paid", "12 Oct"]],
+            },
+        });
+        const table = host.querySelector<HTMLElement>('[role="table"]');
+        if (!table) throw new Error("no table");
+        expect(table.className).not.toContain("min-w-max");
+        expect(table.style.getPropertyValue("--phone")).toBe(layout.tracks);
+        const heads = host.querySelectorAll('[role="columnheader"]');
+        expect(heads[3].className).toContain("max-sm:hidden");
+        expect(heads[2].className).not.toContain("max-sm:hidden");
+        const cells = host.querySelectorAll('[role="cell"]');
+        expect(cells[1].querySelector(".sm\\:hidden")?.textContent).toBe(
+            "Paid · 12 Oct",
+        );
+        expect(cells[4].className).toContain("max-sm:hidden");
+    });
+
+    it("keeps figures, folding the rest with their names", () => {
+        const layout = phoneLayout(
+            ["Class", "Sessions", "Booked", "Places", "Full"],
+            new Set([1, 2, 3, 4]),
+        );
+        expect(layout.shown).toEqual([0, 1, 2]);
+        expect(layout.folded).toEqual([3, 4]);
+        expect(layout.host).toBe(0);
+        expect(layout.tracks).toBe("minmax(0,1fr) max-content max-content");
     });
 });

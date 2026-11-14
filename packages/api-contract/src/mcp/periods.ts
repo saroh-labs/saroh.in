@@ -211,6 +211,8 @@ export const summariseBookingsTool = {
     input: z.object(periodInput).strict(),
     output: z.object({
         span,
+        all: z.number(),
+        by_status: z.array(count),
         bookings: z.number(),
         cancelled: z.number(),
         came: z.number(),

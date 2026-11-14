@@ -10,7 +10,7 @@ import {
 import { Prisma, prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
-import { moneyWords } from "../../../common/words-format";
+import { moneyWords, moneyWordsWhole } from "../../../common/words-format";
 import type { OwnDiary } from "../../bookings/own-diary";
 import { ownBookingsWhere, ownDiaryOf } from "../../bookings/own-diary";
 import { businessTimezone } from "../../bookings/staff-availability";
@@ -43,7 +43,7 @@ import { when } from "./v1-bridge";
 /** How many records a summary names (its card's rows). */
 export const FIRST = 8;
 
-/** Sums in major units by currency, as readable money. */
+/** Sums in major units by currency, as readable money in whole units. */
 export function amountsOf(
     rows: readonly { currency: string; amount: string | number | null }[],
 ): string[] {
@@ -53,7 +53,9 @@ export function amountsOf(
     }
     return [...by.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([currency, amount]) => moneyWords(amount.toFixed(2), currency));
+        .map(([currency, amount]) =>
+            moneyWordsWhole(amount.toFixed(2), currency),
+        );
 }
 
 const listOr = (a: string[] | null) => (a?.length ? a.join(", ") : "nothing");
@@ -730,7 +732,7 @@ async function summariseStock(ctx: OrganizationContext, s: Span) {
             name: r.name,
             on_hand: Number(r.on_hand),
             value: money
-                ? moneyWords(Number(r.value ?? 0).toFixed(2), r.currency)
+                ? moneyWordsWhole(Number(r.value ?? 0).toFixed(2), r.currency)
                 : null,
         })),
         needs: needs.map((n) => ({ ...n, on_hand: Number(n.on_hand) })),
@@ -793,6 +795,27 @@ const WEEKDAYS = [
     "Sunday",
 ];
 
+/** Booking counts by status, most first, in lower-case words. */
+export function statusCountsOf(
+    rows: readonly { status: string; _count: { _all: number } }[],
+): { key: string; count: number }[] {
+    return rows
+        .map((g) => ({
+            key: g.status.toLowerCase().replaceAll("_", " "),
+            count: g._count._all,
+        }))
+        .filter((r) => r.count > 0)
+        .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key));
+}
+
+/** "14 in all: 11 confirmed, 2 pending, 1 cancelled." */
+export function statusLine(
+    all: number,
+    counts: readonly { key: string; count: number }[],
+): string {
+    return `${all} in all: ${counts.map((r) => `${r.count} ${r.key}`).join(", ")}.`;
+}
+
 async function summariseBookings(ctx: OrganizationContext, s: Span) {
     const org = ctx.organizationId;
     const own = await ownDiaryOf(prisma, ctx);
@@ -802,15 +825,18 @@ async function summariseBookings(ctx: OrganizationContext, s: Span) {
         ...ownBookingsWhere(own),
     });
     const standing = { status: "CONFIRMED" };
-    const [byOutcome, cancelled, before, byService, byStaff, days, first] =
+    const [byOutcome, byStatus, before, byService, byStaff, days, first] =
         await Promise.all([
             prisma.booking.groupBy({
                 by: ["outcome"],
                 where: { ...where(s.from, s.to), ...standing },
                 _count: { _all: true },
             }),
-            prisma.booking.count({
-                where: { ...where(s.from, s.to), status: "CANCELLED" },
+            // Every status, so the counts sum to the dated All bookings list.
+            prisma.booking.groupBy({
+                by: ["status"],
+                where: where(s.from, s.to),
+                _count: { _all: true },
             }),
             prisma.booking.count({
                 where: { ...where(s.before.from, s.before.to), ...standing },
@@ -880,10 +906,16 @@ async function summariseBookings(ctx: OrganizationContext, s: Span) {
             .filter((g) => outcome === undefined || g.outcome === outcome)
             .reduce((t, g) => t + g._count._all, 0);
     const bookings = n();
+    const statusCounts = statusCountsOf(byStatus);
+    const all = statusCounts.reduce((t, r) => t + r.count, 0);
+    const cancelled =
+        statusCounts.find((r) => r.key === "cancelled")?.count ?? 0;
     const came = n("ATTENDED");
     const noShow = n("NO_SHOW");
     const data = {
         span: spanData(s),
+        all,
+        by_status: statusCounts,
         bookings,
         cancelled,
         came,
@@ -929,12 +961,17 @@ async function summariseBookings(ctx: OrganizationContext, s: Span) {
         rows.map((r) => `${JSON.stringify(r.key)} ${r.count}`).join("; ");
     const text = [
         spanLine(s, "Bookings"),
-        bookings === 0 && cancelled === 0
+        all === 0
             ? "No bookings in this period."
-            : `- Bookings: ${bookings} (came ${came}, no-show ${noShow}, not marked yet ${data.not_marked}); ${cancelled} cancelled. Period before (${s.before.firstDay} to ${s.before.lastDay}): ${before} bookings; ${change(bookings, before)}.`,
-        ...(bookings || cancelled
+            : `- ${statusLine(all, statusCounts)}`,
+        ...(all === 0
+            ? []
+            : [
+                  `- Confirmed bookings: ${bookings} (came ${came}, no-show ${noShow}, not marked yet ${data.not_marked}). Period before (${s.before.firstDay} to ${s.before.lastDay}): ${before} confirmed bookings; ${change(bookings, before)}.`,
+              ]),
+        ...(all
             ? [
-                  `Answer with: the bookings (${bookings}), came (${came}), no-shows (${noShow}), not marked yet, cancelled (${cancelled}), and the first and last day as dates.`,
+                  `Answer with: the bookings in all (${all}) and each status as above, so they add up to the Bookings list; came (${came}), no-shows (${noShow}), not marked yet; and the first and last day as dates.`,
               ]
             : []),
         ...(data.by_service.length

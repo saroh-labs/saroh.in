@@ -101,6 +101,21 @@ const toMinute = (clock: string) =>
 type Shelf = Awaited<ReturnType<typeof shelvesOf>>[number];
 
 /**
+ * Units on hand across every store, and every variant when the product
+ * counts them: a per-variant product's own shelf holds nothing (it said
+ * "Stock: 0" above a list of sizes in stock, 14 Nov).
+ */
+export function stockOnHand(
+    shelves: readonly Pick<Shelf, "variant_id" | "on_hand">[],
+    counted: number | null,
+): number | null {
+    if (!shelves.some((r) => r.variant_id)) return counted;
+    return shelves
+        .filter((r) => r.variant_id)
+        .reduce((n, r) => n + r.on_hand, 0);
+}
+
+/**
  * A product's shelves: on hand per store, and per variant when it counts
  * them, with the Stock screen's need (`shelfNeed`). A per-variant product's
  * own shelf sells nothing and is named only when it is short. None when
@@ -228,9 +243,11 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
                     productDetail(ctx, view),
                     shelvesOf(ctx.organizationId, view.id),
                 ]);
+                const stock = stockOnHand(shelves, product.stock);
+                const byVariant = shelves.some((r) => r.variant_id);
                 return {
                     text: [
-                        `${productLine(view)}. Stock: ${product.stock ?? "not counted"}.`,
+                        `${productLine(view)}. Stock: ${stock ?? "not counted"}${byVariant ? " in all, by size or colour below" : ""}.`,
                         ...(shelves.length
                             ? [
                                   `On hand by store${view.variants.length ? " and variant" : ""}:`,
@@ -238,7 +255,7 @@ export function catalogueTools(catalogue: CatalogueV1Controller): McpTool[] {
                               ]
                             : []),
                     ].join("\n"),
-                    data: { product: { ...product, shelves } },
+                    data: { product: { ...product, stock, shelves } },
                 };
             },
         }),

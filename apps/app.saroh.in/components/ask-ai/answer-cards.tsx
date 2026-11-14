@@ -147,31 +147,71 @@ function ProductsCard({ card }: { card: AskAiProductsCard }) {
     );
 }
 
+/**
+ * The table on a phone: it fits 390px, never scrolls sideways. The first
+ * column (the row's link) stays, the second when it is words, and figures
+ * up to three columns in all; the rest fold into one quiet line under the
+ * words column, as the app's phone rows read ("Paid · 12 Oct").
+ */
+export function phoneLayout(columns: readonly string[], numeric: Set<number>) {
+    const all = columns.map((_, i) => i);
+    const shown = [0];
+    if (columns.length > 1 && !numeric.has(1)) shown.push(1);
+    for (const i of all) {
+        if (shown.length >= 3) break;
+        if (numeric.has(i) && !shown.includes(i)) shown.push(i);
+    }
+    const folded = all.filter((i) => !shown.includes(i));
+    const host = shown.includes(1) && !numeric.has(1) ? 1 : 0;
+    const tracks = shown.map((i) =>
+        numeric.has(i)
+            ? "max-content"
+            : i === 0 && host === 1
+              ? "fit-content(40%)"
+              : "minmax(0,1fr)",
+    );
+    return { shown, folded, host, tracks: tracks.join(" ") };
+}
+
 function TableCard({ card }: { card: AskAiTableCard }) {
     const numeric = new Set(card.numeric ?? []);
     const rowHref = (r: number) => appHref(card.hrefs?.[r] ?? undefined);
+    const phone = phoneLayout(card.columns, numeric);
     // One grid for the table, the head and rows on its columns (subgrid),
-    // so every row lines up. The first column takes the room it needs; on a
-    // phone the rest are narrow (cut, the card scrolls sideways), at the
-    // desk they share what's left.
+    // so every row lines up. At the desk the first column takes the room it
+    // needs and the rest share what's left; on a phone `phoneLayout` picks
+    // the columns that fit and folds the rest under the row's words.
     const cols = {
         "--cols": Math.max(1, card.columns.length - 1),
+        "--phone": phone.tracks,
     } as React.CSSProperties;
     const onColumns = "col-span-full grid grid-cols-subgrid";
-    const cell = (i: number, last: boolean) =>
+    const cell = (i: number) =>
         cn(
-            "px-2 first:pl-3 last:pr-3 sm:px-2.5",
+            "min-w-0 px-2 first:pl-3 last:pr-3 sm:px-2.5",
             numeric.has(i) && listTable.numeric,
-            !numeric.has(i) && i > 0 && !last && "truncate",
+            // A folded column is drawn only at the desk.
+            phone.folded.includes(i) && "max-sm:hidden",
         );
+    const foldedLine = (row: readonly string[]) =>
+        phone.folded
+            .map((i) =>
+                !row[i]
+                    ? ""
+                    : numeric.has(i)
+                      ? `${card.columns[i]} ${row[i]}`
+                      : row[i],
+            )
+            .filter(Boolean)
+            .join(" · ");
     return (
         <section className="flex flex-col gap-2">
-            <ListTable scroll className="overflow-x-auto">
+            <ListTable>
                 <div
                     role="table"
                     aria-label={card.title}
                     style={cols}
-                    className="grid min-w-max grid-cols-[max-content_repeat(var(--cols),minmax(56px,112px))] text-[13px] sm:min-w-0 sm:grid-cols-[minmax(max-content,1.3fr)_repeat(var(--cols),minmax(0,1fr))]"
+                    className="grid grid-cols-[var(--phone)] text-[13px] sm:grid-cols-[minmax(max-content,1.3fr)_repeat(var(--cols),minmax(0,1fr))]"
                 >
                     <ListTableHead
                         role="row"
@@ -181,53 +221,59 @@ function TableCard({ card }: { card: AskAiTableCard }) {
                             <span
                                 key={c}
                                 role="columnheader"
-                                className={cell(
-                                    i,
-                                    i === card.columns.length - 1,
-                                )}
+                                className={cn(cell(i), "truncate")}
                             >
                                 {c}
                             </span>
                         ))}
                     </ListTableHead>
                     <div role="rowgroup" className="contents">
-                        {card.rows.map((row, r) => (
-                            <div
-                                key={r}
-                                role="row"
-                                className={cn(
-                                    listTable.row,
-                                    onColumns,
-                                    "items-center px-0 py-2",
-                                )}
-                            >
-                                {row.map((value, i) => (
-                                    <span
-                                        key={i}
-                                        role="cell"
-                                        title={value}
-                                        className={cn(
-                                            // One line a row: a long name is cut, never wrapped to three.
-                                            "whitespace-nowrap",
-                                            cell(i, i === row.length - 1),
-                                            i === 0 && "font-medium",
-                                        )}
-                                    >
-                                        {/* The first cell carries the row's link, as DataView's rows. */}
-                                        {i === 0 && rowHref(r) ? (
-                                            <Link
-                                                href={rowHref(r) ?? ""}
-                                                className="block rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
-                                            >
-                                                {value}
-                                            </Link>
-                                        ) : (
-                                            value
-                                        )}
-                                    </span>
-                                ))}
-                            </div>
-                        ))}
+                        {card.rows.map((row, r) => {
+                            const folded = foldedLine(row);
+                            return (
+                                <div
+                                    key={r}
+                                    role="row"
+                                    className={cn(
+                                        listTable.row,
+                                        onColumns,
+                                        "items-center px-0 py-2",
+                                    )}
+                                >
+                                    {row.map((value, i) => (
+                                        <span
+                                            key={i}
+                                            role="cell"
+                                            title={value}
+                                            className={cn(
+                                                cell(i),
+                                                i === 0 && "font-medium",
+                                            )}
+                                        >
+                                            {/* One line a value: a long name is cut, never wrapped to three. */}
+                                            {/* The first cell carries the row's link, as DataView's rows. */}
+                                            {i === 0 && rowHref(r) ? (
+                                                <Link
+                                                    href={rowHref(r) ?? ""}
+                                                    className="block truncate rounded-sm underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                                                >
+                                                    {value}
+                                                </Link>
+                                            ) : (
+                                                <span className="block truncate">
+                                                    {value}
+                                                </span>
+                                            )}
+                                            {i === phone.host && folded ? (
+                                                <span className="block truncate text-[12px] font-normal text-muted-foreground sm:hidden">
+                                                    {folded}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    ))}
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </ListTable>

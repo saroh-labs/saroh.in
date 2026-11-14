@@ -25,9 +25,12 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import type { OrgAction } from "../../organizations/organization-policy";
 import type { McpCall, McpTool } from "../tool-registry";
 import {
+    amountsOf,
     foldBuckets,
     periodSummaryTools,
     standingWhere,
+    statusCountsOf,
+    statusLine,
 } from "./period-summary.tools";
 
 const tools: McpTool[] = periodSummaryTools();
@@ -418,5 +421,35 @@ describe("foldBuckets", () => {
             count: 3,
             amount: null,
         });
+    });
+});
+
+describe("bookings by status", () => {
+    it("gives every status, so the counts add up to the dated list", () => {
+        const counts = statusCountsOf([
+            { status: "CONFIRMED", _count: { _all: 11 } },
+            { status: "CANCELLED", _count: { _all: 1 } },
+            { status: "PENDING", _count: { _all: 2 } },
+            { status: "NO_SHOW", _count: { _all: 0 } },
+        ]);
+        expect(counts).toEqual([
+            { key: "confirmed", count: 11 },
+            { key: "pending", count: 2 },
+            { key: "cancelled", count: 1 },
+        ]);
+        expect(statusLine(14, counts)).toBe(
+            "14 in all: 11 confirmed, 2 pending, 1 cancelled.",
+        );
+    });
+});
+
+describe("totals in tool text", () => {
+    it("are whole rupees with Indian grouping: a model copies them as said", () => {
+        expect(
+            amountsOf([
+                { currency: "INR", amount: "3686000.18" },
+                { currency: "INR", amount: "245.50" },
+            ]),
+        ).toEqual(["₹36,86,246"]);
     });
 });

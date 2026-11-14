@@ -29,7 +29,7 @@ const actions = vi.hoisted(() => ({
     redraftDraft: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
-const router = vi.hoisted(() => ({ push: vi.fn() }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({
     default: ({
@@ -529,6 +529,43 @@ describe("the full page, /ask (board AI 9)", () => {
             "Add a keratin service",
         );
         expect(window.location.search).toBe("?c=c1");
+        // The new address is read again, so Back to it isn't a stale copy.
+        expect(router.refresh).toHaveBeenCalled();
+    });
+
+    it("reads the page again once a turn ends, so Back shows its card", async () => {
+        window.history.replaceState(null, "", "/ask?c=c1");
+        act(() =>
+            root.render(
+                <AskAiPanel
+                    layout="page"
+                    state={STATE}
+                    businessName="Kesar Salon"
+                    zone="Asia/Kolkata"
+                    phone={false}
+                    conversation={{
+                        id: "c1",
+                        agent: "ask-ai",
+                        title: "x",
+                        lastMessageAt: "",
+                        createdAt: "",
+                        messages: [],
+                    }}
+                    conversations={[]}
+                />,
+            ),
+        );
+        expect(router.refresh).not.toHaveBeenCalled();
+        const stream = feed();
+        answerWith(stream.body);
+        await ask("orders last month");
+        await stream.send({ type: "turn", turnId: "t1", conversationId: "c1" });
+        await stream.send({ type: "text-delta", text: "Here." });
+        expect(router.refresh).not.toHaveBeenCalled();
+        await stream.send({ type: "done", outcome: "ANSWERED" });
+        await stream.end();
+        await settle();
+        expect(router.refresh).toHaveBeenCalledTimes(1);
     });
 
     it("Free sees the same lock on the page, no list and no box", () => {
