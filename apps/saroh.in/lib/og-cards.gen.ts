@@ -15,9 +15,29 @@ export const HELP_CARDS: Record<
         area: "Billing",
         title: "Add your GSTIN",
     },
+    "api-keys-and-webhooks": {
+        area: "AI apps and API",
+        title: "API keys and webhooks",
+    },
+    "ask-ai": {
+        area: "AI apps and API",
+        title: "Ask AI about your business",
+    },
     "connect-cashfree": {
         area: "Payments",
         title: "Connect Cashfree",
+    },
+    "connect-chatgpt": {
+        area: "AI apps and API",
+        title: "Connect ChatGPT",
+    },
+    "connect-claude": {
+        area: "AI apps and API",
+        title: "Connect Claude",
+    },
+    "connect-other-ai-apps": {
+        area: "AI apps and API",
+        title: "Connect other AI apps",
     },
     "connect-razorpay": {
         area: "Payments",
@@ -46,6 +66,10 @@ export const HELP_CARDS: Record<
     "set-your-teams-hours": {
         area: "Bookings",
         title: "Set your team's hours",
+    },
+    "share-a-post": {
+        area: "Share and posts",
+        title: "Share a post",
     },
     "take-a-deposit-when-they-book": {
         area: "Bookings",

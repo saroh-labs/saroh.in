@@ -51,10 +51,19 @@ export const FEATURE_HELP: Readonly<
             label: "How to make your link look right when shared",
         },
     ],
-    // Their articles come with U9 (plan 2026-11-13-002), behind the switches.
-    "ai-apps": [],
-    "ask-ai": [],
-    social: [],
+    // Each waits on its feature's switch, as the page does (plan
+    // 2026-11-13-002, U9). API keys and webhooks belongs to /developers,
+    // which isn't a feature page.
+    "ai-apps": [
+        { slug: "connect-claude", label: "How to connect Claude" },
+        { slug: "connect-chatgpt", label: "How to connect ChatGPT" },
+        {
+            slug: "connect-other-ai-apps",
+            label: "How to connect other AI apps",
+        },
+    ],
+    "ask-ai": [{ slug: "ask-ai", label: "How to ask AI about your business" }],
+    social: [{ slug: "share-a-post", label: "How to share a post" }],
 };
 
 export interface FeatureHelpLink {

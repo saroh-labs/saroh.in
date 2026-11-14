@@ -60,9 +60,13 @@ describe("FEATURE_HELP", () => {
                 "make-your-link-look-right-when-shared",
             ],
             insights: [],
-            "ai-apps": [],
-            "ask-ai": [],
-            social: [],
+            "ai-apps": [
+                "connect-claude",
+                "connect-chatgpt",
+                "connect-other-ai-apps",
+            ],
+            "ask-ai": ["ask-ai"],
+            social: ["share-a-post"],
         });
     });
 });
@@ -122,5 +126,18 @@ describe("featureHelpLinks", () => {
                 at(AFTER),
             ),
         ).toEqual([]);
+    });
+
+    it("leaves out an article while its feature's switch is off", () => {
+        expect(
+            featureHelpLinks(
+                "social",
+                articles,
+                at(AFTER, { off: ["social"] }),
+            ),
+        ).toEqual([]);
+        expect(featureHelpLinks("social", articles, at(AFTER))).toEqual([
+            { href: "/help/share-a-post", label: "How to share a post" },
+        ]);
     });
 });

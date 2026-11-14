@@ -1,0 +1,94 @@
+---
+# The words are board VHClaude's (release visibility, approved 13 Nov 2026),
+# each Saroh label checked against the code. Sources, from the repo root:
+#   AI      apps/app.saroh.in/components/settings/developers/ai-apps.tsx
+#           ("Connect in Claude", "Using another AI app? Paste this address
+#           into it", Copy, "Connected to …", "Disconnect from this business")
+#   TABS    apps/app.saroh.in/lib/settings/developers.ts (Settings › API and
+#           AI apps, AI assistants first)
+#   ADDRESS apps/app.saroh.in/lib/ai-connections/mcp-address.ts
+#           (production's mcp.saroh.in/mcp; CONNECT_IN.claude)
+#   PICK    apps/accounts.saroh.in/lib/oauth-sign-in.ts ("Which businesses
+#           should … work with?", "All my businesses", Continue, Allow)
+#   PUBLISH apps/api.saroh.in/src/modules/mcp/publish-requests.ts (DEC-215)
+#   SWEEP   apps/api.saroh.in/src/modules/mcp/ai-connections-sweep.job.ts
+# Claude's own menus aren't confirmed until the dev sign-in walk (plan
+# 2026-11-13-002), so its steps name none, as content/integrations/claude.mdx
+# doesn't; its form and chat are drawn panels, captioned as drawings. The
+# Saroh shots are captured on Gulmohar Salon & Bridal before the switch opens.
+title: Connect Claude
+slug: connect-claude
+area: AI apps and API
+group: Use AI apps and the API
+order: 10
+feature: ai-apps
+intro: "Connect Claude to your business and ask it to do your Saroh work in your own words: add a product, change your hours, see who's booked on Saturday. You add Saroh in Claude, sign in, and pick the businesses it may use. It takes about a minute."
+description: "Connect Claude to your business on Saroh: add Saroh as a connector, sign in, pick your businesses and allow it. Then ask in your own words."
+readMinutes: 3
+updated: "2026-11-14"
+steps:
+    # AI, TABS, ADDRESS.
+    - title: Open Settings › API and AI apps
+      body: "In Saroh, open Settings › API and AI apps. AI assistants is the first tab. Press Connect in Claude: Claude's connector settings open in a new tab."
+      shot: help-connect-claude-1
+      caption: "AI assistants at Gulmohar Salon & Bridal (a demo salon), nothing connected yet, with Connect in Claude."
+      marker: Connect in Claude
+    # ADDRESS. Claude's form: drawn, its labels unconfirmed.
+    - title: Add Saroh as a connector in Claude
+      body: "In Claude, open your connectors and add a custom connector. Name it Saroh, paste this address as its URL, and add it: https://mcp.saroh.in/mcp. Then connect it."
+      panel:
+          kind: form
+          app: Claude
+          address: claude.ai
+          title: Add a custom connector
+          fields:
+              - { label: Name, value: Saroh }
+              - { label: Server URL, value: "https://mcp.saroh.in/mcp", mono: true }
+          button: Add
+      caption: "A drawing of Claude's connector form, not a screenshot: Claude's own labels may differ."
+      tip: "The same address is on the AI assistants tab, under Using another AI app? Paste this address into it, with a Copy button. On a Claude plan your company manages, an admin may need to add the connector first."
+    # PICK.
+    - title: Sign in and pick your businesses
+      body: "Claude opens a Saroh window. Sign in if it asks. Under Which businesses should Claude work with? tick one, several, or All my businesses, then press Continue. In each one it can only do what you can do there."
+      shot: help-connect-claude-3
+      caption: "Picking businesses for Claude, signed in as the owner of Gulmohar Salon & Bridal (a demo salon)."
+      tip: "Only your own businesses on this Saroh are listed, never a demo. A business you add later isn't included: connect again to add it."
+      marker: Continue
+    # PICK.
+    - title: Read what it may do, and allow it
+      body: "Saroh shows what Claude will be able to do, that it never gets more than you can do yourself, and that what it reads goes to Anthropic, the company behind Claude, under their terms. Press Allow. You're taken back to Claude."
+      shot: help-connect-claude-4
+      caption: "The last step before Claude works with Gulmohar Salon & Bridal (a demo salon)."
+      marker: Allow
+    # PUBLISH. Claude's chat: drawn.
+    - title: Ask Claude something
+      body: "In a new chat, check Saroh is turned on in Claude, then ask in your own words, like “Who's booked on Saturday?”. When you ask it to change your website, it makes a draft and shows a preview link. To publish, it gives you a link into Saroh, where you choose Publish or Don't publish."
+      panel:
+          kind: chat
+          app: Claude
+          address: claude.ai
+          ask: "Who's booked on Saturday?"
+          rows:
+              - { label: "10:00", value: "Meera Joshi · Haircut" }
+              - { label: "10:30", value: "Sana Qureshi · Manicure" }
+              - { label: "11:30", value: "Ritika Bansal · Threading" }
+          reply: "Here are the first three of Saturday's bookings at Gulmohar Salon & Bridal."
+      caption: "A drawing of a chat in Claude, not a screenshot, answering from a demo salon's bookings."
+    # AI.
+    - title: See it in Saroh
+      body: "Back in Settings › API and AI apps, Claude is listed under Connected to your business, with who connected it and when it was last used. Open it to see each change it made, roll back its site draft, or disconnect it. Every change it makes is also in Settings › Activity."
+      shot: help-connect-claude-6
+      caption: "Claude connected to Gulmohar Salon & Bridal (a demo salon)."
+troubles:
+    - title: Claude says it couldn't connect.
+      body: "Check the address is exactly https://mcp.saroh.in/mcp, with /mcp at the end and no space. Then connect again."
+    - title: Your business isn't in the list.
+      body: "Only businesses you belong to on this Saroh are listed. If it's someone else's, ask its owner to add you to the team first."
+    - title: Claude says it isn't allowed to do something.
+      body: "It can do only what your role allows, and never cancels, refunds or changes billing. Ask an owner if your role should do more."
+    - title: It stopped working.
+      body: "A connection ends after 90 days without use, when you leave the business, or when someone disconnects it. Connect again from step 2."
+next: [connect-chatgpt, connect-other-ai-apps, ask-ai]
+---
+
+Claude acts as you, so it can only do what you can do in Saroh, and it can't cancel, refund or touch your payment settings. Website changes stay a draft until you publish them yourself. More in [how AI apps work with Saroh](/features/ai-apps).

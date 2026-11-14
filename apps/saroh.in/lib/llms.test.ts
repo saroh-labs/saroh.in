@@ -84,11 +84,13 @@ describe("llmsText", () => {
     it("lists no AI app's page while its switch is off, and no card that links into Help", () => {
         const text = llmsText(BASE, at(AFTER, { off: ["ai-apps"] }), articles);
         expect(text).not.toMatch(/Claude|ChatGPT/);
-        const on = linked(llmsText(BASE, at(AFTER), articles));
-        expect(on).toContain("/integrations/claude");
+        const onText = llmsText(BASE, at(AFTER), articles);
+        expect(linked(onText)).toContain("/integrations/claude");
+        // The article is listed once, as itself; no card links to its anchors.
+        expect(onText).not.toContain("connect-other-ai-apps#");
         expect(
-            on.some((p) => p.startsWith("/help/connect-other-ai-apps")),
-        ).toBe(false);
+            linked(onText).filter((p) => p === "/help/connect-other-ai-apps"),
+        ).toHaveLength(1);
     });
 
     it("from midnight in India on 17 Oct, adds Help, every article and the launch entry", () => {

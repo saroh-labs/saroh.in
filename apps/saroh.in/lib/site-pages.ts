@@ -280,7 +280,14 @@ export function lastModified(
                   isPublished(e.publishOn, now),
               ).map((e) => e.publishOn)
             : path === HELP_PATH
-              ? helpArticles().map((a) => a.updated)
+              ? helpArticles()
+                    // An article waiting on a switch that is off isn't there.
+                    .filter(
+                        (a) =>
+                            !a.feature ||
+                            !resourcesContext(now).off?.includes(a.feature),
+                    )
+                    .map((a) => a.updated)
               : [];
     return dayInIndia([day, ...under].sort().at(-1) ?? day);
 }
