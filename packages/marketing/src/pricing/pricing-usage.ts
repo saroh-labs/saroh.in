@@ -42,10 +42,11 @@ const NOUN: Record<LimitKind, [string, string]> = {
  * switch that hides the row until the feature ships. Ask AI shows no price
  * for more ("Request more" only); the API shows its allowance only.
  */
-const PERIOD_ROWS: Record<string, { label: string; switch: string }> = {
-    "ask-ai-questions": { label: "Ask AI questions", switch: "ask-ai" },
-    "api-requests": { label: "API requests", switch: "developers" },
-};
+const PERIOD_ROWS: Partial<Record<string, { label: string; switch: string }>> =
+    {
+        "ask-ai-questions": { label: "Ask AI questions", switch: "ask-ai" },
+        "api-requests": { label: "API requests", switch: "developers" },
+    };
 
 /** One plan's cell for a billing-period row: the allowance, nothing to buy. */
 export function periodCell(

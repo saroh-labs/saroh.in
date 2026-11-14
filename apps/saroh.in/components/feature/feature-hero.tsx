@@ -1,5 +1,3 @@
-import { ChatExchange } from "@saroh/marketing/chat-exchange";
-import { Container } from "@saroh/marketing/container";
 import { ProductHero } from "@saroh/marketing/product-hero";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { cellOf, offeredPlans } from "@saroh/pricing-catalog";
@@ -53,28 +51,17 @@ export function FeatureHero({
     /** The published catalogue, or null before launch or without one. */
     catalog: Catalog | null;
 }) {
-    const chat = feature.heroChat;
     return (
-        <>
-            <ProductHero
-                section={{ name: "Features", href: "/#features" }}
-                name={feature.name}
-                headline={feature.headline}
-                sub={feature.sub}
-                narrow
-                actions={<HeroActions src={`feature-${feature.slug}`} />}
-                freeLine={heroPlanLine(feature, catalog)}
-                shot={
-                    chat
-                        ? undefined
-                        : shotView(feature.hero.shot, feature.hero.alt)
-                }
-            />
-            {chat ? (
-                <Container width="article" className="pt-14">
-                    <ChatExchange words={chat} variant="hero" />
-                </Container>
-            ) : null}
-        </>
+        <ProductHero
+            section={{ name: "Features", href: "/#features" }}
+            name={feature.name}
+            headline={feature.headline}
+            sub={feature.sub}
+            narrow
+            actions={<HeroActions src={`feature-${feature.slug}`} />}
+            freeLine={heroPlanLine(feature, catalog)}
+            shot={shotView(feature.hero.shot, feature.hero.alt)}
+            chat={feature.heroChat}
+        />
     );
 }

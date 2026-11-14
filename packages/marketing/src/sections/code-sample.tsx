@@ -1,13 +1,10 @@
 "use client";
 
-import { copyText } from "@saroh/ui/copy-button";
-import { useEffect, useRef, useState } from "react";
+import { selectContents, useCopy } from "@saroh/ui/copy-button";
+import { useRef } from "react";
 
 import { cn } from "../cn";
 import { ring } from "../ring";
-
-/** How long "Copied" stays before the button reads "Copy" again. */
-const COPIED_MS = 2000;
 
 /**
  * A code sample on Ink (board VFDevelopers): a request, its answer or a
@@ -29,30 +26,13 @@ export function CodeSample({
     title: string;
     className?: string;
 }) {
-    const [copied, setCopied] = useState(false);
-    const [failed, setFailed] = useState(false);
+    const { state, copy } = useCopy();
+    const copied = state === "copied";
+    const failed = state === "failed";
     const block = useRef<HTMLElement>(null);
-    const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-    useEffect(() => () => clearTimeout(timer.current), []);
-
-    async function copy() {
-        if (await copyText(code)) {
-            setFailed(false);
-            setCopied(true);
-            clearTimeout(timer.current);
-            timer.current = setTimeout(() => setCopied(false), COPIED_MS);
-            return;
-        }
-        setFailed(true);
-        const node = block.current;
-        const selection = window.getSelection();
-        if (node && selection) {
-            const range = document.createRange();
-            range.selectNodeContents(node);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
+    async function onCopy() {
+        if (!(await copy(code))) selectContents(block.current);
     }
 
     return (
@@ -68,7 +48,7 @@ export function CodeSample({
                 </span>
                 <button
                     type="button"
-                    onClick={copy}
+                    onClick={onCopy}
                     aria-label={`Copy ${title.toLowerCase()} code`}
                     className={`ml-auto inline-flex h-8 cursor-pointer items-center rounded-md px-2.5 text-[12.5px] font-semibold text-background transition-colors duration-fast ease-out hover:bg-mk-on-ink-hover ${ring({ color: "paper" })}`}
                 >

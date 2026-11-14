@@ -35,6 +35,16 @@ export async function copyText(value: string): Promise<boolean> {
     }
 }
 
+/** Selects a node's text, so a value the clipboard refused can be copied by hand. */
+export function selectContents(node: Node | null) {
+    const selection = window.getSelection();
+    if (!node || !selection) return;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    selection.removeAllRanges();
+    selection.addRange(range);
+}
+
 type CopyState = "idle" | "copied" | "failed";
 
 /**

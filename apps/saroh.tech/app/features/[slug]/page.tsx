@@ -1,8 +1,10 @@
 import { AppList } from "@saroh/marketing/app-list";
 import { ChatExchange } from "@saroh/marketing/chat-exchange";
 import { ComingList } from "@saroh/marketing/coming-list";
-import { Container } from "@saroh/marketing/container";
-import type { FeatureSlug } from "@saroh/marketing/content-types";
+import type {
+    FeatureSlug,
+    SlugPageProps as Props,
+} from "@saroh/marketing/content-types";
 import { CtaBand } from "@saroh/marketing/cta-band";
 import { FeaturePoints } from "@saroh/marketing/feature-points";
 import { FeatureSteps } from "@saroh/marketing/feature-steps";
@@ -37,10 +39,6 @@ export const dynamicParams = false;
 export function generateStaticParams() {
     // Only the shown features: a switched-off one is never built (404).
     return featureList.map((f) => ({ slug: f.slug }));
-}
-
-interface Props {
-    params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -82,7 +80,6 @@ export default async function FeaturePage({ params }: Props) {
     const coming = feature.state === "coming-soon";
     const limited = feature.state === "limited";
     const catalog = limited ? null : await readCatalog();
-    const chat = feature.heroChat;
 
     return (
         <div data-page-type={page.type}>
@@ -96,17 +93,9 @@ export default async function FeaturePage({ params }: Props) {
                 actions={<HeroActions src={`feature-${slug}`} />}
                 today={limited ? feature.worksToday : undefined}
                 freeLine={limited ? undefined : freePlanLine(catalog)}
-                shot={
-                    chat
-                        ? undefined
-                        : shotView(feature.hero.shot, feature.hero.alt)
-                }
+                shot={shotView(feature.hero.shot, feature.hero.alt)}
+                chat={feature.heroChat}
             />
-            {chat ? (
-                <Container width="article" className="pt-14">
-                    <ChatExchange words={chat} variant="hero" />
-                </Container>
-            ) : null}
             {coming ? (
                 <>
                     <Section

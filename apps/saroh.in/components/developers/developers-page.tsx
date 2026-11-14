@@ -10,6 +10,7 @@ import { CodeSample } from "@saroh/marketing/code-sample";
 import { Container } from "@saroh/marketing/container";
 import { CtaBand } from "@saroh/marketing/cta-band";
 import { FeaturePoints } from "@saroh/marketing/feature-points";
+import { FeatureSteps } from "@saroh/marketing/feature-steps";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
@@ -80,57 +81,26 @@ export function DevelopersPage({
                 </figure>
             </Container>
 
-            <section aria-labelledby="how-it-works">
-                <Container className="pt-[120px]">
-                    <SectionHeading
-                        id="how-it-works"
-                        eyebrow="How it works"
-                        title={page.howTitle}
-                    />
-                </Container>
-                <Container as="ol" className="grid list-none gap-[88px] pt-14">
-                    {page.steps.map((step, i) => (
-                        <li
-                            key={step.title}
-                            className={cn(
-                                "flex flex-wrap items-center gap-12",
-                                i % 2 === 1 && "flex-row-reverse",
+            <FeatureSteps
+                title={page.howTitle}
+                steps={page.steps.map((step) => ({
+                    title: step.title,
+                    body: step.body,
+                    who: step.who,
+                    drawn: (
+                        <div className="rounded-mk-band border border-border bg-muted p-3.5 sm:p-[22px]">
+                            {"code" in step ? (
+                                <CodeSample
+                                    title={step.code.title}
+                                    code={step.code.code}
+                                />
+                            ) : (
+                                <KeysPanel />
                             )}
-                        >
-                            <div className="grid flex-[1_1_320px] content-center gap-3">
-                                <span
-                                    aria-hidden
-                                    className="grid size-11 place-items-center rounded-full border-2 border-brand-500 font-display text-[17px] font-bold text-brand-700"
-                                >
-                                    {i + 1}
-                                </span>
-                                <h3 className="m-0 font-display text-mk-h3 font-bold [text-wrap:balance]">
-                                    <span className="sr-only">
-                                        Step {i + 1}:{" "}
-                                    </span>
-                                    {step.title}
-                                </h3>
-                                <p className="m-0 text-mk-body text-mk-copy [text-wrap:pretty]">
-                                    {step.body}
-                                </p>
-                                <span className="text-mk-note text-muted-foreground">
-                                    {step.who}
-                                </span>
-                            </div>
-                            <div className="min-w-0 flex-[1.4_1_420px] rounded-mk-band border border-border bg-muted p-3.5 sm:p-[22px]">
-                                {"code" in step ? (
-                                    <CodeSample
-                                        title={step.code.title}
-                                        code={step.code.code}
-                                    />
-                                ) : (
-                                    <KeysPanel />
-                                )}
-                            </div>
-                        </li>
-                    ))}
-                </Container>
-            </section>
+                        </div>
+                    ),
+                }))}
+            />
 
             <FeaturePoints points={page.points} />
 

@@ -26,6 +26,11 @@ export const FEATURE_SLUGS = [
 ] as const;
 export type FeatureSlug = (typeof FEATURE_SLUGS)[number];
 
+/** A `[slug]` route's props: both sites' feature pages take the same. */
+export interface SlugPageProps {
+    params: Promise<{ slug: string }>;
+}
+
 /** The four solution pages, in the menu's order. */
 export const SOLUTION_SLUGS = ["shops", "salons", "gyms", "clinics"] as const;
 export type SolutionSlug = (typeof SOLUTION_SLUGS)[number];

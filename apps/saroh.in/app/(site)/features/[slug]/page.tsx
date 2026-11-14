@@ -1,4 +1,5 @@
 import { AppList } from "@saroh/marketing/app-list";
+import type { SlugPageProps as Props } from "@saroh/marketing/content-types";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -45,10 +46,6 @@ export const dynamicParams = false;
 export function generateStaticParams() {
     // Only the shown features: a switched-off one is never built (404).
     return featureList.map((f) => ({ slug: f.slug }));
-}
-
-interface Props {
-    params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

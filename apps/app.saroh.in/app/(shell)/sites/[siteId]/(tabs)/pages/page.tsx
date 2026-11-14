@@ -176,7 +176,11 @@ export default async function SitePagesPage({
                 })}
             </ListCard>
             {wayIn ? (
-                <p className="-mt-1.5 flex items-start gap-2 text-[13px] leading-normal text-foreground/80">
+                // Saroh's own words and its list of AI apps: read in a recording.
+                <p
+                    data-ph-unmask=""
+                    className="-mt-1.5 flex items-start gap-2 text-[13px] leading-normal text-foreground/80"
+                >
                     <Plug
                         aria-hidden
                         className="mt-0.5 size-4 shrink-0 text-muted-foreground"
