@@ -11,7 +11,7 @@ import {
 } from "../../public-api/v1-reads";
 
 /**
- * What Ask AI's drafts know about each of the 11 business write tools
+ * What Ask AI's drafts know about each of the business write tools
  * (plan 2026-11-13-001 U5): the record a tool touches, how it is read as
  * the card shows it, how an edit is undone through the normal tools, and
  * what would make a create a duplicate. Every read is the business's own
@@ -64,6 +64,8 @@ export interface DraftSpec {
     askable?: readonly string[];
     /** Said beside Confirm, and after Undo. */
     note?: string;
+    /** Said after a confirmed create, beside "Added". */
+    addedNote?: string;
     undoNote?: string;
 }
 
@@ -88,6 +90,9 @@ const LABELS: Record<string, string> = {
     last_name: "Last name",
     phone: "Phone",
     company: "Company",
+    title: "Title",
+    body: "Post",
+    site: "Website",
 };
 
 export function labelOf(field: string, currency?: string | null): string {
@@ -276,9 +281,61 @@ async function readCustomer(
     };
 }
 
+/** How much of a blog post's text the card shows. */
+export const POST_PREVIEW = 400;
+
+/** A post's stored HTML as plain words, for the card. */
+export function postPreview(html: string): string {
+    const text = html
+        .replace(/<\/(p|h\d|li|blockquote)>/g, " ")
+        .replace(/<[^>]*>/g, "")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/&amp;/g, "&")
+        .replace(/\s+/g, " ")
+        .trim();
+    return text.length > POST_PREVIEW
+        ? `${text.slice(0, POST_PREVIEW).trimEnd()}…`
+        : text;
+}
+
+/** A blog post's id on a card is `<siteId>:<postId>`: its editor needs both. */
+async function readBlogPost(
+    r: ReadContext,
+    id: string,
+): Promise<TargetState | null> {
+    const [siteId, postId] = id.split(":");
+    if (!siteId || !postId) return null;
+    const post = await prisma.post.findFirst({
+        where: {
+            id: postId,
+            siteId,
+            site: { organizationId: r.ctx.organizationId },
+        },
+        select: {
+            title: true,
+            content: true,
+            updatedAt: true,
+            site: { select: { name: true } },
+        },
+    });
+    if (!post) return null;
+    return {
+        name: post.title,
+        updatedAt: post.updatedAt.toISOString(),
+        fields: {
+            title: post.title,
+            body: postPreview(post.content),
+            site: post.site.name,
+        },
+    };
+}
+
 const TELLS_CUSTOMER = "The customer is told when you confirm.";
 
-/** The 11 business write tools Ask AI drafts (Ask AI's `draftTools`). */
+/** The business write tools Ask AI drafts (Ask AI's `draftTools`). */
 export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
     create_product: {
         kind: "product",
@@ -399,6 +456,17 @@ export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
             tool: "update_customer",
             input: { customer_id: id, ...changed(before, after) },
         }),
+    },
+    // Owner, 14 Nov: a draft post only; publishing stays in the editor.
+    draft_blog_post: {
+        kind: "blog_post",
+        madeOf: (data) =>
+            typeof data.site_id === "string" && typeof data.post_id === "string"
+                ? `${data.site_id}:${data.post_id}`
+                : undefined,
+        read: readBlogPost,
+        note: "It's saved as a draft; nothing is published.",
+        addedNote: "It's saved as a draft; nothing is published.",
     },
 };
 

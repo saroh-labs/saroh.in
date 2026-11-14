@@ -217,7 +217,7 @@ function revisionsIn(target: string | null): [string, string][] {
 }
 
 /** A site id, or the business's only website when none is named. */
-async function siteIdOf(ctx: OrganizationContext, siteId?: string) {
+export async function siteIdOf(ctx: OrganizationContext, siteId?: string) {
     if (siteId) return siteId;
     const sites = await prisma.site.findMany({
         where: { organizationId: ctx.organizationId, deletedAt: null },

@@ -253,6 +253,71 @@ describe("refused by Saroh", () => {
     });
 });
 
+describe("a blog post", () => {
+    const POST: AskAiDraftCard = {
+        ...CREATE,
+        draftId: "d3",
+        tool: "draft_blog_post",
+        kind: "blog_post",
+        targetName: "Our new eco packing range",
+        fields: [
+            {
+                field: "title",
+                label: "Title",
+                old: null,
+                new: "Our new eco packing range",
+            },
+            {
+                field: "body",
+                label: "Post",
+                old: null,
+                new: "We now pack every order in recycled paper…",
+            },
+            { field: "site", label: "Website", old: null, new: "Northwind" },
+        ],
+        missing: [],
+        note: "It's saved as a draft; nothing is published.",
+    };
+
+    it("shows title, preview and website; Save as draft → Added, Open it to the editor, no Undo", async () => {
+        actions.confirmDraft.mockResolvedValue(
+            result(
+                { ...POST, status: "confirmed", targetId: "site_1:post_9" },
+                {
+                    outcome: "added",
+                    canUndo: false,
+                    open: { kind: "blog_post", id: "site_1:post_9" },
+                },
+            ),
+        );
+        render(POST);
+        expect(text()).toContain("Draft blog post");
+        expect(text()).toContain("We now pack every order in recycled paper");
+        expect(text()).toContain("Northwind");
+        expect(text()).toContain("nothing is published");
+
+        act(() => button("Save as draft")?.click());
+        await settle();
+        expect(actions.confirmDraft).toHaveBeenCalledWith("d3", undefined);
+        expect(text()).toContain("Added · Our new eco packing range");
+        expect(text()).toContain(
+            "It's saved as a draft; nothing is published.",
+        );
+        expect(text()).not.toContain("recycled paper");
+        expect(link("Open it")?.getAttribute("href")).toBe(
+            "/sites/site_1/posts/post_9",
+        );
+        expect(button("Undo")).toBeUndefined();
+    });
+
+    it("read back from history, still opens the editor", () => {
+        render({ ...POST, status: "confirmed", targetId: "site_1:post_9" });
+        expect(link("Open it")?.getAttribute("href")).toBe(
+            "/sites/site_1/posts/post_9",
+        );
+    });
+});
+
 it("draws values as text, never markup", () => {
     render({
         ...EDIT,

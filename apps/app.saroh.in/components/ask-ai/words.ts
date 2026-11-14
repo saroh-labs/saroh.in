@@ -73,6 +73,7 @@ const NOUN: Record<AskAiDraftKind, string> = {
     booking: "booking",
     order: "order",
     customer: "customer",
+    blog_post: "blog post",
 };
 
 /** Moving a booking is a move; other edits are changes (boards 5 and 14). */
@@ -84,6 +85,17 @@ function moves(card: AskAiDraftCard): boolean {
 
 export function draftWords(card: AskAiDraftCard) {
     const noun = NOUN[card.kind];
+    // A blog post is only ever saved as a draft (owner, 14 Nov).
+    if (card.kind === "blog_post") {
+        return {
+            noun,
+            tag: "Draft blog post",
+            confirm: "Save as draft",
+            state: card.status === "refused" ? "Not saved" : "Not saved yet",
+            cancelled: "Not saved",
+            open: "Open blog post",
+        };
+    }
     const create = card.action === "create";
     return {
         noun,
@@ -123,6 +135,11 @@ export function recordHref(kind: AskAiDraftKind, id: string): string {
             return `/commerce/orders/${at}`;
         case "customer":
             return `/contacts/${at}`;
+        case "blog_post": {
+            // `<siteId>:<postId>`: the post editor sits under its website.
+            const [site = "", post = ""] = id.split(":");
+            return `/sites/${encodeURIComponent(site)}/posts/${encodeURIComponent(post)}`;
+        }
     }
 }
 

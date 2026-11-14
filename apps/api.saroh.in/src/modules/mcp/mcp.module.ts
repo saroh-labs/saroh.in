@@ -40,6 +40,7 @@ import { BookingsV1Controller } from "../public-api/bookings.v1.controller";
 import { CatalogueV1Controller } from "../public-api/catalogue.v1.controller";
 import { CustomersV1Controller } from "../public-api/customers.v1.controller";
 import { OrdersV1Controller } from "../public-api/orders.v1.controller";
+import { BlogTools } from "./tools/blog.tools";
 import { CatalogueTools } from "./tools/catalogue.tools";
 import { DayTools } from "./tools/day.tools";
 // Ask AI's U4 (plan 2026-11-13-001): the summary tools read Home and Insights.
@@ -100,6 +101,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         DayTools,
         SummaryTools,
         PeriodSummaryTools,
+        // Ask AI's blog post drafts (owner, 14 Nov): saved as a draft post only.
+        BlogTools,
         SellsService,
         // U12: U8's handlers as plain providers (their routes stay in
         // PublicApiModule), and what they need.

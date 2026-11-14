@@ -17,6 +17,7 @@ export const askAiDraftKind = z.enum([
     "booking",
     "order",
     "customer",
+    "blog_post",
 ]);
 export type AskAiDraftKind = z.infer<typeof askAiDraftKind>;
 

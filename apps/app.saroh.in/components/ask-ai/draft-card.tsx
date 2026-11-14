@@ -101,6 +101,8 @@ export function DraftCard({
         (!result && card.status === "confirmed");
     if (confirmed) {
         const create = card.action === "create";
+        // A blog post's preview is long: its card says it is a draft instead.
+        const post = card.kind === "blog_post";
         const canUndo = result
             ? result.canUndo
             : !create && now().getTime() < Date.parse(card.expiresAt);
@@ -116,12 +118,14 @@ export function DraftCard({
                         <b className="block text-sm">
                             {create ? "Added" : "Done"} · {card.targetName}
                         </b>
-                        <span className="mt-px block text-[13px] text-neutral-700 dark:text-foreground">
-                            {card.fields
-                                .map((f) => valueText(f.new))
-                                .filter(Boolean)
-                                .join(" · ")}
-                        </span>
+                        {post ? null : (
+                            <span className="mt-px block text-[13px] text-neutral-700 dark:text-foreground">
+                                {card.fields
+                                    .map((f) => valueText(f.new))
+                                    .filter(Boolean)
+                                    .join(" · ")}
+                            </span>
+                        )}
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -152,7 +156,7 @@ export function DraftCard({
                         </Button>
                     ) : null}
                 </div>
-                {!create && card.note ? (
+                {(!create || post) && card.note ? (
                     <p className="m-0 text-[12.5px] leading-[1.4] text-muted-foreground">
                         {card.note}
                     </p>

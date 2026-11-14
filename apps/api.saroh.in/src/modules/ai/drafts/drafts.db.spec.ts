@@ -32,11 +32,13 @@ import { AuditService } from "../../audit/audit.service";
 import type { CatalogueAccessService } from "../../billing/catalogue-access.service";
 import { BookingsService } from "../../bookings/bookings.service";
 import { ContactsService } from "../../contacts/contacts.service";
+import { PostsService } from "../../content/posts.service";
 import { CustomerAddService } from "../../customer-workspace/customer-add.service";
 import type { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { FlagKey } from "../../feature-flags/flags";
 import { McpActivityService } from "../../mcp/activity.service";
 import { McpToolRegistry } from "../../mcp/tool-registry";
+import { blogTools } from "../../mcp/tools/blog.tools";
 import { catalogueTools } from "../../mcp/tools/catalogue.tools";
 import { dayTools } from "../../mcp/tools/day.tools";
 import { OrderKitchenService } from "../../orders/order-kitchen.service";
@@ -115,6 +117,7 @@ registry.register(
         bookings,
         kitchen,
     }),
+    ...blogTools({ posts: new PostsService(), idempotency }),
 );
 const organizations = new OrganizationContextService();
 const settings = new AiSettingsService();
@@ -495,6 +498,89 @@ describe("Confirm", () => {
                 },
             }),
         ).toBe(1);
+    });
+
+    it("a blog post: drafting saves nothing; Confirm saves exactly one DRAFT post, audited; a second Confirm is refused", async () => {
+        const org = await business();
+        const owner = await asIn(org.id, org.ownerId);
+        const site = await prisma.site.create({
+            data: { organizationId: org.id, name: "Rye", slug: uniq("site") },
+        });
+        const body = `## Paper, not plastic\n\n${"Every order now ships in recycled paper. ".repeat(20)}`;
+        const { card } = await draft(owner, "draft_blog_post", {
+            title: "Our new eco packing range",
+            body,
+        });
+        expect(card).toMatchObject({
+            kind: "blog_post",
+            action: "create",
+            targetName: "Our new eco packing range",
+            note: "It's saved as a draft; nothing is published.",
+        });
+        const preview = card?.fields.find((f) => f.field === "body")?.new;
+        expect(typeof preview).toBe("string");
+        expect(
+            (preview as string).startsWith("Paper, not plastic Every order"),
+        ).toBe(true);
+        expect((preview as string).length).toBeLessThanOrEqual(401);
+        expect(card?.fields.find((f) => f.field === "site")?.new).toBe("Rye");
+        expect(await prisma.post.count({ where: { siteId: site.id } })).toBe(0);
+
+        const id = card?.draftId ?? "";
+        const done = await drafts.confirm(owner, id, {});
+        expect(done).toMatchObject({
+            outcome: "added",
+            canUndo: false,
+            words: "Added Our new eco packing range. It's saved as a draft; nothing is published.",
+        });
+        const posts = await prisma.post.findMany({
+            where: { siteId: site.id },
+        });
+        expect(posts).toHaveLength(1);
+        expect(posts[0]).toMatchObject({
+            status: "DRAFT",
+            publishedAt: null,
+            currentPublicationId: null,
+        });
+        expect(done.open).toEqual({
+            kind: "blog_post",
+            id: `${site.id}:${posts[0].id}`,
+        });
+
+        expect(await drafts.confirm(owner, id, {})).toMatchObject({
+            outcome: "refused",
+            words: "This was already saved.",
+        });
+        expect(await drafts.undo(owner, id)).toMatchObject({
+            outcome: "refused",
+        });
+        expect(await prisma.post.count({ where: { siteId: site.id } })).toBe(1);
+        expect(
+            await prisma.mcpActivity.findMany({
+                where: { organizationId: org.id, tool: "draft_blog_post" },
+                select: { clientName: true },
+            }),
+        ).toEqual([{ clientName: "Ask AI" }]);
+    });
+
+    it("a blog post asked for by a Member is refused for their role, and nothing is drafted", async () => {
+        const org = await business();
+        await prisma.site.create({
+            data: { organizationId: org.id, name: "Rye", slug: uniq("site") },
+        });
+        const member = await asIn(org.id, await person(org.id, "MEMBER"));
+        const { run, card } = await draft(member, "draft_blog_post", {
+            title: "x",
+            body: "y",
+        });
+        expect(card).toBeUndefined();
+        expect(run.isError).toBe(true);
+        expect(run.output).toContain("role doesn't include draft_blog_post");
+        expect(
+            await prisma.askAiDraft.count({
+                where: { organizationId: org.id },
+            }),
+        ).toBe(0);
     });
 
     it("two Confirms at once save exactly once", async () => {

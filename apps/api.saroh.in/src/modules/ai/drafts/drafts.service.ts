@@ -338,7 +338,11 @@ export class DraftsService {
         return {
             outcome: create ? "added" : "done",
             card,
-            words: create ? `Added ${card.targetName}.` : "Done.",
+            words: create
+                ? [`Added ${card.targetName}.`, spec.addedNote]
+                      .filter(Boolean)
+                      .join(" ")
+                : "Done.",
             canUndo: !create && !!spec.undo,
             open: create && madeId ? { kind: spec.kind, id: madeId } : null,
         };

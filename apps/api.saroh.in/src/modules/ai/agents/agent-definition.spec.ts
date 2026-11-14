@@ -111,11 +111,14 @@ describe("what Ask AI is told (eval run 14 Nov)", () => {
             "refunds",
             "cancelling",
             "deleting",
-            "the website",
-            "posts",
+            "website pages and sections",
+            "social posts",
         ]) {
             expect(told).toContain(thing);
         }
+        // Blog posts are drafted (owner, 14 Nov), never published here.
+        expect(told).toContain("call draft_blog_post once");
+        expect(told).toContain("Never publish");
         expect(told).toContain("never draft one with create_product");
         expect(told).toContain("For any of these call no tool");
     });

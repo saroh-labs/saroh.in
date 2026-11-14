@@ -20,7 +20,7 @@ import type { McpTool } from "../../mcp/tool-registry";
 import { ToolError } from "../../mcp/tool-registry";
 import { ASK_AI_DRAFT_TOOLS } from "../agents/ask-ai.agent";
 import type { TargetState } from "./draft-targets";
-import { DRAFT_SPECS } from "./draft-targets";
+import { DRAFT_SPECS, postPreview } from "./draft-targets";
 import {
     changedSince,
     endOfBusinessDay,
@@ -227,11 +227,32 @@ describe("each write tool's draft", () => {
 
     it("creates have no Undo; edits name their record", () => {
         for (const [name, spec] of Object.entries(DRAFT_SPECS)) {
-            const create = name.startsWith("create_");
+            const create =
+                name.startsWith("create_") || name === "draft_blog_post";
             expect(!spec.targetOf).toBe(create);
             expect(!!spec.madeOf).toBe(create);
             if (create) expect(spec.undo).toBeUndefined();
         }
+    });
+
+    it("a blog post shows a plain-text preview, cut at 400 characters", () => {
+        expect(
+            postPreview(
+                "<h2>Eco &amp; kind</h2><p>Paper <strong>tape</strong>.</p>",
+            ),
+        ).toBe("Eco & kind Paper tape.");
+        const long = postPreview(`<p>${"word ".repeat(200)}</p>`);
+        expect(long.length).toBeLessThanOrEqual(401);
+        expect(long.endsWith("…")).toBe(true);
+        expect(
+            DRAFT_SPECS.draft_blog_post.madeOf?.({
+                site_id: "s1",
+                post_id: "p1",
+            }),
+        ).toBe("s1:p1");
+        expect(DRAFT_SPECS.draft_blog_post.addedNote).toBe(
+            "It's saved as a draft; nothing is published.",
+        );
     });
 
     it("a product edit is undone through update_product, with only what changed", () => {
