@@ -335,7 +335,7 @@ describe("Ask AI's tool bridge (U4)", () => {
         });
 
         const byNumber = await ask(ctx, "list_orders", { number: "#ord-014" });
-        expect(byNumber.output).toMatch(/^1 orders\./);
+        expect(byNumber.output).toMatch(/^1 orders in all\./);
         expect(byNumber.output).toContain(`ORD-014 (order_id ${ids[1]})`);
 
         const recent = await ask(ctx, "list_orders", {

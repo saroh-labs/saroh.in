@@ -290,14 +290,16 @@ describe("a question's stream", () => {
         });
         expect(res.writableEnded).toBe(true);
         const frames = res.frames();
+        // The "start" status goes out at once, before the first round.
         expect(frames.map((f) => f.event)).toEqual([
             "turn",
+            "status",
             "text-delta",
             "text-delta",
             "done",
         ]);
         expect(frames[0]?.data.conversationId).toEqual(expect.any(String));
-        expect(frames[3]?.data).toMatchObject({
+        expect(frames[4]?.data).toMatchObject({
             outcome: "ANSWERED",
             counted: true,
             turnId: turnOf(res).turnId,
@@ -366,6 +368,7 @@ describe("a question's stream", () => {
         // Nothing written after the reader left.
         expect(res.frames().map((f) => f.event)).toEqual([
             "turn",
+            "status",
             "text-delta",
         ]);
         const { turnId, conversationId } = turnOf(res);
@@ -418,7 +421,10 @@ describe("a question's stream", () => {
         ]);
         const res = await ask(controller, b.owner, "Kaisa chal raha hai?");
 
-        const status = res.frames().find((f) => f.event === "status");
+        // The first status is the "start" line; the tool's own words follow it.
+        const status = res
+            .frames()
+            .find((f) => f.event === "status" && f.data.tool === TOOL);
         const hindi = statusWordsFor(ASK_AI_AGENT, TOOL, "HINDI");
         expect(hindi).not.toBe(statusWordsFor(ASK_AI_AGENT, TOOL, "ENGLISH"));
         expect(status?.data).toEqual({
@@ -582,7 +588,10 @@ describe("the business's switch", () => {
 
         expect(
             await controller.setSettings(b.owner, undefined, { on: false }),
-        ).toEqual({ on: false });
+        ).toEqual({
+            on: false,
+            usage: { used: 1, limit: null, resetsAt: expect.any(String) },
+        });
         // The total stays with the switch off.
         expect(await controller.settings(b.owner)).toEqual({
             on: false,
