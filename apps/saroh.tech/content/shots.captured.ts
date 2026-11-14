@@ -21,7 +21,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/s-home.webp",
         alt: "Home at Thistlewick Bakery (demo bakery): what needs doing today, most urgent first, beside today's pick-ups",
         width: 2316,
-        height: 1368,
+        height: 1536,
     },
     "s-orders": {
         src: "/shots/v2/s-orders.webp",
@@ -39,7 +39,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/r-invoice.webp",
         alt: "An invoice written by hand at Thistlewick Bakery (demo bakery), in dollars, with a sales tax line and the business's tax number",
         width: 1424,
-        height: 1222,
+        height: 1108,
     },
     "r-customers": {
         src: "/shots/v2/r-customers.webp",
@@ -117,13 +117,13 @@ export const CAPTURED: Record<
         src: "/shots/v2/l-home.webp",
         alt: "Home at Larkspur & Vane (demo salon): today's appointments and overdue invoices, in pounds",
         width: 2316,
-        height: 1068,
+        height: 868,
     },
     "l-book": {
         src: "/shots/v2/l-book.webp",
         alt: "The booking page of Larkspur & Vane (demo salon): services with prices in pounds",
         width: 2184,
-        height: 2572,
+        height: 960,
     },
     "l-team": {
         src: "/shots/v2/l-team.webp",
@@ -153,7 +153,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/l-invoice.webp",
         alt: "An invoice written by hand at Larkspur & Vane (demo salon), in pounds, with a VAT 20% line and the business's tax number",
         width: 1424,
-        height: 1188,
+        height: 1074,
     },
     "l-site": {
         src: "/shots/v2/l-site.webp",
@@ -165,7 +165,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/g-home.webp",
         alt: "Home at Ironvale Fitness (demo gym): today's sessions and overdue invoices",
         width: 2316,
-        height: 470,
+        height: 602,
     },
     "g-bookings": {
         src: "/shots/v2/g-bookings.webp",
@@ -177,7 +177,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/g-book.webp",
         alt: "The booking page of Ironvale Fitness (demo gym), with services, classes and a summary",
         width: 2184,
-        height: 2236,
+        height: 960,
     },
     "g-courses": {
         src: "/shots/v2/g-courses.webp",
@@ -225,7 +225,7 @@ export const CAPTURED: Record<
         src: "/shots/v2/d-book.webp",
         alt: "The booking page of Wrenfield Dental (demo clinic), with check-ups, a root canal over three visits and a video consultation",
         width: 2184,
-        height: 2118,
+        height: 960,
     },
     "d-billing": {
         src: "/shots/v2/d-billing.webp",
