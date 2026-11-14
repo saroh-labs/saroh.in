@@ -442,7 +442,7 @@ type PhotoKey = keyof typeof PHOTOS;
 const WIDTH = 1600;
 
 function photoUrl(key: PhotoKey): string {
-    return `https://images.unsplash.com/${PHOTOS[key][0]}?w=${WIDTH}&q=80&auto=format&fit=crop`;
+    return `https://media.saroh.io/demo/${PHOTOS[key][0]}.jpg`;
 }
 
 function photoHeight(key: PhotoKey): number {

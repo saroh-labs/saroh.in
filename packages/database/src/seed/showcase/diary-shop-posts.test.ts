@@ -45,12 +45,15 @@ describe.each([
             expect(n, `${p.slug}: ${n} words`).toBeGreaterThanOrEqual(lo);
             expect(n, `${p.slug}: ${n} words`).toBeLessThanOrEqual(hi);
             expect(p.body).toMatch(
-                /<figure><img src="https:\/\/images\.unsplash\.com\//,
+                /<figure><img src="https:\/\/media\.saroh\.io\/demo\//,
             );
             expect(p.body).not.toContain(p.image.url);
             expect(p.daysAgo).toBeGreaterThanOrEqual(2);
             expect(p.daysAgo).toBeLessThanOrEqual(185);
-            expect(p.body.toLowerCase()).not.toContain("saroh");
+            // The words a visitor reads, not the address its photo is served
+            // from (media.saroh.io since 15 Nov 2026).
+            const visible = p.body.replace(/<img\b[^>]*>/g, "").toLowerCase();
+            expect(visible).not.toContain("saroh");
         },
     );
 });

@@ -64,7 +64,7 @@ export const photo = (
 ): JournalPhoto => ({ id, alt, creditName, creditUrl });
 
 export const unsplashUrl = (id: string, width = 1600) =>
-    `https://images.unsplash.com/${id}?w=${width}&q=80&auto=format&fit=crop`;
+    `https://media.saroh.io/demo/${id}.jpg`;
 
 const escapeHtml = (s: string) =>
     s

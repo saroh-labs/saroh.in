@@ -37,7 +37,7 @@ const BODHI = { maker: "Bodhi Mats LLP", madeIn: "Bengaluru, Karnataka" };
 /** Every photograph used below, looked at before it was chosen. */
 const P = {
     sleeve: {
-        url: "https://images.unsplash.com/photo-1652354989460-ecccd5644412?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1652354989460-ecccd5644412.jpg",
         alt: "A white knitted compression sleeve on a knee",
         width: 1600,
         height: 1067,
@@ -45,7 +45,7 @@ const P = {
         creditUrl: "https://unsplash.com/@alexeydemidov",
     },
     sleeve2: {
-        url: "https://images.unsplash.com/photo-1628271554223-550dc5f5a1c4?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1628271554223-550dc5f5a1c4.jpg",
         alt: "A pair of legs in white knee sleeves, seen from the side",
         width: 1600,
         height: 2400,
@@ -53,7 +53,7 @@ const P = {
         creditUrl: "https://unsplash.com/@sezha72",
     },
     hinged: {
-        url: "https://images.unsplash.com/photo-1783698155811-e9ed6eb1c96e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1783698155811-e9ed6eb1c96e.jpg",
         alt: "A woman standing on a promenade wearing a black hinged knee brace",
         width: 1600,
         height: 2400,
@@ -61,7 +61,7 @@ const P = {
         creditUrl: "https://unsplash.com/@zulfugarkarimov",
     },
     hinged2: {
-        url: "https://images.unsplash.com/photo-1783698154611-1fdf6b0931be?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1783698154611-1fdf6b0931be.jpg",
         alt: "A woman sitting on the grass with a black hinged brace on one knee",
         width: 1600,
         height: 1067,
@@ -69,7 +69,7 @@ const P = {
         creditUrl: "https://unsplash.com/@zulfugarkarimov",
     },
     ankle: {
-        url: "https://images.unsplash.com/photo-1733744578633-4c087bbde305?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1733744578633-4c087bbde305.jpg",
         alt: "A player on a tennis court wearing teal ankle supports over her socks",
         width: 1600,
         height: 901,
@@ -77,7 +77,7 @@ const P = {
         creditUrl: "https://unsplash.com/@barekind_bamboo_socks",
     },
     wrist: {
-        url: "https://images.unsplash.com/photo-1752858579375-e379d0449d4c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1752858579375-e379d0449d4c.jpg",
         alt: "A wrist and thumb splint with a rigid thumb support, worn on the right hand",
         width: 1600,
         height: 2138,
@@ -85,7 +85,7 @@ const P = {
         creditUrl: "https://unsplash.com/@adevaleev",
     },
     wrist2: {
-        url: "https://images.unsplash.com/photo-1636124883996-fedf726177b9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1636124883996-fedf726177b9.jpg",
         alt: "A hand in a black wrist brace giving a thumbs up",
         width: 1600,
         height: 2400,
@@ -93,7 +93,7 @@ const P = {
         creditUrl: "https://unsplash.com/@marwan15",
     },
     bands: {
-        url: "https://images.unsplash.com/photo-1552226351-1ac7863af926?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1552226351-1ac7863af926.jpg",
         alt: "A pink resistance band loop around a woman's legs, just above the knees",
         width: 1600,
         height: 2776,
@@ -101,7 +101,7 @@ const P = {
         creditUrl: "https://unsplash.com/@gabrielalenius",
     },
     tape: {
-        url: "https://images.unsplash.com/photo-1669125207581-789b24db33b8?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1669125207581-789b24db33b8.jpg",
         alt: "Rolls of kinesiology tape in several colours on a white tray",
         width: 1600,
         height: 2395,
@@ -109,7 +109,7 @@ const P = {
         creditUrl: "https://unsplash.com/@towelstudio",
     },
     tape2: {
-        url: "https://images.unsplash.com/photo-1643400063987-4fcf4ba5bb32?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1643400063987-4fcf4ba5bb32.jpg",
         alt: "Strips of kinesiology tape on a woman's shoulder and upper back",
         width: 1600,
         height: 2133,
@@ -117,7 +117,7 @@ const P = {
         creditUrl: "https://unsplash.com/@travelertraveler_",
     },
     roller: {
-        url: "https://images.unsplash.com/photo-1763004871583-4183d64096b1?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1763004871583-4183d64096b1.jpg",
         alt: "Two foam rollers standing on end against a wall",
         width: 1600,
         height: 2400,
@@ -125,7 +125,7 @@ const P = {
         creditUrl: "https://unsplash.com/@tuaans_",
     },
     roller2: {
-        url: "https://images.unsplash.com/photo-1738524108491-9a0db4067897?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1738524108491-9a0db4067897.jpg",
         alt: "A man lying back over a foam roller on an exercise mat",
         width: 1600,
         height: 1067,
@@ -133,7 +133,7 @@ const P = {
         creditUrl: "https://unsplash.com/@sergiokian",
     },
     ball: {
-        url: "https://images.unsplash.com/photo-1564647324470-a3c6f1a45fb6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1564647324470-a3c6f1a45fb6.jpg",
         alt: "A hand holding a small grey massage ball",
         width: 1600,
         height: 1067,
@@ -141,7 +141,7 @@ const P = {
         creditUrl: "https://unsplash.com/@ziontech",
     },
     ball2: {
-        url: "https://images.unsplash.com/photo-1738496071079-605e5a741807?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1738496071079-605e5a741807.jpg",
         alt: "A bare foot rolling over a small blue massage ball on a wooden floor",
         width: 1600,
         height: 1067,
@@ -149,7 +149,7 @@ const P = {
         creditUrl: "https://unsplash.com/@rad_roller",
     },
     mat: {
-        url: "https://images.unsplash.com/photo-1637157216470-d92cd2edb2e8?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1637157216470-d92cd2edb2e8.jpg",
         alt: "Bare feet on a sage-green exercise mat in sunlight",
         width: 1600,
         height: 1067,
@@ -157,7 +157,7 @@ const P = {
         creditUrl: "https://unsplash.com/@bearsnap",
     },
     mat2: {
-        url: "https://images.unsplash.com/photo-1646239646963-b0b9be56d6b5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1646239646963-b0b9be56d6b5.jpg",
         alt: "Two cork blocks on a green exercise mat",
         width: 1600,
         height: 1066,
@@ -165,7 +165,7 @@ const P = {
         creditUrl: "https://unsplash.com/@samsheppardphoto",
     },
     dumbbell: {
-        url: "https://images.unsplash.com/photo-1586401100295-7a8096fd231a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1586401100295-7a8096fd231a.jpg",
         alt: "A hand holding a pair of small pink vinyl dumbbells",
         width: 1600,
         height: 2400,
@@ -176,7 +176,7 @@ const P = {
 
 export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
     assessment: {
-        url: "https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1649751361457-01d3a696c7e6.jpg",
         alt: "A physiotherapist examining a patient's bent knee on a treatment table",
         width: 1600,
         height: 1067,
@@ -184,7 +184,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@relievemassage",
     },
     followup: {
-        url: "https://images.unsplash.com/photo-1645005513713-9e2b92a687d3?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1645005513713-9e2b92a687d3.jpg",
         alt: "A physio guiding a patient through an arm exercise with light dumbbells",
         width: 1600,
         height: 1067,
@@ -192,7 +192,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     "sports-rehab": {
-        url: "https://images.unsplash.com/photo-1610720991840-457ad2c7a658?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1610720991840-457ad2c7a658.jpg",
         alt: "A woman doing a single-leg exercise with a band around her ankles",
         width: 1600,
         height: 2844,
@@ -200,7 +200,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@gabrielalenius",
     },
     "postop-rehab": {
-        url: "https://images.unsplash.com/photo-1709880754445-8ffbd7e6ab3a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1709880754445-8ffbd7e6ab3a.jpg",
         alt: "A clinician beside a patient at the parallel bars in a rehab room",
         width: 1600,
         height: 1067,
@@ -208,7 +208,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@ortopediatri",
     },
     "home-visit": {
-        url: "https://images.unsplash.com/photo-1635367216109-aa3353c0c22e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1635367216109-aa3353c0c22e.jpg",
         alt: "A woman doing a stretching exercise on a mat in her bedroom",
         width: 1600,
         height: 1067,
@@ -216,7 +216,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@coleito",
     },
     "online-followup": {
-        url: "https://images.unsplash.com/photo-1612832164313-ac0d7e07b5ce?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1612832164313-ac0d7e07b5ce.jpg",
         alt: "A woman on a video call from her sofa at home",
         width: 1600,
         height: 1067,
@@ -224,7 +224,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@surface",
     },
     "dry-needling": {
-        url: "https://images.unsplash.com/photo-1740689580128-9173edce303f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1740689580128-9173edce303f.jpg",
         alt: "Fine needles being placed by a practitioner's hand",
         width: 1600,
         height: 1200,
@@ -232,7 +232,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@galligancm",
     },
     "knee-programme": {
-        url: "https://images.unsplash.com/photo-1645005512942-a17817fb7c11?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1645005512942-a17817fb7c11.jpg",
         alt: "A physio correcting a patient's position during a band exercise",
         width: 1600,
         height: 1067,
@@ -240,7 +240,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     taping: {
-        url: "https://images.unsplash.com/photo-1706795034887-be9a24d1ac19?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1706795034887-be9a24d1ac19.jpg",
         alt: "A therapist smoothing kinesiology tape onto a patient's back",
         width: 1600,
         height: 2400,
@@ -251,7 +251,7 @@ export const MOTION_SERVICE_IMAGES: Record<string, DsImage> = {
 
 export const MOTION_GALLERY: DsImage[] = [
     {
-        url: "https://images.unsplash.com/photo-1706353399656-210cca727a33?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1706353399656-210cca727a33.jpg",
         alt: "A physio stretching a patient's shoulder on a treatment table",
         width: 1600,
         height: 1067,
@@ -259,7 +259,7 @@ export const MOTION_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@der_zeman",
     },
     {
-        url: "https://images.unsplash.com/photo-1645005512914-c053ce912e43?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1645005512914-c053ce912e43.jpg",
         alt: "A physio helping a patient hold an arm exercise with small dumbbells",
         width: 1600,
         height: 1067,
@@ -267,7 +267,7 @@ export const MOTION_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     {
-        url: "https://images.unsplash.com/photo-1643400063987-4fcf4ba5bb32?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1643400063987-4fcf4ba5bb32.jpg",
         alt: "Kinesiology tape on a woman's shoulder and upper back",
         width: 1600,
         height: 2133,
@@ -275,7 +275,7 @@ export const MOTION_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@travelertraveler_",
     },
     {
-        url: "https://images.unsplash.com/photo-1699523229199-fce5aa6b0ec3?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1699523229199-fce5aa6b0ec3.jpg",
         alt: "A physio's hands working on a patient's shoulder",
         width: 1600,
         height: 2397,
@@ -283,7 +283,7 @@ export const MOTION_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@edwardmuntinga",
     },
     {
-        url: "https://images.unsplash.com/photo-1518609571773-39b7d303a87b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1518609571773-39b7d303a87b.jpg",
         alt: "Women doing an overhead exercise with resistance bands",
         width: 1600,
         height: 1067,
@@ -291,7 +291,7 @@ export const MOTION_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@brucemars",
     },
     {
-        url: "https://images.unsplash.com/photo-1590333748338-d629e4564ad9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1590333748338-d629e4564ad9.jpg",
         alt: "Runners' legs and shoes mid-stride on a city road",
         width: 1600,
         height: 978,
@@ -303,7 +303,7 @@ export const MOTION_GALLERY: DsImage[] = [
 /** The "Conditions we treat" page: knee, desk, sport, after surgery. */
 export const MOTION_CONDITIONS_IMAGES = {
     knee: {
-        url: "https://images.unsplash.com/photo-1687013367433-9077a7624830?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1687013367433-9077a7624830.jpg",
         alt: "A woman sitting on a bed holding her knee",
         width: 1600,
         height: 1067,
@@ -311,7 +311,7 @@ export const MOTION_CONDITIONS_IMAGES = {
         creditUrl: "https://unsplash.com/@annaauza",
     },
     desk: {
-        url: "https://images.unsplash.com/photo-1504279664890-136a82299d1b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1504279664890-136a82299d1b.jpg",
         alt: "A woman at a table rubbing her sore neck",
         width: 1600,
         height: 1312,
@@ -319,7 +319,7 @@ export const MOTION_CONDITIONS_IMAGES = {
         creditUrl: "https://unsplash.com/@keenangrams",
     },
     sport: {
-        url: "https://images.unsplash.com/photo-1759674804375-3d0c038a0a6a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1759674804375-3d0c038a0a6a.jpg",
         alt: "Two runners on a road, mid-stride",
         width: 1600,
         height: 2400,
@@ -327,7 +327,7 @@ export const MOTION_CONDITIONS_IMAGES = {
         creditUrl: "https://unsplash.com/@pierreantoinef",
     },
     surgery: {
-        url: "https://images.unsplash.com/photo-1663053822692-f036a147593c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1663053822692-f036a147593c.jpg",
         alt: "A physio helping a man through a strength exercise in a rehab gym",
         width: 1600,
         height: 1069,

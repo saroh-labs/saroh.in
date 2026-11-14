@@ -64,7 +64,7 @@ export async function checkStudio(
         const c = p.category?.slug ?? "none";
         perCategory.set(c, (perCategory.get(c) ?? 0) + 1);
         if (
-            !/<img\s[^>]*src="(https:\/\/images\.unsplash\.com\/|data:image\/)/.test(
+            !/<img\s[^>]*src="(https:\/\/media\.saroh\.io\/demo\/|data:image\/)/.test(
                 p.content,
             )
         ) {

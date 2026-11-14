@@ -17,7 +17,7 @@ const fig = (image: DsImage, caption: string) =>
 /** Every photograph the journal uses. */
 const ph = {
     H1c: {
-        url: "https://images.unsplash.com/photo-1554672408-730436b60dde?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1554672408-730436b60dde.jpg",
         alt: "A hand holding a phone with a booking screen open",
         width: 1600,
         height: 2183,
@@ -25,7 +25,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@charlesdeluvio",
     },
     H1i: {
-        url: "https://images.unsplash.com/photo-1695527081848-1e46c06e6458?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1695527081848-1e46c06e6458.jpg",
         alt: "A stylist working on a client's hair in a bright salon",
         width: 1600,
         height: 2400,
@@ -33,7 +33,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@unsplashbydan",
     },
     H2c: {
-        url: "https://images.unsplash.com/photo-1562217180-021f74991332?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1562217180-021f74991332.jpg",
         alt: "An open planner with a pen and paper clips on a desk",
         width: 1600,
         height: 1068,
@@ -41,7 +41,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@glamorousplanning",
     },
     H2i: {
-        url: "https://images.unsplash.com/photo-1569257437369-90bdc0a45d5f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1569257437369-90bdc0a45d5f.jpg",
         alt: "Hands tapping on a phone's number pad",
         width: 1600,
         height: 1067,
@@ -49,7 +49,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@igorrodrigues",
     },
     H3c: {
-        url: "https://images.unsplash.com/photo-1617391654484-2894196c2cc9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1617391654484-2894196c2cc9.jpg",
         alt: "A colourist in black gloves applying colour to hair",
         width: 1600,
         height: 1067,
@@ -57,7 +57,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@primipil",
     },
     H3i: {
-        url: "https://images.unsplash.com/photo-1715220210514-5b52d4893f65?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1715220210514-5b52d4893f65.jpg",
         alt: "A ring of hair colour swatches from dark brown to blonde",
         width: 1600,
         height: 2400,
@@ -65,7 +65,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@courtsue",
     },
     H4c: {
-        url: "https://images.unsplash.com/photo-1610173826014-d131b02d69ca?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1610173826014-d131b02d69ca.jpg",
         alt: "A bride in pink with a maang tikka and jewellery, getting ready at a mirror",
         width: 1600,
         height: 1067,
@@ -73,7 +73,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@theweddingfocus",
     },
     H4i: {
-        url: "https://images.unsplash.com/photo-1724856605022-106d6dd6e842?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1724856605022-106d6dd6e842.jpg",
         alt: "Close-up of red lehenga embroidery in gold thread",
         width: 1600,
         height: 2400,
@@ -81,7 +81,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@abhishekvats",
     },
     H5c: {
-        url: "https://images.unsplash.com/photo-1614838000027-76439aa4aedc?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1614838000027-76439aa4aedc.jpg",
         alt: "A stylist blow-drying a client's dark hair in a salon",
         width: 1600,
         height: 1067,
@@ -89,7 +89,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@nicolasflor",
     },
     H5i: {
-        url: "https://images.unsplash.com/photo-1552693673-1bf958298935?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1552693673-1bf958298935.jpg",
         alt: "A therapist working on a client's face during a facial",
         width: 1600,
         height: 1064,
@@ -97,7 +97,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@karelysruiz",
     },
     H6c: {
-        url: "https://images.unsplash.com/photo-1599011176306-4a96f1516d4d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1599011176306-4a96f1516d4d.jpg",
         alt: "A barber trimming a bearded client's hair with scissors",
         width: 1600,
         height: 2400,
@@ -105,7 +105,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@mrshave",
     },
     H6i: {
-        url: "https://images.unsplash.com/photo-1560869713-7d0a29430803?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1560869713-7d0a29430803.jpg",
         alt: "A stylist curling a client's long hair into soft waves",
         width: 1600,
         height: 2847,
@@ -113,7 +113,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@bayleejadegramling",
     },
     H7c: {
-        url: "https://images.unsplash.com/photo-1673465766620-1f336d434bff?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1673465766620-1f336d434bff.jpg",
         alt: "A stylist straightening a section of hair with flat irons",
         width: 1600,
         height: 1068,
@@ -121,7 +121,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@awcreativeut",
     },
     H7i: {
-        url: "https://images.unsplash.com/photo-1629397662600-50ad523ef4fb?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1629397662600-50ad523ef4fb.jpg",
         alt: "A stylist working on a client's long hair in the salon",
         width: 1600,
         height: 1067,
@@ -129,7 +129,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@giorgiotrovato",
     },
     H8c: {
-        url: "https://images.unsplash.com/photo-1602339752474-f77aa7bcaecd?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1602339752474-f77aa7bcaecd.jpg",
         alt: "Patrika Gate in Jaipur, painted in pink and red",
         width: 1600,
         height: 1064,
@@ -137,7 +137,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@b_satyam",
     },
     H8i: {
-        url: "https://images.unsplash.com/photo-1477587458883-47145ed94245?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1477587458883-47145ed94245.jpg",
         alt: "Traffic and a decorated horse cart on a Jaipur street by Hawa Mahal",
         width: 1600,
         height: 1067,
@@ -145,7 +145,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@msaditya9",
     },
     H9c: {
-        url: "https://images.unsplash.com/photo-1623217509141-6f735087b50c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1623217509141-6f735087b50c.jpg",
         alt: "A woman holding up her hand to show fresh mehendi",
         width: 1600,
         height: 2397,
@@ -153,7 +153,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@lee_eddy",
     },
     H9i: {
-        url: "https://images.unsplash.com/photo-1771992230380-bc023f41771e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1771992230380-bc023f41771e.jpg",
         alt: "A hand with dark mehendi resting on marigold flowers",
         width: 1600,
         height: 2400,
@@ -161,7 +161,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@rejaul_creativedesign",
     },
     N1c: {
-        url: "https://images.unsplash.com/photo-1771992226177-759e116e72f4?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1771992226177-759e116e72f4.jpg",
         alt: "Hands with mehendi over a yellow outfit and marigold garlands",
         width: 1600,
         height: 2400,
@@ -169,7 +169,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@rejaul_creativedesign",
     },
     N1i: {
-        url: "https://images.unsplash.com/photo-1729587024306-6992a1c1057c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1729587024306-6992a1c1057c.jpg",
         alt: "A woman on a rooftop showing her mehendi-covered palms",
         width: 1600,
         height: 1056,
@@ -177,7 +177,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@tanujsky",
     },
     N2c: {
-        url: "https://images.unsplash.com/photo-1785581778868-79100f7fe56c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1785581778868-79100f7fe56c.jpg",
         alt: "An open jar of cream and a dropper bottle on marble with dried flowers",
         width: 1600,
         height: 1067,
@@ -185,7 +185,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@henrydavisonny",
     },
     N2i: {
-        url: "https://images.unsplash.com/photo-1648313143853-aa913f6ad44a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1648313143853-aa913f6ad44a.jpg",
         alt: "A client relaxing at the basin while her hair is washed",
         width: 1600,
         height: 1006,
@@ -193,7 +193,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@gabigi",
     },
     N3c: {
-        url: "https://images.unsplash.com/photo-1774660810725-fb04e002003d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1774660810725-fb04e002003d.jpg",
         alt: "A colourist at work in a bright, white salon",
         width: 1600,
         height: 2400,
@@ -201,7 +201,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@alexandermassph",
     },
     N3i: {
-        url: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1522337360788-8b13dee7a37e.jpg",
         alt: "Long hair with warm balayage against a pink wall",
         width: 1600,
         height: 1068,
@@ -209,7 +209,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@element5digital",
     },
     N4c: {
-        url: "https://images.unsplash.com/photo-1746372283841-dbb3838f9935?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1746372283841-dbb3838f9935.jpg",
         alt: "A bride in a pink lehenga standing under a stone arch",
         width: 1600,
         height: 2400,
@@ -217,7 +217,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sareegharjaipur",
     },
     N4i: {
-        url: "https://images.unsplash.com/photo-1756483560049-e7b2208f99a0?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1756483560049-e7b2208f99a0.jpg",
         alt: "A smiling bride wearing a kundan necklace and maang tikka",
         width: 1600,
         height: 2399,
@@ -225,7 +225,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@ikshanaproductions",
     },
     N5c: {
-        url: "https://images.unsplash.com/photo-1605029271330-95970e826af3?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1605029271330-95970e826af3.jpg",
         alt: "Two women in festive outfits taking a selfie",
         width: 1600,
         height: 1068,
@@ -233,7 +233,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@am_ranjan",
     },
     N5i: {
-        url: "https://images.unsplash.com/photo-1780247473263-4be70d512f5c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1780247473263-4be70d512f5c.jpg",
         alt: "A woman in red smiling and showing her mehendi palms",
         width: 1600,
         height: 1041,
@@ -241,7 +241,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@mrcato",
     },
     N6c: {
-        url: "https://images.unsplash.com/photo-1662720868850-e60cefb03201?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1662720868850-e60cefb03201.jpg",
         alt: "Rows of lit clay diyas",
         width: 1600,
         height: 1064,
@@ -249,7 +249,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@joshimilestoner",
     },
     N6i: {
-        url: "https://images.unsplash.com/photo-1785456390070-9960e3997066?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1785456390070-9960e3997066.jpg",
         alt: "Long, soft bronde hair after colour, in a salon",
         width: 1600,
         height: 899,
@@ -257,7 +257,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@yovankaloriasalon",
     },
     N7c: {
-        url: "https://images.unsplash.com/photo-1575989762363-c7ce0137427a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1575989762363-c7ce0137427a.jpg",
         alt: "A brass diya lit on a wooden ledge",
         width: 1600,
         height: 2844,
@@ -265,7 +265,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@manoj25",
     },
     N7i: {
-        url: "https://images.unsplash.com/photo-1603262110263-fb0112e7cc33?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1603262110263-fb0112e7cc33.jpg",
         alt: "Hawa Mahal in Jaipur at dusk",
         width: 1600,
         height: 1067,
@@ -273,7 +273,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@bleachedhuman",
     },
     N8c: {
-        url: "https://images.unsplash.com/photo-1747253523463-b3d68611a5a5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1747253523463-b3d68611a5a5.jpg",
         alt: "Rows of hair colour swatches in browns and reds",
         width: 1600,
         height: 1067,
@@ -281,7 +281,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@ninjason",
     },
     N8i: {
-        url: "https://images.unsplash.com/photo-1677746882421-2e3f45ccb9b1?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1677746882421-2e3f45ccb9b1.jpg",
         alt: "Bundles of hair swatches in natural and bright colours",
         width: 1600,
         height: 2133,
@@ -289,7 +289,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@michaircompany",
     },
     N9c: {
-        url: "https://images.unsplash.com/photo-1788930045572-5be1e03c1433?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1788930045572-5be1e03c1433.jpg",
         alt: "A young boy in a red cape in a barber's chair",
         width: 1600,
         height: 2402,
@@ -297,7 +297,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@firephotos",
     },
     N9i: {
-        url: "https://images.unsplash.com/photo-1703792685152-d13e206924d8?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1703792685152-d13e206924d8.jpg",
         alt: "A barber cutting a young boy's hair with clippers",
         width: 1600,
         height: 2400,
@@ -305,7 +305,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@kawerodriguess",
     },
     A1c: {
-        url: "https://images.unsplash.com/photo-1669139470813-827cbcf54b20?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1669139470813-827cbcf54b20.jpg",
         alt: "A glass being filled from a kitchen tap",
         width: 1600,
         height: 1219,
@@ -313,7 +313,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@swankyfella",
     },
     A1i: {
-        url: "https://images.unsplash.com/photo-1599661046289-e31897846e41?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1599661046289-e31897846e41.jpg",
         alt: "Amer Fort above a dry, sandy hillside",
         width: 1600,
         height: 2845,
@@ -321,7 +321,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@meric",
     },
     A2c: {
-        url: "https://images.unsplash.com/photo-1665923148259-3340e61d3ff2?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1665923148259-3340e61d3ff2.jpg",
         alt: "Long, voluminous curly hair seen from behind",
         width: 1600,
         height: 1067,
@@ -329,7 +329,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@irina_chishkova",
     },
     A2i: {
-        url: "https://images.unsplash.com/photo-1753269045298-08cb92bd7374?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1753269045298-08cb92bd7374.jpg",
         alt: "A woman with an umbrella crossing a wet street in the rain",
         width: 1600,
         height: 1248,
@@ -337,7 +337,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@saadahmad_umn",
     },
     A3c: {
-        url: "https://images.unsplash.com/photo-1713180760640-c9ff9eb90b2d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1713180760640-c9ff9eb90b2d.jpg",
         alt: "A woman straightening her long hair with a flat iron",
         width: 1600,
         height: 1067,
@@ -345,7 +345,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@tymobeauty",
     },
     A3i: {
-        url: "https://images.unsplash.com/photo-1629397683830-9805395892e8?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1629397683830-9805395892e8.jpg",
         alt: "A stylist blow-drying a client's hair straight with a paddle brush",
         width: 1600,
         height: 1067,
@@ -353,7 +353,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@giorgiotrovato",
     },
     A4c: {
-        url: "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1524504388940-b1c1722653e1.jpg",
         alt: "A woman with long, brown-to-caramel coloured hair",
         width: 1600,
         height: 2400,
@@ -361,7 +361,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@rafaelladiniz",
     },
     A4i: {
-        url: "https://images.unsplash.com/photo-1605980625600-88b46abafa8d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1605980625600-88b46abafa8d.jpg",
         alt: "Long ash-brown waves seen from behind",
         width: 1600,
         height: 2000,
@@ -369,7 +369,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@newyork_creator",
     },
     A5c: {
-        url: "https://images.unsplash.com/photo-1573461160327-b450ce3d8e7f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1573461160327-b450ce3d8e7f.jpg",
         alt: "A dropper placing a drop of oil on the back of a hand",
         width: 1600,
         height: 2000,
@@ -377,7 +377,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@enecta",
     },
     A5i: {
-        url: "https://images.unsplash.com/photo-1787616291784-0de8970e3ad4?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1787616291784-0de8970e3ad4.jpg",
         alt: "A stylist applying colour to a client's hair",
         width: 1600,
         height: 2402,
@@ -385,7 +385,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@firephotos",
     },
     A6c: {
-        url: "https://images.unsplash.com/photo-1775642548371-861fab6cea75?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1775642548371-861fab6cea75.jpg",
         alt: "A woman with a towel on her hair doing her skincare at the mirror",
         width: 1600,
         height: 1067,
@@ -393,7 +393,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@chriscreations__",
     },
     A6i: {
-        url: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1616394584738-fc6e612e71b9.jpg",
         alt: "A therapist applying a white hydrating mask during a facial",
         width: 1600,
         height: 1067,
@@ -401,7 +401,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@enginakyurt",
     },
     A7c: {
-        url: "https://images.unsplash.com/photo-1618049049816-43a00d5b0c3d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1618049049816-43a00d5b0c3d.jpg",
         alt: "A man with a full, well-groomed beard",
         width: 1600,
         height: 2442,
@@ -409,7 +409,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@barczakshoots",
     },
     A7i: {
-        url: "https://images.unsplash.com/photo-1627876280688-24a58ba02f2c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1627876280688-24a58ba02f2c.jpg",
         alt: "Two small bottles of beard oil beside cut oranges",
         width: 1600,
         height: 1067,
@@ -417,7 +417,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@castlebeard",
     },
     A8c: {
-        url: "https://images.unsplash.com/photo-1605980766335-d3a41c7332a1?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1605980766335-d3a41c7332a1.jpg",
         alt: "Long ash-blonde balayage seen from behind",
         width: 1600,
         height: 2400,
@@ -425,7 +425,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@newyork_creator",
     },
     A8i: {
-        url: "https://images.unsplash.com/photo-1707914704014-0f0b2f65ce5b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1707914704014-0f0b2f65ce5b.jpg",
         alt: "Hair colour swatches in pinks and violets on a shade card",
         width: 1600,
         height: 2400,
@@ -433,7 +433,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@lensyfoxography",
     },
     A9c: {
-        url: "https://images.unsplash.com/photo-1740674570259-a47d713a2976?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1740674570259-a47d713a2976.jpg",
         alt: "A bride in a maroon lehenga and bridal jewellery",
         width: 1600,
         height: 2215,
@@ -441,7 +441,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@dingledesign",
     },
     A9i: {
-        url: "https://images.unsplash.com/photo-1518468607622-5844bca31a05?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1518468607622-5844bca31a05.jpg",
         alt: "A wedding planner notebook with rings, flowers and bridal shoes",
         width: 1600,
         height: 1600,
