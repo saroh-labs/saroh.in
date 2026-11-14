@@ -16,6 +16,7 @@ import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 import { DateTime } from "luxon";
 import type { z } from "zod";
 
+import { moneyWords } from "../../../common/words-format";
 import { COUNTING_ROWS } from "../../stock/tracking";
 
 /**
@@ -404,7 +405,7 @@ export async function productFacts(
             p.id,
             {
                 image: p.image,
-                price: `${p.currency} ${p.price.toFixed(2)}`,
+                price: moneyWords(p.price, p.currency),
                 stock: left.get(p.id) ?? null,
             },
         ]),

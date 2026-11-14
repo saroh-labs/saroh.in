@@ -25,7 +25,7 @@
         "kind": "answer",
         "question": "क्या नेहा कल 11 बजे खाली है?",
         "expect": {
-            "note": "Neha is NOT free at 11:00 tomorrow: she has a Haircut booked then. The answer must say she is busy."
+            "note": "Neha is NOT free at 11:00 tomorrow: she has a Haircut booked then. The answer must say she is not free; naming the booked haircut is best, and it must not give another reason (closed, outside hours) that no tool said."
         }
     },
     {

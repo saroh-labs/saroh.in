@@ -261,18 +261,18 @@ describe("Ask AI's tool bridge (U4)", () => {
             period: "this_month",
         });
         expect(summary.output).toMatch(
-            /Unpaid bills: 3 \(INR 2600\.00\)\. Overdue, past their due date: 2 \(INR 1600\.00\)\. Not due yet: 1 \(INR 1000\.00\)\./,
+            /Unpaid bills: 3 \(₹2,600\)\. Overdue, past their due date: 2 \(₹1,600\)\. Not due yet: 1 \(₹1,000\)\./,
         );
 
         const list = await ask(ctx, "list_unpaid_bills", { limit: 2 });
         expect(list.isError).toBeUndefined();
-        expect(list.output).toMatch(/^3 unpaid bills, oldest due first/);
+        expect(list.output).toMatch(
+            /^3 unpaid bills, \d+ of them overdue \(past their due date\), oldest due first/,
+        );
         const lines = list.output.split("\n").filter((l) => l.startsWith("- "));
         expect(lines).toHaveLength(2);
         expect(lines[0]).toContain(`invoice_id ${oldest.id}`);
-        expect(lines[0]).toMatch(
-            /"Asha".*INR 600\.00 left to pay.*40 days late/,
-        );
+        expect(lines[0]).toMatch(/"Asha".*₹600 left to pay.*40 days late/);
         expect(list.output).toMatch(/cursor 2/);
 
         const { userId } = await person(org.id, "MEMBER");
@@ -280,8 +280,8 @@ describe("Ask AI's tool bridge (U4)", () => {
             await contextOf(org.id, userId),
             "list_unpaid_bills",
         );
-        expect(member.output).toBe(
-            "Not shown: your role doesn't include bills.",
+        expect(member.output).toMatch(
+            /^Not shown: your role doesn't include bills\. .*offer one or two things/,
         );
     });
 
@@ -507,7 +507,11 @@ describe("Ask AI's tool bridge (U4)", () => {
         // The same conversation, its context from before the change.
         const after = await ask(ctx, "list_orders");
         expect(after.isError).toBe(true);
-        expect(after.output).toMatch(/may not use list_orders/);
+        expect(after.output).toMatch(
+            /role doesn't include list_orders\..*one or two things their role lets them ask about/,
+        );
+        // Ask AI runs as the person: there is no app to reconnect.
+        expect(after.output).not.toMatch(/reconnect/);
     });
 
     it("input that fails the contract is refused before the tool runs", async () => {

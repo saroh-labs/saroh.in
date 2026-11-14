@@ -481,6 +481,13 @@ export class McpToolRegistry {
             );
         }
         if (!this.allows(tool, call.ctx)) {
+            // Saroh's own agent runs as the person, nothing to reconnect: their role is the only reason.
+            if (call.connection.kind === "app") {
+                throw new ToolError(
+                    `Not shown: this person's role doesn't include ${tool.name}.`,
+                    "Tell them plainly in one line that their role doesn't show this, give no other figures they didn't ask for, and end with one or two things their role lets them ask about (the business facts list them).",
+                );
+            }
             throw new ToolError(
                 `This connection may not use ${tool.name}: the person's role, or what they allowed this app when connecting it, doesn't include it.`,
                 "Tell the person; they can do it in the Saroh app, or reconnect the app and allow it.",

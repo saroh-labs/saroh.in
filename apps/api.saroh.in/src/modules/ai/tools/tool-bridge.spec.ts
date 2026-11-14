@@ -70,7 +70,7 @@ const orders = defineTool({
                         status: "OPEN",
                         stage: "new",
                         payment_status: "PAID",
-                        total: "INR 180.00",
+                        total: "₹180",
                         customer_id: null,
                         created_at: "2026-11-13T10:00:00.000Z",
                     },
@@ -221,7 +221,11 @@ describe("ToolBridge", () => {
         actions = [];
         const run = await b.run(asker, call("list_bookings"), live);
         expect(run).toMatchObject({ isError: true });
-        expect(run.output).toMatch(/may not use list_bookings/);
+        expect(run.output).toMatch(
+            /role doesn't include list_bookings\..*one or two things their role lets them ask about/,
+        );
+        // Ask AI runs as the person: there is no app to reconnect.
+        expect(run.output).not.toMatch(/reconnect/);
     });
 
     it("refuses once the person has left the business", async () => {
@@ -275,7 +279,7 @@ describe("ToolBridge", () => {
             data: {
                 title: "Orders",
                 columns: ["Order", "Placed", "Step", "Payment", "Total"],
-                rows: [["ORD-001", "13 Nov", "New", "Paid", "INR 180.00"]],
+                rows: [["ORD-001", "13 Nov", "New", "Paid", "₹180"]],
             },
         });
     });

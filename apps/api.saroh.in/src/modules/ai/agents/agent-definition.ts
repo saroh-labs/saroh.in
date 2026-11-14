@@ -48,6 +48,10 @@ export interface AgentDefinition<Tool extends string = string> {
     draftTools: readonly Tool[];
     /** Fixed words per tool, so a status line never comes from the model. */
     statusWords: Readonly<Record<Tool, StatusWords>>;
+    /** The status line shown the moment a turn starts, before the first round. */
+    startWords: StatusWords;
+    /** Said under a draft's card when the model wrote nothing before it. */
+    draftWords: StatusWords;
     /** The metered key a counted turn draws on (U7). */
     usageKey: "questions";
 }
@@ -63,13 +67,34 @@ export function statusWordsFor(
     agent: AgentDefinition,
     tool: string,
     language: AiLanguage,
+    question = "",
 ): string {
     const words =
         (agent.statusWords as Record<string, StatusWords | undefined>)[tool] ??
         ANY_TOOL_WORDS;
-    if (language === "HINDI") return words.hi;
-    if (language === "HINGLISH") return words.hinglish;
+    return inLanguage(words, language, question);
+}
+
+/** Fixed words in the person's language; "match" reads the question's. */
+export function inLanguage(
+    words: StatusWords,
+    language: AiLanguage,
+    question: string,
+): string {
+    const said = language === "MATCH" ? languageOf(question) : language;
+    if (said === "HINDI") return words.hi;
+    if (said === "HINGLISH") return words.hinglish;
     return words.en;
+}
+
+// shortcut: a word list, not a classifier; Hinglish without these words reads as English. Upgrade if the language mark says so.
+const HINGLISH_WORDS =
+    /\b(hai|hain|karo|kar|kardo|kijiye|kitne|kitna|kitni|kya|kaun|kaise|mein|nahi|nahin|aaj|kal|naya|nayi|wala|wali|baaki|liye|ka|ke|ki|mera|meri|hua|hui|hue|aaya|aaye)\b/i;
+
+/** The language a question is written in: Devanagari is Hindi; common Hindi words in Latin letters, Hinglish. */
+export function languageOf(question: string): Exclude<AiLanguage, "MATCH"> {
+    if (/[\u0900-\u097F]/.test(question)) return "HINDI";
+    return HINGLISH_WORDS.test(question) ? "HINGLISH" : "ENGLISH";
 }
 
 /** The instructions before the cache breakpoint: the same for every business. */
@@ -95,6 +120,8 @@ export function agentVersion(agent: AgentDefinition): string {
                 agent.tools,
                 agent.draftTools,
                 statusWords,
+                agent.startWords,
+                agent.draftWords,
             ]),
         )
         .digest("hex")

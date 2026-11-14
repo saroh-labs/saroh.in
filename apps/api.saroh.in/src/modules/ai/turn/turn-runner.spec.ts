@@ -30,7 +30,7 @@ import { AiSettingNotConfiguredError } from "../settings/ai-settings.service";
 import type { AiToolbox, AiToolRun } from "../tools/toolbox.port";
 import type { TurnEvent } from "./events";
 import { estimateTokens } from "./guards";
-import { TurnRunner } from "./turn-runner";
+import { LAST_ROUND, TurnRunner } from "./turn-runner";
 import type { TurnConversation, TurnFinish, TurnStore } from "./turn-store";
 
 const ctx: OrganizationContext = {
@@ -65,6 +65,16 @@ const agent: AgentDefinition<"list_bookings" | "draft_booking"> = {
             hinglish: "Draft bana rahe hain…",
             hi: "ड्राफ़्ट बना रहे हैं…",
         },
+    },
+    startWords: {
+        en: "Looking at your business…",
+        hinglish: "Aapka business dekh rahe hain…",
+        hi: "आपका कारोबार देख रहे हैं…",
+    },
+    draftWords: {
+        en: "Here it is to check.",
+        hinglish: "Yeh check kar lijiye.",
+        hi: "इसे देख लीजिए।",
     },
     usageKey: "questions",
 };
@@ -280,11 +290,17 @@ describe("TurnRunner", () => {
             rounds: [toolRound(), [text("You have "), text("3."), done()]],
         });
         const events = await collect(t.turn());
+        // The question is Hinglish and the setting matches it.
         expect(events).toEqual([
             {
                 type: "status",
+                tool: "start",
+                words: "Aapka business dekh rahe hain…",
+            },
+            {
+                type: "status",
                 tool: "list_bookings",
-                words: "Reading your bookings…",
+                words: "Bookings dekh rahe hain…",
             },
             { type: "text-delta", text: "You have " },
             { type: "text-delta", text: "3." },
@@ -373,6 +389,45 @@ describe("TurnRunner", () => {
         });
         expect(last(events)).toMatchObject({ outcome: "DRAFT", counted: true });
         expect(t.provider.requests).toHaveLength(1);
+        // No words from the model: the fixed line, in the question's language, kept with the message.
+        expect(events).toContainEqual({
+            type: "text-delta",
+            text: "Yeh check kar lijiye.",
+        });
+        expect(t.store.finished[0]).toMatchObject({
+            text: "Yeh check kar lijiye.",
+            outcome: "DRAFT",
+        });
+    });
+
+    it("keeps the model's own words before a draft, with no fixed line", async () => {
+        const t = setup({
+            rounds: [[text("Drafting it now."), call("draft_booking"), done()]],
+            toolRun: () => ({
+                output: "Drafted.",
+                card: { kind: "booking", data: { id: "b1" } },
+            }),
+        });
+        await collect(t.turn());
+        expect(t.store.finished[0]).toMatchObject({
+            text: "Drafting it now.",
+            outcome: "DRAFT",
+        });
+    });
+
+    it("shows a status line at once, before the first round is sent", async () => {
+        const t = setup({ rounds: [[text("Hi."), done()]] });
+        const events = await collect(
+            t.turn(),
+            (e) =>
+                e.type === "status" &&
+                expect(t.provider.requests).toHaveLength(0),
+        );
+        expect(events[0]).toEqual({
+            type: "status",
+            tool: "start",
+            words: "Aapka business dekh rahe hain…",
+        });
     });
 
     it("shows a read's card whole under the answer and keeps it with the answer", async () => {
@@ -384,11 +439,12 @@ describe("TurnRunner", () => {
         const events = await collect(t.turn());
         expect(events.map((e) => e.type)).toEqual([
             "status",
+            "status",
             "text-delta",
             "card",
             "done",
         ]);
-        expect(events[2]).toEqual({ type: "card", ...card });
+        expect(events[3]).toEqual({ type: "card", ...card });
         expect(t.store.finished[0]).toMatchObject({
             text: "Three tomorrow.",
             cards: [card],
@@ -424,6 +480,14 @@ describe("TurnRunner", () => {
             const events = await collect(t.turn());
             expect(t.provider.requests).toHaveLength(4);
             expect(t.provider.requests[3].toolChoice).toBe("none");
+            // Told at the tail to answer now (so it never ends silent); earlier rounds aren't.
+            expect(last(t.provider.requests[3].messages)).toEqual({
+                role: "user",
+                text: LAST_ROUND,
+            });
+            expect(last(t.provider.requests[2].messages)).toMatchObject({
+                role: "tool",
+            });
             expect(
                 t.provider.requests.slice(0, 3).map((r) => r.toolChoice),
             ).toEqual([undefined, undefined, undefined]);

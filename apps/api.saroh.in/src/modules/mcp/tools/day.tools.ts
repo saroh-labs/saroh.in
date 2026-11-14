@@ -377,7 +377,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "find_free_slots",
             title: "Find free times",
             description:
-                "Use this when the person asks when a service is free, and always before create_booking or move_booking. Example: service_id, from 2026-11-14T00:00:00+05:30 for that day. Shows up to 20 starts; narrow from/to for others. Not for the weekly hours (get_hours).",
+                "Use this when the person asks when a service is free, or before create_booking or move_booking when they haven't named an exact time. Example: service_id, from 2026-11-14T00:00:00+05:30 for that day. Shows up to 20 starts; narrow from/to for others. Not for the weekly hours (get_hours).",
             contract: findFreeSlotsTool,
             capability: "service:read",
             module: "APPOINTMENTS",
@@ -393,13 +393,19 @@ export function dayTools(d: DayDeps): McpTool[] {
                 const end = to
                     ? instantOf(to, "to")
                     : new Date(start.getTime() + 86_400_000);
-                const slots = await d.bookings.availability(
-                    ctx,
-                    service_id,
-                    start.toISOString(),
-                    end.toISOString(),
-                    staff_id,
+                // `to` is the last start asked about: a slot only has to start before it, not end.
+                const reach = new Date(
+                    end.getTime() + service.durationMinutes * 60_000,
                 );
+                const slots = (
+                    await d.bookings.availability(
+                        ctx,
+                        service_id,
+                        start.toISOString(),
+                        reach.toISOString(),
+                        staff_id,
+                    )
+                ).filter((s) => s.startAt <= end);
                 const shown = slots.slice(0, PAGE).map((s) => ({
                     starts_at: s.startAt.toISOString(),
                     when: when(s.startAt, service.timezone),
@@ -421,7 +427,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                                     ]
                                   : []),
                           ].join("\n")
-                        : `${JSON.stringify(service.name)} has no free time then. Try other days, or check get_hours.`,
+                        : `${JSON.stringify(service.name)} has no free time then${staff_id ? " with that staff member" : ""}. This doesn't say why: to tell the person, call list_bookings for that time${staff_id ? " and staff_id" : ""} (already booked) or get_hours (closed then).`,
                     data: {
                         service_id,
                         timezone: service.timezone,
@@ -435,7 +441,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "create_booking",
             title: "Book a service",
             description:
-                'Use this when the person books a customer in. Take starts_at from find_free_slots; name the customer by customer_id (list_customers) or by customer_email. The customer is sent the booking. Example: "book Priya for a haircut Thursday 3:30". Never for moving one; use move_booking.',
+                "Use this when the person books a customer in. Take starts_at from the exact time the person named (with the business's offset), else from find_free_slots; a taken time is refused, so don't check first. Name the customer by customer_id (list_customers) or by customer_email. The customer is sent the booking. Example: \"book Priya for a haircut Thursday 3:30\". Never for moving one; use move_booking.",
             contract: createBookingTool,
             capability: "booking:write",
             module: "APPOINTMENTS",
@@ -491,7 +497,7 @@ export function dayTools(d: DayDeps): McpTool[] {
             name: "move_booking",
             title: "Move a booking",
             description:
-                'Use this when the person moves a booking to another time. Example: "move Priya to 4pm". Take starts_at from find_free_slots for the booking\'s service; a taken time is refused with free times near it. The customer is told. Not for cancelling, which is done in the Saroh app.',
+                "Use this when the person moves a booking to another time. Example: \"move Priya to 4pm\". Take booking_id from list_bookings (no get_booking needed) and starts_at from the time the person named (with the business's offset), else from find_free_slots; a taken time is refused with free times near it, so don't check first. The customer is told. Not for cancelling, which is done in the Saroh app.",
             contract: moveBookingTool,
             capability: "booking:write",
             module: "APPOINTMENTS",

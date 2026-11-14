@@ -8,6 +8,7 @@ import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
 import {
     agentVersion,
+    inLanguage,
     sharedInstructions,
     statusWordsFor,
 } from "../agents/agent-definition";
@@ -45,6 +46,14 @@ import { TurnStore } from "./turn-store";
 
 /** The agents a conversation may name, bound in `ai.module.ts`. */
 export const AI_AGENTS = Symbol("AI_AGENTS");
+
+/**
+ * Said to the model on the round that may not call tools (the round cap), so
+ * it answers with what it found instead of ending silent: a draft it could
+ * not make yet is offered in words, for the person to say go ahead.
+ */
+export const LAST_ROUND =
+    '(From Saroh, not the person: no more tools this turn. Answer now, in the person\'s language, from what the tools gave you. If you were about to draft a change, say in one sentence what you would draft, with the details you found, and ask them to reply "go ahead".)';
 
 /** A round whose prompt passes this is priced higher by some models; flagged on the row. */
 const LONG_PROMPT_TOKENS = 100_000;
@@ -220,6 +229,16 @@ export class TurnRunner {
             rounds: 0,
             over100k: false,
         };
+        // At once, before the first round (the status line's 1 s); a tool's own words replace it.
+        yield {
+            type: "status",
+            tool: "start",
+            words: inLanguage(
+                prepared.agent.startWords,
+                prepared.language,
+                input.question,
+            ),
+        };
         try {
             yield* this.rounds(input, prepared, state);
         } catch (error) {
@@ -341,6 +360,16 @@ export class TurnRunner {
         };
     }
 
+    /** The round that must answer: told so at the tail (the cache stays), so it says something. */
+    private lastRequest(p: Prepared, messages: AiMessage[]): AiStreamRequest {
+        if (p.tools.length === 0) return this.request(p, messages, true);
+        return this.request(
+            p,
+            [...messages, { role: "user", text: LAST_ROUND }],
+            true,
+        );
+    }
+
     private async *rounds(
         input: TurnInput,
         p: Prepared,
@@ -369,15 +398,17 @@ export class TurnRunner {
             }
             if (state.rounds + 1 >= limits.maxRounds) answerOnly = true;
             messages = trimHistory(messages, limits.maxHistoryTokens);
-            let request = this.request(p, messages, answerOnly);
+            let request = answerOnly
+                ? this.lastRequest(p, messages)
+                : this.request(p, messages, false);
             if (estimateTokens(request) > limits.maxPromptTokens) {
                 // Too long to send: keep what fits and make it answer now.
                 const room =
                     limits.maxPromptTokens -
-                    estimateTokens(this.request(p, [], true));
+                    estimateTokens(this.lastRequest(p, []));
                 messages = trimHistory(messages, room);
                 answerOnly = true;
-                request = this.request(p, messages, true);
+                request = this.lastRequest(p, messages);
                 if (estimateTokens(request) > limits.maxPromptTokens) {
                     return withWhatItHas(state);
                 }
@@ -424,7 +455,12 @@ export class TurnRunner {
                 yield {
                     type: "status",
                     tool: call.name,
-                    words: statusWordsFor(p.agent, call.name, p.language),
+                    words: statusWordsFor(
+                        p.agent,
+                        call.name,
+                        p.language,
+                        input.question,
+                    ),
                 };
                 const run = await this.toolbox.run(ctx, call, signal, {
                     conversationId: p.conversation.id,
@@ -432,6 +468,16 @@ export class TurnRunner {
                 });
                 if (run.card && p.agent.draftTools.includes(call.name)) {
                     state.card = run.card;
+                    // Every draft says one line, saved with the message: fixed words when the model wrote none.
+                    if (!state.text.trim()) {
+                        const line = inLanguage(
+                            p.agent.draftWords,
+                            p.language,
+                            input.question,
+                        );
+                        state.text = line;
+                        yield { type: "text-delta", text: line };
+                    }
                     yield { type: "card", ...run.card };
                     end(state, "DRAFT");
                     return;

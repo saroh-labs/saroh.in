@@ -3,6 +3,7 @@ import type { Question, Resolved, Results, RunRecord } from "./lib";
 import {
     checkDraft,
     gradeRun,
+    graderPrompt,
     hasNumber,
     leakedFigure,
     mentions,
@@ -79,6 +80,41 @@ describe("reading figures", () => {
         expect(
             hasNumber("This week: 46 bookings.", 47, "bookings:this_week"),
         ).toBe(false);
+    });
+
+    it("reads small counts written as words, and none as 0", () => {
+        expect(
+            hasNumber("Eight orders came in today.", 8, "orders:today"),
+        ).toBe(true);
+        expect(hasNumber("Seven clients haven't booked.", 7, "lapsed:60")).toBe(
+            true,
+        );
+        expect(hasNumber("कल सात सेशन हैं।", 7, "bookings:tomorrow")).toBe(
+            true,
+        );
+        expect(hasNumber("Seven clients haven't booked.", 8, "lapsed:60")).toBe(
+            false,
+        );
+        expect(
+            hasNumber(
+                "Dr. Arun Kulkarni has no appointments tomorrow.",
+                0,
+                "staff-bookings:arun:tomorrow",
+            ),
+        ).toBe(true);
+        expect(
+            hasNumber(
+                "Abhi koi bhi invoice ka payment baaki nahi hai.",
+                0,
+                "owed:count",
+            ),
+        ).toBe(true);
+        // "kar do" is not 2, and "no-show" is not none.
+        expect(hasNumber("Mark kar do.", 2, "orders:today")).toBe(false);
+        expect(hasNumber("3 no-shows today.", 0, "noshow:today")).toBe(false);
+        // Money is never written in words, but "nothing" is 0.
+        expect(hasNumber("Nothing came in.", 0, "moneyin:today")).toBe(true);
+        expect(hasNumber("Five came in.", 5, "moneyin:today")).toBe(false);
     });
 
     it("matches money to the rupee, in Indian format", () => {
@@ -454,5 +490,22 @@ describe("questionsMarkdown", () => {
         expect(md).toContain("1 PASS, 1 FAIL");
         expect(md).toContain("#### Run 2: FAIL");
         expect(md).toContain("₹0.20");
+    });
+});
+
+describe("the grader's prompt for a draft", () => {
+    it("judges the card with the runner's fixed line, not free text", () => {
+        const prompt = graderPrompt(
+            question("draft", {}),
+            run({
+                outcome: "DRAFT",
+                text: "Here it is to check. Nothing is saved until you confirm it.",
+                card: { kind: "draft", data: { tool: "create_product" } },
+            }),
+        );
+        expect(prompt).toContain("A draft card was shown: create_product");
+        expect(prompt).toContain("it need not repeat the card's details");
+        expect(prompt).toContain("Nothing is saved until you confirm it.");
+        expect(prompt).not.toContain("(no answer text)");
     });
 });

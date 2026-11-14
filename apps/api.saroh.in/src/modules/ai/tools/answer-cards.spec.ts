@@ -45,7 +45,7 @@ const seller = (i: number) => ({
     name: `Product ${i}`,
     sold: 20 - i,
     sold_before: 0,
-    amount: "INR 100.00",
+    amount: "₹100",
 });
 
 describe("products card", () => {
@@ -68,7 +68,7 @@ describe("products card", () => {
                 "p1",
                 {
                     image: `${MEDIA}/a.webp`,
-                    price: "INR 180.00",
+                    price: "₹180",
                     stock: 4,
                 },
             ],
@@ -76,7 +76,7 @@ describe("products card", () => {
                 "p2",
                 {
                     image: "https://images.unsplash.com/x",
-                    price: "INR 90.00",
+                    price: "₹90",
                     stock: null,
                 },
             ],
@@ -92,9 +92,9 @@ describe("products card", () => {
                         id: "p1",
                         name: "Product 1",
                         imageUrl: `${MEDIA}/a.webp`,
-                        price: "INR 180.00",
+                        price: "₹180",
                         sold: 19,
-                        amount: "INR 100.00",
+                        amount: "₹100",
                         stock: 4,
                         href: "/commerce/products/p1",
                     },
@@ -102,9 +102,9 @@ describe("products card", () => {
                         id: "p2",
                         name: "Product 2",
                         imageUrl: null,
-                        price: "INR 90.00",
+                        price: "₹90",
                         sold: 18,
-                        amount: "INR 100.00",
+                        amount: "₹100",
                         stock: null,
                         href: "/commerce/products/p2",
                     },
@@ -152,7 +152,7 @@ const bill = (i: number, over: Partial<Record<string, unknown>> = {}) => ({
     invoice_id: `inv${i}`,
     number: `INV-${i}`,
     customer: { untrusted: true as const, text: `Customer ${i}` },
-    left_to_pay: "INR 500.00",
+    left_to_pay: "₹500",
     due_on: "2026-11-01",
     days_late: 13,
     ...over,
@@ -179,7 +179,7 @@ describe("table card", () => {
         expect(card.data.rows[0]).toEqual([
             "INV-1",
             "Customer 1",
-            "INR 500.00",
+            "₹500",
             "13 days late",
         ]);
         expect(card.data.rows).toHaveLength(8);

@@ -30,7 +30,12 @@ const MODULES = [
     "INSIGHTS",
     "COMMERCE",
 ] as const;
-const FLAGS = [...MODULES.map((m) => `MODULE_${m}`), "ASK_AI"];
+// ORG_AUTHORIZATION as in production: without it a store takes the older per-store checks, and a draft order fails "Location not found".
+const FLAGS = [
+    ...MODULES.map((m) => `MODULE_${m}`),
+    "ASK_AI",
+    "ORG_AUTHORIZATION",
+];
 
 const ROLE_KEY: Record<TeamRole, string> = {
     owner: "OWNER",
@@ -359,6 +364,16 @@ async function seedBusiness(
                 stockTracked: true,
                 stockTrackedAt: since,
                 createdAt: since,
+            },
+        });
+        // Listed where it is stocked, as the app's create does (ADR-010):
+        // an unlisted shelf sells nothing, so Home never calls it low.
+        await prisma.productListing.create({
+            data: {
+                id: id("listing", p.key),
+                organizationId: orgId,
+                storeId,
+                productId: id("product", p.key),
             },
         });
         await prisma.stockLevel.create({

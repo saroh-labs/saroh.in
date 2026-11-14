@@ -13,6 +13,7 @@ import { prisma, Prisma } from "@saroh/database";
 import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import { moneyWords } from "../../../common/words-format";
 import type { OwedByAge } from "../../analytics/owed-by-age";
 import { foldOwedByAge, readOwedByAge } from "../../analytics/owed-by-age";
 import type { SellsPeriod } from "../../analytics/period";
@@ -101,7 +102,7 @@ function moneyOf(rows: readonly TakingsDayRow[]): string[] {
     }
     return [...by.entries()]
         .sort(([a], [b]) => a.localeCompare(b))
-        .map(([currency, amount]) => `${currency} ${amount.toFixed(2)}`);
+        .map(([currency, amount]) => moneyWords(amount.toFixed(2), currency));
 }
 
 const minorTotals = (
@@ -111,7 +112,9 @@ const minorTotals = (
 /** The person's role doesn't include these: said once, in their words. */
 const notShownLine = (nouns: readonly string[]) =>
     nouns.length
-        ? [`Not shown: your role doesn't include ${nouns.join(", ")}.`]
+        ? [
+              `Not shown: your role doesn't include ${nouns.join(", ")}. If that was asked, say so in one line, give no other figure in its place, and offer one or two things the role can ask about instead.`,
+          ]
         : [];
 
 /** Two per-currency totals added together; null when either is. */
@@ -158,6 +161,13 @@ type OwedData = Awaited<ReturnType<typeof readOwed>>;
 
 const inBrackets = (totals: string[] | null) =>
     totals ? ` (${totals.join(", ") || "nothing"})` : "";
+
+/**
+ * The bookings line, with how many are not marked yet as a number: "the
+ * rest" read as some even when it was none (80 came + 10 no-show of 90).
+ */
+export const bookingsLine = (bookings: number, came: number, noShow: number) =>
+    `- Bookings: ${bookings} (came ${came}, no-show ${noShow}, not marked yet ${bookings - came - noShow})`;
 
 /** The one owed line both summary tools send. */
 export function owedLine(o: OwedData): string {
@@ -242,9 +252,7 @@ async function businessSummary(
     const text = [
         `${PERIOD_WORDS[period]} (${w.firstDay} to ${w.lastDay}, ${zone}):`,
         ...(data.bookings !== null
-            ? [
-                  `- Bookings: ${data.bookings} (came ${data.came}, no-show ${data.no_show}, the rest not marked yet)`,
-              ]
+            ? [bookingsLine(data.bookings, data.came ?? 0, data.no_show ?? 0)]
             : []),
         ...(orders !== null ? [`- Orders placed: ${orders}`] : []),
         ...(data.money_in
@@ -712,9 +720,13 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 // Owed by age's bills, so the count is the summary's.
                 const where = { organizationId: org, ...OWED_VIEW_WHERE };
                 const now = new Date();
-                const [zone, total, rows] = await Promise.all([
+                const [zone, total, overdue, rows] = await Promise.all([
                     businessTimezone(prisma, org),
                     prisma.invoice.count({ where }),
+                    // Counted whole, so "how many are overdue" needs no second page.
+                    prisma.invoice.count({
+                        where: { ...where, dueAt: { lt: now } },
+                    }),
                     prisma.invoice.findMany({
                         where,
                         orderBy: [
@@ -764,7 +776,7 @@ export function summaryTools(d: SummaryDeps): McpTool[] {
                 const text = [
                     total === 0
                         ? "No unpaid bills."
-                        : `${total} unpaid bills, oldest due first; ${offset + 1} to ${offset + bills.length} here.`,
+                        : `${total} unpaid bills, ${overdue} of them overdue (past their due date), oldest due first; ${offset + 1} to ${offset + bills.length} here.`,
                     ...bills.map(
                         (b) =>
                             `- ${b.number ?? "Bill"} (invoice_id ${b.invoice_id}), ${b.customer ? quoteUntrusted("Customer", b.customer.text) : "no customer named"}${b.left_to_pay ? `, ${b.left_to_pay} left to pay` : ""}, ${

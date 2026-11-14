@@ -608,6 +608,8 @@ const team = (
 const WEEK = [1, 2, 3, 4, 5, 6];
 const ALL_WEEK = [0, 1, 2, 3, 4, 5, 6];
 
+// Open every day: salon-03 asks about tomorrow and salon-04 about today,
+// whatever weekday the run falls on (a Sunday run once put Neha's 11:00 on a closed day).
 function salon(anchor: Date): BusinessPlan {
     const rng = rngOf(101);
     const services: ServicePlan[] = [
@@ -618,7 +620,7 @@ function salon(anchor: Date): BusinessPlan {
             price: 500,
             capacity: 1,
             staff: ["neha", "imran"],
-            days: WEEK,
+            days: ALL_WEEK,
             opens: 600,
             closes: 1200,
             perDay: [1, 3],
@@ -630,7 +632,7 @@ function salon(anchor: Date): BusinessPlan {
             price: 1800,
             capacity: 1,
             staff: ["neha"],
-            days: WEEK,
+            days: ALL_WEEK,
             opens: 600,
             closes: 1200,
             perDay: [0, 1],
@@ -642,7 +644,7 @@ function salon(anchor: Date): BusinessPlan {
             price: 1200,
             capacity: 1,
             staff: ["ritu"],
-            days: WEEK,
+            days: ALL_WEEK,
             opens: 600,
             closes: 1200,
             perDay: [1, 3],
@@ -654,7 +656,7 @@ function salon(anchor: Date): BusinessPlan {
             price: 200,
             capacity: 1,
             staff: ["imran"],
-            days: WEEK,
+            days: ALL_WEEK,
             opens: 600,
             closes: 1200,
             perDay: [0, 2],

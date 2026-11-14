@@ -230,9 +230,45 @@ export function numbersIn(text: string): number[] {
 const isMoneyKey = (key: string) =>
     /^(moneyin|owed:total|owed:customer)/.test(key);
 
+/**
+ * Small counts written as words ("Eight orders", "सात", "teen"). Not
+ * Hinglish "do" (2): it is the verb in "kar do".
+ */
+const COUNT_WORDS = new Map<string, number>(
+    [
+        ["one", "ek", "एक"],
+        ["two", "", "दो"],
+        ["three", "teen", "तीन"],
+        ["four", "chaar", "चार"],
+        ["five", "paanch", "पाँच"],
+        ["six", "chhe", "छह"],
+        ["seven", "saat", "सात"],
+        ["eight", "aath", "आठ"],
+        ["nine", "nau", "नौ"],
+        ["ten", "das", "दस"],
+        ["eleven", "gyarah", "ग्यारह"],
+        ["twelve", "barah", "बारह"],
+    ].flatMap((names, i) =>
+        names.filter(Boolean).map((n) => [n, i + 1] as [string, number]),
+    ),
+);
+COUNT_WORDS.set("पांच", 5).set("छः", 6).set("char", 4).set("panch", 5);
+
+/** "None" said in words: "no appointments", "koi bhi invoice … nahi", "कोई नहीं". */
+const NONE =
+    /\b(?:no(?!-)|none|zero|nothing|nobody|koi bhi|koi nahi)\b|कोई|शून्य/i;
+
 export function hasNumber(text: string, value: number, key = ""): boolean {
     const tolerance = isMoneyKey(key) ? 0.5 : 0;
-    return numbersIn(text).some((n) => Math.abs(n - value) <= tolerance);
+    if (numbersIn(text).some((n) => Math.abs(n - value) <= tolerance)) {
+        return true;
+    }
+    if (value === 0 && NONE.test(text)) return true;
+    if (isMoneyKey(key)) return false;
+    return text
+        .toLowerCase()
+        .split(/[\s,.;:!?()"'*\u2013\u2014\u0964-]+/)
+        .some((w) => COUNT_WORDS.get(w) === value);
 }
 
 /**
@@ -504,8 +540,8 @@ const LANGUAGE_WORDS: Record<Language, string> = {
 
 const BEHAVIOUR_WORDS: Record<Kind, string> = {
     answer: "Answers the question directly, leading with the answer, without inventing figures.",
-    draft: "Says it has drafted the change on a card for the person to confirm; never claims it is already saved.",
-    access: "Says kindly and plainly that this person's role doesn't show that, gives no figure or name, and says what it can help with instead.",
+    draft: "A draft card holds the change; the text is a short line pointing to it for the person to check or confirm (it need not repeat the card's details), and never claims it is already saved.",
+    access: "Says kindly and plainly that this person's role doesn't show that, gives no figure and no name beyond any the person named, and says what it can help with instead.",
     "out-of-scope":
         "Declines kindly, without lecturing, and says what it can do instead (or where in Saroh to do it).",
     vague: "Asks one short question back to find out what the person means, and changes nothing.",
