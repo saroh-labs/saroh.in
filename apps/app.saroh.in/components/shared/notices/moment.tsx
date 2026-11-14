@@ -5,13 +5,20 @@ import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import { showError } from "@saroh/ui/toast";
-import { X } from "lucide-react";
+import { Megaphone, Plug, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { markMomentSeen } from "@/lib/moments/actions";
-import type { MomentView } from "@/lib/moments/keys";
+import type { MomentKey, MomentView } from "@/lib/moments/keys";
+
+/** A new feature's glyph: the one its own screen and nav use. */
+const NEWS_GLYPH: Partial<Record<MomentKey, typeof Plug>> = {
+    "new-ai-apps": Plug,
+    "new-share": Megaphone,
+    "new-ask-ai": Sparkles,
+};
 
 /**
  * A moment (wave G): one calm line where the product marks that something
@@ -61,16 +68,33 @@ export function Moment({
         void runAction(() => markMomentSeen(moment.key), { quiet: true });
     };
 
+    const NewsGlyph = moment.news ? NEWS_GLYPH[moment.key] : undefined;
+
     return (
         <Notice
             tone={moment.news ? "info" : "success"}
             role="status"
             data-moment={moment.key}
+            // A new feature (board VAHome): its glyph in a tile at the desk,
+            // level with one-row words and button. On a phone no tile,
+            // Dismiss in the corner and the button full width (44px).
+            align={moment.news ? "center" : undefined}
+            icon={
+                NewsGlyph ? (
+                    <span className="-my-1 grid size-8 place-items-center rounded-md bg-card">
+                        <NewsGlyph />
+                    </span>
+                ) : undefined
+            }
             // The title is Saroh's own words ("Your first order"), so a
             // session recording may read it. The fact under it names a
             // customer and an amount, and stays masked.
             title={
-                <span data-ph-unmask="">
+                // Clear of Dismiss, in the corner on a phone.
+                <span
+                    data-ph-unmask=""
+                    className={cn(moment.news && "max-sm:block max-sm:pr-9")}
+                >
                     {moment.news ? (
                         <span className="mr-2 inline-block rounded-[5px] bg-card px-1.5 align-[1px] text-[11px] font-semibold tracking-[0.04em]">
                             New
@@ -81,6 +105,8 @@ export function Moment({
             }
             className={cn(
                 "duration-slow ease-out animate-in fade-in-0 motion-reduce:animate-none",
+                moment.news &&
+                    "relative max-sm:[&>div:first-child>span[aria-hidden]]:hidden max-sm:[&>div:last-child]:pl-0",
                 className,
             )}
             action={
@@ -90,7 +116,10 @@ export function Moment({
                             size="sm"
                             asChild
                             variant="outline"
-                            className="border-border-strong coarse:min-h-11"
+                            className={cn(
+                                "border-border-strong coarse:min-h-11",
+                                moment.news && "max-sm:h-11 max-sm:w-full",
+                            )}
                         >
                             <Link href={moment.action.href} onClick={followed}>
                                 {moment.action.label}
@@ -101,6 +130,10 @@ export function Moment({
                         label="Dismiss"
                         icon={<X />}
                         variant="ghost"
+                        className={cn(
+                            moment.news &&
+                                "max-sm:absolute max-sm:right-1 max-sm:top-1 max-sm:size-11",
+                        )}
                         onClick={() => void dismiss()}
                     />
                 </>
