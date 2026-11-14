@@ -4,11 +4,11 @@ import Link from "next/link";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef } from "react";
 
-import { NewTag } from "../links/pill";
 import { TextLink } from "../links/text-link";
 import { ring } from "../ring";
 import { nextIndex } from "../roving";
 import { ColumnHeading } from "./column-heading";
+import { MenuItemText } from "./menu-item-text";
 import type { MenuLink, NavItem } from "./nav-types";
 import { menuColumns } from "./nav-types";
 
@@ -88,15 +88,10 @@ export function MenuPanel({
                                         }
                                         className={`grid cursor-pointer gap-[3px] rounded-lg px-2.5 py-2 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`}
                                     >
-                                        <span className="text-[15px] font-semibold">
-                                            {item.name}
-                                            {item.isNew ? <NewTag /> : null}
-                                        </span>
-                                        {item.line ? (
-                                            <span className="text-mk-note leading-[1.4] text-muted-foreground">
-                                                {item.line}
-                                            </span>
-                                        ) : null}
+                                        <MenuItemText
+                                            item={item}
+                                            nameClass="text-[15px]"
+                                        />
                                     </Link>
                                 ))}
                             </div>

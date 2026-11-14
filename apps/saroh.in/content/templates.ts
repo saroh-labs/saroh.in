@@ -15,7 +15,7 @@ import { numberWord } from "@/lib/format/number-words";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-14";
 
 /**
  * The Templates gallery (Resources plan U6, industry templates plan U13):
