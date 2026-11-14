@@ -86,10 +86,17 @@ export async function main(argv: readonly string[]): Promise<number> {
     let graderSpent = 0;
     if (args.ai) graderSpent = await aiGrade(results, targets, verdicts);
 
-    const marks = passMarks(results, grades, verdicts, targets);
+    // Fix rounds run without the AI grader (owner, 14 Nov): its marks show as
+    // not graded and don't decide the result; the final run grades them.
+    const aiOnly = new Set(["Right language", "Refusals and asking back"]);
+    const marks = passMarks(results, grades, verdicts, targets).map((m) =>
+        !args.ai && aiOnly.has(m.name)
+            ? { ...m, pass: true, value: "not graded", notGraded: true }
+            : m,
+    );
     for (const m of marks) {
         console.info(
-            `${m.pass ? "PASS" : "FAIL"}  ${m.name}: ${m.value} (target ${m.target})${m.detail ? `; ${m.detail}` : ""}`,
+            `${"notGraded" in m ? "N/A " : m.pass ? "PASS" : "FAIL"}  ${m.name}: ${m.value} (target ${m.target})${m.detail ? `; ${m.detail}` : ""}`,
         );
     }
     for (const s of results.meta.skipped ?? [])
@@ -239,7 +246,7 @@ function gradeReport(
         "|---|---|---|---|",
         ...marks.map(
             (m) =>
-                `| ${m.name} | ${m.value} | ${m.target} | ${m.pass ? "PASS" : "FAIL"} |`,
+                `| ${m.name} | ${m.value} | ${m.target} | ${"notGraded" in m ? "not graded" : m.pass ? "PASS" : "FAIL"} |`,
         ),
         "",
         "## Runs with a problem",
