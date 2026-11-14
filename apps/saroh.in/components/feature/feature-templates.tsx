@@ -47,7 +47,7 @@ export function FeatureTemplates({ words }: { words: Words }) {
 }
 
 const FIGURE =
-    "m-0 overflow-hidden rounded-[16px] border border-border bg-card shadow-[0_24px_60px_-30px_rgba(28,28,26,.35)]";
+    "m-0 min-w-0 overflow-hidden rounded-[16px] border border-border bg-card shadow-[0_24px_60px_-30px_rgba(28,28,26,.35)]";
 
 const CHIP = "rounded-full border px-3 py-1 text-[12px] font-semibold";
 
@@ -113,11 +113,13 @@ function Picker({
 function Preview({ template }: { template: GalleryTemplate }) {
     const home = template.pages.at(0);
     return (
-        <figure className={`${FIGURE} grid gap-3 p-4 sm:p-[18px]`}>
+        <figure
+            className={`${FIGURE} grid grid-cols-[minmax(0,1fr)] gap-3 p-4 sm:p-[18px]`}
+        >
             <figcaption className="sr-only">
                 {`Drawing of the ${template.name} template's preview in Saroh, on a computer and a phone`}
             </figcaption>
-            <div aria-hidden className="flex items-center gap-2">
+            <div aria-hidden className="flex flex-wrap items-center gap-2">
                 <b className="text-[14px]">{template.name}</b>
                 <span className="text-[12.5px] text-muted-foreground">
                     with your details
@@ -137,7 +139,7 @@ function Preview({ template }: { template: GalleryTemplate }) {
                 <div aria-hidden className="flex items-start gap-3">
                     <BrowserFrame
                         host={template.sample.host}
-                        className="flex-1"
+                        className="min-w-0 flex-1"
                     >
                         <span className="block aspect-[16/10] overflow-hidden">
                             <TemplatePageView

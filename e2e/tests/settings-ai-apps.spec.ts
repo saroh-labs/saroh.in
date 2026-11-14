@@ -29,12 +29,21 @@ test("nothing connected: copy the address, then pick an app", async ({
     await page.goto(`/open/${NORTHWIND_ORG}`);
     await page.goto("/settings/developers/ai");
 
+    // The address is the API's host with mcp. for api.; a stack whose API
+    // has no api. host (CI's localhost) has none, and step 1 is the apps.
     const address = page.getByLabel(/Copy your Saroh address/);
-    await expect(address).toHaveValue(/^https:\/\/mcp\.[^/]+\/mcp$/);
-    const mcp = await address.inputValue();
-    await page.getByRole("button", { name: "Copy", exact: true }).click();
-    await expect(page.getByText("Copied", { exact: true })).toBeVisible();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(mcp);
+    if (/^https?:\/\/api\./.test(urls.API_URL)) {
+        await expect(address).toHaveValue(/^https:\/\/mcp\.[^/]+\/mcp$/);
+        const mcp = await address.inputValue();
+        await page.getByRole("button", { name: "Copy", exact: true }).click();
+        await expect(page.getByText("Copied", { exact: true })).toBeVisible();
+        expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+            mcp,
+        );
+    } else {
+        await expect(page.getByText("Add it in your assistant")).toBeVisible();
+        await expect(address).toHaveCount(0);
+    }
 
     const apps = page.locator("[data-ai-app]");
     await expect(apps).toHaveCount(2);
