@@ -177,9 +177,10 @@ export interface PublishContext {
      */
     routes: readonly string[] | null;
     /**
-     * The ids of Resources pages switched off (DEC-135): never shown,
-     * whatever the date or the preview flag, and nothing under them either.
-     * None when unset.
+     * The release switches that are off (`lib/feature-switches.ts`): a
+     * Resources page with one of these ids is never shown (DEC-135),
+     * whatever the date or the preview flag, and nothing under it either;
+     * a feature page with one is never built. None when unset.
      */
     off?: readonly string[];
     /**

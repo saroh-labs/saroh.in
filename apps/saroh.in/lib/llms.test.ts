@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { featureList } from "@/content/features";
 import { summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
 import { galleryTemplates } from "@/content/templates";
@@ -175,9 +176,9 @@ describe("llmsText", () => {
         for (const when of [BEFORE, AFTER]) {
             const text = llmsText(BASE, at(when, { routes }), articles);
             const paths = linked(text);
-            expect(
-                paths.filter((p) => p.startsWith("/features/")),
-            ).toHaveLength(9);
+            expect(paths.filter((p) => p.startsWith("/features/"))).toEqual(
+                featureList.map((f) => `/features/${f.slug}`),
+            );
             expect(
                 paths.filter((p) => p.startsWith("/solutions/")),
             ).toHaveLength(4);

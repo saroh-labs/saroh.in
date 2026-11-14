@@ -5,7 +5,11 @@
  * sentences: this file reaches browser bundles.
  */
 
-/** The nine feature pages, in the menu's order. */
+/**
+ * Every feature page, in the menu's order. What a build shows is
+ * `shownFeatures` (`feature-switches.ts`): read the list through it, never
+ * directly, so a switched-off feature is never built or linked.
+ */
 export const FEATURE_SLUGS = [
     "dashboard",
     "products",
@@ -16,6 +20,9 @@ export const FEATURE_SLUGS = [
     "billing",
     "website",
     "insights",
+    "ai-apps",
+    "ask-ai",
+    "social",
 ] as const;
 export type FeatureSlug = (typeof FEATURE_SLUGS)[number];
 
@@ -69,6 +76,23 @@ export const SHOT_KEYS = [
     "l-customer",
     "l-invoice",
     "l-site",
+    // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until
+    // U3 to U5 capture or draw them; never built while their switch is off.
+    "ai-hero",
+    "ai-connect",
+    "ai-consent",
+    "ai-ask",
+    "ai-activity",
+    "ask-hero",
+    "ask-start",
+    "ask-answer",
+    "ask-confirm",
+    "ask-history",
+    "sh-sheet",
+    "sh-button",
+    "sh-cards",
+    "sh-phone",
+    "sh-post",
 ] as const;
 export type ShotKey = (typeof SHOT_KEYS)[number];
 

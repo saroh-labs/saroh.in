@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
+import { shownFeatures } from "@saroh/marketing/feature-switches";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { features } from "@/content/features";
-import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
+import { featureList, features } from "@/content/features";
+import { SOLUTION_SLUGS } from "@/content/types";
+import { featuresOff } from "@/lib/feature-switches";
 
 import FeaturePage, { generateMetadata, generateStaticParams } from "./page";
 
@@ -36,9 +38,9 @@ async function renderAt(slug: string, iso: string) {
 }
 
 describe("/features/[slug]", () => {
-    it("builds the nine feature pages and nothing else", () => {
+    it("builds the shown feature pages and nothing else", () => {
         expect(generateStaticParams()).toEqual(
-            FEATURE_SLUGS.map((slug) => ({ slug })),
+            shownFeatures(featuresOff()).map((slug) => ({ slug })),
         );
     });
 
@@ -66,10 +68,10 @@ describe("/features/[slug]", () => {
 
     it("links only to feature and solution pages that exist", async () => {
         const known = new Set([
-            ...FEATURE_SLUGS.map((s) => `/features/${s}`),
+            ...featureList.map((f) => `/features/${f.slug}`),
             ...SOLUTION_SLUGS.map((s) => `/solutions/${s}`),
         ]);
-        for (const slug of FEATURE_SLUGS) {
+        for (const { slug } of featureList) {
             const { container, unmount } = render(
                 await FeaturePage(params(slug)),
             );

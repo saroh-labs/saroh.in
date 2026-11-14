@@ -60,6 +60,9 @@ describe("FEATURE_HELP", () => {
                 "make-your-link-look-right-when-shared",
             ],
             insights: [],
+            "ai-apps": [],
+            "ask-ai": [],
+            social: [],
         });
     });
 });

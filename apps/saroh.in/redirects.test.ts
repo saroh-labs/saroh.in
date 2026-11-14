@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { featureList } from "./content/features";
 import { SOLUTION_SLUGS as SITE_SOLUTION_SLUGS } from "./content/types";
 import { SIGN_UP_URL } from "./lib/links";
 import { CRAWL_DISALLOWED, indexedPaths, SERVED_PATHS } from "./lib/site-pages";
@@ -376,9 +377,9 @@ describe("search page redirects (DEC-193)", () => {
 });
 
 describe("indexed pages", () => {
-    it("lists Home, 9 features, 4 solutions, About, Contact, /customers, /llms.txt and the waitlist while it is the ask; Pricing once it opens", () => {
+    it("lists Home, the shown features, 4 solutions, About, Contact, /customers, /llms.txt and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
-        expect(waitlist).toHaveLength(19);
+        expect(waitlist).toHaveLength(10 + featureList.length);
         expect(waitlist).toEqual(
             expect.arrayContaining(["/features/website", "/solutions/salons"]),
         );
@@ -396,8 +397,8 @@ describe("indexed pages", () => {
         expect(waitlist).not.toContain("/pricing.md");
         expect(indexedPaths("open")).toContain("/pricing");
         expect(indexedPaths("open")).toContain("/pricing.md");
-        expect(waitlist.filter((p) => p.startsWith("/features/"))).toHaveLength(
-            9,
+        expect(waitlist.filter((p) => p.startsWith("/features/"))).toEqual(
+            featureList.map((f) => `/features/${f.slug}`),
         );
         expect(
             waitlist.filter((p) => p.startsWith("/solutions/")),

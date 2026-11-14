@@ -1,6 +1,5 @@
 import { ComingList } from "@saroh/marketing/coming-list";
 import type { FeatureSlug } from "@saroh/marketing/content-types";
-import { FEATURE_SLUGS } from "@saroh/marketing/content-types";
 import { CtaBand } from "@saroh/marketing/cta-band";
 import { FeaturePoints } from "@saroh/marketing/feature-points";
 import { FeatureSteps } from "@saroh/marketing/feature-steps";
@@ -13,7 +12,12 @@ import { notFound } from "next/navigation";
 
 import { HeroActions } from "@/components/shared/hero-actions";
 import { JsonLd } from "@/components/shared/json-ld";
-import { featureHref, features, NOT_AVAILABLE_YET } from "@/content/features";
+import {
+    featureHref,
+    featureList,
+    features,
+    NOT_AVAILABLE_YET,
+} from "@/content/features";
 import { CTA_BAND } from "@/content/home";
 import { shotView } from "@/content/shots";
 import { solutionHref, solutions } from "@/content/solutions";
@@ -25,7 +29,8 @@ import { pageAt } from "@/lib/site-map";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return FEATURE_SLUGS.map((slug) => ({ slug }));
+    // Only the shown features: a switched-off one is never built (404).
+    return featureList.map((f) => ({ slug: f.slug }));
 }
 
 interface Props {

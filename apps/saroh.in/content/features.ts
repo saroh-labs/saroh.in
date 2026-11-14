@@ -1,5 +1,6 @@
 /**
- * The nine feature pages: eight from the Features template's `F` and `LINE`
+ * The feature pages (nine, plus AI apps, Ask AI and Share behind their
+ * switches): eight from the Features template's `F` and `LINE`
  * data blocks, the Nav's `FEATURES` lines and Home's `modules` bodies, and
  * Website, written in the same shape on 12 Oct 2026 (it has no design of
  * its own yet).
@@ -17,15 +18,18 @@
  *   which says what the screenshot really shows;
  * - the design's `home` key is the `dashboard` slug (/features/dashboard).
  */
+import { shownFeatures } from "@saroh/marketing/feature-switches";
+
+import { featuresOff } from "@/lib/feature-switches";
+
 import type { Feature, FeatureSlug } from "./types";
-import { FEATURE_SLUGS } from "./types";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-14";
 
 export const features: Record<FeatureSlug, Feature> = {
     dashboard: {
@@ -670,13 +674,233 @@ export const features: Record<FeatureSlug, Feature> = {
         usedBy: ["shops", "gyms", "clinics"],
         closer: "See how your site is doing.",
     },
+    /*
+     * AI apps, Ask AI and Share (plan 2026-11-13-002): the approved boards'
+     * words (VFAiApps, VFAskAi, VFSocial), built only while their switch is
+     * on (`shownFeatures`). U3 to U5 finish them: shots, the drawn chat, the
+     * plan lines from the catalogue, and the Anthropic point after the
+     * owner's legal read.
+     */
+    "ai-apps": {
+        slug: "ai-apps",
+        phrase: "AI assistant integration",
+        seoTitle: "AI assistant integration for small business",
+        seoDescription:
+            "AI assistant integration that lets Claude, ChatGPT and other AI apps add products, move bookings and draft pages for your business.",
+        name: "AI apps",
+        navLine: "Use Saroh from your AI assistant",
+        cardLine: "Use Saroh from your AI assistant.",
+        homeBody:
+            "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
+        headline: "Use Saroh from your AI assistant.",
+        sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up today's bookings or move one. It can do only what you can do in Saroh, and nothing on your website goes live until someone on your team publishes it.",
+        hero: { shot: "ai-hero" },
+        howTitle: "Connected in a minute. In charge after.",
+        steps: [
+            {
+                title: "Add Saroh to your AI app",
+                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector. Each app's guide shows where.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ai-connect",
+            },
+            {
+                title: "Sign in and pick your businesses",
+                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick one business, several or all of yours, and allow it. One connection covers them all.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ai-consent",
+            },
+            {
+                title: "Ask in your own words",
+                body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in your activity in Settings. Website changes stay a draft until you publish them in Saroh.",
+                who: "Kesar Salon (demo salon)",
+                shot: "ai-ask",
+            },
+            {
+                title: "See everything it did",
+                body: "Settings lists each AI app you connected and every change it made. Put the website draft back as it was before the app's changes, or disconnect it at any time.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ai-activity",
+            },
+        ],
+        points: [
+            {
+                title: "Your website, by asking",
+                body: "Build and change pages, sections, the look, the menu and the footer, and add images. Or start a site from a template.",
+            },
+            {
+                title: "Your catalogue",
+                body: "Products, services, prices, stock and opening hours.",
+            },
+            {
+                title: "Your day",
+                body: "Find free times, make and move bookings, make orders and move them along, and read enquiries and customers.",
+            },
+            {
+                title: "Only what you can do",
+                body: "It acts as you, with your role. It can't cancel bookings, refund, touch billing or change your team, and it never sees sensitive customer details.",
+            },
+            {
+                title: "Nothing goes live by itself",
+                body: "You publish website changes in Saroh, or send them to your reviewer. The app can't.",
+            },
+            {
+                title: "Several businesses, one connection",
+                body: "Tick the ones it may use. It names the business on every change it makes.",
+            },
+        ],
+        worksLead:
+            "Your AI assistant works on the same records as the rest of Saroh, so a change it makes is a change everywhere.",
+        worksWith: ["website", "products", "bookings", "orders"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Do your Saroh work by asking.",
+    },
+    "ask-ai": {
+        slug: "ask-ai",
+        phrase: "AI business assistant",
+        seoTitle: "AI business assistant for small business owners",
+        seoDescription:
+            "AI business assistant that answers questions about your bookings, orders and customers from your own records, in English, Hinglish or Hindi.",
+        name: "Ask AI",
+        navLine: "Ask about your business, inside Saroh",
+        cardLine: "Ask about your business, inside Saroh.",
+        homeBody:
+            "Ask about your business inside Saroh, answered from your own bookings, orders and customers.",
+        headline: "Ask about your business. Get a straight answer.",
+        sub: "An AI business assistant inside Saroh. Ask in English, Hinglish or Hindi how the week went, what's selling or who hasn't come back, and get the answer from your own records, in the same figures Home and Insights show. Ask it to add or change something and it fills in a card for you to check. Nothing is saved until you confirm.",
+        hero: { shot: "ask-hero" },
+        howTitle: "Ask in your own words.",
+        steps: [
+            {
+                title: "Open Ask AI from any screen",
+                body: "The Ask AI button sits at the top of Saroh. Type a question, or tap one of the ready ones to start.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "ask-start",
+            },
+            {
+                title: "Answers from your own records",
+                body: "It reads your bookings, orders, customers and products, says where each answer came from, and links to that screen. Ask in Hinglish and it answers in Hinglish.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ask-answer",
+            },
+            {
+                title: "Changes come as a card you confirm",
+                body: "Ask it to add a service, move a booking or update a customer and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo an edit the same day.",
+                who: "Kesar Salon (demo salon)",
+                shot: "ask-confirm",
+            },
+            {
+                title: "Go back to an earlier question",
+                body: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
+                who: "Kesar Salon (demo salon)",
+                shot: "ask-history",
+            },
+        ],
+        points: [
+            {
+                title: "Only what you may see",
+                body: "It answers from what your role lets you see in Saroh. Someone without access to money gets no takings.",
+            },
+            {
+                title: "Nothing saved without you",
+                body: "Every change is a card you confirm. It never deletes, cancels or refunds.",
+            },
+            {
+                title: "English, Hinglish or Hindi",
+                body: "It answers in the language you ask in, or the one you choose.",
+            },
+            {
+                title: "You decide who uses it",
+                body: "Owners and admins can use it to start. Give it to anyone else in Roles, or turn it off for the business.",
+            },
+        ],
+        worksLead:
+            "Ask AI reads from everything else in Saroh, so its answers match your screens.",
+        worksWith: ["dashboard", "insights", "bookings"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Ask your business, in your words.",
+    },
+    social: {
+        slug: "social",
+        phrase: "social media posts",
+        seoTitle: "Social media posts made from what you sell",
+        seoDescription:
+            "Social media posts made from your products, services and offers, in your website's look, ready to share on WhatsApp, Instagram or Facebook.",
+        name: "Share and posts",
+        navLine: "Share cards and posts made from what you sell",
+        cardLine: "Turn what you sell into a post.",
+        homeBody:
+            "Share a product, service, offer or post as a card in your look, or make a post of your own.",
+        headline: "Turn what you sell into a post in a minute.",
+        sub: "Social media posts made from what you sell. Share a product, a service or class, an offer, a blog post or your booking page as a ready post, drawn in your website's own colours, fonts and logo. Pick a card, check the caption, then post it yourself on WhatsApp, Instagram or Facebook from your phone or computer.",
+        hero: { shot: "sh-sheet" },
+        howTitle: "From your page to their feed.",
+        steps: [
+            {
+                title: "Press Share on anything with a page",
+                body: "Products, services and classes, blog posts, offers and your booking page each get a Share button once they're live on your site.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "sh-button",
+            },
+            {
+                title: "Pick a card and a size",
+                body: "Photo, Price tag, Offer or Simple, as a post, a square or a story. A card only shows what the item has: no live offer, no Offer card.",
+                who: "Kesar Salon (demo salon)",
+                shot: "sh-cards",
+            },
+            {
+                title: "Post it from your phone",
+                body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "sh-phone",
+            },
+            {
+                title: "Or make your own post",
+                body: "In Social, Create post takes a headline, your own photo or both, and a link to any page on your site. Your own posts are saved, so you can share them again.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "sh-post",
+            },
+        ],
+        points: [
+            {
+                title: "In your look, not ours",
+                body: "Cards use your website's colours, fonts and logo.",
+            },
+            {
+                title: "Indian scripts drawn right",
+                body: "Names in Hindi and other Indian scripts come out as you typed them.",
+            },
+            {
+                title: "The right size for each place",
+                body: "Post, square and story. Stories keep words clear of the top and bottom.",
+            },
+            {
+                title: "You post, from your own accounts",
+                body: "Saroh makes the picture and the caption. You share them, so there's nothing to connect and no password to give.",
+            },
+            {
+                title: "Links that sell",
+                body: "Every post links to the item's live page, where people can book or buy.",
+            },
+        ],
+        worksLead:
+            "A post reads its name, picture and price from where you already keep them.",
+        worksWith: ["products", "bookings", "website"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Something new? Share it today.",
+    },
 };
 
-/** The features in the menu's order. */
-export const featureList: Feature[] = FEATURE_SLUGS.map((s) => features[s]);
+/**
+ * The features this build shows, in the menu's order: a switched-off one
+ * (`lib/feature-switches.ts`) is never built or linked.
+ */
+export const featureList: Feature[] = shownFeatures(featuresOff()).map(
+    (s) => features[s],
+);
 
 export const featureHref = (slug: FeatureSlug) => `/features/${slug}`;
 
+/** Whether `value` names a feature page, shown or not. */
 export function isFeatureSlug(value: string): value is FeatureSlug {
-    return (FEATURE_SLUGS as readonly string[]).includes(value);
+    return Object.hasOwn(features, value);
 }

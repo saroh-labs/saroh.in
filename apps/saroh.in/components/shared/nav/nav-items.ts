@@ -7,7 +7,7 @@ import type { NavItem } from "./nav-section";
 
 export type { NavItem, NavSection } from "./nav-section";
 
-/** The Features menu: eight items, each with its line (the Nav design). */
+/** The Features menu: the shown features, each with its line (the Nav design). */
 export const FEATURE_ITEMS: NavItem[] = featureList.map((f) => ({
     name: f.name,
     line: f.navLine,

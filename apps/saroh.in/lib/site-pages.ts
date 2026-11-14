@@ -10,7 +10,11 @@ import {
     UPDATED as CONTACT_UPDATED,
 } from "@/content/contact-page";
 import { UPDATED as CUSTOMERS_UPDATED } from "@/content/customers";
-import { featureHref, UPDATED as FEATURES_UPDATED } from "@/content/features";
+import {
+    featureHref,
+    featureList,
+    UPDATED as FEATURES_UPDATED,
+} from "@/content/features";
 import {
     HELP_PATH,
     UPDATED as HELP_UPDATED,
@@ -44,7 +48,7 @@ import {
     TEMPLATES_PATH,
     UPDATED as TEMPLATES_UPDATED,
 } from "@/content/templates";
-import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
+import { SOLUTION_SLUGS } from "@/content/types";
 import { UPDATED as WAITLIST_UPDATED } from "@/content/waitlist";
 import { docPages } from "@/lib/docs-pages";
 import { helpArticles } from "@/lib/help-docs";
@@ -122,7 +126,7 @@ export function indexedPaths(
     return [
         "/",
         ...(mode === "open" ? ["/pricing", "/pricing.md"] : []),
-        ...FEATURE_SLUGS.map(featureHref),
+        ...featureList.map((f) => featureHref(f.slug)),
         ...SOLUTION_SLUGS.map(solutionHref).filter(
             (path) =>
                 !forPages.includes(path.replace(/^\/solutions\//, "/for/")),
@@ -158,7 +162,7 @@ const indiaDayOf = (iso: string) =>
 const PAGE_DAYS: Readonly<Record<string, string>> = {
     "/": HOME_UPDATED,
     ...Object.fromEntries(
-        FEATURE_SLUGS.map((s) => [featureHref(s), FEATURES_UPDATED]),
+        featureList.map((f) => [featureHref(f.slug), FEATURES_UPDATED]),
     ),
     ...Object.fromEntries(
         SOLUTION_SLUGS.map((s) => [solutionHref(s), SOLUTIONS_UPDATED]),

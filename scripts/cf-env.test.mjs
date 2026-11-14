@@ -157,3 +157,22 @@ test("the scheduled run deploys nothing when this isn't the launch", () => {
     );
     assert.equal(launchWait([LAUNCH_AT], at(-7 * 86_400_000)), "none");
 });
+
+test("saroh.in's release switches: on in dev, left out (off) in production", () => {
+    const SWITCHES = [
+        "NEXT_PUBLIC_TEMPLATES",
+        "NEXT_PUBLIC_AI_APPS",
+        "NEXT_PUBLIC_ASK_AI",
+        "NEXT_PUBLIC_SOCIAL",
+        "NEXT_PUBLIC_DEVELOPERS",
+        "NEXT_PUBLIC_DOCS",
+    ];
+    const dev = buildVars("apps/saroh.in", "development", new Date(0));
+    const prod = buildVars("apps/saroh.in", "production", new Date(8.64e15));
+    const tech = buildVars("apps/saroh.tech", "production", new Date(8.64e15));
+    for (const name of SWITCHES) {
+        assert.equal(dev[name], "on", `${name} in saroh.in's dev vars`);
+        assert.equal(prod[name], undefined, `${name} in saroh.in's production`);
+        assert.equal(tech[name], undefined, `${name} in saroh.tech's production`);
+    }
+});

@@ -51,6 +51,10 @@ export const FEATURE_HELP: Readonly<
             label: "How to make your link look right when shared",
         },
     ],
+    // Their articles come with U9 (plan 2026-11-13-002), behind the switches.
+    "ai-apps": [],
+    "ask-ai": [],
+    social: [],
 };
 
 export interface FeatureHelpLink {

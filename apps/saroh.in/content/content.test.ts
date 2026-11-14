@@ -74,7 +74,7 @@ describe("contentErrors", () => {
 });
 
 describe("feature pages", () => {
-    it("has exactly the nine slugs, keyed by their own slug", () => {
+    it("states every feature slug, shown or not, keyed by its own slug", () => {
         expect(Object.keys(features).sort()).toEqual([...FEATURE_SLUGS].sort());
         for (const [key, f] of Object.entries(features)) {
             expect(f.slug).toBe(key);

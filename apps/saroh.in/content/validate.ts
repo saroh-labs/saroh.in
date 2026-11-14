@@ -4,13 +4,14 @@ import {
     WEBHOOK_EVENTS,
     webhookPath,
 } from "@saroh/integrations";
+import { ALL_FEATURES } from "@saroh/marketing/feature-switches";
 
 import { HELP_AREAS, HELP_GROUPS, namesPriceOrLimit } from "./help";
 import type { HelpFrontmatter } from "./help-frontmatter";
 import type { IntegrationFrontmatter } from "./integrations";
 import { API_ORIGIN, PLACEHOLDER_BUSINESS_ID } from "./integrations";
 import type { FaqItem, Feature, Solution } from "./types";
-import { FEATURE_SLUGS, SOLUTION_SLUGS } from "./types";
+import { SOLUTION_SLUGS } from "./types";
 
 /**
  * Every broken cross-link in the content model, as readable lines: a page
@@ -35,7 +36,7 @@ export function contentErrors({
     const isSolution = (s: string) => s in solutions;
     const hasShot = (k: string) => k in shots;
 
-    for (const slug of FEATURE_SLUGS) {
+    for (const slug of ALL_FEATURES) {
         const f = features[slug];
         if (!f) {
             errors.push(`feature ${slug}: missing`);

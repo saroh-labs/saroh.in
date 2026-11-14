@@ -11,9 +11,13 @@ import { FeatureSteps } from "@/components/feature/feature-steps";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { CtaBand } from "@/components/shared/sections/cta-band";
 import { featureHelpLinks } from "@/content/feature-help";
-import { featureHref, features, isFeatureSlug } from "@/content/features";
+import {
+    featureHref,
+    featureList,
+    features,
+    isFeatureSlug,
+} from "@/content/features";
 import { summarise } from "@/content/help";
-import { FEATURE_SLUGS } from "@/content/types";
 import { helpArticles } from "@/lib/help-docs";
 import { LAUNCH_MODE } from "@/lib/links";
 import { freePlanLine } from "@/lib/plan-teasers";
@@ -35,7 +39,8 @@ import { breadcrumbLd } from "@/lib/structured-data";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return FEATURE_SLUGS.map((slug) => ({ slug }));
+    // Only the shown features: a switched-off one is never built (404).
+    return featureList.map((f) => ({ slug: f.slug }));
 }
 
 interface Props {

@@ -129,6 +129,51 @@ const designed = {
     "g-subs": pending(
         "Memberships at Pulse Fitness (demo gym) with their next charge",
     ),
+    // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until U3
+    // to U5 capture or draw them. Not built while their switch is off.
+    "ai-hero": pending(
+        "An AI assistant adding a section to the home page of Rye & Co. (demo bakery) as a draft",
+    ),
+    "ai-connect": pending(
+        "An AI app's Add a connector form with Saroh's address",
+    ),
+    "ai-consent": pending(
+        "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
+    ),
+    "ai-ask": pending(
+        "An AI assistant moving a booking at Kesar Salon (demo salon)",
+    ),
+    "ai-activity": pending(
+        "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
+    ),
+    "ask-hero": pending(
+        "Ask AI at Kesar Salon (demo salon) answering how the week went",
+    ),
+    "ask-start": pending(
+        "Ask AI at Pulse Fitness (demo gym) before a question, with ready questions",
+    ),
+    "ask-answer": pending(
+        "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish",
+    ),
+    "ask-confirm": pending(
+        "Ask AI at Kesar Salon (demo salon): a new service card to check before it is added",
+    ),
+    "ask-history": pending("Ask AI's history at Kesar Salon (demo salon)"),
+    "sh-sheet": pending(
+        "The Share sheet for a product at Rye & Co. (demo bakery): a card in the bakery's look, its sizes and caption",
+    ),
+    "sh-button": pending(
+        "A live product at Rye & Co. (demo bakery) with its Share button",
+    ),
+    "sh-cards": pending(
+        "Card styles for a service at Kesar Salon (demo salon) in the salon's own colours",
+    ),
+    "sh-phone": pending(
+        "A phone's share sheet with a class card from Pulse Fitness (demo gym)",
+    ),
+    "sh-post": pending(
+        "Create post at Rye & Co. (demo bakery): a headline, a link and the card drawn in the bakery's look",
+    ),
 } satisfies Record<string, Shot>;
 
 /** A captured shot (U20) replaces its placeholder, alt included: the
