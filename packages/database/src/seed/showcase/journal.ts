@@ -63,7 +63,8 @@ export const photo = (
     creditUrl: string,
 ): JournalPhoto => ({ id, alt, creditName, creditUrl });
 
-export const unsplashUrl = (id: string, width = 1600) =>
+/** A demo photo on Saroh's media host: one 1600px copy of each (15 Nov 2026). */
+export const unsplashUrl = (id: string) =>
     `https://media.saroh.io/demo/${id}.jpg`;
 
 const escapeHtml = (s: string) =>
@@ -77,7 +78,7 @@ const escapeHtml = (s: string) =>
 export function figure(p: JournalPhoto, caption?: string): string {
     const credit = `Photo: <a href="${p.creditUrl}">${escapeHtml(p.creditName)}</a> on Unsplash`;
     return (
-        `<figure><img src="${unsplashUrl(p.id, 1400)}" alt="${escapeHtml(p.alt)}" />` +
+        `<figure><img src="${unsplashUrl(p.id)}" alt="${escapeHtml(p.alt)}" />` +
         `<figcaption>${caption ? `${escapeHtml(caption)} · ` : ""}${credit}</figcaption></figure>`
     );
 }
