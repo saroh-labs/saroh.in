@@ -20,6 +20,7 @@ export const UI_FILES = [
     "components/ui/calendar.tsx",
     "components/ui/check-row.tsx",
     "components/ui/checkbox.tsx",
+    "components/ui/copy-button.tsx",
     "components/ui/date-picker.tsx",
     "components/ui/dialog.tsx",
     "components/ui/field.tsx",

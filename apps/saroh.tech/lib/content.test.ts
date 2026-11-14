@@ -49,7 +49,8 @@ function missingFields(theirs: unknown, ours: unknown, at = ""): string[] {
 }
 
 /** Optional on saroh.in: a site may have no shot or plan note for a line. */
-const OPTIONAL = /\.(openNote|label|shot|alt|hero|heroNote)$/;
+// shortcut: `.templates` is a switched section saroh.tech gains in U16 (plan 2026-11-13-002); drop it from here then.
+const OPTIONAL = /\.(openNote|label|shot|alt|hero|heroNote|templates)$/;
 const missing = (theirs: unknown, ours: unknown) =>
     missingFields(theirs, ours).filter((f) => !OPTIONAL.test(f));
 
