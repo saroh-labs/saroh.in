@@ -7,6 +7,7 @@
 import type { ShotKey } from "@saroh/marketing/content-types";
 import type { Shot, ShotView } from "@saroh/marketing/shot";
 
+import PLACEHOLDERS from "./shot-placeholders.json";
 import { CAPTURED } from "./shots.captured";
 
 /**
@@ -43,7 +44,11 @@ export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */
 export const SHOT_WIDTHS = [640, 960, 1280, 1920] as const;
 
+/** Blurred stand-ins `shots:sizes` writes, one per captured shot (`v2/<key>`). */
+const PLACEHOLDER: Record<string, string> = PLACEHOLDERS;
+
 const shot = (key: string, c: (typeof CAPTURED)[string]): Shot => ({
+    placeholder: PLACEHOLDER[`v2/${key}`],
     src: c.src,
     alt: c.alt,
     width: c.width,
