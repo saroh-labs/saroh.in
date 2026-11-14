@@ -12,14 +12,14 @@ import type { OrderAttention } from "./order-attention";
 import { attentionByCustomer } from "./order-attention";
 import type { OrderListFilter, OrderListView } from "./order-list-filters";
 import {
+    asksDates,
     computedConditions,
-    dayRange,
     lateSettingsJoin,
     lateSql,
+    listRange,
     openSql,
     orderConditions,
     paymentSql,
-    presetRange,
     tabCondition,
     ts,
 } from "./order-list-filters";
@@ -97,20 +97,11 @@ export async function listOrderRows(
         contact: caller.contact,
         sensitive: caller.viewer ? canSeeSensitive(caller.viewer) : false,
     };
-    if (query.date && (query.from || query.to)) {
-        throw new BadRequestException({
-            message: "Pick a date range or a preset, not both.",
-            details: { field: "date" },
-        });
-    }
-    const zone =
-        query.from || query.to || query.date
-            ? await businessTimezone(prisma, organizationId)
-            : // No day asked for, so no zone is read.
-              "UTC";
-    const range = query.date
-        ? presetRange(query.date, zone, now)
-        : dayRange(query.from, query.to, zone);
+    const zone = asksDates(query)
+        ? await businessTimezone(prisma, organizationId)
+        : // No day asked for, so no zone is read.
+          "UTC";
+    const range = listRange(query, zone, now);
 
     if (query.cursor && query.page) {
         throw new BadRequestException({

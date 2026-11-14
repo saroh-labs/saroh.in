@@ -9,6 +9,7 @@ import {
     narrowed,
     readsOnServer,
     shownRows,
+    withDateRange,
     withFigure,
     withSearch,
     withTab,
@@ -27,6 +28,9 @@ const ALL: ListQuery = {
     cheques: false,
     paidFrom: null,
     q: "",
+    date: null,
+    from: null,
+    to: null,
 };
 
 describe("listQueryFrom", () => {
@@ -196,5 +200,60 @@ describe("figureEmptyLine", () => {
             "No money in since day 2026-10-01",
         );
         expect(figureEmptyLine({ ...ALL, tab: "paid" }, day)).toBeNull();
+    });
+});
+
+describe("the issued date (Orders' ?date=, ?from=, ?to=)", () => {
+    const params = {
+        tab: "paid",
+        date: "custom",
+        from: "2026-08-01",
+        to: "2026-10-31",
+    };
+
+    it("reads the range beside the status, and asks the API for it", () => {
+        const query = listQueryFrom(params);
+        expect(query).toMatchObject({
+            tab: "paid",
+            date: "custom",
+            from: "2026-08-01",
+            to: "2026-10-31",
+        });
+        expect(readsOnServer(query)).toBe(true);
+        expect(narrowed({ ...query, tab: "all" })).toBe(true);
+    });
+
+    it("a custom range with no day yet is the newest page", () => {
+        const query = listQueryFrom({ date: "custom" });
+        expect(readsOnServer(query)).toBe(false);
+        expect(narrowed(query)).toBe(false);
+    });
+
+    it("keeps the status when the dates change, and the dates when the status does", () => {
+        const at = new URLSearchParams("tab=overdue&q=tara");
+        expect(
+            withDateRange(at, {
+                date: "month",
+                from: null,
+                to: null,
+            }).toString(),
+        ).toBe("tab=overdue&q=tara&date=month");
+        expect(
+            withTab(new URLSearchParams("date=7d&tab=paid"), "due").toString(),
+        ).toBe("date=7d&tab=due");
+    });
+
+    it("says an empty range as the days", () => {
+        expect(
+            figureEmptyLine(
+                {
+                    ...ALL,
+                    date: "custom",
+                    from: "2026-08-01",
+                    to: "2026-08-31",
+                },
+                (d) => d,
+            ),
+        ).toBe("No invoices issued between 1 Aug and 31 Aug");
     });
 });

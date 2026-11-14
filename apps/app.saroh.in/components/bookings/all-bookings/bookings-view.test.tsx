@@ -44,8 +44,9 @@ vi.mock("@/lib/services/actions", () => ({
 vi.mock("@/lib/api/http", () => ({}));
 
 const refresh = vi.fn();
+const replace = vi.fn();
 vi.mock("next/navigation", () => ({
-    useRouter: () => ({ refresh, push: vi.fn(), replace: vi.fn() }),
+    useRouter: () => ({ refresh, push: vi.fn(), replace }),
     usePathname: () => "/bookings/all",
     useSearchParams: () => new URLSearchParams(),
 }));
@@ -282,6 +283,7 @@ beforeEach(() => {
         cancelBooking,
         readBookingForCancel,
         refresh,
+        replace,
         showUndo,
         showSuccess,
         showError,
@@ -607,6 +609,37 @@ describe.each([
         press(byText("button, a", "Show all bookings"));
         expect(chip("All")?.getAttribute("aria-checked")).toBe("true");
         expect(all("[data-booking-row]")).toHaveLength(6);
+    });
+
+    it("shows the date filter, a custom range with its two days", () => {
+        draw({
+            dates: { date: "custom", from: "2026-08-01", to: "2026-10-31" },
+        });
+        expect(
+            document.querySelector('[aria-label="Starts"]')?.textContent,
+        ).toContain("Custom range…");
+        expect(
+            all<HTMLInputElement>('[aria-label="From"], [aria-label="To"]')
+                .length,
+        ).toBeGreaterThanOrEqual(2);
+    });
+
+    it("says days with no bookings as a filter, and Clear filters drops the dates", () => {
+        window.history.replaceState(
+            null,
+            "",
+            "/bookings/all?view=all&date=custom&from=2026-08-01&to=2026-08-31",
+        );
+        draw({
+            bookings: [],
+            initialView: "all",
+            dates: { date: "custom", from: "2026-08-01", to: "2026-08-31" },
+        });
+        expect(text()).not.toContain("No bookings yet");
+        press(byText("button", "Clear filters"));
+        expect(replace).toHaveBeenCalledWith("/bookings/all?view=all", {
+            scroll: false,
+        });
     });
 
     it("moves the view with the arrow keys", () => {

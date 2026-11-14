@@ -1,26 +1,17 @@
 "use client";
 
-import { DateInput } from "@saroh/ui/date-picker";
 import { cn } from "@saroh/ui/lib/utils";
 
 import type { OrderFilterOptions } from "@/lib/orders/business-service";
-import type {
-    OrdersDate,
-    OrdersFilters,
-    OrdersPayment,
-} from "@/lib/orders/list-filters";
-import {
-    DATE_OPTIONS,
-    PAYMENT_OPTIONS,
-    stepOptions,
-} from "@/lib/orders/list-filters";
+import type { OrdersFilters, OrdersPayment } from "@/lib/orders/list-filters";
+import { PAYMENT_OPTIONS, stepOptions } from "@/lib/orders/list-filters";
 import type { OrdersQuery } from "@/lib/orders/list-query";
 import type { FulfilmentType } from "@/lib/orders/read";
 import { OptionSelect } from "@saroh/ui/option-select";
 
+import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
 import {
     AttentionToggle,
-    listFilterClass,
     NARROWED,
 } from "@/components/shared/lists/list-toolbar";
 import { ProductFilter } from "./product-filter";
@@ -85,48 +76,7 @@ export function OrderDateFilter({
     go,
     stacked = false,
 }: FilterProps & { stacked?: boolean }) {
-    const field = stacked ? "w-full min-w-0" : "w-auto min-w-0";
-    return (
-        <>
-            <OptionSelect<OrdersDate | "">
-                aria-label="Date"
-                value={query.date ?? ""}
-                onValueChange={(v) =>
-                    go({ date: v || null, from: null, to: null })
-                }
-                options={[{ value: "", label: "All dates" }, ...DATE_OPTIONS]}
-                className={
-                    stacked
-                        ? "w-full"
-                        : cn(listFilterClass, query.date && NARROWED)
-                }
-            />
-            {query.date === "custom" ? (
-                <div
-                    className={
-                        stacked ? "grid grid-cols-2 gap-2.5" : "contents"
-                    }
-                >
-                    <DateInput
-                        aria-label="From"
-                        placeholder="From"
-                        value={query.from ?? ""}
-                        max={query.to ?? undefined}
-                        onValueChange={(v) => go({ from: v || null })}
-                        className={field}
-                    />
-                    <DateInput
-                        aria-label="To"
-                        placeholder="To"
-                        value={query.to ?? ""}
-                        min={query.from ?? undefined}
-                        onValueChange={(v) => go({ to: v || null })}
-                        className={field}
-                    />
-                </div>
-            ) : null}
-        </>
-    );
+    return <DateRangeFilter value={query} onChange={go} stacked={stacked} />;
 }
 
 /**

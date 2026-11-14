@@ -1,5 +1,7 @@
 import { DEFAULT_PAGE_SIZE, readPageSize } from "@saroh/ui/lib/paging";
 
+import type { DateRange } from "@/lib/views/date-range";
+
 /**
  * The Stock screen's address (#527): its tab, each tab's filters, and each
  * tab's page. Pure, with no client mark: the page reads an address with it
@@ -38,7 +40,7 @@ const PAGE_KEYS: Record<StockTab, { page: string; size: string }> = {
 /** The parts whose change lists something else on a tab: back to page 1. */
 const RELISTING: Record<StockTab, readonly string[]> = {
     levels: ["show", "q"],
-    log: ["kind", "store", "product"],
+    log: ["kind", "store", "product", "date", "from", "to"],
     checks: [],
 };
 
@@ -80,8 +82,12 @@ export function readStockPages(
     return { levels: read("levels"), log: read("log"), checks: read("checks") };
 }
 
-/** Where the screen is: what its address says, defaults filled in. */
-export interface StockAddress {
+/**
+ * Where the screen is: what its address says, defaults filled in. The
+ * log's date filter is every list's (`?date=`, `?from=`, `?to=`,
+ * `lib/views/date-range.ts`): the day of the change.
+ */
+export interface StockAddress extends DateRange {
     tab: StockTab;
     /** Levels: "all", "needs" or a storefront's id. */
     show: string;
@@ -107,6 +113,10 @@ export interface StockChange {
     kind?: string;
     store?: string;
     product?: string;
+    /** The log's date filter; null or undefined clears a part. */
+    date?: string | null;
+    from?: string | null;
+    to?: string | null;
     page?: number;
     size?: number;
 }
@@ -133,15 +143,20 @@ export function stockHref(at: StockAddress, change: StockChange = {}): string {
     if (size !== undefined) pages[at.tab] = { page: 1, size };
     if (page !== undefined) pages[at.tab].page = page;
 
-    const next: Record<string, string | undefined> = {
+    const next: Record<string, string | null | undefined> = {
         tab: at.tab === "levels" ? undefined : at.tab,
         show: at.show === "all" ? undefined : at.show,
         q: at.q || undefined,
         kind: at.kind === "all" ? undefined : at.kind,
         store: at.store === "all" ? undefined : at.store,
         product: at.product || undefined,
+        date: at.date,
+        from: at.from,
+        to: at.to,
         ...parts,
     };
+    // The days count only for a custom range.
+    if (next.date !== "custom") next.from = next.to = undefined;
     for (const tab of STOCK_TABS) {
         const keys = PAGE_KEYS[tab];
         next[keys.page] =

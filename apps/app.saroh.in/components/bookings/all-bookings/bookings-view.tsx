@@ -14,6 +14,7 @@ import { useMemo, useRef, useState } from "react";
 
 import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
+import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { personHref } from "@/lib/contacts/person-href";
@@ -52,6 +53,12 @@ import { BOOKING_WORDS } from "@/lib/services/booking-words";
 import { whoFor } from "@/lib/services/diary";
 import { zoneShortName } from "@/lib/services/time-picker";
 import type { ShareLink } from "@/lib/sites/share-links";
+import type { DateRange } from "@/lib/views/date-range";
+import {
+    dateRangeOn,
+    NO_DATE_RANGE,
+    writeDateRange,
+} from "@/lib/views/date-range";
 import { ChipGroup } from "@saroh/ui/choice-group";
 import { BookingRow, ROW_GRID } from "./booking-row";
 import { MoreBookingFilters } from "./more-filters";
@@ -103,6 +110,7 @@ export function BookingsView({
     initialView,
     can,
     share = null,
+    dates = NO_DATE_RANGE,
 }: {
     bookings: DiaryBooking[];
     /** The business's zone: every time is read in it (Q10). */
@@ -111,6 +119,11 @@ export function BookingsView({
     now: number;
     initialView?: string;
     can: AllBookingsCan;
+    /**
+     * The date filter the address asks for (`?date=`, Orders' params):
+     * `bookings` are already the API's for those days.
+     */
+    dates?: DateRange;
     /**
      * A business with no bookings yet is offered "Share your booking page"
      * while the page is live (DEC-069, L8); null leaves it out.
@@ -182,11 +195,21 @@ export function BookingsView({
     );
 
     const searching = term.trim() !== "";
-    const filtering = moreCount(more) > 0;
+    const dated = dateRangeOn(dates);
+    const filtering = moreCount(more) > 0 || dated;
+
+    // The date filter is read on the server, so a change goes by the
+    // address; the view, the search and the rest stay as they are.
+    const pickDates = (patch: Partial<DateRange>) => {
+        const url = new URL(window.location.href);
+        writeDateRange({ ...dates, ...patch }, url.searchParams);
+        router.replace(`${url.pathname}${url.search}`, { scroll: false });
+    };
     const clearAll = () => {
         setTerm("");
         setSearchKey((k) => k + 1);
         setMore(NO_MORE);
+        if (dates.date) pickDates(NO_DATE_RANGE);
     };
 
     const mark = (b: DiaryBooking, outcome: BookingOutcome) => {
@@ -223,7 +246,7 @@ export function BookingsView({
     const whenLine = (b: DiaryBooking) =>
         `${formatDateTime(b.startAt, timezone, { weekday: "short", relative: true, now })} · ${b.service.name}${b.staff ? ` with ${b.staff.name}` : ""}`;
 
-    if (bookings.length === 0) {
+    if (bookings.length === 0 && !dates.date) {
         return (
             <EmptyState
                 icon={<CalendarDays />}
@@ -287,6 +310,17 @@ export function BookingsView({
                                 />
                             </div>
                         </ScrollX>
+                    </div>
+                }
+                // The day it starts, read by the API; on a phone it wraps
+                // to its own line under the views.
+                more={
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <DateRangeFilter
+                            label="Starts"
+                            value={dates}
+                            onChange={pickDates}
+                        />
                     </div>
                 }
                 onClear={searching || filtering ? clearAll : undefined}

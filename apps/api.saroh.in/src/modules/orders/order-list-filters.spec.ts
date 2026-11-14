@@ -10,6 +10,7 @@ import {
     dayRange,
     lateSettingsJoin,
     lateSql,
+    listRange,
     orderConditions,
     paymentStandingOf,
     presetRange,
@@ -460,5 +461,40 @@ describe("ListOrdersQuery — B4's step and date", () => {
         { date: "fortnight" },
     ])("refuses %o", async (value) => {
         await expect(parse(value)).rejects.toThrow(BadRequestException);
+    });
+});
+
+describe("listRange — every list's date filter (Orders, Invoices, All bookings, the stock log)", () => {
+    const now = new Date("2026-11-14T20:00:00Z"); // 15 Nov, 01:30 in Kolkata
+
+    it("is no range when none is asked for", () => {
+        expect(listRange({}, "Asia/Kolkata", now)).toEqual({
+            gte: undefined,
+            lt: undefined,
+        });
+    });
+
+    it("reads the days in the business's zone, the last one included", () => {
+        const { gte, lt } = listRange(
+            { from: "2026-08-01", to: "2026-10-31" },
+            "Asia/Kolkata",
+            now,
+        );
+        expect(gte?.toISOString()).toBe("2026-07-31T18:30:00.000Z");
+        expect(lt?.toISOString()).toBe("2026-10-31T18:30:00.000Z");
+    });
+
+    it("reads a preset at the business's today, not the server's", () => {
+        const { gte } = listRange({ date: "today" }, "Asia/Kolkata", now);
+        expect(gte?.toISOString()).toBe("2026-11-14T18:30:00.000Z");
+    });
+
+    it("refuses a preset with days, and a range that ends before it starts", () => {
+        expect(() =>
+            listRange({ date: "7d", to: "2026-08-01" }, "UTC", now),
+        ).toThrow(BadRequestException);
+        expect(() =>
+            listRange({ from: "2026-08-02", to: "2026-08-01" }, "UTC", now),
+        ).toThrow(BadRequestException);
     });
 });

@@ -101,16 +101,20 @@ const productView = (p: ProductRow): ProductView => ({
 });
 
 /** `query`: words in the name (the MCP's `list_products`). */
+const productsWhere = (organizationId: string, q: { query?: string }) => ({
+    organizationId,
+    ...(q.query
+        ? { name: { contains: q.query, mode: "insensitive" as const } }
+        : {}),
+});
+
 export async function productsPage(
     organizationId: string,
     q: Paging & { query?: string },
 ) {
     const rows = await prisma.product.findMany({
         where: {
-            organizationId,
-            ...(q.query
-                ? { name: { contains: q.query, mode: "insensitive" as const } }
-                : {}),
+            ...productsWhere(organizationId, q),
             ...afterCursor(q.cursor),
         },
         ...paged(q),
@@ -118,6 +122,10 @@ export async function productsPage(
     });
     return pageOf(rows, q.limit, productView);
 }
+
+/** Every product {@link productsPage} pages through, counted whole. */
+export const productsTotal = (organizationId: string, q: { query?: string }) =>
+    prisma.product.count({ where: productsWhere(organizationId, q) });
 
 export async function productById(organizationId: string, id: string) {
     const row = await prisma.product.findFirst({
@@ -355,48 +363,54 @@ export const bookingView = (b: BookingRow): BookingView => ({
     createdAt: b.createdAt.toISOString(),
 });
 
+type BookingFilters = {
+    status?: BookingView["status"];
+    serviceId?: string;
+    contactId?: string;
+    staffId?: string;
+    /** A storefront: bookings with staff who work there (`StoreMembers`). */
+    storeId?: string;
+    from?: Date;
+    to?: Date;
+};
+
+const bookingsWhere = (organizationId: string, q: BookingFilters) => ({
+    organizationId,
+    ...(q.status ? { status: bookingStatus.in(q.status) } : {}),
+    ...(q.serviceId ? { serviceId: q.serviceId } : {}),
+    ...(q.contactId ? { contactId: q.contactId } : {}),
+    ...(q.staffId ? { staffId: q.staffId } : {}),
+    ...(q.storeId
+        ? {
+              staff: {
+                  membership: {
+                      user: {
+                          storeMembers: {
+                              some: { storeId: q.storeId },
+                          },
+                      },
+                  },
+              },
+          }
+        : {}),
+    ...(q.from || q.to
+        ? {
+              startAt: {
+                  ...(q.from ? { gte: q.from } : {}),
+                  ...(q.to ? { lt: q.to } : {}),
+              },
+          }
+        : {}),
+});
+
 /** `contactId`, `from` and `to` (on the start) are the MCP's `list_bookings`. */
 export async function bookingsPage(
     organizationId: string,
-    q: Paging & {
-        status?: BookingView["status"];
-        serviceId?: string;
-        contactId?: string;
-        staffId?: string;
-        /** A storefront: bookings with staff who work there (`StoreMembers`). */
-        storeId?: string;
-        from?: Date;
-        to?: Date;
-    },
+    q: Paging & BookingFilters,
 ) {
     const rows = await prisma.booking.findMany({
         where: {
-            organizationId,
-            ...(q.status ? { status: bookingStatus.in(q.status) } : {}),
-            ...(q.serviceId ? { serviceId: q.serviceId } : {}),
-            ...(q.contactId ? { contactId: q.contactId } : {}),
-            ...(q.staffId ? { staffId: q.staffId } : {}),
-            ...(q.storeId
-                ? {
-                      staff: {
-                          membership: {
-                              user: {
-                                  storeMembers: {
-                                      some: { storeId: q.storeId },
-                                  },
-                              },
-                          },
-                      },
-                  }
-                : {}),
-            ...(q.from || q.to
-                ? {
-                      startAt: {
-                          ...(q.from ? { gte: q.from } : {}),
-                          ...(q.to ? { lt: q.to } : {}),
-                      },
-                  }
-                : {}),
+            ...bookingsWhere(organizationId, q),
             ...afterCursor(q.cursor),
         },
         ...paged(q),
@@ -404,6 +418,10 @@ export async function bookingsPage(
     });
     return pageOf(rows, q.limit, bookingView);
 }
+
+/** Every booking {@link bookingsPage} pages through, counted whole. */
+export const bookingsTotal = (organizationId: string, q: BookingFilters) =>
+    prisma.booking.count({ where: bookingsWhere(organizationId, q) });
 
 export async function bookingById(organizationId: string, id: string) {
     const row = await prisma.booking.findFirst({
@@ -504,37 +522,49 @@ const orderView = (o: OrderRow): OrderView => ({
 /** Who reads: a location's team reads its own storefronts' (DEC-074). */
 type OrderViewer = Pick<OrganizationContext, "roleKey" | "userId">;
 
-export async function ordersPage(
+type OrderFilters = {
+    status?: OrderView["status"];
+    /** The order number ("ORD-014"), any case, a leading "#" ignored. */
+    number?: string;
+    from?: Date;
+    to?: Date;
+    /** One store's orders (within what the viewer may see). */
+    storeId?: string;
+};
+
+function ordersWhere(
     organizationId: string,
-    q: Paging & {
-        status?: OrderView["status"];
-        /** The order number ("ORD-014"), any case, a leading "#" ignored. */
-        number?: string;
-        from?: Date;
-        to?: Date;
-        /** One store's orders (within what the viewer may see). */
-        storeId?: string;
-    },
+    q: OrderFilters,
     viewer: OrderViewer,
 ) {
     const number = q.number?.trim().replace(/^#/, "");
+    return {
+        organizationId,
+        ...orderLocationWhere(viewer),
+        ...(q.storeId ? { storeId: q.storeId } : {}),
+        ...(q.status ? { status: orderStatus.in(q.status) } : {}),
+        ...(number
+            ? { orderId: { equals: number, mode: "insensitive" as const } }
+            : {}),
+        ...(q.from || q.to
+            ? {
+                  createdAt: {
+                      ...(q.from ? { gte: q.from } : {}),
+                      ...(q.to ? { lt: q.to } : {}),
+                  },
+              }
+            : {}),
+    };
+}
+
+export async function ordersPage(
+    organizationId: string,
+    q: Paging & OrderFilters,
+    viewer: OrderViewer,
+) {
     const rows = await prisma.order.findMany({
         where: {
-            organizationId,
-            ...orderLocationWhere(viewer),
-            ...(q.storeId ? { storeId: q.storeId } : {}),
-            ...(q.status ? { status: orderStatus.in(q.status) } : {}),
-            ...(number
-                ? { orderId: { equals: number, mode: "insensitive" as const } }
-                : {}),
-            ...(q.from || q.to
-                ? {
-                      createdAt: {
-                          ...(q.from ? { gte: q.from } : {}),
-                          ...(q.to ? { lt: q.to } : {}),
-                      },
-                  }
-                : {}),
+            ...ordersWhere(organizationId, q, viewer),
             ...afterCursor(q.cursor),
         },
         ...paged(q),
@@ -542,6 +572,13 @@ export async function ordersPage(
     });
     return pageOf(rows, q.limit, orderView);
 }
+
+/** Every order {@link ordersPage} pages through, counted whole. */
+export const ordersTotal = (
+    organizationId: string,
+    q: OrderFilters,
+    viewer: OrderViewer,
+) => prisma.order.count({ where: ordersWhere(organizationId, q, viewer) });
 
 export async function orderById(
     organizationId: string,
@@ -633,28 +670,34 @@ const customerView = (c: CustomerRow): CustomerView => {
 
 // A merged-away contact is a tombstone (DEC-042): never listed.
 // `query`: part of a name, email, phone or company (the MCP's `list_customers`).
+function customersWhere(organizationId: string, q: { query?: string }) {
+    // Every word somewhere, so "Priya Shah" finds first name + last name.
+    const words = (q.query ?? "").split(/\s+/).filter(Boolean).slice(0, 5);
+    return {
+        organizationId,
+        mergedIntoId: null,
+        AND: words.map((word) => {
+            const like = { contains: word, mode: "insensitive" as const };
+            return {
+                OR: [
+                    { firstName: like },
+                    { lastName: like },
+                    { email: like },
+                    { phone: like },
+                    { company: like },
+                ],
+            };
+        }),
+    };
+}
+
 export async function customersPage(
     organizationId: string,
     q: Paging & { query?: string },
 ) {
-    // Every word somewhere, so "Priya Shah" finds first name + last name.
-    const words = (q.query ?? "").split(/\s+/).filter(Boolean).slice(0, 5);
     const rows = await prisma.contact.findMany({
         where: {
-            organizationId,
-            mergedIntoId: null,
-            AND: words.map((word) => {
-                const like = { contains: word, mode: "insensitive" as const };
-                return {
-                    OR: [
-                        { firstName: like },
-                        { lastName: like },
-                        { email: like },
-                        { phone: like },
-                        { company: like },
-                    ],
-                };
-            }),
+            ...customersWhere(organizationId, q),
             ...afterCursor(q.cursor),
         },
         ...paged(q),
@@ -662,6 +705,10 @@ export async function customersPage(
     });
     return pageOf(rows, q.limit, customerView);
 }
+
+/** Every customer {@link customersPage} pages through, counted whole. */
+export const customersTotal = (organizationId: string, q: { query?: string }) =>
+    prisma.contact.count({ where: customersWhere(organizationId, q) });
 
 export async function customerById(organizationId: string, id: string) {
     const row = await prisma.contact.findFirst({

@@ -9,6 +9,7 @@ import { useState, useTransition } from "react";
 
 import { BulkRemindSheet } from "@/components/invoices/bulk-remind/bulk-remind-sheet";
 import { InvoiceDetailsSheet } from "@/components/invoices/details/invoice-details-sheet";
+import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
 import {
     ListFilter,
     ListToolbar,
@@ -24,6 +25,7 @@ import {
     narrowed,
     readsOnServer,
     shownRows,
+    withDateRange,
     withFigure,
     withSearch,
     withTab,
@@ -49,6 +51,8 @@ import type { InvoiceTab } from "@/lib/invoices/status";
 import { inTab, INVOICE_TABS, paidSinceRows } from "@/lib/invoices/status";
 import type { InvoiceSummary, SummaryFilter } from "@/lib/invoices/summary";
 import { invoiceZone } from "@/lib/invoices/zone";
+import type { DateRange } from "@/lib/views/date-range";
+import { NO_DATE_RANGE } from "@/lib/views/date-range";
 import { withoutSince } from "@/lib/views/since";
 import { ChequesLine } from "./cheques-line";
 import type { InvoiceBusinessTax } from "./gst-status-line";
@@ -241,6 +245,14 @@ export function InvoicesScreen({
         go(q);
     }
 
+    /** The issued date: on top of the status and the figure. */
+    function pickDates(patch: Partial<DateRange>) {
+        const next = { ...shownQuery, ...patch };
+        setPicked(next);
+        showInvoice(null);
+        go(withDateRange(here(), next));
+    }
+
     function search(term: string) {
         if (term === shownQuery.q) return;
         showInvoice(null);
@@ -254,10 +266,14 @@ export function InvoicesScreen({
             cheques: false,
             paidFrom: null,
             q: "",
+            ...NO_DATE_RANGE,
         });
         setChip("all");
         showInvoice(null);
-        const q = withFigure(withSearch(here(), ""), null);
+        const q = withDateRange(
+            withFigure(withSearch(here(), ""), null),
+            NO_DATE_RANGE,
+        );
         q.delete("source");
         go(q);
     }
@@ -322,7 +338,7 @@ export function InvoicesScreen({
     const exempt = exemptNote(invoices);
     const chequesOn = shownQuery.cheques;
 
-    const view = `${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}`;
+    const view = `${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}|${shownQuery.date}|${shownQuery.from}|${shownQuery.to}`;
     const owed = canWrite ? pickRowsOf(rows) : [];
     const onOverdue = shownQuery.tab === "overdue";
     const tickedIds = ticks.view === view ? ticks.ids : new Set<string>();
@@ -399,7 +415,8 @@ export function InvoicesScreen({
             />
 
             {/* The one list toolbar, in one row: the search, then an
-                invoice's standing and what it was for. */}
+                invoice's standing, the day it was issued and what it was
+                for. */}
             <ListToolbar
                 className="mt-3.5"
                 search={
@@ -441,6 +458,11 @@ export function InvoicesScreen({
                                     .length,
                             }))}
                         />
+                        <DateRangeFilter
+                            label="Issued"
+                            value={shownQuery}
+                            onChange={pickDates}
+                        />
                         {scope ? (
                             <ScopeNotice
                                 line={scopeLine(scope, mine.length)}
@@ -460,7 +482,7 @@ export function InvoicesScreen({
             <InvoiceListBody
                 rows={rows}
                 empty={empty}
-                resetOn={`${shownQuery.tab}|${chip}|${shownQuery.owed}|${shownQuery.cheques}|${shownQuery.paidFrom}|${shownQuery.q}`}
+                resetOn={view}
                 selectedId={openId}
                 onOpen={openInvoice}
                 timeZone={timeZone}

@@ -211,3 +211,25 @@ describe("what the list's query accepts", () => {
         expect(await invalid({ packId: "x".repeat(65) })).toEqual(["packId"]);
     });
 });
+
+describe("the issued date the list's query accepts (Orders' ?date=, ?from=, ?to=)", () => {
+    const invalid = async (query: Record<string, unknown>) =>
+        (await validate(plainToInstance(ListInvoicesQueryDto, query))).map(
+            (e) => e.property,
+        );
+
+    it("takes a preset, in any case, and days", async () => {
+        expect(await invalid({ date: "MONTH" })).toEqual([]);
+        expect(await invalid({ from: "2026-08-01", to: "2026-10-31" })).toEqual(
+            [],
+        );
+    });
+
+    it("refuses a preset it doesn't know and a day that isn't a day", async () => {
+        expect(await invalid({ date: "decade" })).toEqual(["date"]);
+        expect(await invalid({ from: "1 Aug", to: "2026-8-31" })).toEqual([
+            "from",
+            "to",
+        ]);
+    });
+});

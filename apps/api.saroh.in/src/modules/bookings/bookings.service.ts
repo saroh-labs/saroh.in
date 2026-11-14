@@ -25,6 +25,8 @@ import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
 import { isGstRate, notGstRateMessage } from "../invoices/gst";
 import { loadPriceTerms } from "../invoices/price-terms";
+import type { DatePreset } from "../orders/date-presets";
+import { asksDates, listRange } from "../orders/order-list-filters";
 import { allows } from "../organizations/organization-policy";
 import { PaymentsService } from "../payments/payments.service";
 import { OPENS_CHECKOUT } from "../payments/public-key";
@@ -237,6 +239,11 @@ export type {
 
 /** The widest range the bookings calendar reads at once: two years. */
 const MAX_CALENDAR_RANGE_MS = 731 * 86_400_000;
+
+/** A YYYY-MM-DD day as the query has it, or undefined for an instant. */
+function dayOrUndefined(value: string | undefined): string | undefined {
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
 
 /** The bookings calendar (U4): diaries by person over a range. */
 export interface BookingsCalendar {
@@ -843,11 +850,45 @@ export class BookingsService {
      */
     async calendarBookings(
         ctx: OrganizationContext,
-        query: { from: string; to: string; staffId?: string },
+        query: {
+            from?: string;
+            to?: string;
+            date?: DatePreset;
+            staffId?: string;
+        },
     ): Promise<BookingsCalendar> {
         requireBookingPower(ctx, "booking:read");
-        const from = new Date(query.from);
-        const to = new Date(query.to);
+        const now = new Date();
+        // By day (All bookings' date filter) or by instant (the diary).
+        const byDay = asksDates({
+            date: query.date,
+            from: dayOrUndefined(query.from),
+            to: dayOrUndefined(query.to),
+        });
+        let from = new Date(query.from ?? "");
+        let to = new Date(query.to ?? "");
+        let dayZone: Awaited<ReturnType<typeof businessZone>> | null = null;
+        if (byDay) {
+            if (
+                (query.from && !dayOrUndefined(query.from)) ||
+                (query.to && !dayOrUndefined(query.to))
+            ) {
+                throw new BadRequestException(
+                    "Give from and to both as days or both as instants.",
+                );
+            }
+            dayZone = await businessZone(prisma, ctx.organizationId);
+            const range = listRange(query, dayZone.zone, now);
+            // One day left out reaches as far as a range may from the other.
+            const reach = MAX_CALENDAR_RANGE_MS - 86_400_000;
+            if (range.gte) {
+                from = range.gte;
+                to = range.lt ?? new Date(from.getTime() + reach);
+            } else if (range.lt) {
+                to = range.lt;
+                from = new Date(to.getTime() - reach);
+            }
+        }
         if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
             throw new BadRequestException("from and to must be dates.");
         }
@@ -867,7 +908,6 @@ export class BookingsService {
             throw new NotFoundException("Staff member not found");
         }
         const staffId = own ? (own.staffId ?? undefined) : query.staffId;
-        const now = new Date();
         const [people, rows, zone] = await Promise.all([
             own && !own.staffId
                 ? Promise.resolve([])
@@ -881,8 +921,11 @@ export class BookingsService {
             prisma.booking.findMany({
                 where: {
                     organizationId,
-                    startAt: { lt: to },
-                    endAt: { gt: from },
+                    // By day, the day it starts; the diary, anything that
+                    // overlaps its range.
+                    ...(byDay
+                        ? { startAt: { gte: from, lt: to } }
+                        : { startAt: { lt: to }, endAt: { gt: from } }),
                     ...(own
                         ? ownBookingsWhere(own)
                         : staffId
@@ -892,7 +935,7 @@ export class BookingsService {
                 orderBy: [{ startAt: "asc" }, { createdAt: "asc" }],
                 select: diarySelect,
             }),
-            businessZone(prisma, organizationId),
+            dayZone ?? businessZone(prisma, organizationId),
         ]);
         if (staffId && people.length === 0 && !own) {
             throw new NotFoundException("Staff member not found");
