@@ -767,6 +767,18 @@ export const CAPTURED: Record<
         width: 2024,
         height: 1604,
     },
+    "ai-hero": {
+        src: "/shots/v2/ai-hero.webp",
+        alt: "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
+        width: 1548,
+        height: 500,
+    },
+    "ai-ask": {
+        src: "/shots/v2/ai-ask.webp",
+        alt: "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
+        width: 1548,
+        height: 418,
+    },
     "ai-connect": {
         src: "/shots/v2/ai-connect.webp",
         alt: "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",

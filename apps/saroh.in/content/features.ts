@@ -718,21 +718,9 @@ export const features: Record<FeatureSlug, Feature> = {
             "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
         headline: "Use Saroh from your AI assistant.",
         sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up today's bookings or move one. It can do only what you can do in Saroh, and nothing on your website goes live until someone on your team publishes it.",
-        // The hero and step 3 happen in another company's app: drawn, never
-        // captured (`ChatExchange`). `ai-hero` stays the share card's key.
+        // The hero and step 3 are real chats in Claude, shot by hand and kept
+        // as supplied shots (owner, 15 Nov 2026), not drawings.
         hero: { shot: "ai-hero" },
-        heroChat: {
-            caption:
-                "Drawing of a chat in an AI assistant: the owner of Rye & Co. (demo bakery) asks for a Diwali offer section on the home page, and it comes back as a draft with a preview",
-            ask: "Add a Diwali offer section to my home page for our gift boxes, till Sunday.",
-            tools: "Saroh · Rye & Co. · edit_page, preview_publish",
-            reply: "Done. I added a Diwali offer section near the top of your home page, with a button to your gift boxes. It's a draft: your live site hasn't changed. Open the preview to check it, then publish it in Saroh. Only someone on your team can.",
-            outcome: "draft",
-            result: {
-                title: "Draft · Home page",
-                line: "1 section added · Preview the draft",
-            },
-        },
         howTitle: "Connected in a minute. In charge after.",
         steps: [
             {
@@ -750,20 +738,9 @@ export const features: Record<FeatureSlug, Feature> = {
             {
                 title: "Ask in your own words",
                 body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in AI activity in Settings, kept for 90 days. When a booking moves, the customer is told. Website changes stay a draft until you publish them in Saroh.",
-                who: "Gulmohar Salon & Bridal (demo salon)",
+                who: "Rye & Co. (demo bakery)",
+                // A real chat in Claude (owner, 15 Nov 2026), not a drawing.
                 shot: "ai-ask",
-                chat: {
-                    caption:
-                        "Drawing of a chat in an AI assistant: the owner of Gulmohar Salon & Bridal (demo salon) moves a customer's facial to Saturday morning, and it changes at once",
-                    ask: "Move Ritu's 4 PM facial today to Saturday morning.",
-                    tools: "Saroh · Gulmohar Salon & Bridal · find_free_slots, move_booking",
-                    reply: "Moved. Ritu's Hydrating facial is now on Saturday at 11:00 AM with Pooja, and Ritu is told the new time.",
-                    outcome: "at_once",
-                    result: {
-                        title: "Hydrating facial · 60 min",
-                        line: "Saturday, 11:00 AM · Pooja · was today, 4:00 PM",
-                    },
-                },
             },
             {
                 title: "See everything it did",

@@ -315,7 +315,7 @@ describe("AI apps says only what's true (MARKETING_CLAIMS.md)", () => {
     });
 
     it("says website changes stay a draft and other changes happen at once, logged", () => {
-        const step = features["ai-apps"].steps.find((s) => s.chat);
+        const step = features["ai-apps"].steps.find((s) => s.shot === "ai-ask");
         expect(step?.body).toMatch(/change at once/);
         expect(step?.body).toMatch(/AI activity in Settings, kept for 90 days/);
         expect(step?.body).toMatch(/stay a draft until you publish/);
@@ -323,8 +323,9 @@ describe("AI apps says only what's true (MARKETING_CLAIMS.md)", () => {
         expect(step?.body).toMatch(
             /When a booking moves, the customer is told/,
         );
-        expect(features["ai-apps"].heroChat?.outcome).toBe("draft");
-        expect(step?.chat?.outcome).toBe("at_once");
+        // Both are real chats in Claude now (owner, 15 Nov 2026): the hero's
+        // change is a draft, step 3's happens at once.
+        expect(features["ai-apps"].hero?.shot).toBe("ai-hero");
     });
 
     it("names the four apps without cards in one line", () => {

@@ -137,7 +137,7 @@ const designed = {
     // check refuses its switch while any is a placeholder. Not built while
     // their switch is off. The demo salon is the seed's Gulmohar.
     "ai-hero": pending(
-        "An AI assistant adding a section to the home page of Rye & Co. (demo bakery) as a draft",
+        "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
     ),
     "ai-connect": pending(
         "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
@@ -146,7 +146,7 @@ const designed = {
         "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
     ),
     "ai-ask": pending(
-        "An AI assistant moving a booking at Gulmohar Salon & Bridal (demo salon)",
+        "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
     ),
     "ai-activity": pending(
         "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",

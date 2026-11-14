@@ -1598,6 +1598,28 @@ const SHARE_SHOTS: Shot[] = [
  */
 const AI_APPS_SHOTS: Shot[] = [
     {
+        key: "ai-hero",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude connected to Rye & Co. on saroh.io, asked to add a button to the home page as a draft; cropped to the request and the answer (15 Nov 2026)",
+        alt: "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
+        caption:
+            "In Claude: add a button near the top of Rye & Co.'s home page that says Order tomorrow's sourdough. Claude, using Saroh, adds it as a draft visitors don't see yet and says where it sits",
+    },
+    {
+        key: "ai-ask",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude connected to Rye & Co. on saroh.io, asked to mark an order ready for pickup; the request and the answer joined without the tool line, which shows internal ids (15 Nov 2026)",
+        alt: "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
+        caption:
+            "In Claude: mark order 1067 as ready for pickup. Claude marks it ready, leaves the courier order alone, and says 13 orders are still to pack",
+    },
+    {
         key: "ai-connect",
         role: "visitor",
         route: "/",
