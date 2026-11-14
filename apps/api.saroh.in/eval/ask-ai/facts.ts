@@ -11,11 +11,21 @@
  * - owed: issued bills not paid; overdue when due before now.
  * - lapsed: last seen (a booking not missed, or an order) before now less
  *   the days; someone never seen isn't lapsed (`find_lapsed_customers`).
- * Periods are the business's calendar in Kolkata, weeks from Monday.
+ * - period totals (the summary tools, spec "Changes after approval"):
+ *   orders counted as placed (cancelled included, as `get_business_summary`);
+ *   standing ones are those not cancelled, and the comparison with the
+ *   period before is on them; their money is the totals, after discount;
+ *   products and variants sold are units on orders not cancelled; bills
+ *   by issue date; bookings by start, standing and cancelled apart.
+ * - stock: per store shelf; a shelf is low at or under its alert.
+ * Periods are the business's calendar in Kolkata, weeks from Monday;
+ * `last_3_months` is Insights' "3m" (the day after this date three months
+ * ago to today), `prev_3_months` the same number of days before it,
+ * `last_month` the whole calendar month before this one.
  */
 import { DateTime } from "luxon";
 
-import type { BizKey, BookingPlan, BusinessPlan } from "./plan";
+import type { BizKey, BookingPlan, BusinessPlan, OrderPlan } from "./plan";
 import { dayAt, idOf, ZONE } from "./plan";
 
 export type FactValue = number | string | string[];
@@ -26,6 +36,9 @@ const PERIODS = [
     "this_week",
     "last_week",
     "this_month",
+    "last_month",
+    "last_3_months",
+    "prev_3_months",
 ] as const;
 type Period = (typeof PERIODS)[number];
 const DAY_MS = 86_400_000;
@@ -35,12 +48,18 @@ export function windowOf(period: string, now: Date): [Date, Date] {
     const day = at.startOf("day");
     const week = at.startOf("week");
     const month = at.startOf("month");
+    const tomorrow = day.plus({ days: 1 });
+    const q = day.minus({ months: 3 }).plus({ days: 1 });
+    const qDays = Math.round(tomorrow.diff(q, "days").days);
     const w: Record<Period, [DateTime, DateTime]> = {
         today: [day, day.plus({ days: 1 })],
         tomorrow: [day.plus({ days: 1 }), day.plus({ days: 2 })],
         this_week: [week, week.plus({ weeks: 1 })],
         last_week: [week.minus({ weeks: 1 }), week],
         this_month: [month, month.plus({ months: 1 })],
+        last_month: [month.minus({ months: 1 }), month],
+        last_3_months: [q, tomorrow],
+        prev_3_months: [q.minus({ days: qDays }), q],
     };
     if (!(PERIODS as readonly string[]).includes(period)) {
         throw new Error(`unknown period ${period}`);
@@ -55,10 +74,73 @@ const rupees = (n: number) => Math.round(n * 100) / 100;
 function orderTotal(
     biz: BusinessPlan,
     items: { product: string; qty: number }[],
+    discount = 0,
 ) {
     const price = new Map(biz.products.map((p) => [p.key, p.price]));
-    return items.reduce((n, i) => n + (price.get(i.product) ?? 0) * i.qty, 0);
+    return (
+        items.reduce((n, i) => n + (price.get(i.product) ?? 0) * i.qty, 0) -
+        discount
+    );
 }
+
+/** Units sold per label (product name, or "name variant") on orders not cancelled, most first, ties by name. */
+function unitsSold(
+    biz: BusinessPlan,
+    orders: OrderPlan[],
+    byVariant: boolean,
+): [string, number][] {
+    const units = new Map<string, number>();
+    for (const o of orders) {
+        if (o.cancelled) continue;
+        for (const i of o.items) {
+            const p = product(biz, i.product);
+            const v = p.variants?.find((x) => x.key === i.variant);
+            const label = byVariant && v ? `${p.name} ${v.label}` : p.name;
+            units.set(label, (units.get(label) ?? 0) + i.qty);
+        }
+    }
+    return [...units].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
+interface Shelf {
+    label: string;
+    product: string;
+    variant: string | null;
+    store: string;
+    onHand: number;
+    lowAlert: number;
+}
+
+/** Every shelf: product (and variant) at each store, with its alert. */
+function shelves(biz: BusinessPlan): Shelf[] {
+    return biz.products.flatMap((p): Shelf[] =>
+        p.variants
+            ? p.variants.flatMap((v) =>
+                  Object.entries(v.stock).map(([store, onHand]) => ({
+                      label: `${p.name} ${v.label}`,
+                      product: p.key,
+                      variant: v.key,
+                      store,
+                      onHand,
+                      lowAlert: v.lowAlert,
+                  })),
+              )
+            : Object.entries({ main: p.onHand, ...p.stockAt }).map(
+                  ([store, onHand]) => ({
+                      label: p.name,
+                      product: p.key,
+                      variant: null,
+                      store,
+                      onHand,
+                      lowAlert: p.lowAlert,
+                  }),
+              ),
+    );
+}
+
+/** A day as people write it: "Saturday 21 November". */
+const dayWords = (at: Date) =>
+    DateTime.fromJSDate(at, { zone: ZONE }).toFormat("cccc d LLLL");
 
 function lastSeen(biz: BusinessPlan): Map<string, Date> {
     const seen = new Map<string, Date>();
@@ -83,7 +165,7 @@ export function resolveFact(
     key: string,
     now: Date,
 ): FactValue {
-    const [kind, a, b] = key.split(":");
+    const [kind, a, b, c] = key.split(":");
     const confirmed = (period: string) => {
         const w = windowOf(period, now);
         return biz.bookings.filter(
@@ -113,13 +195,123 @@ export function resolveFact(
         }
         case "orders": {
             const w = windowOf(a, now);
-            return biz.orders.filter((o) => inWindow(o.at, w)).length;
+            const placed = biz.orders.filter((o) => inWindow(o.at, w));
+            if (!b) return placed.length;
+            if (b === "cancelled")
+                return placed.filter((o) => o.cancelled).length;
+            if (b === "standing")
+                return placed.filter((o) => !o.cancelled).length;
+            if (b === "amount") {
+                return rupees(
+                    placed
+                        .filter((o) => !o.cancelled)
+                        .reduce(
+                            (n, o) => n + orderTotal(biz, o.items, o.discount),
+                            0,
+                        ),
+                );
+            }
+            // A store's key: orders placed there.
+            return placed.filter((o) => (o.store ?? "main") === b).length;
+        }
+        case "cancelled":
+            return biz.bookings.filter(
+                (x) =>
+                    x.status === "CANCELLED" &&
+                    inWindow(x.start, windowOf(a, now)),
+            ).length;
+        case "invoices": {
+            const issued = biz.invoices.filter((i) =>
+                inWindow(i.issuedAt, windowOf(a, now)),
+            );
+            if (b === "count") return issued.length;
+            if (b === "paid") return issued.filter((i) => i.paidAt).length;
+            if (b === "unpaid") return issued.filter((i) => !i.paidAt).length;
+            if (b === "amount")
+                return rupees(issued.reduce((n, i) => n + i.amount, 0));
+            break;
+        }
+        case "top-products":
+        case "top-variants": {
+            const w = windowOf(a, now);
+            const sold = unitsSold(
+                biz,
+                biz.orders.filter((o) => inWindow(o.at, w)),
+                kind === "top-variants",
+            );
+            // Ties at the cut are in too: either is a right answer, so both are asked for.
+            const cut = sold[Number(b) - 1]?.[1] ?? 0;
+            return sold
+                .filter(([, units], i) => i < Number(b) || units === cut)
+                .map(([label]) => label);
+        }
+        case "low-variants":
+            return [
+                ...new Set(
+                    shelves(biz)
+                        .filter((s) => s.onHand <= s.lowAlert)
+                        .map((s) => s.label),
+                ),
+            ];
+        case "vstock": {
+            const shelf = shelves(biz).find(
+                (s) => s.product === a && s.variant === b && s.store === c,
+            );
+            if (!shelf) throw new Error(`${biz.key}: no shelf ${key}`);
+            return shelf.onHand;
+        }
+        case "stock-summary": {
+            const all = shelves(biz);
+            if (a === "products") return biz.products.length;
+            if (a === "units") return all.reduce((n, s) => n + s.onHand, 0);
+            if (a === "low")
+                return all.filter((s) => s.onHand <= s.lowAlert).length;
+            if (a === "out") return all.filter((s) => s.onHand === 0).length;
+            break;
+        }
+        case "class-booked":
+            return confirmed(b).filter((x) => x.service === a).length;
+        case "class-places": {
+            const s = biz.services.find((x) => x.key === a);
+            if (!s?.classAt) throw new Error(`${biz.key}: no class ${a}`);
+            const [from, to] = windowOf(b, now);
+            let sessions = 0;
+            for (
+                let d = DateTime.fromJSDate(from, { zone: ZONE });
+                d.toJSDate() < to;
+                d = d.plus({ days: 1 })
+            ) {
+                if (s.days.includes(d.weekday % 7))
+                    sessions += s.classAt.length;
+            }
+            return sessions * s.capacity;
+        }
+        case "waitlist": {
+            const list = biz.waitlists?.find((x) => x.session === a);
+            if (!list) throw new Error(`${biz.key}: no waitlist ${a}`);
+            return list.customers.map((k) => fullName(customer(biz, k)));
+        }
+        case "session-day": {
+            const list = biz.waitlists?.find((x) => x.session === a);
+            if (!list) throw new Error(`${biz.key}: no session ${a}`);
+            return dayWords(list.start);
+        }
+        case "packs-expiring": {
+            const w = windowOf(a, now);
+            return (biz.packPurchases ?? []).filter((p) =>
+                inWindow(p.expiresAt, w),
+            ).length;
+        }
+        case "period": {
+            const [from, to] = windowOf(a, now);
+            const last = new Date(to.getTime() - 1);
+            return isoDate(b === "to" ? last : from);
         }
         case "moneyin": {
             const w = windowOf(a, now);
             const orders = biz.orders
                 .filter((o) => o.paid && inWindow(o.at, w))
-                .reduce((n, o) => n + orderTotal(biz, o.items), 0);
+                .reduce((n, o) => n + orderTotal(biz, o.items, o.discount), 0);
             const bills = biz.invoices
                 .filter((i) => i.paidAt && inWindow(i.paidAt, w))
                 .reduce((n, i) => n + i.amount, 0);
@@ -215,6 +407,10 @@ function clockMinute(hhmm: string): number {
     const [h, m] = hhmm.split(".").map(Number);
     return h * 60 + m;
 }
+
+/** "2026-08-15", the day in Kolkata. */
+export const isoDate = (at: Date) =>
+    DateTime.fromJSDate(at, { zone: ZONE }).toISODate() ?? "";
 
 const isoAt = (at: Date) =>
     DateTime.fromJSDate(at, { zone: ZONE }).toISO({

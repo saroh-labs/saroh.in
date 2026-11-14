@@ -6,7 +6,8 @@
  * then against the pass marks in the targets file. Prints PASS or FAIL per
  * mark and writes `grade.json`, `grade.md` and `questions.md` (every
  * question and run in full) beside the results. Exit 0
- * only when every mark passes.
+ * only when every mark passes. Questions the run skipped (a tool Ask AI
+ * hasn't got yet) are listed as SKIP and count in no mark.
  *
  * The AI grader spends from the same budget as the run; `--no-ai` grades by
  * code only (the AI marks then read n/a and fail).
@@ -91,6 +92,8 @@ export async function main(argv: readonly string[]): Promise<number> {
             `${m.pass ? "PASS" : "FAIL"}  ${m.name}: ${m.value} (target ${m.target})${m.detail ? `; ${m.detail}` : ""}`,
         );
     }
+    for (const s of results.meta.skipped ?? [])
+        console.info(`SKIP  ${s.id}: ${s.reason}`);
     const pass = marks.every((m) => m.pass);
     console.info(pass ? "PASS: every mark" : "FAIL: see the marks above");
     writeFileSync(
@@ -243,5 +246,13 @@ function gradeReport(
         "",
         ...(problems.length ? problems : ["None."]),
         "",
+        ...(r.meta.skipped?.length
+            ? [
+                  "## Not run",
+                  "",
+                  ...r.meta.skipped.map((s) => `- **${s.id}**: ${s.reason}`),
+                  "",
+              ]
+            : []),
     ].join("\n");
 }

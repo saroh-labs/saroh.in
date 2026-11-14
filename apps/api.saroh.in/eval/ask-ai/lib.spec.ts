@@ -1,19 +1,26 @@
-import { resolveFact } from "./facts";
+import { join } from "node:path";
+
+import { fillText, resolveDeep, resolveFact } from "./facts";
 import type { Question, Resolved, Results, RunRecord } from "./lib";
 import {
+    checkCard,
     checkDraft,
     gradeRun,
     graderPrompt,
     hasNumber,
     leakedFigure,
+    loadQuestions,
     mentions,
+    mentionsDate,
     numbersIn,
     parseVerdict,
+    partialMatch,
     questionsMarkdown,
     runWithinBudget,
+    splitByTools,
     westernGroupings,
 } from "./lib";
-import { anchorFor, buildPlan } from "./plan";
+import { anchorFor, buildPlan, dayOffset } from "./plan";
 
 const resolved = (r: Partial<Resolved>): Resolved => ({
     question: "q",
@@ -514,5 +521,251 @@ describe("the grader's prompt for a draft", () => {
         expect(prompt).toContain("it need not repeat the card's details");
         expect(prompt).toContain("Nothing is saved until you confirm it.");
         expect(prompt).not.toContain("(no answer text)");
+    });
+});
+
+describe("summaries: the period and the card", () => {
+    it("reads a day however it is written", () => {
+        expect(mentionsDate("From 15 Aug to 14 Nov", "2026-08-15")).toBe(true);
+        expect(mentionsDate("August 15th – November 14th", "2026-08-15")).toBe(
+            true,
+        );
+        expect(mentionsDate("१५ अगस्त से १४ नवंबर", "2026-08-15")).toBe(true);
+        expect(mentionsDate("15/08 to 14/11", "2026-08-15")).toBe(true);
+        expect(mentionsDate("(2026-08-15 to 2026-11-14)", "2026-08-15")).toBe(
+            true,
+        );
+        expect(mentionsDate("From 5 Aug", "2026-08-15")).toBe(false);
+        expect(mentionsDate("115 august", "2026-08-15")).toBe(false);
+        expect(mentionsDate("15 Sept", "2026-08-15")).toBe(false);
+    });
+
+    it("wants a card of the kind, with its link", () => {
+        const table = {
+            kind: "table",
+            data: {
+                link: { label: "Open in Orders", href: "/commerce/orders" },
+            },
+        };
+        expect(checkCard(["table", "products"], [table])).toEqual([]);
+        expect(checkCard(["products"], [table])[0]).toContain(
+            "no products card",
+        );
+        expect(
+            checkCard(["table"], [{ kind: "table", data: { link: null } }]),
+        ).toEqual(["table card has no link"]);
+        expect(checkCard(["table"], undefined)[0]).toContain("none");
+    });
+
+    it("grades a summary's dates and card with its facts", () => {
+        const q = question("answer", {
+            numbers: [{ key: "orders:last_3_months", value: 323 }],
+            period: {
+                key: "last_3_months",
+                from: "2026-08-15",
+                to: "2026-11-14",
+            },
+            card: ["table"],
+        });
+        const card = {
+            kind: "table",
+            data: { link: { href: "/commerce/orders?from=2026-08-15" } },
+        };
+        const text = "323 orders from 15 Aug to 14 Nov.";
+        expect(gradeRun(q, run({ text, cards: [card] }), null).facts).toBe(
+            "exact",
+        );
+        const noDates = gradeRun(
+            q,
+            run({ text: "323 orders.", cards: [card] }),
+            null,
+        );
+        expect(noDates.facts).toBe("wrong");
+        expect(noDates.missing).toEqual([
+            "last_3_months date 2026-08-15",
+            "last_3_months date 2026-11-14",
+        ]);
+        expect(gradeRun(q, run({ text }), null).missing[0]).toContain(
+            "no table card",
+        );
+        // Results from before every card was kept: the one card counts.
+        expect(gradeRun(q, run({ text, card }), null).facts).toBe("exact");
+    });
+
+    it("matches money facts by key to the rupee", () => {
+        expect(
+            hasNumber(
+                "₹5,99,496 in all",
+                599496,
+                "orders:last_3_months:amount",
+            ),
+        ).toBe(true);
+        expect(
+            hasNumber("Five lakh", 500000, "orders:last_3_months:amount"),
+        ).toBe(false);
+    });
+});
+
+describe("drafts that only need words", () => {
+    it("takes any non-empty text for *, and absent or the value for ?x", () => {
+        const expected = { title: "*", body: "*", status: "?draft" };
+        expect(
+            partialMatch(expected, { title: "Monsoon", body: "Rain-ready" }),
+        ).toEqual([]);
+        expect(
+            partialMatch(expected, {
+                title: "Monsoon",
+                body: "x",
+                status: "DRAFT",
+            }),
+        ).toEqual([]);
+        expect(partialMatch(expected, { title: "", body: "x" })[0]).toContain(
+            "input.title",
+        );
+        expect(
+            partialMatch(expected, {
+                title: "a",
+                body: "b",
+                status: "published",
+            })[0],
+        ).toContain("input.status");
+    });
+});
+
+describe("questions that need a tool", () => {
+    it("skips a question whose tool Ask AI hasn't got, saying why", () => {
+        const base = question("draft", {});
+        const qs: Question[] = [
+            { ...base, id: "blog-01", needs: "draft_blog_post" },
+            { ...base, id: "salon-01" },
+        ];
+        expect(splitByTools(qs, ["create_product"])).toEqual({
+            runnable: [qs[1]],
+            skipped: [
+                {
+                    id: "blog-01",
+                    reason: "skipped: tool not available (draft_blog_post)",
+                },
+            ],
+        });
+        expect(
+            splitByTools(qs, ["draft_blog_post"]).runnable.map((q) => q.id),
+        ).toEqual(["blog-01", "salon-01"]);
+    });
+});
+
+describe("the question files", () => {
+    const questions = loadQuestions(join(__dirname, "questions"));
+
+    it("holds the 60 and the 25 added", () => {
+        expect(questions).toHaveLength(85);
+        for (const prefix of ["clothing", "yoga", "period", "blog"]) {
+            expect(questions.some((q) => q.id.startsWith(`${prefix}-`))).toBe(
+                true,
+            );
+        }
+    });
+
+    // Run dates across a month: its first day, a Saturday, its last day.
+    for (const at of [
+        "2026-11-14T07:00:00Z",
+        "2026-12-01T07:00:00Z",
+        "2026-11-21T07:00:00Z",
+        "2026-11-30T07:00:00Z",
+    ]) {
+        it(`resolves every fact a question names on ${at.slice(0, 10)}`, () => {
+            const now = new Date(at);
+            const plan = buildPlan(anchorFor(now));
+            for (const q of questions) {
+                const biz = plan.find((b) => b.key === q.business);
+                if (!biz) throw new Error(q.id);
+                const e = q.expect;
+                for (const key of [
+                    ...(e.numbers ?? []),
+                    ...(e.forbiddenFigures ?? []),
+                ])
+                    expect(typeof resolveFact(biz, key, now)).toBe("number");
+                for (const key of [
+                    ...(e.mentions ?? []),
+                    ...(e.forbiddenText ?? []),
+                ])
+                    expect(resolveFact(biz, key, now)).toBeTruthy();
+                fillText(biz, q.question, now);
+                for (const b of q.before ?? []) fillText(biz, b, now);
+                if (e.draft) resolveDeep(biz, e.draft, now);
+                if (e.period) {
+                    expect(
+                        resolveFact(biz, `period:${e.period}:from`, now),
+                    ).toMatch(/^\d{4}-\d\d-\d\d$/);
+                }
+            }
+        });
+    }
+});
+
+describe("the clothing shop and the yoga studio", () => {
+    const now = new Date("2026-11-14T07:00:00Z");
+    const plan = buildPlan(anchorFor(now));
+    const shop = plan.find((b) => b.key === "clothing");
+    const studio = plan.find((b) => b.key === "yoga");
+    if (!shop || !studio) throw new Error("missing business");
+
+    it("has two stores, variants, online, cancelled and discounted orders", () => {
+        expect(shop.stores?.map((s) => s.key)).toEqual(["main", "second"]);
+        expect(shop.orders.some((o) => o.online)).toBe(true);
+        expect(shop.orders.some((o) => o.cancelled)).toBe(true);
+        expect(shop.orders.some((o) => o.discount)).toBe(true);
+        expect(shop.orders.some((o) => o.store === "second")).toBe(true);
+        expect(resolveFact(shop, "orders:today:second", now)).toBeGreaterThan(
+            0,
+        );
+        expect(resolveFact(shop, "vstock:kurta:m:second", now)).toBe(1);
+        expect(
+            resolveFact(shop, "orders:prev_3_months:standing", now),
+        ).toBeLessThan(
+            resolveFact(shop, "orders:prev_3_months", now) as number,
+        );
+        // A cancelled order is counted as placed, but moves no money.
+        expect(shop.orders.filter((o) => o.cancelled && o.paid)).toEqual([]);
+    });
+
+    it("fills the waitlisted class and keeps tomorrow's open", () => {
+        const list = studio.waitlists?.[0];
+        if (!list) throw new Error("no waitlist");
+        const booked = (start: Date) =>
+            studio.bookings.filter(
+                (b) =>
+                    b.service === "hatha" &&
+                    b.status === "CONFIRMED" &&
+                    b.start.getTime() === start.getTime(),
+            );
+        expect(booked(list.start)).toHaveLength(12);
+        expect(dayOffset(anchorFor(now), list.start)).toBeGreaterThanOrEqual(2);
+        const tomorrow = new Date(
+            anchorFor(now).getTime() + 86_400_000 + 7 * 3_600_000,
+        );
+        expect(booked(tomorrow).length).toBeLessThan(12);
+        expect(booked(tomorrow).some((b) => b.customer === "meera")).toBe(
+            false,
+        );
+    });
+
+    it("spends pack credits once each, never more than a pack holds", () => {
+        const all = (studio.packPurchases ?? []).flatMap((p) => p.used);
+        expect(new Set(all).size).toBe(all.length);
+        const credits = new Map(studio.packs?.map((p) => [p.key, p.credits]));
+        for (const p of studio.packPurchases ?? [])
+            expect(p.used.length).toBeLessThanOrEqual(credits.get(p.pack) ?? 0);
+        expect(
+            resolveFact(studio, "packs-expiring:this_month", now),
+        ).toBeGreaterThan(0);
+    });
+
+    it("has no visit 30 or 31 days back, so lapsed:30 holds all day", () => {
+        expect(
+            studio.bookings.filter((b) =>
+                [-31, -30].includes(dayOffset(anchorFor(now), b.start)),
+            ),
+        ).toEqual([]);
     });
 });

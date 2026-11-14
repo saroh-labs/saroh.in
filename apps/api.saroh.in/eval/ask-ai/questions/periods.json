@@ -1,0 +1,98 @@
+[
+    {
+        "id": "period-01",
+        "business": "clinic",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Invoices for the last 3 months",
+        "expect": {
+            "numbers": [
+                "invoices:last_3_months:count",
+                "invoices:last_3_months:paid",
+                "invoices:last_3_months:unpaid",
+                "invoices:last_3_months:amount"
+            ],
+            "period": "last_3_months",
+            "card": ["table"],
+            "note": "Every bill issued in the period, by status (paid, not paid) and in money, from Saroh's totals; a card with the first bills and a link to Invoices for the period."
+        }
+    },
+    {
+        "id": "period-02",
+        "business": "bakery",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Products sold in the last 3 months",
+        "expect": {
+            "mentions": ["top-products:last_3_months:3"],
+            "period": "last_3_months",
+            "card": ["products", "table"],
+            "note": "The products sold, most first, with units; a products card linking each product and to the list for the period."
+        }
+    },
+    {
+        "id": "period-03",
+        "business": "bakery",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Stock summary",
+        "expect": {
+            "numbers": [
+                "stock-summary:products",
+                "stock-summary:units",
+                "stock-summary:low"
+            ],
+            "mentions": ["low-stock"],
+            "card": ["products", "table"],
+            "note": "Products counted, units on hand in all, and which are low; a card linking to Products."
+        }
+    },
+    {
+        "id": "period-04",
+        "business": "salon",
+        "role": "owner",
+        "language": "hi",
+        "kind": "answer",
+        "question": "पिछले 3 महीनों की बुकिंग का सारांश बताओ",
+        "expect": {
+            "numbers": [
+                "bookings:last_3_months",
+                "came:last_3_months",
+                "noshow:last_3_months",
+                "cancelled:last_3_months"
+            ],
+            "period": "last_3_months",
+            "card": ["table"],
+            "note": "Standing bookings in the period, how many came and didn't, and the cancelled ones apart; a card linking to Bookings for the period."
+        }
+    },
+    {
+        "id": "period-05",
+        "business": "bakery",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Pichle 3 mahine ke orders ka summary do",
+        "expect": {
+            "numbers": ["orders:last_3_months", "orders:last_3_months:amount"],
+            "period": "last_3_months",
+            "card": ["table", "products"],
+            "note": "Orders placed and their money from Saroh's totals; a card linking to Orders for the period."
+        }
+    },
+    {
+        "id": "period-06",
+        "business": "bakery",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Last month vs this month orders",
+        "expect": {
+            "numbers": ["orders:last_month", "orders:this_month"],
+            "note": "Last calendar month in full against this month so far; saying this month isn't over is best."
+        }
+    }
+]

@@ -1,5 +1,5 @@
 /**
- * The five made-up test businesses of the Ask AI quality test (plan
+ * The seven made-up test businesses of the Ask AI quality test (plan
  * 2026-11-13-001 U6), as plain data: no database, no clock of its own.
  *
  * Every row is a pure function of the run date (`anchor`, local midnight
@@ -22,6 +22,8 @@ export const BUSINESS_KEYS = [
     "clinic",
     "bakery",
     "coach",
+    "clothing",
+    "yoga",
 ] as const;
 export type BizKey = (typeof BUSINESS_KEYS)[number];
 
@@ -93,26 +95,90 @@ export interface BookingPlan {
     outcome: Outcome;
 }
 
+/** One size or colour of a product, with its shelf at each store. */
+export interface VariantPlan {
+    key: string;
+    label: string;
+    /** On hand per store key. */
+    stock: Record<string, number>;
+    lowAlert: number;
+    weight: number;
+}
+
 export interface ProductPlan {
     key: string;
     name: string;
     price: number;
+    /** Main store, whole product (no variants). */
     onHand: number;
     lowAlert: number;
     /** How often it is picked for an order line. */
     weight: number;
+    /** The product's one option ("Size", "Colour") and its variants. */
+    option?: string;
+    variants?: VariantPlan[];
+    /** Whole-product stock at the other stores, by store key. */
+    stockAt?: Record<string, number>;
 }
 
-export type Stage = "NEW" | "PREPARING" | "READY" | "COLLECTED";
+export type Stage = "NEW" | "PREPARING" | "READY" | "COLLECTED" | "DELIVERED";
 export interface OrderPlan {
     key: string;
     number: string;
     customer: string | null;
     walkIn: string | null;
-    items: { product: string; qty: number }[];
+    items: { product: string; qty: number; variant?: string }[];
     at: Date;
     paid: boolean;
     stage: Stage;
+    /** Store key; absent is the main store. */
+    store?: string;
+    online?: boolean;
+    cancelled?: boolean;
+    /** Rupees off the order's lines. */
+    discount?: number;
+}
+
+export interface StorePlan {
+    key: string;
+    name: string;
+}
+
+export interface ClassPackPlan {
+    key: string;
+    name: string;
+    credits: number;
+    validityDays: number;
+    price: number;
+    services: string[];
+}
+
+export interface PackPurchasePlan {
+    key: string;
+    pack: string;
+    customer: string;
+    at: Date;
+    expiresAt: Date;
+    /** Booking keys a credit was spent on. */
+    used: string[];
+}
+
+export interface MemberPlan {
+    key: string;
+    name: string;
+    price: number;
+    /** Customer keys holding it, and when each started. */
+    holders: { customer: string; since: Date }[];
+}
+
+export interface WaitlistPlan {
+    /** The session: a class and its start. */
+    session: string;
+    service: string;
+    start: Date;
+    end: Date;
+    /** In line, first first. */
+    customers: string[];
 }
 
 export interface InvoicePlan {
@@ -150,6 +216,16 @@ export interface BusinessPlan {
     orders: OrderPlan[];
     invoices: InvoicePlan[];
     enquiries: EnquiryPlan[];
+    /** Absent: one store, `main`, the "<name> counter". */
+    stores?: StorePlan[];
+    /** Modules on beyond the ones every business has (`seed.ts`). */
+    extraModules?: string[];
+    /** A website (for blog drafts), by name. */
+    site?: string;
+    packs?: ClassPackPlan[];
+    packPurchases?: PackPurchasePlan[];
+    memberships?: MemberPlan[];
+    waitlists?: WaitlistPlan[];
 }
 
 /** Local midnight in Kolkata of the day `now` falls on: the run date. */
@@ -506,6 +582,46 @@ function billAttended(
     return out;
 }
 
+/** Monthly memberships, billed on the 1st, due on the 7th; a few never paid (not `alwaysPaid`). */
+function monthlyBills(
+    anchor: Date,
+    rng: Rng,
+    people: Person[],
+    activity: Map<string, Activity>,
+    amount: number,
+    alwaysPaid: Set<string>,
+): Omit<InvoicePlan, "number">[] {
+    const out: Omit<InvoicePlan, "number">[] = [];
+    const start = DateTime.fromJSDate(dayAt(anchor, -HISTORY_DAYS), {
+        zone: ZONE,
+    }).startOf("month");
+    const today = DateTime.fromJSDate(anchor, { zone: ZONE });
+    for (let m = start; m <= today; m = m.plus({ months: 1 })) {
+        const d = dayOffset(anchor, m.toJSDate());
+        if (d < -HISTORY_DAYS) continue;
+        for (const p of people) {
+            const a = activity.get(p.key);
+            if (!a || a.first > d || a.last < d) continue;
+            const after = rng.int(0, 6);
+            const never =
+                d < -20 && rng.next() < 0.06 && !alwaysPaid.has(p.key);
+            const paidDay = d + after;
+            const paidAt =
+                never || paidDay > 0 ? null : dayAt(anchor, paidDay, 10 * 60);
+            out.push({
+                key: `m_${p.key}_${m.toFormat("yyyyLL")}`,
+                customer: p.key,
+                description: `Membership ${m.toFormat("LLLL yyyy")}`,
+                amount,
+                issuedAt: dayAt(anchor, d, 9 * 60),
+                dueAt: dayAt(anchor, d + 6, 23 * 60 + 59),
+                paidAt,
+            });
+        }
+    }
+    return out;
+}
+
 const dayOffset = (anchor: Date, at: Date) =>
     Math.floor(
         DateTime.fromJSDate(at, { zone: ZONE })
@@ -850,33 +966,16 @@ function gym(anchor: Date): BusinessPlan {
         dueAt: dayAt(anchor, 7, 23 * 60 + 59),
         paidAt: dayAt(anchor, 0, 10 * 60 + 10),
     });
-    // Monthly memberships, billed on the 1st, due on the 7th.
-    const start = DateTime.fromJSDate(dayAt(anchor, -HISTORY_DAYS), {
-        zone: ZONE,
-    }).startOf("month");
-    const today = DateTime.fromJSDate(anchor, { zone: ZONE });
-    for (let m = start; m <= today; m = m.plus({ months: 1 })) {
-        const d = dayOffset(anchor, m.toJSDate());
-        if (d < -HISTORY_DAYS) continue;
-        for (const p of customers.people) {
-            const a = customers.activity.get(p.key);
-            if (!a || a.first > d || a.last < d) continue;
-            const after = rng.int(0, 6);
-            const never = d < -20 && rng.next() < 0.06 && p.key !== "rahul";
-            const paidDay = d + after;
-            const paidAt =
-                never || paidDay > 0 ? null : dayAt(anchor, paidDay, 10 * 60);
-            invoices.push({
-                key: `m_${p.key}_${m.toFormat("yyyyLL")}`,
-                customer: p.key,
-                description: `Membership ${m.toFormat("LLLL yyyy")}`,
-                amount: 2499,
-                issuedAt: dayAt(anchor, d, 9 * 60),
-                dueAt: dayAt(anchor, d + 6, 23 * 60 + 59),
-                paidAt,
-            });
-        }
-    }
+    invoices.push(
+        ...monthlyBills(
+            anchor,
+            rng,
+            customers.people,
+            customers.activity,
+            2499,
+            new Set(["rahul"]),
+        ),
+    );
     return {
         key: "gym",
         slug: slugOf("gym"),
@@ -1156,6 +1255,9 @@ function bakery(anchor: Date): BusinessPlan {
         trade: "other",
         tradeOther: "Bakery",
         city: "Bengaluru",
+        // A website, for blog-02's draft post.
+        extraModules: ["WEBSITE"],
+        site: "Crumb & Co. Bakery",
         team: team("bakery", [
             ["owner", "Farhan", "Ali"],
             ["member", "Lata", "Hegde"],
@@ -1322,6 +1424,533 @@ function coach(anchor: Date): BusinessPlan {
     };
 }
 
+/** The clothing shop's orders go this far back: "last 3 months" is compared with the 3 months before it. */
+export const SHOP_HISTORY_DAYS = 190;
+
+const variantLine = (
+    ...rows: [string, string, number, number, number, number][]
+): VariantPlan[] =>
+    rows.map(([key, label, weight, lowAlert, main, second]) => ({
+        key,
+        label,
+        weight,
+        lowAlert,
+        stock: { main, second },
+    }));
+
+/** Two stores, counter and online, some cancelled and some discounted, by variant. */
+function makeShopOrders(
+    anchor: Date,
+    rng: Rng,
+    products: ProductPlan[],
+    customers: ReturnType<typeof makeCustomers>,
+    fixed: Omit<OrderPlan, "number">[],
+): OrderPlan[] {
+    const out: Omit<OrderPlan, "number">[] = [...fixed];
+    const byWeight = <T extends { weight: number }>(xs: T[]): T => {
+        let r = rng.next() * xs.reduce((n, x) => n + x.weight, 0);
+        for (const x of xs) {
+            r -= x.weight;
+            if (r <= 0) return x;
+        }
+        return xs[0];
+    };
+    const price = new Map(products.map((p) => [p.key, p.price]));
+    let n = 0;
+    for (let d = -SHOP_HISTORY_DAYS; d <= 0; d++) {
+        if (GAP_DAYS.has(d)) continue;
+        for (let i = rng.int(2, 5); i > 0; i--) {
+            const store = rng.next() < 0.6 ? "main" : "second";
+            const pool = customers.people.filter((p) => {
+                const a = customers.activity.get(p.key);
+                return (
+                    a &&
+                    d >= a.first &&
+                    d <= a.last &&
+                    !customers.named.has(p.key)
+                );
+            });
+            const online =
+                store === "main" && pool.length > 0 && rng.next() < 0.3;
+            // Shop customers are the main store's: the other's are walk-ins.
+            const known =
+                online ||
+                (store === "main" && pool.length > 0 && rng.next() < 0.6);
+            const items: OrderPlan["items"] = [];
+            for (let l = rng.int(1, 2); l > 0; l--) {
+                const p = byWeight(products);
+                const variant = p.variants
+                    ? byWeight(p.variants).key
+                    : undefined;
+                items.push({
+                    product: p.key,
+                    qty: rng.next() < 0.85 ? 1 : 2,
+                    ...(variant ? { variant } : {}),
+                });
+            }
+            const lines = items.reduce(
+                (s, it) => s + (price.get(it.product) ?? 0) * it.qty,
+                0,
+            );
+            const cancelled = d < 0 && rng.next() < 0.05;
+            const discount =
+                rng.next() < 0.1 ? Math.round(lines * 0.1) : undefined;
+            out.push({
+                key: `r${n++}`,
+                customer: known ? rng.pick(pool).key : null,
+                walkIn: known ? null : "Walk-in customer",
+                items,
+                at: dayAt(
+                    anchor,
+                    d,
+                    d === 0
+                        ? rng.int(10 * 60, TODAY_CUTOFF_MINUTE - 20)
+                        : rng.int(10 * 60, 21 * 60),
+                ),
+                // A cancelled order was never paid: it moved no money.
+                paid: !cancelled,
+                stage:
+                    d === 0
+                        ? rng.pick(["NEW", "PREPARING", "READY"] as const)
+                        : cancelled
+                          ? "NEW"
+                          : online
+                            ? "DELIVERED"
+                            : "COLLECTED",
+                store,
+                ...(online ? { online } : {}),
+                ...(cancelled ? { cancelled } : {}),
+                ...(discount ? { discount } : {}),
+            });
+        }
+    }
+    return out
+        .sort(
+            (a, b) =>
+                a.at.getTime() - b.at.getTime() || a.key.localeCompare(b.key),
+        )
+        .map((o, i) => ({
+            ...o,
+            number: `ORD-${String(i + 1).padStart(3, "0")}`,
+        }));
+}
+
+function clothing(anchor: Date): BusinessPlan {
+    const rng = rngOf(606);
+    // The kurta's M sells most, by far: "best seller by variant" has one answer.
+    const products: ProductPlan[] = [
+        {
+            key: "kurta",
+            name: "Cotton kurta",
+            price: 1299,
+            onHand: 0,
+            lowAlert: 0,
+            weight: 10,
+            option: "Size",
+            variants: variantLine(
+                ["s", "S", 1, 3, 6, 4],
+                ["m", "M", 12, 3, 6, 1],
+                ["l", "L", 2, 3, 5, 4],
+                ["xl", "XL", 1, 3, 2, 0],
+            ),
+        },
+        {
+            key: "tee",
+            name: "Everyday tee",
+            price: 499,
+            onHand: 0,
+            lowAlert: 0,
+            weight: 7,
+            option: "Colour",
+            variants: variantLine(
+                ["white", "White", 3, 4, 14, 9],
+                ["black", "Black", 3, 4, 11, 8],
+                ["olive", "Olive", 3, 4, 7, 6],
+            ),
+        },
+        {
+            key: "shirt",
+            name: "Linen shirt",
+            price: 1599,
+            onHand: 0,
+            lowAlert: 0,
+            weight: 5,
+            option: "Size",
+            variants: variantLine(
+                ["s", "S", 1, 2, 4, 3],
+                ["m", "M", 3, 2, 6, 4],
+                ["l", "L", 3, 2, 5, 5],
+                ["xl", "XL", 1, 2, 1, 3],
+            ),
+        },
+        {
+            key: "dupatta",
+            name: "Printed dupatta",
+            price: 699,
+            onHand: 0,
+            lowAlert: 0,
+            weight: 4,
+            option: "Colour",
+            variants: variantLine(
+                ["indigo", "Indigo", 3, 2, 8, 5],
+                ["maroon", "Maroon", 2, 2, 6, 4],
+                ["mustard", "Mustard", 1, 2, 2, 3],
+            ),
+        },
+        {
+            key: "jeans",
+            name: "Straight-fit jeans",
+            price: 1899,
+            onHand: 0,
+            lowAlert: 0,
+            weight: 3,
+            option: "Size",
+            variants: variantLine(
+                ["w28", "28", 1, 2, 4, 3],
+                ["w30", "30", 2, 2, 5, 4],
+                ["w32", "32", 2, 2, 5, 4],
+                ["w34", "34", 1, 2, 3, 0],
+            ),
+        },
+        {
+            key: "saree",
+            name: "Handloom saree",
+            price: 3499,
+            onHand: 4,
+            lowAlert: 2,
+            weight: 1,
+            stockAt: { second: 2 },
+        },
+    ];
+    for (const p of products) {
+        if (p.variants)
+            p.onHand = p.variants.reduce((n, v) => n + v.stock.main, 0);
+    }
+    const customers = makeCustomers("clothing", rng, 70, {
+        meher: ["Meher", "Kapoor"],
+        tanvir: ["Tanvir", "Ahmed"],
+    });
+    const orders = makeShopOrders(anchor, rng, products, customers, [
+        // "<number> pack ho gaya, ready mark kar do".
+        {
+            key: "pack_today",
+            customer: "meher",
+            walkIn: null,
+            items: [{ product: "kurta", variant: "l", qty: 1 }],
+            at: dayAt(anchor, 0, 10 * 60 + 5),
+            paid: true,
+            stage: "PREPARING",
+            store: "main",
+        },
+        // So the Satellite store has an order today, whatever the dice say.
+        {
+            key: "second_today",
+            customer: null,
+            walkIn: "Walk-in customer",
+            items: [{ product: "kurta", variant: "m", qty: 1 }],
+            at: dayAt(anchor, 0, 10 * 60 + 20),
+            paid: true,
+            stage: "READY",
+            store: "second",
+        },
+        // "Refund order <number>": collected three days ago.
+        {
+            key: "refund_me",
+            customer: "tanvir",
+            walkIn: null,
+            items: [{ product: "shirt", variant: "m", qty: 1 }],
+            at: dayAt(anchor, -3, 17 * 60),
+            paid: true,
+            stage: "COLLECTED",
+            store: "main",
+        },
+    ]);
+    return {
+        key: "clothing",
+        slug: slugOf("clothing"),
+        name: "Threadline Studio",
+        trade: "other",
+        tradeOther: "Clothing shop",
+        city: "Ahmedabad",
+        team: team("clothing", [
+            ["owner", "Hetal", "Desai"],
+            ["member", "Jignesh", "Patel"],
+            ["storefront", "Komal", "Shah"],
+        ]),
+        staff: [],
+        services: [],
+        products,
+        customers: customers.people,
+        bookings: [],
+        orders,
+        invoices: [],
+        enquiries: [],
+        stores: [
+            { key: "main", name: "Threadline Studio, Navrangpura" },
+            { key: "second", name: "Threadline Studio, Satellite" },
+        ],
+        extraModules: ["WEBSITE"],
+        site: "Threadline Studio",
+    };
+}
+
+function yoga(anchor: Date): BusinessPlan {
+    const rng = rngOf(707);
+    const services: ServicePlan[] = [
+        {
+            key: "hatha",
+            name: "7 AM Hatha",
+            minutes: 60,
+            price: null,
+            capacity: 12,
+            staff: ["radhika"],
+            days: ALL_WEEK,
+            opens: 420,
+            closes: 480,
+            classAt: [420],
+            perDay: [5, 10],
+        },
+        {
+            key: "vinyasa",
+            name: "6 PM Vinyasa",
+            minutes: 60,
+            price: null,
+            capacity: 15,
+            staff: ["kiran"],
+            days: WEEK,
+            opens: 1080,
+            closes: 1140,
+            classAt: [1080],
+            perDay: [6, 12],
+        },
+        {
+            key: "private",
+            name: "Private yoga session",
+            minutes: 60,
+            price: 1500,
+            capacity: 1,
+            staff: ["kiran", "dev"],
+            days: WEEK,
+            opens: 600,
+            closes: 1020,
+            perDay: [0, 1],
+        },
+    ];
+    const customers = makeCustomers("yoga", rng, 56, {
+        meera: ["Meera", "Joshi"],
+        ira: ["Ira", "Sen"],
+        kunal: ["Kunal", "Shah"],
+        nandini: ["Nandini", "Roy"],
+    });
+    // No visit 31 or 30 days back, so "not in for 30 days" can't tip on the hour of the run.
+    const bookings = makeBookings(
+        anchor,
+        rng,
+        services,
+        customers,
+        [],
+        [],
+    ).filter((b) => ![-31, -30].includes(dayOffset(anchor, b.start)));
+    // The Saturday class with a waitlist: full, never tomorrow (yoga-05 books tomorrow's).
+    const satDay = openDay(anchor, 2, [6]);
+    const satStart = dayAt(anchor, satDay, 420);
+    const satEnd = new Date(satStart.getTime() + 60 * 60_000);
+    const inClass = new Set(
+        bookings
+            .filter(
+                (b) =>
+                    b.service === "hatha" &&
+                    b.start.getTime() === satStart.getTime(),
+            )
+            .map((b) => b.customer),
+    );
+    for (const p of customers.people) {
+        if (inClass.size >= 12) break;
+        const a = customers.activity.get(p.key);
+        if (customers.named.has(p.key) || !a || a.last < satDay) continue;
+        if (inClass.has(p.key)) continue;
+        inClass.add(p.key);
+        bookings.push({
+            key: `full_${p.key}`,
+            service: "hatha",
+            staff: "radhika",
+            customer: p.key,
+            start: satStart,
+            end: satEnd,
+            status: "CONFIRMED",
+            outcome: null,
+        });
+    }
+    bookings.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    const packs: ClassPackPlan[] = [
+        {
+            key: "eight",
+            name: "8-class pack",
+            credits: 8,
+            validityDays: 60,
+            price: 3600,
+            services: ["hatha", "vinyasa"],
+        },
+        {
+            key: "four",
+            name: "4-class pack",
+            credits: 4,
+            validityDays: 30,
+            price: 1900,
+            services: ["hatha", "vinyasa"],
+        },
+    ];
+    const packOf = new Map(packs.map((p) => [p.key, p]));
+    const purchases: Omit<PackPurchasePlan, "used">[] = [];
+    for (const p of customers.people) {
+        const a = customers.activity.get(p.key);
+        if (customers.named.has(p.key) || !a || rng.next() > 0.45) continue;
+        const pack = rng.next() < 0.6 ? "eight" : "four";
+        const d = rng.int(Math.max(a.first, -110), Math.min(a.last, -1));
+        purchases.push({
+            key: `p_${p.key}`,
+            pack,
+            customer: p.key,
+            at: dayAt(anchor, d, 8 * 60 + 30),
+            expiresAt: dayAt(
+                anchor,
+                d + (packOf.get(pack)?.validityDays ?? 30),
+                23 * 60,
+            ),
+        });
+    }
+    // Two that run out on the month's last day, and one sold this morning.
+    const monthEnd = dayOffset(
+        anchor,
+        DateTime.fromJSDate(anchor, { zone: ZONE }).endOf("month").toJSDate(),
+    );
+    for (const who of ["meera", "ira"]) {
+        purchases.push({
+            key: `p_${who}`,
+            pack: "four",
+            customer: who,
+            at: dayAt(anchor, Math.min(monthEnd - 30, -1), 9 * 60),
+            expiresAt: dayAt(anchor, monthEnd, 20 * 60),
+        });
+    }
+    purchases.push({
+        key: "p_kunal",
+        pack: "eight",
+        customer: "kunal",
+        at: dayAt(anchor, 0, 9 * 60),
+        expiresAt: dayAt(anchor, 60, 23 * 60),
+    });
+    // Credits spent on classes they came to, oldest first.
+    const spent = new Set<string>();
+    const packPurchases: PackPurchasePlan[] = purchases.map((pp) => {
+        const pack = packOf.get(pp.pack);
+        const used = bookings
+            .filter(
+                (b) =>
+                    b.customer === pp.customer &&
+                    b.outcome === "ATTENDED" &&
+                    !spent.has(b.key) &&
+                    pack?.services.includes(b.service) &&
+                    b.start >= pp.at &&
+                    b.start < pp.expiresAt,
+            )
+            .slice(0, pack?.credits ?? 0)
+            .map((b) => b.key);
+        for (const k of used) spent.add(k);
+        return { ...pp, used };
+    });
+
+    const members = customers.people.filter((p) => {
+        const a = customers.activity.get(p.key);
+        return !customers.named.has(p.key) && a && a.last >= 0;
+    });
+    const holders = members.slice(0, 12);
+    const invoices: Omit<InvoicePlan, "number">[] = [
+        ...billAttended(anchor, rng, bookings, services, {
+            unpaidShare: () => 0.05,
+            paidAfter: () => 0,
+            alwaysPaid: new Set(),
+        }),
+        ...packPurchases.map((pp) => ({
+            key: `pack_${pp.key}`,
+            customer: pp.customer,
+            description: packOf.get(pp.pack)?.name ?? pp.pack,
+            amount: packOf.get(pp.pack)?.price ?? 0,
+            issuedAt: pp.at,
+            dueAt: pp.at,
+            paidAt: new Date(pp.at.getTime() + 5 * 60_000),
+        })),
+        ...monthlyBills(
+            anchor,
+            rng,
+            holders,
+            customers.activity,
+            3200,
+            new Set(),
+        ),
+    ];
+    return {
+        key: "yoga",
+        slug: slugOf("yoga"),
+        name: "Prana Yoga Studio",
+        trade: "other",
+        tradeOther: "Yoga studio",
+        city: "Kochi",
+        team: team("yoga", [
+            ["owner", "Radhika", "Menon"],
+            ["member", "Siddharth", "Varma"],
+        ]),
+        staff: [
+            {
+                key: "radhika",
+                name: "Radhika Menon",
+                title: "Lead teacher",
+                isOwner: true,
+            },
+            { key: "kiran", name: "Kiran Thomas", title: "Teacher" },
+            { key: "dev", name: "Dev Pillai", title: "Teacher" },
+        ],
+        services,
+        products: [],
+        customers: customers.people,
+        bookings,
+        orders: [],
+        invoices: numberInvoices(invoices),
+        enquiries: [],
+        extraModules: ["CLASS_PACKS"],
+        packs,
+        packPurchases,
+        memberships: [
+            {
+                key: "monthly",
+                name: "Monthly unlimited",
+                price: 3200,
+                holders: holders.map((p) => ({
+                    customer: p.key,
+                    since: dayAt(
+                        anchor,
+                        Math.max(
+                            customers.activity.get(p.key)?.first ?? 0,
+                            -HISTORY_DAYS,
+                        ),
+                        9 * 60,
+                    ),
+                })),
+            },
+        ],
+        waitlists: [
+            {
+                session: "sat",
+                service: "hatha",
+                start: satStart,
+                end: satEnd,
+                customers: ["ira", "kunal", "nandini"],
+            },
+        ],
+    };
+}
+
 /** The whole test set for the run date `anchor`. */
 export function buildPlan(anchor: Date): BusinessPlan[] {
     return [
@@ -1330,6 +1959,8 @@ export function buildPlan(anchor: Date): BusinessPlan[] {
         clinic(anchor),
         bakery(anchor),
         coach(anchor),
+        clothing(anchor),
+        yoga(anchor),
     ];
 }
 

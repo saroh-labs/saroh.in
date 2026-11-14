@@ -4,8 +4,13 @@
  * conversation (plan 2026-11-13-001 U6). Costs real money: it stops when
  * the targets file's budget would be passed. Never in CI.
  *
+ * A question that `needs` a tool Ask AI hasn't got yet is skipped, said
+ * so on the console and in `results.json`. A question's `before` turns are
+ * asked first in the same conversation and not graded; their cost counts
+ * against the budget, apart from the question's own.
+ *
  * Records per run: the answer, the status lines, every tool call (name,
- * input), the draft card, the usage row (tokens, cost), the time to the
+ * input), every card (the draft's last), the usage row (tokens, cost), the time to the
  * first status line and to the first answer text, and which business
  * tables changed (a save without Confirm). Writes `results.json` and
  * `report.md` to the out folder as it goes, so a stopped run keeps what it
@@ -37,7 +42,12 @@ import type {
     RunRecord,
     ToolCallRecord,
 } from "./lib";
-import { loadQuestions, parseTargets, runWithinBudget } from "./lib";
+import {
+    loadQuestions,
+    parseTargets,
+    runWithinBudget,
+    splitByTools,
+} from "./lib";
 import {
     assertEvalDatabase,
     boot,
@@ -120,6 +130,17 @@ export function resolveQuestion(
     };
     return {
         question: fillText(biz, q.question, now),
+        before: (q.before ?? []).map((b) => fillText(biz, b, now)),
+        period: e.period
+            ? {
+                  key: e.period,
+                  from: String(
+                      resolveFact(biz, `period:${e.period}:from`, now),
+                  ),
+                  to: String(resolveFact(biz, `period:${e.period}:to`, now)),
+              }
+            : null,
+        card: e.card ?? null,
         numbers: (e.numbers ?? []).map(num),
         mentions: (e.mentions ?? []).map((key) => ({ key, value: words(key) })),
         draft: e.draft
@@ -207,10 +228,12 @@ export async function main(argv: readonly string[]): Promise<number> {
         return 2;
     }
     const plan = buildPlan(anchor);
-    const { ASK_AI_DRAFT_TOOLS } = fromDist<typeof AskAiAgentFile>(
-        "modules/ai/agents/ask-ai.agent",
-    );
-    const resolved = questions.map((q) => ({
+    const { ASK_AI_DRAFT_TOOLS, ASK_AI_TOOLS } = fromDist<
+        typeof AskAiAgentFile
+    >("modules/ai/agents/ask-ai.agent");
+    const split = splitByTools(questions, ASK_AI_TOOLS);
+    for (const s of split.skipped) console.info(`${TAG} ${s.id}: ${s.reason}`);
+    const resolved = split.runnable.map((q) => ({
         ...q,
         resolved: resolveQuestion(
             q,
@@ -270,6 +293,7 @@ export async function main(argv: readonly string[]): Promise<number> {
                 turnCapMicroUsd: turnCap,
                 stoppedForBudget: false,
                 draftTools: [...ASK_AI_DRAFT_TOOLS],
+                skipped: split.skipped,
             },
             questions: resolved,
             runs: [],
@@ -297,12 +321,15 @@ export async function main(argv: readonly string[]): Promise<number> {
                 const record = await runOne(q, run);
                 record.toolCalls = calls;
                 results.runs.push(record);
-                results.meta.spentMicroUsd += record.usage?.costMicroUsd ?? 0;
+                const cost =
+                    (record.usage?.costMicroUsd ?? 0) +
+                    (record.setupMicroUsd ?? 0);
+                results.meta.spentMicroUsd += cost;
                 save();
                 console.info(
-                    `${TAG} ${q.id} #${run}: ${record.outcome ?? record.error} ${record.usage?.costMicroUsd ?? 0} micro-USD, ${record.totalMs} ms`,
+                    `${TAG} ${q.id} #${run}: ${record.outcome ?? record.error} ${cost} micro-USD, ${record.totalMs} ms`,
                 );
-                return record.usage?.costMicroUsd ?? 0;
+                return cost;
             },
         );
         results.meta.stoppedForBudget = done.stopped;
@@ -328,6 +355,7 @@ export async function main(argv: readonly string[]): Promise<number> {
                 statuses: [],
                 toolCalls: [],
                 card: null,
+                cards: [],
                 outcome: null,
                 error: null,
                 usage: null,
@@ -349,6 +377,34 @@ export async function main(argv: readonly string[]): Promise<number> {
                     ctx,
                     "ask-ai",
                 );
+                for (const prior of q.resolved.before ?? []) {
+                    const id = randomUUID();
+                    const s = registry.begin(ctx, id);
+                    const t = setTimeout(
+                        () => registry.stop(ctx, id),
+                        TURN_TIMEOUT_MS,
+                    );
+                    try {
+                        for await (const event of runner.run({
+                            ctx,
+                            conversationId: conversation.id,
+                            question: prior,
+                            turnId: id,
+                            signal: s,
+                        }))
+                            void event;
+                    } finally {
+                        clearTimeout(t);
+                        registry.end(id);
+                    }
+                    const u = await asBusiness(orgId, () =>
+                        prisma.aiUsage.findUnique({ where: { turnId: id } }),
+                    );
+                    record.setupMicroUsd =
+                        (record.setupMicroUsd ?? 0) + (u?.costMicroUsd ?? 0);
+                }
+                // Only the graded turn's tool calls.
+                calls = [];
                 const turnId = randomUUID();
                 record.turnId = turnId;
                 const signal = registry.begin(ctx, turnId);
@@ -381,6 +437,7 @@ export async function main(argv: readonly string[]): Promise<number> {
                                 kind: event.kind,
                                 data: event.data,
                             };
+                            record.cards?.push(record.card);
                         } else if (event.type === "error") {
                             record.error = event.reason;
                         } else if (event.type === "done") {

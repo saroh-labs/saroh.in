@@ -54,6 +54,10 @@ const expectSchema = z
         behaviour: z
             .enum(["refuse", "ask-back", "ignore-injection"])
             .optional(),
+        /** A summary's period (`last_3_months`, …): its first and last days must be in the answer. */
+        period: z.string().optional(),
+        /** A read card of one of these kinds (`table`, `products`) must be shown, with its link. */
+        card: z.array(z.string()).min(1).optional(),
         /** For the AI grader: what a right answer says. */
         note: z.string().optional(),
     })
@@ -68,6 +72,10 @@ export const questionSchema = z
         kind: z.enum(KINDS),
         /** `{{fact}}` is filled from the seed at run time. */
         question: z.string().min(1),
+        /** Asked first in the same conversation, not graded ("Publish it" after a draft). */
+        before: z.array(z.string().min(1)).optional(),
+        /** A tool Ask AI must have for this question: skipped while it hasn't. */
+        needs: z.string().optional(),
         expect: expectSchema,
     })
     .strict();
@@ -95,6 +103,24 @@ export function loadQuestions(dir: string): Question[] {
         ids.add(q.id);
     }
     return out;
+}
+
+/** The questions whose `needs` tool Ask AI has, and the rest, skipped with the reason. */
+export function splitByTools(
+    questions: readonly Question[],
+    tools: readonly string[],
+): { runnable: Question[]; skipped: { id: string; reason: string }[] } {
+    const runnable: Question[] = [];
+    const skipped: { id: string; reason: string }[] = [];
+    for (const q of questions) {
+        if (q.needs && !tools.includes(q.needs))
+            skipped.push({
+                id: q.id,
+                reason: `skipped: tool not available (${q.needs})`,
+            });
+        else runnable.push(q);
+    }
+    return { runnable, skipped };
 }
 
 /**
@@ -143,6 +169,12 @@ export function parseTargets(text: string): Targets {
 /** A question's expectations with every fact resolved at run time. */
 export interface Resolved {
     question: string;
+    /** Turns asked first, filled (absent in results from before they existed). */
+    before?: string[];
+    /** The summary's period, first and last day as `2026-08-15`. */
+    period?: { key: string; from: string; to: string } | null;
+    /** Card kinds accepted. */
+    card?: string[] | null;
     numbers: { key: string; value: number }[];
     mentions: { key: string; value: string[] }[];
     draft: { tool: string; input: unknown; inputMentions: string[][] } | null;
@@ -164,7 +196,12 @@ export interface RunRecord {
     text: string;
     statuses: { tool: string; words: string; ms: number }[];
     toolCalls: ToolCallRecord[];
+    /** The last card shown (a draft's, when the turn drafted). */
     card: { kind: string; data: Record<string, unknown> } | null;
+    /** Every card shown, in order (absent in results from before it was kept). */
+    cards?: { kind: string; data: Record<string, unknown> }[];
+    /** What the `before` turns cost, outside `usage`. */
+    setupMicroUsd?: number;
     outcome: string | null;
     error: string | null;
     usage: {
@@ -192,6 +229,8 @@ export interface Results {
         turnCapMicroUsd: number | null;
         stoppedForBudget: boolean;
         draftTools: string[];
+        /** Questions not run, with why (a tool Ask AI hasn't got yet). */
+        skipped?: { id: string; reason: string }[];
     };
     questions: (Question & { resolved: Resolved })[];
     runs: RunRecord[];
@@ -228,7 +267,7 @@ export function numbersIn(text: string): number[] {
 
 /** Money facts are matched to the rupee; counts exactly. */
 const isMoneyKey = (key: string) =>
-    /^(moneyin|owed:total|owed:customer)/.test(key);
+    /^(moneyin|owed:total|owed:customer)|:amount$/.test(key);
 
 /**
  * Small counts written as words ("Eight orders", "सात", "teen"). Not
@@ -321,6 +360,41 @@ export function mentions(text: string, value: string): boolean {
     return words.some((w) => lower.includes(w));
 }
 
+const MONTHS = [
+    ["jan", "january", "जनवरी"],
+    ["feb", "february", "फ़रवरी", "फरवरी"],
+    ["mar", "march", "मार्च"],
+    ["apr", "april", "अप्रैल"],
+    ["may", "मई"],
+    ["jun", "june", "जून"],
+    ["jul", "july", "जुलाई"],
+    ["aug", "august", "अगस्त"],
+    ["sep", "sept", "september", "सितंबर", "सितम्बर"],
+    ["oct", "october", "अक्टूबर"],
+    ["nov", "november", "नवंबर", "नवम्बर"],
+    ["dec", "december", "दिसंबर", "दिसम्बर"],
+];
+
+/**
+ * Whether the day `iso` ("2026-08-15") is in the text as people write it:
+ * 15 Aug, August 15th, 15 अगस्त, 15/08, 2026-08-15 (Devanagari digits too).
+ * The year may be left out.
+ */
+export function mentionsDate(text: string, iso: string): boolean {
+    const [y, m, d] = iso.split("-").map(Number);
+    const t = toAsciiDigits(text).toLowerCase();
+    if (t.includes(iso)) return true;
+    const edge = "(?<![\\p{L}\\p{M}\\d])";
+    const end = "(?![\\p{L}\\p{M}\\d])";
+    const names = MONTHS[m - 1].join("|");
+    const day = `0?${d}(?:st|nd|rd|th)?`;
+    return [
+        `${edge}${day}\\s+(?:${names})\\.?${end}`,
+        `${edge}(?:${names})\\.?\\s+${day}${end}`,
+        `${edge}0?${d}[/.-]0?${m}(?:[/.-](?:${y}|${y % 100}))?${end}`,
+    ].some((re) => new RegExp(re, "iu").test(t));
+}
+
 const HEDGE =
     /can't tell|cannot tell|can't see|cannot see|not sure|don't have|do not have|unable|not shown|no access|pata nahi|nahi pata|nahi dikh|नहीं पता|नहीं दिख|नहीं बता/i;
 
@@ -364,6 +438,17 @@ export function partialMatch(
         return asNumber(actual) === expected
             ? []
             : [`${path}: ${JSON.stringify(actual)} is not ${expected}`];
+    }
+    // "*": any words at all; "?x": absent, or x.
+    if (expected === "*") {
+        return typeof actual === "string" && actual.trim()
+            ? []
+            : [`${path}: ${JSON.stringify(actual)} is empty`];
+    }
+    if (typeof expected === "string" && expected.startsWith("?")) {
+        return actual === undefined || actual === null
+            ? []
+            : partialMatch(expected.slice(1), actual, path);
     }
     if (looksLikeInstant(expected)) {
         return looksLikeInstant(actual) &&
@@ -421,6 +506,22 @@ export function checkDraft(
     return { ok: problems.length === 0, problems };
 }
 
+/** A read card of an accepted kind was shown, and it links to the list in Saroh. */
+export function checkCard(
+    kinds: readonly string[],
+    cards: RunRecord["cards"],
+): string[] {
+    const card = (cards ?? []).find((c) => kinds.includes(c.kind));
+    if (!card) {
+        const shown = (cards ?? []).map((c) => c.kind).join(", ") || "none";
+        return [`no ${kinds.join(" or ")} card (cards shown: ${shown})`];
+    }
+    const link = card.data.link as { href?: unknown } | null | undefined;
+    return typeof link?.href === "string" && link.href
+        ? []
+        : [`${card.kind} card has no link`];
+}
+
 // --- One run, graded by code ---------------------------------------------------
 
 export interface CodeGrade {
@@ -458,8 +559,18 @@ export function gradeRun(
         ...r.mentions
             .filter((m) => !m.value.every((v) => mentions(text, v)))
             .map((m) => `${m.key}=${m.value.join(", ")}`),
+        ...(r.period
+            ? [r.period.from, r.period.to]
+                  .filter((day) => !mentionsDate(text, day))
+                  .map((day) => `${r.period?.key} date ${day}`)
+            : []),
+        // Results from before cards were all kept: the one card recorded.
+        ...(r.card
+            ? checkCard(r.card, run.cards ?? (run.card ? [run.card] : []))
+            : []),
     ];
-    const hasFacts = r.numbers.length + r.mentions.length > 0;
+    const hasFacts =
+        r.numbers.length + r.mentions.length > 0 || !!r.period || !!r.card;
     const facts: CodeGrade["facts"] = !hasFacts
         ? null
         : missing.length === 0
@@ -818,6 +929,15 @@ function expectedLines(q: Question & { resolved: Resolved }): string[] {
         ...(r.forbiddenTools.length
             ? [`Must not call: ${r.forbiddenTools.join(", ")}`]
             : []),
+        ...(r.period
+            ? [`Says the period: ${r.period.from} to ${r.period.to}`]
+            : []),
+        ...(r.card
+            ? [`Shows a ${r.card.join(" or ")} card with its link`]
+            : []),
+        ...(r.before?.length
+            ? [`Asked first: ${r.before.map((b) => `"${b}"`).join(", ")}`]
+            : []),
         ...(e.behaviour ? [`Behaviour: ${e.behaviour}`] : []),
         ...(e.note ? [`Note: ${e.note}`] : []),
     ];
@@ -883,14 +1003,14 @@ export function questionsMarkdown(
                           `- Tool \`${c.name}\`${c.isError ? " (error)" : ""}: \`${json(c.input).replace(/`/g, "'")}\``,
                   )
                 : ["- Tools: none"]),
-            ...(run.card
-                ? [
-                      `- Draft card (${run.card.kind}): ${Object.entries(
-                          run.card.data,
-                      )
-                          .map(([k, val]) => `${k}: ${json(val)}`)
-                          .join("; ")}`,
-                  ]
+            ...(run.cards ?? (run.card ? [run.card] : [])).map(
+                (card) =>
+                    `- Card (${card.kind}): ${Object.entries(card.data)
+                        .map(([k, val]) => `${k}: ${json(val)}`)
+                        .join("; ")}`,
+            ),
+            ...(run.setupMicroUsd
+                ? [`- Earlier turns cost ${rupees(run.setupMicroUsd)}`]
                 : []),
             ...(run.error ? [`- Error: ${run.error}`] : []),
             // shortcut: no thinking-token count in the run record, add it when run.ts records one.
@@ -931,6 +1051,12 @@ export function questionsMarkdown(
         "",
         `Run date ${results.meta.anchor}. ${results.questions.length} questions, ${results.runs.length} runs: ${passed} PASS, ${results.runs.length - passed} FAIL. Marks: see [grade.md](grade.md).`,
         "",
+        ...(results.meta.skipped?.length
+            ? [
+                  `Not run: ${results.meta.skipped.map((s) => `${s.id} (${s.reason})`).join("; ")}.`,
+                  "",
+              ]
+            : []),
         "| # | id | trade | kind | language | role | question | passed | worst problem | median cost | first status / text |",
         "|---|---|---|---|---|---|---|---|---|---|---|",
         ...summary,

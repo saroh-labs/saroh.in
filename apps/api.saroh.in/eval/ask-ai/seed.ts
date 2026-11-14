@@ -1,5 +1,5 @@
 /**
- * Seeds the quality test's five made-up businesses (`plan.ts`) into a fresh
+ * Seeds the quality test's seven made-up businesses (`plan.ts`) into a fresh
  * eval database, laid out around today. Prisma directly: seeding is not the
  * API's job. Refuses unless the database is on this machine and named
  * `…-eval`, and refuses a database that already has them (drop it and make
@@ -15,6 +15,7 @@ import {
     prisma,
     STOREFRONT_TEAM_ROLE_KEY,
 } from "@saroh/database";
+import { DateTime } from "luxon";
 
 import { assertEvalDatabase } from "./local";
 import type { BizKey, BusinessPlan, Person, TeamRole } from "./plan";
@@ -31,10 +32,15 @@ const MODULES = [
     "COMMERCE",
 ] as const;
 // ORG_AUTHORIZATION as in production: without it a store takes the older per-store checks, and a draft order fails "Location not found".
-const FLAGS = [
-    ...MODULES.map((m) => `MODULE_${m}`),
+const flagsOf = (modules: readonly string[]) => [
+    ...modules.map((m) => `MODULE_${m}`),
     "ASK_AI",
     "ORG_AUTHORIZATION",
+];
+/** Every business's modules, its own extras after the shared ones. */
+const modulesOf = (biz: BusinessPlan) => [
+    ...MODULES,
+    ...(biz.extraModules ?? []),
 ];
 
 const ROLE_KEY: Record<TeamRole, string> = {
@@ -122,7 +128,8 @@ export async function main(): Promise<number> {
             "[eval seed] no base seed (demo-org): the businesses get no plan",
         );
     else await addAskAiRow(base.plan.version);
-    for (const key of FLAGS) {
+    const flags = new Set(plan.flatMap((biz) => flagsOf(modulesOf(biz))));
+    for (const key of flags) {
         await prisma.featureFlag.upsert({
             where: { key },
             update: {},
@@ -170,22 +177,25 @@ async function seedBusiness(
         },
     });
     const storeId = id("store", "main");
-    await prisma.store.create({
-        data: {
-            id: storeId,
-            name: `${biz.name} counter`,
-            organizationId: orgId,
-        },
-    });
-    await prisma.storeSettings.create({
-        data: {
-            id: id("storesettings", "main"),
-            storeId,
-            currency: "INR",
-            timezone: ZONE,
-            kind: "SHOP",
-        },
-    });
+    const stores = biz.stores ?? [{ key: "main", name: `${biz.name} counter` }];
+    for (const st of stores) {
+        await prisma.store.create({
+            data: {
+                id: id("store", st.key),
+                name: st.name,
+                organizationId: orgId,
+            },
+        });
+        await prisma.storeSettings.create({
+            data: {
+                id: id("storesettings", st.key),
+                storeId: id("store", st.key),
+                currency: "INR",
+                timezone: ZONE,
+                kind: "SHOP",
+            },
+        });
+    }
 
     // --- people
     const memberships = new Map<TeamRole, string>();
@@ -225,7 +235,7 @@ async function seedBusiness(
         });
         memberships.set(p.role, membershipId);
     }
-    for (const moduleKey of MODULES) {
+    for (const moduleKey of modulesOf(biz)) {
         await prisma.organizationModule.create({
             data: {
                 id: id("module", moduleKey.toLowerCase()),
@@ -238,7 +248,7 @@ async function seedBusiness(
         });
     }
     await prisma.featureFlagOverride.createMany({
-        data: FLAGS.map((flagKey) => ({
+        data: flagsOf(modulesOf(biz)).map((flagKey) => ({
             id: id("flag", flagKey.toLowerCase()),
             flagKey,
             organizationId: orgId,
@@ -363,7 +373,32 @@ async function seedBusiness(
         });
     }
 
-    // --- products and stock
+    // --- products and stock: each product's option and its values once
+    const optionValues = new Map<string, string>();
+    for (const p of biz.products) {
+        if (!p.option || !p.variants) continue;
+        const optionId = id("option", p.option.toLowerCase());
+        if (!optionValues.has(p.option)) {
+            await prisma.productOption.create({
+                data: { id: optionId, organizationId: orgId, name: p.option },
+            });
+            optionValues.set(p.option, optionId);
+        }
+        for (const [i, v] of p.variants.entries()) {
+            const valueId = id("optionvalue", `${p.option}_${v.label}`);
+            if (optionValues.has(valueId)) continue;
+            await prisma.productOptionValue.create({
+                data: {
+                    id: valueId,
+                    optionId,
+                    organizationId: orgId,
+                    value: v.label,
+                    position: i,
+                },
+            });
+            optionValues.set(valueId, valueId);
+        }
+    }
     for (const p of biz.products) {
         await prisma.product.create({
             data: {
@@ -378,29 +413,82 @@ async function seedBusiness(
                 stockTracked: true,
                 stockTrackedAt: since,
                 createdAt: since,
+                optionId: p.option
+                    ? id("option", p.option.toLowerCase())
+                    : null,
             },
         });
+        for (const [i, v] of (p.variants ?? []).entries()) {
+            await prisma.productVariant.create({
+                data: {
+                    id: id("variant", `${p.key}_${v.key}`),
+                    productId: id("product", p.key),
+                    sku: `${p.key}-${v.key}`.toUpperCase(),
+                    title: v.label,
+                    optionValueId: id("optionvalue", `${p.option}_${v.label}`),
+                    position: i,
+                    createdAt: since,
+                },
+            });
+        }
         // Listed where it is stocked, as the app's create does (ADR-010):
-        // an unlisted shelf sells nothing, so Home never calls it low.
-        await prisma.productListing.create({
-            data: {
-                id: id("listing", p.key),
-                organizationId: orgId,
-                storeId,
-                productId: id("product", p.key),
-            },
-        });
-        await prisma.stockLevel.create({
-            data: {
-                id: id("stock", p.key),
-                organizationId: orgId,
-                storeId,
-                productId: id("product", p.key),
-                onHand: p.onHand,
-                promised: 0,
-                lowStockAlert: p.lowAlert,
-            },
-        });
+        // an unlisted shelf sells nothing, so Home never calls it low. The
+        // main store's ids are as they were before there were others.
+        const whole: Record<string, number> = {
+            main: p.onHand,
+            ...p.stockAt,
+        };
+        for (const st of stores) {
+            const at = (key: string) =>
+                st.key === "main" ? key : `${key}_${st.key}`;
+            const listingId = id("listing", at(p.key));
+            await prisma.productListing.create({
+                data: {
+                    id: listingId,
+                    organizationId: orgId,
+                    storeId: id("store", st.key),
+                    productId: id("product", p.key),
+                },
+            });
+            if (!p.variants) {
+                await prisma.stockLevel.create({
+                    data: {
+                        id: id("stock", at(p.key)),
+                        organizationId: orgId,
+                        storeId: id("store", st.key),
+                        productId: id("product", p.key),
+                        onHand: whole[st.key] ?? 0,
+                        promised: 0,
+                        lowStockAlert: p.lowAlert,
+                    },
+                });
+                continue;
+            }
+            for (const v of p.variants) {
+                const variantId = id("variant", `${p.key}_${v.key}`);
+                await prisma.productListingVariant.create({
+                    data: {
+                        id: id("listingvariant", at(`${p.key}_${v.key}`)),
+                        organizationId: orgId,
+                        listingId,
+                        productId: id("product", p.key),
+                        variantId,
+                    },
+                });
+                await prisma.stockLevel.create({
+                    data: {
+                        id: id("stock", at(`${p.key}_${v.key}`)),
+                        organizationId: orgId,
+                        storeId: id("store", st.key),
+                        productId: id("product", p.key),
+                        variantId,
+                        onHand: v.stock[st.key] ?? 0,
+                        promised: 0,
+                        lowStockAlert: v.lowAlert,
+                    },
+                });
+            }
+        }
     }
 
     // --- bookings
@@ -464,27 +552,33 @@ async function seedBusiness(
     const orders: Prisma.OrderCreateManyInput[] = [];
     const items: Prisma.OrderItemCreateManyInput[] = [];
     for (const o of biz.orders) {
-        const total = o.items.reduce(
+        const subtotal = o.items.reduce(
             (n, i) => n + (price.get(i.product) ?? 0) * i.qty,
             0,
         );
+        const discount = o.discount ?? 0;
         orders.push({
             id: id("order", o.key),
-            storeId,
+            storeId: id("store", o.store ?? "main"),
             organizationId: orgId,
             orderId: o.number,
             customerId: o.customer ? id("shopcustomer", o.customer) : null,
             walkInName: o.walkIn,
-            subtotal: total,
-            total,
+            subtotal,
+            discount,
+            total: subtotal - discount,
             currency: "INR",
-            status: o.stage === "COLLECTED" ? "DELIVERED" : "PROCESSING",
+            status: o.cancelled
+                ? "CANCELLED"
+                : o.stage === "COLLECTED" || o.stage === "DELIVERED"
+                  ? "DELIVERED"
+                  : "PROCESSING",
             paymentStatus: o.paid ? "PAID" : "UNPAID",
             paidAt: o.paid ? o.at : null,
             payOnHandover: !o.paid,
             stage: o.stage,
-            fulfilment: "PICKUP",
-            placedOnline: false,
+            fulfilment: o.online ? "SHIPPING" : "PICKUP",
+            placedOnline: o.online ?? false,
             createdAt: o.at,
             updatedAt: o.at,
         });
@@ -493,6 +587,9 @@ async function seedBusiness(
                 id: id("orderitem", `${o.key}_${n}`),
                 orderId: id("order", o.key),
                 productId: id("product", i.product),
+                variantId: i.variant
+                    ? id("variant", `${i.product}_${i.variant}`)
+                    : null,
                 quantity: i.qty,
                 price: price.get(i.product) ?? 0,
             }),
@@ -567,6 +664,122 @@ async function seedBusiness(
                 series: "INV",
                 lastNumber: invoices.length,
             },
+        });
+    }
+
+    // --- a website, so a blog post has somewhere to be drafted
+    if (biz.site) {
+        await prisma.site.create({
+            data: {
+                id: id("site", "main"),
+                organizationId: orgId,
+                name: biz.site,
+                slug: biz.slug,
+                createdAt: since,
+            },
+        });
+    }
+
+    // --- class packs: sold, spent on classes; memberships; a waitlist
+    for (const pack of biz.packs ?? []) {
+        await prisma.classPack.create({
+            data: {
+                id: id("pack", pack.key),
+                organizationId: orgId,
+                name: pack.name,
+                credits: pack.credits,
+                validityDays: pack.validityDays,
+                price: pack.price,
+                currency: "INR",
+                status: "ACTIVE",
+                kind: "CLASSES",
+                createdAt: since,
+            },
+        });
+        await prisma.classPackService.createMany({
+            data: pack.services.map((s) => ({
+                packId: id("pack", pack.key),
+                serviceId: id("service", s),
+                organizationId: orgId,
+            })),
+        });
+    }
+    const packs = new Map((biz.packs ?? []).map((p) => [p.key, p]));
+    for (const pp of biz.packPurchases ?? []) {
+        const pack = packs.get(pp.pack);
+        if (!pack) throw new Error(`${k}: purchase ${pp.key} names no pack`);
+        await prisma.packPurchase.create({
+            data: {
+                id: id("purchase", pp.key),
+                organizationId: orgId,
+                packId: id("pack", pp.pack),
+                contactId: id("customer", pp.customer),
+                credits: pack.credits,
+                price: pack.price,
+                currency: "INR",
+                expiresAt: pp.expiresAt,
+                paidBy: "UPI",
+                createdAt: pp.at,
+            },
+        });
+        await prisma.packRedemption.createMany({
+            data: pp.used.map((b) => ({
+                id: id("redemption", b),
+                organizationId: orgId,
+                purchaseId: id("purchase", pp.key),
+                bookingId: id("booking", b),
+                createdAt: pp.at,
+            })),
+        });
+    }
+    for (const m of biz.memberships ?? []) {
+        const planId = id("memberplan", m.key);
+        await prisma.subscriptionPlan.create({
+            data: {
+                id: planId,
+                organizationId: orgId,
+                name: m.name,
+                price: m.price,
+                currency: "INR",
+                interval: "MONTH",
+                status: "ACTIVE",
+                createdAt: since,
+            },
+        });
+        const month = DateTime.fromJSDate(anchor, { zone: ZONE }).startOf(
+            "month",
+        );
+        await prisma.customerSubscription.createMany({
+            data: m.holders.map((h) => ({
+                id: id("membersub", `${m.key}_${h.customer}`),
+                organizationId: orgId,
+                planId,
+                contactId: id("customer", h.customer),
+                status: "ACTIVE",
+                price: m.price,
+                currency: "INR",
+                interval: "MONTH",
+                timezone: ZONE,
+                anchorAt: h.since,
+                currentPeriodStart: month.toJSDate(),
+                currentPeriodEnd: month.plus({ months: 1 }).toJSDate(),
+                createdAt: h.since,
+            })),
+        });
+    }
+    for (const w of biz.waitlists ?? []) {
+        await prisma.classWaitlistEntry.createMany({
+            data: w.customers.map((c, i) => ({
+                id: id("waitlist", `${w.session}_${c}`),
+                organizationId: orgId,
+                serviceId: id("service", w.service),
+                startAt: w.start,
+                endAt: w.end,
+                contactId: id("customer", c),
+                position: i + 1,
+                status: "WAITING" as const,
+                createdAt: dayAt(anchor, -1, 12 * 60 + i),
+            })),
         });
     }
 

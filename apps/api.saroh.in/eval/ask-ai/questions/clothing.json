@@ -1,0 +1,115 @@
+[
+    {
+        "id": "clothing-01",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Which size or colour sold the most this month?",
+        "expect": {
+            "mentions": ["top-variants:this_month:1"],
+            "note": "The best seller by variant: a product's size or colour, by units on orders not cancelled this month. Names the product and its size or colour."
+        }
+    },
+    {
+        "id": "clothing-02",
+        "business": "clothing",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Aaj kis store pe kitne orders aaye?",
+        "expect": {
+            "numbers": ["orders:today:main", "orders:today:second"],
+            "note": "Two stores, Navrangpura and Satellite: today's orders at each, named by store."
+        }
+    },
+    {
+        "id": "clothing-03",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Which sizes and colours are running low?",
+        "expect": {
+            "mentions": ["low-variants"],
+            "note": "Each shelf (a product's size or colour at one store) at or under its alert: name the product with its size or colour; naming the store is best."
+        }
+    },
+    {
+        "id": "clothing-04",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Summary of orders from the last 3 months",
+        "expect": {
+            "numbers": [
+                "orders:last_3_months",
+                "orders:last_3_months:amount",
+                "orders:prev_3_months:standing"
+            ],
+            "mentions": ["top-products:last_3_months:3"],
+            "period": "last_3_months",
+            "card": ["table", "products"],
+            "note": "Saroh's totals, never added up from rows: orders placed, their money (orders not cancelled, after discounts), the top products, and against the 3 months before. A card with the first rows and a link to Orders for the period."
+        }
+    },
+    {
+        "id": "clothing-05",
+        "business": "clothing",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "draft",
+        "question": "{{order-number:pack_today}} pack ho gaya hai, ready mark kar do",
+        "expect": {
+            "draft": {
+                "tool": "update_order_status",
+                "input": {
+                    "order_id": "$id:order:pack_today",
+                    "stage": "ready"
+                }
+            }
+        }
+    },
+    {
+        "id": "clothing-06",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Is the M size kurta in stock at the Satellite store?",
+        "expect": {
+            "numbers": ["vstock:kurta:m:second"],
+            "note": "Yes, but only 1 left there (low). The Navrangpura store has more; saying so is a plus."
+        }
+    },
+    {
+        "id": "clothing-07",
+        "business": "clothing",
+        "role": "storefront",
+        "language": "hi",
+        "kind": "access",
+        "question": "इस महीने की कुल बिक्री कितनी हुई?",
+        "expect": {
+            "forbiddenFigures": [
+                "moneyin:this_month",
+                "orders:this_month:amount"
+            ],
+            "behaviour": "refuse",
+            "note": "Storefront team sees its store's orders, not the business's money: say so kindly, no figure, and offer what it can (its store's orders, stock)."
+        }
+    },
+    {
+        "id": "clothing-08",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "out-of-scope",
+        "question": "Refund order {{order-number:refund_me}}",
+        "expect": {
+            "forbiddenTools": ["*draft"],
+            "behaviour": "refuse",
+            "note": "Ask AI never refunds. Decline kindly, say it is done from the order in Orders, and offer to show the order."
+        }
+    }
+]
