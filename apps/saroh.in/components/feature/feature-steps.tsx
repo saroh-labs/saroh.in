@@ -23,7 +23,17 @@ export function FeatureSteps({
                 who: step.who,
                 // A step in another company's app is drawn, not captured.
                 ...(step.chat
-                    ? { drawn: <ChatExchange words={step.chat} /> }
+                    ? {
+                          drawn: (
+                              // The wash the boards set a drawn screen on (as /developers).
+                              <div className="rounded-mk-band border border-border bg-muted p-3.5 sm:p-[22px]">
+                                  <ChatExchange
+                                      words={step.chat}
+                                      className="mx-auto max-w-[520px]"
+                                  />
+                              </div>
+                          ),
+                      }
                     : { shot: shotView(step.shot, step.alt) }),
             }))}
             help={help}

@@ -958,6 +958,11 @@
 .sp .sp-go-ink {
     color: var(--sp-ink);
 }
+/* The New pill keeps its own case beside the uppercase eyebrow. */
+.sp-eyebrow .vc-pill {
+    text-transform: none;
+    letter-spacing: normal;
+}
 .sp .sp-ai-lead {
     margin: 0;
     max-width: 60ch;
@@ -1012,7 +1017,8 @@
     margin: 40px 0 0;
     padding: 0;
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* Also in Saroh's columns (board VTForC): each line a third wide. */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 24px 40px;
 }
 .sp .sp-ai-lines li {
@@ -1021,8 +1027,9 @@
     align-items: flex-start;
 }
 @media (max-width: 899.98px) {
+    /* As "What gets easier" on a phone (board VTForC). */
     .sp-ai .sp-bento {
-        margin-top: 24px;
+        margin-top: 64px;
     }
     .sp .sp-ai-lines {
         margin-top: 32px;

@@ -148,7 +148,7 @@ function CardGroup({
                     <Link
                         href={link.href}
                         className={textLinkClasses({
-                            className: "text-[14.5px]",
+                            className: "text-[14.5px] font-semibold",
                         })}
                     >
                         {link.label}
@@ -167,7 +167,7 @@ function Cards({
     stack = false,
 }: {
     cards: readonly LiveIntegration[];
-    /** Four to a row: the connect line sits over the link, not beside it. */
+    /** Four to a row: past phone width the connect line sits over the link. */
     stack?: boolean;
 }) {
     return (
@@ -183,7 +183,10 @@ function Cards({
                 <li key={item.slug} className="grid">
                     <Link
                         href={item.href}
-                        className={cardLinkClasses("gap-3.5 p-[22px]")}
+                        className={cardLinkClasses(
+                            // A column, so the line grows and the connect rows line up.
+                            "flex flex-col gap-3.5 p-[22px]",
+                        )}
                     >
                         <span className="flex items-start gap-3">
                             <span className="grid">
@@ -204,7 +207,8 @@ function Cards({
                         <span
                             className={cn(
                                 "flex flex-wrap justify-between gap-x-3 gap-y-1 rounded-[10px] border border-mk-line-soft bg-background px-3 py-2.5 text-[13px]",
-                                stack ? "flex-col items-start" : "items-center",
+                                "items-center",
+                                stack && "sm:flex-col sm:items-start",
                             )}
                         >
                             <span className="text-muted-foreground">

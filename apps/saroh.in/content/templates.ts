@@ -215,6 +215,8 @@ export interface GalleryTemplate {
     type: string;
     fonts: { heading: string; body: string };
     colourways: string[];
+    /** Each colourway's accent, where it carries a palette: the preview's swatches. */
+    swatches: string[];
     colours: PreviewColours;
     pages: PreviewPage[];
 }
@@ -369,6 +371,9 @@ function toGallery(t: TemplateManifest): GalleryTemplate {
             body: pair ? fontStack(pair.body) : "inherit",
         },
         colourways: (t.styles ?? []).map((s) => s.name),
+        swatches: (t.styles ?? []).flatMap((s) =>
+            s.style.palette?.accent ? [s.style.palette.accent] : [],
+        ),
         colours: previewColours(t, slug),
         pages,
     };

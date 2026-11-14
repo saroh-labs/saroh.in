@@ -108,13 +108,18 @@ curl ${API_ORIGIN}/v1/bookings \\
   -H "Authorization: Bearer sk_live_…" \\
   -H "Content-Type: application/json" \\
   -H "Idempotency-Key: booking-7f3a" \\
-  -d '{"serviceId":"…","startAt":"2026-12-01T10:00:00+05:30","bookerEmail":"asha@example.com","bookerName":"Asha"}'`,
+  -d '{
+    "serviceId": "…",
+    "startAt": "2026-12-01T10:00:00+05:30",
+    "bookerEmail": "asha@example.com",
+    "bookerName": "Asha"
+  }'`,
             },
         },
         {
             title: "Show the catalogue on your own site",
             body: "A publishable key is safe in a web page. It reads only what the business's Saroh website already shows: products, stock, services, open slots, staff names, posts and plans.",
-            who: "Example request",
+            who: "Gulmohar Salon & Bridal (demo salon)",
             visual: "code",
             code: {
                 title: "Your website",
@@ -123,6 +128,15 @@ const res = await fetch(
   "${API_ORIGIN}/v1/storefront/pk_live_…/products"
 );
 const { data } = await res.json();`,
+            },
+            /** Under the code: what that read draws on the salon's own site (no prices: this page names none). */
+            storefront: {
+                title: "Our services",
+                rows: [
+                    { name: "Haircut", line: "30 min" },
+                    { name: "Hair spa", line: "60 min" },
+                    { name: "Keratin treatment", line: "90 min" },
+                ],
             },
         },
         {

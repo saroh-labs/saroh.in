@@ -25,7 +25,7 @@ export function FeatureTemplates({ words }: { words: Words }) {
             titleId="templates"
             eyebrow="Templates"
             title={words.title}
-            lead={words.lead}
+            lead={<span className="block max-w-[72ch]">{words.lead}</span>}
             className="grid gap-9 pt-[120px]"
         >
             {first ? (
@@ -117,10 +117,20 @@ function Preview({ template }: { template: GalleryTemplate }) {
             <figcaption className="sr-only">
                 {`Drawing of the ${template.name} template's preview in Saroh, on a computer and a phone`}
             </figcaption>
-            <div aria-hidden className="flex items-baseline gap-2">
+            <div aria-hidden className="flex items-center gap-2">
                 <b className="text-[14px]">{template.name}</b>
                 <span className="text-[12.5px] text-muted-foreground">
                     with your details
+                </span>
+                <span className="ml-auto flex gap-1.5">
+                    {template.swatches.map((accent, i) => (
+                        <span
+                            key={`${accent}-${i}`}
+                            // The template's own colour: data, not a site token.
+                            style={{ backgroundColor: accent }}
+                            className={`size-5 rounded-full border-2 border-card ${i === 0 ? "ring-2 ring-foreground" : "ring-1 ring-border"}`}
+                        />
+                    ))}
                 </span>
             </div>
             {home ? (

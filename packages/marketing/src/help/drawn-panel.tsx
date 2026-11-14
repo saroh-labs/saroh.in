@@ -15,7 +15,13 @@ export type DrawnPanelData =
           /** The address bar's words. */
           address: string;
           title: string;
-          fields: readonly { label: string; value: string; mono?: boolean }[];
+          /** `mark`: the field the step names, ringed in Saffron. */
+          fields: readonly {
+              label: string;
+              value: string;
+              mono?: boolean;
+              mark?: boolean;
+          }[];
           /** A ticked box under the fields. */
           check?: string;
           button: string;
@@ -87,6 +93,8 @@ function FormPanel({
                         className={cn(
                             "truncate rounded-lg border border-border px-3 py-2",
                             f.mono && "font-mono text-[13px]",
+                            f.mark &&
+                                "border-2 border-mk-saffron shadow-[0_0_0_3px_rgba(240,169,43,0.22)]",
                         )}
                     >
                         {f.value}

@@ -1,3 +1,4 @@
+import { ButtonLink } from "@saroh/marketing/button";
 import { ProductHero } from "@saroh/marketing/product-hero";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { cellOf, offeredPlans } from "@saroh/pricing-catalog";
@@ -51,6 +52,8 @@ export function FeatureHero({
     /** The published catalogue, or null before launch or without one. */
     catalog: Catalog | null;
 }) {
+    const line = heroPlanLine(feature, catalog);
+    const start = <HeroActions src={`feature-${feature.slug}`} />;
     return (
         <ProductHero
             section={{ name: "Features", href: "/#features" }}
@@ -58,8 +61,20 @@ export function FeatureHero({
             headline={feature.headline}
             sub={feature.sub}
             narrow
-            actions={<HeroActions src={`feature-${feature.slug}`} />}
-            freeLine={heroPlanLine(feature, catalog)}
+            actions={
+                // A feature on some plans only names them, and links them (board VFAskAi).
+                line === freePlanLine(catalog) ? (
+                    start
+                ) : (
+                    <div className="flex flex-wrap gap-3">
+                        {start}
+                        <ButtonLink href="/pricing" variant="secondary">
+                            See plans
+                        </ButtonLink>
+                    </div>
+                )
+            }
+            freeLine={line}
             shot={shotView(feature.hero.shot, feature.hero.alt)}
             chat={feature.heroChat}
         />

@@ -90,10 +90,15 @@ export function DevelopersPage({
                     drawn: (
                         <div className="rounded-mk-band border border-border bg-muted p-3.5 sm:p-[22px]">
                             {"code" in step ? (
-                                <CodeSample
-                                    title={step.code.title}
-                                    code={step.code.code}
-                                />
+                                <div className="grid gap-3.5">
+                                    <CodeSample
+                                        title={step.code.title}
+                                        code={step.code.code}
+                                    />
+                                    {"storefront" in step ? (
+                                        <Storefront list={step.storefront} />
+                                    ) : null}
+                                </div>
                             ) : (
                                 <KeysPanel />
                             )}
@@ -183,9 +188,7 @@ function WebhookPanel() {
     const hook = page.hero.webhook;
     return (
         <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-card">
-            <div className="border-b border-muted px-4 py-2.5 text-[13px] font-semibold">
-                {hook.business}
-            </div>
+            <BusinessBar name={hook.business} />
             <div className="grid gap-2.5 px-4 py-4 sm:px-[18px]">
                 <span className="text-[12.5px] text-muted-foreground">
                     {hook.path}
@@ -232,9 +235,7 @@ function KeysPanel() {
     const keys = page.keys;
     return (
         <div className="mx-auto max-w-[540px] overflow-hidden rounded-xl border border-border bg-card">
-            <div className="border-b border-muted px-4 py-2.5 text-[13px] font-semibold">
-                {keys.business}
-            </div>
+            <BusinessBar name={keys.business} />
             <div className="grid gap-2 px-4 py-4 sm:px-[18px]">
                 <span className="flex items-center gap-2">
                     <span className="font-display text-[19px] font-bold">
@@ -281,6 +282,48 @@ function KeysPanel() {
                     {keys.note}
                 </span>
             </div>
+        </div>
+    );
+}
+
+/** A drawn Settings screen's top bar: the business's letter tile and name. */
+function BusinessBar({ name }: { name: string }) {
+    return (
+        <div className="flex items-center gap-2 border-b border-muted px-4 py-2.5 text-[13px] font-semibold">
+            <span
+                aria-hidden
+                className="grid size-6 place-items-center rounded-md bg-foreground text-[12px] text-background"
+            >
+                {name.charAt(0)}
+            </span>
+            {name}
+        </div>
+    );
+}
+
+/**
+ * Step 3's second drawing: what the publishable read draws on the salon's
+ * own site, in a plain serif, not Saroh's type (a merchant's page).
+ */
+function Storefront({ list }: { list: (typeof page.steps)[2]["storefront"] }) {
+    return (
+        <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="border-b border-muted px-4 py-3 font-serif text-[17px]">
+                {list.title}
+            </div>
+            <ul className="m-0 grid list-none p-0 text-[13px]">
+                {list.rows.map((row) => (
+                    <li
+                        key={row.name}
+                        className="flex items-baseline gap-2 border-t border-muted px-4 py-2 first:border-t-0"
+                    >
+                        {row.name}
+                        <span className="ml-auto text-muted-foreground">
+                            {row.line}
+                        </span>
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }

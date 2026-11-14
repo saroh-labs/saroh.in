@@ -1,3 +1,5 @@
+import { Sparkles, Wrench } from "lucide-react";
+
 import { cn } from "../cn";
 import type { ChatOutcome, ChatWords } from "../content/types";
 import { Pill } from "../links/pill";
@@ -25,12 +27,9 @@ export const OUTCOME_PILL: Record<
  */
 export function ChatExchange({
     words,
-    variant = "shot",
     className,
 }: {
     words: ChatWords;
-    /** `hero`: the deeper shadow and corners of a feature page's hero. */
-    variant?: "shot" | "hero";
     className?: string;
 }) {
     const pill = OUTCOME_PILL[words.outcome];
@@ -38,18 +37,18 @@ export function ChatExchange({
         <figure
             data-chat={words.outcome}
             className={cn(
-                "m-0 min-w-0 overflow-hidden border border-border bg-card",
-                variant === "hero"
-                    ? "rounded-2xl shadow-mk-hero"
-                    : "rounded-xl shadow-mk-shot",
+                "m-0 min-w-0 overflow-hidden rounded-xl border border-border bg-card shadow-mk-shot",
                 className,
             )}
         >
             <figcaption className="sr-only">{words.caption}</figcaption>
             <div
                 aria-hidden
-                className="flex items-center gap-2 border-b border-border px-4 py-3 text-[14px] font-semibold"
+                className="flex items-center gap-2.5 border-b border-border px-4 py-3 text-[14px] font-semibold"
             >
+                <span className="grid size-6 place-items-center rounded-md bg-muted text-muted-foreground">
+                    <Sparkles className="size-3.5" />
+                </span>
                 Your AI assistant
                 <Pill tone="ok" className="ml-auto">
                     Saroh connected
@@ -61,7 +60,8 @@ export function ChatExchange({
                     {words.ask}
                 </p>
                 {words.tools ? (
-                    <p className="m-0 justify-self-start rounded-full border border-border px-3 py-1 text-[12px] text-muted-foreground">
+                    <p className="m-0 inline-flex items-center gap-1.5 justify-self-start rounded-full border border-border bg-background px-3 py-1 text-[12px] text-muted-foreground">
+                        <Wrench aria-hidden className="size-3" />
                         <span className="sr-only">It used: </span>
                         {words.tools}
                     </p>
@@ -70,17 +70,26 @@ export function ChatExchange({
                     <span className="sr-only">Assistant: </span>
                     {words.reply}
                 </p>
+                {/* As drawn: the outcome sits on the record it touched. */}
                 {words.result ? (
-                    <p className="m-0 grid gap-0.5 rounded-[12px] border border-border bg-background px-3.5 py-2.5">
-                        <b className="font-semibold">{words.result.title}</b>
-                        <span className="text-[13px] text-muted-foreground">
-                            {words.result.line}
-                        </span>
-                    </p>
-                ) : null}
-                <Pill tone={pill.tone} className="justify-self-start">
-                    {pill.text}
-                </Pill>
+                    <div className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-[12px] border border-border bg-background px-3.5 py-2.5">
+                        <p className="m-0 grid min-w-0 flex-[1_1_200px] gap-0.5">
+                            <b className="font-semibold">
+                                {words.result.title}
+                            </b>
+                            <span className="text-[13px] text-muted-foreground">
+                                {words.result.line}
+                            </span>
+                        </p>
+                        <Pill tone={pill.tone} className="ml-auto shrink-0">
+                            {pill.text}
+                        </Pill>
+                    </div>
+                ) : (
+                    <Pill tone={pill.tone} className="justify-self-start">
+                        {pill.text}
+                    </Pill>
+                )}
             </div>
         </figure>
     );

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { cn } from "../cn";
 import { useFocusTrap } from "../layout/use-focus-trap";
+import { NewTag } from "../links/pill";
 import { TextLink } from "../links/text-link";
 import { ring } from "../ring";
 import { ColumnHeading } from "./column-heading";
@@ -220,6 +221,7 @@ export function PhoneSheet({
                                     >
                                         <span className="text-base font-semibold">
                                             {item.name}
+                                            {item.isNew ? <NewTag /> : null}
                                         </span>
                                         {item.line ? (
                                             <span className="text-mk-note leading-[1.4] text-muted-foreground">

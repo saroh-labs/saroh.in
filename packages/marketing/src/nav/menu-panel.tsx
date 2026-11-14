@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef } from "react";
 
+import { NewTag } from "../links/pill";
 import { TextLink } from "../links/text-link";
 import { ring } from "../ring";
 import { nextIndex } from "../roving";
@@ -89,6 +90,7 @@ export function MenuPanel({
                                     >
                                         <span className="text-[15px] font-semibold">
                                             {item.name}
+                                            {item.isNew ? <NewTag /> : null}
                                         </span>
                                         {item.line ? (
                                             <span className="text-mk-note leading-[1.4] text-muted-foreground">

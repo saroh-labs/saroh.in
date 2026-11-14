@@ -74,8 +74,14 @@ export function ProductHero({
                 ) : null}
             </Container>
             {chat ? (
-                <Container width="article" className="pt-14">
-                    <ChatExchange words={chat} variant="hero" />
+                <Container className="pt-14">
+                    {/* The wash the boards set a drawn screen on (as /developers). */}
+                    <div className="rounded-mk-band border border-border bg-muted p-4 sm:p-7">
+                        <ChatExchange
+                            words={chat}
+                            className="mx-auto max-w-mk-article"
+                        />
+                    </div>
                 </Container>
             ) : shot ? (
                 <Container className="pt-14">

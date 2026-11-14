@@ -29,8 +29,9 @@ export function AppList({
             lead={words.lead}
             className="grid gap-7 pt-[130px]"
         >
+            {/* auto-fill: two live apps keep the board's four-across card width. */}
             {apps.length > 0 ? (
-                <ul className="m-0 grid list-none gap-4 p-0 [grid-template-columns:repeat(auto-fit,minmax(min(100%,max(220px,calc((100%_-_48px)/4))),1fr))]">
+                <ul className="m-0 grid list-none gap-4 p-0 [grid-template-columns:repeat(auto-fill,minmax(min(100%,max(220px,calc((100%_-_48px)/4))),1fr))]">
                     {apps.map((app) => (
                         <li key={app.href} className="grid">
                             <CardLink

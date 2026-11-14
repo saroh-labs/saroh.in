@@ -955,6 +955,16 @@ export const featureList: Feature[] = shownFeatures(featuresOff()).map(
 
 export const featureHref = (slug: FeatureSlug) => `/features/${slug}`;
 
+/**
+ * Tagged "new" in the menus, the footer and Home's grid while their release
+ * is fresh (plan 2026-11-13-002, U2); empty this list in a later commit.
+ */
+export const NEW_FEATURES: readonly FeatureSlug[] = [
+    "ai-apps",
+    "ask-ai",
+    "social",
+];
+
 /** Whether `value` names a feature page, shown or not. */
 export function isFeatureSlug(value: string): value is FeatureSlug {
     return Object.hasOwn(features, value);

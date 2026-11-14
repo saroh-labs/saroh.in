@@ -121,7 +121,7 @@ export default async function IntegrationPage({ params }: Props) {
                             href="/features/ai-apps"
                             className={textLinkClasses({
                                 className:
-                                    "inline-flex min-h-11 items-center text-[15px]",
+                                    "inline-flex min-h-11 items-center text-[15px] font-semibold",
                             })}
                         >
                             See what AI apps can do
@@ -157,25 +157,25 @@ export default async function IntegrationPage({ params }: Props) {
                 </section>
             </Article>
 
-            <section
-                aria-labelledby="steps"
-                className="grid gap-6 px-mk-gutter pt-14"
-            >
-                <Container
-                    width="article"
-                    className="border-t border-border pt-6"
-                >
-                    <SectionHeading
-                        id="steps"
-                        title={stepsTitle}
-                        size="article"
-                    />
+            <section aria-labelledby="steps" className="grid gap-6 pt-14">
+                <Container width="article">
+                    {/* The rule on the column, not its gutter: as wide as the one above. */}
+                    <div className="border-t border-border pt-6">
+                        <SectionHeading
+                            id="steps"
+                            title={stepsTitle}
+                            size="article"
+                        />
+                    </div>
                 </Container>
-                <IntegrationSteps
-                    steps={fm.steps}
-                    panelPath={fm.panelPath}
-                    initialStep={fm.initialStep}
-                />
+                {/* The heading's Container has its own gutter; the steps get theirs here. */}
+                <div className="px-mk-gutter">
+                    <IntegrationSteps
+                        steps={fm.steps}
+                        panelPath={fm.panelPath}
+                        initialStep={fm.initialStep}
+                    />
+                </div>
             </section>
 
             <Container
@@ -191,7 +191,7 @@ export default async function IntegrationPage({ params }: Props) {
                     className="max-w-none px-0 pt-0"
                 />
                 {links.length > 0 ? (
-                    <div className="flex flex-wrap gap-5 text-[15px]">
+                    <div className="flex flex-wrap gap-5 text-[15px] font-semibold">
                         {links.map((l) => (
                             <Link
                                 key={l.href}

@@ -1,4 +1,4 @@
-import { featureHref, featureList } from "@/content/features";
+import { featureHref, featureList, NEW_FEATURES } from "@/content/features";
 import type { ResourcePage } from "@/content/resources";
 import { solutionHref, solutionList } from "@/content/solutions";
 import type { SolutionSlug } from "@/content/types";
@@ -12,6 +12,7 @@ export const FEATURE_ITEMS: NavItem[] = featureList.map((f) => ({
     name: f.name,
     line: f.navLine,
     href: featureHref(f.slug),
+    isNew: NEW_FEATURES.includes(f.slug),
 }));
 
 /**

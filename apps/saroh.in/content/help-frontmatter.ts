@@ -29,7 +29,13 @@ const slug = z
  * readable text, never an image; its caption says it is a drawing.
  */
 const panelField = z
-    .object({ label: text, value: text, mono: z.boolean().default(false) })
+    .object({
+        label: text,
+        value: text,
+        mono: z.boolean().default(false),
+        /** The field the step's words name, ringed in Saffron (boards VH*). */
+        mark: z.boolean().default(false),
+    })
     .strict();
 const panel = z.discriminatedUnion("kind", [
     z

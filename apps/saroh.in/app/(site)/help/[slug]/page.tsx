@@ -209,14 +209,14 @@ export default async function HelpArticlePage({ params }: Props) {
                     >
                         <h2
                             id={TROUBLES_ID}
-                            className="m-0 border-b border-border pb-4 font-display text-[26px] font-bold leading-[1.15] tracking-[-0.02em]"
+                            className="m-0 border-b border-border pb-4 font-display text-[22px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[26px]"
                         >
                             {TROUBLES_TITLE}
                         </h2>
                         {fm.troubles.map((t) => (
                             <div
                                 key={t.title}
-                                className="grid gap-1.5 border-b border-border py-4"
+                                className="grid gap-1.5 border-b border-border py-4 last:border-b-0"
                             >
                                 <h3 className="m-0 text-mk-faq font-semibold">
                                     {t.title}

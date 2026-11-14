@@ -30,7 +30,7 @@ export function HelpStep({ step, index }: { step: Step; index: number }) {
         >
             <h2
                 id={stepId(index)}
-                className="m-0 flex items-baseline gap-3.5 font-display text-[26px] font-bold leading-[1.15] tracking-[-0.02em] [text-wrap:balance]"
+                className="m-0 flex items-baseline gap-3.5 font-display text-[22px] font-bold leading-[1.15] tracking-[-0.02em] [text-wrap:balance] sm:text-[26px]"
             >
                 <span className="font-mono text-[15px] font-normal tracking-normal text-brand-700">
                     {stepNumber(index)}
