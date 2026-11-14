@@ -25,6 +25,8 @@ const actions = vi.hoisted(() => ({
     redraftDraft: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({
     default: ({
         href,
@@ -452,6 +454,89 @@ describe("the panel's states", () => {
         expect(text()).toContain("Ask AI is off for Kesar Salon");
         expect(button("Turn on")).toBeDefined();
         expect(actions.readAskAiConversations).toHaveBeenCalled();
+        expect(host.querySelector("textarea")).toBeNull();
+    });
+});
+
+const SUMMARY = (id: string, title: string) => ({
+    id,
+    agent: "ask-ai",
+    title,
+    lastMessageAt: "2026-11-14T05:00:00.000Z",
+    createdAt: "2026-11-14T05:00:00.000Z",
+});
+
+describe("the full page, /ask (board AI 9)", () => {
+    it("Expand on a desk opens the page with the conversation, and closes the panel", () => {
+        const onClose = vi.fn();
+        act(() =>
+            root.render(
+                <AskAiPanel
+                    state={STATE}
+                    businessName="Kesar Salon"
+                    zone="Asia/Kolkata"
+                    phone={false}
+                    onClose={onClose}
+                    conversation={{
+                        ...SUMMARY("c 1", "Keratin"),
+                        messages: [],
+                    }}
+                />,
+            ),
+        );
+        act(() => button("Open as a full page")?.click());
+        expect(router.push).toHaveBeenCalledWith("/ask?c=c%201");
+        expect(onClose).toHaveBeenCalled();
+    });
+
+    function renderPage(state: AskAiState = STATE) {
+        act(() =>
+            root.render(
+                <AskAiPanel
+                    layout="page"
+                    state={state}
+                    businessName="Kesar Salon"
+                    zone="Asia/Kolkata"
+                    phone={false}
+                    conversations={[
+                        SUMMARY("c1", "Add a keratin service"),
+                        SUMMARY("c2", "Who hasn't paid"),
+                    ]}
+                />,
+            ),
+        );
+    }
+
+    it("lists the conversations beside the conversation, and loads the one picked", async () => {
+        renderPage();
+        expect(text()).toContain("Add a keratin service");
+        expect(text()).toContain("Who hasn't paid");
+        expect(button("Close Ask AI")).toBeUndefined();
+        expect(button("Open as a full page")).toBeUndefined();
+        const row = () =>
+            Array.from(host.querySelectorAll("nav button")).find((b) =>
+                b.textContent.includes("Add a keratin service"),
+            );
+        act(() => (row() as HTMLButtonElement).click());
+        await settle();
+        expect(actions.readAskAiConversation).toHaveBeenCalledWith("c1");
+        expect(row()?.getAttribute("aria-current")).toBe("true");
+        expect(host.querySelector("h2")?.textContent).toBe(
+            "Add a keratin service",
+        );
+        expect(window.location.search).toBe("?c=c1");
+    });
+
+    it("Free sees the same lock on the page, no list and no box", () => {
+        renderPage({
+            ...STATE,
+            available: false,
+            reason: "locked",
+            upgradeTo: "Grow",
+            usage: null,
+        });
+        expect(text()).toContain("Ask AI comes with Grow");
+        expect(host.querySelector("nav")).toBeNull();
         expect(host.querySelector("textarea")).toBeNull();
     });
 });

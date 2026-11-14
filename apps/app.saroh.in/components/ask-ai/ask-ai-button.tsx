@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, Sparkles } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { ASK_AI_SHOWN, openAskAi } from "./open";
@@ -28,19 +29,23 @@ export function AskAiButton({
         window.addEventListener(ASK_AI_SHOWN, on);
         return () => window.removeEventListener(ASK_AI_SHOWN, on);
     }, []);
+    // On the full page Ask AI is the screen, so the button shows it on.
+    const here = usePathname() === "/ask";
+    const on = open || here;
     const name = locked ? `Ask AI, on ${planName(upgradeTo)}` : "Ask AI";
     return (
         <>
             <Button
                 type="button"
-                variant={open ? "default" : "outline"}
+                variant={on ? "default" : "outline"}
                 size="sm"
                 aria-expanded={open}
+                aria-current={here ? "page" : undefined}
                 aria-label={locked ? name : undefined}
                 onClick={openAskAi}
                 className={cn(
                     "hidden h-9 gap-[7px] rounded-[9px] px-3 text-[13.5px] min-[760px]:inline-flex",
-                    locked && !open && "text-neutral-700 dark:text-foreground",
+                    locked && !on && "text-neutral-700 dark:text-foreground",
                 )}
             >
                 {locked ? (

@@ -65,6 +65,8 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "settings/(sections)/developers/keys": "full",
     "settings/(sections)/developers/usage": "full",
     "settings/(sections)/developers/webhooks": "full",
+    // Ask AI's full page draws its list and conversation edge to edge.
+    ask: "full",
     // The post editor owns its viewport.
     "sites/[siteId]/posts/[postId]": "full",
     "sites/[siteId]/posts/new": "full",
@@ -191,6 +193,9 @@ describe("a page's title is the page header's", () => {
         // The Calendar month: the month between ‹ and › is the page's
         // title, in the row that moves it (bookings U13, #1029).
         "components/calendar/month-toolbar.tsx",
+        // Ask AI's full page: "Ask AI" over the list is the page's title,
+        // as board AI 9 draws it.
+        "components/ask-ai/ask-ai-panel.tsx",
     ]);
 
     it("has no hand-written <h1> under the shell or in components", () => {

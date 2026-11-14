@@ -36,6 +36,7 @@ import {
     ArrowUp,
     Ellipsis,
     History,
+    Maximize2,
     Power,
     Settings,
     Sparkles,
@@ -44,6 +45,7 @@ import {
     X,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { Ref } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -141,13 +143,26 @@ export function turnsOf(conversation: AskAiConversation): Turn[] {
     return turns;
 }
 
+/** The full page, `/ask` (board AI 9): the list beside the conversation. */
+export const ASK_PAGE = "/ask";
+export const askPageHref = (conversationId: string | null) =>
+    conversationId
+        ? `${ASK_PAGE}?c=${encodeURIComponent(conversationId)}`
+        : ASK_PAGE;
+
 export interface AskAiPanelProps {
     state: AskAiState | null;
     businessName: string;
     zone: string;
     phone: boolean;
-    onClose: () => void;
+    /** The panel's close; the page has none (the rail navigates away). */
+    onClose?: () => void;
     boxRef?: Ref<HTMLTextAreaElement>;
+    /** "page": `/ask`, the conversation list beside a wider conversation. */
+    layout?: "panel" | "page";
+    /** The page's opening conversation (`?c=`) and list, read on the server. */
+    conversation?: AskAiConversation | null;
+    conversations?: AskAiConversationSummary[] | null;
 }
 
 export function AskAiPanel({
@@ -157,14 +172,23 @@ export function AskAiPanel({
     phone,
     onClose,
     boxRef,
+    layout = "panel",
+    conversation,
+    conversations,
 }: AskAiPanelProps) {
+    const page = layout === "page";
+    const router = useRouter();
     const [state, setState] = useState(initial);
-    const [turns, setTurns] = useState<Turn[]>([]);
-    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [turns, setTurns] = useState<Turn[]>(() =>
+        conversation ? turnsOf(conversation) : [],
+    );
+    const [conversationId, setConversationId] = useState<string | null>(
+        conversation?.id ?? null,
+    );
     const [view, setView] = useState<"thread" | "history">("thread");
     const [history, setHistory] = useState<
         AskAiConversationSummary[] | null | "failed"
-    >(null);
+    >(page ? (conversations ?? "failed") : null);
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
     const [langOpen, setLangOpen] = useState(false);
@@ -184,6 +208,15 @@ export function AskAiPanel({
     useEffect(() => {
         end.current?.scrollIntoView({ block: "end" });
     }, [turns]);
+
+    // The page's address names the conversation open, so it can be kept.
+    useEffect(() => {
+        if (!page) return;
+        const href = askPageHref(conversationId);
+        if (window.location.pathname + window.location.search !== href) {
+            window.history.replaceState(null, "", href);
+        }
+    }, [page, conversationId]);
 
     const loadHistory = useCallback(async () => {
         const list = await runAction(() => readAskAiConversations(), {
@@ -331,6 +364,8 @@ export function AskAiPanel({
             .at(-1);
         if (answer) patch(key, { messageId: answer.id });
         if (fresh) setState(fresh);
+        // A new conversation, or this one moved to the top.
+        if (page) void loadHistory();
     };
 
     const openConversation = async (id: string) => {
@@ -404,13 +439,27 @@ export function AskAiPanel({
             disabled={running}
         />
     );
+    // On a desk the list is the full page (board AI 9); a phone keeps it here.
+    const toPage = () => {
+        router.push(askPageHref(conversationId));
+        onClose?.();
+    };
     const historyButton = (
         <IconButton
             label="Your conversations"
             icon={<History />}
             size="md"
             className={ib}
-            onClick={() => setView("history")}
+            onClick={phone ? () => setView("history") : toPage}
+        />
+    );
+    const expandButton = phone ? null : (
+        <IconButton
+            label="Open as a full page"
+            icon={<Maximize2 />}
+            size="md"
+            className={ib}
+            onClick={toPage}
         />
     );
     const more = state ? (
@@ -476,11 +525,56 @@ export function AskAiPanel({
                     {newButton}
                     {view === "thread" ? historyButton : null}
                     {view === "thread" ? more : null}
+                    {view === "thread" ? expandButton : null}
                 </>
             ) : null}
             {close}
         </div>
     );
+
+    const historyList =
+        history === "failed" ? (
+            <Notice
+                tone="error"
+                action={
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setHistory(null);
+                            void loadHistory();
+                        }}
+                    >
+                        Try again
+                    </Button>
+                }
+            >
+                Your conversations didn&apos;t load.
+            </Notice>
+        ) : history === null ? (
+            <p
+                data-ph-unmask=""
+                role="status"
+                className="m-0 text-[13.5px] text-muted-foreground"
+            >
+                Loading your conversations…
+            </p>
+        ) : (
+            <ConversationList
+                conversations={history}
+                zone={zone}
+                phone={phone}
+                grouped={page || !offLike}
+                current={page ? conversationId : null}
+                line={
+                    offLike && !page
+                        ? "Still readable, each until 90 days after its last message."
+                        : undefined
+                }
+                onOpen={(id) => void openConversation(id)}
+            />
+        );
 
     // — body —
     let content: React.ReactNode;
@@ -528,52 +622,12 @@ export function AskAiPanel({
                         <p className="m-0">{UNAVAILABLE}</p>
                     </One>
                 ) : null}
-                {offLike ? (
+                {offLike && !page ? (
                     <h3 data-ph-unmask="" className="label m-0">
                         Your conversations
                     </h3>
                 ) : null}
-                {history === "failed" ? (
-                    <Notice
-                        tone="error"
-                        action={
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setHistory(null);
-                                    void loadHistory();
-                                }}
-                            >
-                                Try again
-                            </Button>
-                        }
-                    >
-                        Your conversations didn&apos;t load.
-                    </Notice>
-                ) : history === null ? (
-                    <p
-                        data-ph-unmask=""
-                        role="status"
-                        className="m-0 text-[13.5px] text-muted-foreground"
-                    >
-                        Loading your conversations…
-                    </p>
-                ) : (
-                    <ConversationList
-                        conversations={history}
-                        zone={zone}
-                        phone={phone}
-                        grouped={!offLike}
-                        line={
-                            offLike
-                                ? "Still readable, each until 90 days after its last message."
-                                : undefined
-                        }
-                        onOpen={(id) => void openConversation(id)}
-                    />
-                )}
+                {page ? null : historyList}
             </>
         );
     } else if (turns.length === 0) {
@@ -619,16 +673,48 @@ export function AskAiPanel({
     }
 
     const first = turns.length === 0;
-    return (
+    const openTitle =
+        (Array.isArray(history)
+            ? history.find((c) => c.id === conversationId)?.title
+            : null) ??
+        conversation?.title ??
+        turns.at(0)?.question ??
+        "New conversation";
+    const pageHeader = (
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border pl-6 pr-4">
+            {tools ? (
+                <h2 className="m-0 flex-1 truncate text-base font-semibold">
+                    {openTitle}
+                </h2>
+            ) : (
+                <h1 className="m-0 flex flex-1 items-center gap-2 text-base font-semibold">
+                    <Sparkles className="size-[18px]" aria-hidden />
+                    Ask AI
+                </h1>
+            )}
+            {tools ? more : null}
+        </div>
+    );
+    const conversationView = (
         <>
-            {header}
+            {page ? pageHeader : header}
             <div
                 className={cn(
                     "flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain",
-                    phone ? "px-3.5 pb-2.5 pt-4" : "px-[18px] pb-3 pt-[18px]",
+                    phone
+                        ? "px-3.5 pb-2.5 pt-4"
+                        : page
+                          ? "px-6 pb-3 pt-[18px]"
+                          : "px-[18px] pb-3 pt-[18px]",
                 )}
             >
-                {content}
+                {page ? (
+                    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-3.5">
+                        {content}
+                    </div>
+                ) : (
+                    content
+                )}
                 <div ref={end} />
             </div>
             {composer && switchedOff ? (
@@ -643,6 +729,7 @@ export function AskAiPanel({
                 <div
                     className={cn(
                         "flex shrink-0 flex-col gap-2 border-t border-border",
+                        page && "mx-auto w-[calc(100%-48px)] max-w-[680px]",
                         phone
                             ? "px-3 pb-[calc(14px+env(safe-area-inset-bottom))] pt-2.5"
                             : "px-4 pb-3 pt-2.5",
@@ -721,6 +808,42 @@ export function AskAiPanel({
                 />
             ) : null}
         </>
+    );
+    if (!page) return conversationView;
+
+    return (
+        <div className="flex h-[calc(100dvh-61px)] min-h-0">
+            {tools ? (
+                <nav
+                    aria-label="Your conversations"
+                    className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-r border-border bg-neutral-50 px-2.5 py-4 dark:bg-background min-[760px]:flex"
+                >
+                    <div className="flex items-center gap-2 pl-1.5 pr-1">
+                        <h1 className="m-0 flex flex-1 items-center gap-2 text-xl font-semibold tracking-[-0.02em]">
+                            <Sparkles className="size-[19px]" aria-hidden />
+                            Ask AI
+                        </h1>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={startNew}
+                            disabled={running}
+                        >
+                            <SquarePen aria-hidden />
+                            New
+                        </Button>
+                    </div>
+                    <div className="mt-3.5 px-1">{historyList}</div>
+                </nav>
+            ) : null}
+            <section
+                id="ask-ai-page"
+                aria-label="Ask AI"
+                className="flex min-w-0 flex-1 flex-col"
+            >
+                {conversationView}
+            </section>
+        </div>
     );
 }
 

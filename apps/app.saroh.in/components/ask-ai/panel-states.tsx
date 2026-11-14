@@ -155,6 +155,7 @@ export function ConversationList({
     phone,
     line = HISTORY_LINE,
     grouped = true,
+    current = null,
     onOpen,
     now = new Date(),
 }: {
@@ -163,6 +164,8 @@ export function ConversationList({
     phone: boolean;
     line?: string;
     grouped?: boolean;
+    /** The conversation open beside the list (the full page). */
+    current?: string | null;
     onOpen: (id: string) => void;
     now?: Date;
 }) {
@@ -180,6 +183,7 @@ export function ConversationList({
             {conversations.map((c, i) => {
                 const group = groups[i];
                 const head = grouped && group !== groups[i - 1];
+                const on = c.id === current;
                 return (
                     <div key={c.id} className="contents">
                         {head ? (
@@ -187,13 +191,20 @@ export function ConversationList({
                         ) : null}
                         <button
                             type="button"
+                            aria-current={on ? "true" : undefined}
                             onClick={() => onOpen(c.id)}
                             className={cn(
                                 "flex flex-col gap-0.5 rounded-[9px] px-3 py-2.5 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 phone && "min-h-11",
+                                on && "bg-muted",
                             )}
                         >
-                            <b className="truncate text-[13.5px] font-medium">
+                            <b
+                                className={cn(
+                                    "truncate text-[13.5px] font-medium",
+                                    on && "font-semibold",
+                                )}
+                            >
                                 {c.title ?? "Untitled conversation"}
                             </b>
                             <span className="text-xs text-muted-foreground">

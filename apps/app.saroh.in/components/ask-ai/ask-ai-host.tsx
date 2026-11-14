@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import { AskAiPanel } from "./ask-ai-panel";
-import { OPEN_ASK_AI, sayAskAiShown } from "./open";
+import { OPEN_ASK_AI, onAskPage, sayAskAiShown } from "./open";
 
 /**
  * Where Ask AI's panel lives (plan 2026-11-13-001 U10): one host in the
@@ -63,6 +63,7 @@ export function AskAiHost({
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
+                if (onAskPage()) return;
                 setOpen((o) => {
                     if (!o) {
                         back.current =
