@@ -52,7 +52,7 @@ describe.each([
             expect(p.daysAgo).toBeLessThanOrEqual(185);
             // The words a visitor reads, not the address its photo is served
             // from (media.saroh.io since 15 Nov 2026).
-            const visible = p.body.replace(/<img\b[^>]*>/g, "").toLowerCase();
+            const visible = p.body.replace(/<img\b[^>]*>/g, " ").toLowerCase();
             expect(visible).not.toContain("saroh");
         },
     );

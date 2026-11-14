@@ -325,7 +325,7 @@ describe("AI apps says only what's true (MARKETING_CLAIMS.md)", () => {
         );
         // Both are real chats in Claude now (owner, 15 Nov 2026): the hero's
         // change is a draft, step 3's happens at once.
-        expect(features["ai-apps"].hero?.shot).toBe("ai-hero");
+        expect(features["ai-apps"].hero.shot).toBe("ai-hero");
     });
 
     it("names the four apps without cards in one line", () => {
