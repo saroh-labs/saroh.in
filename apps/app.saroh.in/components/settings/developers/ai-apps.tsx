@@ -16,6 +16,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { Check, ChevronRight, ExternalLink, Lock, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
 import {
@@ -23,7 +24,7 @@ import {
     readAiActivity,
     rollBackAiSiteDraft,
 } from "@/lib/ai-connections/actions";
-import { CONNECT_IN } from "@/lib/ai-connections/mcp-address";
+import { CONNECT_IN, liveAiApps } from "@/lib/ai-connections/mcp-address";
 import type { AiConnection } from "@/lib/ai-connections/types";
 import { runAction } from "@/lib/api/run-action";
 import { formatDateTime } from "@/lib/format/datetime";
@@ -41,13 +42,6 @@ const CANT = [
     "See sensitive customer details, like health notes",
     "Change your plan, team or payment settings",
 ];
-const ASKS = [
-    "“Add our new seasonal special and set its price”",
-    "“Change our Sunday hours to 8 till 2”",
-    "“Who's booked on Saturday?”",
-    "“Move tomorrow's 10 o'clock booking to Friday”",
-];
-
 export interface AiAppsProps {
     connections: AiConnection[];
     business: string;
@@ -186,6 +180,214 @@ function CanAndCant() {
     );
 }
 
+/** A numbered step of the empty state. */
+function Step({
+    n,
+    title,
+    children,
+}: {
+    n: number;
+    title?: ReactNode;
+    children: ReactNode;
+}) {
+    return (
+        <li className="flex gap-3">
+            <span
+                aria-hidden
+                className="mt-px inline-flex size-6 shrink-0 items-center justify-center rounded-full bg-foreground text-[12.5px] font-semibold text-background"
+            >
+                {n}
+            </span>
+            <div className="min-w-0 flex-1">
+                {title ? (
+                    <h3 data-ph-unmask="" className="text-[15px] font-semibold">
+                        {title}
+                    </h3>
+                ) : null}
+                {children}
+            </div>
+        </li>
+    );
+}
+
+/**
+ * Nothing connected (board VASettingsEmpty): every app needs the address
+ * pasted, Claude and ChatGPT too, so it is step 1; step 2 is the apps
+ * whose sign-in has been walked on dev (`liveAiApps`), each opening where
+ * it adds a connector. What an assistant can do sits beside it at the
+ * desk, behind a button on a phone.
+ */
+function NothingConnected({
+    business,
+    mcp,
+    docs,
+}: {
+    business: string;
+    mcp: string | null;
+    docs: string;
+}) {
+    const [canOpen, setCanOpen] = useState(false);
+    const apps = liveAiApps();
+    const coding = apps.some((app) => app.key === "coding-tools");
+    const safe = (
+        <>
+            <Notice tone="neutral" icon={<Lock />}>
+                Website changes stay a draft until you publish them yourself in
+                Saroh, and you can roll the draft back. An assistant can do only
+                what you can do here. What it reads is sent to the company
+                behind that app.
+            </Notice>
+            <a
+                href={`${docs}/api/ai-apps`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 self-start text-[13px] font-semibold underline decoration-border-strong underline-offset-[3px]"
+            >
+                How assistants work with Saroh
+                <ExternalLink aria-hidden className="size-3.5" />
+            </a>
+        </>
+    );
+    return (
+        <div className="grid gap-5 min-[1100px]:grid-cols-[minmax(0,1fr)_320px]">
+            <section className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-[22px]">
+                <h2
+                    className="font-display text-[19px] font-semibold sm:text-[21px]"
+                    data-ph-mask=""
+                >
+                    Run {business} from a chat
+                </h2>
+                <p
+                    data-ph-unmask=""
+                    className="mt-1.5 text-[14px] leading-normal text-foreground/80"
+                >
+                    Connect your AI assistant and ask in your own words, like
+                    “Change our Sunday hours to 8 till 2”.
+                </p>
+                <ol className="mt-[18px] flex flex-col gap-4">
+                    {mcp ? (
+                        <Step n={1}>
+                            <div className="max-w-[520px]">
+                                <Field
+                                    label={
+                                        <span className="text-[15px] font-semibold">
+                                            Copy your Saroh address
+                                            <small
+                                                data-ph-unmask=""
+                                                className="ml-1.5 text-[11.5px] font-medium text-muted-foreground"
+                                            >
+                                                MCP server
+                                            </small>
+                                        </span>
+                                    }
+                                >
+                                    {(control) => (
+                                        <div className="flex items-start gap-2">
+                                            <Input
+                                                {...control}
+                                                readOnly
+                                                value={mcp}
+                                                onFocus={(e) =>
+                                                    e.currentTarget.select()
+                                                }
+                                                className="min-w-0 flex-1 bg-muted font-mono text-[13px]"
+                                            />
+                                            <CopyButton
+                                                value={mcp}
+                                                label="Copy"
+                                                thing="address"
+                                                className="coarse:min-h-11"
+                                            />
+                                        </div>
+                                    )}
+                                </Field>
+                            </div>
+                        </Step>
+                    ) : null}
+                    <Step n={mcp ? 2 : 1} title="Add it in your assistant">
+                        <ul className="mt-2.5 grid gap-2 overflow-hidden max-[759px]:gap-0 max-[759px]:rounded-xl max-[759px]:border max-[759px]:border-border min-[760px]:grid-cols-2">
+                            {apps.map((app) => (
+                                <li
+                                    key={app.key}
+                                    data-ai-app={app.key}
+                                    className="flex min-h-[52px] items-center gap-2.5 bg-card py-2 pl-2.5 pr-2 max-[759px]:border-t max-[759px]:border-border max-[759px]:first:border-t-0 min-[760px]:rounded-[10px] min-[760px]:border min-[760px]:border-border"
+                                >
+                                    <AppMark name={app.name} />
+                                    <span className="min-w-0 flex-1 text-[14px] font-semibold leading-tight">
+                                        {app.name}
+                                        {app.sub ? (
+                                            <small className="block text-[12px] font-normal text-muted-foreground">
+                                                {app.sub}
+                                            </small>
+                                        ) : null}
+                                    </span>
+                                    <Button
+                                        asChild
+                                        size="sm"
+                                        variant="outline"
+                                        className="coarse:min-h-11"
+                                    >
+                                        <a
+                                            href={app.connectIn}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            aria-label={`Connect ${app.name} (opens in a new tab)`}
+                                        >
+                                            Connect
+                                            <ExternalLink
+                                                aria-hidden
+                                                className="size-3.5"
+                                            />
+                                        </a>
+                                    </Button>
+                                </li>
+                            ))}
+                        </ul>
+                        <p
+                            data-ph-mask=""
+                            className="mt-2 text-[12.5px] leading-normal text-muted-foreground"
+                        >
+                            {coding
+                                ? "Coding tools are Cursor, VS Code and Claude Code. "
+                                : null}
+                            Each asks you to sign in to Saroh and pick{" "}
+                            {business}. Takes about a minute.
+                        </p>
+                    </Step>
+                </ol>
+                <Button
+                    variant="outline"
+                    className="mt-4 min-h-11 w-full min-[760px]:hidden"
+                    onClick={() => setCanOpen(true)}
+                >
+                    What an assistant can and can’t do
+                </Button>
+            </section>
+            <aside className="flex min-w-0 flex-col gap-3.5 self-start rounded-xl border border-border bg-card p-4 max-[759px]:hidden">
+                <h3 data-ph-unmask="" className="text-[15px] font-semibold">
+                    What an assistant can do here
+                </h3>
+                <CanAndCant />
+                {safe}
+            </aside>
+            <FormSheet
+                open={canOpen}
+                title="What an assistant can do here"
+                description="It can do only what you can do here."
+                onClose={() => setCanOpen(false)}
+                doneOnly
+                doneQuiet
+                doneLabel="Close"
+            >
+                <div className="flex flex-col gap-3.5">
+                    <CanAndCant />
+                    {safe}
+                </div>
+            </FormSheet>
+        </div>
+    );
+}
+
 /**
  * Settings › API and AI apps › AI assistants ("API and AI apps" boards 1
  * and 2). Nothing connected: how to run the business from a chat, what an
@@ -209,67 +411,7 @@ export function AiApps(props: AiAppsProps) {
     const now = new Date();
 
     if (connections.length === 0) {
-        return (
-            <div className="grid gap-5 min-[1100px]:grid-cols-[minmax(0,1fr)_360px]">
-                <section className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-[22px]">
-                    <h2
-                        className="font-display text-[21px] font-semibold"
-                        data-ph-mask=""
-                    >
-                        Run {business} from a chat
-                    </h2>
-                    <p
-                        data-ph-unmask=""
-                        className="mt-1.5 text-[14px] leading-normal text-foreground/80"
-                    >
-                        Connect Claude or ChatGPT and ask in your own words.
-                        That sounds like:
-                    </p>
-                    <ul className="mt-3 space-y-2">
-                        {ASKS.map((ask) => (
-                            <li
-                                key={ask}
-                                className="rounded-[10px] border border-border bg-muted px-3 py-2.5 text-[14px] leading-snug"
-                            >
-                                {ask}
-                            </li>
-                        ))}
-                    </ul>
-                    <div className="mt-[18px] max-w-[520px]">
-                        <ConnectButtons />
-                    </div>
-                    <p
-                        data-ph-unmask=""
-                        className="mt-2 text-[12.5px] text-muted-foreground"
-                    >
-                        You sign in to Saroh and pick the businesses it may use
-                        when the app asks. Takes about a minute.
-                    </p>
-                </section>
-                <aside className="flex min-w-0 flex-col gap-3.5 self-start rounded-xl border border-border bg-card p-4">
-                    <h3 data-ph-unmask="" className="text-[15px] font-semibold">
-                        What an assistant can do here
-                    </h3>
-                    <CanAndCant />
-                    <Notice tone="neutral" icon={<Lock />}>
-                        Website changes stay a draft until you publish them
-                        yourself in Saroh, and you can roll the draft back. An
-                        assistant can do only what you can do here. What it
-                        reads is sent to the company behind that app.
-                    </Notice>
-                    <McpAddress mcp={mcp} />
-                    <a
-                        href={`${docs}/api/ai-apps`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 self-start text-[13px] font-semibold underline decoration-border-strong underline-offset-[3px]"
-                    >
-                        How assistants work with Saroh
-                        <ExternalLink aria-hidden className="size-3.5" />
-                    </a>
-                </aside>
-            </div>
-        );
+        return <NothingConnected business={business} mcp={mcp} docs={docs} />;
     }
 
     return (

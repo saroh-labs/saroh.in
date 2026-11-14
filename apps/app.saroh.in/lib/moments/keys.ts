@@ -16,6 +16,11 @@ export const MOMENT_KEYS = [
     // Not a moment told: the booking page (or shop) link was copied or
     // shared, Home's "Share your booking link" step (#1194).
     "shared-booking-link",
+    // Home's one "New" card, one feature at a time in this order (release
+    // visibility U14): put away or followed, it is gone for the business.
+    "new-ai-apps",
+    "new-share",
+    "new-ask-ai",
 ] as const;
 
 export type MomentKey = (typeof MOMENT_KEYS)[number];
@@ -29,4 +34,6 @@ export interface MomentView {
     title: string;
     fact: string;
     action?: { label: string; href: string };
+    /** A new feature told once, not something that happened: info, tagged New. */
+    news?: true;
 }

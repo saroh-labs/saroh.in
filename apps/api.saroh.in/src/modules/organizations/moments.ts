@@ -24,6 +24,11 @@ export const MOMENT_KEYS = [
     // Not a moment told: the booking page (or shop) link was copied or
     // shared, Home's "Share your booking link" step (#1194).
     "shared-booking-link",
+    // Not a moment told: Home's "New" card for a released feature, put
+    // away or followed (release visibility U14).
+    "new-ai-apps",
+    "new-share",
+    "new-ask-ai",
 ] as const;
 
 export type MomentKey = (typeof MOMENT_KEYS)[number];

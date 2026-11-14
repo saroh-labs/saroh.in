@@ -2,9 +2,11 @@ import type { HomeNew } from "@/components/shared/navigation/quick-actions";
 import type { HomeModel } from "@/lib/home/service";
 import { storesOnly } from "@/lib/home/staff";
 import type { ModuleView } from "@/lib/modules/schema";
+import type { MomentView } from "@/lib/moments/keys";
 
 import { HomeHeader } from "@/components/home/header/home-header";
 import { NewSpace } from "@/components/home/header/new-sheet";
+import { Moment } from "@/components/shared/notices/moment";
 import { HomeDashboard } from "./home-dashboard";
 
 /**
@@ -30,6 +32,7 @@ export function StaffHome({
     name,
     businessName,
     newMenu = null,
+    moment = null,
 }: {
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run state. */
@@ -39,6 +42,8 @@ export function StaffHome({
     businessName: string;
     /** What New offers them (`homeNewFor`); a staff member may book. */
     newMenu?: HomeNew | null;
+    /** Home's one "New" card (release visibility U14), under the greeting. */
+    moment?: MomentView | null;
 }) {
     return (
         <>
@@ -51,6 +56,7 @@ export function StaffHome({
                 // The phone Home says it in the day sheet (U17).
                 sinceOnPhone={!home.hasAnyModule}
             />
+            {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
                 <HomeDashboard
                     home={home}

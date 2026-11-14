@@ -140,4 +140,24 @@ describe("Moment", () => {
         await press(link);
         expect(markMomentSeen).toHaveBeenCalledWith("first-order");
     });
+
+    it("tells a new feature in the info tone, tagged New", async () => {
+        render({
+            key: "new-ai-apps",
+            title: "Use Saroh from Claude or ChatGPT",
+            fact: "Connect your AI assistant.",
+            action: {
+                label: "Connect an assistant",
+                href: "/settings/developers/ai",
+            },
+            news: true,
+        });
+        expect(card()?.getAttribute("data-notice")).toBe("info");
+        expect(card()?.textContent).toMatch(/^New/);
+        const link = host.querySelector<HTMLAnchorElement>("a");
+        if (!link) throw new Error("No action");
+        link.addEventListener("click", (e) => e.preventDefault());
+        await press(link);
+        expect(markMomentSeen).toHaveBeenCalledWith("new-ai-apps");
+    });
 });

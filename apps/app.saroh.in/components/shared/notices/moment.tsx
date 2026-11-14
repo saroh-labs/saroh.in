@@ -28,6 +28,9 @@ import type { MomentView } from "@/lib/moments/keys";
  * away, or following its action, tells the API, and it is gone for everyone
  * on every device. A refusal brings it back and says why.
  *
+ * A new feature (`news`, release visibility U14, board VAHome) uses the
+ * same slot and rules in the info tone, its title tagged "New".
+ *
  * What it must never be: an exclamation, a celebration, a count of days in
  * a row, a badge, anything that asks to be looked at twice.
  */
@@ -60,13 +63,22 @@ export function Moment({
 
     return (
         <Notice
-            tone="success"
+            tone={moment.news ? "info" : "success"}
             role="status"
             data-moment={moment.key}
             // The title is Saroh's own words ("Your first order"), so a
             // session recording may read it. The fact under it names a
             // customer and an amount, and stays masked.
-            title={<span data-ph-unmask="">{moment.title}</span>}
+            title={
+                <span data-ph-unmask="">
+                    {moment.news ? (
+                        <span className="mr-2 inline-block rounded-[5px] bg-card px-1.5 align-[1px] text-[11px] font-semibold tracking-[0.04em]">
+                            New
+                        </span>
+                    ) : null}
+                    {moment.title}
+                </span>
+            }
             className={cn(
                 "duration-slow ease-out animate-in fade-in-0 motion-reduce:animate-none",
                 className,
@@ -78,7 +90,7 @@ export function Moment({
                             size="sm"
                             asChild
                             variant="outline"
-                            className="border-border-strong"
+                            className="border-border-strong coarse:min-h-11"
                         >
                             <Link href={moment.action.href} onClick={followed}>
                                 {moment.action.label}
@@ -94,7 +106,8 @@ export function Moment({
                 </>
             }
         >
-            <p>{moment.fact}</p>
+            {/* A new feature's line is Saroh's own words too. */}
+            <p data-ph-unmask={moment.news ? "" : undefined}>{moment.fact}</p>
         </Notice>
     );
 }
