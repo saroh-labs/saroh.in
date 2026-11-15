@@ -58,9 +58,22 @@ const SITE_ROUTES = [{ pattern: "saroh.tech/*", zone_name: "saroh.tech" }];
 export function globalProductionConfig(
     config,
     dir,
-    { routes = false, now = new Date() } = {},
+    { routes = false, gate = false, now = new Date() } = {},
 ) {
     const production = config.env.production;
+    // Behind the access key (owner, 15 Nov 2026): the dev key, one cookie for
+    // every saroh.tech host, and anyone without it sent to saroh.in's home,
+    // for now (302). Added after the host swap, so saroh.in stays saroh.in.
+    // "off" tells the deploy to take the key off the Worker.
+    const gated = gate
+        ? {
+              GLOBAL_ACCESS_GATE: "on",
+              DEV_ACCESS_COOKIE_DOMAIN: ".saroh.tech",
+              DEV_REDIRECT_ORIGIN: "https://saroh.in",
+              DEV_REDIRECT_PATH: "/",
+              DEV_REDIRECT_STATUS: "302",
+          }
+        : { GLOBAL_ACCESS_GATE: "off" };
     // `routes: []`, never left out: wrangler fills a missing env key from the
     // top level, which holds the dev Worker's saroh.io routes.
     const dark = { workers_dev: false, preview_urls: false, routes: [] };
@@ -74,7 +87,11 @@ export function globalProductionConfig(
                     ...rest,
                     ...dark,
                     ...(routes && { routes: SITE_ROUTES }),
-                    vars: { ...production.vars, NEXT_PUBLIC_EDITION: "GLOBAL" },
+                    vars: {
+                        ...production.vars,
+                        NEXT_PUBLIC_EDITION: "GLOBAL",
+                        ...gated,
+                    },
                 },
             },
         };
@@ -133,6 +150,7 @@ export function globalProductionConfig(
                     // Off on Global until a consent decision (KTD10).
                     NEXT_PUBLIC_POSTHOG_REPLAY: "off",
                     NEXT_PUBLIC_EDITION: "GLOBAL",
+                    ...gated,
                 },
             },
         },
@@ -156,6 +174,7 @@ if (process.argv[1]?.endsWith("cf-global-prod.mjs")) {
     const config = parseJsonc(readFileSync(path, "utf8"));
     const out = globalProductionConfig(config, dir, {
         routes: process.env.GLOBAL_ROUTES === "on",
+        gate: process.env.GLOBAL_ACCESS_GATE === "on",
     });
     writeFileSync(path, JSON.stringify(out));
     console.log(

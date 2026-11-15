@@ -104,6 +104,30 @@ test("an unmapped saroh.in host stops the conversion, naming the setting", () =>
     );
 });
 
+test("GLOBAL_ACCESS_GATE: every Global Worker behind the key, sent to saroh.in for now", () => {
+    for (const dir of [
+        "apps/app.saroh.in",
+        "apps/accounts.saroh.in",
+        "apps/admin.saroh.in",
+        "apps/docs.saroh.in",
+        "apps/saroh.tech",
+    ]) {
+        const on = globalProductionConfig(read(dir), dir, {
+            gate: true,
+            now: NOW,
+        }).env.production.vars;
+        assert.equal(on.GLOBAL_ACCESS_GATE, "on", dir);
+        assert.equal(on.DEV_ACCESS_COOKIE_DOMAIN, ".saroh.tech", dir);
+        // Not swapped for saroh.tech: the way out is India's site.
+        assert.equal(on.DEV_REDIRECT_ORIGIN, "https://saroh.in", dir);
+        assert.equal(on.DEV_REDIRECT_PATH, "/", dir);
+        assert.equal(on.DEV_REDIRECT_STATUS, "302", dir);
+        const off = convert(dir).vars;
+        assert.equal(off.GLOBAL_ACCESS_GATE, "off", dir);
+        assert.equal(off.DEV_REDIRECT_ORIGIN, undefined, dir);
+    }
+});
+
 test("routes only with GLOBAL_ROUTES on, and exactly each Worker's saroh.tech one", () => {
     const expected = {
         "apps/app.saroh.in": "app.saroh.tech/*",
