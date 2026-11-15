@@ -6760,3 +6760,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the page header gets the button under 760px, swapping the conversation for the list until one is picked; the page's height subtracts `--tab-bar-inset` (`ask-ai-panel.tsx`).
 - **Rule:** a list hidden at a breakpoint needs a control that reaches it at that breakpoint; a full-height workspace screen subtracts `--tab-bar-inset`.
 - **Category:** frontend · ask-ai
+
+## A page couldn't change twice on the day it was dated (15 Nov 2026)
+
+- **Symptom:** the push of batch-2026-11-15-1 failed content-dates: `features.ts`'s words changed but its date was still 2026-11-15, though that was today. The morning's merge had already set it.
+- **Cause:** the check asked for a new date whenever the words changed, and a date can't move past today.
+- **Fix:** a page already dated today passes (`scripts/check-content-dates.mjs`, `CONTENT_DATES_TODAY` for its test); a test covers it.
+- **Rule:** a freshness check accepts "already today" as fresh.
+- **Category:** tooling · content
