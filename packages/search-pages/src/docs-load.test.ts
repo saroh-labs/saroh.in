@@ -124,7 +124,7 @@ describe("docs content", () => {
         ["a missing field", GST.replace(/^checkedOn: .*\n/m, ""), /checkedOn/],
         [
             "30 February",
-            GST.replace("checkedOn: 2026-10-24", "checkedOn: 2026-02-30"),
+            GST.replace(/checkedOn: .*/, "checkedOn: 2026-02-30"),
             /checkedOn: isn't a real date/,
         ],
         [

@@ -19,11 +19,17 @@ import {
 const TODAY = "2026-10-31";
 const pages = embeddedDocs.all();
 const GST = "/gst/salon-and-beauty-services";
-const GUIDE = "/guides/when-you-need-a-gst-invoice"; // still waits for a CA check
+const GUIDE = "/guides/when-you-need-a-gst-invoice";
 const DOWNLOAD = "/downloads/customer-list-template";
 
 /** The code's pages with every fact confirmed, so their checks pass. */
 const confirmed: DocPage[] = pages.map((p) => ({ ...p, toConfirm: [] }));
+// Every page is confirmed (15 Nov 2026); these two are made to wait, as a CA check would.
+const unconfirmed: DocPage[] = pages.map((p) =>
+    [GST, GUIDE].some((path) => path.endsWith(`/${p.slug}`))
+        ? { ...p, toConfirm: ["the CBIC notification number for the 5% rate"] }
+        : p,
+);
 
 let dir: string;
 let at: { genFile: string; downloadsDir: string };
@@ -132,7 +138,7 @@ describe("planDocs + writeDocs (plan 2026-10-31-002, U3)", () => {
     });
 
     it("covers R9: a live page with unconfirmed facts is left out with a warning", () => {
-        const plan = planDocs(live(GST, GUIDE), pages, {
+        const plan = planDocs(live(GST, GUIDE), unconfirmed, {
             production: true,
             today: TODAY,
         });

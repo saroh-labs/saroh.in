@@ -17,6 +17,9 @@ export default defineConfig({
         environment: "jsdom",
         globals: true,
         setupFiles: ["./vitest.setup.ts"],
+        // The booking flow renders whole pages in jsdom; on a CI runner shared
+        // with other suites one took 5.1s and failed the release (15 Nov 2026).
+        testTimeout: 15_000,
         /*
          * The booking block prints the VISITOR's resolved timezone ("Times
          * shown in Asia/Kolkata"), so its snapshot recorded whichever zone the

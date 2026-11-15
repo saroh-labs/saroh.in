@@ -165,11 +165,15 @@ export function buildOpenApi(surface: Surface) {
                 a.path.localeCompare(b.path) ||
                 a.method.localeCompare(b.method),
         );
-    const paths: Record<string, Record<string, unknown>> = {};
+    // A Map, not an object keyed by path: no path can reach Object's prototype.
+    const byPath = new Map<string, Record<string, unknown>>();
     for (const route of own) {
         const path = route.path.replace(/:(\w+)/g, "{$1}");
-        (paths[path] ??= {})[route.method] = operation(route);
+        const ops = byPath.get(path) ?? {};
+        ops[route.method] = operation(route);
+        byPath.set(path, ops);
     }
+    const paths = Object.fromEntries(byPath);
     return {
         openapi: "3.1.0",
         info: { title: TITLES[surface], version: "1" },
