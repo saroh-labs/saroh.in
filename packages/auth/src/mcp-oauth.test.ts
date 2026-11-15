@@ -443,8 +443,10 @@ describe("sign-in for AI apps", () => {
                 who.cookie,
             ),
         );
-        const location = res.headers.get("location") ?? "";
-        expect(location.startsWith("https://evil.example")).toBe(false);
+        const location = res.headers.get("location");
+        // By its host, not a prefix: "https://evil.example.com" starts the same.
+        const host = location ? new URL(location, "https://app.test").host : "";
+        expect(host).not.toBe("evil.example");
     });
 
     it("rotates refresh tokens, and a reused one stops working", async () => {
