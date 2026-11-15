@@ -1,5 +1,4 @@
 import { ContactCard } from "@/components/legal/contact-card";
-import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { LinkCard } from "@/components/shared/card";
 import { CtaBand } from "@/components/shared/cta-band";
 import { FaqList } from "@/components/shared/faq-list";
@@ -10,7 +9,8 @@ import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 import { signupHref } from "@/site.config";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+import { PageHero } from "@saroh/marketing/page-hero";
 
 const page = pageOf("/help");
 
@@ -20,38 +20,41 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-6 md:gap-14 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter min-[760px]:gap-[72px]"
         >
             <JsonLd data={[...pageSchema(page), faqSchema(HELP_FAQS)]} />
-            <div className="flex flex-col gap-4">
-                {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <PageTitle size="page">{page.h1}</PageTitle>
-                <p className="m-0 max-w-[66ch] text-lg leading-normal text-mk-copy md:text-[19px]">
-                    {page.description}
-                </p>
-            </div>
+            <PageHero
+                crumbs={page.crumb?.map((c) => ({
+                    name: c.name,
+                    href: c.path,
+                }))}
+                title={page.h1}
+                lead={page.description}
+                className="px-0 pb-0 min-[760px]:pb-0"
+            />
 
             {HELP_GROUPS.map((group) => (
-                <section key={group} className="flex flex-col gap-4">
-                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                <section key={group} className="flex flex-col gap-6">
+                    <h2 className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
                         {group}
                     </h2>
-                    <div className="grid gap-3 md:grid-cols-2 md:gap-6 xl:grid-cols-3">
+                    <SwipeRow label={group}>
                         {HELP.filter((a) => a.group === group).map((a) => (
                             <LinkCard
                                 key={a.slug}
                                 href={`/help/${a.slug}`}
                                 title={a.task}
                                 line={a.line}
+                                className="h-full"
                             />
                         ))}
-                    </div>
+                    </SwipeRow>
                 </section>
             ))}
 
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-14">
                 <section className="flex flex-col">
-                    <h2 className={`${H2} mb-3`}>Questions</h2>
+                    <h2 className={`${H2} mb-4`}>Questions</h2>
                     <FaqList items={HELP_FAQS} />
                 </section>
                 <aside className="lg:self-end">

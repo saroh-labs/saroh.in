@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { PageHero } from "@/components/resources/page-hero";
 import { ComingList } from "@/components/shared/sections/coming-list";
 import type { LiveIntegration } from "@/content/integrations";
 import {
@@ -16,6 +15,7 @@ import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { cn } from "@saroh/marketing/cn";
 import { Container } from "@saroh/marketing/container";
 import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { Pill } from "@saroh/marketing/pill";
 import { TextLink } from "@saroh/marketing/text-link";
 

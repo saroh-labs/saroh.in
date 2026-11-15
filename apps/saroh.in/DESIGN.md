@@ -198,6 +198,7 @@ none; the world file supplies names, numbers and times. The kit sheet,
 | Component                            | Import                                         | Purpose and rules                                                                                                                                                                                                                                                                       |
 | ------------------------------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `Section`, `SectionHeading`          | `@saroh/marketing/section`, `/section-heading` | A section and its heading. `size="kit-h1"` with `as="h1"` is the page title; `size="kit-h2"` a section heading; `tone` gives it an edge-to-edge band (`paper`, `white`, hour tints, `lamp`); `space="kit"` the 120/72 spacing; `align="center"`. No eyebrows in the redesign.           |
+| `PageHero`, `markTitle`              | `@saroh/marketing/page-hero`                   | The head of a page without a board of its own (about, help, legal, tools …), both editions: crumbs, the one h1 at `kit-h1` with the Mark under a chosen word or the last one, a lead, the page's actions as children. `markTitle` alone marks an h1 drawn another way.                  |
 | `Mark`                               | `@saroh/marketing/mark`                        | The Saffron underline under **one** word of the h1, once per page.                                                                                                                                                                                                                      |
 | `Button` / `ButtonLink` `size="kit"` | `@saroh/marketing/button`                      | 48px, 10px corners. Primary Ink, secondary a 1px Ink outline on white. Sentence case. Start buttons are `CtaLink size="kit"`.                                                                                                                                                           |
 | `TextLink` `tone="ink"` / `"on-ink"` | `@saroh/marketing/text-link`                   | 1px underline 3px below, 44px tall. `arrow` (→) only when it goes to another page; none when it opens something here; never ↗.                                                                                                                                                          |
@@ -418,7 +419,7 @@ registry.ts` (stubs drawing the old page until agent reach lands).
   head and closing, templates and each template, the QR code maker, the
   link preview checker, the waitlist and welcome are in the kit, words and
   functions unchanged:
-    - `PageHero` (`components/resources/page-hero.tsx`): crumbs, the one h1
+    - `PageHero` (`@saroh/marketing/page-hero`, shared with saroh.tech): crumbs, the one h1
       at `kit-h1` with `markTitle` putting the Mark under a chosen word or
       the last one, a lead, the page's actions. A page whose old eyebrow named
       it shows that word as its single crumb ("About Saroh", "Pricing",

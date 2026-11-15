@@ -14,7 +14,7 @@ import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 import { Section } from "@saroh/marketing/section";
 import { TextLink } from "@saroh/marketing/text-link";
 
-import { PageHero } from "../resources/page-hero";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { CtaLink } from "../shared/buttons/cta-link";
 
 /** Noto Sans Devanagari, loaded by the route (`app/(site)/about/page.tsx`). */

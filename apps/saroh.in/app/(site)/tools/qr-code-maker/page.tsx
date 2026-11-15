@@ -3,7 +3,7 @@ import "@saroh/search-pages/styles.css";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PageHero, toolsCrumb } from "@/components/resources/page-hero";
+import { toolsCrumb } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { QrCodeMaker } from "@/components/tools/qr-code-maker/qr-code-maker";
@@ -15,6 +15,7 @@ import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { toolLd } from "@/lib/structured-data";
 import { Container } from "@saroh/marketing/container";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
+import { PageHero } from "@saroh/marketing/page-hero";
 
 export const metadata: Metadata = pageMetadata({
     title: copy.metaTitle,

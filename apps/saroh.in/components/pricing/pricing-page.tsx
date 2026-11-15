@@ -5,7 +5,7 @@ import { CTA_BAND } from "@/content/home";
 import { PRICING_COPY } from "@/content/pricing";
 import { demoHref } from "@/lib/demos";
 
-import { PageHero } from "../resources/page-hero";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { CtaLink } from "../shared/buttons/cta-link";
 import { DemoLink } from "../shared/buttons/demo-link";
 import { PricingPlans } from "./pricing-plans";

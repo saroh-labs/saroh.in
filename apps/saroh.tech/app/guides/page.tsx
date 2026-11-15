@@ -1,3 +1,5 @@
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+
 import { ButtonLink } from "@/components/shared/button";
 import { LinkCard } from "@/components/shared/card";
 import { CtaBand } from "@/components/shared/cta-band";
@@ -15,7 +17,7 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-9 px-mk-gutter pt-4 md:gap-[52px] md:pt-10"
+            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter min-[760px]:gap-[72px]"
         >
             <HubHead
                 page={page}
@@ -35,11 +37,11 @@ export default function Page() {
             </HubHead>
 
             {GUIDE_GROUPS.map((group) => (
-                <section key={group} className="flex flex-col gap-[18px]">
-                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                <section key={group} className="flex flex-col gap-6">
+                    <h2 className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
                         {group}
                     </h2>
-                    <div className="grid gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+                    <SwipeRow label={group}>
                         {GUIDE_CONTENT.filter((g) => g.group === group).map(
                             (g) => (
                                 <LinkCard
@@ -47,10 +49,11 @@ export default function Page() {
                                     href={`/guides/${g.slug}`}
                                     title={g.card.title}
                                     line={g.card.line}
+                                    className="h-full"
                                 />
                             ),
                         )}
-                    </div>
+                    </SwipeRow>
                 </section>
             ))}
 

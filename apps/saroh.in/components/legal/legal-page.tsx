@@ -9,7 +9,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { Container } from "@saroh/marketing/container";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 
-import { markTitle } from "@/components/resources/page-hero";
+import { markTitle } from "@saroh/marketing/page-hero";
 
 /**
  * A legal page (plan U1, R6): the owner's text, verbatim, in a 720px reading

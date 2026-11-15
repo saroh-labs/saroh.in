@@ -1,5 +1,8 @@
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+
 import { LinkCard } from "./card";
 
+/** Related pages: three or more swipe on a phone (PHONE.md). */
 export function RelatedGrid({
     title,
     items,
@@ -8,15 +11,15 @@ export function RelatedGrid({
     items: readonly { title: string; line: string; href: string }[];
 }) {
     return (
-        <section className="flex flex-col gap-4">
-            <h2 className="m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]">
+        <section className="flex flex-col gap-6">
+            <h2 className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
                 {title}
             </h2>
-            <div className="grid gap-3 md:grid-cols-3 md:gap-6">
+            <SwipeRow label={title}>
                 {items.map((item) => (
-                    <LinkCard key={item.href} {...item} />
+                    <LinkCard key={item.href} className="h-full" {...item} />
                 ))}
-            </div>
+            </SwipeRow>
         </section>
     );
 }

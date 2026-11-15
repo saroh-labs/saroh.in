@@ -25,7 +25,9 @@ export function LinkCard({
             className={cardLinkClasses(`gap-2 p-[22px] ${className}`)}
             {...props}
         >
-            <span className="font-display text-mk-card font-bold">{title}</span>
+            <span className="font-display text-mk-kit-h3 font-bold">
+                {title}
+            </span>
             <span className="text-mk-card-body text-mk-copy [text-wrap:pretty]">
                 {line}
             </span>

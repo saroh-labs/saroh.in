@@ -1,4 +1,6 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { chipClasses } from "@saroh/marketing/kit/chip";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -14,12 +16,12 @@ import type { TemplateCardData, TemplatePage } from "@/lib/templates/pages";
 import { downloads, fillHref, templateView } from "@/lib/templates/pages";
 
 export const H2 =
-    "m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]";
+    "m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]";
 const COPY = "m-0 text-[16.5px] leading-relaxed text-mk-copy";
 const HINT = "text-[13px] text-muted-foreground";
 
 const TH =
-    "border-b border-border-strong px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+    "border-b border-border-strong px-3 py-2.5 text-left text-[13px] font-semibold text-muted-foreground";
 const TD = "border-b border-border p-3 align-top";
 
 /** A filter or a related link: looks like a chip, but it's a page. */
@@ -37,11 +39,7 @@ export function ChipLink({
             prefetch={false}
             href={href}
             aria-current={on ? "page" : undefined}
-            className={`inline-flex h-11 items-center rounded-full border px-3.5 text-[14.5px] no-underline md:h-9 ${
-                on
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border-strong bg-card text-foreground"
-            }`}
+            className={chipClasses({ on })}
         >
             {children}
         </Link>
@@ -51,11 +49,14 @@ export function ChipLink({
 export function TemplateHero({ page }: { page: TemplatePage }) {
     return (
         <>
-            <PageTitle size="article">{page.h1}</PageTitle>
-            <p className="m-0 text-[17px] leading-relaxed text-mk-copy md:text-[18.5px]">
-                {page.lede}
-            </p>
+            <SectionHeading
+                as="h1"
+                size="kit-h1"
+                title={markTitle(page.h1)}
+                lead={page.lede}
+            />
             <ButtonLink
+                id="template-cta"
                 href={fillHref(page)}
                 data-cta="fill-online"
                 className="self-stretch md:self-start"
@@ -69,7 +70,7 @@ export function TemplateHero({ page }: { page: TemplatePage }) {
 /** The page's own data, drawn: every page shows a different filled document. */
 export function PreviewImage({ page }: { page: TemplatePage }) {
     return (
-        <div className="rounded-[20px] bg-mk-hover p-3 md:p-4">
+        <div className="rounded-mk-card bg-mk-hover p-3 md:p-4">
             <div
                 role="img"
                 aria-label={`Preview: ${page.h1}, filled with example items`}
@@ -127,7 +128,7 @@ export function ExampleItems({
             {items.length ? (
                 <div className="flex items-center gap-3">
                     <h2 className={H2}>What's on it</h2>
-                    <span className="rounded-full bg-mk-soon px-2 py-[3px] text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                    <span className="rounded-full bg-mk-soon px-2 py-[3px] text-[12px] font-semibold text-brand-700">
                         Example
                     </span>
                 </div>
@@ -213,7 +214,9 @@ export function TipsList({ tips }: { tips: readonly Tip[] }) {
                         key={t.title}
                         className="flex flex-col gap-2 rounded-mk-card border border-border bg-card p-6"
                     >
-                        <b className="text-lg">{t.title}</b>
+                        <b className="font-display text-mk-kit-h3 font-bold">
+                            {t.title}
+                        </b>
                         <p className="m-0 text-[15.5px] leading-relaxed text-mk-copy">
                             {t.text}
                         </p>
@@ -321,7 +324,9 @@ export function TemplateCard({ card }: { card: TemplateCardData }) {
                 </span>
             </span>
             <span className="flex flex-col gap-1 px-[18px] pb-[18px] pt-4">
-                <span className="text-base font-semibold">{card.title}</span>
+                <span className="font-display text-[17px] font-bold">
+                    {card.title}
+                </span>
                 <span className="text-[13px] text-muted-foreground">
                     PDF · Word · Docs · Sheets
                 </span>
@@ -346,7 +351,7 @@ export function CardGrid({ cards }: { cards: readonly TemplateCardData[] }) {
             </div>
             {rest.length ? (
                 <details className="group flex flex-col">
-                    <summary className="mx-auto flex h-12 w-fit cursor-pointer list-none items-center justify-center rounded-mk-btn border border-border-strong px-[22px] text-[15px] font-semibold group-open:hidden [&::-webkit-details-marker]:hidden">
+                    <summary className="mx-auto flex h-12 w-fit cursor-pointer list-none items-center justify-center rounded-mk-kit-btn border border-foreground bg-card px-[22px] text-base font-semibold group-open:hidden [&::-webkit-details-marker]:hidden">
                         Show more templates
                     </summary>
                     <div className={CARD_GRID}>

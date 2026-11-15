@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { markTitle } from "@/components/resources/page-hero";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import {
     CHANGELOG_ENTRIES,
@@ -14,6 +13,7 @@ import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
 import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Article } from "@saroh/marketing/container";
+import { markTitle } from "@saroh/marketing/page-hero";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 import { TextLink } from "@saroh/marketing/text-link";
 

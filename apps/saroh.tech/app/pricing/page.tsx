@@ -1,10 +1,9 @@
-import { ButtonLink } from "@saroh/marketing/button";
 import { Container } from "@saroh/marketing/container";
-import { CtaBand } from "@saroh/marketing/cta-band";
-import { PricingHero } from "@saroh/marketing/pricing-hero";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { Section } from "@saroh/marketing/section";
 
 import { Plans } from "@/components/pricing/plans";
+import { Closing } from "@/components/shared/closing";
 import { JsonLd } from "@/components/shared/json-ld";
 import { CTA_BAND } from "@/content/home";
 import { PRICING } from "@/content/pricing";
@@ -29,15 +28,17 @@ export default async function PricingPage() {
     return (
         <div data-page-type={page.type}>
             <JsonLd data={pageSchema(page)} />
-            <PricingHero
-                eyebrow={PRICING.eyebrow}
+            <PageHero
+                crumbs={[{ name: PRICING.eyebrow }]}
                 title={page.h1}
-                intro={PRICING.intro}
+                mark="free."
+                lead={PRICING.intro}
+                className="pb-8 min-[760px]:pb-10"
             />
             <Container
                 as="section"
                 aria-labelledby="plans-title"
-                className="grid gap-3.5 pt-14"
+                className="grid gap-3.5"
             >
                 <h2 id="plans-title" className="sr-only">
                     Plans
@@ -50,10 +51,10 @@ export default async function PricingPage() {
                     titleId="usage-title"
                     title={PRICING.usageTitle}
                     lead={PRICING.usageLead}
-                    size="sm"
-                    className="grid scroll-mt-6 gap-[18px] pt-[72px]"
+                    size="kit-h2"
+                    className="grid scroll-mt-6 gap-6 pt-[72px] min-[760px]:pt-[120px]"
                 >
-                    <dl className="m-0 rounded-[18px] border border-border bg-card px-5 text-[15px]">
+                    <dl className="m-0 rounded-mk-card border border-border bg-card px-5 text-[15px]">
                         {usage.map((row) => (
                             <div
                                 key={row.label}
@@ -71,20 +72,11 @@ export default async function PricingPage() {
                     </ul>
                 </Section>
             ) : null}
-            <CtaBand
+            <Closing
+                id="pricing-start"
                 title={PRICING.closer}
-                body={CTA_BAND.body}
-                note={CTA_BAND.note}
-                className="pt-[120px]"
-                actions={
-                    <ButtonLink
-                        variant="saffron"
-                        href={signupHref("pricing")}
-                        data-cta="start-free-band"
-                    >
-                        Start free
-                    </ButtonLink>
-                }
+                href={signupHref("pricing")}
+                note={`${CTA_BAND.body} ${CTA_BAND.note}`}
             />
         </div>
     );

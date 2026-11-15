@@ -39,3 +39,18 @@ lists only where Global differs (DEC-221).
 - **17 Nov 2026 (DEC-221).** The shared kit, the Global world, the claim
   switches, the shared nav and footer, page bands edge to edge, and the
   `/features` route shell (noindex until drawn).
+- **17 Nov 2026, the pages without a board (unit/web-techpages).** As
+  saroh.in's: about, contact, customers, the changelog and its entries,
+  guides and help (styling only), integrations, the legal pages, pricing's
+  head and closing (the plan cards still read the catalogue, Free with
+  "Tell me when"), referral, every templates route, the tools hub and every
+  tool page. One h1 with the Mark through the kit's `PageHero` /
+  `markTitle` (`@saroh/marketing/page-hero`, shared with saroh.in), the
+  kit's heading sizes, 48px buttons (`components/shared/button.tsx`'s
+  primary is the kit size), 16px cards, "/" crumbs, plain 13px labels for
+  the old small caps, and `Closing` (`components/shared/closing.tsx`, the
+  kit's `ClosingCTA`; `CtaBand` now draws it) in place of the Ink band.
+  Phone: card groups of help, guides, the tools hub, integrations,
+  referral's steps and related pages are `SwipeRow`s; each template page
+  gets the `StickyBar`. Tool UIs keep their controls as they were. Words,
+  routes, titles and SEO fields are unchanged.

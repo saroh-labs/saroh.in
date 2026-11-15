@@ -1,4 +1,3 @@
-import { PageHero } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { docsHref, DEVELOPERS as page } from "@/content/developers";
 import { ButtonLink } from "@saroh/marketing/button";
@@ -10,6 +9,7 @@ import { FeaturePoints } from "@saroh/marketing/feature-points";
 import { FeatureSteps } from "@saroh/marketing/feature-steps";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 import { TextLink } from "@saroh/marketing/text-link";
 

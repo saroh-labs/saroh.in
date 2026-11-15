@@ -59,7 +59,7 @@ switches (`CtaLink`, `HeroActions`, `DemoLink`, `TourVideo`) stay in `apps/saroh
 
 `src/kit/` holds the 2026 redesign's pieces, each its own export
 (`@saroh/marketing/kit/<name>`), with `MarketingNav` and `MarketingFooter`
-in `src/nav/`, `Mark` in `src/sections/` and the example world's types in
+in `src/nav/`, `Mark` and `PageHero` (with `markTitle`) in `src/sections/` and the example world's types in
 `src/content/world.ts` (`@saroh/marketing/world`). They take words, links,
 start buttons (`cta()`), switches and a world's facts as props, and hold
 none. Their purposes and rules are in `apps/saroh.in/DESIGN.md`; every one

@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { IntegrationSteps } from "@/components/integrations/integration-steps";
-import { markTitle } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { helpHref, liveArticles, summarise } from "@/content/help";
@@ -22,6 +21,7 @@ import { breadcrumbLd } from "@/lib/structured-data";
 import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Article, Container } from "@saroh/marketing/container";
 import { Faq } from "@saroh/marketing/faq";
+import { markTitle } from "@saroh/marketing/page-hero";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 import { TextLink } from "@saroh/marketing/text-link";
 

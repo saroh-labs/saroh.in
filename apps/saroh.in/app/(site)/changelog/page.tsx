@@ -6,11 +6,11 @@ import {
     FirstEntrySoon,
 } from "@/components/changelog/changelog-list";
 import { ChangelogSignup } from "@/components/changelog/changelog-signup";
-import { PageHero } from "@/components/resources/page-hero";
 import { CHANGELOG, changelogView } from "@/content/changelog";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { Container } from "@saroh/marketing/container";
+import { PageHero } from "@saroh/marketing/page-hero";
 
 export const metadata: Metadata = pageMetadata({
     title: CHANGELOG.metaTitle,

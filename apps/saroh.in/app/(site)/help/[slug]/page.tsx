@@ -6,7 +6,6 @@ import type { ComponentProps } from "react";
 import { HelpStep } from "@/components/help/help-step";
 import { HelpVote } from "@/components/help/help-vote";
 import { OnThisPage } from "@/components/resources/on-this-page";
-import { markTitle } from "@/components/resources/page-hero";
 import { ResourceShell } from "@/components/resources/resource-shell";
 import { SideNav } from "@/components/resources/side-nav";
 import { JsonLd } from "@/components/shared/layout/json-ld";
@@ -27,6 +26,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
 import { breadcrumbLd, howToLd, techArticleLd } from "@/lib/structured-data";
 import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
+import { markTitle } from "@saroh/marketing/page-hero";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 import { TextLink, textLinkClasses } from "@saroh/marketing/text-link";
 

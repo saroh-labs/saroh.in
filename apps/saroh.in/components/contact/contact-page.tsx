@@ -14,9 +14,9 @@ import { cn } from "@saroh/marketing/cn";
 import { Arrow } from "@saroh/marketing/arrow";
 import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { Container } from "@saroh/marketing/container";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { Section } from "@saroh/marketing/section";
 import { textLinkClasses } from "@saroh/marketing/text-link";
-import { PageHero } from "../resources/page-hero";
 import { ContactForm } from "./contact-form";
 
 /** The side column's white card. */

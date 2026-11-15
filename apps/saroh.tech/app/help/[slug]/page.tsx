@@ -1,4 +1,5 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -35,16 +36,18 @@ export default async function Page({ params }: Props) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-6 px-mk-gutter pt-6 md:gap-10 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-8 min-[760px]:gap-12 min-[760px]:pt-10"
         >
             <JsonLd data={[...pageSchema(page), howToSchema(task, steps)]} />
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-5">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <PageTitle size="article">{page.h1}</PageTitle>
-                <p className="m-0 max-w-[66ch] text-lg leading-normal text-mk-copy md:text-[19px]">
-                    {intro}
-                </p>
-                <p className="m-0 text-[15px] text-muted-foreground">
+                <SectionHeading
+                    as="h1"
+                    size="kit-h1"
+                    title={markTitle(page.h1)}
+                    lead={intro}
+                />
+                <p className="m-0 text-[13px] text-muted-foreground">
                     Takes about {minutes} {minutes === 1 ? "minute" : "minutes"}
                 </p>
             </div>
@@ -60,7 +63,7 @@ export default async function Page({ params }: Props) {
                 </div>
                 <aside className="flex flex-col gap-3 lg:sticky lg:top-[calc(var(--mk-nav-h)+16px)] lg:self-start">
                     <Card>
-                        <h2 className="m-0 font-display text-mk-card font-bold [text-wrap:balance]">
+                        <h2 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                             Ready?
                         </h2>
                         <ButtonLink href={next.href} data-cta="help-next-step">
@@ -71,7 +74,7 @@ export default async function Page({ params }: Props) {
                 </aside>
             </div>
 
-            <div className="pt-4">
+            <div className="pb-6">
                 <RelatedGrid
                     title="Related"
                     items={related.map((r) => {

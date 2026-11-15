@@ -1,3 +1,7 @@
+import { buttonClasses } from "@saroh/marketing/button";
+import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
+import Link from "next/link";
+
 import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { CtaBand } from "@/components/shared/cta-band";
 import { FaqList } from "@/components/shared/faq-list";
@@ -53,7 +57,7 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-4 md:gap-16 md:pt-8"
+            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter pt-8 min-[760px]:gap-[72px] min-[760px]:pt-10"
         >
             <JsonLd
                 data={[
@@ -102,7 +106,7 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
 
             <TipsList tips={data.tips} />
 
-            <section className="flex flex-col gap-3 md:gap-[18px]">
+            <section className="flex flex-col gap-6 min-[760px]:gap-10">
                 <h2 className={H2}>How to fill it</h2>
                 <StepList steps={steps} />
             </section>
@@ -134,8 +138,8 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
             />
 
             {similar.length ? (
-                <section className="flex flex-col gap-3.5">
-                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                <section className="flex flex-col gap-4">
+                    <h2 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                         {data.country
                             ? `${doc} templates for other countries`
                             : data.trade
@@ -159,6 +163,16 @@ export function TemplatePage({ page, data }: { page: SitePage; data: Data }) {
                 href={signupHref("template", { template: data.key })}
                 from="start-free-band"
             />
+            <StickyBar watch="template-cta">
+                <Link
+                    prefetch={false}
+                    href={signupHref("template", { template: data.key })}
+                    data-cta="template-sticky"
+                    className={buttonClasses({ size: "kit" })}
+                >
+                    Start free
+                </Link>
+            </StickyBar>
         </div>
     );
 }

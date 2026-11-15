@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
-import { markTitle } from "@/components/resources/page-hero";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
@@ -23,6 +22,7 @@ import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { openingShort } from "@/lib/waitlist";
 import { Arrow } from "@saroh/marketing/arrow";
+import { markTitle } from "@saroh/marketing/page-hero";
 import { Pill } from "@saroh/marketing/pill";
 import { ring } from "@saroh/marketing/ring";
 import { textLinkClasses } from "@saroh/marketing/text-link";

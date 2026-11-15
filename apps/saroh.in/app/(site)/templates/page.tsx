@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PageHero } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { TemplatesGallery } from "@/components/templates/templates-gallery";
 import {
@@ -16,6 +15,7 @@ import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { Container } from "@saroh/marketing/container";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
+import { PageHero } from "@saroh/marketing/page-hero";
 
 export const metadata: Metadata = pageMetadata({
     title: page.seo.title,

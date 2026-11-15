@@ -139,7 +139,7 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
                 <h2
                     ref={thanks}
                     tabIndex={-1}
-                    className="m-0 font-display text-[28px] font-semibold tracking-[-0.02em] focus:outline-none"
+                    className="m-0 font-display text-mk-kit-h3 font-bold focus:outline-none"
                 >
                     {done.title(firstName(name))}
                 </h2>
@@ -165,7 +165,7 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
             <div className="grid gap-1">
                 <h2
                     id="contact-form-title"
-                    className="m-0 font-display text-[24px] font-semibold tracking-[-0.02em]"
+                    className="m-0 font-display text-mk-kit-h3 font-bold"
                 >
                     {copy.title}
                 </h2>
@@ -270,7 +270,7 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
             ) : null}
 
             <div>
-                <Button type="submit" disabled={sending}>
+                <Button type="submit" size="kit" disabled={sending}>
                     {sending ? copy.sending : copy.submit}
                 </Button>
             </div>

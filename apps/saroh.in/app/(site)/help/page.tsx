@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { HelpSearch } from "@/components/help/help-search";
-import { PageHero } from "@/components/resources/page-hero";
 import {
     groupsWithArticles,
     HELP_EMAIL,
@@ -17,6 +16,7 @@ import { helpArticles } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /** A link inside a sentence: underlined, not told apart by colour alone. */

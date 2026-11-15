@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PageHero } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { TemplateCard } from "@/components/templates/template-card";
@@ -19,6 +18,7 @@ import {
 import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
 import { Container } from "@saroh/marketing/container";
+import { PageHero } from "@saroh/marketing/page-hero";
 
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";

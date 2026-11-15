@@ -3,7 +3,7 @@ import "@saroh/search-pages/styles.css";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PageHero, toolsCrumb } from "@/components/resources/page-hero";
+import { toolsCrumb } from "@/components/resources/page-hero";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { LinkPreviewTool } from "@/components/tools/link-preview/link-preview-tool";
 import { SarohSharePreview } from "@/components/tools/link-preview/saroh-share-preview";
@@ -14,6 +14,7 @@ import { builtTools } from "@/lib/search-pages";
 import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { faqPageLd, toolLd } from "@/lib/structured-data";
 import { Faq } from "@saroh/marketing/faq";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { PointGrid } from "@saroh/marketing/point-grid";
 
 /**
