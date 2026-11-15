@@ -253,7 +253,7 @@ seed):
   Dr. Meenakshi Rao and Dr. Arun Pillai, with their own weekly hours, one of
   them with a day off this week; booking rules of 4 weeks ahead, 2 hours
   before and free cancel up to 24 hours. A published site (`kavi-dental`)
-  whose `/book` page lists the five shown services, and one storefront, "Kavi
+  whose `/book` page lists the eight shown services, and one storefront, "Kavi
   Dental", a shop with the clinic's address and hours and nothing listed
   (E9's treatment orders will go there). About 370 bookings from 60 days ago
   to 3 weeks ahead, every one on a start the dentist's week offers, none in

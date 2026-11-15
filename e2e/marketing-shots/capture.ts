@@ -254,6 +254,11 @@ async function capture(
             await page.locator(step.click).first().click();
         } else if ("fill" in step) {
             await page.locator(step.fill).first().fill(step.value);
+        } else if ("scrollTop" in step) {
+            await page
+                .locator(step.scrollTop)
+                .first()
+                .evaluate((el) => (el.scrollTop = 0));
         } else {
             await page.locator(step.waitFor).first().waitFor();
         }

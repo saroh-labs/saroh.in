@@ -6744,3 +6744,27 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `Rename` joins the done verbs; the spec expects `Renamed a site`.
 - **Rule:** when a shared fallback changes, grep the `*.db.spec.ts` files for what they assert about it before pushing (`git grep -n summary -- '*.db.spec.ts'`), and run that spec where a test database is set up.
 - **Category:** api · mcp
+
+## A retaken shot kept serving its old sized copies (15 Nov 2026)
+
+- **Symptom:** after Ask AI's shots were retaken with product photos, `shot-sizes.mjs` reported `0 written`; phones and narrow desks still got the old copies with initials on the cards.
+- **Cause:** the script wrote a sized copy only when it was missing (or with `--force`), so a retaken capture at the same key kept its stale copies.
+- **Fix:** a copy older than its capture is written again (`apps/saroh.in/scripts/shot-sizes.mjs`); its output doesn't change between runs, so a fresh checkout's times only rewrite identical files.
+- **Rule:** a derived file is rebuilt when its source is newer, never only when it is missing.
+- **Category:** marketing · tooling
+
+## Ask AI's own page had no way to the history on a phone (15 Nov 2026)
+
+- **Symptom:** at 390px, `/ask` showed one conversation and no list; the marketing capture couldn't open a past conversation there. The follow-up box also sat half under the tab bar.
+- **Cause:** the page's list is `hidden` below 760px, and only the panel's header (not the page's) had the "Your conversations" button. The page's height left out `--tab-bar-inset`.
+- **Fix:** the page header gets the button under 760px, swapping the conversation for the list until one is picked; the page's height subtracts `--tab-bar-inset` (`ask-ai-panel.tsx`).
+- **Rule:** a list hidden at a breakpoint needs a control that reaches it at that breakpoint; a full-height workspace screen subtracts `--tab-bar-inset`.
+- **Category:** frontend · ask-ai
+
+## A page couldn't change twice on the day it was dated (15 Nov 2026)
+
+- **Symptom:** the push of batch-2026-11-15-1 failed content-dates: `features.ts`'s words changed but its date was still 2026-11-15, though that was today. The morning's merge had already set it.
+- **Cause:** the check asked for a new date whenever the words changed, and a date can't move past today.
+- **Fix:** a page already dated today passes (`scripts/check-content-dates.mjs`, `CONTENT_DATES_TODAY` for its test); a test covers it.
+- **Rule:** a freshness check accepts "already today" as fresh.
+- **Category:** tooling · content

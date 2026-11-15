@@ -117,7 +117,9 @@ export type Step =
      * Type into a field, as a person filling a form would. Only on a form
      * that is never submitted (the shot is taken before its button).
      */
-    | { fill: string; value: string };
+    | { fill: string; value: string }
+    /** Scroll this scrolling area back to its top. */
+    | { scrollTop: string };
 
 /**
  * What part of the page is kept. Omitted: the viewport. `selector`: the box
@@ -1629,6 +1631,25 @@ const ASK_AI_SHOTS: Shot[] = [
         gap: ASK_GAP,
     },
     {
+        // The hero on a phone: the same answer as the app draws it there.
+        key: "ask-hero-phone",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 390, height: 844 },
+        // A phone opens the list from the page's header.
+        steps: [
+            { click: 'button[aria-label="Your conversations"]' },
+            ...openAsk("How did this week go"),
+            // It opens at the answer's end; show the question and the words.
+            { scrollTop: "#ask-ai-page .overflow-y-auto" },
+        ],
+        alt: "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+        caption:
+            "Ask AI on a phone: how the week went, answered from the bakery's own orders",
+        gap: ASK_GAP,
+    },
+    {
         key: "ask-start",
         business: "rye",
         role: "owner",
@@ -1773,6 +1794,17 @@ const AI_APPS_SHOTS: Shot[] = [
     },
 ];
 
+/** Home's "Use Saroh from Claude" notice: a moment, not what a step shows. */
+const HIDE_AI_MOMENT: Step = { hide: '[data-moment="new-ai-apps"]' };
+/** Home's desk layout; the phone one is in the page too, hidden. */
+const HOME_DESK = '[data-home-layout="desk"]';
+
+/**
+ * A step's shot: drawn in half the page, so it's taken at 900 wide and the
+ * screen's words read at near full size (owner, 14-15 Nov 2026).
+ */
+const STEP_VIEW: Viewport = { width: 900, height: 1000 };
+
 export const SHOTS: Shot[] = [
     // ── Rye & Co. ──────────────────────────────────────────────────────
     {
@@ -1781,11 +1813,49 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/",
         viewport: DESK,
+        steps: [HIDE_AI_MOMENT],
         alt: "Home at Rye & Co. (demo bakery): what needs doing today, from late orders to a failed renewal",
         caption:
             "Home at Rye & Co.: nine things that need Priya, from late orders to a failed renewal",
         gap: 'The owner is "Demo", not Priya, and the list holds 18 things, not nine.',
     },
+    // Billing's overdue step: Rye's own Home, the money rows opened.
+    {
+        key: "r-money",
+        business: "rye",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [
+            HIDE_AI_MOMENT,
+            {
+                click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
+            },
+        ],
+        clip: {
+            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
+            until: `${HOME_DESK} [data-need-group]:has-text("go through")`,
+            pad: 8,
+        },
+        alt: "Money to chase on the Home of Rye & Co. (demo bakery): overdue bills with Remind all, cheques waiting to clear and a failed renewal",
+        caption:
+            "Overdue bills with a reminder ready, cheques not yet in the bank, and a renewal to retry by pay link",
+    },
+
+    {
+        // Billing's step 2: Rye's bread is nil-rated, so a bread-only bill
+        // is a bill of supply (the same app rule as a clinic's).
+        key: "r-supply",
+        business: "rye",
+        role: "owner",
+        route: "/billing/invoices/seed_sc_rc_invoice_trade_13",
+        viewport: { width: 1100, height: 1300 },
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        alt: "A bill of supply from Rye & Co. (demo bakery) for nil-rated sourdough loaves, with the exempt-supply line",
+        caption:
+            "Bread is exempt from GST, so a bill for bread alone is a bill of supply, worded as the law asks",
+    },
+
     {
         key: "s-orders",
         business: "rye",
@@ -1803,7 +1873,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         // Order #1074: Priya Raman's, placed today, a loaf that may contain sesame.
         route: "/commerce/orders/seed_sc_rc_order_73",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "An order at Rye & Co. (demo bakery): how long it has waited, a sesame allergy warning, items, customer and money",
         caption:
             "Order #1020: waiting 16 minutes, a sesame allergy warning, items, customer and money",
@@ -1815,7 +1885,9 @@ export const SHOTS: Shot[] = [
         role: "owner",
         // RC/26-27/0087, written by hand to Kiln & Co. Café.
         route: "/billing/invoices/seed_sc_rc_invoice_trade_3",
-        viewport: DESK,
+        viewport: { width: 1100, height: 1300 },
+        // The invoice as it prints, without the page around it.
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
         alt: "A GST tax invoice from Rye & Co. (demo bakery) to a café, with the business's details and tax",
         caption:
             "A GST invoice made from an order, with the business's details and tax / A GST tax invoice from Rye & Co. to Third Wave Café",
@@ -1836,7 +1908,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/customers/seed_sc_rc_contact_priya",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Priya Raman's page: her orders and spend, a sesame allergy and what she usually buys",
         caption:
             "Priya Raman's page: six orders, what she has spent (an amount), a sesame allergy and what she usually buys",
@@ -1857,7 +1929,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/billing/subscriptions",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Subscriptions at Rye & Co. (demo bakery) with one failed renewal flagged",
         caption: "Subscriptions at Rye & Co. with one failed renewal flagged",
     },
@@ -1866,7 +1938,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/billing/invoices",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Invoices at Rye & Co. (demo bakery): each order's GST invoice, paid or due, with what's overdue flagged",
         caption:
             "Invoices at Rye & Co.: each order's GST invoice, paid or due, with a bulk order in draft",
@@ -1877,7 +1949,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/calendar",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "This month on the calendar with each day's money and a strip of totals",
         caption:
             "September on the calendar with each day's money and a strip of totals",
@@ -1898,7 +1970,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/commerce/products/seed_sc_rc_product_0/edit",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "The product editor: name, link, price and category beside visibility, variants and stock",
         caption:
             "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
@@ -1907,24 +1979,20 @@ export const SHOTS: Shot[] = [
         key: "p-site",
         business: "rye",
         role: "owner",
-        // Rye's website does not list its products yet ("Not on the website"),
-        // so this is the product's shop page as a customer sees it, from the
-        // workspace's Customer view, with the team's notes switched off.
-        route: "/commerce/products/seed_sc_rc_product_0?view=customer",
-        viewport: { width: 1440, height: 1600 },
-        steps: [{ click: '[role="switch"]:has-text("Team notes")' }],
-        clip: { selector: "div.overflow-hidden.rounded-xl.border.shadow-sm" },
-        alt: "The shop page of Rye & Co. (demo bakery) for the Sourdough loaf: sizes, price and Add to basket",
+        // Rye's own shop page, as a customer sees it (15 Nov 2026: the seed
+        // gives Rye a shop that sells from Online).
+        route: "site:/shop",
+        viewport: { width: 1100, height: 1000 },
+        alt: "The shop of Rye & Co. (demo bakery) on its Saroh website: cakes and extras with photos and prices",
         caption:
-            "Rye & Co.'s shop page showing each product with its sizes, price and an Add to bag button / Rye & Co.'s own shop, built on Saroh: products with sizes, prices and Add to bag",
-        gap: "Rye's website has no shop yet, so this is one product's shop page (the Customer view), not a list of products; the button reads \"Add to basket\".",
+            "The shop of Rye & Co. (demo bakery), built on Saroh: products with photos, sizes and prices",
     },
     {
         key: "p-stock",
         business: "rye",
         role: "owner",
         route: "/commerce/stock",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
         caption:
             "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
@@ -1934,7 +2002,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/commerce/products/seed_sc_rc_product_0",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Sourdough loaf's page: what can be sold now, with open orders, discounts, collections, the website and reviews",
         caption:
             "Sourdough loaf's page: 25 can be sold now, with open orders, discounts, collections, pages and reviews",
@@ -1954,47 +2022,46 @@ export const SHOTS: Shot[] = [
         gap: "Insights as designed (takings, best week, one location against another) is not built; today's Insights shows site views, visitors, enquiries and orders. Rye has Insights off, so this is Northwind.",
     },
     {
+        // Insights' cards since the redesign (15 Nov 2026 retake).
         key: "i-compare",
         business: "northwind",
         role: "owner",
         route: "/analytics",
-        viewport: { width: 1440, height: 1100 },
-        // The dashboard's headline figures and its chart, without the page.
+        viewport: { width: 1100, height: 1500 },
         clip: {
-            selector: "main div.grid.gap-4:has(> div.grid > .wk-item)",
-            pad: 16,
+            selector: '[data-testid="insights-suggestion"]',
+            pad: 8,
         },
-        alt: "Insights for 30 days: site views, unique visitors, enquiries and orders, views by day and the most-viewed pages",
+        alt: "Insights at Northwind Supply (demo business): what to do next, a product selling less, with a button to open it",
         caption:
-            "Insights at Rye & Co.: takings, 304 orders, best week 15 Sep, average order (amounts)",
-        gap: "No takings, best week or average order in today's Insights; these are site views, visitors, enquiries and orders at Northwind.",
+            "What to do next: one suggestion from the business's own sales, with the button that acts on it",
     },
     {
         key: "i-weeks",
         business: "northwind",
         role: "owner",
-        route: "/analytics?range=90d",
-        viewport: DESK,
+        route: "/analytics",
+        viewport: { width: 1100, height: 1500 },
         clip: {
-            selector:
-                'main div.rounded-xl.border:has-text("Site views by day")',
-            pad: 16,
+            selector: '[data-testid="answer-money"]',
+            pad: 8,
         },
-        alt: "Ninety days of site views, a bar for each day",
+        alt: "Am I making more money? at Northwind Supply (demo business): the last 4 weeks against the 4 before, week by week",
         caption:
-            "Twelve weeks of takings, from 7 Jul to 22 Sep, with 15 Sep marked as the best week",
-        gap: "Today's chart is site views by day, not takings by week, and marks no best week.",
+            "Am I making more money? Yes, with the weeks side by side against the 4 before",
     },
     {
         key: "i-store",
         business: "northwind",
         role: "owner",
-        route: "/analytics?range=7d",
-        viewport: DESK,
-        alt: "Insights for the last seven days: site views, enquiries, orders and the most-viewed pages",
-        caption:
-            "Insights for Hill Road only: takings and 240 orders in four weeks",
-        gap: "Insights cannot be narrowed to one location; this is the last seven days for the whole business.",
+        route: "/analytics",
+        viewport: { width: 1100, height: 1500 },
+        clip: {
+            selector: '[data-testid="answer-sells"]',
+            pad: 8,
+        },
+        alt: "What sells at Northwind Supply (demo business): the three best sellers with units and money",
+        caption: "What sells most, with units sold and money taken",
     },
 
     // ── Pulse Fitness ──────────────────────────────────────────────────
@@ -2025,7 +2092,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "site:/book",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "The booking page of Pulse Fitness (demo gym), with services, classes and a summary",
         caption:
             "Pulse Fitness's booking page with services, courses and a summary",
@@ -2035,7 +2102,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/courses",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Courses at Pulse Fitness (demo gym): a four-week strength course with the places taken",
         caption:
             "Courses at Pulse: a six-week beginners' course and a 5K course with places filled",
@@ -2046,7 +2113,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/class-packs",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Class packs: 5 and 10 classes with how many are sold and still to use",
         caption:
             "Class packs: 5 and 10 classes with how many are sold and still to use",
@@ -2062,12 +2129,50 @@ export const SHOTS: Shot[] = [
             "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
         gap: "Farah Khan is a Kavi Dental patient in the seed; Asha Verma is on Pulse's four-week course, and the page shows her membership and next booking, not the course.",
     },
+    // Subscriptions follows Pulse Fitness (owner, 15 Nov 2026).
+    {
+        // Bookings' step 3: a block of personal training, one order of three visits.
+        key: "g-ptblock",
+        business: "pulse",
+        role: "owner",
+        route: "/commerce/orders/seed_sc_pulse_order_ptblock",
+        viewport: { width: 1100, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        alt: "A personal training block at Pulse Fitness (demo gym): three sessions, the first attended and the second booked",
+        caption:
+            "A block of three personal training sessions, sold once: what's attended, what's booked and what's left",
+    },
+    {
+        key: "g-subdetail",
+        business: "pulse",
+        role: "owner",
+        route: "/billing/subscriptions",
+        viewport: DESK,
+        steps: [
+            { click: 'main tr:has-text("Payment failed")' },
+            { waitFor: '[role="dialog"]:has-text("Try again or fix payment")' },
+        ],
+        alt: "A member's membership at Pulse Fitness (demo gym): a renewal not paid, with Try again or fix payment, Pause and Cancel",
+        caption:
+            "A membership whose renewal failed, with the next charge, the failed one and what to do about it",
+    },
+    {
+        key: "g-plans",
+        business: "pulse",
+        role: "owner",
+        route: "/billing/subscriptions",
+        viewport: STEP_VIEW,
+        steps: [{ click: 'main [role="tab"]:has-text("Plans")' }],
+        alt: "The membership plans at Pulse Fitness (demo gym), each with its price and how often it renews",
+        caption:
+            "Pulse's three membership plans with their prices and how often they renew",
+    },
     {
         key: "g-subs",
         business: "pulse",
         role: "owner",
         route: "/billing/subscriptions",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Memberships at Pulse Fitness (demo gym) with their next charge",
         caption: "Memberships at Pulse with their next charge",
     },
@@ -2076,10 +2181,22 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/billing/invoices",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Invoices at Pulse Fitness (demo gym), with the overdue ones flagged",
         caption: "Pulse Fitness's invoices with four overdue",
         gap: "The seed has 17 overdue, not four.",
+    },
+    {
+        // Website's step 1: what Pulse entered in Saroh, as its site shows it.
+        key: "g-site-train",
+        business: "pulse",
+        role: "owner",
+        route: "site:/",
+        viewport: { width: 1100, height: 1500 },
+        clip: { selector: 'section:has(h2:text-is("Ways to train"))', pad: 0 },
+        alt: "Ways to train on the site of Pulse Fitness (demo gym): its classes and memberships with their prices, read from Saroh",
+        caption:
+            "Pulse Fitness's site lists its ways to train with their prices, read from what it entered in Saroh",
     },
     {
         key: "g-site",
@@ -2110,18 +2227,140 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "A root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
         caption:
             "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
         gap: "The order is #ORD-001 and visit 2 is booked for a coming day, not today.",
+    },
+    // Customers follows Kavi Dental (owner, 15 Nov 2026: the business that
+    // shows every step's feature): Rahul's root canal, note and flags.
+    // Dashboard follows Kavi Dental: its Home has today's people (15 Nov 2026).
+    {
+        key: "k-needs",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [HIDE_AI_MOMENT],
+        clip: {
+            selector: `${HOME_DESK} section:has(h2:text-is("Needs you"))`,
+            pad: 8,
+        },
+        alt: "Needs you on the Home of Kavi Dental (demo clinic): unpaid bills, an enquiry to answer and what to set up, each with its button",
+        caption:
+            "Needs you at Kavi Dental: bills to chase, a patient's note to answer and what's left to set up",
+    },
+    {
+        key: "k-today",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [HIDE_AI_MOMENT],
+        clip: {
+            selector: `${HOME_DESK} section:has(h2:text-is("Today"))`,
+            pad: 8,
+        },
+        alt: "Today on the Home of Kavi Dental (demo clinic): the day's patients in order, with their dentist, how they pay and their flags",
+        caption:
+            "Today's patients in order, each with their dentist, how they pay and anything the team should know",
+    },
+    {
+        key: "k-money",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [
+            HIDE_AI_MOMENT,
+            {
+                click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
+            },
+        ],
+        clip: {
+            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
+            pad: 8,
+        },
+        alt: "Unpaid bills on the Home of Kavi Dental (demo clinic): the overdue ones with Remind all",
+        caption:
+            "Overdue bills at Kavi Dental, each with how late it is and a reminder ready to send",
+    },
+    {
+        key: "k-calendar",
+        business: "kavi",
+        role: "owner",
+        route: "/calendar",
+        viewport: STEP_VIEW,
+        alt: "This month on the calendar at Kavi Dental (demo clinic), with each day's bookings and money",
+        caption:
+            "The month at Kavi Dental: each day's bookings and money in, out and due",
+    },
+    // Orders follows Kavi Dental: treatments sold as orders of several visits.
+    {
+        key: "k-orders",
+        business: "kavi",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: DESK,
+        steps: [HIDE_AI_MOMENT],
+        alt: "Orders at Kavi Dental (demo clinic): treatments of several visits, each with its next visit and how it's paid",
+        caption:
+            "Kavi Dental's orders: implants, braces, root canals and cleanings, each with where it's up to",
+    },
+    {
+        key: "k-invoice",
+        business: "kavi",
+        role: "owner",
+        route: "/billing/invoices/seed_sc_kavi_invoice_o_rahul_rct",
+        viewport: { width: 1100, height: 1300 },
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        alt: "The bill for Rahul Verma's root canal from Kavi Dental (demo clinic): a bill of supply, as dental treatment is exempt from GST",
+        caption:
+            "The treatment's bill, made from the order: a bill of supply, as healthcare is exempt from GST",
+    },
+    {
+        key: "k-visits",
+        business: "kavi",
+        role: "owner",
+        route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
+        viewport: { width: 1100, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        alt: "Rahul Verma's root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book, with his latex allergy and blood thinners above",
+        caption:
+            "A three-visit root canal: what's attended, what's booked and what's left, with the patient's flags on top",
+    },
+    {
+        key: "k-note",
+        business: "kavi",
+        role: "owner",
+        route: "/customers/seed_sc_kavi_contact_rahul",
+        viewport: { width: 1100, height: 1000 },
+        clip: {
+            selector: 'section[aria-label="1 note from the booking page"]',
+            pad: 8,
+        },
+        alt: "A note Rahul Verma wrote when booking at Kavi Dental (demo clinic), ready to label Medical and add to Needs attention as sensitive",
+        caption:
+            "What a patient wrote when booking, matched to their record, to label and add where the team will see it",
+    },
+    {
+        key: "k-flags",
+        business: "kavi",
+        role: "owner",
+        route: "/customers/seed_sc_kavi_contact_rahul",
+        viewport: { width: 1100, height: 1600 },
+        clip: { selector: 'section[aria-label="Needs attention"]', pad: 8 },
+        alt: "Needs attention on Rahul Verma's record at Kavi Dental (demo clinic): a latex allergy, and blood thinners marked Sensitive",
+        caption:
+            "Allergy and medical flags on the patient's record; the medical one is Sensitive, shown only to those allowed",
     },
     {
         key: "d-customer",
         business: "kavi",
         role: "owner",
         route: "/customers/seed_sc_kavi_contact_rahul",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
         caption:
             "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",

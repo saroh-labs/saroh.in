@@ -111,6 +111,9 @@ export const SVC = {
     whitening: 3,
     video: 4,
     xray: 5,
+    implant: 6,
+    scaling: 7,
+    braces: 8,
 } as const;
 
 /**
@@ -196,6 +199,46 @@ export const KAVI_SERVICES: readonly KaviService[] = [
         shown: false,
         weight: 13,
     },
+    // More treatments, so the Orders list reads like a busy clinic's.
+    {
+        name: "Dental implant",
+        description:
+            "Three visits over a few months: placing the implant, checking it has healed, then fitting the crown.",
+        minutes: 60,
+        pricePaise: 4_500_000,
+        visits: 3,
+        locationType: "IN_PERSON",
+        meetingUrl: null,
+        depositMode: "PERCENT_50",
+        shown: true,
+        weight: 0,
+    },
+    {
+        name: "Deep cleaning (scaling)",
+        description:
+            "Two visits, one side of the mouth at a time, for gums that bleed or tartar a check-up can't shift.",
+        minutes: 45,
+        pricePaise: 450_000,
+        visits: 2,
+        locationType: "IN_PERSON",
+        meetingUrl: null,
+        depositMode: "NONE",
+        shown: true,
+        weight: 0,
+    },
+    {
+        name: "Braces adjustment series",
+        description:
+            "Four monthly visits to tighten and check your braces, booked one after the other.",
+        minutes: 30,
+        pricePaise: 1_000_000,
+        visits: 4,
+        locationType: "IN_PERSON",
+        meetingUrl: null,
+        depositMode: "NONE",
+        shown: true,
+        weight: 0,
+    },
 ];
 
 // --- The dentists ------------------------------------------------------------------
@@ -224,7 +267,15 @@ export const KAVI_DENTISTS: readonly Dentist[] = [
         key: "rao",
         name: "Dr. Meenakshi Rao",
         title: "Dentist",
-        services: [SVC.checkUp, SVC.review, SVC.rootCanal, SVC.video, SVC.xray],
+        services: [
+            SVC.checkUp,
+            SVC.review,
+            SVC.rootCanal,
+            SVC.video,
+            SVC.xray,
+            SVC.implant,
+            SVC.braces,
+        ],
         hours: [
             { days: [1, 2, 4, 5], from: "09:00", to: "13:00" },
             { days: [1, 2, 4, 5], from: "16:00", to: "19:00" },
@@ -235,7 +286,15 @@ export const KAVI_DENTISTS: readonly Dentist[] = [
         key: "pillai",
         name: "Dr. Arun Pillai",
         title: "Dentist",
-        services: [SVC.checkUp, SVC.review, SVC.whitening, SVC.video, SVC.xray],
+        services: [
+            SVC.checkUp,
+            SVC.review,
+            SVC.whitening,
+            SVC.video,
+            SVC.xray,
+            SVC.scaling,
+            SVC.braces,
+        ],
         hours: [
             { days: [1, 3, 5, 6], from: "10:00", to: "14:00" },
             { days: [1, 3, 5, 6], from: "17:00", to: "19:00" },
@@ -273,7 +332,7 @@ export interface PatientFixture {
     attention: readonly AttentionFixture[];
 }
 
-/** The four patients the designs name, with their Needs attention entries. */
+/** The patients the designs and the Orders list name, with their Needs attention entries. */
 export const KAVI_PATIENTS: readonly PatientFixture[] = [
     {
         key: "rahul",
@@ -334,10 +393,93 @@ export const KAVI_PATIENTS: readonly PatientFixture[] = [
             },
         ],
     },
+    // The other treatments' patients, and one of today's.
+    {
+        key: "meera",
+        first: "Meera",
+        last: "Shenoy",
+        email: "meera.shenoy@example.com",
+        phone: "+91 00000 00121",
+        attention: [],
+    },
+    {
+        key: "arjun",
+        first: "Arjun",
+        last: "Shetty",
+        email: "arjun.shetty@example.com",
+        phone: "+91 00000 00122",
+        attention: [],
+    },
+    {
+        key: "sneha",
+        first: "Sneha",
+        last: "Reddy",
+        email: "sneha.reddy@example.com",
+        phone: "+91 00000 00123",
+        attention: [
+            {
+                kind: "MEDICAL",
+                label: "Diabetic",
+                detail: "Type 2, on metformin. Check her sugar before surgery",
+                sensitive: true,
+            },
+        ],
+    },
+    {
+        key: "karan",
+        first: "Karan",
+        last: "Malhotra",
+        email: "karan.malhotra@example.com",
+        phone: "+91 00000 00124",
+        attention: [],
+    },
+    {
+        key: "nisha",
+        first: "Nisha",
+        last: "Bhat",
+        email: "nisha.bhat@example.com",
+        phone: "+91 00000 00125",
+        attention: [],
+    },
+    {
+        key: "rohan",
+        first: "Rohan",
+        last: "Das",
+        email: "rohan.das@example.com",
+        phone: "+91 00000 00126",
+        attention: [],
+    },
+    {
+        key: "tanvi",
+        first: "Tanvi",
+        last: "Joshi",
+        email: "tanvi.joshi@example.com",
+        phone: "+91 00000 00127",
+        attention: [
+            {
+                kind: "ACCESS",
+                label: "Anxious patient",
+                detail: "Nervous about needles; talk her through it and go slowly",
+                sensitive: false,
+            },
+        ],
+    },
 ];
 
 /** Indexes into {@link KAVI_PATIENTS}. */
-export const PT = { rahul: 0, farah: 1, vikram: 2, leela: 3 } as const;
+export const PT = {
+    rahul: 0,
+    farah: 1,
+    vikram: 2,
+    leela: 3,
+    meera: 4,
+    arjun: 5,
+    sneha: 6,
+    karan: 7,
+    nisha: 8,
+    rohan: 9,
+    tanvi: 10,
+} as const;
 
 /** What Rahul wrote in "Anything we should know?", still waiting for the team. */
 export const RAHUL_BOOKING_NOTE =

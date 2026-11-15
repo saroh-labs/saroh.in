@@ -344,6 +344,22 @@ function checkDay(now: Date): KaviWorld {
             `${s} at ${when}`,
         ).toBe(true);
     }
+    // Home's Today list: several people, whatever the weekday, unless the
+    // clinic is shut for Diwali.
+    const dayStart = istAt(now, 0, 0).getTime();
+    const shut = w.closures.some(
+        (c) => ms(c.startAt) <= dayStart && ms(c.endAt) > dayStart,
+    );
+    if (!shut) {
+        expect(
+            standing.filter(
+                (b) =>
+                    ms(b.startAt) >= dayStart &&
+                    ms(b.startAt) < istAt(now, 1, 0).getTime(),
+            ).length,
+            `today at ${when}`,
+        ).toBeGreaterThanOrEqual(3);
+    }
     const rahul = w.contacts[PT.rahul].id;
     const note = w.attention.find((a) => a.status === "SUGGESTED");
     expect(note?.contactId, when).toBe(rahul);
@@ -436,9 +452,7 @@ describe("Kavi Dental seeded on any day", () => {
             return s.visits > 1;
         });
         expect(treatments.map((b) => b.id).sort()).toEqual(
-            ["farah_whitening", "rahul_rct_1", "rahul_rct_2"]
-                .map((k) => `seed_sc_kavi_booking_${k}`)
-                .sort(),
+            w.orders.flatMap((o) => o.visits.map((v) => v.bookingId)).sort(),
         );
         // Treatments are E9's orders: no invoice of their own here.
         const billed = new Set(
@@ -464,6 +478,22 @@ describe("Kavi Dental seeded on any day", () => {
                 ],
             ],
             ["farah_whitening", [[k("farah_whitening"), 1]]],
+            ...(
+                [
+                    ["meera_scaling", 2],
+                    ["arjun_braces", 3],
+                    ["sneha_implant", 2],
+                    ["karan_rct", 1],
+                    ["nisha_whitening", 2],
+                    ["rohan_implant", 3],
+                ] as const
+            ).map(([key, n]) => [
+                key,
+                Array.from({ length: n }, (_, i) => [
+                    k(`${key}_${i + 1}`),
+                    i + 1,
+                ]),
+            ]),
         ]);
         for (const o of w.orders) {
             for (const v of o.visits) {
@@ -479,8 +509,13 @@ describe("Kavi Dental seeded on any day", () => {
         // treatment. Farah's is still due on the order, with no invoice.
         const [rahul, farah] = w.orders;
         const paper = w.invoices.filter((i) => i.orderId !== null);
-        expect(paper.map((i) => i.orderId)).toEqual([rahul.id]);
-        expect(paper[0].lines).toEqual([
+        expect(paper.map((i) => i.orderId).sort()).toEqual(
+            w.orders
+                .filter((o) => o.paidAt)
+                .map((o) => o.id)
+                .sort(),
+        );
+        expect(paper.find((i) => i.orderId === rahul.id)?.lines).toEqual([
             {
                 description: "Root canal treatment",
                 quantity: 1,
@@ -490,6 +525,18 @@ describe("Kavi Dental seeded on any day", () => {
         ]);
         expect(rahul.paidAt).not.toBeNull();
         expect(farah.paidAt).toBeNull();
+        // The list's other states: one done, one paid in part, one whose
+        // next visit isn't booked.
+        const by = new Map(w.orders.map((o) => [o.key, o]));
+        expect(w.orders.filter((o) => o.done).map((o) => o.key)).toEqual([
+            "meera_scaling",
+        ]);
+        const sneha = by.get("sneha_implant");
+        expect(sneha?.paidAt).toBeNull();
+        expect(sneha?.depositPaise).toBe(
+            KAVI_SERVICES[SVC.implant].pricePaise / 2,
+        );
+        expect(by.get("karan_rct")?.visits).toHaveLength(1);
     });
 
     it("writes the line as the booking page's hold does", () => {

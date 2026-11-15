@@ -104,6 +104,7 @@ export async function upsertServices(
                 currency: s.priceCents === null ? null : "INR",
                 status: "ACTIVE",
                 ...location(s),
+                visits: s.visits ?? 1,
             },
             create: {
                 id: options.serviceId(i),
@@ -117,6 +118,7 @@ export async function upsertServices(
                 timezone: TIMEZONE,
                 status: "ACTIVE",
                 ...location(s),
+                visits: s.visits ?? 1,
                 createdAt: options.createdAt,
             },
         });
@@ -212,6 +214,11 @@ export function planBookings(
          * See {@link guaranteeAhead}.
          */
         showAhead?: readonly number[];
+        /**
+         * Bookings today the plan must hold, whatever the weekday (a gym's
+         * Home showed an empty Today on a Sunday). See {@link fillToday}.
+         */
+        todayAtLeast?: number;
     },
 ): PlannedBooking[] {
     const slots: Slot[] = [];
@@ -349,7 +356,81 @@ export function planBookings(
         ]);
         planned.push(extra);
     }
+    if (options.todayAtLeast) {
+        fillToday(options.todayAtLeast, slots, planned, {
+            services: options.services,
+            pool: everyone,
+            exclude: options.prospectServices,
+            isFree,
+            busy,
+        });
+    }
     return planned.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+}
+
+/** The roll {@link bookingRows} writes as standing: attended once past, confirmed ahead. */
+const STANDING_ROLL: PlannedBooking["roll"] = [0.5, 0.7, 0.5, 0];
+
+/**
+ * Top today up to `atLeast` standing bookings, without chance: one person at
+ * a time into today's slots that still have room, earliest first, round the
+ * day again until there are enough or no room is left. Only services the
+ * diary books (weight above 0, not a prospect-only trial).
+ */
+function fillToday(
+    atLeast: number,
+    slots: readonly Slot[],
+    planned: PlannedBooking[],
+    o: {
+        services: readonly ShowcaseService[];
+        pool: readonly number[];
+        exclude: readonly number[];
+        isFree: (contact: number, slot: Slot) => boolean;
+        busy: Map<number, { start: number; end: number }[]>;
+    },
+): void {
+    // bookingRows cancels a booking whose first roll is under 0.08.
+    let have = planned.filter(
+        (b) =>
+            b.roll[0] >= 0.08 &&
+            slots.some(
+                (s) =>
+                    s.dayOffset === 0 &&
+                    s.startAt.getTime() === b.startAt.getTime(),
+            ),
+    ).length;
+    const today = slots
+        .filter(
+            (s) =>
+                s.dayOffset === 0 &&
+                o.services[s.service].weight > 0 &&
+                !o.exclude.includes(s.service),
+        )
+        .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    for (let added = true; have < atLeast && added;) {
+        added = false;
+        for (const slot of today) {
+            if (have >= atLeast) break;
+            if (slot.taken >= o.services[slot.service].capacity) continue;
+            const contact = o.pool.find((c) => o.isFree(c, slot));
+            if (contact === undefined) continue;
+            const span = {
+                start: slot.startAt.getTime(),
+                end: slot.endAt.getTime(),
+            };
+            o.busy.set(contact, [...(o.busy.get(contact) ?? []), span]);
+            slot.taken++;
+            planned.push({
+                service: slot.service,
+                contact,
+                startAt: slot.startAt,
+                endAt: slot.endAt,
+                roll: STANDING_ROLL,
+            });
+            have++;
+            added = true;
+        }
+    }
 }
 
 /**

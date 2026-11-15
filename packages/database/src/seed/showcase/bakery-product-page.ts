@@ -13,6 +13,7 @@
  */
 
 import { RYE_CAKE_PHOTOS } from "./catalog-photos";
+import { DK_PHOTOS } from "./desk42-photos";
 
 export interface RyePhoto {
     url: string;
@@ -69,6 +70,99 @@ export const PHOTOS: Record<string, readonly RyePhoto[]> = {
         },
     ],
     "house-blend-beans-250g": [
+        {
+            url: unsplash("photo-1654202752477-22b5bc52d4da"),
+            alt: "Roasted coffee beans spilling from a jute bag",
+            width: 1600,
+            height: 1067,
+            creditName: "Krasimir Savchev",
+            creditUrl: "https://unsplash.com/@k_savchev",
+        },
+    ],
+    "rye-caraway-loaf": [
+        {
+            url: unsplash("photo-1509440159596-0249088772ff"),
+            alt: "Round rye loaves, one crusted with seeds, wheat ears laid across them on a floured board",
+            width: 1600,
+            height: 1064,
+            creditName: "Wesual Click",
+            creditUrl: "https://unsplash.com/@wesual",
+        },
+    ],
+    "seeded-multigrain-loaf": [
+        {
+            url: unsplash("photo-1788363632776-185c1539b456"),
+            alt: "Thick slices of seeded wholegrain bread on a wooden board",
+            width: 1600,
+            height: 2400,
+            creditName: "Natasha Reddy",
+            creditUrl: "https://unsplash.com/@natashareddy",
+        },
+    ],
+    baguette: [
+        {
+            url: unsplash("photo-1768203631935-da182455aa6d"),
+            alt: "Baguettes on a white table, one cut open to show the crumb",
+            width: 1600,
+            height: 1067,
+            creditName: "Lee Milo",
+            creditUrl: "https://unsplash.com/@miloleetw",
+        },
+    ],
+    "butter-croissant": [
+        {
+            url: unsplash("photo-1555507036-ab1f4038808a"),
+            alt: "Two golden croissants on a wooden board",
+            width: 1600,
+            height: 1280,
+            creditName: "Mae Mu",
+            creditUrl: "https://unsplash.com/@picoftasty",
+        },
+    ],
+    "pain-au-chocolat": [
+        {
+            url: unsplash("photo-1613929231151-d7571591259e"),
+            alt: "A pain au chocolat on baking paper, chocolate showing at its end",
+            width: 1600,
+            height: 2400,
+            creditName: "Nicholas Doyle",
+            creditUrl: "https://unsplash.com/@nsdoyle",
+        },
+    ],
+    "almond-croissant": [
+        {
+            url: unsplash("photo-1710220988376-16dbd51fd1de"),
+            alt: "Almond croissants topped with flaked almonds on a bakery shelf",
+            width: 1600,
+            height: 1067,
+            creditName: "Ngo Ngoc Khai Huyen",
+            creditUrl: "https://unsplash.com/@khyeonie18",
+        },
+    ],
+    "flat-white": [
+        {
+            url: unsplash("photo-1534778101976-62847782c213"),
+            alt: "A flat white with latte art in a white cup on a wooden café table",
+            width: 1600,
+            height: 2399,
+            creditName: "Harris Vo",
+            creditUrl: "https://unsplash.com/@hoanvokim",
+        },
+    ],
+    "bakers-gift-box": [
+        {
+            url: unsplash("photo-1772651392135-b891a5e4f8a3"),
+            alt: "An open gift box of chocolate-drizzled cookies",
+            width: 1600,
+            height: 2400,
+            creditName: "César Cabrera",
+            creditUrl: "https://unsplash.com/@gaiostudio",
+        },
+    ],
+    // The café drinks share the coworking café's photos (`desk42-photos.ts`).
+    cappuccino: [DK_PHOTOS.cappuccino],
+    "cold-brew": [DK_PHOTOS.coldCoffee],
+    "house-blend-beans-1kg": [
         {
             url: unsplash("photo-1654202752477-22b5bc52d4da"),
             alt: "Roasted coffee beans spilling from a jute bag",

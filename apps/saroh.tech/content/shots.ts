@@ -19,8 +19,6 @@ const NOT_YET_SHOWN =
     "Its page isn't built while its switch is off; taken when Global turns it on.";
 
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
-    "d-customer":
-        "The booking-page note's card says \"for the team\" to one person; retake when the app's words are fixed.",
     "r-subdetail": "Subscriptions isn't usable on Global yet.",
     "s-subs": "Subscriptions isn't usable on Global yet.",
     "ai-hero": NOT_YET_SHOWN,
@@ -29,6 +27,7 @@ export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
     "ai-ask": NOT_YET_SHOWN,
     "ai-activity": NOT_YET_SHOWN,
     "ask-hero": NOT_YET_SHOWN,
+    "ask-hero-phone": NOT_YET_SHOWN,
     "ask-start": NOT_YET_SHOWN,
     "ask-answer": NOT_YET_SHOWN,
     "ask-confirm": NOT_YET_SHOWN,

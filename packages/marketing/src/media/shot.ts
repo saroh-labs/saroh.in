@@ -10,6 +10,8 @@ export interface Shot {
     srcSet?: string;
     /** A tiny blurred copy (a data URL) shown while the image loads. */
     placeholder?: string;
+    /** Drawn instead on a phone, where a desk capture can't be read. */
+    phone?: Shot;
 }
 
 /** A screenshot as one place shows it. */

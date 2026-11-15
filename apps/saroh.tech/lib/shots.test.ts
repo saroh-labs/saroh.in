@@ -94,7 +94,7 @@ describe("saroh.tech's screenshots", () => {
 
     it("names the shot's real business on every feature page", () => {
         const owner = (key: ShotKey) =>
-            key.startsWith("d-")
+            key.startsWith("d-") || key.startsWith("k-")
                 ? "Wrenfield Dental"
                 : key.startsWith("g-")
                   ? "Ironvale Fitness"

@@ -45,33 +45,33 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Open up and see what needs you.",
         sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in, what's owed and what failed, most urgent first. Each person sees the part that's theirs, and most things can be done right from the list.",
         hero: {
-            shot: "s-home",
+            shot: "d-home",
         },
         howTitle: "One screen before the first customer.",
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders, stock short for orders, failed renewals and overdue bills, each with the button that fixes it: Mark sent, Send reminder, or a new pay link for a failed renewal.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-home",
+                body: "Overdue bills, notes to answer, failed renewals, late orders and stock short for orders, each with the button that fixes it.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-needs",
             },
             {
                 title: "Today's people, in order",
                 body: "Who's booked, at what time and with whom, and who pays at the desk. Anything the team should know is beside their name.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-home",
+                shot: "k-today",
             },
             {
                 title: "Money that needs chasing",
                 body: "Overdue bills with a reminder ready to send, and failed renewals with a new pay link.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-home",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-money",
             },
             {
                 title: "Zoom out to the month",
                 body: "The calendar shows every day's orders, bookings, renewals and bills, with money in, out and due.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-calendar",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-calendar",
             },
         ],
         points: [
@@ -206,27 +206,27 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
-            shot: "s-orders",
+            shot: "k-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
-                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. Print a ticket for the kitchen.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-order",
+                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. A shop's order prints a ticket for the kitchen.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-order",
             },
             {
                 title: "Orders that take several visits",
                 body: "A treatment sold as three visits is fulfilled by those visits. Mark each one attended, or book the next.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-order",
+                shot: "k-visits",
             },
             {
                 title: "Each one makes its invoice",
-                body: "Paid orders get a numbered invoice with the right tax, ready to send or print.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-invoice",
+                body: "Paid orders get a numbered invoice with the right tax, ready to send or print. An exempt treatment gets a bill of supply.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-invoice",
             },
         ],
         points: [
@@ -271,33 +271,33 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Know the person in front of you.",
         sub: "Customer management for a small team. Every customer's bookings, plans, bills and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
         hero: {
-            shot: "r-customers",
+            shot: "d-customers",
         },
         howTitle: "A page for everyone who pays.",
         steps: [
             {
                 title: "Everything about them on one page",
-                body: "What they've spent, how they usually get their order, and what they buy most, down to the size.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-customer",
+                body: "What they've spent, their bookings, orders, invoices and notes, and anything the team should know at the top.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-customer",
             },
             {
-                title: "Members, with what they have left",
-                body: "Classes left on their membership and their next booking.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-customer",
+                title: "What they have left",
+                body: "A treatment of several visits shows what's attended, what's booked and what's still to book. A member's classes left on a pack show the same way.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-visits",
             },
             {
                 title: "Notes they send reach the team",
                 body: "What a patient writes when booking is matched to their record. Check it, label it and add it where the team will see it.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-customer",
+                shot: "k-note",
             },
             {
                 title: "Flags only for the right people",
-                body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to those allowed to see them.",
+                body: "Allergies and access needs show on their orders, today's list and bookings. Medical notes marked Sensitive only show to those allowed to see them.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-customers",
+                shot: "k-flags",
             },
         ],
         points: [
@@ -344,7 +344,7 @@ export const features: Record<FeatureSlug, Feature> = {
         steps: [
             {
                 title: "Customers book themselves",
-                body: "Your booking page shows only real free times, from your team's hours. They pick, and pay what you ask at booking.",
+                body: "Your booking page shows only real free times, from your team's hours. They pick, and pay what you ask at booking, a deposit or the whole amount.",
                 who: "Pulse Fitness (demo gym)",
                 shot: "g-book",
             },
@@ -355,10 +355,10 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "g-courses",
             },
             {
-                title: "Treatments over several visits",
-                body: "A root canal is three visits of an hour. Patients book the first visit, pay a deposit or the whole amount, and tell you what you need to know. Your team books the rest.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-book",
+                title: "Sessions over several visits",
+                body: "A block of personal training is three sessions of an hour. Members book the first, pay a deposit or the whole amount, and your team books the rest. Class packs work the same way, a visit at a time.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-ptblock",
             },
         ],
         points: [
@@ -407,27 +407,27 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Regulars on a plan, renewed on time.",
         sub: "Membership and subscription billing for your regulars: memberships, weekly bread, monthly boxes. Each renewal makes its invoice on the day, and plans can renew on their own by UPI Autopay where you've set it up on your Razorpay account. A failed payment is shown to you with a new pay link.",
         hero: {
-            shot: "r-subdetail",
+            shot: "g-subdetail",
         },
         howTitle: "Set up once, renewed every time.",
         steps: [
             {
-                title: "Your plans, on your site",
-                body: "Plans are listed on your site with their price and what's included. You sign members up at the desk.",
+                title: "Your plans, with their price",
+                body: "Set each plan's price and how often it renews. List them on your site, and sign members up at the desk.",
                 who: "Pulse Fitness (demo gym)",
-                shot: "g-site",
+                shot: "g-plans",
             },
             {
                 title: "Renewals run themselves",
                 body: "Each plan renews on its day. If a payment fails, it's flagged for you with a new pay link.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-subs",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-subs",
             },
             {
                 title: "Every renewal makes its invoice",
                 body: "The invoice is made on the renewal day, ready to send.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-billing",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-billing",
             },
         ],
         points: [
@@ -480,15 +480,15 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "The right kind for your business",
-                body: "Mark a service GST-exempt and its invoices are bills of supply.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-billing",
+                body: "Mark a product or service GST-exempt, like bread, and a bill for it alone is a bill of supply, worded as the law asks.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "r-supply",
             },
             {
                 title: "See what's overdue",
-                body: "Overdue bills are flagged, with a reminder and a pay link ready to send.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-billing",
+                body: "Overdue bills are flagged, with a reminder and a pay link ready to send. Cheques show as paid until they clear.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "r-money",
             },
         ],
         points: [
@@ -555,9 +555,9 @@ export const features: Record<FeatureSlug, Feature> = {
         steps: [
             {
                 title: "It reads what you already entered",
-                body: "A services list shows each service with how long it takes and its price. Opening hours, today's free times, your phone and your address are read the same way, so a change in Saroh shows on your site without editing the page.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-site",
+                body: "Your classes, services and prices, opening hours, today's free times, your phone and your address are read from Saroh, so a change there shows on your site without editing the page.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-site-train",
             },
             {
                 title: "Customers book from it",
@@ -656,20 +656,20 @@ export const features: Record<FeatureSlug, Feature> = {
         howTitle: "From this week to the last three months.",
         steps: [
             {
-                title: "Four numbers for your site",
-                body: "Site views, unique visitors, enquiries and orders, side by side for the days you pick.",
+                title: "What to do next",
+                body: "One suggestion at a time from your own sales, like a product selling less, with the button that acts on it.",
                 who: "Northwind Supply (demo business)",
                 shot: "i-compare",
             },
             {
-                title: "Views, day by day",
-                body: "A bar for each day shows when people came to your site.",
+                title: "Am I making more money?",
+                body: "A straight answer, with each week beside the weeks before it.",
                 who: "Northwind Supply (demo business)",
                 shot: "i-weeks",
             },
             {
-                title: "The pages people open most",
-                body: "See which pages get the most views, so you know what people come for.",
+                title: "What sells, and where customers come from",
+                body: "Your best sellers with units and money, and how many visits, enquiries and paid orders came in.",
                 who: "Northwind Supply (demo business)",
                 shot: "i-store",
             },
@@ -799,7 +799,7 @@ export const features: Record<FeatureSlug, Feature> = {
             "Ask about your business inside Saroh, answered from your own bookings, orders and customers.",
         headline: "Ask about your business. Get a straight answer.",
         sub: "An AI business assistant inside Saroh. Ask in English, Hinglish or Hindi how the week went, what's selling or who hasn't come back, and get the answer from your own records, in the same figures Home and Insights show. Ask it to add or change something and it fills in a card for you to check. Nothing is saved until you confirm.",
-        hero: { shot: "ask-hero" },
+        hero: { shot: "ask-hero", phone: "ask-hero-phone" },
         howTitle: "Ask in your own words.",
         steps: [
             {

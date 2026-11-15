@@ -154,6 +154,49 @@ const designed = {
     "ask-hero": pending(
         "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
     ),
+    "ask-hero-phone": pending(
+        "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+    ),
+    "r-money": pending(
+        "Money to chase on Rye & Co.'s Home (demo bakery): overdue bills, cheques waiting to clear and a failed renewal",
+    ),
+    "g-site-train": pending(
+        "Ways to train on Pulse Fitness's site (demo gym): its classes and memberships with their prices",
+    ),
+    "r-supply": pending(
+        "A bill of supply from Rye & Co. (demo bakery) for nil-rated sourdough loaves",
+    ),
+    "k-visits": pending(
+        "Rahul Verma's root canal at Kavi Dental (demo clinic): visits attended, booked and left",
+    ),
+    "k-note": pending(
+        "A note Rahul Verma wrote when booking at Kavi Dental (demo clinic)",
+    ),
+    "k-flags": pending(
+        "Needs attention on Rahul Verma's record at Kavi Dental (demo clinic)",
+    ),
+    "g-subdetail": pending(
+        "A member's membership at Pulse Fitness (demo gym): a renewal not paid",
+    ),
+    "g-plans": pending("The membership plans at Pulse Fitness (demo gym)"),
+    "k-needs": pending("Needs you on the Home of Kavi Dental (demo clinic)"),
+    "k-today": pending(
+        "Today on the Home of Kavi Dental (demo clinic): the day's patients in order",
+    ),
+    "k-money": pending("Unpaid bills on the Home of Kavi Dental (demo clinic)"),
+    "k-calendar": pending(
+        "This month on the calendar at Kavi Dental (demo clinic)",
+    ),
+    "k-orders": pending(
+        "Orders at Kavi Dental (demo clinic): treatments of several visits",
+    ),
+    "k-invoice": pending(
+        "The bill for Rahul Verma's root canal from Kavi Dental (demo clinic): a bill of supply",
+    ),
+    "g-ptblock": pending(
+        "A personal training block at Pulse Fitness (demo gym): three sessions",
+    ),
+    "t-invoice": pending("An invoice made from an order (saroh.tech's bakery)"),
     "ask-start": pending(
         "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
     ),

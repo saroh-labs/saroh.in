@@ -109,6 +109,10 @@ export interface KaviOrder {
     placedAt: Date;
     /** Paid at the desk (by hand), or still due on the order. */
     paidAt: Date | null;
+    /** A 50% deposit taken at the desk on an order still due (paidByHand). */
+    depositPaise: number;
+    /** Every visit attended: the API fulfils it (stage and status DELIVERED). */
+    done: boolean;
     fulfilment: "APPOINTMENT_IN_PERSON" | "APPOINTMENT_ONLINE";
     visits: { bookingId: string; visitNumber: number }[];
 }
@@ -575,6 +579,192 @@ export function planKavi(input: KaviPlanInput): KaviWorld {
         made: () => Math.min(xray.end + 10 * MINUTE, ago(30)),
     });
 
+    // --- more treatments for the Orders list, after the films' scenes so
+    // theirs keep their slots. Each window is a week or more, so a Diwali
+    // closure (four days) always leaves room. Booked at the desk: the first
+    // visit a couple of days ahead, each next one as the last ended.
+    const desk = input.deskUserId;
+    const atDesk = (start: number) => Math.min(start - 2 * DAY, ago(60));
+    const after = (prev: Planned) => () => prev.end + 15 * MINUTE;
+    const day = (d: number, minute = 0) => istAt(now, d, minute).getTime();
+    const visit = (
+        key: string,
+        contact: number,
+        dentists: readonly number[],
+        service: number,
+        from: number,
+        until: number,
+        made: (start: number) => number,
+    ) =>
+        scene({
+            key,
+            contact,
+            dentists,
+            service,
+            from,
+            until,
+            madeBy: desk,
+            made,
+        });
+    // Meera's scaling: both visits attended, the treatment done.
+    const meera1 = visit(
+        "meera_scaling_1",
+        PT.meera,
+        [DR.pillai],
+        SVC.scaling,
+        day(-20, 9 * 60),
+        day(-13),
+        atDesk,
+    );
+    const meera2 = visit(
+        "meera_scaling_2",
+        PT.meera,
+        [DR.pillai],
+        SVC.scaling,
+        Math.max(meera1.end + 5 * DAY, day(-9)),
+        day(-1),
+        after(meera1),
+    );
+    // Arjun's braces: two monthly visits attended, the third today or next.
+    const arjun1 = visit(
+        "arjun_braces_1",
+        PT.arjun,
+        [DR.rao, DR.pillai],
+        SVC.braces,
+        day(-56, 9 * 60),
+        day(-49),
+        atDesk,
+    );
+    const arjun2 = visit(
+        "arjun_braces_2",
+        PT.arjun,
+        [DR.rao, DR.pillai],
+        SVC.braces,
+        Math.max(arjun1.end + 21 * DAY, day(-30)),
+        day(-21),
+        after(arjun1),
+    );
+    const arjun3 = visit(
+        "arjun_braces_3",
+        PT.arjun,
+        [DR.rao, DR.pillai],
+        SVC.braces,
+        t,
+        day(6),
+        after(arjun2),
+    );
+    // Sneha's implant: placed last week, half paid as a deposit, the check
+    // coming up.
+    const sneha1 = visit(
+        "sneha_implant_1",
+        PT.sneha,
+        [DR.rao],
+        SVC.implant,
+        day(-14, 9 * 60),
+        day(-7),
+        atDesk,
+    );
+    const sneha2 = visit(
+        "sneha_implant_2",
+        PT.sneha,
+        [DR.rao],
+        SVC.implant,
+        day(1),
+        day(8),
+        after(sneha1),
+    );
+    // Karan's root canal: the first visit this week, the next not booked.
+    const karan1 = visit(
+        "karan_rct_1",
+        PT.karan,
+        [DR.rao],
+        SVC.rootCanal,
+        day(-8, 9 * 60),
+        day(-1),
+        atDesk,
+    );
+    // Nisha's whitening: half way.
+    const nisha1 = visit(
+        "nisha_whitening_1",
+        PT.nisha,
+        [DR.pillai],
+        SVC.whitening,
+        day(-9, 9 * 60),
+        day(-2),
+        atDesk,
+    );
+    const nisha2 = visit(
+        "nisha_whitening_2",
+        PT.nisha,
+        [DR.pillai],
+        SVC.whitening,
+        day(1),
+        day(8),
+        after(nisha1),
+    );
+    // Rohan's implant: two visits attended, the crown next week.
+    const rohan1 = visit(
+        "rohan_implant_1",
+        PT.rohan,
+        [DR.rao],
+        SVC.implant,
+        day(-45, 9 * 60),
+        day(-38),
+        atDesk,
+    );
+    const rohan2 = visit(
+        "rohan_implant_2",
+        PT.rohan,
+        [DR.rao],
+        SVC.implant,
+        Math.max(rohan1.end + 14 * DAY, day(-24)),
+        day(-17),
+        after(rohan1),
+    );
+    const rohan3 = visit(
+        "rohan_implant_3",
+        PT.rohan,
+        [DR.rao],
+        SVC.implant,
+        day(3),
+        day(10),
+        after(rohan2),
+    );
+
+    // --- a few more of today's patients, through the day, so Home's Today
+    // list is full whatever the weekday. A day the clinic is shut (Diwali),
+    // or a time nobody is in, simply has fewer.
+    const todays: [number, readonly number[], number, number, boolean][] = [
+        [fixed.length, [DR.rao, DR.pillai], SVC.checkUp, 9 * 60, false],
+        [fixed.length + 1, [DR.pillai, DR.rao], SVC.review, 10 * 60 + 30, true],
+        [PT.tanvi, [DR.pillai, DR.rao], SVC.checkUp, 12 * 60, false],
+        [
+            fixed.length + 2,
+            [DR.rao, DR.pillai],
+            SVC.checkUp,
+            16 * 60 + 30,
+            true,
+        ],
+    ];
+    todays.forEach(([contact, dentists, service, minute, atTheDesk], k) => {
+        try {
+            scene({
+                key: `today_${k + 1}`,
+                contact,
+                dentists,
+                service,
+                from: day(0, minute),
+                until: day(1),
+                madeBy: atTheDesk ? desk : null,
+                // A day or more ahead: inside the booking page's rules.
+                made: (start) => Math.min(start - DAY, ago(60)),
+            });
+        } catch (error) {
+            // Only "no slot free today" is skipped; anything else is a bug.
+            if (!String(error).includes("Kavi Dental: no ")) throw error;
+        }
+    });
+
     // --- the day-to-day diary
     const rng = rngFor("diary");
     const share = (d: number) =>
@@ -896,6 +1086,9 @@ export function planKavi(input: KaviPlanInput): KaviWorld {
     // booked yet) and Farah's whitening (visit 1 coming up, still due).
     const farahWhitening = planned.find((p) => p.scene === "farah_whitening");
     if (!farahWhitening) throw new Error("Kavi Dental: no whitening scene");
+    // Then the rest of the list: paid at the desk at a visit, one paid in
+    // part (a 50% deposit, the balance due), and two with nothing paid yet.
+    const paidAfter = (p: Planned) => Math.min(t, p.end + 10 * MINUTE);
     const orders = [
         {
             key: "rahul_rct",
@@ -903,10 +1096,42 @@ export function planKavi(input: KaviPlanInput): KaviWorld {
             paidAt: Math.min(t, rct1.end + 12 * MINUTE),
         },
         { key: "farah_whitening", visits: [farahWhitening], paidAt: null },
-    ].map(({ key, visits, paidAt }): KaviOrder => {
+        {
+            key: "meera_scaling",
+            visits: [meera1, meera2],
+            paidAt: paidAfter(meera2),
+        },
+        {
+            key: "arjun_braces",
+            visits: [arjun1, arjun2, arjun3],
+            paidAt: paidAfter(arjun1),
+        },
+        {
+            key: "sneha_implant",
+            visits: [sneha1, sneha2],
+            paidAt: null,
+            deposit: true,
+        },
+        { key: "karan_rct", visits: [karan1], paidAt: null },
+        {
+            key: "nisha_whitening",
+            visits: [nisha1, nisha2],
+            paidAt: paidAfter(nisha1),
+        },
+        {
+            key: "rohan_implant",
+            visits: [rohan1, rohan2, rohan3],
+            paidAt: paidAfter(rohan1),
+        },
+    ].map(({ key, visits, paidAt, deposit }): KaviOrder => {
         const first = visits[0];
         const person = people[first.contact];
+        const svc = KAVI_SERVICES[first.service];
         return {
+            depositPaise: deposit ? svc.pricePaise / 2 : 0,
+            done:
+                visits.length === svc.visits &&
+                visits.every((v) => v.outcome === "ATTENDED"),
             id: kaviId("order", key),
             key,
             service: first.service,
@@ -993,8 +1218,6 @@ export function financialYear(at: number): string {
     const yy = (y: number) => String(y % 100).padStart(2, "0");
     return `${yy(start)}-${yy(start + 1)}`;
 }
-
-const TREATMENTS: readonly number[] = [SVC.rootCanal, SVC.whitening];
 
 const hex = (rng: Rng, n: number) =>
     Array.from({ length: n }, () =>
@@ -1083,7 +1306,7 @@ function planMoney(
         // Billed at the desk after the visit: most paid there and then.
         const billable =
             p.outcome === "ATTENDED" &&
-            !TREATMENTS.includes(p.service) &&
+            KAVI_SERVICES[p.service].visits === 1 &&
             p.end + 20 * MINUTE <= t;
         const scene =
             p.id === kaviId("booking", "vikram_xray")

@@ -47,33 +47,33 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         headline: "Open up and see what needs you.",
         sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in and what's owed, most urgent first.",
         hero: {
-            shot: "s-home",
+            shot: "d-home",
         },
         howTitle: "One screen before the first customer.",
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders, stock short for orders and overdue invoices, each with its next step. Mark an order sent right from the list.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-home",
+                body: "Overdue invoices, notes to answer, late orders and stock short for orders, each with the button that fixes it.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "k-needs",
             },
             {
                 title: "Today's people, in order",
                 body: "Who's booked and at what time. Anything you should know is beside their name.",
                 who: "Wrenfield Dental (demo clinic)",
-                shot: "d-home",
+                shot: "k-today",
             },
             {
                 title: "Money that's owed",
-                body: "Overdue invoices are listed, so you know who to ask.",
-                who: "Ironvale Fitness (demo gym)",
-                shot: "g-home",
+                body: "Overdue invoices, each with how late it is and who owes it.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "k-money",
             },
             {
                 title: "Zoom out to the month",
-                body: "The calendar shows every day's orders, bookings and invoices, with money in, out and due.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "r-calendar",
+                body: "The calendar shows every day's orders, bookings and invoices, with money in and due.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "k-calendar",
             },
         ],
         points: [
@@ -197,27 +197,27 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Take orders at the counter and follow each one to done, with its next step on the order. Late ones are flagged.",
         hero: {
-            shot: "s-orders",
+            shot: "k-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
-                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. Print a ticket for the kitchen.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "r-order",
+                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "d-order",
             },
             {
                 title: "Orders that take several visits",
                 body: "A treatment sold as three visits is fulfilled by those visits. Mark each one attended, or book the next.",
                 who: "Wrenfield Dental (demo clinic)",
-                shot: "d-order",
+                shot: "k-visits",
             },
             {
                 title: "Make its invoice",
-                body: "Make a numbered invoice from the order, in your currency. It has no tax line. To add yours, write the invoice by hand.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "r-invoice",
+                body: "Each order makes a numbered invoice with your tax line, ready to send or print.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "k-invoice",
             },
         ],
         points: [
@@ -267,33 +267,33 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         headline: "Know the person in front of you.",
         sub: "Customer management for a small business. Every customer's bookings, invoices and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything you should know before they arrive.",
         hero: {
-            shot: "r-customers",
+            shot: "d-customers",
         },
         howTitle: "A page for everyone who pays.",
         steps: [
             {
                 title: "Everything about them on one page",
-                body: "What they've spent, how they usually get their order, and what they buy most, down to the size.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-customer",
-            },
-            {
-                title: "Regulars, with what's next",
-                body: "Their next booking and the classes they've been to.",
-                who: "Ironvale Fitness (demo gym)",
-                shot: "g-customer",
-            },
-            {
-                title: "Notes they send reach you",
-                body: "What a patient writes when booking is matched to their record. Check it, label it and add it where you'll see it.",
+                body: "Their bookings, orders, invoices and notes, and anything you should know at the top.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "d-customer",
             },
             {
-                title: "Flags where you need them",
-                body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to you.",
+                title: "What they have left",
+                body: "A treatment of several visits shows what's attended, what's booked and what's still to book.",
                 who: "Wrenfield Dental (demo clinic)",
-                shot: "d-customers",
+                shot: "k-visits",
+            },
+            {
+                title: "Notes they send reach you",
+                body: "What someone writes when booking is matched to their record. Check it, label it and add it where you'll see it.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "k-note",
+            },
+            {
+                title: "Flags where you need them",
+                body: "Allergies and access needs show on their orders, today's list and bookings. Medical notes can be marked Sensitive.",
+                who: "Wrenfield Dental (demo clinic)",
+                shot: "k-flags",
             },
         ],
         points: [
@@ -347,21 +347,21 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         steps: [
             {
                 title: "Customers book themselves",
-                body: "Your booking page shows only real free times, from your hours.",
+                body: "Your booking page shows only real free times. They pick a time and you see the booking straight away.",
                 who: "Ironvale Fitness (demo gym)",
                 shot: "g-book",
             },
             {
                 title: "Classes and courses with places",
-                body: "Set how many places a class has. Courses run for several weeks. Enrol people and see who's on each.",
+                body: "Set how many places a class has. Courses run for several weeks. Enrol people and see who's in.",
                 who: "Ironvale Fitness (demo gym)",
                 shot: "g-courses",
             },
             {
-                title: "Treatments over several visits",
-                body: "A course of treatment can be three visits of an hour. Patients book the first visit and tell you what you need to know. You book the rest.",
-                who: "Wrenfield Dental (demo clinic)",
-                shot: "d-book",
+                title: "Sessions over several visits",
+                body: "A block of personal training is three sessions. They book the first, and you book the rest.",
+                who: "Ironvale Fitness (demo gym)",
+                shot: "g-ptblock",
             },
         ],
         points: [
@@ -477,15 +477,15 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Add your tax line",
-                body: "On an invoice you write, add one tax line you name yourself, like VAT 20%, on top of the total. It's kept on the invoice with your tax number. You choose the rate: Saroh doesn't work out tax.",
-                who: "Larkspur & Vane (demo salon)",
-                shot: "l-invoice",
+                body: "Set your sales tax once and every invoice made from an order carries it.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "t-invoice",
             },
             {
                 title: "See what's overdue",
-                body: "Overdue invoices are listed. Record a payment and the invoice becomes a receipt.",
-                who: "Ironvale Fitness (demo gym)",
-                shot: "g-billing",
+                body: "Overdue invoices are flagged, with how late each one is.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "r-money",
             },
         ],
         points: [
@@ -543,13 +543,13 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         steps: [
             {
                 title: "It reads what you already entered",
-                body: "A services list shows each service with how long it takes and its price. Opening hours, today's free times, your phone and your address are read the same way, so a change in Saroh shows on your site without editing the page.",
-                who: "Wrenfield Dental (demo clinic)",
-                shot: "d-site",
+                body: "Your classes, sessions and prices, opening hours, today's free times, your phone and your address are read from Saroh, so a change there shows on your site.",
+                who: "Ironvale Fitness (demo gym)",
+                shot: "g-site-train",
             },
             {
                 title: "Customers book from it",
-                body: "With Bookings on, your site has a booking page that offers only real free times, and you see the booking straight away.",
+                body: "With Bookings on, your site has a booking page that offers only real free times.",
                 who: "Ironvale Fitness (demo gym)",
                 shot: "g-book",
             },
@@ -637,26 +637,20 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         howTitle: "From this week to the last three months.",
         steps: [
             {
-                title: "Three answers first",
-                body: "Each question is answered in a sentence, from the same figures its card draws, and each opens its own tab.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-insights",
-            },
-            {
-                title: "Four numbers for your site",
-                body: "Visits, Visitors, Enquiries, and Paid orders and bookings, each against the period before.",
+                title: "What to do next",
+                body: "One suggestion at a time from your own sales, with the button that acts on it.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-compare",
             },
             {
-                title: "Visits, day by day",
-                body: "A bar for each day shows when people came to your site.",
+                title: "Am I making more money?",
+                body: "A straight answer, with each week beside the weeks before it.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-weeks",
             },
             {
-                title: "The pages people open most",
-                body: "See which pages get the most visits, so you know what people come for.",
+                title: "What sells, and where customers come from",
+                body: "Your best sellers with units and money, and where customers come from: visits, enquiries, and Paid orders and bookings.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "i-store",
             },
@@ -809,7 +803,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             "Ask about your business inside Saroh, answered from your own bookings, orders and customers.",
         headline: "Ask about your business. Get a straight answer.",
         sub: "An AI business assistant inside Saroh. Ask how the week went or what's selling, and get the answer from your own records. Nothing is saved until you confirm.",
-        hero: { shot: "ask-hero" },
+        hero: { shot: "ask-hero", phone: "ask-hero-phone" },
         howTitle: "Ask in your own words.",
         steps: [
             {

@@ -30,7 +30,7 @@ const ENV = Object.fromEntries(
 );
 
 /** A repo whose first commit (tagged `base`) holds BASE, then `edits` uncommitted. */
-function check(edits) {
+function check(edits, today = "2026-11-15") {
     const root = mkdtempSync(join(tmpdir(), "check-content-dates-"));
     const git = (...args) =>
         execFileSync("git", args, { cwd: root, env: ENV, stdio: "ignore" });
@@ -59,7 +59,7 @@ function check(edits) {
         write(edits);
         return spawnSync(process.execPath, [SCRIPT, "base"], {
             cwd: root,
-            env: ENV,
+            env: { ...ENV, CONTENT_DATES_TODAY: today },
             encoding: "utf8",
         });
     } finally {
@@ -89,7 +89,8 @@ test("fails when a provider page's words change but updated: doesn't", () => {
 
 test("fails when a /for/ page's words change but updated: doesn't", () => {
     const r = check({
-        [SALONS]: "---\nslug: salons\nupdated: 2026-10-26\n---\n## New?\nWords\n",
+        [SALONS]:
+            "---\nslug: salons\nupdated: 2026-10-26\n---\n## New?\nWords\n",
     });
     assert.equal(r.status, 1);
     assert.match(r.stderr, /for\/salons\.mdx: its words changed/);
@@ -123,4 +124,14 @@ test("skips when the base isn't there", () => {
     } finally {
         rmSync(root, { recursive: true, force: true });
     }
+});
+
+test("passes a second change on the day the page is already dated", () => {
+    const r = check(
+        {
+            [HOME]: 'export const UPDATED = "2026-10-12";\nexport const h = "New words";\n',
+        },
+        "2026-10-12",
+    );
+    assert.equal(r.status, 0, r.stderr);
 });

@@ -83,7 +83,12 @@ for (const SHOTS of DIRS) {
             const name = `${key}-${w}.webp`;
             const out = path.join(SIZED, name);
             wanted.add(name);
-            if (force || !fs.existsSync(out)) {
+            // A retaken shot is newer than its copies: write them again.
+            if (
+                force ||
+                !fs.existsSync(out) ||
+                fs.statSync(out).mtimeMs < fs.statSync(source).mtimeMs
+            ) {
                 // A capture taken at a lower quality (before 14 Nov 2026) can
                 // come out lighter than its own copy: step the copy down.
                 const full = fs.statSync(source).size;
