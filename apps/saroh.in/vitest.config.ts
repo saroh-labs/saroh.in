@@ -22,6 +22,7 @@ export default defineConfig({
         testTimeout: 30_000,
         // lib/docs-content.gen.ts, which `pnpm build` and `pnpm dev` write first.
         globalSetup: ["./vitest.global-setup.ts"],
+        setupFiles: ["./vitest.setup.ts"],
         include: [
             "*.test.ts",
             "content/**/*.test.ts",

@@ -57,7 +57,8 @@ describe("/features/[slug]", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Invoices you don't have to write.",
+                // jsdom spaces out the Saffron mark's span; a browser doesn't.
+                name: /^Invoices you don't have to write ?\.$/,
             }),
         ).toBeTruthy();
         const how = screen

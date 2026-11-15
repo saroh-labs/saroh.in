@@ -367,5 +367,26 @@ price is ever drawn into an image.
   sub's "add it once" into the orders chapter. `components/home/fold.tsx` is
   the landing's one `<details>` fold. No captured shot on the landing (the
   hero is drawn); `s-home` stays on Shops.
+- **17 Nov 2026, How it works and the Keep pages (unit/web-features).**
+  `/features` is drawn from HWDesk/HWPhone2 and indexed (in the sitemap):
+  the h1 "How it works, and why it all stays yours.", the trade switch
+  (client toggle over drawings already in the HTML, so the page stays
+  static), six ownership chapters grouped Your records / Reaching customers
+  / Asking and connecting ("Your posts", not "Your look"), how money moves
+  on the ledger band (`components/how-it-works/money-flow.tsx`, the board's
+  outline path; the kit `MoneyPath` is for paper), "Everything stays yours"
+  and the full feature index. Its drawn crops are `components/how-it-works/
+panels.tsx`, fed by the world, no Rye literals; words in
+  `content/how-it-works.ts`. Chapters, crops, lines and index rows of a
+  switched-off feature or an unlive claim are not drawn. `/features/[slug]`
+  dispatches by kind: record features render `KeepPage`
+  (`components/feature-pages/keep-page.tsx`, FODesk/FOPhone2: hero with
+  mark, scene, cropped captured shot; steps with their shots and Help
+  links; points, folded after three on a phone; "What happens around it";
+  the Ask band; one MomentCard; PlanLine; Used by chips; questions; close),
+  extra words in `content/feature-keep.ts`; Website, Share, Ask AI and AI
+  apps render their own components from `components/feature-pages/
+registry.ts` (stubs drawing the old page until agent reach lands).
+  `vitest.setup.ts` stands in an IntersectionObserver for jsdom.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).

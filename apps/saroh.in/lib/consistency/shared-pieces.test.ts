@@ -132,6 +132,12 @@ const RULES: Rule[] = [
         allow: {
             "components/home/fold.tsx":
                 "the landing's phone folds (DEC-221): CroppedCard's fold with no screen to crop; the questions themselves are FaqItems",
+            "app/(site)/features/page.tsx":
+                "keep: How it works' phone folds (PHONE.md): the yours rows and the feature index, in the HTML, open from 760px",
+            "components/how-it-works/chapter.tsx":
+                "keep: a chapter's Read more links, folded on a phone, open from 760px",
+            "components/feature-pages/keep-page.tsx":
+                "keep: the Keep template's folded points and its questions (FOPhone2), every answer in the HTML",
         },
         files: SITE,
     },
