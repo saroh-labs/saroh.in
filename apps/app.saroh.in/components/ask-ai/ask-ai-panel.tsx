@@ -732,6 +732,16 @@ export function AskAiPanel({
                     Ask AI
                 </h1>
             )}
+            {tools ? (
+                // Under 760px the list beside the page is hidden: open it here.
+                <IconButton
+                    label="Your conversations"
+                    icon={<History />}
+                    size="md"
+                    className="size-10 min-[760px]:hidden"
+                    onClick={() => setView("history")}
+                />
+            ) : null}
             {tools ? more : null}
         </div>
     );
@@ -852,11 +862,15 @@ export function AskAiPanel({
     if (!page) return conversationView;
 
     return (
-        <div className="flex h-[calc(100dvh-61px)] min-h-0">
+        // The tab bar takes the foot of a phone's screen (`--tab-bar-inset`).
+        <div className="flex h-[calc(100dvh-61px-var(--tab-bar-inset))] min-h-0">
             {tools ? (
                 <nav
                     aria-label="Your conversations"
-                    className="hidden w-[320px] shrink-0 flex-col overflow-y-auto border-r border-border bg-neutral-50 px-2.5 py-4 dark:bg-background min-[760px]:flex"
+                    className={cn(
+                        "w-full shrink-0 flex-col overflow-y-auto border-r border-border bg-neutral-50 px-2.5 py-4 dark:bg-background min-[760px]:flex min-[760px]:w-[320px]",
+                        view === "history" ? "flex" : "hidden",
+                    )}
                 >
                     <div className="flex items-center gap-2 pl-1.5 pr-1">
                         <h1 className="m-0 flex flex-1 items-center gap-2 text-xl font-semibold tracking-[-0.02em]">
@@ -879,7 +893,10 @@ export function AskAiPanel({
             <section
                 id="ask-ai-page"
                 aria-label="Ask AI"
-                className="flex min-w-0 flex-1 flex-col"
+                className={cn(
+                    "min-w-0 flex-1 flex-col min-[760px]:flex",
+                    view === "history" ? "hidden" : "flex",
+                )}
             >
                 {conversationView}
             </section>
