@@ -83,3 +83,28 @@ describe("saroh.tech's feature switches", () => {
         expect(built.title).toBe("Twelve parts, one workspace.");
     });
 });
+
+describe("saroh.tech's claim switches (DEC-221)", () => {
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    it("unset, as production leaves them, draws no unlive claim", async () => {
+        for (const name of NAMES) vi.stubEnv(name, "on");
+        vi.stubEnv("NODE_ENV", "production");
+        vi.resetModules();
+        const { claimsOff } = await import("./feature-switches");
+        expect(claimsOff()).toContain("social-posting");
+        expect(claimsOff()).toContain("ai-apps-plans");
+    });
+
+    it("a claim set on shows while its feature is on", async () => {
+        for (const name of NAMES) vi.stubEnv(name, "on");
+        vi.stubEnv("NODE_ENV", "production");
+        vi.stubEnv("NEXT_PUBLIC_CLAIM_SOCIAL_POSTING", "on");
+        vi.resetModules();
+        const { claimsOff } = await import("./feature-switches");
+        expect(claimsOff()).not.toContain("social-posting");
+    });
+});

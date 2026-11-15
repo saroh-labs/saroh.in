@@ -2,6 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import {
+    CLAIM_SWITCHES,
     countWord,
     RELEASE_SWITCHES,
     shownFeatures,
@@ -166,5 +167,52 @@ describe("FEATURE_SLUGS is read only through shownFeatures", () => {
                     ),
             );
         expect(offenders).toEqual([]);
+    });
+});
+
+/**
+ * The claim switches (DEC-221): each is declared everywhere a build reads
+ * it, and `claimsOff` follows its value as the release switches do.
+ */
+describe("the claim switches", () => {
+    const root = join(__dirname, "../../..");
+    const read = (f: string) => readFileSync(join(root, f), "utf8");
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.resetModules();
+    });
+
+    it("are declared in env.ts, the browser env, turbo.json and .env.example", () => {
+        for (const name of Object.values(CLAIM_SWITCHES)) {
+            for (const file of [
+                "apps/saroh.in/env.ts",
+                "apps/saroh.in/lib/browser/env.ts",
+                "apps/saroh.in/.env.example",
+                "apps/saroh.tech/lib/feature-switches.ts",
+                "turbo.json",
+            ]) {
+                expect(read(file), `${name} in ${file}`).toContain(name);
+            }
+        }
+    });
+
+    it("a built site draws a claim only when it and its feature are on", async () => {
+        vi.stubEnv("SKIP_ENV_VALIDATION", "");
+        for (const name of NAMES) vi.stubEnv(name, "on");
+        for (const name of Object.values(CLAIM_SWITCHES)) vi.stubEnv(name, "");
+        vi.stubEnv("NEXT_PUBLIC_CLAIM_ASK_AI_STOCK", "on");
+        vi.resetModules();
+        const { claimOn, claimsOff } = await import("./feature-switches");
+        expect(claimOn("ask-ai-stock")).toBe(true);
+        expect(claimOn("social-posting")).toBe(false);
+        expect(claimsOff()).toHaveLength(
+            Object.keys(CLAIM_SWITCHES).length - 1,
+        );
+
+        vi.stubEnv("NEXT_PUBLIC_ASK_AI", "off");
+        vi.resetModules();
+        const again = await import("./feature-switches");
+        expect(again.claimOn("ask-ai-stock")).toBe(false);
     });
 });
