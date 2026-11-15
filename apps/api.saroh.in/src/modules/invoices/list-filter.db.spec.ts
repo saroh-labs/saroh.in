@@ -624,3 +624,72 @@ describe("the Invoices list's search, Owed, Cheques and Paid from (DEC-173)", ()
         expect(amountTook).toBeLessThan(1500);
     });
 });
+
+describe("the issued date (Orders' ?date=, ?from=, ?to=), in the business's zone", () => {
+    let kolkata: OrganizationContext;
+    const at: Record<string, string> = {};
+
+    beforeAll(async () => {
+        const created = await prisma.organization.create({
+            data: { name: "Issued Test", slug: `issued-${next()}` },
+        });
+        kolkata = {
+            organizationId: created.id,
+            userId: "user_1",
+            role: "OWNER",
+        };
+        await prisma.businessProfile.create({
+            data: { organizationId: created.id, timezone: "Asia/Kolkata" },
+        });
+        const issue = async (key: string, issuedAt: Date | null) => {
+            at[key] = (
+                await prisma.invoice.create({
+                    data: {
+                        organizationId: created.id,
+                        number: issuedAt ? `INV-${next()}` : null,
+                        status: issuedAt ? "ISSUED" : "DRAFT",
+                        kind: "INVOICE",
+                        source: "MANUAL",
+                        billToName: "Asha",
+                        issuedAt,
+                        currency: "INR",
+                        subtotal: "500.00",
+                        total: "500.00",
+                    },
+                })
+            ).id;
+        };
+        // Each side of midnight in Kolkata (UTC+5:30) at both ends.
+        await issue("lastJuly", new Date("2026-07-31T18:29:00Z"));
+        await issue("firstAug", new Date("2026-07-31T18:30:00Z"));
+        await issue("lastAug", new Date("2026-08-31T18:29:59Z"));
+        await issue("firstSep", new Date("2026-08-31T18:30:00Z"));
+        await issue("draft", null);
+    });
+
+    const ids = (rows: { id: string }[]) => rows.map((r) => r.id).sort();
+
+    it("lists what was issued on those days there, the last day included", async () => {
+        const august = await service.list(kolkata, {
+            from: "2026-08-01",
+            to: "2026-08-31",
+        });
+        expect(ids(august)).toEqual([at.firstAug, at.lastAug].sort());
+    });
+
+    it("an open end reaches every invoice on that side; a draft is never dated", async () => {
+        const since = await service.list(kolkata, { from: "2026-09-01" });
+        expect(ids(since)).toEqual([at.firstSep]);
+        const upTo = await service.list(kolkata, { to: "2026-07-31" });
+        expect(ids(upTo)).toEqual([at.lastJuly]);
+    });
+
+    it("refuses a backwards range, and a preset with days", async () => {
+        await expect(
+            service.list(kolkata, { from: "2026-08-31", to: "2026-08-01" }),
+        ).rejects.toThrow("The range ends before it starts.");
+        await expect(
+            service.list(kolkata, { date: "month", from: "2026-08-01" }),
+        ).rejects.toThrow("Pick a date range or a preset, not both.");
+    });
+});

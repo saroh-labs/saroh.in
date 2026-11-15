@@ -19,7 +19,7 @@ import {
     SaveStaffProfileDto,
 } from "./dto";
 import { InviteStaffDto } from "./staff-invite.dto";
-import { taxIdFingerprint } from "./staff-profile";
+import { taxIdFingerprints } from "./staff-profile";
 
 /**
  * The operator's own team (admin console U2). Granting a colleague access
@@ -298,22 +298,25 @@ export class AdminStaffController {
         @Body() dto: SaveStaffProfileDto,
     ) {
         const { idempotencyKey, reason, taxId, ...profile } = dto;
+        // The stored fingerprint carries a keyed digest of the tax id,
+        // never the tax id or a plain hash a short value could be guessed
+        // back from. One request per key on the ring, newest first, so a
+        // retry from before a key change still replays.
+        const [request, ...older] = (
+            taxId === undefined ? [undefined] : taxIdFingerprints(taxId)
+        ).map((fingerprint) => ({
+            platformAdminId,
+            reason,
+            ...profile,
+            taxId: fingerprint,
+        }));
         return this.idempotency.run(
             {
                 scope: "admin.staff.profile.save",
                 key: idempotencyKey,
                 actorUserId: staff.userId,
             },
-            // The stored fingerprint carries a keyed digest of the tax id,
-            // never the tax id or a plain hash a short value could be
-            // guessed back from.
-            {
-                platformAdminId,
-                reason,
-                ...profile,
-                taxId:
-                    taxId === undefined ? undefined : taxIdFingerprint(taxId),
-            },
+            request,
             () =>
                 this.staffService.saveProfile({
                     staff,
@@ -321,6 +324,7 @@ export class AdminStaffController {
                     profile: { ...profile, taxId },
                     reason,
                 }),
+            older,
         );
     }
 }

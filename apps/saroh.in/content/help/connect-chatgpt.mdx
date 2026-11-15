@@ -1,0 +1,85 @@
+---
+# The words are board VHChatgpt's (release visibility, approved 13 Nov
+# 2026), each Saroh label checked against the code. Sources as in
+# connect-claude.mdx (AI, TABS, ADDRESS with CONNECT_IN.chatgpt, PICK,
+# PUBLISH, SWEEP). ChatGPT's own menus (developer mode, its connector form)
+# aren't confirmed until the dev sign-in walk (plan 2026-11-13-002), so its
+# steps name none, as content/integrations/chatgpt.mdx doesn't; its form and
+# chat are drawn panels. Saroh shots are captured on Pulse Fitness.
+title: Connect ChatGPT
+slug: connect-chatgpt
+area: AI apps and API
+group: Use AI apps and the API
+order: 20
+feature: ai-apps
+intro: "Connect ChatGPT to your business and run your Saroh work from a chat: change your hours, add a class, look up a member's next booking. You add Saroh in ChatGPT, sign in, and pick the businesses it may use. It takes a couple of minutes."
+description: "Connect ChatGPT to your business on Saroh: add Saroh as a custom connector, sign in, pick your businesses and allow it. Then use it in a chat."
+readMinutes: 3
+updated: "2026-11-14"
+steps:
+    # AI, TABS, ADDRESS.
+    - title: Open Settings › API and AI apps
+      body: "In Saroh, open Settings › API and AI apps. On the AI assistants tab, press Connect in ChatGPT: ChatGPT's settings open in a new tab."
+      shot: help-connect-chatgpt-1
+      caption: "AI assistants at Pulse Fitness (a demo gym), with Connect in ChatGPT."
+      marker: Connect in ChatGPT
+    # ADDRESS. ChatGPT's form: drawn, its labels unconfirmed.
+    - title: Create the Saroh connector in ChatGPT
+      body: "In ChatGPT's settings, open its connectors and add Saroh as a custom connector. Name it Saroh, paste https://mcp.saroh.in/mcp as the server URL, and if it asks how to sign in, choose OAuth. ChatGPT may ask you to turn on a setting for custom connectors first."
+      panel:
+          kind: form
+          app: ChatGPT
+          address: chatgpt.com
+          title: New connector
+          fields:
+              - { label: Name, value: Saroh }
+              - { label: Server URL, value: "https://mcp.saroh.in/mcp", mono: true, mark: true }
+              - { label: Sign-in, value: OAuth }
+          check: I trust this app
+          button: Create
+      caption: "A drawing of ChatGPT's connector form, not a screenshot: ChatGPT's own labels may differ."
+      tip: "In a ChatGPT workspace run by a company, an admin may need to allow custom connectors first. The address is also on Saroh's AI assistants tab, with a Copy button."
+    # PICK.
+    - title: Sign in and pick your businesses
+      body: "ChatGPT opens a Saroh window. Sign in if it asks. Under Which businesses should ChatGPT work with? tick one, several, or All my businesses, then press Continue. In each one it can only do what you can do there."
+      shot: help-connect-chatgpt-3
+      caption: "Picking businesses for ChatGPT, signed in as the owner of Pulse Fitness (a demo gym)."
+      tip: "Only your own businesses on this Saroh are listed, never a demo. A business you add later isn't included: connect again to add it."
+      marker: Continue
+    # PICK.
+    - title: Read what it may do, and allow it
+      body: "Saroh shows what ChatGPT will be able to do, that it never gets more than you can do yourself, and that what it reads goes to OpenAI, the company behind ChatGPT, under their terms. Press Allow. You're taken back to ChatGPT."
+      shot: help-connect-chatgpt-4
+      caption: "The last step before ChatGPT works with Pulse Fitness (a demo gym)."
+      marker: Allow
+    # PUBLISH. ChatGPT's chat: drawn.
+    - title: Use Saroh in a chat
+      body: "In a new chat, pick Saroh from ChatGPT's tools, then ask, like “Change our Sunday hours to 8 till 2”. Changes like hours and bookings happen straight away and are in Settings › Activity. Website changes stay a draft: ChatGPT gives you a link into Saroh, where you choose Publish or Don't publish."
+      panel:
+          kind: chat
+          app: ChatGPT
+          address: chatgpt.com
+          ask: "Change our Sunday hours to 8 till 2"
+          rows:
+              - { label: Sunday, value: "8:00 AM to 2:00 PM, was 7:00 AM to 12:00 PM" }
+              - { label: Saturday, value: "6:00 AM to 9:00 PM, no change" }
+          reply: "Done. Pulse Fitness now opens 8 till 2 on Sundays."
+      caption: "A drawing of a chat in ChatGPT, not a screenshot, changing a demo gym's Sunday hours."
+    # AI.
+    - title: See it in Saroh
+      body: "Back in Settings › API and AI apps, ChatGPT is listed under Connected to your business. Open it to see each change it made, roll back its site draft, or disconnect it."
+      shot: help-connect-chatgpt-6
+      caption: "ChatGPT connected to Pulse Fitness (a demo gym)."
+troubles:
+    - title: There's no way to add a custom connector in ChatGPT.
+      body: "Custom connectors may need a setting turned on in ChatGPT first, or your workspace's admin may need to allow them. Check ChatGPT's settings, or ask your admin."
+    - title: ChatGPT says it couldn't connect.
+      body: "Check the address is exactly https://mcp.saroh.in/mcp, with /mcp at the end, and that sign-in is OAuth."
+    - title: Your business isn't in the list.
+      body: "Only businesses you belong to on this Saroh are listed. Ask the owner to add you to the team first."
+    - title: ChatGPT asks you to sign in to Saroh again.
+      body: "That's expected about once a month. Sign in, pick your businesses and press Allow again."
+next: [connect-claude, connect-other-ai-apps, ask-ai]
+---
+
+ChatGPT acts as you, so it can only do what you can do in Saroh, and it can't cancel, refund or touch your payment settings. Website changes stay a draft until you publish them yourself. More in [how AI apps work with Saroh](/features/ai-apps).

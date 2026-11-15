@@ -75,12 +75,15 @@ export class IdempotencyService {
      *
      * Returns the stored response for an identical retry, throws `409` for a
      * key reused with a different payload, and throws `409` for a concurrent
-     * duplicate still in flight.
+     * duplicate still in flight. `alsoMatches` are older forms of the same
+     * request a retry may have been stored under (a fingerprint made with a
+     * key the ring has since replaced).
      */
     async run<T>(
         ctx: IdempotencyContext,
         request: unknown,
         operation: () => Promise<T>,
+        alsoMatches: readonly unknown[] = [],
     ): Promise<T> {
         // No key means the caller is not asking for idempotency. Do not invent
         // it: a synthesised key would collide across genuinely distinct calls.
@@ -120,7 +123,12 @@ export class IdempotencyService {
             });
             if (!existing) throw error;
 
-            if (existing.fingerprint !== fingerprint) {
+            if (
+                existing.fingerprint !== fingerprint &&
+                !alsoMatches.some(
+                    (r) => fingerprintOf(r) === existing.fingerprint,
+                )
+            ) {
                 this.logger.warn(
                     `idempotency conflict: scope=${ctx.scope} key=${ctx.key} — same key, different request`,
                 );

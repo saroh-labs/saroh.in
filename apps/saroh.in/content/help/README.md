@@ -28,12 +28,59 @@ steps:
       tip: "…" # optional, only where needed
       marker: Connect # optional: the control ringed in Saffron
 next: [connect-cashfree] # up to three slugs, published no later than this one
+troubles: # optional: "If it doesn't work", under the steps
+    - title: Razorpay says the webhook failed.
+      body: "…what to check, and what to do…"
+feature: ai-apps # optional: the release switch it waits for
 ```
+
+### A step's picture
+
+Each step has exactly one picture:
+
+- `shot`: a captured Saroh screen, as above. This is the rule for every
+  Saroh screen.
+- `panel`: another company's screen that Saroh can't capture (Claude's
+  connector form, a chat in ChatGPT), drawn as text by
+  `@saroh/marketing/drawn-panel`. Its `caption` says it is a drawing, not a
+  screenshot. Name no menu or field of the other app that hasn't been
+  checked on its real screen:
+
+    ```yaml
+    panel:
+        kind: form # or chat: app, address, ask, rows (label, value), reply
+        app: Claude
+        address: claude.ai
+        title: Add a custom connector
+        fields: [{ label: Name, value: Saroh }]
+        check: I trust this app # optional ticked box
+        button: Add
+    caption: "A drawing of Claude's connector form, not a screenshot…"
+    ```
+
+- `apps`: a step that lists apps gets one card per app instead of a
+  picture and no caption: `id` (its anchor, `#n8n`), `name`, `how`, and
+  optional `code` (drawn with Copy) and `who`. A step can also take an
+  `anchor` of its own (`#coding-tools`). Integrations' AI apps cards link
+  to these anchors in `connect-other-ai-apps`, and `help.test.ts` holds them
+  equal.
+
+### Waiting on a release switch
+
+An article with `feature` set is a 404 and linked nowhere (home, side nav,
+search, feature pages, sitemap, llms.txt) while that `NEXT_PUBLIC_<FEATURE>`
+switch is off, whatever its `publishOn`. Only such an article may name a
+`shot` that isn't captured yet: the step draws a neutral frame in its place.
+Capture every one before the switch is turned on. The app's
+`HELP_ARTICLES` (`apps/app.saroh.in/lib/help/links.ts`) lists it with
+`waitsFor`, so the command menu leaves it out; drop that in the release
+commit.
 
 Cite where each label comes from in YAML comments at the top, as
 `add-your-first-product.mdx` does.
 
-The build fails if a step's `shot` is not captured, a `marker` is set on a
+The build fails if a step has no picture or two, a `shot` is not captured
+(outside an article waiting on a switch), a `marker` is set on a
 shot captured without a `mark`, a `next` slug is missing, the article itself,
 or publishes later, the area or group is unknown, or any text names a price, a
 plan limit or a plan ("₹", "up to 5", "Free plan": DEC-078).
@@ -44,8 +91,8 @@ an article's `publishOn` day in India it is a 404 and linked nowhere; set
 
 ## Screenshots
 
-Each step's picture is a real capture of the app on a demo business, never a
-drawing (KTD-6). Add one entry per step to `HELP_SHOTS` in
+Each Saroh screen is a real capture of the app on a demo business, never a
+drawing (KTD-6); only another company's screen is drawn (`panel`). Add one entry per step to `HELP_SHOTS` in
 `e2e/marketing-shots/shots.config.ts`, keyed `help-<slug>-<n>`:
 
 - `route` and `business`: Rye & Co., Pulse Fitness and Kavi Dental are

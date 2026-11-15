@@ -49,6 +49,8 @@ const NOT_FORMS: Record<string, string> = {
     "components/shared/forms/quick-look.tsx": "a read-only quick look",
     "components/sites/looks/look-preview.tsx":
         "a look's preview: the site drawn read-only, with Use this look and Close",
+    "components/sites/templates/template-preview.tsx":
+        "a template's preview: the site drawn read-only, with Choose or its confirm",
     "components/sites/looks/draft-tools.tsx":
         "the draft's previous versions, read-only, each with Roll back and Bring in",
     "components/stores/catalogue/quick-look.tsx": "a read-only quick look",
@@ -108,6 +110,13 @@ const NOT_FORMS: Record<string, string> = {
         "a picker: whose bookings, in header C's frame",
     "components/bookings/calendar/header/options-sheet.tsx":
         "the view's options, each kept as it is chosen, in header C's frame",
+    // Ask AI (plan 2026-11-13-001 U10).
+    "components/ask-ai/ask-ai-host.tsx":
+        "Ask AI's panel, full-screen on a phone: a conversation, not a form",
+    "components/ask-ai/ask-ai-panel.tsx":
+        "a picker: the phone's Reply language, kept as it is chosen",
+    "components/ask-ai/report-sheet.tsx":
+        "Report this answer: a desk popover or a phone sheet over the panel, as board 21 draws it",
     // Notices and flows with their own states.
     "components/billing/plan-refusal.tsx":
         "a notice with the way up, not a form",

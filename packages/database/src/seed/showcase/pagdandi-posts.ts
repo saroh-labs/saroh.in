@@ -12,7 +12,7 @@ import type { DemoPost } from "./demo-shop-types";
 
 /** A 1600-wide Unsplash address. */
 function photo(id: string): string {
-    return `https://images.unsplash.com/photo-${id}?w=1600&q=80&auto=format&fit=crop`;
+    return `https://media.saroh.io/demo/photo-${id}.jpg`;
 }
 
 /** One body figure; `height` is the real height of the 1600-wide render. */

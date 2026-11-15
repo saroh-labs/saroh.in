@@ -338,14 +338,9 @@ export class ModuleSetupService {
                     setup: { ...address },
                     existing: null,
                     template: kindTemplate(kind),
-                    templates: templateCatalogue().map(
-                        ({ id, name, kinds, uses }) => ({
-                            id,
-                            name,
-                            kinds,
-                            uses,
-                        }),
-                    ),
+                    // The whole catalogue entry: the sheet draws the same
+                    // picture cards and colourways as /sites/new (DEC-216).
+                    templates: templateCatalogue(),
                     kind,
                 };
             }

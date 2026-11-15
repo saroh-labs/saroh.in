@@ -150,7 +150,8 @@ describe("the template picker (K15)", () => {
                 defaults={{ siteName: "Asha Rao Studio", address: "asha" }}
                 defaultTemplateId="portfolio"
                 startTemplateId="writing"
-                suggested={["portfolio", "writing"]}
+                trade="creator"
+                kind="WORK"
             />,
         );
         expect(html).not.toMatch(/template/i);

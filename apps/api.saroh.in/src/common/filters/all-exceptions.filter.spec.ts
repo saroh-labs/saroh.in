@@ -14,7 +14,10 @@ import type { Request } from "express";
 import { authorize } from "../../modules/organizations/organization-policy";
 import { logHttpRequestOnce } from "../logging/http-request-log";
 import { structuredLogger } from "../logging/structured-logger";
-import { AllExceptionsFilter } from "./all-exceptions.filter";
+import {
+    AllExceptionsFilter,
+    KEY_DENIED_MESSAGE,
+} from "./all-exceptions.filter";
 
 interface CapturedResponse {
     statusCode?: number;
@@ -22,6 +25,7 @@ interface CapturedResponse {
     headers: Record<string, string>;
     headersSent: boolean;
     setHeader: jest.Mock;
+    getHeader: jest.Mock;
     status: jest.Mock;
     json: jest.Mock;
 }
@@ -33,6 +37,7 @@ function makeResponse(): CapturedResponse {
         setHeader: jest.fn((k: string, v: string) => {
             res.headers[k] = v;
         }),
+        getHeader: jest.fn((k: string) => res.headers[k]),
         status: jest.fn((code: number) => {
             res.statusCode = code;
             return res;
@@ -91,6 +96,32 @@ describe("AllExceptionsFilter", () => {
         const res = makeResponse();
         filter.catch(new BadRequestException("bad"), makeHost(res));
         expect(res.setHeader).toHaveBeenCalledWith("X-Request-Id", "cid-123");
+    });
+
+    it("never lets a cache keep a refusal other than not-there, over a route's public Cache-Control", () => {
+        const PUBLIC = "public, max-age=30, s-maxage=30";
+        for (const [thrown, kept] of [
+            [new HttpException("Too many requests.", 429), "no-store"],
+            [new ForbiddenException(), "no-store"],
+            [new Error("boom"), "no-store"],
+            // The same for everyone, like a success: the route's own.
+            [new NotFoundException(), PUBLIC],
+            [new GoneException(), PUBLIC],
+        ] as const) {
+            const res = makeResponse();
+            // What a storefront catalogue route set before its handler threw.
+            res.headers["Cache-Control"] = PUBLIC;
+            filter.catch(
+                thrown,
+                makeHost(res, {
+                    method: "GET",
+                    originalUrl: "/v1/storefront/pk_test_x/products/gone",
+                    correlationId: "cid-1",
+                    headers: {},
+                }),
+            );
+            expect(res.headers["Cache-Control"]).toBe(kept);
+        }
     });
 
     it("surfaces class-validator field messages under details", () => {
@@ -422,5 +453,72 @@ describe("AllExceptionsFilter", () => {
             expect(info).toHaveBeenCalledTimes(1);
             info.mockRestore();
         });
+    });
+});
+
+describe("AllExceptionsFilter on the public API (review #8)", () => {
+    const filter = new AllExceptionsFilter();
+    const onV1 = (exception: unknown) => {
+        const res = makeResponse();
+        filter.catch(
+            exception,
+            makeHost(res, {
+                method: "POST",
+                originalUrl: "/v1/products",
+                correlationId: "cid-v1",
+                headers: {},
+            }),
+        );
+        return res;
+    };
+    const codeOf = (res: CapturedResponse) =>
+        (res.body as { error: { code: string } }).error.code;
+
+    it.each([
+        [new BadRequestException("no"), "invalid_request"],
+        [new GoneException("withdrawn"), "not_found"],
+        [new HttpException("big", 413), "payload_too_large"],
+        [new HttpException("xml", 415), "unsupported_media_type"],
+        [new HttpException("rules", 422), "unprocessable"],
+        [new ServiceUnavailableException("later"), "unavailable"],
+        [new InternalServerErrorException(), "internal"],
+    ])("gives %p the code %s", (exception, code) => {
+        expect(codeOf(onV1(exception))).toBe(code);
+    });
+
+    it("a key refused by what it may do reads about the key, not a role", () => {
+        let refused: unknown;
+        try {
+            authorize(
+                { organizationId: "org_1", userId: "user_1", role: "MEMBER" },
+                "store:create",
+            );
+        } catch (error) {
+            refused = error;
+        }
+        const res = onV1(refused);
+        expect(codeOf(res)).toBe("forbidden");
+        expect((res.body as { error: { message: string } }).error.message).toBe(
+            KEY_DENIED_MESSAGE,
+        );
+    });
+
+    it("names a wait on a 429 that set none, and keeps one that did", () => {
+        const bare = onV1(new HttpException("slow down", 429));
+        expect(codeOf(bare)).toBe("rate_limited");
+        expect(bare.headers["Retry-After"]).toBe("60");
+
+        const res = makeResponse();
+        res.headers["Retry-After"] = "7";
+        filter.catch(
+            new HttpException("slow down", 429),
+            makeHost(res, {
+                method: "GET",
+                originalUrl: "/v1/orders",
+                correlationId: "cid",
+                headers: {},
+            }),
+        );
+        expect(res.headers["Retry-After"]).toBe("7");
     });
 });

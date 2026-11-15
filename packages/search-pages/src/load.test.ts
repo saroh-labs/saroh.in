@@ -143,7 +143,7 @@ describe("content", () => {
             family: "Beauty",
             familySlug: "beauty",
             search: "salon software",
-            updated: "2026-11-04",
+            updated: "2026-11-14",
         });
         expect(Object.keys(salons ?? {}).sort()).toEqual([
             "description",
@@ -182,6 +182,23 @@ describe("content", () => {
         expect(() =>
             parseSearchPage("content/for/salons.mdx", noBooking),
         ).toThrow(/scene.booking/);
+    });
+
+    it("holds an ai block to one ask of each outcome (U13)", () => {
+        const twoAtOnce = (SOURCES.salons ?? "").replace(
+            "outcome: draft",
+            "outcome: at_once",
+        );
+        expect(() =>
+            parseSearchPage("content/for/salons.mdx", twoAtOnce),
+        ).toThrow(/one ask of each outcome/);
+        const noAi = (SOURCES.salons ?? "").replace(
+            /\nai:\n[\s\S]*?\nscene:/,
+            "\nscene:",
+        );
+        expect(
+            parseSearchPage("content/for/salons.mdx", noAi).ai,
+        ).toBeUndefined();
     });
 
     it("reads questions as plain words only", () => {

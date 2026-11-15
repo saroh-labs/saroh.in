@@ -14,9 +14,11 @@ const SITE: SeedSite = {
     subdomain: "rye-and-co",
     published: true,
     createdDaysAgo: 120,
-    // Its journal (`rye-posts.ts`): a Journal page, in the menu.
-    modulePages: ["JOURNAL"],
-    revision: "journal-page",
+    // Its journal (`rye-posts.ts`) and its online shop (the Online
+    // storefront's products, so Share is offered on them), both in the
+    // menu. Shop last: a page's seeded id is its place in this list.
+    modulePages: ["JOURNAL", "SHOP"],
+    revision: "shop-and-journal-pages",
     pages: [
         {
             path: "/",
@@ -65,7 +67,7 @@ export async function writeRyeSite(
     prisma: Db,
     a: { orgId: string; userId: string; now: Date },
 ): Promise<string> {
-    return writeSite(prisma, {
+    const siteId = await writeSite(prisma, {
         fixture: SITE,
         orgId: a.orgId,
         userId: a.userId,
@@ -88,4 +90,11 @@ export async function writeRyeSite(
             value: "Rye & Co. · 3 Hill Road, Indiranagar, Bengaluru",
         },
     });
+    // The site sells from the Online storefront (G11): its /shop, and the
+    // live product pages Share links to.
+    await prisma.site.update({
+        where: { id: siteId },
+        data: { storefrontId: ryeId("store", "online") },
+    });
+    return siteId;
 }

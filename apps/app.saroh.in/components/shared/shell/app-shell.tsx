@@ -1,6 +1,7 @@
 import { getServerSession } from "@saroh/auth/next";
 import { cookies, headers } from "next/headers";
 
+import { AskAiHost } from "@/components/ask-ai/ask-ai-host";
 import { PausedBanner } from "@/components/billing/paused-banner";
 import { PaymentDueBanner } from "@/components/billing/payment-due-banner";
 import { PlanEndingBanner } from "@/components/billing/plan-ending-banner";
@@ -24,7 +25,10 @@ import {
     planLockedModuleKeys,
 } from "@/components/shared/navigation/nav-locks";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
 import { accountsUrl } from "@/lib/accounts";
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
+import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
 import { businessZone } from "@/lib/format/business-zone";
 import { getHomeRail } from "@/lib/home/service";
@@ -37,6 +41,7 @@ import {
     activeOrganizationOnce,
     organizationsOnce,
 } from "@/lib/organizations/service";
+import { tradeOf } from "@/lib/organizations/trade";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
@@ -118,6 +123,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     // Whether session recording is switched on for this environment
     // (DEC-125): a PostHog key and the replay switch. Off, nothing is read.
     const recordingOn = recordingSwitchedOn();
+    const askAiShown =
+        askAiOn() && !!activeOrg && activeOrg.role !== "REVIEWER";
 
     // Concurrently, because none of the three depends on another. They used to
     // run one after the next, which cost the sum of three round trips on every
@@ -144,6 +151,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         closing,
         usageSharing,
         accountManager,
+        askAiState,
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
@@ -198,6 +206,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         // Who at Saroh looks after this business (DEC-169, U26), for the
         // account menu's card. Null without a manager or when unread.
         activeOrg ? accountManagerOrNull(activeOrg.id) : null,
+        // Ask AI (U10): what the button and panel open on. A Reviewer has
+        // no Ask AI at all; null when unread, and the panel says so.
+        askAiShown ? getAskAiState().catch(() => null) : null,
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14). None while
@@ -302,6 +313,14 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                 organizations={organizations}
                 activeOrg={activeOrg}
                 accountManager={accountManager}
+                askAi={
+                    askAiShown
+                        ? {
+                              locked: askAiState?.reason === "locked",
+                              upgradeTo: askAiState?.upgradeTo ?? null,
+                          }
+                        : null
+                }
                 moduleKeys={moduleKeys}
                 unread={
                     navCan({ role, actions }, NOTIFICATIONS_NAV.action)
@@ -358,39 +377,55 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                             <BusinessCountryProvider
                                 country={activeOrg?.country}
                             >
-                                {/*
-                                 * PostHog in the signed-in shell (DEC-125):
-                                 * internal ids beside the workspace's error
-                                 * reports, the one-time notice that it is
-                                 * recorded, and the recorder, which waits for
-                                 * that notice. Nothing without a key.
-                                 */}
-                                <UsageRecording
-                                    userId={session.user.id}
-                                    organizationId={activeOrg?.id}
-                                    usage={usageSharing}
-                                />
-                                {/* Scheduled for deletion (#921). */}
-                                <ClosingBanner view={closing} />
-                                {/* A renewal that wasn't paid (DEC-210): one
-                                plan message at a time, this one first. */}
-                                <PaymentDueBanner due={billing?.paymentDue} />
-                                {/* A plan that ends within 30 days (#805). */}
-                                {billing?.paymentDue ? null : (
-                                    <PlanEndingBanner
-                                        ending={billing?.planEnding}
-                                    />
-                                )}
-                                {/* What a lower plan paused, or will (#800). */}
-                                <PausedBanner view={paused} />
-                                <BusinessCurrencyProvider
-                                    value={activeOrg?.currency ?? null}
+                                {/* Its trade: the templates suggested first (DEC-216). */}
+                                <BusinessTradeProvider
+                                    trade={tradeOf(activeOrg?.trade)}
+                                    tradeOther={activeOrg?.tradeOther ?? null}
+                                    startTemplate={
+                                        activeOrg?.startTemplate ?? null
+                                    }
+                                    canSetTrade={
+                                        activeOrg?.actions?.includes(
+                                            "org:update",
+                                        ) === true
+                                    }
                                 >
-                                    {/* Just accepted an invitation: which business
+                                    {/*
+                                     * PostHog in the signed-in shell (DEC-125):
+                                     * internal ids beside the workspace's error
+                                     * reports, the one-time notice that it is
+                                     * recorded, and the recorder, which waits for
+                                     * that notice. Nothing without a key.
+                                     */}
+                                    <UsageRecording
+                                        userId={session.user.id}
+                                        organizationId={activeOrg?.id}
+                                        usage={usageSharing}
+                                    />
+                                    {/* Scheduled for deletion (#921). */}
+                                    <ClosingBanner view={closing} />
+                                    {/* A renewal that wasn't paid (DEC-210): one
+                                plan message at a time, this one first. */}
+                                    <PaymentDueBanner
+                                        due={billing?.paymentDue}
+                                    />
+                                    {/* A plan that ends within 30 days (#805). */}
+                                    {billing?.paymentDue ? null : (
+                                        <PlanEndingBanner
+                                            ending={billing?.planEnding}
+                                        />
+                                    )}
+                                    {/* What a lower plan paused, or will (#800). */}
+                                    <PausedBanner view={paused} />
+                                    <BusinessCurrencyProvider
+                                        value={activeOrg?.currency ?? null}
+                                    >
+                                        {/* Just accepted an invitation: which business
                                 this is and what their role opens, once. */}
-                                    <JoinedNotice />
-                                    {children}
-                                </BusinessCurrencyProvider>
+                                        <JoinedNotice />
+                                        {children}
+                                    </BusinessCurrencyProvider>
+                                </BusinessTradeProvider>
                             </BusinessCountryProvider>
                         </BusinessZoneProvider>
                     </div>
@@ -398,6 +433,13 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             {/* A write the plan refused, shown as its notice (U14). */}
             <PlanRefusalHost />
+            {activeOrg && askAiShown ? (
+                <AskAiHost
+                    state={askAiState}
+                    businessName={activeOrg.name}
+                    zone={businessZone(activeOrg)}
+                />
+            ) : null}
             {/* Below 760px, the rail's place is taken by this. */}
             <TabBar
                 unread={unread}

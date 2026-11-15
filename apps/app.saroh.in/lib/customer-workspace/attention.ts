@@ -229,6 +229,18 @@ export const NO_SENSITIVE_NOTE =
 export const SENSITIVE_ACTION = "customer:sensitive";
 
 /**
+ * Whether this person is offered the sensitive tick: their resolved
+ * permissions hold `customer:sensitive`, and nothing else counts — an Admin
+ * whose role was narrowed isn't offered it by the role's name (audit
+ * 2026-11-12 A1). No permissions came back: not offered.
+ */
+export function maySeeSensitive(
+    organization: { actions?: readonly string[] } | null | undefined,
+): boolean {
+    return organization?.actions?.includes(SENSITIVE_ACTION) ?? false;
+}
+
+/**
  * The roles whose people can read a sensitive note, by name — "Dentist,
  * Owner" — for C12's sensitive tick (DEC-073). A role counts when it holds
  * `customer:sensitive` (an invented role's `grants`, implied holds

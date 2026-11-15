@@ -29,6 +29,7 @@ import {
     socialRowSummary,
 } from "@/lib/organizations/social-links";
 import { zoneLabel } from "@/lib/organizations/time-zones";
+import { TRADE_ROW_LABEL, tradeLabel } from "@/lib/organizations/trade";
 import { countryName } from "@saroh/ui/lib/countries";
 import { Absent, Row } from "@saroh/ui/settings-rows";
 import { KIND_ROW_LABEL, kindChoiceLabel } from "./business-kind-field";
@@ -108,6 +109,26 @@ export function BusinessDetailRows({
                 >
                     <Saved text={kindChoiceLabel(saved.kind)} />
                 </Row>
+                {/* The kind of place (DEC-216, TPLD2): a business's only;
+                    Just me and A site for my work keep the kind alone. */}
+                {business ? (
+                    <Row
+                        id={BUSINESS_ROW_ID.trade}
+                        label={TRADE_ROW_LABEL}
+                        action={edit(
+                            "trade",
+                            "Change",
+                            "Change the kind of place",
+                        )}
+                    >
+                        <Saved
+                            text={
+                                tradeLabel(saved.trade, saved.tradeOther) ?? ""
+                            }
+                            empty="Not marked yet"
+                        />
+                    </Row>
+                ) : null}
                 <Row
                     id={BUSINESS_ROW_ID.name}
                     label={nameLabel}

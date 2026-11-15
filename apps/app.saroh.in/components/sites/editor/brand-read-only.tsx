@@ -13,11 +13,17 @@ export function BrandReadOnly({
     style,
     options,
     looks,
+    template,
 }: {
     style: SiteStyle;
     options: SiteStyleOptions;
     /** The Look row is drawn, as the owner's is (`SITE_LOOKS`). */
     looks: boolean;
+    /**
+     * The site's template (DEC-216); null when not recorded; absent draws
+     * no Template row (the choice is off, DEC-135).
+     */
+    template?: string | null;
 }) {
     const pairs = options.fontPairs ?? [];
     const typeface = (
@@ -25,6 +31,20 @@ export function BrandReadOnly({
     )?.name;
     const colourway = activeColourway(style, options.colourways)?.name;
     const groups: { title: string; rows: [string, string][] }[] = [
+        {
+            title: "Template",
+            rows:
+                template === undefined
+                    ? []
+                    : template
+                      ? [[template, "Your site started from it"]]
+                      : [
+                            [
+                                "Your own pages",
+                                "Not made from a template we can show",
+                            ],
+                        ],
+        },
         {
             title: "Look",
             rows:

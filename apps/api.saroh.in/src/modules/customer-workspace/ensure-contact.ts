@@ -2,6 +2,7 @@ import { Logger } from "@nestjs/common";
 import type { PayingLinkOutcome, Prisma } from "@saroh/database";
 import { linkPayingCustomer } from "@saroh/database";
 
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { normaliseEmail } from "./duplicates";
 import { linkSameEmailCustomer } from "./same-email-link";
 
@@ -91,6 +92,19 @@ export async function ensureContactForPaidOrder(
             { organizationId, customerId, reason: "PAYMENT" },
             normaliseEmail,
         );
+        if (outcome === "made") {
+            const link = await tx.customerIdentityLink.findFirst({
+                where: { organizationId, customerId },
+                select: { contactId: true },
+            });
+            if (link) {
+                await emitWebhook(tx, {
+                    organizationId,
+                    type: "customer.created",
+                    id: link.contactId,
+                });
+            }
+        }
         const linked =
             outcome === "suggested" &&
             (await linkSameEmailCustomer(tx, {

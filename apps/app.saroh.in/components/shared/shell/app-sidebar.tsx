@@ -182,7 +182,7 @@ export function AppSidebar({
                             )}
                         >
                             {showsGroupLabel(group) && (
-                                <p className="label px-2.5 pb-1 pt-3 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only">
+                                <p className="label px-2.5 pb-1 pt-3 group-data-[collapsed=true]/rail:sr-only max-[1100px]:sr-only [@media(max-height:960px)]:pt-2">
                                     {group.label}
                                 </p>
                             )}
@@ -296,7 +296,9 @@ export function AppSidebar({
                                                             // scales from the centre rather than
                                                             // fading, so changing page reads as the
                                                             // marker travelling down the rail.
-                                                            "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast",
+                                                            // On a short screen (a 900px laptop) rows give back 2px a side so
+                                                            // an open section and Settings still fit without scrolling.
+                                                            "wk-nav flex items-center gap-2.5 rounded-md px-2.5 py-2 text-[13.5px] transition-colors duration-fast [@media(max-height:960px)]:py-1.5",
                                                             // The icon rail stacks the glyph over
                                                             // a small label ("Saroh Settings"
                                                             // design, 2026-09-25) and drops the
@@ -477,7 +479,7 @@ function NavFlyout({
                         onClick={onLeave}
                         aria-current={on ? "page" : undefined}
                         className={cn(
-                            "relative flex items-center rounded-[7px] py-2 pl-4 pr-3 text-[12.5px] transition-colors duration-fast",
+                            "relative flex items-center rounded-[7px] py-2 pl-4 pr-3 text-[12.5px] transition-colors duration-fast [@media(max-height:960px)]:py-1.5",
                             "duration-fast before:absolute before:left-1.5 before:top-1/2 before:h-[15px] before:w-0.5 before:-translate-y-1/2 before:rounded-[1px] before:bg-highlight before:transition-transform",
                             // A Paper wash over the Ink, never a white
                             // fill — which on this surface would read as a

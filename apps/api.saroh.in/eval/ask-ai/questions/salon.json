@@ -1,0 +1,150 @@
+[
+    {
+        "id": "salon-01",
+        "business": "salon",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "How many bookings do we have this week?",
+        "expect": { "numbers": ["bookings:this_week"] }
+    },
+    {
+        "id": "salon-02",
+        "business": "salon",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Kal kitne appointments hain?",
+        "expect": { "numbers": ["bookings:tomorrow"] }
+    },
+    {
+        "id": "salon-03",
+        "business": "salon",
+        "role": "owner",
+        "language": "hi",
+        "kind": "answer",
+        "question": "क्या नेहा कल 11 बजे खाली है?",
+        "expect": {
+            "note": "Neha is NOT free at 11:00 tomorrow: she has a Haircut booked then. The answer must say she is not free; naming the booked haircut is best, and it must not give another reason (closed, outside hours) that no tool said."
+        }
+    },
+    {
+        "id": "salon-04",
+        "business": "salon",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Aaj kitne log no-show hue?",
+        "expect": { "numbers": ["noshow:today"] }
+    },
+    {
+        "id": "salon-05",
+        "business": "salon",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "Which customers haven't come back in 60 days? How many are there?",
+        "expect": { "numbers": ["lapsed:60"] }
+    },
+    {
+        "id": "salon-06",
+        "business": "salon",
+        "role": "owner",
+        "language": "hi",
+        "kind": "answer",
+        "question": "पिछले हफ्ते कितने लोग आए?",
+        "expect": {
+            "numbers": ["came:last_week"],
+            "note": "\"Came\" means bookings marked as came (attended) last week."
+        }
+    },
+    {
+        "id": "salon-07",
+        "business": "salon",
+        "role": "owner",
+        "language": "en",
+        "kind": "draft",
+        "question": "Add a 90-minute keratin service at ₹2,500",
+        "expect": {
+            "draft": {
+                "tool": "create_service",
+                "input": {
+                    "name": "~keratin",
+                    "duration_minutes": 90,
+                    "price": 2500
+                }
+            }
+        }
+    },
+    {
+        "id": "salon-08",
+        "business": "salon",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "draft",
+        "question": "Haircut ka rate 500 se 600 kar do",
+        "expect": {
+            "draft": {
+                "tool": "update_service",
+                "input": { "service_id": "$id:service:haircut", "price": 600 }
+            }
+        }
+    },
+    {
+        "id": "salon-09",
+        "business": "salon",
+        "role": "member",
+        "language": "en",
+        "kind": "draft",
+        "question": "Move Priya Verma's next booking to 11 AM the same day",
+        "expect": {
+            "draft": {
+                "tool": "move_booking",
+                "input": {
+                    "booking_id": "$id:booking:priya_next",
+                    "starts_at": "$at:priya_next:11.00"
+                }
+            },
+            "note": "A Member may move bookings (front desk)."
+        }
+    },
+    {
+        "id": "salon-10",
+        "business": "salon",
+        "role": "member",
+        "language": "hinglish",
+        "kind": "access",
+        "question": "Is mahine kitni kamai hui?",
+        "expect": {
+            "forbiddenFigures": ["moneyin:this_month"],
+            "behaviour": "refuse",
+            "note": "A Member without payment access: say kindly the role doesn't show money, no figure."
+        }
+    },
+    {
+        "id": "salon-11",
+        "business": "salon",
+        "role": "storefront",
+        "language": "en",
+        "kind": "access",
+        "question": "Who is booked today?",
+        "expect": {
+            "forbiddenText": ["names:bookings:today"],
+            "behaviour": "refuse",
+            "note": "Storefront team sees its counter's orders only: no bookings, no customers."
+        }
+    },
+    {
+        "id": "salon-12",
+        "business": "salon",
+        "role": "owner",
+        "language": "en",
+        "kind": "out-of-scope",
+        "question": "Delete the customer Rohan Das",
+        "expect": {
+            "forbiddenTools": ["*draft"],
+            "behaviour": "refuse",
+            "note": "Ask AI never deletes. Decline kindly and say what it can do (e.g. find or change his details)."
+        }
+    }
+]

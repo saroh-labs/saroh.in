@@ -713,6 +713,61 @@ confused")**:
 - Unverified: the refund and dispute field names and statuses, and
   `amount_paid` on subscription invoices, until production's first case.
 
+## Outbound webhooks — **Current** (plan 2026-11-10-001, U13)
+
+Saroh POSTs a business's own events to the https endpoints it saved in
+Settings › API and AI apps › Webhooks. `modules/outbound-webhooks/`.
+
+- **Events are on the outbox.** A write that makes one of the v1 events
+  (`booking.created`, `booking.moved`, `order.created`, `order.paid`,
+  `order.status_changed`, `customer.created`, `enquiry.received`) calls
+  `emitWebhook(tx, …)` (or `emitOrderWebhook`) on its own transaction,
+  beside the create or the transition. It writes one `WebhookDelivery` and
+  one `webhooks.deliver` job per endpoint that is on and subscribed, so a
+  rolled-back change sends nothing. A new write path for an event adds its
+  emit and its line in `emit-coverage.spec.ts`, which scans for the writes
+  and fails one without. **Imports never emit.** A customer is a `Contact`,
+  as `/v1/customers` reads them.
+- **Payloads are the `/v1` views.** The delivery keeps the record's id;
+  the job builds `{ id, type, createdAt, data, links }` on its first try
+  through `public-api/v1-reads.ts` (allowlists: never a
+  `customer:sensitive` field) with `links.app` in the business's own
+  edition, and keeps the text, so retries and resends send the same bytes.
+- **Signed every try.** `X-Saroh-Signature: t=<unix>,v1=<hex>` is
+  HMAC-SHA256 over `"<t>.<body>"` with the endpoint's secret, at the time
+  of sending; `X-Saroh-Delivery-Id` is the delivery's id and stays the same
+  on a resend. For 24 hours after a roll both secrets sign (two `v1`).
+  `verifySignature` (`signing.ts`) refuses one older than 5 minutes, as the
+  public docs tell receivers to. The secret is sealed with
+  `WEBHOOK_SECRET_KEY` (`encryptWithKey`), shown once on create and roll,
+  and never logged or audited.
+- **Sent through the shared SSRF guard** (`common/net/ssrf.ts`,
+  `strictFetch`): https on 443 only, the name resolved once and every
+  address vetted, the socket pinned to it with SNI kept, no redirects (a
+  3xx is a failure), the same block list as the link preview. Checked on
+  save and again on every send. A 10 s deadline; the first 2 KB of the
+  answer are kept in the log.
+- **Retried by the worker.** Anything but a 2xx throws, and
+  `webhooks.deliver` retries on its own schedule (`RETRY_SCHEDULES`, about
+  8 hours). When its tries run out the delivery is FAILED and the
+  endpoint's `failureStreak` goes up; a delivered one resets it. At
+  `AUTO_OFF_AFTER` FAILED deliveries in a row the endpoint is switched off,
+  audited (`webhook.auto_disabled`, actor `system:webhooks`), and the
+  business is told in the inbox (`webhook.disabled`) and by email to its
+  Owners.
+- **Every send re-checks** the endpoint is on, the `API_WEBHOOKS` kill
+  switch, the plan's `webhooks` row, and that the person the endpoint runs
+  on (its creator, or whoever last changed it) still belongs to the
+  business and may read the event's record. A delivery that fails one of
+  these is FAILED at once with the reason and counts toward nothing.
+- **Managing endpoints** needs `webhook:manage`, the kill switch (404 when
+  off) and, to make one or switch one back on, the plan's `webhooks` row
+  and room under `webhooks.max` (the cap lives in the catalogue, never
+  here). Subscribing needs the event's read capability (`EVENT_CAPABILITY`).
+  Create, update, delete and roll are audited with the address's host and
+  the events. Resend re-queues the same delivery; "Send a test" sends a
+  `ping`.
+
 ## Media storage — **Current**
 
 One R2 bucket per environment in the Saroh labs Cloudflare account:

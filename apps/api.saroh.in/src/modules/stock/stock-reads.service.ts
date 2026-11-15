@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { businessTimezone } from "../bookings/staff-availability";
+import { listRange } from "../orders/order-list-filters";
 import type { StockLevelsQueryDto, StockLogQueryDto } from "./dto";
 import type { StockLevelsView } from "./levels-read";
 import { readLevels } from "./levels-read";
@@ -107,12 +108,18 @@ export class StockReadsService {
         const window = stockWindow(query, DEFAULT_LOG_PAGE);
         const take = window.take ?? DEFAULT_LOG_PAGE;
         await this.assertFilters(organizationId, query);
+        const zone = await businessTimezone(prisma, organizationId);
+        // Made in the range, in the business's zone (Orders' rule).
+        const made = listRange(query, zone, new Date());
         const where: Prisma.StockEntryWhereInput = {
             organizationId,
             ...(query.kind?.length ? { kind: { in: query.kind } } : {}),
             ...(query.storefront ? { storeId: query.storefront } : {}),
             ...(query.product ? { productId: query.product } : {}),
             ...(query.variant ? { variantId: query.variant } : {}),
+            ...(made.gte || made.lt
+                ? { createdAt: { gte: made.gte, lt: made.lt } }
+                : {}),
         };
         const [page, total] = await Promise.all([
             prisma.stockEntry.findMany({
@@ -193,7 +200,7 @@ export class StockReadsService {
             pageSize: take,
             seesPeople: reader.seesPeople,
             seesOrders: reader.seesOrders,
-            timezone: await businessTimezone(prisma, organizationId),
+            timezone: zone,
         };
     }
 

@@ -8,14 +8,15 @@ import { takeProduct } from "../fixtures/throwaway-products";
 import { ignoreHTTPSErrors, NORTHWIND_ORG, urls } from "../playwright.config";
 
 /**
- * A location's team sees and moves that location's orders (DEC-074).
+ * A location's team sees, moves and takes that location's orders (DEC-074;
+ * order-taking, owner 13 Nov 2026).
  *
  * Farah is on Northwind's team as "Storefront team", with a Viewer's role
  * on Northwind Store and none on Online (the seed's
  * `storefront-teammate.ts`). The test makes its own two orders on
  * Northwind — one at Northwind Store, paid and being prepared, and one at
  * Online — and signs in as her: Sell holds Orders alone, her storefront's
- * order is listed and moves to Ready without a rupee on the page, and
+ * order is listed, shows its money and moves to Ready, and
  * Online's is neither listed nor opened. Afterwards the owner collects the
  * first and cancels the second.
  */
@@ -119,15 +120,13 @@ test("a storefront teammate sees and moves only their storefront's orders (DEC-0
         await expect(page.getByText(/No orders match/)).toBeVisible();
         await expect(page.getByText(`#${theirs.orderId}`)).toHaveCount(0);
 
-        // She moves hers to Ready, and sees no money doing it.
+        // She moves hers to Ready, its money in view: taking and changing
+        // orders shows them whole (owner, 13 Nov 2026).
         await page.goto(`/commerce/orders/${mine.id}`);
         await expect(
             page.getByRole("group", { name: /Preparing, step 2 of 4/ }),
         ).toBeVisible();
-        await expect(page.getByRole("region", { name: "Money" })).toHaveCount(
-            0,
-        );
-        await expect(page.getByText(/₹/)).toHaveCount(0);
+        await expect(page.getByText(/₹/).first()).toBeVisible();
         await page
             .getByRole("button", { name: "Mark ready", exact: true })
             .click();

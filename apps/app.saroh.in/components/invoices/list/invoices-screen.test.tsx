@@ -173,6 +173,9 @@ const ALL: ListQuery = {
     cheques: false,
     paidFrom: null,
     q: "",
+    date: null,
+    from: null,
+    to: null,
 };
 
 const s = stage();
@@ -493,5 +496,51 @@ describe("InvoicesScreen: Remind many (U12)", () => {
         show({ canWrite: false, query: { ...ALL, tab: "overdue" } });
         expect(s.text()).not.toContain("Remind");
         expect(ticks()).toEqual([]);
+    });
+});
+
+describe("InvoicesScreen: the issued date (Orders' ?date=)", () => {
+    it("sits beside the status, and a custom range brings its two days", () => {
+        show({
+            query: {
+                ...ALL,
+                date: "custom",
+                from: "2026-08-01",
+                to: "2026-10-31",
+            },
+        });
+        const issued = document.querySelector('[aria-label="Issued"]');
+        expect(issued?.textContent).toContain("Custom range…");
+        expect(document.querySelector('[aria-label="From"]')).not.toBeNull();
+        expect(document.querySelector('[aria-label="To"]')).not.toBeNull();
+    });
+
+    it("combines with a status: the rows the API sent are narrowed by it", () => {
+        show({
+            query: { ...ALL, tab: "paid", date: "month" },
+        });
+        expect(rows()).toEqual(["0101"]);
+    });
+
+    it("an empty range says the days, and Clear filters drops them", () => {
+        search = "date=custom&from=2026-08-01&to=2026-08-31";
+        show({
+            invoices: [],
+            query: {
+                ...ALL,
+                date: "custom",
+                from: "2026-08-01",
+                to: "2026-08-31",
+            },
+        });
+        expect(s.text()).toContain(
+            "No invoices issued between 1 Aug and 31 Aug",
+        );
+        expect(s.text()).not.toContain("No invoices yet");
+        const clear = Array.from(
+            document.querySelectorAll<HTMLButtonElement>("button"),
+        ).find((b) => b.textContent.trim() === "Clear filters");
+        act(() => clear?.click());
+        expect(lastAddress()).toBe("/billing/invoices");
     });
 });

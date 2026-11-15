@@ -161,7 +161,7 @@ describe("the category phrase", () => {
     );
 
     it("is on Home, every feature and every solution", () => {
-        expect(withPhrase).toHaveLength(1 + 9 + 4);
+        expect(withPhrase).toHaveLength(1 + featureList.length + 4);
     });
 
     it.each(withPhrase)(

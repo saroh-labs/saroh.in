@@ -2,8 +2,9 @@ name: Build and deploy apps on Cloudflare
 
 # Builds the apps that run on Cloudflare Workers (OpenNext) and deploys each
 # one whose build would differ from what is live: the marketing site (web),
-# the workspace (application), accounts (auth), admin and the merchant sites
-# (sites). The API deploys on its own (deploy-api.yml).
+# the workspace (application), accounts (auth), admin, the merchant sites
+# (sites) and the public API docs (docs, a static export like saroh.tech's).
+# The API deploys on its own (deploy-api.yml).
 #
 #   push to development   -> the dev Workers (saroh-*-dev, *.saroh.io)
 #   push to main          -> the production Workers (saroh-*, *.saroh.in, saroh.app)
@@ -32,11 +33,11 @@ name: Build and deploy apps on Cloudflare
 # printed (the repo, and so this log, is public).
 #
 # Global's production Workers (stage 10): saroh.tech (`tech`) and Global
-# variants of the workspace, accounts and admin (`*-global`), built from the
+# variants of the workspace, accounts, admin and the docs (`*-global`), built from the
 # same code with scripts/cf-global-prod.mjs's settings. They have no routes and
 # no workers.dev address until the repo variable GLOBAL_ROUTES is "on" (the
 # launch step), so until then nothing Global answers anywhere. Flipping it
-# changes their fingerprints, so the next run redeploys exactly those four.
+# changes their fingerprints, so the next run redeploys exactly those five.
 #
 # Every production build first refuses settings naming a local or development
 # host (scripts/assert-production-hosts.mjs), and builds with CF_DEPLOY=1, so
@@ -94,11 +95,13 @@ on:
                         auth,
                         admin,
                         sites,
+                        docs,
                         all,
                         tech,
                         application-global,
                         auth-global,
                         admin-global,
+                        docs-global,
                         all-global,
                     ]
                 default: web
@@ -148,7 +151,7 @@ jobs:
                   with_ref() { jq -c --arg r "$(ref_of "$1")" 'map(. + {ref: $r})'; }
                   case "$EVENT" in
                     workflow_dispatch)
-                      # "all" is India's five, "all-global" Global's four.
+                      # "all" is India's six, "all-global" Global's five.
                       json=$(FORCE=1 node scripts/cf-plan.mjs "$INPUT_ENV" "$INPUT_APP" | with_ref "$INPUT_ENV") ;;
                     push)
                       env=$([ "$REF" = main ] && echo production || echo development)
@@ -310,7 +313,7 @@ jobs:
             # empty until LAUNCH_AT has passed; then it is the launch switches
             # this build was given (the "Settings" step), for the Worker too.
             - name: Deploy
-              if: matrix.pkg != 'tech'
+              if: matrix.pkg != 'tech' && matrix.pkg != 'docs'
               working-directory: ${{ matrix.dir }}
               run: >-
                   pnpm exec opennextjs-cloudflare deploy
@@ -318,13 +321,14 @@ jobs:
                   --var BUILD_FINGERPRINT:${{ matrix.fingerprint }}
                   ${LAUNCH_DEPLOY_VARS:-}
 
-            # saroh.tech is a static export (out/) behind its own Worker:
-            # wrangler's deploy, with the same fingerprint label.
-            - name: Deploy saroh.tech
-              if: matrix.pkg == 'tech'
+            # saroh.tech and the docs are static exports (out/) behind their
+            # own small Workers: wrangler's deploy, with the same fingerprint label.
+            - name: Deploy a static site
+              if: matrix.pkg == 'tech' || matrix.pkg == 'docs'
               working-directory: ${{ matrix.dir }}
               run: >-
-                  pnpm cf:deploy --env production
+                  pnpm cf:deploy
+                  ${{ matrix.env == 'production' && '--env production' || '' }}
                   --var BUILD_FINGERPRINT:${{ matrix.fingerprint }}
 
             # A deploy recreates the routes in wrangler.jsonc "fail closed";

@@ -1,4 +1,16 @@
 Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/devanagari)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/bengali)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/tamil)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/gujarati)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/gurmukhi)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/telugu)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/kannada)
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/malayalam)
+
+The files here are Noto Sans and Noto Sans Devanagari, Bengali, Tamil,
+Gujarati, Gurmukhi, Telugu, Kannada and Malayalam, Regular and Bold, as
+Google Fonts serves them, unmodified.
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:

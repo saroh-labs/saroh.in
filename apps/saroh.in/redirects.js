@@ -141,7 +141,8 @@ const FAMILY_PAGE = {
  * The redirects the publish list makes (DEC-193, `search-pages.config.js`):
  *
  * - `/solutions/<x>` → 301 `/for/<x>` once `/for/<x>` is live; until then
- *   the solution page keeps serving.
+ *   the solution page keeps serving. `/solutions` itself → 301 `/for`, the
+ *   Solutions hub, once any /for/ page is live (the hub 404s without one).
  * - A /for/ page taken off → 302 (it may come back) to its family page
  *   when that is live, else Home.
  * - A free tool taken off (#1253) → 302 to the /tools hub while any tool
@@ -182,6 +183,8 @@ const searchRedirects = (
     const solutions = SOLUTION_SLUGS.filter((s) => live.has(s)).map((s) =>
         moved(`/solutions/${s}`, `/for/${s}`),
     );
+    // The /for hub is the nav's Solutions page; it serves once a page is live.
+    if (live.size > 0) solutions.push(moved("/solutions", "/for"));
     if (list.preview) return solutions;
     const takenOff = list.takenOff
         .filter((t) => t.path.startsWith(FOR) && !live.has(slugOf(t.path)))

@@ -91,6 +91,18 @@ export const ALERTS = [
         label: "Members",
         note: "When a member cancels or pauses, or turns off autopay at their bank",
     },
+    // Not in the design: a new enquiry and a customer's message (audit
+    // 12 Nov). The API offers each only to who may read leads, or messages.
+    {
+        key: "enquiry",
+        label: "New enquiry",
+        note: "When someone fills in a form on your website",
+    },
+    {
+        key: "message",
+        label: "Customer messages",
+        note: "When a customer writes to you from their account",
+    },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
 
@@ -184,7 +196,9 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
                     alert.key !== "site" &&
                     alert.key !== "request" &&
                     alert.key !== "mine" &&
-                    alert.key !== "member",
+                    alert.key !== "member" &&
+                    alert.key !== "enquiry" &&
+                    alert.key !== "message",
             ).map((alert) => ({
                 key: alert.key,
                 label: alert.label,

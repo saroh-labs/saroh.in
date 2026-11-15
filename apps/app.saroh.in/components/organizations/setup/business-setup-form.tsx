@@ -24,7 +24,6 @@ import { NO_BILLING } from "@/lib/organizations/setup-billing";
 import { defaultGoal, setupGoals } from "@/lib/organizations/setup-plan";
 import type { SetupDraft, SetupValues } from "@/lib/organizations/setup-steps";
 import {
-    asksTrade,
     clearSetupDraft,
     firstUnanswered,
     isLastStep,
@@ -42,6 +41,8 @@ import {
     writeSetupDraft,
 } from "@/lib/organizations/setup-steps";
 
+import type { Trade } from "@/lib/organizations/trade";
+import { asksTradeOf, TRADE_SETUP_HINT } from "@/lib/organizations/trade";
 import { SetupBillingStep, toChoices } from "./setup-billing-step";
 import { createFromSetup } from "./setup-create";
 import { SetupFoot } from "./setup-foot";
@@ -53,6 +54,9 @@ import {
     STEP_LEAD_ID,
     stepHeadingId,
 } from "./setup-step-frame";
+
+import type { GalleryTemplate } from "./setup-gallery-note";
+import { SetupGalleryNote } from "./setup-gallery-note";
 import { SetupTradeChoice } from "./setup-trade-choice";
 import { isTaken, useAddressCheck } from "./use-address-check";
 import { fieldsOf, useSetupWalk } from "./use-setup-walk";
@@ -117,10 +121,13 @@ const onServer = () => false;
 function startingAnswers(
     draft: SetupDraft | null,
     defaultName: string | undefined,
+    galleryTrade: Trade | null | undefined,
 ): SetupValues {
     const typed = draft?.values.name ?? "";
     return {
         kind: "BUSINESS",
+        // The gallery's template picks its trade (DEC-216) until one is chosen.
+        ...(galleryTrade ? { trade: galleryTrade } : {}),
         yourName: "",
         address: "",
         country: PROFILE.businessCountry === "india-only" ? "IN" : "",
@@ -143,6 +150,7 @@ function SetupSteps({
     defaultName,
     arrival,
     note,
+    gallery,
     billingProfiles,
     ready,
 }: SetupFormProps & {
@@ -166,7 +174,7 @@ function SetupSteps({
     const form = useForm<SetupValues>({
         resolver: zodResolver(setupSchema(needsName, billing)),
         ...PAGE_FORM,
-        defaultValues: startingAnswers(draft, defaultName),
+        defaultValues: startingAnswers(draft, defaultName, gallery?.trade),
     });
     const { isSubmitting } = form.formState;
     // Set up, and on the way in: the push takes a moment, and the button
@@ -183,7 +191,6 @@ function SetupSteps({
     const name = useWatch({ control: form.control, name: "name" });
     const address = useWatch({ control: form.control, name: "address" });
     const kind = useWatch({ control: form.control, name: "kind" });
-    const goal = useWatch({ control: form.control, name: "goal" });
     const check = useAddressCheck(address);
 
     // Which step is on show, and where the keyboard goes when it changes.
@@ -269,6 +276,7 @@ function SetupSteps({
             needsName,
             checkout,
             invite,
+            startTemplate: gallery?.id,
             billing: asksBilling,
             // The business exists: the draft has done its work.
             onMade: () => {
@@ -341,7 +349,16 @@ function SetupSteps({
                     headingRef={headingRef}
                     hidden={!ready && step !== "kind"}
                     entering={moved}
-                    arrival={arrival}
+                    arrival={
+                        arrival || gallery ? (
+                            <>
+                                {arrival}
+                                {gallery ? (
+                                    <SetupGalleryNote template={gallery} />
+                                ) : null}
+                            </>
+                        ) : null
+                    }
                     note={note}
                 >
                     <>
@@ -367,6 +384,39 @@ function SetupSteps({
                                             }}
                                             labelledBy={headingId}
                                             describedBy={STEP_LEAD_ID}
+                                        />
+                                    </FormItem>
+                                )}
+                            />
+                        ) : null}
+
+                        {step === "kind" && asksTradeOf(kind) ? (
+                            <FormField
+                                control={form.control}
+                                name="trade"
+                                render={({ field }) => (
+                                    <FormItem data-ph-unmask="">
+                                        <FormField
+                                            control={form.control}
+                                            name="tradeOther"
+                                            render={({
+                                                field: other,
+                                                fieldState,
+                                            }) => (
+                                                <SetupTradeChoice
+                                                    value={field.value}
+                                                    onChange={field.onChange}
+                                                    other={other.value ?? ""}
+                                                    onOtherChange={
+                                                        other.onChange
+                                                    }
+                                                    otherError={
+                                                        fieldState.error
+                                                            ?.message
+                                                    }
+                                                    hint={TRADE_SETUP_HINT}
+                                                />
+                                            )}
                                         />
                                     </FormItem>
                                 )}
@@ -406,21 +456,6 @@ function SetupSteps({
                                             }}
                                             labelledBy={headingId}
                                             describedBy={STEP_LEAD_ID}
-                                        />
-                                    </FormItem>
-                                )}
-                            />
-                        ) : null}
-
-                        {step === "first" && asksTrade(goal) ? (
-                            <FormField
-                                control={form.control}
-                                name="trade"
-                                render={({ field }) => (
-                                    <FormItem data-ph-unmask="">
-                                        <SetupTradeChoice
-                                            value={field.value}
-                                            onChange={field.onChange}
                                         />
                                     </FormItem>
                                 )}
@@ -469,6 +504,12 @@ interface SetupFormProps {
     arrival?: React.ReactNode;
     /** Said on every step: the plan or the invite the create will act on. */
     note?: React.ReactNode;
+    /**
+     * The template picked in the public gallery (`?template=`, DEC-216):
+     * said on the first step, it picks its trade, and the business keeps it
+     * for the website picker.
+     */
+    gallery?: GalleryTemplate | null;
     /**
      * The owner's billing profiles (DEC-167). With any, setup asks who
      * Saroh bills for the business; with none, it isn't asked, and the

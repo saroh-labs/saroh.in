@@ -1,0 +1,7 @@
+# The targets file (pass marks, budget) stays local: ~/.saroh-ai-eval-targets.json.
+# A copy dropped here by mistake never gets committed.
+targets*.json
+*.targets.json
+# Run output belongs outside the repo; never commit it from here either.
+results.json
+grade.json

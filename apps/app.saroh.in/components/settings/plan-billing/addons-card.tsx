@@ -77,7 +77,7 @@ export function AddonsCard({
     }
 
     return (
-        <section aria-label="Add-ons" className={card}>
+        <section id="add-ons" aria-label="Add-ons" className={card}>
             <div className="flex flex-wrap items-baseline gap-2 border-b border-border/70 px-[18px] py-3">
                 <span
                     data-ph-unmask=""

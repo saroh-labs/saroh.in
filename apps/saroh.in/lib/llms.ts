@@ -7,7 +7,7 @@ import { CONTACT_PAGE } from "@/content/contact-page";
 import { featureHref, featureList } from "@/content/features";
 import { helpHref, liveArticles } from "@/content/help";
 import type { HelpFrontmatter } from "@/content/help-frontmatter";
-import { integrationHref, liveIntegrations } from "@/content/integrations";
+import { shownIntegrations } from "@/content/integrations";
 import { PRICING_DESCRIPTION } from "@/content/pricing";
 import type { PublishContext } from "@/content/resources";
 import {
@@ -176,14 +176,16 @@ export function llmsText(
     }
 
     const integrations = resources.some((p) => p.id === "integrations")
-        ? liveIntegrations.filter((i) =>
-              linkShown(integrationHref(i.slug), ctx),
+        ? // Only the provider pages: a card linking into Help isn't one.
+          shownIntegrations(ctx.off ?? []).filter(
+              (i) =>
+                  i.href.startsWith("/integrations/") && linkShown(i.href, ctx),
           )
         : [];
     if (integrations.length > 0) {
         out.push("", "## Integrations", "");
         for (const i of integrations) {
-            out.push(line(base, integrationHref(i.slug), i.name, i.line));
+            out.push(line(base, i.href, i.name, i.line));
         }
     }
 

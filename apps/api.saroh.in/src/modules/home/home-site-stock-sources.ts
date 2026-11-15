@@ -142,19 +142,17 @@ export function isLowShelf(row: LowShelfRow): boolean {
 }
 
 /**
- * Products running low (A14): only where a stock level is set — a shelf
+ * The shelves running low (A14): only where a stock level is set — a shelf
  * row exists for a product that counts stock, at a business that counts
- * it — and its alert is above 0. Each row says how many are left and, when
- * it sold in the last 7 days, how fast it sells. Lowest first. A staff
- * member's Home keeps only their storefronts' (F11).
+ * it — and its alert is above 0. Lowest first. A staff member's Home keeps
+ * only their storefronts' (F11). The caller has checked the business
+ * tracks stock; Ask AI reads them whole (`HomeService.stockWatch`).
  */
-export async function stockLow(
+export async function readLowShelves(
     db: Db,
     organizationId: string,
-    clock: { now: Date; zone: string },
     storeIds?: readonly string[] | null,
-): Promise<HomeAction | null> {
-    if (!(await businessTracksStock(db, organizationId))) return null;
+): Promise<LowShelfRow[]> {
     const read = (await db.stockLevel.findMany({
         where: {
             organizationId,
@@ -191,7 +189,7 @@ export async function stockLow(
             store: { select: { name: true } },
         },
     })) as LowShelfRow[];
-    const low = read
+    return read
         .filter(isLowShelf)
         .sort(
             (a, b) =>
@@ -199,6 +197,20 @@ export async function stockLow(
                 a.product.name.localeCompare(b.product.name) ||
                 a.id.localeCompare(b.id),
         );
+}
+
+/**
+ * Products running low (A14) — see `readLowShelves` for the rule; each row
+ * says how many are left and, when it sold in the last 7 days, how fast.
+ */
+export async function stockLow(
+    db: Db,
+    organizationId: string,
+    clock: { now: Date; zone: string },
+    storeIds?: readonly string[] | null,
+): Promise<HomeAction | null> {
+    if (!(await businessTracksStock(db, organizationId))) return null;
+    const low = await readLowShelves(db, organizationId, storeIds);
     if (low.length === 0) return null;
 
     const shown = low.slice(0, EVIDENCE_LIMIT);

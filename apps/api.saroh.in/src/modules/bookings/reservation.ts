@@ -18,6 +18,7 @@ import type { PriceTerms } from "../invoices/gst-price";
 import { NO_GST_TERMS } from "../invoices/gst-price";
 import { loadPriceTerms } from "../invoices/price-terms";
 import { publicSiteOnlineFor } from "../organizations/organization-lifecycle.gate";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { appointmentsOpen } from "./appointments-open";
 import type { AvailabilityRuleWindow } from "./availability";
 import { guarded, guardMinutes } from "./availability";
@@ -682,6 +683,13 @@ export async function reserveInTx(
         },
     });
 
+    // The business's own server hears of it (outbound webhooks, U13).
+    await emitWebhook(tx, {
+        organizationId,
+        type: "booking.created",
+        id: booking.id,
+    });
+
     // A place they were waiting for, or held for them, is taken (A12).
     await acceptWaitlistInTx(tx, {
         serviceId,
@@ -931,6 +939,10 @@ async function emailContactInTx(
     input: BookInput,
     by: ReserveBy,
 ): Promise<{ id: string }> {
+    const known = await tx.contact.findUnique({
+        where: { organizationId_email: { organizationId, email } },
+        select: { id: true },
+    });
     const contact = await tx.contact.upsert({
         where: { organizationId_email: { organizationId, email } },
         update: by.actorUserId ? contactUpdate(input) : {},
@@ -943,6 +955,13 @@ async function emailContactInTx(
             source: by.source,
         },
     });
+    if (!known) {
+        await emitWebhook(tx, {
+            organizationId,
+            type: "customer.created",
+            id: contact.id,
+        });
+    }
     if (!by.actorUserId) await fillEmptyInTx(tx, contact, input);
     return contact;
 }

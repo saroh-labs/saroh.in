@@ -1,6 +1,7 @@
 import type { ReviewCan } from "@/components/sites/editor/read-only";
 import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
 import type { WebAddressFix } from "@/components/sites/publish/address-fix";
+import type { TemplateRowSource } from "@/components/sites/templates/template-row";
 import type { SiteChangeKind } from "@/lib/sites/pending";
 import type {
     ModulePageKind,
@@ -96,6 +97,11 @@ export interface SiteEditorProps {
     styleAccess?: SiteStyleAccess | null;
     /** The template the site was made from, for "Suggested for …". */
     templateId?: string | null;
+    /**
+     * The Brand tab's Template row (DEC-216); null draws none (the
+     * template choice is off, DEC-135).
+     */
+    templateRow?: TemplateRowSource | null;
     /** Where this site lives, shown in the bar. Null before a subdomain exists. */
     address?: string | null;
     /**

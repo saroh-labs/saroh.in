@@ -2,7 +2,7 @@
 // IPv6 /64 — the block a single subscriber can rotate through.
 import { createHash } from "node:crypto";
 
-import { hashClientIp, limitAddress } from "./client-ip";
+import { hashClientIp, limitAddress, visitorAddress } from "./client-ip";
 
 describe("limitAddress", () => {
     it("keeps an IPv4 address as it is", () => {
@@ -58,5 +58,50 @@ describe("hashClientIp", () => {
         );
         expect(hashClientIp(undefined)).toBeUndefined();
         expect(hashClientIp("")).toBeUndefined();
+    });
+});
+
+describe("visitorAddress (plan 2026-11-10-001, U6)", () => {
+    const req = (peer: string, headers: Record<string, string> = {}) => ({
+        headers,
+        socket: { remoteAddress: peer },
+    });
+
+    it("takes CF-Connecting-IP from the tunnel or Cloudflare's edge", () => {
+        const sent = { "cf-connecting-ip": "203.0.113.7" };
+        expect(visitorAddress(req("10.0.1.14", sent), "cloudflare")).toBe(
+            "203.0.113.7",
+        );
+        expect(
+            visitorAddress(req("::ffff:172.68.1.1", sent), "cloudflare"),
+        ).toBe("203.0.113.7");
+        expect(visitorAddress(req("127.0.0.1", sent), "cloudflare")).toBe(
+            "203.0.113.7",
+        );
+    });
+
+    it("keeps the socket's address from anyone else, or without the Cloudflare mode", () => {
+        const sent = { "cf-connecting-ip": "203.0.113.7" };
+        expect(visitorAddress(req("198.51.100.4", sent), "cloudflare")).toBe(
+            "198.51.100.4",
+        );
+        expect(visitorAddress(req("10.0.1.14", sent), "private")).toBe(
+            "10.0.1.14",
+        );
+        expect(
+            visitorAddress(
+                req("10.0.1.14", { "cf-connecting-ip": "not an ip" }),
+                "cloudflare",
+            ),
+        ).toBe("10.0.1.14");
+    });
+
+    it("never reads X-Forwarded-For", () => {
+        expect(
+            visitorAddress(
+                req("198.51.100.4", { "x-forwarded-for": "192.0.2.1" }),
+                "cloudflare",
+            ),
+        ).toBe("198.51.100.4");
     });
 });

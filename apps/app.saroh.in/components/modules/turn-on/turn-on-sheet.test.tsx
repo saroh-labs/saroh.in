@@ -13,7 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModuleView } from "@/lib/modules/schema";
 import type { SetupDefaults } from "@/lib/modules/turn-on-schema";
 import type { EnableResult } from "@/lib/modules/turn-on-service";
+import type { WebAddressView } from "@/lib/organizations/web-address";
 import type { ConnectLocks } from "@/lib/providers/connect-lock";
+
+import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
 
 import { TurnOnSheet } from "./turn-on-sheet";
 
@@ -28,6 +31,38 @@ vi.mock("@/lib/modules/turn-on-actions", () => ({
     readSetupDefaultsAction: (keys: string[]) => readSetupDefaultsAction(keys),
     enableModuleAction: (key: string, setup: object) =>
         enableModuleAction(key, setup),
+}));
+
+/**
+ * The web address read and its Change dialog (DEC-069): changing isn't
+ * rolled out by default, so the sheet says today's line.
+ */
+let webAddress: Partial<WebAddressView> = {
+    changeAvailable: false,
+    canChange: false,
+};
+const saveWebAddress = vi.fn();
+const addressView = (over: Partial<WebAddressView> = {}): WebAddressView => ({
+    address: "northwind",
+    origin: "https://northwind.saroh.app",
+    platformOrigin: "https://northwind.saroh.app",
+    customDomain: null,
+    links: { site: null, shop: null, book: null },
+    previous: [],
+    changeAvailable: false,
+    canChange: false,
+    ...over,
+});
+vi.mock("@/lib/organizations/web-address-actions", () => ({
+    readWebAddressAction: () =>
+        Promise.resolve({ ok: true, data: addressView(webAddress) }),
+    checkWebAddress: () => Promise.resolve(null),
+    saveWebAddress: (...args: unknown[]) => saveWebAddress(...args) as unknown,
+}));
+
+/** The business's own details for a template's preview (DEC-216). */
+vi.mock("@/lib/sites/actions", () => ({
+    readTemplatePreview: () => Promise.resolve(null),
 }));
 
 /** The template choice's switch (DEC-135); on, as local dev, by default. */
@@ -134,6 +169,8 @@ let hiddenKeys: string[] = [];
 let websiteTemplate: { id: string; name: string } | null = null;
 /** The templates the API says it could start from instead (U12). */
 let websiteTemplates: SetupDefaults["templates"] = [];
+/** The setup-defaults read for Website failed. */
+let websiteUnread = false;
 let websiteKind: string | null = null;
 
 /** jsdom has no layout, so nothing to observe. */
@@ -157,10 +194,13 @@ beforeEach(() => {
         globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
     ).IS_REACT_ACT_ENVIRONMENT = true;
     hiddenKeys = [];
+    webAddress = { changeAvailable: false, canChange: false };
+    saveWebAddress.mockReset();
     templateChoice = true;
     websiteTemplate = null;
     locks = { payments: null, messaging: null };
     websiteTemplates = [];
+    websiteUnread = false;
     websiteKind = null;
     // Radix's checkbox measures itself; jsdom has no ResizeObserver.
     vi.stubGlobal("ResizeObserver", NoResize);
@@ -172,7 +212,7 @@ beforeEach(() => {
                 defaults: DEFAULTS[key] ?? null,
                 dependencies: NEEDS[key] ?? [],
                 hidden: hiddenKeys.includes(key),
-                read: true,
+                read: !(key === "WEBSITE" && websiteUnread),
                 template: key === "WEBSITE" ? websiteTemplate : null,
                 templates: key === "WEBSITE" ? websiteTemplates : [],
                 kind: key === "WEBSITE" ? websiteKind : null,
@@ -264,6 +304,15 @@ function typeInto(el: HTMLInputElement, value: string) {
         )?.set?.call(el, value);
         el.dispatchEvent(new Event("input", { bubbles: true }));
     });
+}
+
+/** A radio by its text: a colourway. */
+function radioNamed(name: string): HTMLButtonElement {
+    const hit = Array.from(
+        sheet().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+    ).find((r) => r.textContent.trim() === name);
+    if (!hit) throw new Error(`No radio ${name}`);
+    return hit;
 }
 
 async function press(b: HTMLButtonElement) {
@@ -517,6 +566,66 @@ describe("Website", () => {
         expect(onOpenChange).not.toHaveBeenCalledWith(false);
     });
 
+    it("offers Change only to the owner, while changing is rolled out", async () => {
+        await open(["WEBSITE"]);
+        expect(() => button(/^Change$/)).toThrow();
+
+        act(() => root.unmount());
+        root = createRoot(host);
+        webAddress = { changeAvailable: true, canChange: false };
+        await open(["WEBSITE"]);
+        expect(text()).toContain(
+            "You chose it when you set up. Only the owner can change it.",
+        );
+        expect(() => button(/^Change$/)).toThrow();
+
+        act(() => root.unmount());
+        root = createRoot(host);
+        webAddress = { changeAvailable: true, canChange: true };
+        await open(["WEBSITE"]);
+        expect(text()).not.toContain("Settings › Business");
+        expect(text()).not.toContain("Only the owner");
+        expect(button(/^Change$/)).toBeDefined();
+    });
+
+    it("changes the web address on top of the sheet, which stays open with the new one", async () => {
+        webAddress = { changeAvailable: true, canChange: true };
+        saveWebAddress.mockResolvedValueOnce({
+            ok: true,
+            data: addressView({
+                ...webAddress,
+                address: "northwind-supply",
+                platformOrigin: "https://northwind-supply.saroh.app",
+            }),
+        });
+        await open(["WEBSITE"]);
+        await press(button(/^Change$/));
+        const dialog = Array.from(
+            document.querySelectorAll<HTMLElement>('[role="dialog"]'),
+        ).find((d) => d.textContent.includes("Change web address"));
+        if (!dialog) throw new Error("The Change dialog is not open");
+        const input = dialog.querySelector("input");
+        if (!input) throw new Error("No address field");
+        typeInto(input, "northwind-supply");
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 400));
+        });
+        await act(async () => {
+            dialog.querySelector("form")?.requestSubmit();
+            await Promise.resolve();
+        });
+        await settle();
+        expect(saveWebAddress).toHaveBeenLastCalledWith("northwind-supply");
+        expect(text()).toContain("northwind-supply.saroh.app");
+        expect(onOpenChange).not.toHaveBeenCalledWith(false);
+
+        await press(button(/^Turn on$/));
+        expect(enableModuleAction).toHaveBeenLastCalledWith(
+            "WEBSITE",
+            expect.objectContaining({ address: "northwind-supply" }),
+        );
+    });
+
     it("says which template the new site starts from, when the API names one (K15)", async () => {
         await open(["WEBSITE"]);
         expect(text()).not.toContain("Starts from");
@@ -536,25 +645,42 @@ describe("Website", () => {
         });
     });
 
-    it("offers the templates suggested for the business, and sends one chosen (U12)", async () => {
+    it("offers the template picker, the suggested first, and sends the one chosen with its colourway (DEC-216)", async () => {
         websiteTemplate = { id: "starter", name: "Starter" };
         websiteKind = "BUSINESS";
         websiteTemplates = [
-            { id: "starter", name: "Starter", kinds: [], uses: [] },
-            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+            {
+                id: "portfolio",
+                version: 1,
+                name: "Portfolio",
+                kinds: [],
+                uses: [],
+            },
             {
                 id: "bakery",
+                version: 1,
                 name: "Bakery",
                 kinds: ["food"],
                 uses: ["COMMERCE"],
+                colourways: [
+                    { id: "crust", name: "Crust", chips: ["0 0% 100%"] },
+                    { id: "night", name: "Night", chips: ["0 0% 0%"] },
+                ],
             },
-            { id: "gym", name: "Gym", kinds: ["gym"], uses: ["APPOINTMENTS"] },
+            {
+                id: "gym",
+                version: 1,
+                name: "Gym",
+                kinds: ["gym"],
+                uses: ["APPOINTMENTS"],
+            },
         ];
         // Sell is turned on with the website, so a shop's template suits.
         await open(["COMMERCE", "WEBSITE"]);
         const group = () => {
             const label = Array.from(sheet().querySelectorAll("span")).find(
-                (el) => el.textContent === "Starts from",
+                (el) => el.textContent === "Template",
             );
             const el = sheet().querySelector(
                 `[role="radiogroup"][aria-labelledby="${label?.id}"]`,
@@ -564,22 +690,101 @@ describe("Website", () => {
         };
         const radios = () =>
             Array.from(
-                group().querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+                group().querySelectorAll<HTMLButtonElement>(
+                    ':scope [role="radio"][aria-labelledby]',
+                ),
+            ).filter((r) => r.closest("[data-template-card]"));
+        const names = () =>
+            radios().map(
+                (r) =>
+                    document.getElementById(
+                        r.getAttribute("aria-labelledby") ?? "",
+                    )?.textContent,
             );
-        const names = radios().map((r) => r.closest("label")?.textContent);
         // The kind's first; Bookings is off, so not the gym's; Portfolio
         // is not a business's.
-        expect(names).toEqual(["Starter", "BakeryUses Products"]);
+        expect(text()).toContain("Suggested");
+        expect(names()).toEqual(["Starter", "Bakery"]);
         expect(radios()[0]?.getAttribute("aria-checked")).toBe("true");
         expect(text()).toContain("Uses Products");
 
+        // All is one press away, the gym's saying why it waits.
+        await press(button(/^All 4$/));
+        expect(names()).toEqual(["Starter", "Bakery", "Portfolio", "Gym"]);
+        expect(text()).toContain("Uses Bookings: turn it on to use this");
+
         await press(radios()[1]);
+        await press(radioNamed("Night"));
         await press(button(/^Turn on/));
         expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
             siteName: "Northwind",
             address: "northwind",
             templateId: "bakery",
+            styleId: "night",
         });
+    });
+
+    it("starts on the template picked in the gallery, and sends it (DEC-216)", async () => {
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+            {
+                id: "salon",
+                version: 1,
+                name: "Salon",
+                kinds: ["salon"],
+                uses: [],
+            },
+        ];
+        act(() => {
+            root.render(
+                <BusinessTradeProvider trade="salon" startTemplate="salon">
+                    <TurnOnSheet
+                        picked={["WEBSITE"]}
+                        modules={ALL_OFF}
+                        onOpenChange={onOpenChange}
+                    />
+                </BusinessTradeProvider>,
+            );
+        });
+        await settle();
+        expect(text()).toContain("Suggested for salons");
+        await press(button(/^Turn on with Salon$/));
+        expect(enableModuleAction).toHaveBeenCalledWith("WEBSITE", {
+            siteName: "Northwind",
+            address: "northwind",
+            templateId: "salon",
+        });
+    });
+
+    it("names the template on the button when Website is turned on alone", async () => {
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteKind = "BUSINESS";
+        websiteTemplates = [
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+        ];
+        await open(["WEBSITE"]);
+        // One template is still a picture card, never a sentence alone.
+        expect(
+            sheet().querySelector('[data-template-card="starter"]'),
+        ).not.toBeNull();
+        expect(button(/^Turn on with Starter$/)).toBeTruthy();
+    });
+
+    it("says templates that couldn't be read, and reads them again (board D7)", async () => {
+        websiteUnread = true;
+        await open(["WEBSITE"]);
+        expect(text()).toContain("Couldn't load the templates.");
+        websiteUnread = false;
+        websiteTemplate = { id: "starter", name: "Starter" };
+        websiteTemplates = [
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
+        ];
+        await press(button(/^Try again$/));
+        expect(
+            sheet().querySelector('[data-template-card="starter"]'),
+        ).not.toBeNull();
     });
 
     it("with the template choice switched off, names and offers no template and sends none (DEC-135)", async () => {
@@ -587,9 +792,10 @@ describe("Website", () => {
         websiteTemplate = { id: "starter", name: "Starter" };
         websiteKind = "BUSINESS";
         websiteTemplates = [
-            { id: "starter", name: "Starter", kinds: [], uses: [] },
+            { id: "starter", version: 1, name: "Starter", kinds: [], uses: [] },
             {
                 id: "bakery",
+                version: 1,
                 name: "Bakery",
                 kinds: ["food"],
                 uses: ["COMMERCE"],
@@ -606,19 +812,6 @@ describe("Website", () => {
             siteName: "Northwind",
             address: "northwind",
         });
-    });
-
-    it("keeps the sentence when only the kind's template suits", async () => {
-        websiteTemplate = { id: "portfolio", name: "Portfolio" };
-        websiteKind = "WORK";
-        websiteTemplates = [
-            { id: "starter", name: "Starter", kinds: [], uses: [] },
-            { id: "portfolio", name: "Portfolio", kinds: [], uses: [] },
-        ];
-        await open(["WEBSITE"]);
-        expect(text()).toContain(
-            "Starts from the Portfolio template. Change its pages any time.",
-        );
     });
 
     it("says a refusal it can't place at the top of the sheet", async () => {

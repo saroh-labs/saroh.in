@@ -49,7 +49,7 @@ import { OrderFulfilmentChangeService } from "./order-fulfilment-change.service"
 import { OrderKitchenService } from "./order-kitchen.service";
 import { PAY_LINK_ORDER_SELECT, payLinkStanding } from "./order-pay-link";
 import { OrderPayLinkService } from "./order-pay-link.service";
-import { OrdersService } from "./orders.service";
+import { ORDER_TAKEN_NOTE, OrdersService } from "./orders.service";
 
 const WEBHOOK_SECRET = "whsec_b9_test";
 const tag = `${process.pid}-${Date.now()}`;
@@ -645,7 +645,11 @@ describe("cancel as a full refund (B9, real database)", () => {
         const row = await orderRow(id);
         expect(row.status).toBe("CANCELLED");
         const step = await prisma.orderEvent.findFirstOrThrow({
-            where: { orderId: id, kind: "STATUS" },
+            where: {
+                orderId: id,
+                kind: "STATUS",
+                note: { not: ORDER_TAKEN_NOTE },
+            },
             select: { toStatus: true, note: true },
         });
         expect(step).toEqual({

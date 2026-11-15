@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
 import type { StaffView } from "@/lib/staff/types";
 
+import type { EditorProps } from "./service-editor";
 import { ServiceEditor } from "./service-editor";
 
 vi.setConfig({ testTimeout: 20_000 });
@@ -192,6 +193,7 @@ function open({
     canEdit = true,
     hasPage = true,
     others = [],
+    share = null,
 }: {
     saved?: Service | null;
     rules?: AvailabilityRule[] | null;
@@ -201,6 +203,7 @@ function open({
     canEdit?: boolean;
     hasPage?: boolean | null;
     others?: { id: string; name: string }[];
+    share?: EditorProps["share"];
 } = {}) {
     act(() =>
         root.render(
@@ -215,6 +218,7 @@ function open({
                 canEdit={canEdit}
                 hasPage={hasPage}
                 others={others}
+                share={share}
             />,
         ),
     );
@@ -789,5 +793,30 @@ describe.each([
                 (i) => i.textContent.trim(),
             ),
         ).toEqual(["See its bookings"]);
+    });
+});
+
+describe("Share as a post (#1375 U2)", () => {
+    const share = {
+        bookUrl: "https://rye.example.com/book",
+        setup: {
+            apiOrigin: "https://api.example.com",
+            siteId: "site_1",
+            schedule: { tier: "free" as const },
+        },
+    };
+    const shareButton = () =>
+        document.querySelector('[data-share-item="service"]');
+
+    it("is offered for a service on the live booking page", () => {
+        open({ saved: service(), share });
+        expect(shareButton()).not.toBeNull();
+    });
+
+    it("is left out off the booking page, or with no live site", () => {
+        open({ saved: service({ showOnBookingPage: false }), share });
+        expect(shareButton()).toBeNull();
+        open({ saved: service(), share: null });
+        expect(shareButton()).toBeNull();
     });
 });

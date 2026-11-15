@@ -5,6 +5,7 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { emailHeldBy } from "../contacts/contact-edit";
 import { CreateContactDto } from "../contacts/dto";
 import { authorize } from "../organizations/organization-policy";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import { ADDED_AS_CUSTOMER } from "./customers-list.sql";
 
 /** Sell › Customers › Add customer: the same fields as Contacts' own add. */
@@ -44,17 +45,25 @@ export class CustomerAddService {
         });
         if (holder) throw emailHeldBy(holder);
         try {
-            const made = await this.db.contact.create({
-                data: {
+            const made = await this.db.$transaction(async (tx) => {
+                const contact = await tx.contact.create({
+                    data: {
+                        organizationId,
+                        email: dto.email,
+                        firstName: blank(dto.firstName),
+                        lastName: blank(dto.lastName),
+                        phone: blank(dto.phone),
+                        company: blank(dto.company),
+                        source: ADDED_AS_CUSTOMER,
+                    },
+                    select: { id: true },
+                });
+                await emitWebhook(tx, {
                     organizationId,
-                    email: dto.email,
-                    firstName: blank(dto.firstName),
-                    lastName: blank(dto.lastName),
-                    phone: blank(dto.phone),
-                    company: blank(dto.company),
-                    source: ADDED_AS_CUSTOMER,
-                },
-                select: { id: true },
+                    type: "customer.created",
+                    id: contact.id,
+                });
+                return contact;
             });
             return { contactId: made.id };
         } catch (err) {

@@ -29,6 +29,18 @@ export function Pill({
     return <span className={cn(TONE[tone], className)} {...props} />;
 }
 
+/** The small "new" beside a fresh item in a menu or the footer (`NavItem.isNew`). */
+export function NewTag({ className }: { className?: string }) {
+    return (
+        <Pill
+            tone="soon"
+            className={cn("ml-1.5 px-1.5 py-px text-[10.5px]", className)}
+        >
+            new
+        </Pill>
+    );
+}
+
 /**
  * A chip that goes somewhere, with its arrow:
  * - `md` — Home's "Works for" chips (14.5px).

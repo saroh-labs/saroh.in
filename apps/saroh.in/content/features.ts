@@ -1,5 +1,6 @@
 /**
- * The nine feature pages: eight from the Features template's `F` and `LINE`
+ * The feature pages (nine, plus AI apps, Ask AI and Share behind their
+ * switches): eight from the Features template's `F` and `LINE`
  * data blocks, the Nav's `FEATURES` lines and Home's `modules` bodies, and
  * Website, written in the same shape on 12 Oct 2026 (it has no design of
  * its own yet).
@@ -17,15 +18,18 @@
  *   which says what the screenshot really shows;
  * - the design's `home` key is the `dashboard` slug (/features/dashboard).
  */
+import { shownFeatures } from "@saroh/marketing/feature-switches";
+
+import { featuresOff } from "@/lib/feature-switches";
+
 import type { Feature, FeatureSlug } from "./types";
-import { FEATURE_SLUGS } from "./types";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for its
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-15";
 
 export const features: Record<FeatureSlug, Feature> = {
     dashboard: {
@@ -41,33 +45,33 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Open up and see what needs you.",
         sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in, what's owed and what failed, most urgent first. Each person sees the part that's theirs, and most things can be done right from the list.",
         hero: {
-            shot: "s-home",
+            shot: "d-home",
         },
         howTitle: "One screen before the first customer.",
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders, stock short for orders, failed renewals and overdue bills, each with the button that fixes it: Mark sent, Send reminder, or a new pay link for a failed renewal.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-home",
+                body: "Overdue bills, notes to answer, failed renewals, late orders and stock short for orders, each with the button that fixes it.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-needs",
             },
             {
                 title: "Today's people, in order",
                 body: "Who's booked, at what time and with whom, and who pays at the desk. Anything the team should know is beside their name.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-home",
+                shot: "k-today",
             },
             {
                 title: "Money that needs chasing",
                 body: "Overdue bills with a reminder ready to send, and failed renewals with a new pay link.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-home",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-money",
             },
             {
                 title: "Zoom out to the month",
                 body: "The calendar shows every day's orders, bookings, renewals and bills, with money in, out and due.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-calendar",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-calendar",
             },
         ],
         points: [
@@ -202,27 +206,27 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
-            shot: "s-orders",
+            shot: "k-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
-                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. Print a ticket for the kitchen.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-order",
+                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. A shop's order prints a ticket for the kitchen.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-order",
             },
             {
                 title: "Orders that take several visits",
                 body: "A treatment sold as three visits is fulfilled by those visits. Mark each one attended, or book the next.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-order",
+                shot: "k-visits",
             },
             {
                 title: "Each one makes its invoice",
-                body: "Paid orders get a numbered invoice with the right tax, ready to send or print.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-invoice",
+                body: "Paid orders get a numbered invoice with the right tax, ready to send or print. An exempt treatment gets a bill of supply.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-invoice",
             },
         ],
         points: [
@@ -267,33 +271,33 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Know the person in front of you.",
         sub: "Customer management for a small team. Every customer's bookings, plans, bills and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
         hero: {
-            shot: "r-customers",
+            shot: "d-customers",
         },
         howTitle: "A page for everyone who pays.",
         steps: [
             {
                 title: "Everything about them on one page",
-                body: "What they've spent, how they usually get their order, and what they buy most, down to the size.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-customer",
+                body: "What they've spent, their bookings, orders, invoices and notes, and anything the team should know at the top.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-customer",
             },
             {
-                title: "Members, with what they have left",
-                body: "Classes left on their membership and their next booking.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-customer",
+                title: "What they have left",
+                body: "A treatment of several visits shows what's attended, what's booked and what's still to book. A member's classes left on a pack show the same way.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-visits",
             },
             {
                 title: "Notes they send reach the team",
                 body: "What a patient writes when booking is matched to their record. Check it, label it and add it where the team will see it.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-customer",
+                shot: "k-note",
             },
             {
                 title: "Flags only for the right people",
-                body: "Allergies and access needs show on their orders, kitchen tickets, today's list and bookings. Medical notes only show to those allowed to see them.",
+                body: "Allergies and access needs show on their orders, today's list and bookings. Medical notes marked Sensitive only show to those allowed to see them.",
                 who: "Kavi Dental (demo clinic)",
-                shot: "d-customers",
+                shot: "k-flags",
             },
         ],
         points: [
@@ -340,7 +344,7 @@ export const features: Record<FeatureSlug, Feature> = {
         steps: [
             {
                 title: "Customers book themselves",
-                body: "Your booking page shows only real free times, from your team's hours. They pick, and pay what you ask at booking.",
+                body: "Your booking page shows only real free times, from your team's hours. They pick, and pay what you ask at booking, a deposit or the whole amount.",
                 who: "Pulse Fitness (demo gym)",
                 shot: "g-book",
             },
@@ -351,10 +355,10 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "g-courses",
             },
             {
-                title: "Treatments over several visits",
-                body: "A root canal is three visits of an hour. Patients book the first visit, pay a deposit or the whole amount, and tell you what you need to know. Your team books the rest.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-book",
+                title: "Sessions over several visits",
+                body: "A block of personal training is three sessions of an hour. Members book the first, pay a deposit or the whole amount, and your team books the rest. Class packs work the same way, a visit at a time.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-ptblock",
             },
         ],
         points: [
@@ -403,27 +407,27 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Regulars on a plan, renewed on time.",
         sub: "Membership and subscription billing for your regulars: memberships, weekly bread, monthly boxes. Each renewal makes its invoice on the day, and plans can renew on their own by UPI Autopay where you've set it up on your Razorpay account. A failed payment is shown to you with a new pay link.",
         hero: {
-            shot: "r-subdetail",
+            shot: "g-subdetail",
         },
         howTitle: "Set up once, renewed every time.",
         steps: [
             {
-                title: "Your plans, on your site",
-                body: "Plans are listed on your site with their price and what's included. You sign members up at the desk.",
+                title: "Your plans, with their price",
+                body: "Set each plan's price and how often it renews. List them on your site, and sign members up at the desk.",
                 who: "Pulse Fitness (demo gym)",
-                shot: "g-site",
+                shot: "g-plans",
             },
             {
                 title: "Renewals run themselves",
                 body: "Each plan renews on its day. If a payment fails, it's flagged for you with a new pay link.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-subs",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-subs",
             },
             {
                 title: "Every renewal makes its invoice",
                 body: "The invoice is made on the renewal day, ready to send.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-billing",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-billing",
             },
         ],
         points: [
@@ -476,15 +480,15 @@ export const features: Record<FeatureSlug, Feature> = {
             },
             {
                 title: "The right kind for your business",
-                body: "Mark a service GST-exempt and its invoices are bills of supply.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-billing",
+                body: "Mark a product or service GST-exempt, like bread, and a bill for it alone is a bill of supply, worded as the law asks.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "r-supply",
             },
             {
                 title: "See what's overdue",
-                body: "Overdue bills are flagged, with a reminder and a pay link ready to send.",
-                who: "Pulse Fitness (demo gym)",
-                shot: "g-billing",
+                body: "Overdue bills are flagged, with a reminder and a pay link ready to send. Cheques show as paid until they clear.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "r-money",
             },
         ],
         points: [
@@ -527,6 +531,9 @@ export const features: Record<FeatureSlug, Feature> = {
      * nothing about choosing a template (DEC-135), the online shop
      * (`SITE_SHOP`) or the customer's account area (`SITE_ACCOUNT_AREA`).
      * Both shots are of a demo business's own site and booking page.
+     * `templates` (DEC-216, board VSWebsite) is drawn only while templates
+     * are switched on (`NEXT_PUBLIC_TEMPLATES`), so the rule above still
+     * holds in production until then.
      */
     website: {
         slug: "website",
@@ -548,9 +555,9 @@ export const features: Record<FeatureSlug, Feature> = {
         steps: [
             {
                 title: "It reads what you already entered",
-                body: "A services list shows each service with how long it takes and its price. Opening hours, today's free times, your phone and your address are read the same way, so a change in Saroh shows on your site without editing the page.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-site",
+                body: "Your classes, services and prices, opening hours, today's free times, your phone and your address are read from Saroh, so a change there shows on your site without editing the page.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-site-train",
             },
             {
                 title: "Customers book from it",
@@ -559,6 +566,27 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "g-book",
             },
         ],
+        templates: {
+            title: "Pick a template for your trade.",
+            lead: "Tell Saroh what kind of place it is when you set up, and the templates made for your trade come first. Each one is already wired to your services, products or classes, with its own type and colours.",
+            picks: ["salon", "bakery", "gym", "store"],
+            suggested: "Suggested for salons",
+            points: [
+                {
+                    title: "Your trade first",
+                    body: "Setup asks what kind of place it is: a salon, gym, clinic, coach, food, shop or creator. The templates made for it come first, and All is one press away.",
+                },
+                {
+                    title: "See your own site before you choose",
+                    body: "Press a template to see it with your business's name and details, on a computer and a phone, in each of its colourways. Choosing is a separate press.",
+                },
+                {
+                    title: "Change it later",
+                    body: "Pick another template in the editor. Saroh shows you the preview first, then asks before it replaces any pages.",
+                },
+            ],
+            linkLabel: "See every template",
+        },
         points: [
             {
                 title: "Your own domain",
@@ -628,20 +656,20 @@ export const features: Record<FeatureSlug, Feature> = {
         howTitle: "From this week to the last three months.",
         steps: [
             {
-                title: "Four numbers for your site",
-                body: "Site views, unique visitors, enquiries and orders, side by side for the days you pick.",
+                title: "What to do next",
+                body: "One suggestion at a time from your own sales, like a product selling less, with the button that acts on it.",
                 who: "Northwind Supply (demo business)",
                 shot: "i-compare",
             },
             {
-                title: "Views, day by day",
-                body: "A bar for each day shows when people came to your site.",
+                title: "Am I making more money?",
+                body: "A straight answer, with each week beside the weeks before it.",
                 who: "Northwind Supply (demo business)",
                 shot: "i-weeks",
             },
             {
-                title: "The pages people open most",
-                body: "See which pages get the most views, so you know what people come for.",
+                title: "What sells, and where customers come from",
+                body: "Your best sellers with units and money, and how many visits, enquiries and paid orders came in.",
                 who: "Northwind Supply (demo business)",
                 shot: "i-store",
             },
@@ -670,13 +698,251 @@ export const features: Record<FeatureSlug, Feature> = {
         usedBy: ["shops", "gyms", "clinics"],
         closer: "See how your site is doing.",
     },
+    /*
+     * AI apps, Ask AI and Share (plan 2026-11-13-002): the approved boards'
+     * words (VFAiApps, VFAskAi, VFSocial), built only while their switch is
+     * on (`shownFeatures`). U3 to U5 finish them: shots, the drawn chat, the
+     * plan lines from the catalogue, and the Anthropic point after the
+     * owner's legal read.
+     */
+    "ai-apps": {
+        slug: "ai-apps",
+        phrase: "AI assistant integration",
+        seoTitle: "AI assistant integration for small business",
+        seoDescription:
+            "AI assistant integration that lets Claude, ChatGPT and other AI apps add products, move bookings and draft pages for your business.",
+        name: "AI apps",
+        navLine: "Use Saroh from your AI assistant",
+        cardLine: "Use Saroh from your AI assistant.",
+        homeBody:
+            "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
+        headline: "Use Saroh from your AI assistant.",
+        sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up today's bookings or move one. It can do only what you can do in Saroh, and nothing on your website goes live until someone on your team publishes it.",
+        // The hero and step 3 are real chats in Claude, shot by hand and kept
+        // as supplied shots (owner, 15 Nov 2026), not drawings.
+        hero: { shot: "ai-hero" },
+        howTitle: "Connected in a minute. In charge after.",
+        steps: [
+            {
+                title: "Add Saroh to your AI app",
+                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector. Each app's guide shows where.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ai-connect",
+            },
+            {
+                title: "Sign in and pick your businesses",
+                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick one business, several or all of yours, and allow it. One connection covers them all.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ai-consent",
+            },
+            {
+                title: "Ask in your own words",
+                body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in AI activity in Settings, kept for 90 days. When a booking moves, the customer is told. Website changes stay a draft until you publish them in Saroh.",
+                who: "Rye & Co. (demo bakery)",
+                // A real chat in Claude (owner, 15 Nov 2026), not a drawing.
+                shot: "ai-ask",
+            },
+            {
+                title: "See everything it did",
+                body: "Settings lists each AI app you connected and every change it made. Put the website draft back as it was before the app's changes, or disconnect it at any time.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ai-activity",
+            },
+        ],
+        points: [
+            {
+                title: "Your website, by asking",
+                body: "Build and change pages, sections, the look, the menu and the footer, and add images. Or start a site from a template.",
+            },
+            {
+                title: "Your catalogue",
+                body: "Products, services, prices, stock and opening hours.",
+            },
+            {
+                title: "Your day",
+                body: "Find free times, make and move bookings, make orders and move them along, and read enquiries and customers.",
+            },
+            {
+                title: "Only what you can do",
+                body: "It acts as you, with your role. It can't cancel bookings, refund, touch billing or change your team, and it never sees sensitive customer details.",
+            },
+            {
+                title: "Nothing goes live by itself",
+                body: "You publish website changes in Saroh, or send them to your reviewer. The app can't.",
+            },
+            {
+                title: "Several businesses, one connection",
+                body: "Tick the ones it may use. It names the business on every change it makes.",
+            },
+        ],
+        apps: {
+            title: "Apps you can use",
+            lead: "Saroh connects through MCP, the open standard AI apps use to reach other tools. Each app has a short guide.",
+            also: "Also works with Gemini CLI, Microsoft Copilot Studio, Windsurf and Notion, and other apps that connect to MCP servers with a sign-in. Some apps need one of their own paid plans.",
+        },
+        worksLead:
+            "Your AI assistant works on the same records as the rest of Saroh, so a change it makes is a change everywhere.",
+        worksWith: ["website", "products", "bookings", "orders"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Do your Saroh work by asking.",
+    },
+    "ask-ai": {
+        slug: "ask-ai",
+        phrase: "AI business assistant",
+        seoTitle: "AI business assistant for small business owners",
+        seoDescription:
+            "AI business assistant that answers questions about your bookings, orders and customers from your own records, in English, Hinglish or Hindi.",
+        name: "Ask AI",
+        navLine: "Ask about your business, inside Saroh",
+        cardLine: "Ask about your business, inside Saroh.",
+        homeBody:
+            "Ask about your business inside Saroh, answered from your own bookings, orders and customers.",
+        headline: "Ask about your business. Get a straight answer.",
+        sub: "An AI business assistant inside Saroh. Ask in English, Hinglish or Hindi how the week went, what's selling or who hasn't come back, and get the answer from your own records, in the same figures Home and Insights show. Ask it to add or change something and it fills in a card for you to check. Nothing is saved until you confirm.",
+        hero: { shot: "ask-hero", phone: "ask-hero-phone" },
+        howTitle: "Ask in your own words.",
+        steps: [
+            {
+                title: "Open Ask AI from any screen",
+                body: "The Ask AI button sits at the top of Saroh. Type a question, or tap one of the ready ones to start.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ask-start",
+            },
+            {
+                title: "Answers from your own records",
+                body: "It reads your bookings, orders, customers and products, says where each answer came from, and links to that screen. Ask in Hinglish and it answers in Hinglish.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ask-answer",
+            },
+            {
+                title: "Changes come as a card you confirm",
+                body: "Ask it to add a service, move a booking or update a customer and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo an edit the same day.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ask-confirm",
+            },
+            {
+                title: "Go back to an earlier question",
+                body: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "ask-history",
+            },
+        ],
+        points: [
+            {
+                title: "Only what you may see",
+                body: "It answers from what your role lets you see in Saroh. Someone without access to money gets no takings.",
+            },
+            {
+                title: "Nothing saved without you",
+                body: "Every change is a card you confirm. It never deletes, cancels or refunds.",
+            },
+            {
+                title: "English, Hinglish or Hindi",
+                body: "It answers in the language you ask in, or the one you choose.",
+            },
+            {
+                title: "You decide who uses it",
+                body: "Owners and admins can use it to start. Give it to anyone else in Roles, or turn it off for the business.",
+            },
+        ],
+        worksLead:
+            "Ask AI reads from everything else in Saroh, so its answers match your screens.",
+        worksWith: ["dashboard", "insights", "bookings", "ai-apps"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Ask your business, in your words.",
+    },
+    social: {
+        slug: "social",
+        phrase: "social media posts",
+        seoTitle: "Social media posts made from what you sell",
+        seoDescription:
+            "Social media posts made from your products, services and offers, in your website's look, ready to share on WhatsApp, Instagram or Facebook.",
+        name: "Share and posts",
+        navLine: "Share cards and posts made from what you sell",
+        cardLine: "Turn what you sell into a post.",
+        homeBody:
+            "Share a product, service, offer or post as a card in your look, or make a post of your own.",
+        headline: "Turn what you sell into a post in a minute.",
+        sub: "Social media posts made from what you sell. Share a product, a service or class, an offer, a blog post or your booking page as a ready post, drawn in your website's own colours, fonts and logo. Pick a card, check the caption, then post it yourself on WhatsApp, Instagram or Facebook from your phone or computer.",
+        hero: { shot: "sh-post" },
+        howTitle: "From your page to their feed.",
+        steps: [
+            {
+                title: "Press Share on anything with a page",
+                body: "Products, services and classes, blog posts, offers and your booking page each get a Share button once they're live on your site.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "sh-button",
+            },
+            {
+                title: "Pick a card and a size",
+                body: "Photo, Price tag, Offer or Simple, as a post, a square or a story. A card only shows what the item has: no live offer, no Offer card.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "sh-cards",
+            },
+            {
+                title: "Post it from your phone",
+                body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "sh-phone",
+            },
+            {
+                title: "Or make your own post",
+                body: "In Social, Create post takes a headline, your own photo or both, and a link to any page on your site. Your own posts are saved, so you can share them again.",
+                who: "Rye & Co. (demo bakery)",
+                shot: "sh-post-card",
+            },
+        ],
+        points: [
+            {
+                title: "In your look, not ours",
+                body: "Cards use your website's colours, fonts and logo.",
+            },
+            {
+                title: "Indian scripts drawn right",
+                body: "Names in Hindi and other Indian scripts come out as you typed them.",
+            },
+            {
+                title: "The right size for each place",
+                body: "Post, square and story. Stories keep words clear of the top and bottom.",
+            },
+            {
+                title: "You post, from your own accounts",
+                body: "Saroh makes the picture and the caption. You share them, so there's nothing to connect and no password to give.",
+            },
+            {
+                title: "Links that sell",
+                body: "Every post links to the item's live page, where people can book or buy.",
+            },
+        ],
+        worksLead:
+            "A post reads its name, picture and price from where you already keep them.",
+        worksWith: ["products", "bookings", "website"],
+        usedBy: ["shops", "salons", "gyms", "clinics"],
+        closer: "Something new? Share it today.",
+    },
 };
 
-/** The features in the menu's order. */
-export const featureList: Feature[] = FEATURE_SLUGS.map((s) => features[s]);
+/**
+ * The features this build shows, in the menu's order: a switched-off one
+ * (`lib/feature-switches.ts`) is never built or linked.
+ */
+export const featureList: Feature[] = shownFeatures(featuresOff()).map(
+    (s) => features[s],
+);
 
 export const featureHref = (slug: FeatureSlug) => `/features/${slug}`;
 
+/**
+ * Tagged "new" in the menus, the footer and Home's grid while their release
+ * is fresh (plan 2026-11-13-002, U2); empty this list in a later commit.
+ */
+export const NEW_FEATURES: readonly FeatureSlug[] = [
+    "ai-apps",
+    "ask-ai",
+    "social",
+];
+
+/** Whether `value` names a feature page, shown or not. */
 export function isFeatureSlug(value: string): value is FeatureSlug {
-    return (FEATURE_SLUGS as readonly string[]).includes(value);
+    return Object.hasOwn(features, value);
 }

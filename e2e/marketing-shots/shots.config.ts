@@ -36,6 +36,12 @@ export const BUSINESSES = {
         site: "pulse-fitness",
     },
     kavi: { id: "seed_sc_kavi_org", name: "Kavi Dental", site: "kavi-dental" },
+    /** The demo salon (`salon-data.ts`, NOOR): Share and, later, Ask AI. */
+    gulmohar: {
+        id: "seed_sc_ns_org",
+        name: "Gulmohar Salon & Bridal",
+        site: "gulmohar-salon",
+    },
     northwind: {
         id: "seed_org",
         name: "Northwind Supply",
@@ -111,7 +117,9 @@ export type Step =
      * Type into a field, as a person filling a form would. Only on a form
      * that is never submitted (the shot is taken before its button).
      */
-    | { fill: string; value: string };
+    | { fill: string; value: string }
+    /** Scroll this scrolling area back to its top. */
+    | { scrollTop: string };
 
 /**
  * What part of the page is kept. Omitted: the viewport. `selector`: the box
@@ -156,6 +164,12 @@ export interface Shot {
      * The image itself stays clean.
      */
     mark?: string;
+    /**
+     * Another product's own screen (Claude's, ChatGPT's), which the stack
+     * can't open: the image is put in place by hand and kept, never taken.
+     * Says where it came from.
+     */
+    supplied?: string;
 }
 
 /** Notices that would only be put away by a write. */
@@ -1437,6 +1451,360 @@ const PAYMENT_SHOTS: Shot[] = [
     },
 ];
 
+/* ── Share and posts (plan 2026-11-13-002, U4; board VFSocial) ─────────
+ *
+ * The Share button on a live product or service and its sheet, and Create
+ * post. Opening the sheet, picking a card or a size and typing a headline
+ * only change the page's own state: nothing is downloaded, shared or
+ * saved. Needs Share on (`NEXT_PUBLIC_SHARE_POSTS`, unset reads on under
+ * `next dev`) and the API's `SHARE_POSTS`. A phone's own share sheet is
+ * the phone's, never captured: `sh-phone` is Saroh's sheet at phone width.
+ */
+const RYE_SOURDOUGH_PAGE =
+    "/commerce/products/seed_sc_rc_product_0?storefront=seed_sc_rc_store";
+/** The visible Share button: a product page draws a second one for phones. */
+const OPEN_SHARE: Step[] = [
+    { click: "button[data-share-item]:visible" },
+    { waitFor: '[role="dialog"] [role="radiogroup"]' },
+];
+const PHONE: Viewport = { width: 390, height: 844 };
+
+const SHARE_SHOTS: Shot[] = [
+    {
+        key: "sh-sheet",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH_PAGE,
+        viewport: DESK,
+        steps: [
+            ...OPEN_SHARE,
+            { click: '[role="dialog"] [data-card="price"]' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        alt: "The Share sheet for the Sourdough loaf at Rye & Co. (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
+        caption:
+            "The Share sheet for Rye & Co.'s Cardamom bun box: a large Price tag card in the bakery's brown and cream, four card styles, Post, Square and Story, an editable caption with the shop link, and Download image, Copy caption, Send on WhatsApp and Share on Facebook",
+        gap: "The seed's Rye & Co. has no Cardamom bun box; the Sourdough loaf is shown.",
+    },
+    {
+        key: "sh-button",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH_PAGE,
+        // Taken at 900 wide, so the page lays out in about the width a
+        // step's half draws it at, and cropped from the breadcrumb through
+        // the photos: Share and "On the online shop" read at near full size
+        // (owner, 14 Nov 2026).
+        viewport: { width: 900, height: 1300 },
+        clip: {
+            selector: 'main nav[aria-label="Breadcrumb"]',
+            until: 'main [role="tabpanel"] div.bg-card:has-text("Photos and videos")',
+            pad: 12,
+        },
+        alt: "The Sourdough loaf's page at Rye & Co. (demo bakery), live on the shop, with the Share button beside QR",
+        caption:
+            "A live product page in Saroh, Cardamom bun box, with the Share button beside QR",
+        gap: "The Sourdough loaf, not a Cardamom bun box.",
+    },
+    {
+        // The same Sourdough loaf as the hero (owner, 14 Nov 2026: one
+        // example through the page), its weekend offer on the Offer card.
+        key: "sh-cards",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH_PAGE,
+        viewport: DESK,
+        steps: [
+            ...OPEN_SHARE,
+            { click: '[role="dialog"] button:has-text("Square")' },
+            { click: '[role="dialog"] [data-card="offer"]' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
+        ],
+        clip: { selector: '[role="dialog"]' },
+        alt: "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
+        caption:
+            "The Sourdough loaf's card styles in Rye & Co.'s colours, Square chosen, and the Offer card showing its weekend discount",
+    },
+    {
+        key: "sh-phone",
+        business: "rye",
+        role: "owner",
+        route: RYE_SOURDOUGH_PAGE,
+        viewport: PHONE,
+        steps: OPEN_SHARE,
+        alt: "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
+        caption:
+            "A phone share sheet with the Sourdough loaf's card in Rye & Co.'s colours, a note saying the caption is copied for Instagram, and Share now",
+        gap: "The phone's own share sheet can't be captured; this is Saroh's sheet before Share now opens it.",
+    },
+    {
+        key: "sh-post",
+        business: "rye",
+        role: "owner",
+        route: "/social/new",
+        viewport: DESK,
+        steps: [
+            { click: '[data-own-post] button:has-text("Text only")' },
+            { waitFor: "[data-own-headline]" },
+            {
+                fill: "[data-own-headline]",
+                value: "We're hiring a morning baker",
+            },
+            // Out of the field, so no focus ring is in the picture.
+            { click: "main h1" },
+        ],
+        alt: "Create post at Rye & Co. (demo bakery): Text only, the headline We're hiring a morning baker, a link and the card drawn in the bakery's look",
+        caption:
+            "Create post with Text only chosen, the headline We're hiring a morning baker, a link to the Work with us page, and the card drawn in the bakery's green",
+        gap: "The link is left as offered; the seed may have no Work with us page.",
+    },
+    {
+        // Step 4's close-up of the hero's post, finished (owner, 14 Nov
+        // 2026): narrower than DESK and cropped to the form and its card.
+        key: "sh-post-card",
+        business: "rye",
+        role: "owner",
+        route: "/social/new",
+        viewport: { width: 1100, height: 1000 },
+        steps: [
+            { click: '[data-own-post] button:has-text("Text only")' },
+            { waitFor: "[data-own-headline]" },
+            {
+                fill: "[data-own-headline]",
+                value: "We're hiring a morning baker",
+            },
+            {
+                fill: "[data-own-caption]",
+                value: "Early starts, good pay and all the bread you can eat. Come and see us on Hill Road.",
+            },
+            { click: 'main [role="radiogroup"] label:has-text("Shop")' },
+            // Out of the field, so no focus ring is in the picture.
+            { click: "main h1" },
+        ],
+        clip: { selector: "[data-own-composer]", pad: 20 },
+        alt: "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+        caption:
+            "Create post filled in: the headline We're hiring a morning baker, a short caption, the Shop link chosen, and the card drawn in the bakery's colours",
+    },
+];
+
+/* ── AI apps (plan 2026-11-13-002, U3; board VFAiApps) ─────────────────
+ *
+ * Only Saroh's own screens: the AI app's chat and its Add a connector form
+ * are another company's, drawn on the page or left out, never captured.
+ * Both wait for state the showcase seed doesn't make, so each waits for a
+ * control only the real screen has and fails rather than shoot the wrong
+ * one (see `gap`). Read-only: the consent screen is shot before Allow, and
+ * opening a connection's sheet only changes the page.
+ */
+
+/**
+ * Ask AI (owner, 15 Nov 2026): Rye & Co. through the page, each shot a
+ * conversation already asked on the capture database, opened from the
+ * history list by its question; the capture never asks. Ask them first
+ * (`gap`): "How did this week go, and which products sold the most?",
+ * "Is hafte sabse zyada kya bika?" and "Change the Sourdough loaf's
+ * description to: …", the change card left unconfirmed.
+ */
+const ASK_GAP =
+    "Asked by hand on the capture database first (Anthropic key in .env.local), with the API's R2_PUBLIC_BASE_URL set so the product cards show photos.";
+const openAsk = (question: string): Step[] => [
+    {
+        click: `nav[aria-label="Your conversations"] button:has-text("${question}")`,
+    },
+    { waitFor: 'button:has-text("Report this answer")' },
+];
+const ASK_PANE = 'section[aria-label="Ask AI"]';
+const ASK_AI_SHOTS: Shot[] = [
+    {
+        key: "ask-hero",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        // Tall enough that the question shows above the answer.
+        viewport: { width: 1440, height: 1200 },
+        steps: openAsk("How did this week go"),
+        alt: "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
+        caption:
+            "Ask AI's page: How did this week go, and which products sold the most? Answered from the bakery's own orders, with the best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        // The hero on a phone: the same answer as the app draws it there.
+        key: "ask-hero-phone",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 390, height: 844 },
+        // A phone opens the list from the page's header.
+        steps: [
+            { click: 'button[aria-label="Your conversations"]' },
+            ...openAsk("How did this week go"),
+            // It opens at the answer's end; show the question and the words.
+            { scrollTop: "#ask-ai-page .overflow-y-auto" },
+        ],
+        alt: "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+        caption:
+            "Ask AI on a phone: how the week went, answered from the bakery's own orders",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-start",
+        business: "rye",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 900 },
+        steps: [
+            { click: 'header button:has-text("Ask AI")' },
+            {
+                waitFor:
+                    'aside[aria-label="Ask AI"] button:has-text("Who hasn\'t paid")',
+            },
+        ],
+        clip: { selector: 'aside[aria-label="Ask AI"]' },
+        alt: "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
+        caption:
+            "The Ask AI panel opened over Home: Ask about Rye & Co., and ready questions such as Who hasn't paid and Top products this month",
+    },
+    {
+        key: "ask-answer",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 1000 },
+        steps: openAsk("Is hafte sabse zyada"),
+        clip: { selector: ASK_PANE },
+        alt: "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
+        caption:
+            "Is hafte sabse zyada kya bika? Answered in Hinglish from the bakery's own orders, with the week's best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-confirm",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 640 },
+        steps: openAsk("Change the Sourdough"),
+        clip: { selector: ASK_PANE },
+        alt: "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+        caption:
+            "A change to the Sourdough loaf's description comes back as a card: the old words struck through, the new ones, and Change product or Cancel",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-history",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 900 },
+        steps: [{ waitFor: 'nav[aria-label="Your conversations"] button' }],
+        clip: {
+            selector: 'nav[aria-label="Your conversations"] h1',
+            until: 'nav[aria-label="Your conversations"] button:has-text("How did this week go")',
+            pad: 20,
+        },
+        alt: "Ask AI's history at Rye & Co. (demo bakery)",
+        caption:
+            "Your conversations: each kept for 90 days and seen only by you, newest first",
+        gap: ASK_GAP,
+    },
+];
+const AI_APPS_SHOTS: Shot[] = [
+    {
+        key: "ai-hero",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude connected to Rye & Co. on saroh.io, asked to add a button to the home page as a draft; cropped to the request and the answer (15 Nov 2026)",
+        alt: "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
+        caption:
+            "In Claude: add a button near the top of Rye & Co.'s home page that says Order tomorrow's sourdough. Claude, using Saroh, adds it as a draft visitors don't see yet and says where it sits",
+    },
+    {
+        key: "ai-ask",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude connected to Rye & Co. on saroh.io, asked to mark an order ready for pickup; the request and the answer joined without the tool line, which shows internal ids (15 Nov 2026)",
+        alt: "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
+        caption:
+            "In Claude: mark order 1067 as ready for pickup. Claude marks it ready, leaves the courier order alone, and says 13 orders are still to pack",
+    },
+    {
+        key: "ai-connect",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude's Settings › Connectors › Add custom connector with Saroh's address, shot by the owner (14 Nov 2026)",
+        alt: "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
+        caption:
+            "An AI app's Add a connector form with the name Saroh and Saroh's MCP address filled in",
+    },
+    {
+        key: "ai-consent",
+        business: "rye",
+        role: "owner",
+        // Claude's own sign-in, as claude.ai starts it (its published client
+        // document), through Pick a business to the consent page; shot before
+        // Allow, so no code is issued. The challenge is a fixed, valid one: the
+        // capture never trades a code.
+        route: `api:/api/auth/oauth2/authorize?${new URLSearchParams({
+            response_type: "code",
+            client_id: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+            redirect_uri: "https://claude.ai/api/mcp/auth_callback",
+            scope: "saroh:read saroh:write offline_access",
+            code_challenge: "p7ZuqXBBQMmAPxlhacRYlz9GkdSucYGHKSxCZ05PETA",
+            code_challenge_method: "S256",
+            state: "shots",
+        }).toString()}&resource={mcp}`,
+        viewport: DESK,
+        steps: [
+            { click: 'role=checkbox[name="Rye & Co."]' },
+            { click: 'button:has-text("Continue")' },
+            { waitFor: 'button:has-text("Don\'t allow")' },
+        ],
+        // The consent column alone: full page it was a small card in white.
+        clip: { selector: "h1 >> xpath=..", pad: 32 },
+        alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
+        caption:
+            "An AI app wants to use Saroh as you: two of three businesses ticked, what it may do and what it can't, and Allow",
+        gap: "The seed's owner ticks Rye & Co. only, not two of three businesses.",
+    },
+    {
+        key: "ai-activity",
+        business: "rye",
+        role: "owner",
+        route: "/settings/developers/ai",
+        viewport: DESK,
+        steps: [
+            { click: 'button[aria-label^="Open "]' },
+            { waitFor: '[role="dialog"]' },
+        ],
+        // The connection's sheet alone; the page behind it is dimmed.
+        clip: { selector: '[role="dialog"]' },
+        alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
+        caption:
+            "Settings › API and AI apps › AI assistants: Claude connected to two businesses, its last three changes, and Roll back site draft and Disconnect",
+        gap: "The seed connects no AI app: run `pnpm --filter @saroh/e2e shots:connect-claude` and make a change or two through it first (see that script).",
+    },
+];
+
+/** Home's "Use Saroh from Claude" notice: a moment, not what a step shows. */
+const HIDE_AI_MOMENT: Step = { hide: '[data-moment="new-ai-apps"]' };
+/** Home's desk layout; the phone one is in the page too, hidden. */
+const HOME_DESK = '[data-home-layout="desk"]';
+
+/**
+ * A step's shot: drawn in half the page, so it's taken at 900 wide and the
+ * screen's words read at near full size (owner, 14-15 Nov 2026).
+ */
+const STEP_VIEW: Viewport = { width: 900, height: 1000 };
+
 export const SHOTS: Shot[] = [
     // ── Rye & Co. ──────────────────────────────────────────────────────
     {
@@ -1445,11 +1813,49 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/",
         viewport: DESK,
+        steps: [HIDE_AI_MOMENT],
         alt: "Home at Rye & Co. (demo bakery): what needs doing today, from late orders to a failed renewal",
         caption:
             "Home at Rye & Co.: nine things that need Priya, from late orders to a failed renewal",
         gap: 'The owner is "Demo", not Priya, and the list holds 18 things, not nine.',
     },
+    // Billing's overdue step: Rye's own Home, the money rows opened.
+    {
+        key: "r-money",
+        business: "rye",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [
+            HIDE_AI_MOMENT,
+            {
+                click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
+            },
+        ],
+        clip: {
+            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
+            until: `${HOME_DESK} [data-need-group]:has-text("go through")`,
+            pad: 8,
+        },
+        alt: "Money to chase on the Home of Rye & Co. (demo bakery): overdue bills with Remind all, cheques waiting to clear and a failed renewal",
+        caption:
+            "Overdue bills with a reminder ready, cheques not yet in the bank, and a renewal to retry by pay link",
+    },
+
+    {
+        // Billing's step 2: Rye's bread is nil-rated, so a bread-only bill
+        // is a bill of supply (the same app rule as a clinic's).
+        key: "r-supply",
+        business: "rye",
+        role: "owner",
+        route: "/billing/invoices/seed_sc_rc_invoice_trade_13",
+        viewport: { width: 1100, height: 1300 },
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        alt: "A bill of supply from Rye & Co. (demo bakery) for nil-rated sourdough loaves, with the exempt-supply line",
+        caption:
+            "Bread is exempt from GST, so a bill for bread alone is a bill of supply, worded as the law asks",
+    },
+
     {
         key: "s-orders",
         business: "rye",
@@ -1467,7 +1873,7 @@ export const SHOTS: Shot[] = [
         role: "owner",
         // Order #1074: Priya Raman's, placed today, a loaf that may contain sesame.
         route: "/commerce/orders/seed_sc_rc_order_73",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "An order at Rye & Co. (demo bakery): how long it has waited, a sesame allergy warning, items, customer and money",
         caption:
             "Order #1020: waiting 16 minutes, a sesame allergy warning, items, customer and money",
@@ -1479,7 +1885,9 @@ export const SHOTS: Shot[] = [
         role: "owner",
         // RC/26-27/0087, written by hand to Kiln & Co. Café.
         route: "/billing/invoices/seed_sc_rc_invoice_trade_3",
-        viewport: DESK,
+        viewport: { width: 1100, height: 1300 },
+        // The invoice as it prints, without the page around it.
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
         alt: "A GST tax invoice from Rye & Co. (demo bakery) to a café, with the business's details and tax",
         caption:
             "A GST invoice made from an order, with the business's details and tax / A GST tax invoice from Rye & Co. to Third Wave Café",
@@ -1500,7 +1908,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/customers/seed_sc_rc_contact_priya",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Priya Raman's page: her orders and spend, a sesame allergy and what she usually buys",
         caption:
             "Priya Raman's page: six orders, what she has spent (an amount), a sesame allergy and what she usually buys",
@@ -1521,7 +1929,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/billing/subscriptions",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Subscriptions at Rye & Co. (demo bakery) with one failed renewal flagged",
         caption: "Subscriptions at Rye & Co. with one failed renewal flagged",
     },
@@ -1530,7 +1938,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/billing/invoices",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Invoices at Rye & Co. (demo bakery): each order's GST invoice, paid or due, with what's overdue flagged",
         caption:
             "Invoices at Rye & Co.: each order's GST invoice, paid or due, with a bulk order in draft",
@@ -1541,7 +1949,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/calendar",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "This month on the calendar with each day's money and a strip of totals",
         caption:
             "September on the calendar with each day's money and a strip of totals",
@@ -1562,7 +1970,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/commerce/products/seed_sc_rc_product_0/edit",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "The product editor: name, link, price and category beside visibility, variants and stock",
         caption:
             "The product editor: name, address on the shop, price and category beside visibility, variants and stock",
@@ -1571,24 +1979,20 @@ export const SHOTS: Shot[] = [
         key: "p-site",
         business: "rye",
         role: "owner",
-        // Rye's website does not list its products yet ("Not on the website"),
-        // so this is the product's shop page as a customer sees it, from the
-        // workspace's Customer view, with the team's notes switched off.
-        route: "/commerce/products/seed_sc_rc_product_0?view=customer",
-        viewport: { width: 1440, height: 1600 },
-        steps: [{ click: '[role="switch"]:has-text("Team notes")' }],
-        clip: { selector: "div.overflow-hidden.rounded-xl.border.shadow-sm" },
-        alt: "The shop page of Rye & Co. (demo bakery) for the Sourdough loaf: sizes, price and Add to basket",
+        // Rye's own shop page, as a customer sees it (15 Nov 2026: the seed
+        // gives Rye a shop that sells from Online).
+        route: "site:/shop",
+        viewport: { width: 1100, height: 1000 },
+        alt: "The shop of Rye & Co. (demo bakery) on its Saroh website: cakes and extras with photos and prices",
         caption:
-            "Rye & Co.'s shop page showing each product with its sizes, price and an Add to bag button / Rye & Co.'s own shop, built on Saroh: products with sizes, prices and Add to bag",
-        gap: "Rye's website has no shop yet, so this is one product's shop page (the Customer view), not a list of products; the button reads \"Add to basket\".",
+            "The shop of Rye & Co. (demo bakery), built on Saroh: products with photos, sizes and prices",
     },
     {
         key: "p-stock",
         business: "rye",
         role: "owner",
         route: "/commerce/stock",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
         caption:
             "Stock levels for each size at Hill Road and Online, with what can be sold and what's promised",
@@ -1598,7 +2002,7 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/commerce/products/seed_sc_rc_product_0",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Sourdough loaf's page: what can be sold now, with open orders, discounts, collections, the website and reviews",
         caption:
             "Sourdough loaf's page: 25 can be sold now, with open orders, discounts, collections, pages and reviews",
@@ -1618,47 +2022,46 @@ export const SHOTS: Shot[] = [
         gap: "Insights as designed (takings, best week, one location against another) is not built; today's Insights shows site views, visitors, enquiries and orders. Rye has Insights off, so this is Northwind.",
     },
     {
+        // Insights' cards since the redesign (15 Nov 2026 retake).
         key: "i-compare",
         business: "northwind",
         role: "owner",
         route: "/analytics",
-        viewport: { width: 1440, height: 1100 },
-        // The dashboard's headline figures and its chart, without the page.
+        viewport: { width: 1100, height: 1500 },
         clip: {
-            selector: "main div.grid.gap-4:has(> div.grid > .wk-item)",
-            pad: 16,
+            selector: '[data-testid="insights-suggestion"]',
+            pad: 8,
         },
-        alt: "Insights for 30 days: site views, unique visitors, enquiries and orders, views by day and the most-viewed pages",
+        alt: "Insights at Northwind Supply (demo business): what to do next, a product selling less, with a button to open it",
         caption:
-            "Insights at Rye & Co.: takings, 304 orders, best week 15 Sep, average order (amounts)",
-        gap: "No takings, best week or average order in today's Insights; these are site views, visitors, enquiries and orders at Northwind.",
+            "What to do next: one suggestion from the business's own sales, with the button that acts on it",
     },
     {
         key: "i-weeks",
         business: "northwind",
         role: "owner",
-        route: "/analytics?range=90d",
-        viewport: DESK,
+        route: "/analytics",
+        viewport: { width: 1100, height: 1500 },
         clip: {
-            selector:
-                'main div.rounded-xl.border:has-text("Site views by day")',
-            pad: 16,
+            selector: '[data-testid="answer-money"]',
+            pad: 8,
         },
-        alt: "Ninety days of site views, a bar for each day",
+        alt: "Am I making more money? at Northwind Supply (demo business): the last 4 weeks against the 4 before, week by week",
         caption:
-            "Twelve weeks of takings, from 7 Jul to 22 Sep, with 15 Sep marked as the best week",
-        gap: "Today's chart is site views by day, not takings by week, and marks no best week.",
+            "Am I making more money? Yes, with the weeks side by side against the 4 before",
     },
     {
         key: "i-store",
         business: "northwind",
         role: "owner",
-        route: "/analytics?range=7d",
-        viewport: DESK,
-        alt: "Insights for the last seven days: site views, enquiries, orders and the most-viewed pages",
-        caption:
-            "Insights for Hill Road only: takings and 240 orders in four weeks",
-        gap: "Insights cannot be narrowed to one location; this is the last seven days for the whole business.",
+        route: "/analytics",
+        viewport: { width: 1100, height: 1500 },
+        clip: {
+            selector: '[data-testid="answer-sells"]',
+            pad: 8,
+        },
+        alt: "What sells at Northwind Supply (demo business): the three best sellers with units and money",
+        caption: "What sells most, with units sold and money taken",
     },
 
     // ── Pulse Fitness ──────────────────────────────────────────────────
@@ -1689,7 +2092,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "site:/book",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "The booking page of Pulse Fitness (demo gym), with services, classes and a summary",
         caption:
             "Pulse Fitness's booking page with services, courses and a summary",
@@ -1699,7 +2102,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/courses",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Courses at Pulse Fitness (demo gym): a four-week strength course with the places taken",
         caption:
             "Courses at Pulse: a six-week beginners' course and a 5K course with places filled",
@@ -1710,7 +2113,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/class-packs",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Class packs: 5 and 10 classes with how many are sold and still to use",
         caption:
             "Class packs: 5 and 10 classes with how many are sold and still to use",
@@ -1726,12 +2129,50 @@ export const SHOTS: Shot[] = [
             "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
         gap: "Farah Khan is a Kavi Dental patient in the seed; Asha Verma is on Pulse's four-week course, and the page shows her membership and next booking, not the course.",
     },
+    // Subscriptions follows Pulse Fitness (owner, 15 Nov 2026).
+    {
+        // Bookings' step 3: a block of personal training, one order of three visits.
+        key: "g-ptblock",
+        business: "pulse",
+        role: "owner",
+        route: "/commerce/orders/seed_sc_pulse_order_ptblock",
+        viewport: { width: 1100, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        alt: "A personal training block at Pulse Fitness (demo gym): three sessions, the first attended and the second booked",
+        caption:
+            "A block of three personal training sessions, sold once: what's attended, what's booked and what's left",
+    },
+    {
+        key: "g-subdetail",
+        business: "pulse",
+        role: "owner",
+        route: "/billing/subscriptions",
+        viewport: DESK,
+        steps: [
+            { click: 'main tr:has-text("Payment failed")' },
+            { waitFor: '[role="dialog"]:has-text("Try again or fix payment")' },
+        ],
+        alt: "A member's membership at Pulse Fitness (demo gym): a renewal not paid, with Try again or fix payment, Pause and Cancel",
+        caption:
+            "A membership whose renewal failed, with the next charge, the failed one and what to do about it",
+    },
+    {
+        key: "g-plans",
+        business: "pulse",
+        role: "owner",
+        route: "/billing/subscriptions",
+        viewport: STEP_VIEW,
+        steps: [{ click: 'main [role="tab"]:has-text("Plans")' }],
+        alt: "The membership plans at Pulse Fitness (demo gym), each with its price and how often it renews",
+        caption:
+            "Pulse's three membership plans with their prices and how often they renew",
+    },
     {
         key: "g-subs",
         business: "pulse",
         role: "owner",
         route: "/billing/subscriptions",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Memberships at Pulse Fitness (demo gym) with their next charge",
         caption: "Memberships at Pulse with their next charge",
     },
@@ -1740,10 +2181,22 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/billing/invoices",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Invoices at Pulse Fitness (demo gym), with the overdue ones flagged",
         caption: "Pulse Fitness's invoices with four overdue",
         gap: "The seed has 17 overdue, not four.",
+    },
+    {
+        // Website's step 1: what Pulse entered in Saroh, as its site shows it.
+        key: "g-site-train",
+        business: "pulse",
+        role: "owner",
+        route: "site:/",
+        viewport: { width: 1100, height: 1500 },
+        clip: { selector: 'section:has(h2:text-is("Ways to train"))', pad: 0 },
+        alt: "Ways to train on the site of Pulse Fitness (demo gym): its classes and memberships with their prices, read from Saroh",
+        caption:
+            "Pulse Fitness's site lists its ways to train with their prices, read from what it entered in Saroh",
     },
     {
         key: "g-site",
@@ -1774,18 +2227,140 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "A root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
         caption:
             "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
         gap: "The order is #ORD-001 and visit 2 is booked for a coming day, not today.",
+    },
+    // Customers follows Kavi Dental (owner, 15 Nov 2026: the business that
+    // shows every step's feature): Rahul's root canal, note and flags.
+    // Dashboard follows Kavi Dental: its Home has today's people (15 Nov 2026).
+    {
+        key: "k-needs",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [HIDE_AI_MOMENT],
+        clip: {
+            selector: `${HOME_DESK} section:has(h2:text-is("Needs you"))`,
+            pad: 8,
+        },
+        alt: "Needs you on the Home of Kavi Dental (demo clinic): unpaid bills, an enquiry to answer and what to set up, each with its button",
+        caption:
+            "Needs you at Kavi Dental: bills to chase, a patient's note to answer and what's left to set up",
+    },
+    {
+        key: "k-today",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [HIDE_AI_MOMENT],
+        clip: {
+            selector: `${HOME_DESK} section:has(h2:text-is("Today"))`,
+            pad: 8,
+        },
+        alt: "Today on the Home of Kavi Dental (demo clinic): the day's patients in order, with their dentist, how they pay and their flags",
+        caption:
+            "Today's patients in order, each with their dentist, how they pay and anything the team should know",
+    },
+    {
+        key: "k-money",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [
+            HIDE_AI_MOMENT,
+            {
+                click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
+            },
+        ],
+        clip: {
+            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
+            pad: 8,
+        },
+        alt: "Unpaid bills on the Home of Kavi Dental (demo clinic): the overdue ones with Remind all",
+        caption:
+            "Overdue bills at Kavi Dental, each with how late it is and a reminder ready to send",
+    },
+    {
+        key: "k-calendar",
+        business: "kavi",
+        role: "owner",
+        route: "/calendar",
+        viewport: STEP_VIEW,
+        alt: "This month on the calendar at Kavi Dental (demo clinic), with each day's bookings and money",
+        caption:
+            "The month at Kavi Dental: each day's bookings and money in, out and due",
+    },
+    // Orders follows Kavi Dental: treatments sold as orders of several visits.
+    {
+        key: "k-orders",
+        business: "kavi",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: DESK,
+        steps: [HIDE_AI_MOMENT],
+        alt: "Orders at Kavi Dental (demo clinic): treatments of several visits, each with its next visit and how it's paid",
+        caption:
+            "Kavi Dental's orders: implants, braces, root canals and cleanings, each with where it's up to",
+    },
+    {
+        key: "k-invoice",
+        business: "kavi",
+        role: "owner",
+        route: "/billing/invoices/seed_sc_kavi_invoice_o_rahul_rct",
+        viewport: { width: 1100, height: 1300 },
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        alt: "The bill for Rahul Verma's root canal from Kavi Dental (demo clinic): a bill of supply, as dental treatment is exempt from GST",
+        caption:
+            "The treatment's bill, made from the order: a bill of supply, as healthcare is exempt from GST",
+    },
+    {
+        key: "k-visits",
+        business: "kavi",
+        role: "owner",
+        route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
+        viewport: { width: 1100, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        alt: "Rahul Verma's root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book, with his latex allergy and blood thinners above",
+        caption:
+            "A three-visit root canal: what's attended, what's booked and what's left, with the patient's flags on top",
+    },
+    {
+        key: "k-note",
+        business: "kavi",
+        role: "owner",
+        route: "/customers/seed_sc_kavi_contact_rahul",
+        viewport: { width: 1100, height: 1000 },
+        clip: {
+            selector: 'section[aria-label="1 note from the booking page"]',
+            pad: 8,
+        },
+        alt: "A note Rahul Verma wrote when booking at Kavi Dental (demo clinic), ready to label Medical and add to Needs attention as sensitive",
+        caption:
+            "What a patient wrote when booking, matched to their record, to label and add where the team will see it",
+    },
+    {
+        key: "k-flags",
+        business: "kavi",
+        role: "owner",
+        route: "/customers/seed_sc_kavi_contact_rahul",
+        viewport: { width: 1100, height: 1600 },
+        clip: { selector: 'section[aria-label="Needs attention"]', pad: 8 },
+        alt: "Needs attention on Rahul Verma's record at Kavi Dental (demo clinic): a latex allergy, and blood thinners marked Sensitive",
+        caption:
+            "Allergy and medical flags on the patient's record; the medical one is Sensitive, shown only to those allowed",
     },
     {
         key: "d-customer",
         business: "kavi",
         role: "owner",
         route: "/customers/seed_sc_kavi_contact_rahul",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
         caption:
             "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
@@ -1837,4 +2412,7 @@ export const SHOTS: Shot[] = [
     ...PAYMENT_SHOTS,
     ...SIZES_SHOTS,
     ...STOCK_SHOTS,
+    ...SHARE_SHOTS,
+    ...AI_APPS_SHOTS,
+    ...ASK_AI_SHOTS,
 ];

@@ -1,0 +1,55 @@
+---
+title: "Authentication"
+---
+
+## Authentication
+
+One identity system for the whole suite, powered by
+[Better Auth](https://www.better-auth.com/).
+
+- **`api.saroh.in` hosts the auth server**, at `/api/auth/*`.
+- **`accounts.saroh.in` is the sign-in UI.** It is the only place a password is
+  entered, and the only identity provider the other apps trust.
+- Apps consume the shared `@saroh/auth` package rather than configuring auth
+  themselves, so there is one session contract instead of nine.
+
+## Sessions across subdomains
+
+Every app validates the same session, so `BETTER_AUTH_SECRET` must be identical
+everywhere one is checked. The session cookie is scoped to the shared parent
+domain — `saroh.in` in production, `saroh.localhost` locally — which is why
+every app runs under portless at a `.localhost` hostname. Apps on different
+ports of bare `localhost` do not share a session, and the workspace bounces
+back to sign-in forever.
+
+## Two things that will trip you up locally
+
+### The secret is read at import time
+
+`createAuth()` runs when the auth module is imported, before Nest's
+`ConfigModule` has loaded `.env`. Running the built output directly therefore
+throws before it can explain itself. Source the environment first — see
+[Getting started](./getting-started.md).
+
+### Trusted origins exclude localhost
+
+Mutating requests whose `Origin` is not trusted are refused, and that includes
+same-origin Next.js **server actions**. The default list is `*.saroh.in`, so on
+`.localhost` every write returns 403 while every read works — which looks like
+a permissions bug and is not — and sign-in lands on the app launcher instead of
+the page you asked for.
+
+Set `BETTER_AUTH_TRUSTED_ORIGINS` in the API's `.env` and in each frontend you
+run; the root `.env.example` has the value. Production does not need it.
+
+## Verification and invitation emails
+
+With SMTP unset, links and sign-in codes are **logged to the API console**
+rather than sent. That is deliberate for local development: read the link or
+code out of the log, and carry on without wiring a mail provider.
+
+## Roles
+
+Authentication answers _who_; the organization policy answers _what they may
+do_. See [Architecture](./architecture.md#tenancy) for the role table, and note that
+CRM data is deliberately outside the read-only floor.

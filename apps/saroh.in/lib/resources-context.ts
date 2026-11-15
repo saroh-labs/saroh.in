@@ -1,5 +1,8 @@
+import { switchedOffSet } from "@saroh/marketing/feature-switches";
+
 import type { PublishContext } from "@/content/resources";
 import { env } from "@/env";
+import { featuresOff } from "@/lib/feature-switches";
 import { publishList } from "@/lib/search-pages";
 
 /**
@@ -26,8 +29,10 @@ export function templatesOn(
     flag: string | undefined,
     nodeEnv: string | undefined,
 ): boolean {
-    if (flag) return flag === "on";
-    return nodeEnv === "development";
+    return !switchedOffSet({
+        NEXT_PUBLIC_TEMPLATES: flag,
+        NODE_ENV: nodeEnv,
+    }).includes("templates");
 }
 
 /** The build's routes from `SAROH_BUILT_ROUTES`, or null when it isn't set or readable. */
@@ -77,9 +82,7 @@ function contextAt(now: Date): PublishContext {
         now,
         preview: previewOn(env.RESOURCES_PREVIEW, env.VERCEL_ENV),
         routes: parseBuiltRoutes(env.SAROH_BUILT_ROUTES),
-        off: templatesOn(env.NEXT_PUBLIC_TEMPLATES, env.NODE_ENV)
-            ? []
-            : ["templates"],
+        off: featuresOff(env),
         live: publishedPaths(),
     };
 }

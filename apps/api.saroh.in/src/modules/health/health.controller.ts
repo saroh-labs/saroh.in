@@ -1,7 +1,6 @@
 import { Controller, Get, HttpCode, Res } from "@nestjs/common";
 import type { Response } from "express";
 
-import { env } from "../../env";
 import type { ReadinessReport } from "./health.service";
 import { HealthService } from "./health.service";
 
@@ -10,18 +9,15 @@ export class HealthController {
     constructor(private readonly health: HealthService) {}
 
     /**
-     * Kept at the original path and shape so existing probes and uptime checks
-     * do not break. This is a LIVENESS answer — `/health/ready` is the one that
-     * says whether this instance can actually serve.
+     * Kept at the original path so existing probes and uptime checks do not
+     * break. This is a LIVENESS answer — `/health/ready` is the one that says
+     * whether this instance can actually serve. Public, so it names no
+     * environment or version (security test, 12 Nov 2026): nothing to
+     * fingerprint.
      */
     @Get()
     check() {
-        return {
-            status: "ok",
-            timestamp: new Date().toISOString(),
-            environment: env.NODE_ENV,
-            version: env.npm_package_version ?? "0.1.0",
-        };
+        return { status: "ok", timestamp: new Date().toISOString() };
     }
 
     /** Process liveness. Touches no dependency, so it cannot fail on theirs. */

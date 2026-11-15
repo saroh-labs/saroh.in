@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 
 /**
  * A treatment's order whose visit 1 was a pay-now hold that was let go
@@ -39,6 +40,11 @@ export async function cancelUnsoldTreatmentInTx(
         data: { status: "CANCELLED" },
     });
     if (count === 0) return false;
+    await emitWebhook(tx, {
+        organizationId: order.organizationId,
+        type: "order.status_changed",
+        id: order.id,
+    });
     if (order.organizationId) {
         await tx.orderEvent.create({
             data: {

@@ -76,7 +76,9 @@ const AUTH_DIR = path.join(ROOT, "e2e/.auth");
 const PASSWORD = "demo-password-123";
 
 const DPR = 2;
-const WEBP = { quality: 72, effort: 6 } as const;
+// High enough that small UI text stays sharp; smartSubsample keeps its
+// coloured edges clean (owner, 14 Nov 2026: shots looked soft at 72).
+const WEBP = { quality: 90, effort: 6, smartSubsample: true } as const;
 
 /**
  * sharp, borrowed from the marketing app's Next.js (which ships it for image
@@ -128,6 +130,13 @@ function urlOf(shot: Shot): string {
     );
     if (route.startsWith("accounts:")) {
         return `${urls.ACCOUNTS_URL}${route.slice("accounts:".length)}`;
+    }
+    // An AI app's sign-in starts on the API; `{mcp}` is this stack's MCP
+    // resource (`https://mcp.<host>/mcp`), the one the token is for.
+    if (route.startsWith("api:")) {
+        const api = new URL(urls.API_URL);
+        const mcp = `${api.protocol}//${api.host.replace(/^api\./, "mcp.")}/mcp`;
+        return `${urls.API_URL}${route.slice("api:".length).replace("{mcp}", encodeURIComponent(mcp))}`;
     }
     if (route.startsWith("site:")) {
         if (!shot.business)
@@ -183,7 +192,23 @@ async function settle(page: Page) {
     await page.waitForLoadState("networkidle").catch(() => undefined);
     await page.evaluate(() => document.fonts.ready);
     await page.addStyleTag({ content: STILL });
-    await page.waitForTimeout(400);
+    await loaded(page);
+}
+
+/**
+ * Every picture drawn and the page quiet, then a beat more: a shot taken
+ * sooner caught skeletons and half-drawn previews (owner, 14 Nov 2026).
+ */
+async function loaded(page: Page) {
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    await page
+        .waitForFunction(
+            () => [...document.images].every((i) => i.complete),
+            undefined,
+            { timeout: 15_000 },
+        )
+        .catch(() => undefined);
+    await page.waitForTimeout(1500);
 }
 
 /** Open the shot's business: the workspace's own cookie, in this context. */
@@ -229,11 +254,16 @@ async function capture(
             await page.locator(step.click).first().click();
         } else if ("fill" in step) {
             await page.locator(step.fill).first().fill(step.value);
+        } else if ("scrollTop" in step) {
+            await page
+                .locator(step.scrollTop)
+                .first()
+                .evaluate((el) => (el.scrollTop = 0));
         } else {
             await page.locator(step.waitFor).first().waitFor();
         }
     }
-    await page.waitForTimeout(300);
+    await loaded(page);
     if (!shot.clip) {
         const whole = { x: 0, y: 0, ...shot.viewport };
         const mark = await markOf(page, shot, whole);
@@ -356,6 +386,10 @@ async function main() {
     try {
         const sessions = new Map<Role, string | undefined>();
         for (const shot of shots) {
+            if (shot.supplied) {
+                console.log(`${shot.key}  supplied, kept: ${shot.supplied}`);
+                continue;
+            }
             let storageState = sessions.get(shot.role);
             if (!sessions.has(shot.role)) {
                 storageState = await sessionFor(browser, shot.role);
@@ -370,6 +404,12 @@ async function main() {
                 reducedMotion: "reduce",
                 ...clockOf(shot),
             });
+            // An AI app's sign-in ends on its own site: answer it here, so a
+            // local code never reaches claude.ai or chatgpt.com.
+            await context.route(
+                /^https:\/\/(claude\.ai|chatgpt\.com)\//,
+                (route) => route.fulfill({ status: 200, body: "" }),
+            );
             const page = await context.newPage();
             try {
                 if (shot.business) await open(page, shot.business);

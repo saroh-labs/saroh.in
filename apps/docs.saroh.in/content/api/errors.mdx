@@ -1,0 +1,60 @@
+---
+title: "Errors"
+---
+
+## Errors
+
+Every refusal has the same shape:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "No such booking.",
+    "requestId": "8d0c5b8e-…"
+  }
+}
+```
+
+- `code` is for your code. It doesn't change. Branch on it.
+- `message` is for people. Its wording may change. Show or log it, but
+  don't match on it.
+- `requestId` is also in the `X-Request-Id` header. Quote it when you ask
+  Saroh for help with a call.
+
+### Codes
+
+| Status | Code                     | What happened                                                                     |
+| ------ | ------------------------ | --------------------------------------------------------------------------------- |
+| 400    | `invalid_request`        | The request is malformed or breaks a rule. The message names the field             |
+| 401    | `unauthorized`           | No key or token, or one that no longer works: revoked, rolled, expired or unknown |
+| 401    | `key_owner_inactive`     | The person who made the key has left the business or is paused                    |
+| 403    | `forbidden`              | The key can't do this, the website isn't on the key's list, or a publishable key was used to write |
+| 403    | `visitor_email_required` | The visitor token was made without a visitor email, so it can't book or order     |
+| 403    | `visitor_email_mismatch` | The email sent isn't the one the visitor token was made for                       |
+| 404    | `not_found`              | Nothing like that in this business                                                |
+| 409    | `conflict`               | It clashes with how things stand, or an `Idempotency-Key` was reused              |
+| 409    | `payments_unavailable`   | The business can't take payment online right now                                  |
+| 413    | `payload_too_large`      | The body is bigger than the route takes                                           |
+| 415    | `unsupported_media_type` | The body isn't JSON                                                               |
+| 422    | `unprocessable`          | Well formed, but the business's rules refuse it as sent                           |
+| 429    | `rate_limited`           | Too many requests. See [Limits](/api/limits)                                      |
+| 500    | `internal`               | Something broke on Saroh's side                                                   |
+| 503    | `unavailable`            | Saroh, or a provider it relies on, can't serve this now. Try again                |
+
+More codes may be added later. Treat one you don't know by its status.
+
+### A 404 for the whole API
+
+If every call gets `404`, check the address. A key works only on the API
+of the Saroh it was made on. The API can also be switched off for a
+business, and then it answers `404` too.
+
+### When to retry
+
+- `429` and `503`: yes, after a wait. A `429` says how long in
+  `Retry-After`.
+- `409 conflict` for a request still running: yes, shortly, with the same
+  `Idempotency-Key`.
+- `500`: yes, a little later, with the same `Idempotency-Key`.
+- Anything else in the 400s: no. Fix the request first.

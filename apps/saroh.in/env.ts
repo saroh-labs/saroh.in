@@ -75,6 +75,13 @@ import { z } from "zod";
  * build. Unset counts as `on` only under `next dev`
  * (`lib/resources-context.ts`).
  *
+ * `NEXT_PUBLIC_AI_APPS`, `NEXT_PUBLIC_ASK_AI`, `NEXT_PUBLIC_SOCIAL`,
+ * `NEXT_PUBLIC_DEVELOPERS` and `NEXT_PUBLIC_DOCS` are the release switches
+ * of plan 2026-11-13-002, by the same rule as `NEXT_PUBLIC_TEMPLATES`: `on`
+ * shows that feature's pages and links (`/features/ai-apps`, …; `DOCS` says
+ * docs.saroh.in is live), anything else hides them. Unset counts as `on`
+ * only under `next dev`. One reader decides: `lib/feature-switches.ts`.
+ *
  * `NEXT_PUBLIC_WHATSAPP_CHAT` and `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits
  * with the country code, no `+`) show the floating "Chat with us on
  * WhatsApp" button on the V2 pages (#1188). Both must be set, the switch to
@@ -102,6 +109,11 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: z.url().optional(),
         NEXT_PUBLIC_LAUNCH_MODE: z.enum(["waitlist", "open"]).optional(),
         NEXT_PUBLIC_TEMPLATES: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_AI_APPS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_ASK_AI: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_SOCIAL: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_DEVELOPERS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_DOCS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_CHAT: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_NUMBER: z
             .string()
@@ -193,6 +205,11 @@ export const env = createEnv({
         NEXT_PUBLIC_ACCOUNTS_URL: process.env.NEXT_PUBLIC_ACCOUNTS_URL,
         NEXT_PUBLIC_LAUNCH_MODE: process.env.NEXT_PUBLIC_LAUNCH_MODE,
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
+        NEXT_PUBLIC_AI_APPS: process.env.NEXT_PUBLIC_AI_APPS,
+        NEXT_PUBLIC_ASK_AI: process.env.NEXT_PUBLIC_ASK_AI,
+        NEXT_PUBLIC_SOCIAL: process.env.NEXT_PUBLIC_SOCIAL,
+        NEXT_PUBLIC_DEVELOPERS: process.env.NEXT_PUBLIC_DEVELOPERS,
+        NEXT_PUBLIC_DOCS: process.env.NEXT_PUBLIC_DOCS,
         NEXT_PUBLIC_WHATSAPP_CHAT: process.env.NEXT_PUBLIC_WHATSAPP_CHAT,
         NEXT_PUBLIC_WHATSAPP_NUMBER: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER,
         NEXT_PUBLIC_DEMOS: process.env.NEXT_PUBLIC_DEMOS,

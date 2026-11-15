@@ -18,6 +18,20 @@
   the database, content publications are tenant-specific and code releases
   are shared. The API deploys on its own (below). ADR-009 and DEC-025 (Vercel)
   are superseded.
+- **A content-only site is a static export, not OpenNext** (2026-11-12).
+  saroh.tech and the public API docs (`apps/docs.saroh.in`, `docs` in
+  `scripts/cf-plan.mjs`) build with `output: "export"` and deploy as Workers
+  static assets (`out/`) behind a small `worker/` for what must happen at the
+  edge: the dev access key, `X-Robots-Tag: noindex` off the production host,
+  the security headers. The docs ship on the same pushes as the other apps
+  (`docs.saroh.io` / `docs.saroh.in`), Global's through the same converters
+  (`docs-global` → `docs.saroh.tech` once `GLOBAL_ROUTES` is on; Global dev in
+  `deploy-global-dev.yml`, its domain added by hand as for the other Global
+  dev apps). Their hosts are Worker custom domains (`custom_domain: true`), so
+  the deploy makes the DNS record. The docs' `cf:build` first writes that
+  edition's and environment's OpenAPI files in the deploy's own checkout
+  (`pnpm openapi` reads `NEXT_PUBLIC_EDITION` and `VERCEL_ENV`); the committed
+  copy stays India's production, which `check:openapi` compares.
 - **A cache kept between builds holds code, never data.** The deploy keeps
   `.next/cache` so a build recompiles only what changed, and drops its
   `fetch-cache` before building: a static page that reads the API as it is
@@ -257,6 +271,25 @@ and blocked real deploys. So work reaches GitHub in batches:
    release, a `release-<date>` branch off `development` takes `main` and goes
    up instead; its tree must equal `development`'s, because an auto-merge can
    leave a stale copy behind (5 Nov 2026).
+
+### How the gate stays out of the way — **Current** (2026-11-12)
+
+The gate shares the laptop with the person working on it (owner, 12 Nov 2026:
+the full gate froze everything else). So `scripts/prepush.sh`, always and
+with no opt-out:
+
+- **Runs at low priority.** It re-execs itself under `nice -n 10` and, on
+  macOS, `taskpolicy -c utility`; everything it starts inherits both. Idle
+  cores are still used; anything interactive goes first.
+- **Builds two at a time.** Every turbo build it runs (the browser run's
+  production builds, the Global ones, the integration build) takes
+  `--concurrency=2`; the rest queue. A Next production build takes 2-3 GB.
+- **Recycles Jest workers past 1 GB** (`--workerIdleMemoryLimit=1GB`), unit
+  and integration.
+- **Waits for memory** before the production builds, the integration shards
+  and the browser specs: under 4 GB free, it waits (up to 10 minutes)
+  instead of piling on. macOS has no per-process-group memory cap, so the
+  limits are how much runs at once.
 
 ### How the gate stays fast — **Current** (2026-09-29)
 

@@ -2,6 +2,8 @@ import type { CanActivate, ExecutionContext } from "@nestjs/common";
 import { ForbiddenException, Injectable } from "@nestjs/common";
 import { isTrustedOrigin } from "@saroh/auth";
 
+import { publicApiSurfaceOf } from "../cors";
+
 /**
  * App-layer CSRF origin check (Blocker B3 / R-10).
  *
@@ -29,6 +31,11 @@ import { isTrustedOrigin } from "@saroh/auth";
  *    `/api/auth/*` are EXEMPT: public intake (enquiry, analytics, provider
  *    webhooks) is deliberately cross-origin from customer sites / providers and
  *    carries no session cookie, so there is nothing to forge.
+ *  - The keyed public API (plan 2026-11-10-001) reads no cookie either.
+ *    `/v1/storefront/…` is exempt: `ApiKeyGuard` checks the Origin against
+ *    the key's own list. `/v1` (secret keys) and `/mcp` are called from
+ *    servers, so a missing Origin is fine on any method, and a present one
+ *    must be Saroh's own.
  */
 @Injectable()
 export class OriginGuard implements CanActivate {
@@ -56,10 +63,20 @@ export class OriginGuard implements CanActivate {
             headers: Record<string, string | string[] | undefined>;
         }>();
 
+        const path = this.pathOf(req);
+        const surface = publicApiSurfaceOf(path);
+        if (surface === "storefront") return true;
+        if (surface) {
+            const origin = this.header(req.headers.origin);
+            if (origin !== undefined && !isTrustedOrigin(origin)) {
+                throw new ForbiddenException("Untrusted request origin");
+            }
+            return true;
+        }
+
         const method = (req.method ?? "GET").toUpperCase();
         if (!OriginGuard.UNSAFE.has(method)) return true;
 
-        const path = this.pathOf(req);
         if (OriginGuard.EXEMPT_PREFIXES.some((p) => path.startsWith(p))) {
             return true;
         }

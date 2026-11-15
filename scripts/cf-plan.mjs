@@ -13,7 +13,7 @@
  *
  *   node scripts/cf-plan.mjs development            # JSON list to deploy
  *   node scripts/cf-plan.mjs production web,sites   # only these, if changed
- *   node scripts/cf-plan.mjs production all-global  # Global's four, if changed
+ *   node scripts/cf-plan.mjs production all-global  # Global's five, if changed
  *   FORCE=1 node scripts/cf-plan.mjs development web  # deploy regardless
  *   node scripts/cf-plan.mjs --launch-wait            # seconds to LAUNCH_AT
  *
@@ -42,6 +42,7 @@ export const APPS = {
     auth: "apps/accounts.saroh.in",
     admin: "apps/admin.saroh.in",
     sites: "apps/saroh.app",
+    docs: "apps/docs.saroh.in",
 };
 
 /** Global's production Workers: the name a run uses -> Turbo package and directory. */
@@ -50,11 +51,12 @@ export const GLOBAL_APPS = {
     "application-global": { pkg: "application", dir: APPS.application },
     "auth-global": { pkg: "auth", dir: APPS.auth },
     "admin-global": { pkg: "admin", dir: APPS.admin },
+    "docs-global": { pkg: "docs", dir: APPS.docs },
 };
 
 /**
  * Which apps a run looks at. Nothing named: every app of the environment
- * (a push). "all" is India's five, "all-global" Global's four.
+ * (a push). "all" is India's six, "all-global" Global's five.
  */
 export function selectApps(environment, only = "") {
     const india = Object.keys(APPS);

@@ -9,6 +9,7 @@ import {
     IsInt,
     IsOptional,
     IsString,
+    Matches,
     Max,
     MaxLength,
     Min,
@@ -16,6 +17,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { DatePreset } from "../orders/date-presets";
+import { DATE_PRESETS } from "../orders/date-presets";
 import { STOCK_PAGE_SIZES } from "./stock-paging";
 
 /**
@@ -309,6 +312,27 @@ export class StockLogQueryDto extends StockPageQueryDto {
     @IsOptional()
     @IsString()
     variant?: string;
+
+    /**
+     * Changes made in a date preset, in the business's zone (Orders'
+     * presets, `listRange`); not with `from`/`to`.
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(DATE_PRESETS, { message: "Unknown date range" })
+    date?: DatePreset;
+
+    /** Changes made on or after this day, in the business's zone. */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A date is YYYY-MM-DD" })
+    from?: string;
+
+    /** Changes made on or before this day, in the business's zone. */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A date is YYYY-MM-DD" })
+    to?: string;
 
     /** The last entry of the page before; the next page starts after it. */
     @IsOptional()

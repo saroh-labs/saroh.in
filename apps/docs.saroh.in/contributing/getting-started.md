@@ -1,0 +1,144 @@
+---
+title: "Getting started"
+---
+
+## Getting started
+
+Everything below runs on one machine. The only thing you must supply yourself is
+a PostgreSQL database.
+
+## Prerequisites
+
+- **Node.js 24+** and **pnpm 9.9+**
+- **[portless](https://www.npmjs.com/package/portless)**, installed once per
+  machine (it asks for `sudo`):
+  `npm install -g portless && portless service install --wildcard`
+- **PostgreSQL 14+** — local, or a hosted branch (Neon, Supabase, RDS). The API
+  is the only thing that connects to it.
+
+## 1. Install
+
+```bash
+git clone https://github.com/saroh-labs/saroh.in.git
+cd saroh.in
+pnpm install
+```
+
+## 2. Configure the API
+
+The API needs its own `.env`. Start from the example, which documents every key:
+
+```bash
+cp apps/api.saroh.in/.env.example apps/api.saroh.in/.env
+```
+
+The four that must be set for anything to start:
+
+| Key                  | What it is                                                    |
+| -------------------- | ------------------------------------------------------------- |
+| `DATABASE_URL`       | Your Postgres connection string.                              |
+| `BETTER_AUTH_SECRET` | 32+ characters. Identical anywhere a session is validated.    |
+| `BETTER_AUTH_URL`    | The API's own origin — `https://api.saroh.localhost` locally. |
+| `APP_URL`            | The workspace origin, for links the API emails.               |
+
+Object storage, SMTP and OAuth are all optional locally. With storage unset,
+media uploads fall back to an in-memory adapter; with SMTP unset, verification
+and invitation links are logged to the API console instead of being emailed.
+
+### The gotcha that will cost you an hour
+
+`BETTER_AUTH_SECRET` is read at **import** time, not when the module
+initialises. Nest's `ConfigModule` loads `.env` too late for that, so
+`node dist/main.js` on its own throws before it can tell you why. Source the
+environment first:
+
+```bash
+cd apps/api.saroh.in
+set -a; . ./.env; set +a
+node dist/main.js
+```
+
+`pnpm dev` handles this for you. It only bites when you run the built output
+directly.
+
+### Trusted origins on localhost
+
+Unset, `BETTER_AUTH_TRUSTED_ORIGINS` falls back to the `*.saroh.in` production
+list. Locally that refuses your `.localhost` origins: server actions answer
+`403 Untrusted request origin`, and sign-in lands on the app launcher instead
+of the page you asked for. Set it in the API's `.env` **and** each frontend you
+run — the root `.env.example` has the value:
+
+```bash
+BETTER_AUTH_TRUSTED_ORIGINS=https://accounts.saroh.localhost,https://admin.saroh.localhost,https://app.saroh.localhost
+```
+
+Production does not need it: the real origins are already in the default list.
+
+## 3. Set up the database
+
+```bash
+pnpm --filter @saroh/database db:migrate:deploy
+```
+
+This runs a guard before Prisma touches anything — see
+[Database](./database.md#the-target-guard). If it refuses, read the message: it is
+telling you the connection string points somewhere it was not expecting.
+
+## 4. Seed a business worth looking at
+
+```bash
+pnpm --filter @saroh/database db:seed
+```
+
+That creates **Northwind Supply** — 24 contacts, 16 leads with real values, 4
+overdue follow-ups, services and bookings, 12 products and 10 orders — so Home,
+the tables and the search all have something to show. Every row carries a
+`seed_` id prefix, so teardown is exact.
+
+Sign in with:
+
+```
+demo@saroh.dev / demo-password-123
+```
+
+The password is for a database on your own machine only: seeding any other database (a shared dev one) needs `SEED_PASSWORD`, and the seed refuses the documented one there.
+
+## 5. Run it
+
+```bash
+pnpm dev
+```
+
+Every app runs under portless at its production hostname with `.localhost`
+added — `https://accounts.saroh.localhost`, `https://app.saroh.localhost`,
+`https://api.saroh.localhost`, `https://docs.saroh.localhost` and so on. A
+merchant's site is `https://<slug>.saroh.app.localhost` (the seeded one is
+`northwind`).
+
+**Do not start an app on a bare port** (`next dev -p 3003`, or `nest start`
+with a `PORT`). The API's CORS allowlist is built from the `.localhost` names
+and the session cookie is scoped to their shared parent domain, so on bare
+ports sign-in is refused or never sticks — with nothing in the API log.
+
+To run only what you need:
+
+```bash
+pnpm dev:app        # API, accounts and the workspace
+pnpm dev:api-auth   # API and accounts
+pnpm portless:status
+```
+
+## 6. Check it is actually up
+
+```bash
+curl https://api.saroh.localhost/health/live     # process is running
+curl https://api.saroh.localhost/health/ready    # database, migrations and queue are usable
+```
+
+`ready` fails on an unreachable database, an unapplied migration, or an
+unreadable job queue — so a 503 here tells you which of the three to look at
+before you start guessing in the UI.
+
+The full local guide, kept current, is
+[`docs/architecture/LOCAL_DEV.md`](https://github.com/saroh-labs/saroh.in/blob/main/docs/architecture/LOCAL_DEV.md).

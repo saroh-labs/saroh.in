@@ -64,7 +64,7 @@ const flags = new FeatureFlagService();
  * business with no row for a module gets nothing that needs it: a template
  * adds only what is known to be on.
  */
-async function modulesOn(
+export async function modulesOn(
     db: ContextDb,
     organizationId: string,
 ): Promise<string[]> {

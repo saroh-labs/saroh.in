@@ -18,9 +18,11 @@ import { useState } from "react";
 
 import { useTakingBookings } from "@/components/services/list/use-taking-bookings";
 import { PriceHistoryList } from "@/components/shared/price-history/price-history";
+import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
+import { formatMoney } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 import {
     PRICE_HISTORY_TITLE,
@@ -101,6 +103,7 @@ export function EditService(props: EditorProps & { service: Service }) {
         businessPriceMode = null,
         priceHistory,
         others = [],
+        share = null,
     } = props;
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
@@ -274,6 +277,25 @@ export function EditService(props: EditorProps & { service: Service }) {
                 title={name}
                 actions={
                     <div className="flex items-center gap-2">
+                        {share &&
+                        who.status === "ACTIVE" &&
+                        who.showOnBookingPage ? (
+                            // On the live booking page: a post can send people to it.
+                            <ShareItemButton
+                                setup={share.setup}
+                                item={{
+                                    kind: "service",
+                                    ref: service.id,
+                                    name,
+                                    price: formatMoney(
+                                        service.priceCents,
+                                        service.currency ?? currency,
+                                    ),
+                                    url: `${share.bookUrl}?service=${encodeURIComponent(service.id)}`,
+                                    offerId: null,
+                                }}
+                            />
+                        ) : null}
                         <Button asChild variant="outline" className={DESK}>
                             <Link href={ALL_BOOKINGS_HREF}>
                                 See its bookings

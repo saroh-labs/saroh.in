@@ -48,3 +48,22 @@ export async function withoutOrgContext<T>(
 ): Promise<T> {
     return prisma.$transaction((tx) => fn(tx));
 }
+
+/**
+ * Cap how long any one statement in this transaction may run (public API
+ * connection budget, plan 2026-11-10-001 U4): Postgres cancels a statement
+ * past `ms` with "canceling statement due to statement timeout", and the
+ * setting ends with the transaction. Call it first inside the transaction.
+ * The value is a bound parameter, and must be a positive whole number of ms.
+ */
+export async function setStatementTimeout(
+    tx: TransactionClient,
+    ms: number,
+): Promise<void> {
+    if (!Number.isInteger(ms) || ms <= 0) {
+        throw new Error(
+            `statement timeout must be a positive whole ms, got ${ms}`,
+        );
+    }
+    await tx.$executeRaw`SELECT set_config('statement_timeout', ${String(ms)}, true)`;
+}

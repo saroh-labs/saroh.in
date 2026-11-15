@@ -1,11 +1,16 @@
+import { AppList } from "@saroh/marketing/app-list";
+import { ChatExchange } from "@saroh/marketing/chat-exchange";
 import { ComingList } from "@saroh/marketing/coming-list";
-import type { FeatureSlug } from "@saroh/marketing/content-types";
-import { FEATURE_SLUGS } from "@saroh/marketing/content-types";
+import type {
+    FeatureSlug,
+    SlugPageProps as Props,
+} from "@saroh/marketing/content-types";
 import { CtaBand } from "@saroh/marketing/cta-band";
 import { FeaturePoints } from "@saroh/marketing/feature-points";
 import { FeatureSteps } from "@saroh/marketing/feature-steps";
 import { FeatureUsedBy } from "@saroh/marketing/feature-used-by";
 import { FeatureWorksWith } from "@saroh/marketing/feature-works-with";
+import { PointGrid } from "@saroh/marketing/point-grid";
 import { ProductHero } from "@saroh/marketing/product-hero";
 import { Section } from "@saroh/marketing/section";
 import type { Metadata } from "next";
@@ -13,10 +18,17 @@ import { notFound } from "next/navigation";
 
 import { HeroActions } from "@/components/shared/hero-actions";
 import { JsonLd } from "@/components/shared/json-ld";
-import { featureHref, features, NOT_AVAILABLE_YET } from "@/content/features";
+import {
+    featureHref,
+    featureList,
+    features,
+    NOT_AVAILABLE_YET,
+} from "@/content/features";
 import { CTA_BAND } from "@/content/home";
+import { AI_APP_CARDS } from "@/content/integrations";
 import { shotView } from "@/content/shots";
 import { solutionHref, solutions } from "@/content/solutions";
+import { featuresOff } from "@/lib/feature-switches";
 import { freePlanLine, readCatalog } from "@/lib/plans";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
@@ -25,11 +37,8 @@ import { pageAt } from "@/lib/site-map";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return FEATURE_SLUGS.map((slug) => ({ slug }));
-}
-
-interface Props {
-    params: Promise<{ slug: string }>;
+    // Only the shown features: a switched-off one is never built (404).
+    return featureList.map((f) => ({ slug: f.slug }));
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -58,7 +67,10 @@ function NotYet({
 /**
  * saroh.in's feature template, section for section. A Limited page says what
  * works today, in place of the free-plan line, so a page carries one message. A Coming soon page says it in its headline and sub, and
- * its parts are planned rows, with no steps to follow.
+ * its parts are planned rows, with no steps to follow. A hero or step in
+ * another company's app is drawn (`ChatExchange`), as saroh.in draws it.
+ * Website's templates section follows `NEXT_PUBLIC_TEMPLATES`, as words and
+ * points: this site has no website template gallery to draw from.
  */
 export default async function FeaturePage({ params }: Props) {
     const { slug } = await params;
@@ -82,6 +94,7 @@ export default async function FeaturePage({ params }: Props) {
                 today={limited ? feature.worksToday : undefined}
                 freeLine={limited ? undefined : freePlanLine(catalog)}
                 shot={shotView(feature.hero.shot, feature.hero.alt)}
+                chat={feature.heroChat}
             />
             {coming ? (
                 <>
@@ -119,6 +132,15 @@ export default async function FeaturePage({ params }: Props) {
                     <FeatureSteps
                         title={feature.howTitle}
                         steps={feature.steps.map((step) => {
+                            // A step in another company's app is drawn, not captured.
+                            if (step.chat) {
+                                return {
+                                    title: step.title,
+                                    body: step.body,
+                                    who: step.who,
+                                    drawn: <ChatExchange words={step.chat} />,
+                                };
+                            }
                             const shot = shotView(step.shot, step.alt);
                             // `who` names the demo business in the picture.
                             return {
@@ -129,7 +151,22 @@ export default async function FeaturePage({ params }: Props) {
                             };
                         })}
                     />
+                    {feature.templates &&
+                    !featuresOff().includes("templates") ? (
+                        <Section
+                            titleId="templates"
+                            eyebrow="Templates"
+                            title={feature.templates.title}
+                            lead={feature.templates.lead}
+                            className="grid gap-9 pt-[120px]"
+                        >
+                            <PointGrid points={feature.templates.points} />
+                        </Section>
+                    ) : null}
                     <FeaturePoints points={feature.points} />
+                    {feature.apps ? (
+                        <AppList words={feature.apps} apps={AI_APP_CARDS} />
+                    ) : null}
                 </>
             )}
             <FeatureWorksWith

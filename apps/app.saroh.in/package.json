@@ -45,6 +45,7 @@
         "@radix-ui/react-toggle": "^1.1.18",
         "@radix-ui/react-tooltip": "^1.2.16",
         "@saroh/edition": "workspace:*",
+        "@saroh/api-contract": "workspace:*",
         "@saroh/auth": "workspace:*",
         "@saroh/block-contract": "workspace:*",
         "@saroh/error-tracking": "workspace:*",

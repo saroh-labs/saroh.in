@@ -14,12 +14,16 @@ jest.mock("../../common/email", () => ({
         .mockResolvedValue(undefined),
 }));
 
+// Who is emailed is `emailedAbout`'s (alert-recipients.spec.ts).
+jest.mock("./alert-recipients", () => ({ emailedAbout: jest.fn() }));
+
 jest.mock("../../env", () => ({ env: { APP_URL: "https://app.saroh.in" } }));
 
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { sendCustomerMessageNotificationEmail } from "../../common/email";
+import { emailedAbout } from "./alert-recipients";
 import {
     attendedAt,
     enqueueCustomerMessageNotice,
@@ -35,7 +39,7 @@ import {
 
 const findMessage = prisma.customerThreadMessage.findUnique as jest.Mock;
 const notificationCreate = prisma.notification.create as jest.Mock;
-const membershipFindMany = prisma.membership.findMany as jest.Mock;
+const emailed = emailedAbout as jest.Mock;
 const sendEmail = sendCustomerMessageNotificationEmail as jest.Mock;
 
 function job(messageId = "msg_1"): Job {
@@ -68,11 +72,7 @@ function message(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
     jest.clearAllMocks();
-    membershipFindMany.mockResolvedValue([
-        { user: { email: "owner@example.in" } },
-        { user: { email: "admin@example.in" } },
-        { user: { email: "owner@example.in" } },
-    ]);
+    emailed.mockResolvedValue(["owner@example.in", "admin@example.in"]);
 });
 
 describe("CustomerMessageNotifyHandler (UX-014)", () => {

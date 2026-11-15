@@ -2,6 +2,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 
+import { poolOptions } from "./pool-options";
 import { createRlsProxy } from "./rls-proxy";
 
 const globalForPrisma = globalThis as unknown as {
@@ -22,13 +23,7 @@ const globalForPrisma = globalThis as unknown as {
  * cleanly instead of discovering they were killed underneath it.
  */
 function createPool(): Pool {
-    const pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        // Comfortably under the ~5 min after which Neon reaps an idle
-        // connection, so we always let go first.
-        idleTimeoutMillis: 30_000,
-        keepAlive: true,
-    });
+    const pool = new Pool(poolOptions());
 
     // Idle-client failures are informational: `pg` has already removed the
     // client from the pool and the next query gets a fresh one. Log and carry

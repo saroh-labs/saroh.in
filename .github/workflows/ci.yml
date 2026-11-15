@@ -140,6 +140,8 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -231,6 +233,14 @@ jobs:
       - name: Hard-coded domains
         run: pnpm run check:domains
 
+      # The OpenAPI files the docs serve match the contract (plan U16)
+      - name: OpenAPI up to date
+        run: pnpm run check:openapi
+
+      # Every link inside the docs site reaches a page or a file (plan U16)
+      - name: Docs links
+        run: pnpm run check:docs-links
+
       # Every model has a business, or is listed as shared (DEC-204)
       - name: Shared data
         run: pnpm run check:shared-data
@@ -300,6 +310,12 @@ jobs:
       - name: One copy of each block
         run: pnpm run check:dupes
 
+      # Production's release switches (plan 2026-11-13-002, U15): each one
+      # on is ready (pages, captured shots, claims rows), and nothing behind
+      # an off one is dated ahead. Repo files only.
+      - name: Feature release
+        run: pnpm run check:feature-release
+
       # Every browser spec names what it exercises (`// @covers …`), so the
       # local gate can run only the specs a batch reaches. CI still runs all.
       - name: Browser spec coverage keys
@@ -316,6 +332,8 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -376,6 +394,8 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -442,6 +462,8 @@ jobs:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       APP_URL: http://localhost:3003
       CORS_ORIGIN: http://localhost:3000
@@ -657,6 +679,8 @@ jobs:
       # Cloudflare does, so one run's customers don't share the rate limits.
       TRUST_PROXY: private
       BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
       BETTER_AUTH_URL: http://localhost:3333
       # The redirect-after-sign-in check (#222) fails without this: the trusted
       # list defaults to the *.saroh.in production origins, so a return-to on
@@ -706,6 +730,20 @@ jobs:
       # Templates on (DEC-135): saroh.in's gallery and the app's template
       # picker, which the templates specs open. Unset, as production, is off.
       NEXT_PUBLIC_TEMPLATES: "on"
+      # saroh.in's release switches (plan 2026-11-13-002): every feature page
+      # and link on, so the specs see them. Unset, as production, is off.
+      NEXT_PUBLIC_AI_APPS: "on"
+      NEXT_PUBLIC_ASK_AI: "on"
+      NEXT_PUBLIC_SOCIAL: "on"
+      NEXT_PUBLIC_DEVELOPERS: "on"
+      NEXT_PUBLIC_DOCS: "on"
+      # Settings › API and AI apps, which the role specs list. Unset, as
+      # production, hides it until the area ships (#1357).
+      NEXT_PUBLIC_API_AREA: "on"
+      # Share as a post and Create post (DEC-217), in the app and the API.
+      # Unset, as production, hides the screens and the API answers 404.
+      NEXT_PUBLIC_SHARE_POSTS: "on"
+      SHARE_POSTS: "on"
       # The API's links to the renderer (pay links, DEC-069 L6): this
       # stack's, not production's saroh.app, which a pay page opened on a
       # tenant host would otherwise redirect to.
@@ -747,6 +785,11 @@ jobs:
       # this stack. The same throwaway key the API specs use; it opens
       # nothing — the seeded connections are fakes.
       PAYMENTS_ENC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
+      # Ask AI on a script (the Ask AI spec): questions stream scripted words
+      # and drafts, nothing calls Anthropic. Test only, as above. Its text
+      # key is a throwaway too: it seals only this stack's test conversations.
+      AI_PROVIDER_FAKE: "1"
+      AI_TEXT_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
 
     steps:
       - uses: actions/checkout@v4
@@ -781,7 +824,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /tmp/e2e-seed.dump
-          key: e2e-seed-v1-${{ steps.seed-key.outputs.window }}-${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'pnpm-lock.yaml') }}
+          key: e2e-seed-v1-${{ steps.seed-key.outputs.window }}-${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'packages/pricing-catalog/src/**', 'pnpm-lock.yaml') }}
       - name: Load the seeded database from the dump
         if: steps.seed-dump.outputs.cache-hit == 'true'
         run: >-

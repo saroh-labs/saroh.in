@@ -66,7 +66,13 @@ describe("navFor", () => {
             ],
             [
                 "Product",
-                ["Releases", "Plans and modules", "Search pages", "Usage"],
+                [
+                    "Releases",
+                    "Plans and modules",
+                    "Search pages",
+                    "Ask AI",
+                    "Usage",
+                ],
             ],
             [
                 "Keep it running",
@@ -135,7 +141,7 @@ describe("navFor", () => {
         ).toEqual([
             ["Home", ["Home"]],
             ["Help customers", ["Businesses", "Reports"]],
-            ["Product", ["Releases", "Search pages", "Usage"]],
+            ["Product", ["Releases", "Search pages", "Ask AI", "Usage"]],
             ["Keep it running", ["Health", "Saroh's apps"]],
         ]);
         // An Account manager reaches Home, their own leads board and their

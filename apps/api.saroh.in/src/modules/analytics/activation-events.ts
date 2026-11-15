@@ -1,4 +1,5 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
+import { inRolledBack } from "@saroh/database";
 
 import { AnalyticsService } from "./analytics.service";
 import {
@@ -233,6 +234,8 @@ export class ActivationEvents {
         properties: Record<string, unknown>,
         dedupeKey: string | null,
     ): Promise<void> {
+        // A dry run (Ask AI's draft) made nothing: no event, no milestone.
+        if (inRolledBack()) return;
         const workspaceEvent = WORKSPACE_EVENT_BY_TYPE[type];
         if (workspaceEvent) {
             workspaceAction(

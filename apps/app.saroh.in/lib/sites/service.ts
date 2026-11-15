@@ -1435,6 +1435,8 @@ export async function copyStarterContent(
     siteId: string,
     look: LookId | "classic",
     fill: boolean,
+    /** A template's pages instead of the look's (DEC-216). */
+    chosen?: { templateId: string; styleId?: string },
 ): Promise<SitesResult<StarterContentCopy>> {
     const base = await sitesBase();
     if (!base)
@@ -1444,7 +1446,7 @@ export async function copyStarterContent(
         };
     const res = await apiFetch(`${base}/${siteId}/starter-content`, {
         method: "POST",
-        body: JSON.stringify({ look, fill }),
+        body: JSON.stringify({ look, fill, ...chosen }),
     });
     const data = (await res.json().catch(() => null)) as
         | (Partial<StarterContentCopy> & { message?: string; error?: string })

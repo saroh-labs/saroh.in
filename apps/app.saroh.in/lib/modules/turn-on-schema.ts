@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import type { Template } from "@/lib/sites/service";
+
 import { moduleViewSchema } from "./schema";
 
 /**
@@ -54,6 +56,8 @@ export const websiteSetupSchema = z.object({
      * the API picks itself. Never prefilled by the API.
      */
     templateId: z.string().optional(),
+    /** The chosen template's colourway (DEC-216); absent: its first. */
+    styleId: z.string().optional(),
 });
 export type WebsiteSetup = z.infer<typeof websiteSetupSchema>;
 
@@ -130,19 +134,31 @@ export interface SetupDefaults {
     bookingPage?: { address: string } | null;
 }
 
-/** A template the Website step may offer (`setup-defaults`' `templates`). */
-export interface WebsiteTemplateChoice {
-    id: string;
-    name: string;
-    kinds: string[];
-    uses: string[];
-}
+/**
+ * A template the Website step may offer (`setup-defaults`' `templates`):
+ * the catalogue's whole entry (DEC-216), so the sheet draws the same
+ * picture cards and colourways as /sites/new. An older API sends the
+ * name, kinds and uses alone; the card then shows those.
+ */
+export type WebsiteTemplateChoice = Template;
+
+const colourwaySchema = z.object({
+    id: z.string().min(1),
+    name: z.string(),
+    chips: z.array(z.string()),
+});
 
 const templateChoiceSchema = z.object({
     id: z.string().min(1),
+    version: z.number().catch(0),
     name: z.string().min(1),
+    description: z.string().optional().catch(undefined),
+    slug: z.string().optional().catch(undefined),
     kinds: z.array(z.string()).catch([]),
+    shape: z.string().nullish().catch(null),
     uses: z.array(z.string()).catch([]),
+    colourways: z.array(colourwaySchema).catch([]),
+    pages: z.array(z.string()).catch([]),
 });
 
 const defaultsEnvelopeSchema = z.object({

@@ -8,6 +8,7 @@ import {
     reservedPhoneEmail,
 } from "../contacts/contact-email";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 import {
     CustomerAccountRepository,
     LIVE_ACCOUNT_STATUSES,
@@ -129,6 +130,11 @@ export class AccountLinkingService {
                 },
                 select: { id: true },
             });
+            await emitWebhook(tx, {
+                organizationId: organizationId,
+                type: "customer.created",
+                id: contact.id,
+            });
             return this.open(tx, organizationId, contact.id, email, now);
         }
 
@@ -169,6 +175,11 @@ export class AccountLinkingService {
             where: { id: separate.id },
             data: { email: reservedAccountEmail(separate.id) },
         });
+        await emitWebhook(tx, {
+            organizationId: organizationId,
+            type: "customer.created",
+            id: separate.id,
+        });
         return this.open(tx, organizationId, separate.id, email, now);
     }
 
@@ -205,6 +216,11 @@ export class AccountLinkingService {
                 source: "site-account",
             },
             select: { id: true },
+        });
+        await emitWebhook(tx, {
+            organizationId: organizationId,
+            type: "customer.created",
+            id: contact.id,
         });
         const account = await this.accounts.createByPhone(
             {

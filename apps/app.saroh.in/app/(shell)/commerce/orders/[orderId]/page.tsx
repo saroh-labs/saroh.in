@@ -180,6 +180,7 @@ export default async function OrderPage({
             can={{
                 stage: powers.stage,
                 edit: powers.edit,
+                record: powers.record,
                 payLink: linkable && (canPayOnline || connectable),
                 refund: powers.refund,
                 payOnline: canPayOnline,

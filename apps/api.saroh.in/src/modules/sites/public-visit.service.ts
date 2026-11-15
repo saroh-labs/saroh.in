@@ -232,7 +232,7 @@ export class PublicVisitService {
             // A named store that isn't this business's open shop: never
             // served, and never swapped for another place.
             if (storeId !== undefined) notFound();
-            const fallback = await this.business(
+            const fallback = await businessVisit(
                 organizationId,
                 site.organization.name,
                 timezone,
@@ -249,43 +249,43 @@ export class PublicVisitService {
             };
         });
     }
+}
 
-    /**
-     * No shop: the business's own facts. The hours are the business's week —
-     * the first storefront's, which Settings › Hours writes to every
-     * storefront (DEC-034), online ones included. No storefront at all: no
-     * hours, rather than a guess.
-     */
-    private async business(
-        organizationId: string,
-        name: string,
-        timezone: string,
-        phone: string | null,
-    ): Promise<Omit<PublicVisit, "closedDates">> {
-        const [profile, first] = await Promise.all([
-            prisma.businessProfile.findUnique({
-                where: { organizationId },
-                select: {
-                    addressLine1: true,
-                    addressLine2: true,
-                    city: true,
-                    postalCode: true,
-                },
-            }),
-            prisma.store.findFirst({
-                where: { organizationId, deletedAt: null },
-                orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-                select: { settings: { select: { openingHours: true } } },
-            }),
-        ]);
-        return {
-            source: "business",
-            storeId: null,
-            name,
-            address: profile ? registeredAddress(profile) : null,
-            phone,
-            hours: publicWeek(first?.settings?.openingHours),
-            timezone,
-        };
-    }
+/**
+ * No shop: the business's own facts. The hours are the business's week —
+ * the first storefront's, which Settings › Hours writes to every
+ * storefront (DEC-034), online ones included. No storefront at all: no
+ * hours, rather than a guess.
+ */
+export async function businessVisit(
+    organizationId: string,
+    name: string,
+    timezone: string,
+    phone: string | null,
+): Promise<Omit<PublicVisit, "closedDates">> {
+    const [profile, first] = await Promise.all([
+        prisma.businessProfile.findUnique({
+            where: { organizationId },
+            select: {
+                addressLine1: true,
+                addressLine2: true,
+                city: true,
+                postalCode: true,
+            },
+        }),
+        prisma.store.findFirst({
+            where: { organizationId, deletedAt: null },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+            select: { settings: { select: { openingHours: true } } },
+        }),
+    ]);
+    return {
+        source: "business",
+        storeId: null,
+        name,
+        address: profile ? registeredAddress(profile) : null,
+        phone,
+        hours: publicWeek(first?.settings?.openingHours),
+        timezone,
+    };
 }

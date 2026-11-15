@@ -1,0 +1,114 @@
+---
+title: "Bookings and orders from your site"
+---
+
+import { API_URL, Sample } from "../../components/api-reference";
+
+## Bookings and orders from your site
+
+A publishable key only reads. To take a booking, an order or an enquiry
+from your own website, pick one of three ways.
+
+| Way                       | You need                     | Good for                                   |
+| ------------------------- | ---------------------------- | ------------------------------------------ |
+| 1. Your server            | A server and a secret key    | Your own checkout, an app, a sync          |
+| 2. A visitor token        | A server to make the token   | Booking and paying from your own pages     |
+| 3. Saroh's hosted pages   | Nothing                      | A website with no server                   |
+
+### 1. From your server, with the secret key
+
+Your server calls `/v1` with the secret key, as for any other record.
+
+- `POST /v1/bookings` books a service for a customer. Name them by
+  `contactId`, or give `bookerEmail` (and a name and phone if you have
+  them). The booking follows the business's own hours and diary, as one
+  made in Saroh does.
+- `POST /v1/orders` makes an order, left unpaid. Name the customer by
+  `contactId`, or give `customer.email`. Taking the money stays with Saroh.
+
+<Sample>{`curl ${API_URL}/v1/bookings \\
+  -H "Authorization: Bearer sk_live_…" \\
+  -H "Content-Type: application/json" \\
+  -H "Idempotency-Key: booking-7f3a" \\
+  -d '{"serviceId":"…","startAt":"2026-12-01T10:00:00+05:30","bookerEmail":"asha@example.com","bookerName":"Asha"}'`}</Sample>
+
+The key needs the right to make bookings or orders. See the
+[reference](/api/reference) for every field.
+
+### 2. From the browser, with a visitor token
+
+Your server makes a short-lived visitor token for one visitor. Your page
+then books, orders or sends an enquiry with it, straight from the browser.
+The secret key never leaves your server.
+
+**On your server**, when the visitor is ready to book or pay:
+
+<Sample>{`curl ${API_URL}/v1/storefront-tokens \\
+  -H "Authorization: Bearer sk_live_…" \\
+  -H "Content-Type: application/json" \\
+  -d '{"publishableKeyId":"…","visitor":{"email":"asha@example.com"}}'`}</Sample>
+
+- The secret key needs the storefront right (`storefront:mint`).
+- `publishableKeyId` names one of the business's publishable keys. The
+  token takes that key's allowed origins, so it works only from those
+  websites.
+- `visitor.email` is the visitor you know, for example because they signed
+  in to your site. Bookings and orders made with the token are made under
+  this email and no other. Leave it out and the token can only send
+  enquiries.
+- The answer has the `token` (`st_live_…`, shown once), when it expires
+  (about 30 minutes) and its allowed origins.
+- Each call makes a new token. Don't retry it with an `Idempotency-Key`;
+  just ask for another.
+
+**In the browser**, send the token as a Bearer token to
+`/v1/storefront/write/…`:
+
+<Sample>{`await fetch("${API_URL}/v1/storefront/write/holds", {
+  method: "POST",
+  headers: {
+    Authorization: \`Bearer \${visitorToken}\`,
+    "Content-Type": "application/json",
+    "Idempotency-Key": crypto.randomUUID(),
+  },
+  body: JSON.stringify({
+    serviceId: "…",
+    startAt: "2026-12-01T10:00:00+05:30",
+    name: "Asha",
+  }),
+});`}</Sample>
+
+What the token can do:
+
+| Call                               | Does                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------ |
+| `POST /write/bookings`             | Books a slot to pay at the visit, or one with nothing to pay              |
+| `POST /write/holds`                | Holds a slot while the visitor pays online: the whole price, or the deposit (`"pay": "deposit"`) |
+| `POST /write/payments`             | Starts paying for a hold. Gives what the business's own payment provider's checkout needs |
+| `POST /write/holds/release`        | Lets a hold go early, if the visitor changes their mind                   |
+| `POST /write/orders`               | Places an order, paid online or at handover, with its payment when online |
+| `POST /write/forms/{formId}/submissions` | Sends an enquiry through one of the business's forms               |
+
+A held booking comes back with a `holdToken`. It is given once: keep it
+to start the payment or release the hold.
+
+The business takes payment with its own provider. `POST /write/payments`
+and an order paid online answer with the provider's name, its public key
+and `clientParams`, which you pass to that provider's own checkout. If the
+business can't take payment online, these calls answer `409` with
+`payments_unavailable`: offer to pay at the visit, or on handover, instead.
+
+If the body's `email` isn't the one the token was made for, the call gets
+`403` with `visitor_email_mismatch`. Leave `email` out to use the token's.
+
+When the token expires, calls get `401`. Ask your server for a new one.
+
+### 3. Saroh's hosted pages
+
+No server? Link to the business's own Saroh pages. Products, services,
+posts and plans from the [storefront](/api/storefront) carry a `hostedUrl`:
+the page for that item on the business's Saroh website, at its own domain
+if it has one, else its saroh.app address. The visitor books, buys or
+joins there, and pays there too.
+
+`hostedUrl` is `null` when the business has no published website.

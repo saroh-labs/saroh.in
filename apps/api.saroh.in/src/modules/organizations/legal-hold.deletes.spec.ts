@@ -33,6 +33,8 @@ const HOLD_AWARE: Record<string, string> = {
         "Leaves out a held business's customer sessions, sign-in codes and store logs, and its members' sign-in sessions.",
     "analytics/analytics-retention.handler.ts":
         "Leaves a held business's events out of the read and of the delete.",
+    "ai/history/retention.job.ts":
+        "Leaves a held business's Ask AI conversations out of the read and of the delete.",
 };
 
 /**
@@ -48,6 +50,8 @@ const NOT_TENANT_DATA: Record<string, string> = {
         "Saroh's billing state for a subscription's add-ons, cleared on a move to or from Free; the charges themselves are kept (DROPPED), and a held business's plan doesn't change.",
     "data-export/data-export.handler.ts":
         "The export's zip, deleted 7 days after it was made: a copy. Every record in it stays where it is, and no new export is made while the business is held.",
+    "mcp/ai-connections-sweep.job.ts":
+        "AI apps' sign-in grants (Better Auth's auth-owned tables) unused for 90 days, and apps nobody connected: a person's access, not the business's records; the audit trail keeps the end.",
 };
 
 /**

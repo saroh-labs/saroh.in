@@ -68,6 +68,13 @@ const changed = git(
     .split("\n")
     .filter((p) => CONTENT.test(p) && !TEST.test(p));
 
+// A page already dated today can change again today: its date can't move on.
+const TODAY =
+    process.env.CONTENT_DATES_TODAY ??
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+        new Date(),
+    );
+
 const stale = [];
 for (const path of changed) {
     const file = join(root, path);
@@ -78,7 +85,11 @@ for (const path of changed) {
     if (now === null && then === null) continue;
     if (now === null) {
         stale.push(`${path}: its date was removed (was ${then})`);
-    } else if (now === then && !onlyHiddenWords(file, before)) {
+    } else if (
+        now === then &&
+        now !== TODAY &&
+        !onlyHiddenWords(file, before)
+    ) {
         stale.push(`${path}: its words changed, its date is still ${now}`);
     }
 }

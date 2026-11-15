@@ -43,7 +43,11 @@ function deps(over: Partial<ClearDeps> = {}): ClearDeps {
     return {
         row: jest.fn().mockResolvedValue(row()),
         used: jest.fn().mockResolvedValue(1),
-        zone: jest.fn().mockResolvedValue("Asia/Kolkata"),
+        window: jest.fn().mockResolvedValue({
+            start: new Date("2026-09-30T18:30:00Z"),
+            end: new Date("2026-10-31T18:30:00Z"),
+            key: "2026-10",
+        }),
         ...over,
     };
 }

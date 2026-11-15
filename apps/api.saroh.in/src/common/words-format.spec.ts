@@ -6,6 +6,8 @@ import {
     dayWords,
     moneyWords,
     moneyWordsMinor,
+    moneyWordsWhole,
+    moneyWordsWholeMinor,
     timeWords,
     whenWords,
 } from "./words-format";
@@ -33,6 +35,17 @@ describe("money in a sentence", () => {
     it("reads a Decimal-like value and a negative one", () => {
         expect(moneyWords({ toString: () => "60" }, "INR")).toBe("₹60");
         expect(moneyWords("-49.5", "INR")).toBe("-₹49.50");
+    });
+
+    it("rounds a total to whole units, half up, keeping Indian grouping", () => {
+        expect(moneyWordsWhole("3686245.68", "INR")).toBe("₹36,86,246");
+        expect(moneyWordsWhole("3686245.49", "INR")).toBe("₹36,86,245");
+        expect(moneyWordsWhole("0.50", "INR")).toBe("₹1");
+        expect(moneyWordsWhole("-49.5", "INR")).toBe("-₹50");
+        expect(moneyWordsWhole("-0.40", "INR")).toBe("₹0");
+        expect(moneyWordsWholeMinor(368624568, "INR")).toBe("₹36,86,246");
+        expect(moneyWordsWholeMinor(125049, "INR")).toBe("₹1,250");
+        expect(moneyWordsWholeMinor(-40, "INR")).toBe("₹0");
     });
 
     it("reads minor units", () => {

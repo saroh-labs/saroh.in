@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // #281: a submission is validated against the form the LIVE site shows, not
 // against Form.fields, which the site editor rewrites on every autosave.
 jest.mock("@saroh/database", () => {

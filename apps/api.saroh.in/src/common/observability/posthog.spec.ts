@@ -174,6 +174,30 @@ describe("PostHog in the API (DEC-125)", () => {
                 expect(sent).not.toContain(leak);
         });
 
+        it("never carries an API key, a storefront key past its prefix or a Bearer value (U5)", () => {
+            const transport = fakeTransport();
+            setTelemetry({ transport, environment: "production" });
+            const logged = jest.spyOn(structuredLogger, "error");
+            const sk = `sk_live_${"Ab9".repeat(14)}z`;
+            const pk = `pk_live_${"Xy4".repeat(14)}q`;
+
+            reportError(new Error(`key ${sk} refused; Bearer ${sk}; ${pk}`), {
+                ...ctx,
+                url: `/v1/storefront/${pk}/products?x=1`,
+                route: "/v1/storefront/:key/products",
+                headers: { authorization: `Bearer ${sk}` },
+            });
+
+            const sent = JSON.stringify([
+                transport.captureException.mock.calls,
+                logged.mock.calls,
+            ]);
+            expect(sent).not.toContain(sk);
+            expect(sent).not.toContain(pk);
+            expect(sent).not.toContain("Ab9Ab9");
+            expect(sent).not.toContain("Xy4Xy4");
+        });
+
         it("sends a job's last failure with its type", () => {
             const transport = fakeTransport();
             setTelemetry({ transport, environment: "development" });

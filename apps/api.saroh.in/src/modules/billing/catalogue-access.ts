@@ -249,8 +249,8 @@ export interface ModuleAccessView {
     /** Why it differs from the plan, in the design's words; empty if not. */
     override: string;
     /**
-     * Metered use against `limit` (U13, `metering.ts`): this month's count
-     * for a monthly row. Null for a row metering doesn't count (a switch) or
+     * Metered use against `limit` (U13, `metering.ts`): the count over
+     * `meterWindow` (DEC-219) for a monthly row. Null for a row metering doesn't count (a switch) or
      * that is off.
      */
     usage: number | null;

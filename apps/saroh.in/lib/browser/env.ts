@@ -20,6 +20,15 @@ export const browserEnv = {
         process.env.NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE,
     NEXT_PUBLIC_POSTHOG_ANALYTICS: process.env.NEXT_PUBLIC_POSTHOG_ANALYTICS,
     NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
+    // The release switches (`lib/feature-switches.ts`): the feature lists
+    // reach browser code through the tools' and the nav's imports.
+    NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
+    NEXT_PUBLIC_AI_APPS: process.env.NEXT_PUBLIC_AI_APPS,
+    NEXT_PUBLIC_ASK_AI: process.env.NEXT_PUBLIC_ASK_AI,
+    NEXT_PUBLIC_SOCIAL: process.env.NEXT_PUBLIC_SOCIAL,
+    NEXT_PUBLIC_DEVELOPERS: process.env.NEXT_PUBLIC_DEVELOPERS,
+    NEXT_PUBLIC_DOCS: process.env.NEXT_PUBLIC_DOCS,
+    NODE_ENV: process.env.NODE_ENV,
     /** `API_URL`, written in by next.config.js `env` (the header's session check). */
     SAROH_API_URL: process.env.SAROH_API_URL,
 } as { SAROH_API_URL?: string } & Pick<
@@ -32,4 +41,11 @@ export const browserEnv = {
     | "NEXT_PUBLIC_POSTHOG_REPLAY_SAMPLE"
     | "NEXT_PUBLIC_POSTHOG_ANALYTICS"
     | "NEXT_PUBLIC_VERCEL_ENV"
+    | "NEXT_PUBLIC_TEMPLATES"
+    | "NEXT_PUBLIC_AI_APPS"
+    | "NEXT_PUBLIC_ASK_AI"
+    | "NEXT_PUBLIC_SOCIAL"
+    | "NEXT_PUBLIC_DEVELOPERS"
+    | "NEXT_PUBLIC_DOCS"
+    | "NODE_ENV"
 >;

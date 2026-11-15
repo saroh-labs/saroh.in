@@ -29,12 +29,12 @@ import { useEffect, useRef, useState } from "react";
 import type { StorefrontAllowance } from "@/lib/business-limits";
 import type { HelpTopic } from "@/lib/help/links";
 import {
-    HELP_ARTICLES,
     HELP_TOPICS,
     helpArticleUrl,
     helpHasMoved,
     helpHomeUrl,
     helpUrl,
+    LINKED_HELP_ARTICLES,
 } from "@/lib/help/links";
 import type { Recent } from "@/lib/search/recents";
 import { readRecents, rememberRecent } from "@/lib/search/recents";
@@ -45,11 +45,11 @@ import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
 import type { NavRole } from "./nav-items";
 import {
-    NOTIFICATIONS_NAV,
-    WEBSITE_HREF,
     navCan,
     navFor,
+    NOTIFICATIONS_NAV,
     settingsPagesFor,
+    WEBSITE_HREF,
 } from "./nav-items";
 import { quickActionsFor } from "./quick-actions";
 
@@ -156,7 +156,7 @@ function helpItems(now: Date): { key: string; label: string; href: string }[] {
         }));
     }
     return [
-        ...HELP_ARTICLES.map((a) => ({
+        ...LINKED_HELP_ARTICLES.map((a) => ({
             key: a.slug,
             label: `Help: ${a.title.charAt(0).toLowerCase()}${a.title.slice(1)}`,
             href: helpArticleUrl(a.slug),

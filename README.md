@@ -15,6 +15,14 @@ so you can use, modify and self-host it, including to run your own business
 > copy; that works but has no step-by-step guide yet
 > ([what it takes](setup-instructions.md#running-your-own-copy)).
 
+**Jump to:** [Start free](https://www.saroh.in) ·
+[watch the tour](#watch-it) · [what it does](#what-it-does) ·
+[run it on your machine](#try-it) · [how it is built](#how-it-is-built) ·
+[licence](#licence)
+
+If Saroh is useful to you, starring the repository helps other small
+businesses and developers find it.
+
 Follow along: [Instagram](https://www.instagram.com/sarohlabs) ·
 [X](https://x.com/sarohlabs) ·
 [YouTube](https://www.youtube.com/@SarohLabs) ·

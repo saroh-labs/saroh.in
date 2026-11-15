@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // The kitchen flow on one order (ADR-008, U6) against an in-memory stand-in
 // for Prisma: enough of an order, its lines, its events and its stock rows to
 // walk New → Preparing → Ready → Collected, undo, edit, and read — and to see

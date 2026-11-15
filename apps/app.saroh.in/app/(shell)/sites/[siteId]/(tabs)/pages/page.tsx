@@ -1,12 +1,19 @@
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
-import { FileText } from "lucide-react";
+import { FileText, Plug } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import {
+    liveAiApps,
+    offersAssistantWayIn,
+} from "@/lib/ai-connections/mcp-address";
+import { listAiConnections } from "@/lib/ai-connections/service";
+import { formatList } from "@/lib/home/needs";
 import { requireSession } from "@/lib/session";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import {
     describePendingChanges,
     pendingChangeCount,
@@ -40,7 +47,7 @@ export default async function SitePagesPage({
     params: Promise<{ siteId: string }>;
 }) {
     const { siteId } = await params;
-    await requireSession();
+    const session = await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();
     // A reader reads the pages in the editor, read-only (DEC-200).
@@ -66,6 +73,14 @@ export default async function SitePagesPage({
     const pages = [...site.pages].sort(
         (a, b) => Number(b.isHome) - Number(a.isHome),
     );
+    // A way into AI apps (release visibility U14): a line, never a notice,
+    // so it can't stack with "Waiting to be published". Read softly.
+    const wayIn =
+        apiAreaOn() &&
+        offersAssistantWayIn(
+            await listAiConnections().catch(() => null),
+            session.user.id,
+        );
     const waiting = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
@@ -160,6 +175,31 @@ export default async function SitePagesPage({
                     );
                 })}
             </ListCard>
+            {wayIn ? (
+                // Saroh's own words and its list of AI apps: read in a recording.
+                <p
+                    data-ph-unmask=""
+                    className="-mt-1.5 flex items-start gap-2 text-[13px] leading-normal text-foreground/80"
+                >
+                    <Plug
+                        aria-hidden
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                    />
+                    <span>
+                        <Link
+                            href="/settings/developers/ai"
+                            className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px] coarse:inline-block coarse:py-2.5"
+                        >
+                            Edit your site from your AI assistant
+                        </Link>
+                        <span className="text-muted-foreground">
+                            {" · Works with "}
+                            {formatList(liveAiApps().map((app) => app.name))}.
+                            Changes stay a draft until you publish.
+                        </span>
+                    </span>
+                </p>
+            ) : null}
         </div>
     );
 }

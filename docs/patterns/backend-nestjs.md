@@ -102,6 +102,11 @@ src/
   keeps 5xx messages generic. The one exception is a deliberate 503 thrown
   with `{ message, details }` (a site sign-in code that could not be sent,
   `reason: "unavailable"`): its words and reason reach the client.
+- **Only a success, or "not there", is cacheable.** A route may say
+  `Cache-Control: public, …` (a storefront catalogue read, the launch offer,
+  a live read via `edgeMayKeep`), but the filter answers every other error
+  `no-store`, so a 429, 403 or 500 is never kept at the edge and served to
+  the next visitor (U17). A 404 or 410 keeps the route's own header.
 
 ## Cross-cutting — **Current**
 

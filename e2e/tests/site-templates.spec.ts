@@ -11,9 +11,9 @@ import { useSession } from "../fixtures/sessions";
  * a business made in a spec has every module dark and can't turn Website
  * on.
  *
- * - The Turn on sheet's Website step offers the templates suggested for the
- *   business (U12, `lib/sites/template-picker.ts`), the kind's first and
- *   chosen. Read only, on the three first-run businesses (`FIRST_RUNS`), which
+ * - The Turn on sheet's Website step offers the one template picker
+ *   (DEC-216): picture cards, the suggested first, the kind's chosen, and a
+ *   card's preview with its own Choose. Read only, on the three first-run businesses (`FIRST_RUNS`), which
  *   `first-run-kind.spec.ts` reads too: the sheet is opened, never saved.
  * - A site for my work turns Website on and opens on the portfolio, with
  *   its Projects block. On `SITE_STARTS`, one business per browser, since a
@@ -32,15 +32,29 @@ async function openHome(page: Page, orgId: string) {
     await page.goto("/");
 }
 
-/** The sheet's "Starts from" choice opens on the kind's template, listed first. */
+/**
+ * The sheet's template picker (DEC-216) opens on the kind's template, its
+ * card first and chosen; its Preview opens the template drawn as the
+ * business's site, and Back chooses nothing.
+ */
 async function expectStartsFrom(sheet: Locator, name: string) {
-    const radios = sheet
-        .getByRole("radiogroup", { name: "Starts from" })
-        .getByRole("radio");
-    await expect(radios.first()).toHaveAccessibleName(new RegExp(`^${name}`));
+    const cards = sheet.locator("[data-template-card]");
+    const radios = cards.getByRole("radio");
+    await expect(radios.first()).toHaveAccessibleName(name);
     await expect(radios.first()).toBeChecked();
-    expect(await radios.count()).toBeGreaterThan(1);
-    await expect(sheet).toContainText("Change its pages any time.");
+    expect(await cards.count()).toBeGreaterThan(1);
+    await cards
+        .first()
+        .getByRole("button", { name: `Preview ${name}` })
+        .click();
+    const preview = sheet
+        .page()
+        .getByRole("dialog", { name: `Your site in ${name}` });
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText("What goes in");
+    await preview.getByRole("button", { name: "Back" }).click();
+    await expect(preview).toHaveCount(0);
+    await expect(radios.first()).toBeChecked();
 }
 
 /** Home's "Put up a website" card, pressed until the sheet opens. */
@@ -75,10 +89,10 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
             await expect(
                 sheet.getByRole("term").filter({ hasText: "Web address" }),
             ).toBeVisible();
+            // Beside it, the owner's Change (DEC-069), which opens
+            // Settings' dialog over the sheet.
             await expect(
-                sheet
-                    .getByRole("definition")
-                    .filter({ hasText: /^[a-z0-9-]+\.saroh\.app$/ }),
+                sheet.getByText(/^[a-z0-9-]+\.saroh\.app$/),
             ).toBeVisible();
             await expect(sheet.getByLabel("Web address")).toHaveCount(0);
         });
@@ -93,7 +107,10 @@ test.describe("a new site starts from the kind's template (DEC-070, K15)", () =>
         await openHome(page, `seed_org_site-start_work-${browser}`);
         const sheet = await openWebsiteSheet(page);
         await expectStartsFrom(sheet, "Portfolio");
-        await sheet.getByRole("button", { name: /^Turn on$/ }).click();
+        // Website alone: the button names its template (DEC-216).
+        await sheet
+            .getByRole("button", { name: /^Turn on with Portfolio$/ })
+            .click();
 
         // A first run lands on the thing itself (`goalHref`): the new
         // site, open in its editor.

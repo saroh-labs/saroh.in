@@ -44,6 +44,16 @@ export interface StarterContentActions {
      * details in place of the samples when `fill`.
      */
     copy: (look: LookId | null, fill: boolean) => Promise<StarterCopyOutcome>;
+    /**
+     * Copy a template's pages into the draft (DEC-216, the Template row),
+     * the draft's `look` kept, its colourway's colours too when `styleId`.
+     */
+    copyTemplate: (
+        templateId: string,
+        styleId: string | null,
+        look: LookId | null,
+        fill: boolean,
+    ) => Promise<StarterCopyOutcome>;
     /** "Bring in my details": said in a toast, with Undo when it changed. */
     fillDetails: () => Promise<void>;
     /** The draft's previous versions, newest first. */
@@ -107,16 +117,12 @@ export function starterContentActions({
         );
     };
 
-    const copy = async (
-        look: LookId | null,
-        fill: boolean,
+    const copyInto = async (
+        send: () => ReturnType<typeof copyStarterContent>,
     ): Promise<StarterCopyOutcome> => {
         settleUndo();
         // Unreached, it is said in the dialog rather than a toast.
-        const res = await runAction(
-            () => copyStarterContent(siteId, look ?? "classic", fill),
-            { quiet: true },
-        );
+        const res = await runAction(send, { quiet: true });
         if (!res) return { ok: false, error: UNREACHED };
         if (!res.ok) {
             return {
@@ -134,6 +140,22 @@ export function starterContentActions({
         );
         return { ok: true };
     };
+
+    const copy = (look: LookId | null, fill: boolean) =>
+        copyInto(() => copyStarterContent(siteId, look ?? "classic", fill));
+
+    const copyTemplate = (
+        templateId: string,
+        styleId: string | null,
+        look: LookId | null,
+        fill: boolean,
+    ) =>
+        copyInto(() =>
+            copyStarterContent(siteId, look ?? "classic", fill, {
+                templateId,
+                ...(styleId ? { styleId } : {}),
+            }),
+        );
 
     const fillDetailsNow = async () => {
         settleUndo();
@@ -196,6 +218,7 @@ export function starterContentActions({
     return {
         blocked: unsaved ? STARTER_WAITS_FOR_SAVE : null,
         copy,
+        copyTemplate,
         fillDetails: fillDetailsNow,
         listVersions,
         rollback,

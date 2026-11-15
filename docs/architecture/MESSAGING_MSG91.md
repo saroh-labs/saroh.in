@@ -16,18 +16,18 @@ Code: `apps/api.saroh.in/src/modules/messaging/`. Other modules call
 
 All optional; set on the API. Values never go in the repo.
 
-| Name                               | What it is for                                                                                                                                                                |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MESSAGING_PROVIDER`               | `msg91` or `fake`. The fake is used only in development and test, even when named. Unset: MSG91 when the three below are set, else the fake in development and test.          |
-| `MSG91_AUTH_KEY`                   | Saroh's MSG91 auth key, for every call. MSG91 turns IP security on for a new key: allow the API's outbound address.                                                           |
-| `MSG91_WHATSAPP_NUMBER`            | The integrated WhatsApp number, country code and digits (`91…`).                                                                                                              |
-| `MSG91_WHATSAPP_TEMPLATE`          | The approved authentication template's name. Set it to `saroh_login_code` (Meta's authentication text: the code and a copy-code button, en_US; below).                        |
-| `MSG91_WHATSAPP_UTILITY_TEMPLATES` | Approved utility templates, `key=template_name` pairs, comma separated. Callers send the key; an unknown key is refused without a call.                                       |
-| `MSG91_WIDGET_ID`                  | The OTP widget's id. Public: the browser loads the widget with it (`MessagingService.otpWidgetConfig()`).                                                                     |
-| `MSG91_WIDGET_TOKEN`               | The OTP widget's token. Public client config, but still read from the environment.                                                                                            |
-| `MSG91_WEBHOOK_SECRET`             | At least 32 random characters; the same value goes in the webhook's header (below). Unset, every webhook is refused.                                                          |
-| `MESSAGING_ENC_KEY`                | A 32-byte key (64 hex or base64) sealing a queued send's number and words until MSG91 accepts it (a retry). Development and test fall back to a public key; elsewhere set it. |
-| `MSG91_BASE_URL`                   | Tests only: where calls go instead of MSG91.                                                                                                                                  |
+| Name                               | What it is for                                                                                                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MESSAGING_PROVIDER`               | `msg91`, `meta` or `fake`. The fake is used only in development and test, even when named. Unset: MSG91 when the three below are set, else the fake in development and test. `meta`: below. |
+| `MSG91_AUTH_KEY`                   | Saroh's MSG91 auth key, for every call. MSG91 turns IP security on for a new key: allow the API's outbound address.                                                                         |
+| `MSG91_WHATSAPP_NUMBER`            | The integrated WhatsApp number, country code and digits (`91…`).                                                                                                                            |
+| `MSG91_WHATSAPP_TEMPLATE`          | The approved authentication template's name. Set it to `saroh_login_code` (Meta's authentication text: the code and a copy-code button, en_US; below).                                      |
+| `MSG91_WHATSAPP_UTILITY_TEMPLATES` | Approved utility templates, `key=template_name` pairs, comma separated. Callers send the key; an unknown key is refused without a call.                                                     |
+| `MSG91_WIDGET_ID`                  | The OTP widget's id. Public: the browser loads the widget with it (`MessagingService.otpWidgetConfig()`).                                                                                   |
+| `MSG91_WIDGET_TOKEN`               | The OTP widget's token. Public client config, but still read from the environment.                                                                                                          |
+| `MSG91_WEBHOOK_SECRET`             | At least 32 random characters; the same value goes in the webhook's header (below). Unset, every webhook is refused.                                                                        |
+| `MESSAGING_ENC_KEY`                | A 32-byte key (64 hex or base64) sealing a queued send's number and words until MSG91 accepts it (a retry). Development and test fall back to a public key; elsewhere set it.               |
+| `MSG91_BASE_URL`                   | Tests only: where calls go instead of MSG91.                                                                                                                                                |
 
 ## Where things live in the MSG91 dashboard
 
@@ -150,16 +150,62 @@ is refused, whatever MSG91 says of it.
   answers 200 to anything it can't read or match (MSG91 pauses a webhook on a
   4xx), and 401 only to a wrong secret.
 
-## Moving WhatsApp to Meta's Cloud API
+## WhatsApp on Meta's Cloud API (DEC-213)
 
-1. Write `providers/meta-cloud.provider.ts` implementing `MessagingProvider`
-   (and a webhook controller for Meta's signed events, which carry an
-   `X-Hub-Signature-256`; record events in `MessagingWebhookEvent` as the
-   MSG91 one does).
-2. Add `meta` to `MESSAGING_PROVIDER` in `src/env.ts` and a branch in
-   `providers/messaging-provider.factory.ts`.
-3. Set the new adapter's environment names, then `MESSAGING_PROVIDER=meta`.
-   Callers change nothing. Keep the template keys the same.
+`MESSAGING_PROVIDER=meta` sends WhatsApp (codes, utility templates, free
+text) through Meta's Cloud API directly, from Saroh's own number
+(`providers/meta-cloud.provider.ts`, Graph API v27.0). SMS and the OTP
+widget's token check still go to MSG91, so the MSG91 names above stay set.
+MSG91 stays the default until the cut-over day; its WhatsApp code is kept.
+
+| Name                           | What it is for                                                                                               |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `META_WA_PHONE_NUMBER_ID`      | The WhatsApp number's phone number ID (WhatsApp Manager › API setup), not the number itself.                 |
+| `META_WA_TOKEN`                | A system user's permanent access token with `whatsapp_business_messaging`. Never logged.                     |
+| `META_APP_SECRET`              | The Meta app's secret (App settings › Basic). Webhooks are checked with it; unset, every webhook is refused. |
+| `META_WA_WEBHOOK_VERIFY_TOKEN` | Any long random string; the same value goes in the app's webhook settings (below).                           |
+| `META_WA_TEMPLATE_LANG`        | The templates' language code. Unset: `en_US`.                                                                |
+| `META_GRAPH_BASE_URL`          | Tests only: where Graph API calls go, version included.                                                      |
+
+Template names are read from `MSG91_WHATSAPP_TEMPLATE` and
+`MSG91_WHATSAPP_UTILITY_TEMPLATES`: they are Meta's own names in the same
+WhatsApp account, so the cut-over copies nothing. They get provider-neutral
+names when MSG91's WhatsApp path is removed. Check each name and its
+language in WhatsApp Manager › Message templates before switching.
+
+The code goes as the authentication template's one body parameter and
+again on its copy-code button (`sub_type` `url`, index 0). Meta's error
+131026 (not on WhatsApp) is `ineligible`; its throughput codes and HTTP 429
+are `rate_limited`, and a 5xx or a timeout is thrown, so the send is tried
+again.
+
+### Meta webhook
+
+- Callback URL: `https://api.saroh.in/public/webhooks/meta` (development:
+  `https://api.saroh.io/public/webhooks/meta`).
+- Verify token: the value of `META_WA_WEBHOOK_VERIFY_TOKEN`. Meta's GET
+  handshake gets the challenge back only for `hub.mode=subscribe` with this
+  token; anything else is 403.
+- Subscribe the app to the WhatsApp Business Account, then subscribe the
+  webhook fields `messages` (delivery statuses and inbound messages) and
+  `message_template_status_update` (template approvals; received and
+  ignored by the API for now).
+- Every POST must carry `X-Hub-Signature-256`, the HMAC-SHA256 of the raw
+  body under `META_APP_SECRET`; a missing or wrong one is 401 and nothing is
+  read. A signed body the API can't read or match is a 200 no-op, as Meta
+  retries anything else for up to 7 days. What each status or inbound
+  message changes is `delivery-reports.ts`, shared with the MSG91 webhook.
+- While both MSG91 and the Meta app are subscribed (testing), the same
+  report can come twice: events are recorded once and statuses only move
+  forward, so the second is a no-op.
+
+### Cut-over
+
+1. Put the `META_*` values on the server (values only in its secret store).
+2. Set the callback URL and verify token in the Meta app, subscribe the app
+   to the WhatsApp account and the fields above.
+3. Set `MESSAGING_PROVIDER=meta`, redeploy, and send one code to the
+   owner's number. Unset it to go back to MSG91.
 
 ## Moving SMS to Saroh's own DLT templates
 

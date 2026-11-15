@@ -1,3 +1,8 @@
+import type {
+    SharedBooking,
+    SharedHoursWindow,
+    SharedService,
+} from "@/lib/api/client";
 import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
@@ -41,16 +46,9 @@ export interface ServiceGst {
 }
 
 /** A bookable Service (mirror of the api's Service row, JSON-serialized). */
-export interface Service {
-    id: string;
+export interface Service extends SharedService {
     organizationId: string;
     siteId: string | null;
-    name: string;
-    description: string | null;
-    durationMinutes: number;
-    bufferBeforeMinutes: number;
-    bufferAfterMinutes: number;
-    capacity: number;
     priceCents: number | null;
     currency: string | null;
     /** GST the price includes, in percent, and its SAC code (ADR-008). */
@@ -72,13 +70,10 @@ export interface Service {
      * none apply (not registered, no rate, exempt, no price).
      */
     gst?: ServiceGst | null;
-    timezone: string;
     status: ServiceStatus;
     locationType: LocationType;
     /** The link an online service's bookers join by; null in person. */
     meetingUrl: string | null;
-    createdAt: string;
-    updatedAt: string;
     /** Visits one booking of it is, 1 to 12 (E1; honoured from E9/E10). */
     visits: number;
     depositMode: DepositMode;
@@ -102,15 +97,10 @@ export interface Service {
 }
 
 /** One recurring weekly availability window (in the Service's timezone). */
-export interface AvailabilityRule {
+/** 0 = Sunday; minutes from local midnight, start inclusive, end exclusive. */
+export interface AvailabilityRule extends SharedHoursWindow {
     id: string;
     serviceId: string;
-    /** 0 = Sunday … 6 = Saturday. */
-    dayOfWeek: number;
-    /** Minutes from local midnight, inclusive (0–1439). */
-    startMinute: number;
-    /** Minutes from local midnight, exclusive; > startMinute (1–1440). */
-    endMinute: number;
 }
 
 // The booking state vocabulary and its predicates live in ./booking-state,
@@ -129,22 +119,14 @@ export type CancelledBooking = Booking & { money?: CancelMoney };
 export type { BookingOutcome, BookingStatus };
 
 /** A reserved slot (mirror of the api's Booking row, JSON-serialized). */
-export interface Booking {
-    id: string;
-    serviceId: string;
-    /** Absolute-UTC ISO instants. */
-    startAt: string;
-    endAt: string;
-    /** IANA timezone the booker saw the slot in. */
-    timezone: string;
+/** Status, outcome and the booker's fields are this route's own; `/v1` differs. */
+export interface Booking extends SharedBooking {
     status: BookingStatus;
     /** Set only by a person; never derived from the slot having passed. */
     outcome: BookingOutcome | null;
     bookerName: string | null;
     bookerEmail: string | null;
     bookerPhone: string | null;
-    createdAt: string;
-    cancelledAt: string | null;
     /**
      * The free-cancel deadline fixed when it was booked (E8, DEC-051); a
      * move never changes it. Null with no rule then, and absent from an
@@ -318,11 +300,7 @@ export interface UpdateServiceInput {
 }
 
 /** One availability window to persist (no id — position is not meaningful). */
-export interface AvailabilityRuleInput {
-    dayOfWeek: number;
-    startMinute: number;
-    endMinute: number;
-}
+export type AvailabilityRuleInput = SharedHoursWindow;
 
 /**
  * Send a mutation to a services route and return an {@link ApiResult} — with

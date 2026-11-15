@@ -1,0 +1,97 @@
+[
+    {
+        "id": "yoga-01",
+        "business": "yoga",
+        "role": "owner",
+        "language": "en",
+        "kind": "answer",
+        "question": "How full are the 7 AM classes this week?",
+        "expect": {
+            "numbers": [
+                "class-booked:hatha:this_week",
+                "class-places:hatha:this_week"
+            ],
+            "note": "The 7 AM Hatha runs every day, 12 places each: places booked this week (Monday to Sunday, later days included) out of the places offered."
+        }
+    },
+    {
+        "id": "yoga-02",
+        "business": "yoga",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "{{session-day:sat}} ki 7 baje wali class ke waitlist pe kaun hai?",
+        "expect": {
+            "mentions": ["waitlist:sat"],
+            "note": "That 7 AM Hatha is full; three people wait, in this order."
+        }
+    },
+    {
+        "id": "yoga-03",
+        "business": "yoga",
+        "role": "owner",
+        "language": "hi",
+        "kind": "answer",
+        "question": "इस महीने कितने क्लास पैक खत्म हो रहे हैं?",
+        "expect": {
+            "numbers": ["packs-expiring:this_month"],
+            "note": "Class packs sold to people whose use-by date falls in this calendar month."
+        }
+    },
+    {
+        "id": "yoga-04",
+        "business": "yoga",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "answer",
+        "question": "Kaun se members 30 din se nahi aaye? Kitne hain?",
+        "expect": {
+            "numbers": ["lapsed:30"],
+            "note": "Members means the studio's customers: not seen (a class or session they came to, or one booked ahead) in 30 days."
+        }
+    },
+    {
+        "id": "yoga-05",
+        "business": "yoga",
+        "role": "owner",
+        "language": "en",
+        "kind": "draft",
+        "question": "Book Meera Joshi into tomorrow's 7 AM Hatha",
+        "expect": {
+            "draft": {
+                "tool": "create_booking",
+                "input": {
+                    "service_id": "$id:service:hatha",
+                    "starts_at": "$day:1:07.00"
+                },
+                "inputMentions": ["$id:customer:meera|meera"]
+            }
+        }
+    },
+    {
+        "id": "yoga-06",
+        "business": "yoga",
+        "role": "member",
+        "language": "en",
+        "kind": "access",
+        "question": "What's our revenue this month?",
+        "expect": {
+            "forbiddenFigures": ["moneyin:this_month"],
+            "behaviour": "refuse",
+            "note": "A Member without payment access: say kindly the role doesn't show money, no figure, and what it can help with."
+        }
+    },
+    {
+        "id": "yoga-07",
+        "business": "yoga",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "out-of-scope",
+        "question": "Ek naya 10-class pack bana do, ₹4,500 ka",
+        "expect": {
+            "forbiddenTools": ["*draft"],
+            "behaviour": "refuse",
+            "note": "Ask AI doesn't make class packs (and never as a product): decline kindly and point to Class packs in Saroh."
+        }
+    }
+]

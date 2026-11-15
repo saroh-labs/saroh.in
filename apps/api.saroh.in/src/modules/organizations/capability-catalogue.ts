@@ -34,6 +34,8 @@ export const CAPABILITY_GROUPS = [
     "money",
     "messaging",
     "insights",
+    "social",
+    "ai",
 ] as const;
 
 export type CapabilityGroup = (typeof CAPABILITY_GROUPS)[number];
@@ -92,6 +94,13 @@ export const CAPABILITIES: readonly Capability[] = [
         ownerOnly: true,
     },
     {
+        action: "org:export",
+        group: "business",
+        label: "Download all the business's data",
+        note: "Every customer, order and record, in one download.",
+        ownerOnly: true,
+    },
+    {
         action: "audit:read",
         group: "business",
         label: "Read the activity log",
@@ -119,6 +128,26 @@ export const CAPABILITIES: readonly Capability[] = [
         action: "automation:manage",
         group: "business",
         label: "Manage automations",
+    },
+    {
+        action: "apikey:manage",
+        group: "business",
+        label: "Make and revoke keys for other software",
+        note: "A key lets other software work in the business without anyone signing in. Includes disconnecting anyone's AI assistant.",
+        // The owner's alone (R7): a key acts with no person behind it.
+        ownerOnly: true,
+    },
+    {
+        action: "webhook:manage",
+        group: "business",
+        label: "Manage notifications to your systems (webhooks)",
+        note: "Sends details of orders, bookings and customers to an address someone types in, as they happen.",
+    },
+    {
+        action: "storefront:mint",
+        group: "business",
+        label: "Let your own website take bookings and orders",
+        note: "A secret key with this gives each visitor of the business's own website a short-lived pass to book, order and send enquiries.",
     },
 
     // — Team ——————————————————————————————————————————————————
@@ -222,6 +251,13 @@ export const CAPABILITIES: readonly Capability[] = [
         note: "For someone checking the wording: they can comment without being able to change anything.",
     },
     { action: "site:approve", group: "website", label: "Sign a website off" },
+    {
+        action: "site:approval:override",
+        group: "website",
+        label: "Publish without approval",
+        note: "Goes live without a sign-off, and turns “Publishing needs approval” on or off.",
+        ownerOnly: true,
+    },
     { action: "section:write", group: "website", label: "Edit page sections" },
     { action: "media:read", group: "website", label: "See the media library" },
     {
@@ -408,6 +444,23 @@ export const CAPABILITIES: readonly Capability[] = [
 
     // — Insights ——————————————————————————————————————————————
     { action: "analytics:read", group: "insights", label: "See insights" },
+
+    // — Social ————————————————————————————————————————————————
+    { action: "social:read", group: "social", label: "See posts" },
+    {
+        action: "social:post",
+        group: "social",
+        label: "Make and share posts",
+        note: "Posts about the business, with its pictures and words. Whoever can make posts can also see them.",
+    },
+
+    // — Ask AI ————————————————————————————————————————————————
+    {
+        action: "ai:use",
+        group: "ai",
+        label: "Use Ask AI",
+        note: "Questions come out of the business's shared allowance for the month. Answers only show what this person can already see, and a change it drafts is saved only when they confirm it.",
+    },
 ];
 
 /** Lookup by action, for turning a stored grant back into its label. */

@@ -54,6 +54,17 @@ const FEATURES = [
     // The Website page (12 Oct 2026): /website and /modules/website land here.
     "website",
     "insights",
+    // The release switches (plan 2026-11-13-002): built only when on, as CI
+    // and `pnpm prepush --e2e` set them.
+    ...(
+        [
+            ["ai-apps", "NEXT_PUBLIC_AI_APPS"],
+            ["ask-ai", "NEXT_PUBLIC_ASK_AI"],
+            ["social", "NEXT_PUBLIC_SOCIAL"],
+        ] as const
+    )
+        .filter(([, name]) => process.env[name] === "on")
+        .map(([slug]) => slug),
 ];
 // Salons (12 Oct 2026) has no screenshot yet: every check runs on it as on
 // the others.
@@ -107,6 +118,8 @@ const RESOURCE_PREFIXES = [
     // The gallery and each template's page (`lib/site-pages.ts`), listed
     // with /templates once it is published (17 Oct, or RESOURCES_PREVIEW=1).
     "/templates",
+    // API keys and webhooks, a Resources page behind NEXT_PUBLIC_DEVELOPERS (on in CI).
+    "/developers",
 ];
 
 /**

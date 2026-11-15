@@ -30,9 +30,9 @@ const LEELA: Storefront = { organizationId: ORG, storeId: STORE };
 /** Writes that leave history go to the base seed, never a showcase. */
 const NW: Storefront = { organizationId: "seed_org", storeId: "seed_store" };
 const PHOTOS = [
-    "https://images.unsplash.com/photo-1671493235081-5842463637cd?w=1600&q=80&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1671493234884-b1611bcf3e69?w=1600&q=80&auto=format&fit=crop",
-    "https://images.unsplash.com/photo-1671493229048-4dddd00ca84a?w=1600&q=80&auto=format&fit=crop",
+    "https://media.saroh.io/demo/photo-1671493235081-5842463637cd.jpg",
+    "https://media.saroh.io/demo/photo-1671493234884-b1611bcf3e69.jpg",
+    "https://media.saroh.io/demo/photo-1671493229048-4dddd00ca84a.jpg",
 ];
 
 async function signIn(page: Page) {

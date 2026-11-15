@@ -63,4 +63,45 @@ describe("IntegrationSteps", () => {
         fireEvent.keyDown(first, { key: "End" });
         expect(current()).toContain("Three");
     });
+
+    it("draws a step's own breadcrumb, else the page's, and a row without a label", () => {
+        const own: IntegrationStep = {
+            ...step("Sign in"),
+            panelPath: ["Saroh", "Sign in"],
+            rows: [
+                {
+                    value: "Green Leaf Salon",
+                    note: "Ticked",
+                    mono: false,
+                    done: true,
+                    tone: "ok",
+                },
+            ],
+        };
+        render(
+            <IntegrationSteps
+                steps={[step("Add it"), own, step("Allow")]}
+                panelPath={["Claude", "Connectors"]}
+            />,
+        );
+        expect(
+            screen.getByRole("figure", {
+                name: "Step 1 in Claude › Connectors",
+                hidden: true,
+            }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("figure", {
+                name: "Step 2 in Saroh › Sign in",
+                hidden: true,
+            }),
+        ).toBeTruthy();
+        expect(
+            screen.getByRole("figure", {
+                name: "Step 3 in Claude › Connectors",
+                hidden: true,
+            }),
+        ).toBeTruthy();
+        expect(screen.getByText("Green Leaf Salon")).toBeTruthy();
+    });
 });

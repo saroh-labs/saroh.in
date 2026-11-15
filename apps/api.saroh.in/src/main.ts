@@ -18,13 +18,12 @@ import "reflect-metadata";
 import "./env";
 
 import { ValidationPipe } from "@nestjs/common";
-import type { CorsOptions } from "@nestjs/common/interfaces/external/cors-options.interface";
 import { NestFactory, Reflector } from "@nestjs/core";
 import { getTrustedOrigins } from "@saroh/auth";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
-import { corsOptionsFor } from "./common/cors";
+import { corsDelegate } from "./common/cors";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { OriginGuard } from "./common/guards/origin.guard";
 import { TestHostWriteGuard } from "./common/guards/test-host.guard";
@@ -32,6 +31,7 @@ import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
 import { correlationIdMiddleware } from "./common/logging/correlation-id.middleware";
 import { LoggingInterceptor } from "./common/logging/logging.interceptor";
 import { structuredLogger } from "./common/logging/structured-logger";
+import { mcpHostOnly } from "./common/mcp-host";
 import { merchantApiOnly } from "./common/merchant-api";
 import {
     flushTelemetry,
@@ -41,6 +41,7 @@ import { robotsNoindex } from "./common/robots-header";
 import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
+import { ApiKeyGuard } from "./modules/api-keys/api-key.guard";
 
 /**
  * Last line of defence against a library's own timers killing the process.
@@ -115,6 +116,9 @@ async function bootstrap() {
     // Merchant sites' address serves its own short list of routes (DEC-204).
     app.use(merchantApiOnly);
 
+    // The MCP address serves `/mcp` and its discovery documents only (U10).
+    app.use(mcpHostOnly);
+
     app.use(helmet());
 
     // The dev API stays out of search (ROBOTS_NOINDEX=on); off in production.
@@ -136,14 +140,11 @@ async function bootstrap() {
         ...devOrigins,
     ];
     // Guardless `/public/*` routes answer any origin, without credentials:
-    // merchants' own sites call them (U19). See common/cors.ts.
+    // merchants' own sites call them (U19). `/v1/storefront/{pk_…}` answers
+    // only its key's origins; `/v1` none. See common/cors.ts.
+    const keys = app.get(ApiKeyGuard, { strict: false });
     app.enableCors(
-        (
-            req: { url?: string },
-            callback: (error: Error | null, options: CorsOptions) => void,
-        ) => {
-            callback(null, corsOptionsFor(req.url ?? "", trustedOrigins));
-        },
+        corsDelegate(trustedOrigins, (token) => keys.allowedOrigins(token)),
     );
 
     app.useGlobalPipes(

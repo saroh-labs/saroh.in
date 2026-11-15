@@ -1,3 +1,5 @@
+import type { ReleaseSwitch } from "@saroh/marketing/feature-switches";
+
 import { NOT_AVAILABLE_YET } from "./coming";
 import type { IsoDay, PublishContext } from "./resources";
 import { isLive } from "./resources";
@@ -9,7 +11,7 @@ import { formatDay } from "@/lib/format/day";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-04";
+export const UPDATED = "2026-11-14";
 
 /**
  * The changelog (plan U4, design "Saroh Resources - Changelog" 1a): its
@@ -42,7 +44,17 @@ export interface ChangelogEntry {
     signoff: string;
     /** The search result's line. */
     description: string;
+    /**
+     * The release switch it waits for (plan 2026-11-13-002, U11): never
+     * live while that switch is off, whatever its day (`isLive`).
+     */
+    waitsFor?: ReleaseSwitch;
 }
+
+/** An entry written ahead of its release: no day yet. */
+export type WaitingEntry = Omit<ChangelogEntry, "publishOn"> & {
+    waitsFor: ReleaseSwitch;
+};
 
 export const changelogHref = (slug: string) => `/changelog/${slug}`;
 
@@ -233,6 +245,130 @@ export const CHANGELOG_ENTRIES: readonly ChangelogEntry[] = [
         signoff: "Team Saroh",
         description:
             "Saroh's early access is open: orders, products and stock, bookings, monthly plans, GST invoices, payments to your own account, emails to your customers and your own website, in one place.",
+    },
+];
+
+/**
+ * Entries written ahead of their feature's release (plan 2026-11-13-002,
+ * U11). None carries a day: no date for unreleased work is in the repo. The
+ * release commit moves an entry into `CHANGELOG_ENTRIES` with that day's
+ * `publishOn`, keeping its `waitsFor`, so it shows with the first deploy
+ * that has both the day and the switch on.
+ *
+ * Each line is the approved feature page's (`content/features.ts`, boards
+ * VF*), already held to the claims ledger; the release commit reads them
+ * again against what ships. Ask AI's is written from its page before its
+ * screens exist (plan 2026-11-13-001): check every line against them first.
+ */
+export const WAITING_ENTRIES: readonly WaitingEntry[] = [
+    {
+        slug: "use-saroh-from-your-ai-assistant",
+        waitsFor: "ai-apps",
+        kind: "New",
+        title: "Use Saroh from your AI assistant",
+        summary:
+            "Connect Claude, ChatGPT or another AI app to your business, then ask in your own words: add a product, look up today's bookings, move one, or draft a page on your site.",
+        lead: "Saroh now works from the AI assistant you already use. Add Saroh as a connector, sign in, pick your businesses, and ask.",
+        sections: [
+            {
+                name: "Ask in your own words",
+                // MCP tools (apps/api.saroh.in/src/modules/mcp/tools/).
+                body: "Add a product, change your opening hours, find a free time, make or move a booking, move an order along, or look up a customer. It can do only what you can do in Saroh.",
+                link: { label: "See AI apps", href: "/features/ai-apps" },
+            },
+            {
+                name: "Your website stays a draft",
+                // DEC-215, publish-requests.ts.
+                body: "It can build and change pages, sections and the look, but it can't publish. It gives you a link into Saroh, and you choose whether it goes live.",
+            },
+            {
+                name: "Everything on record",
+                // AI assistants in Settings › API and AI apps (ai-apps.tsx).
+                body: "Settings › API and AI apps lists each app you connected and every change it made. Roll the website draft back, or disconnect it from a business, at any time.",
+                link: { label: "Connect Claude", href: "/integrations/claude" },
+            },
+        ],
+        signoff: "Team Saroh",
+        description:
+            "Use Saroh from Claude, ChatGPT or another AI app: add products, move bookings and draft pages by asking. Website changes wait for you to publish.",
+    },
+    {
+        slug: "share-and-posts",
+        waitsFor: "social",
+        kind: "New",
+        title: "Share what you sell as a post",
+        summary:
+            "Press Share on a product, service, class, offer, blog post or your booking page, and get a ready post in your website's look, with its caption.",
+        lead: "Anything with a page on your site can now become a post in a minute, drawn in your website's own colours, fonts and logo.",
+        sections: [
+            {
+                name: "Pick a card and a size",
+                body: "Photo, Price tag, Offer or Simple, as a post, a square or a story. A card only shows what the item has: no live offer, no Offer card.",
+                link: {
+                    label: "See Share and posts",
+                    href: "/features/social",
+                },
+            },
+            {
+                name: "You post it, from your own accounts",
+                body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. There's nothing to connect and no password to give.",
+            },
+            {
+                name: "Or make your own",
+                body: "In Social, Create post takes a headline, your own photo or both, and a link to any page on your site. Your own posts are saved, so you can share them again.",
+            },
+        ],
+        signoff: "Team Saroh",
+        description:
+            "Share and posts in Saroh: turn a product, service, offer or page into a post in your website's look, and share it from your phone or computer.",
+    },
+    {
+        slug: "api-keys-and-webhooks",
+        waitsFor: "developers",
+        kind: "New",
+        title: "API keys and webhooks",
+        summary:
+            "Owners can make API keys for a developer or agency, and webhooks tell your own systems the moment an order is paid or a booking is made.",
+        lead: "Your business's data can now reach the tools you build or pay for, with keys you control.",
+        sections: [
+            {
+                name: "Keys you control",
+                // docs.saroh.in/api/keys.
+                body: "In Settings › API and AI apps, an owner makes a secret key for a server, choosing what it may do, or a publishable key for a website, which only reads. Roll a key and the old one keeps working for 24 hours. Revoke one to stop it at once.",
+                link: { label: "See the API", href: "/developers" },
+            },
+            {
+                name: "Webhooks",
+                // docs.saroh.in/api/webhooks.
+                body: "Pick events like order.paid or booking.created, and Saroh sends each one to your address, signed so your server can check it came from Saroh, and tried again if it doesn't answer.",
+            },
+        ],
+        signoff: "Team Saroh",
+        description:
+            "Saroh API keys and webhooks: secret and publishable keys an owner controls, and signed webhooks for orders, bookings and enquiries.",
+    },
+    {
+        slug: "ask-ai",
+        waitsFor: "ask-ai",
+        kind: "New",
+        title: "Ask AI: ask about your business",
+        summary:
+            "Ask in English, Hinglish or Hindi how the week went, what's selling or who hasn't come back, and get the answer from your own records.",
+        lead: "Ask AI sits at the top of Saroh. Ask a question about your business and it answers from your own bookings, orders, customers and products.",
+        sections: [
+            {
+                name: "Answers from your own records",
+                body: "It says where each answer came from and links to that screen, in the same figures Home and Insights show. It answers only from what your role lets you see.",
+                link: { label: "See Ask AI", href: "/features/ask-ai" },
+            },
+            {
+                name: "Nothing saved without you",
+                body: "Ask it to add or change something and it fills in a card for you to check. Nothing is saved until you confirm. It never deletes, cancels or refunds.",
+            },
+        ],
+        signoff: "Team Saroh",
+        description:
+            "Ask AI in Saroh: ask about your bookings, orders and customers in English, Hinglish or Hindi, answered from your own records.",
     },
 ];
 

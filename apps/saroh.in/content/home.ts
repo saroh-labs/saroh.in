@@ -11,6 +11,9 @@
  * what Free leaves out or what a paid plan adds: "Move up when you need
  * more."
  */
+import { countWord } from "@saroh/marketing/feature-switches";
+
+import { featureList } from "./features";
 import type { PlanTeaser, ShotRef } from "./types";
 
 /**
@@ -18,7 +21,7 @@ import type { PlanTeaser, ShotRef } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-27";
+export const UPDATED = "2026-11-14";
 
 export interface HeroWord {
     /** The saffron initial. */
@@ -56,7 +59,8 @@ export const home = {
     chips: ["UPI Autopay", "GST invoices", "Bills of supply"],
     worksFor: "Works for",
     featuresEyebrow: "Everything in Saroh",
-    featuresTitle: "Nine parts, one workspace.",
+    /** "Nine parts, one workspace.": counts the features this build shows. */
+    featuresTitle: `${countWord(featureList.length)} parts, one workspace.`,
     solutionsTitle: "Solutions",
     pricingTitle: "Pricing",
     pricingCompare: "Compare every plan",

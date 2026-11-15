@@ -912,6 +912,8 @@ export interface ShowcaseService {
      * it, so it is a placeholder on a reserved domain, never a real room.
      */
     meetingUrl?: string;
+    /** A treatment of several visits sold as one order (E9); absent: 1. */
+    visits?: number;
 }
 
 export interface ShowcaseLead {
@@ -1257,6 +1259,22 @@ export const PULSE: ShowcaseBusiness = {
             priceCents: 80_000,
             rules: [{ days: [1, 2, 3, 4, 5, 6], from: "07:00", to: "10:00" }],
             weight: 1.2,
+        },
+        {
+            // Sold as one order of three sessions (`pulse.ts`
+            // `seedPulseTrainingBlock`); weight 0 keeps it out of the diary.
+            name: "Personal training block",
+            description:
+                "Three one-hour sessions with the same coach, booked one after another: a plan, then two sessions to check it's working.",
+            minutes: 60,
+            capacity: 1,
+            priceCents: 330_000,
+            rules: [
+                { days: [1, 2, 3, 4, 5, 6], from: "06:00", to: "11:00" },
+                { days: [1, 2, 3, 4, 5], from: "17:00", to: "21:00" },
+            ],
+            weight: 0,
+            visits: 3,
         },
     ],
     bookings: 440,

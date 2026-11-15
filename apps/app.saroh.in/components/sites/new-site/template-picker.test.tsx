@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 /**
- * `/sites/new`'s template picker (industry templates plan, U12): the
+ * `/sites/new`'s template choice (DEC-216, `TemplateChoice`): the trade's
  * suggested templates first and every one under "All", the kind's (or the
  * asked-for) one chosen to start with, a colourway of the chosen one sent
- * as `styleId`, and a module that is off said on its card, never refused.
+ * as `styleId`, a module that is off said on its card, never refused, and
+ * a card's preview with its own Choose, after which the choice is a line.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -22,6 +23,8 @@ import { CreateSiteForm } from "./create-site-form";
 const createSite = vi.fn();
 vi.mock("@/lib/sites/actions", () => ({
     createSite: (input: unknown) => createSite(input) as unknown,
+    // The business's own details couldn't be read: the sample is drawn.
+    readTemplatePreview: () => Promise.resolve(null),
 }));
 const push = vi.fn();
 const refresh = vi.fn();
@@ -137,7 +140,8 @@ function render(props: Partial<Parameters<typeof CreateSiteForm>[0]> = {}) {
                 templates={TEMPLATES}
                 defaults={{ siteName: "Rye & Co", address: "rye" }}
                 defaultTemplateId="starter"
-                suggested={["starter", "bakery"]}
+                trade="food"
+                kind="BUSINESS"
                 modules={SELL_OFF}
                 {...props}
             />,
@@ -158,11 +162,17 @@ function group(label: string): HTMLElement {
     return el;
 }
 
+/** The radios of a group, not of a group inside it (a card's colourways). */
+function own(label: string): HTMLElement[] {
+    const g = group(label);
+    return Array.from(g.querySelectorAll<HTMLElement>('[role="radio"]')).filter(
+        (r) => r.closest('[role="radiogroup"]') === g,
+    );
+}
+
 /** Each radio's accessible name and whether it is checked. */
 function radios(label: string): [string, boolean][] {
-    return Array.from(
-        group(label).querySelectorAll<HTMLElement>('[role="radio"]'),
-    ).map((r) => {
+    return own(label).map((r) => {
         const named = r.getAttribute("aria-labelledby");
         const name = named
             ? (document.getElementById(named)?.textContent ?? "")
@@ -173,15 +183,13 @@ function radios(label: string): [string, boolean][] {
 
 function radio(label: string, name: string): HTMLElement {
     const i = radios(label).findIndex(([n]) => n === name);
-    const el = Array.from(
-        group(label).querySelectorAll<HTMLElement>('[role="radio"]'),
-    ).at(i);
+    const el = own(label).at(i);
     if (!el) throw new Error(`No ${name} in "${label}"`);
     return el;
 }
 
 function button(name: string): HTMLButtonElement {
-    const b = Array.from(host.querySelectorAll("button")).find(
+    const b = Array.from(document.querySelectorAll("button")).find(
         (x) => x.textContent.trim() === name,
     );
     if (!b) throw new Error(`No button ${name}`);
@@ -203,14 +211,15 @@ async function submit() {
     await settle();
 }
 
-describe("the template picker (U12)", () => {
+describe("the template picker (DEC-216)", () => {
     it("shows the suggested templates first, the kind's chosen", () => {
         render();
         expect(radios("Template")).toEqual([
             ["Starter", true],
             ["Bakery", false],
         ]);
-        expect(button("Suggested").getAttribute("aria-checked")).toBe("true");
+        expect(button("Suggested 2").getAttribute("aria-checked")).toBe("true");
+        expect(host.textContent).toContain("Suggested for food businesses");
     });
 
     it("lists every template under All", async () => {
@@ -233,7 +242,7 @@ describe("the template picker (U12)", () => {
         render();
         await click(button("All 3"));
         await click(radio("Template", "Studio"));
-        await click(button("Suggested"));
+        await click(button("Suggested 2"));
         expect(radios("Template")).toEqual([
             ["Starter", false],
             ["Bakery", false],
@@ -242,15 +251,50 @@ describe("the template picker (U12)", () => {
     });
 
     it("has no filter when every template is suggested", () => {
-        render({ suggested: ["starter", "bakery", "studio"] });
-        expect(host.textContent).not.toContain("Suggested");
+        render({ templates: TEMPLATES.slice(0, 2) });
+        expect(host.textContent).not.toContain("All 2");
+    });
+
+    it("with no trade, says why and offers to set it, to whoever may (DEC-216)", () => {
+        render({ trade: null, canSetTrade: true });
+        const heading = host.querySelector("h3");
+        expect(heading?.textContent).toContain(
+            "Suggested · Tell us what kind of place this is for better suggestions · Set it",
+        );
+        expect(
+            host
+                .querySelector("[data-template-set-trade]")
+                ?.getAttribute("href"),
+        ).toBe("/settings/organization?section=identity&edit=trade");
+    });
+
+    it("says only Suggested to someone who can't set the trade", () => {
+        render({ trade: null, canSetTrade: false });
+        expect(host.querySelector("h3")?.textContent).toBe("Suggested");
+        expect(host.querySelector("[data-template-set-trade]")).toBeNull();
+    });
+
+    it("names the trade once it is set, and offers nothing", () => {
+        render({ trade: "food", canSetTrade: true });
+        expect(host.querySelector("h3")?.textContent).toBe(
+            "Suggested for food businesses",
+        );
+    });
+
+    it("groups the rest under All, those that need a module saying why", async () => {
+        render({ trade: "creator" });
+        await click(button("All 3"));
+        const headings = Array.from(host.querySelectorAll("h3")).map(
+            (h) => h.textContent,
+        );
+        expect(headings).toEqual(["Suggested for creators", "Need Sell"]);
     });
 
     it("says what each uses, and what a module that is off holds back", () => {
         render();
         const text = host.textContent;
         expect(text).toContain("Uses Products");
-        expect(text).toContain("Its products show once Sell is on.");
+        expect(text).toContain("Uses Sell: turn it on to use this");
         // Still a choice like any other.
         const bakery = radio("Template", "Bakery");
         expect(bakery.hasAttribute("disabled")).toBe(false);
@@ -258,7 +302,7 @@ describe("the template picker (U12)", () => {
             .split(" ")
             .map((id) => document.getElementById(id)?.textContent)
             .join(" ");
-        expect(described).toContain("Its products show once Sell is on.");
+        expect(described).toContain("Uses Sell: turn it on to use this");
     });
 
     it("sends the template chosen, without a colourway when none was chosen", async () => {
@@ -304,6 +348,35 @@ describe("the template picker (U12)", () => {
     });
 });
 
+describe("a card's preview (DEC-216)", () => {
+    it("opens from the card, chooses with its own press, and collapses the choice to a line", async () => {
+        render();
+        const open = host.querySelector<HTMLButtonElement>(
+            '[data-template-preview-open="bakery"]',
+        );
+        expect(open?.getAttribute("aria-label")).toBe("Preview Bakery");
+        if (open) await click(open);
+        const dialog = document.querySelector('[role="dialog"]');
+        expect(dialog?.textContent).toContain("Your site in Bakery");
+        // The business's details couldn't be read: the sample, said once.
+        expect(dialog?.textContent).toContain(
+            "Couldn't load your details. This is Bakery with a sample business.",
+        );
+        // Previewing chose nothing.
+        expect(radios("Template")).toContainEqual(["Starter", true]);
+        await click(button("Choose Bakery"));
+        expect(document.querySelector('[role="dialog"]')).toBeNull();
+        const chosen = host.querySelector('[data-template-chosen="bakery"]');
+        expect(chosen?.textContent).toContain("Crust colourway");
+        await click(button("Change"));
+        expect(radios("Template")).toContainEqual(["Bakery", true]);
+        await submit();
+        expect(createSite).toHaveBeenCalledWith(
+            expect.objectContaining({ templateId: "bakery" }),
+        );
+    });
+});
+
 describe("with no templates to choose from", () => {
     it("says a failed catalogue, offers a retry, and still creates the site", async () => {
         render({ templates: null });
@@ -339,7 +412,7 @@ describe("rendered on the server", () => {
                 templates={TEMPLATES}
                 defaults={{ siteName: "Rye & Co", address: "rye" }}
                 defaultTemplateId="bakery"
-                suggested={["starter", "bakery"]}
+                trade="food"
                 modules={null}
             />,
         );
@@ -347,13 +420,14 @@ describe("rendered on the server", () => {
         expect(html).toContain("Bakery");
         expect(html).toContain("background:hsl(40 24% 97%)");
         // Modules unknown: nothing is claimed about them.
-        expect(html).not.toContain("show once");
+        expect(html).not.toContain("turn it on");
     });
 });
 
 describe("TemplateThumbnail", () => {
     it("shows the captured render when there is one, else the drawing", async () => {
-        const { TemplateThumbnail } = await import("./template-picker");
+        const { TemplateThumbnail } =
+            await import("@/components/sites/templates/template-picker");
         const captured = renderToStaticMarkup(
             <TemplateThumbnail
                 name="Bakery"

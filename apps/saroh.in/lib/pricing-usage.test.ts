@@ -2,6 +2,8 @@ import type { CatalogInput } from "@saroh/pricing-catalog";
 import { formatInr, GST_PERCENT, withGstPaise } from "@saroh/pricing-catalog";
 import { describe, expect, it } from "vitest";
 
+import { PRICING_COPY } from "@/content/pricing";
+
 import { usageView } from "./pricing-usage";
 import { fakeCatalog } from "./pricing.fixture";
 
@@ -182,6 +184,58 @@ describe("usageView rows", () => {
                 false,
             ),
         ).toBeNull();
+    });
+});
+
+describe("usageView billing-period rows (release visibility U10)", () => {
+    function withPeriodRows(c: CatalogInput) {
+        capped(c);
+        for (const [id, name] of [
+            ["ask-ai-questions", "Ask AI"],
+            ["api-requests", "API"],
+        ] as const) {
+            c.modules.push({
+                id,
+                name,
+                group: "two",
+                what: `${name} words.`,
+                cells: {
+                    grow: { inc: true, text: "7", limit: 7, per: "month" },
+                    pro: { inc: true, text: "Any", limit: null },
+                },
+            });
+        }
+    }
+    const labels = (off: string[]) =>
+        usageView(fakeCatalog(withPeriodRows), false, off)?.rows.map(
+            (r) => r.label,
+        );
+
+    it("a switched-off feature's row is dropped even when the catalogue has it", () => {
+        expect(labels(["ask-ai", "developers"])).not.toContain(
+            "Ask AI questions",
+        );
+        expect(labels(["ask-ai", "developers"])).not.toContain("API requests");
+        expect(labels(["ask-ai"])).toContain("API requests");
+    });
+
+    it("switched on: the allowance only, each billing period, no price for more", () => {
+        const rows = usageView(fakeCatalog(withPeriodRows), false, [])?.rows;
+        for (const label of ["Ask AI questions", "API requests"]) {
+            expect(rows?.find((r) => r.label === label)).toMatchObject({
+                cells: [
+                    "Not included",
+                    "7 each billing period included",
+                    "No limit",
+                ],
+            });
+        }
+    });
+
+    it("the lead says each billing period", () => {
+        expect(PRICING_COPY.usageLead).toBe(
+            "What each plan includes, and what more costs each billing period.",
+        );
     });
 });
 

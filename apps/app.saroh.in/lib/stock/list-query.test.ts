@@ -13,6 +13,9 @@ function at(over: Partial<StockAddress> = {}): StockAddress {
         kind: "all",
         store: "all",
         product: "",
+        date: null,
+        from: null,
+        to: null,
         pages: { levels: FIRST, log: FIRST, checks: FIRST },
         ...over,
     };
@@ -163,6 +166,40 @@ describe("stockHref", () => {
         );
         expect(stockHref({ ...here, tab: "checks" }, { tab: undefined })).toBe(
             "/commerce/stock?q=rye&page=3",
+        );
+    });
+});
+
+describe("the log's date filter (Orders' ?date=, ?from=, ?to=)", () => {
+    it("keeps a custom range in the address, and starts the log again at page 1", () => {
+        const href = stockHref(
+            at({
+                tab: "log",
+                pages: {
+                    levels: FIRST,
+                    log: { page: 3, size: 50 },
+                    checks: FIRST,
+                },
+            }),
+            { date: "custom", from: "2026-08-01", to: "2026-10-31" },
+        );
+        expect(href).toBe(
+            "/commerce/stock?tab=log&date=custom&from=2026-08-01&to=2026-10-31",
+        );
+    });
+
+    it("drops the days with a preset, and the range with Clear", () => {
+        const custom = at({
+            tab: "log",
+            date: "custom",
+            from: "2026-08-01",
+            to: "2026-10-31",
+        });
+        expect(stockHref(custom, { date: "7d", from: null, to: null })).toBe(
+            "/commerce/stock?tab=log&date=7d",
+        );
+        expect(stockHref(custom, { date: undefined })).toBe(
+            "/commerce/stock?tab=log",
         );
     });
 });

@@ -249,3 +249,48 @@ describe("Insights period query", () => {
         );
     });
 });
+
+describe("calendar months (Ask AI's this_month and last_month)", () => {
+    // Saturday 14 Nov 2026, 00:10 in Kolkata: still 13 Nov in UTC.
+    const now = new Date("2026-11-13T18:40:00.000Z");
+
+    it("this month runs from the 1st to today in the business's zone, against as many days before", () => {
+        const w = periodWindows("this_month", now, ZONE);
+        expect([w.fromDate, w.toDate, w.days]).toEqual([
+            "2026-11-01",
+            "2026-11-14",
+            14,
+        ]);
+        expect(w.from.toISOString()).toBe("2026-10-31T18:30:00.000Z");
+        expect(w.to.toISOString()).toBe("2026-11-14T18:30:00.000Z");
+        expect([w.beforeFromDate, w.beforeToDate]).toEqual([
+            "2026-10-18",
+            "2026-10-31",
+        ]);
+    });
+
+    it("last month is the whole month before, ending at this month's start", () => {
+        const w = periodWindows("last_month", now, ZONE);
+        expect([w.fromDate, w.toDate, w.days]).toEqual([
+            "2026-10-01",
+            "2026-10-31",
+            31,
+        ]);
+        expect(w.to.toISOString()).toBe("2026-10-31T18:30:00.000Z");
+        expect(w.beforeFromDate).toBe("2026-08-31");
+        expect(w.beforeToDate).toBe("2026-09-30");
+    });
+
+    it("on the 1st, this month is that one day", () => {
+        const w = periodWindows(
+            "this_month",
+            new Date("2026-11-01T04:30:00.000Z"),
+            ZONE,
+        );
+        expect([w.fromDate, w.toDate, w.days]).toEqual([
+            "2026-11-01",
+            "2026-11-01",
+            1,
+        ]);
+    });
+});

@@ -7,6 +7,7 @@ import type { NumberRestart } from "../invoices/numbering";
 import { numberFormatFor, seriesFor } from "../invoices/numbering";
 import { businessTypeRead } from "./business-type";
 import { kindRead } from "./organization-kind";
+import { tradeOtherRead, tradeRead } from "./organization-trade";
 
 /**
  * A settings save as the audit stream says it (#509): each business detail
@@ -24,6 +25,10 @@ export interface SettingsRow {
     name: string;
     /** Absent on a row read before DEC-070; reads as BUSINESS. */
     kind?: string | null;
+    /** The kind of place (DEC-216); absent or null: not said. */
+    trade?: string | null;
+    /** The trade typed beside Other; read only while trade is other. */
+    tradeOther?: string | null;
     businessProfile: {
         legalName?: string | null;
         type?: string | null;
@@ -121,6 +126,10 @@ export function settingsSnapshot(
         // As stored (BUSINESS, SOLO, WORK); the app words it, as it does
         // the type. No row at all reads as nothing, not as BUSINESS.
         kind: row ? kindRead(row.kind) : null,
+        // As stored (salon, gym, …); the app words it.
+        trade: tradeRead(row?.trade),
+        // The typed trade ("Bakery"), only beside Other.
+        tradeOther: tradeOtherRead(row?.trade, row?.tradeOther),
         legalName: p.legalName ?? null,
         // In today's words: a `company` row reads as `pvt` (F10).
         type: businessTypeRead(p.type),

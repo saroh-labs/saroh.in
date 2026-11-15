@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import type { TemplateKind } from "@saroh/templates";
 
 import type {
     OrganizationContext,
@@ -19,6 +20,7 @@ import { kindRead } from "./organization-kind";
 import { assertMembersMayOpen } from "./organization-lifecycle.gate";
 import { membersMayOpen } from "./organization-lifecycle.policy";
 import { isBuiltInRole, resolveCapabilities } from "./organization-policy";
+import { tradeOtherRead, tradeRead } from "./organization-trade";
 
 /** A user's Organization membership as surfaced to the switcher/list UI. */
 export interface UserOrganization {
@@ -53,6 +55,18 @@ export interface UserOrganization {
      */
     kind: OrganizationKind;
     /**
+     * The kind of place it is (DEC-216), one of the template kinds; null
+     * when never said. The website picker suggests its templates first.
+     */
+    trade: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther: string | null;
+    /**
+     * The template picked in the public gallery before sign-up (DEC-216),
+     * a template id; the website picker starts on it. Null for most.
+     */
+    startTemplate: string | null;
+    /**
      * The IANA zone the business keeps time in (UX-008), so the app can
      * write every server-rendered time in it rather than the server's UTC.
      * Null when it was never set; the app then reads India's.
@@ -82,6 +96,13 @@ export interface OrganizationSummary {
      * Member's Home needs the words too; words and defaults only.
      */
     kind: OrganizationKind;
+    /**
+     * The kind of place it is (DEC-216), one of the template kinds; null
+     * when never said. The website picker suggests its templates first.
+     */
+    trade: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther: string | null;
 }
 
 /**
@@ -194,6 +215,9 @@ export class OrganizationContextService {
                         slug: true,
                         lifecycleStatus: true,
                         kind: true,
+                        trade: true,
+                        tradeOther: true,
+                        startTemplate: true,
                         edition: true,
                         currency: true,
                         businessProfile: {
@@ -277,6 +301,12 @@ export class OrganizationContextService {
                 edition: membership.organization.edition,
                 currency: membership.organization.currency,
                 kind: kindRead(membership.organization.kind),
+                trade: tradeRead(membership.organization.trade),
+                tradeOther: tradeOtherRead(
+                    membership.organization.trade,
+                    membership.organization.tradeOther,
+                ),
+                startTemplate: membership.organization.startTemplate,
                 timeZone:
                     membership.organization.businessProfile?.timezone ?? null,
                 country:
@@ -306,12 +336,27 @@ export class OrganizationContextService {
     async getSummary(organizationId: string): Promise<OrganizationSummary> {
         const organization = await prisma.organization.findUnique({
             where: { id: organizationId },
-            select: { id: true, name: true, slug: true, kind: true },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                kind: true,
+                trade: true,
+                tradeOther: true,
+            },
         });
         if (!organization) {
             throw new NotFoundException("Business not found");
         }
-        return { ...organization, kind: kindRead(organization.kind) };
+        return {
+            ...organization,
+            kind: kindRead(organization.kind),
+            trade: tradeRead(organization.trade),
+            tradeOther: tradeOtherRead(
+                organization.trade,
+                organization.tradeOther,
+            ),
+        };
     }
 
     /**

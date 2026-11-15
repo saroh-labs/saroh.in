@@ -13,6 +13,8 @@ import {
     KanbanSquare,
     LayoutGrid,
     Link2,
+    Megaphone,
+    Plug,
     QrCode,
     ReceiptText,
     SlidersHorizontal,
@@ -22,11 +24,17 @@ import {
     Users,
 } from "lucide-react";
 
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { mayAddWebsite } from "@/lib/business-limits";
 import { kindOf } from "@/lib/organizations/kind";
 import { isLocationScopedRole } from "@/lib/organizations/storefront-team";
 import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
+import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
+
+/** Grow › Social: Create post, while Share is switched on (DEC-217). */
+export const SOCIAL_HREF = "/social/new";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -131,7 +139,10 @@ export type NavAction =
     // invoices. Owner and Admin by default, as the API has it; changing the
     // plan is `billing:manage`, the Owner's alone, which the page asks
     // (`plan-access.ts`).
-    | "billing:read";
+    | "billing:read"
+    // Grow › Social (Create post, #1378): seeing and sharing posts. Owner and
+    // Admin by default, grantable to Members (the Social group in Roles).
+    | "social:read";
 
 /**
  * Role → what it may reach here.
@@ -180,6 +191,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "lead:read",
         "pipeline:read",
         "billing:read",
+        "social:read",
     ],
     ADMIN: [
         "org:read",
@@ -218,6 +230,7 @@ const REACHABLE: Record<NavRole, readonly NavAction[]> = {
         "lead:read",
         "pipeline:read",
         "billing:read",
+        "social:read",
     ],
     MEMBER: [
         "org:read",
@@ -638,6 +651,16 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: BarChart3,
                 moduleKey: "INSIGHTS",
             },
+            // Create post (#1378, DEC-217). Saroh Social will add its posts
+            // and calendar here; until then the row lands on Create post.
+            // Website until the Social module exists, as the API gates it.
+            {
+                href: SOCIAL_HREF,
+                label: "Social",
+                icon: Megaphone,
+                moduleKey: "WEBSITE",
+                action: "social:read",
+            },
         ],
         // The canvas design also shows Marketing, Automation and AI here as
         // SOON. The rail deliberately has no "coming soon" state: a nav entry
@@ -1026,8 +1049,8 @@ export function navFor({
         role,
         actions,
     );
-    const stocked =
-        stockTracked === false ? withoutStockRows(tracked) : tracked;
+    const shared = sharePostsOn() ? tracked : withoutSocial(tracked);
+    const stocked = stockTracked === false ? withoutStockRows(shared) : shared;
     const billed =
         kindOf(kind) === "WORK" ? withoutStandaloneInvoices(stocked) : stocked;
     const groups = isLocationScopedRole(roleKey)
@@ -1068,6 +1091,16 @@ function withoutStandaloneInvoices(groups: NavGroup[]): NavGroup[] {
             items: group.items.filter(
                 (item) => !(item.href === INVOICES_HREF && item.unlessModule),
             ),
+        }))
+        .filter((group) => group.items.length > 0);
+}
+
+/** The Social row taken out while Share is switched off (DEC-217). */
+function withoutSocial(groups: NavGroup[]): NavGroup[] {
+    return groups
+        .map((group) => ({
+            ...group,
+            items: group.items.filter((item) => item.href !== SOCIAL_HREF),
         }))
         .filter((group) => group.items.length > 0);
 }
@@ -1178,6 +1211,7 @@ export function isNavSectionActive(
 
 /** Settings › Plan and billing, hidden while plans aren't shown. */
 const PLAN_PAGE_HREF = "/settings/billing";
+const API_AREA_HREF = "/settings/developers";
 
 /**
  * One settings tab. `action` is what the actor must hold to open it; left off,
@@ -1194,6 +1228,8 @@ export interface SettingsPage {
     icon: LucideIcon;
     action?: NavAction;
     ownerOnly?: true;
+    /** Offered to every role but the Reviewer, who holds no part of the business. */
+    notForReviewer?: true;
 }
 
 /**
@@ -1265,6 +1301,16 @@ export const SETTINGS_PAGES = [
         action: "provider:read",
     },
     {
+        // Every member connects their own AI assistant (plan 2026-11-10-001,
+        // R9); keys and webhooks inside ask `apikey:manage` and
+        // `webhook:manage`. Not a Reviewer's (owner, v1).
+        href: "/settings/developers",
+        label: "API and AI apps",
+        description: "AI assistants, keys and notifications",
+        icon: Plug,
+        notForReviewer: true,
+    },
+    {
         // "Download your data" (DEC-120): the owner's alone, by role, as
         // the API has it. Last, after everything the business runs on.
         href: "/settings/data",
@@ -1298,6 +1344,15 @@ export function mayOpenSettingsPage(
     }
     if (page.action && !navCan(actor, page.action)) return false;
     if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
+        return false;
+    }
+    if (page.notForReviewer && actor.role === "REVIEWER") return false;
+    // Ask AI's tab opens the area too, for whoever may switch it (U11).
+    if (
+        page.href === API_AREA_HREF &&
+        !apiAreaOn() &&
+        !(askAiOn() && actor.actions?.includes("module:manage"))
+    ) {
         return false;
     }
     return true;

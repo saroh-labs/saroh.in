@@ -1,3 +1,6 @@
+import type { ReleaseSwitch } from "@saroh/marketing/feature-switches";
+
+import { featuresOff } from "@/lib/feature-switches";
 import { site } from "@/site.config";
 
 export interface HelpStep {
@@ -9,7 +12,7 @@ export interface HelpArticle {
     slug: string;
     /** The H1, in plain words. */
     task: string;
-    group: (typeof HELP_GROUPS)[number];
+    group: (typeof ALL_HELP_GROUPS)[number];
     minutes: number;
     /** The line on its card on the hub. */
     line: string;
@@ -19,15 +22,19 @@ export interface HelpArticle {
     /** The article's one next step. */
     next: { label: string; href: string; inApp?: boolean };
     related: readonly [string, string, string];
+    /** Shown only while this release switch is on (plan 2026-11-13-002). */
+    feature?: ReleaseSwitch;
 }
 
-export const HELP_GROUPS = [
+const ALL_HELP_GROUPS = [
     "Get set up",
     "Products and stock",
     "Orders",
     "Bookings",
     "Your website",
     "Invoices and payments",
+    "AI apps",
+    "Share and posts",
     "Free tools",
 ] as const;
 
@@ -37,7 +44,8 @@ const doInSaroh = (path: string) => ({
     inApp: true,
 });
 
-export const HELP: readonly HelpArticle[] = [
+/** Every article, shown or not: content checks only. */
+export const ALL_HELP: readonly HelpArticle[] = [
     /*
      * After apps/saroh.in/content/help, for one person outside India. Every step
      * was read against apps/app.saroh.in on 4 Nov 2026, in the code, on the batch
@@ -476,6 +484,174 @@ export const HELP: readonly HelpArticle[] = [
             "make-an-invoice-pdf",
         ],
     },
+    /*
+     * AI apps and Share (plan 2026-11-13-002, U16): after saroh.in's
+     * connect-claude, connect-chatgpt, connect-other-ai-apps and share-a-post
+     * (boards VHClaude, VHChatgpt, VHOtherApps, VHShare), for one person on
+     * Free outside India, with Global's MCP address. Each waits on its
+     * switch. The other apps' and Claude's and ChatGPT's own menus aren't
+     * named: they're unconfirmed until each dev sign-in walk (ticket 11).
+     * Sources: app.saroh.in settings/developers/ai-apps.tsx,
+     * lib/ai-connections/mcp-address.ts; accounts.saroh.in
+     * lib/oauth-sign-in.ts; share-item-sheet.tsx, lib/share-item/words.ts,
+     * lib/social/words.ts.
+     */
+    {
+        slug: "connect-claude",
+        task: "Connect Claude",
+        group: "AI apps",
+        minutes: 3,
+        line: "Add Saroh in Claude, sign in and allow it, then ask in your own words.",
+        intro: "Connect Claude to your business and ask it to do your Saroh work in your own words: add a product, change your hours, see who's booked on Saturday. It takes about a minute.",
+        steps: [
+            {
+                title: "Open Settings › API and AI apps",
+                text: "In Saroh, open Settings › API and AI apps. AI assistants is the first tab. Press Connect in Claude: Claude's connector settings open in a new tab.",
+            },
+            {
+                title: "Add Saroh as a connector in Claude",
+                text: "In Claude, add a custom connector. Name it Saroh, paste https://mcp.saroh.tech/mcp as its address, add it, then connect it.",
+            },
+            {
+                title: "Sign in and pick your business",
+                text: "Claude opens a Saroh window. Sign in if it asks, tick your business and press Continue.",
+            },
+            {
+                title: "Read what it may do, and allow it",
+                text: "Saroh shows what Claude will be able to do, that it never gets more than you can do yourself, and that what it reads goes to Anthropic, the company behind Claude, under their terms. Press Allow, and you're back in Claude.",
+            },
+            {
+                title: "Ask Claude something",
+                text: "In a new chat, check Saroh is turned on, then ask in your own words. A website change comes back as a draft with a preview link, and you publish it in Saroh.",
+            },
+            {
+                title: "See it in Saroh",
+                text: "Back in Settings › API and AI apps, Claude is listed under Connected to your business. Open it to see each change it made, put back its site draft, or disconnect it.",
+            },
+        ],
+        note: "Claude says it couldn't connect? Check the address is exactly https://mcp.saroh.tech/mcp, with /mcp at the end, then connect again. A connection ends after 90 days without use.",
+        next: doInSaroh("/settings/developers"),
+        related: [
+            "connect-chatgpt",
+            "connect-another-ai-app",
+            "add-your-first-product",
+        ],
+        feature: "ai-apps",
+    },
+    {
+        slug: "connect-chatgpt",
+        task: "Connect ChatGPT",
+        group: "AI apps",
+        minutes: 3,
+        line: "Add Saroh in ChatGPT as a custom connector, sign in and allow it.",
+        intro: "Connect ChatGPT to your business and run your Saroh work from a chat: change your hours, add a product, look up an order. It takes a couple of minutes.",
+        steps: [
+            {
+                title: "Open Settings › API and AI apps",
+                text: "In Saroh, open Settings › API and AI apps. On the AI assistants tab, press Connect in ChatGPT: ChatGPT's settings open in a new tab.",
+            },
+            {
+                title: "Add Saroh as a connector in ChatGPT",
+                text: "In ChatGPT's settings, add Saroh as a custom connector. Paste https://mcp.saroh.tech/mcp as its address, and choose OAuth if it asks how to sign in. ChatGPT may ask you to turn on custom connectors first.",
+            },
+            {
+                title: "Sign in and pick your business",
+                text: "ChatGPT opens a Saroh window. Sign in if it asks, tick your business and press Continue.",
+            },
+            {
+                title: "Read what it may do, and allow it",
+                text: "Saroh shows what ChatGPT will be able to do, that it never gets more than you can do yourself, and that what it reads goes to OpenAI, the company behind ChatGPT, under their terms. Press Allow.",
+            },
+            {
+                title: "Use Saroh in a chat",
+                text: "In a new chat, pick Saroh from ChatGPT's tools, then ask, like “Change our Sunday hours to 8 till 2”. Hours and bookings change straight away. Website changes stay a draft until you publish them in Saroh.",
+            },
+            {
+                title: "See it in Saroh",
+                text: "Back in Settings › API and AI apps, ChatGPT is listed under Connected to your business. Open it to see each change it made, or disconnect it.",
+            },
+        ],
+        note: "ChatGPT asks you to sign in to Saroh again about once a month. Sign in and press Allow again.",
+        next: doInSaroh("/settings/developers"),
+        related: [
+            "connect-claude",
+            "connect-another-ai-app",
+            "add-your-first-product",
+        ],
+        feature: "ai-apps",
+    },
+    {
+        slug: "connect-another-ai-app",
+        task: "Connect another AI app",
+        group: "AI apps",
+        minutes: 4,
+        line: "Any app that connects to MCP servers with a sign-in, by one address.",
+        intro: "Saroh works with more AI apps than Claude and ChatGPT: chat apps, automation tools and coding tools that connect to MCP servers with a sign-in. Each one adds Saroh by the same address.",
+        steps: [
+            {
+                title: "Copy Saroh's address",
+                text: "In Saroh, open Settings › API and AI apps. On the AI assistants tab, under Using another AI app? Paste this address into it, press Copy. The address is https://mcp.saroh.tech/mcp.",
+            },
+            {
+                title: "Add it in your app",
+                text: "Add Saroh as a custom connector or MCP server, and paste the address. If it asks how to sign in, choose OAuth. If it asks for the kind of server, choose HTTP or Streamable HTTP, not SSE.",
+            },
+            {
+                title: "Sign in and allow it",
+                text: "The app opens a Saroh window. Sign in, tick your business, press Continue, read what it may do, and press Allow. If Saroh doesn't know who makes the app, it says Unverified app: only allow it if you added it yourself.",
+            },
+            {
+                title: "See it in Saroh",
+                text: "The app is listed on the AI assistants tab under Connected to your business, by the name it gave Saroh. Open it to see what it changed, or disconnect it.",
+            },
+        ],
+        note: "The app doesn't see something new in Saroh? Some apps read Saroh's tools only when you add it. Remove the connector and add it again.",
+        next: doInSaroh("/settings/developers"),
+        related: [
+            "connect-claude",
+            "connect-chatgpt",
+            "add-your-first-product",
+        ],
+        feature: "ai-apps",
+    },
+    {
+        slug: "share-a-post",
+        task: "Share a post",
+        group: "Share and posts",
+        minutes: 4,
+        line: "Turn a product, service or page into a ready post in your site's look.",
+        intro: "Turn a product, a service or class, a blog post, an offer or your booking page into a ready post in your website's look. Download it, copy the caption, or send it on WhatsApp or Facebook.",
+        steps: [
+            {
+                title: "Press Share on what you want to post",
+                text: "Open a live product or service and press Share, beside QR code. A live blog post has it in its header, and your booking page on its row in Services. Something still a draft has no Share: publish it first.",
+            },
+            {
+                title: "Pick a card, a size and colours",
+                text: "The share sheet opens with your cards under Pick a post. A card shows only when the item has what it needs, like a price or a live offer. Choose a size, Post 4:5, Square or Story 9:16, and Site colours or Your own colour.",
+            },
+            {
+                title: "Check the caption",
+                text: "Start from one of the captions, then change the words if you like. The link to its page stays at the end, so Saroh can count visits from this post.",
+            },
+            {
+                title: "Share it",
+                text: "At a computer, under Share now: Download image, Copy caption, Send on WhatsApp or Share on Facebook. On a phone, Share now copies the caption and opens your phone's share sheet with the picture, so you can paste the caption in Instagram.",
+            },
+            {
+                title: "Make your own post",
+                text: "For news that isn't a product, like new opening hours, open Grow › Social and choose Your own post. Pick Use a photo or Text only, write a Headline and a caption, and choose the Link. It's saved to your posts as you go.",
+            },
+        ],
+        note: "Posts use your site's colours, fonts and logo, never Saroh's. Only things live on your website can be shared, because each post links to its page.",
+        next: doInSaroh("/social/new"),
+        related: [
+            "make-your-link-look-right-when-shared",
+            "add-your-first-product",
+            "add-a-service",
+        ],
+        feature: "social",
+    },
     {
         slug: "make-an-invoice-pdf",
         task: "Make an invoice PDF without an account",
@@ -547,6 +723,16 @@ export const HELP: readonly HelpArticle[] = [
         ],
     },
 ];
+
+/** The articles this build shows: one whose switch is off is never built or linked. */
+export const HELP: readonly HelpArticle[] = ALL_HELP.filter(
+    (a) => !a.feature || !featuresOff().includes(a.feature),
+);
+
+/** The groups with an article this build shows, in order. */
+export const HELP_GROUPS = ALL_HELP_GROUPS.filter((g) =>
+    HELP.some((a) => a.group === g),
+);
 
 export const helpArticle = (slug: string) => HELP.find((a) => a.slug === slug);
 

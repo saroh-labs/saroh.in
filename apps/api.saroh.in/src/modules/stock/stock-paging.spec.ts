@@ -97,3 +97,22 @@ describe("the stock lists' page and size", () => {
         }
     });
 });
+
+describe("the stock log's date filter (Orders' ?date=, ?from=, ?to=)", () => {
+    const errors = (raw: object) =>
+        validateSync(plainToInstance(StockLogQueryDto, raw)).map(
+            (e) => e.property,
+        );
+
+    it("takes a preset and days", () => {
+        expect(errors({ date: "7d" })).toEqual([]);
+        expect(errors({ from: "2026-08-01", to: "2026-10-31" })).toEqual([]);
+    });
+
+    it("refuses a preset it doesn't know and a day that isn't a day", () => {
+        expect(errors({ date: "week", from: "2026/08/01" })).toEqual([
+            "date",
+            "from",
+        ]);
+    });
+});

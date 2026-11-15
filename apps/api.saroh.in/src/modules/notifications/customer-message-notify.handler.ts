@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import { appBase, editionOf } from "../../common/app-url";
 import { sendCustomerMessageNotificationEmail } from "../../common/email";
 import { contactEmailForDisplay } from "../contacts/contact-email";
+import { emailedAbout } from "./alert-recipients";
 import type { CustomerMessageNotifyPayload } from "./customer-message-notify";
 import {
     CUSTOMER_MESSAGE_NOTIFY_TYPE,
@@ -60,8 +61,9 @@ export function writerName(input: {
  *  1. One durable notice in the business's inbox (the bell), opening on the
  *     customer's thread, unique on (messageId, type): a job run twice
  *     notifies once.
- *  2. Then a best-effort email to each owner and admin, through Saroh's
- *     own mail, as an enquiry's is. A failed send throws so the worker
+ *  2. Then a best-effort email to whoever may read messages
+ *     (`message:read`, the "Customer messages" row) and has its email on,
+ *     through Saroh's own mail, as an enquiry's is. A failed send throws so the worker
  *     retries; the unique above keeps the retry from a second notice.
  *
  * A message that has gone (the contact removed for privacy, C11) is a
@@ -136,7 +138,10 @@ export class CustomerMessageNotifyHandler {
             );
         }
 
-        const recipients = await this.ownerAdminEmails(message.organizationId);
+        const recipients = await emailedAbout(
+            message.organizationId,
+            "message",
+        );
         const edition = await editionOf(message.organizationId);
         const threadUrl = `${appBase(edition)}/contacts/${contactId}?tab=msg`;
         for (const to of recipients) {
@@ -151,16 +156,4 @@ export class CustomerMessageNotifyHandler {
             );
         }
     };
-
-    /** Distinct OWNER/ADMIN member emails, as the enquiry notice reaches. */
-    private async ownerAdminEmails(organizationId: string): Promise<string[]> {
-        const memberships = await prisma.membership.findMany({
-            where: { organizationId, role: { in: ["OWNER", "ADMIN"] } },
-            include: { user: true },
-        });
-        const emails = memberships
-            .map((m) => m.user.email)
-            .filter((e): e is string => Boolean(e));
-        return Array.from(new Set(emails));
-    }
 }

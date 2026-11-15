@@ -16,6 +16,8 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { DatePreset } from "../orders/date-presets";
+import { DATE_PRESETS } from "../orders/date-presets";
 import type { InvoiceSource, InvoiceView } from "./invoice-state";
 import { INVOICE_SOURCES, INVOICE_VIEWS } from "./invoice-state";
 import { SEARCH_MAX } from "./list-filter";
@@ -267,6 +269,28 @@ export class ListInvoicesQueryDto {
     @IsString()
     @MaxLength(64)
     orderId?: string;
+
+    /**
+     * Issued in a date preset, in the business's zone (Orders' presets,
+     * `listRange`); not with `from`/`to`. A draft has no issue date, so a
+     * date filter never lists one.
+     */
+    @IsOptional()
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? value.trim().toLowerCase() : value,
+    )
+    @IsIn(DATE_PRESETS, { message: "Unknown date range" })
+    date?: DatePreset;
+
+    /** Issued on or after this day, in the business's zone. */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A date is YYYY-MM-DD" })
+    from?: string;
+
+    /** Issued on or before this day, in the business's zone. */
+    @IsOptional()
+    @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: "A date is YYYY-MM-DD" })
+    to?: string;
 }
 
 /** Whose unpaid invoices to add up: a person, or one subscription. */

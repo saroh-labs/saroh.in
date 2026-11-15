@@ -1,6 +1,7 @@
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { isLocationScoped } from "../orders/order-location";
 import { activeMemberships } from "../payments/provider-memberships";
 import type {
     OutstandingRefund,
@@ -112,7 +113,9 @@ export async function closingNotice(
         return { closing: null };
     }
 
-    const readsOrders = allows(ctx, "order:read");
+    // Refunds owed across the business: not a location's team's (DEC-074).
+    const readsOrders =
+        allows(ctx, "order:read") && !isLocationScoped(ctx.roleKey);
     const readsInvoices = allows(ctx, "invoice:read");
     const readsMemberships = allows(ctx, "subscription:read");
 

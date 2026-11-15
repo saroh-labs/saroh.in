@@ -5,11 +5,14 @@ import { orderListQuery } from "@/lib/orders/business-service";
 import { permits } from "@/lib/organizations/permits";
 import type { BookingWithService } from "@/lib/services/service";
 import { listBookingsWithPast } from "@/lib/services/service";
+import { apiAreaOn } from "@/lib/settings/api-area-switch";
+import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
 
 import {
     firstBookingMoment,
     homeMayHaveFirstBooking,
     homeMayHaveFirstOrder,
+    newFeatureMoment,
     ordersMoment,
     unseen,
 } from "./derive";
@@ -70,6 +73,30 @@ export async function homeMoment(
         return bookingsListMoment(await listBookingsWithPast(), viewer);
     }
     return null;
+}
+
+/**
+ * Home's "New" card (release visibility U14): the next released feature
+ * this person may use that the business hasn't put away. The caller
+ * offers it only while nothing else holds Home's message slot (a moment,
+ * a part that couldn't load, Finish setup while it leads): one message,
+ * never stacked.
+ *
+ * AI apps: everyone may connect their own assistant once the area is on.
+ * Share: who may open Create post (`social:read`).
+ */
+export async function homeNewFeature(
+    viewer: Viewer,
+): Promise<MomentView | null> {
+    const open = {
+        "new-ai-apps": apiAreaOn(),
+        "new-share": sharePostsOn() && permits(viewer, "social:read"),
+        // TODO(plan 2026-11-13-001): Ask AI has no app switch yet. Open it
+        // here behind that switch and the Ask AI permission once it lands.
+        "new-ask-ai": false,
+    };
+    if (!Object.values(open).some(Boolean)) return null;
+    return newFeatureMoment(open, await getSeenMoments());
 }
 
 /**

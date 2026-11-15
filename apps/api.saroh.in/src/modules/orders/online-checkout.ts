@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 
 /**
  * An online order before it is paid (round-2 G13; round-1 R5's pattern).
@@ -114,6 +115,11 @@ export async function closeCheckoutInTx(
     await tx.order.update({
         where: { id: orderId },
         data: { status: "CANCELLED" },
+    });
+    await emitWebhook(tx, {
+        organizationId: order.organizationId,
+        type: "order.status_changed",
+        id: orderId,
     });
     // A checkout that never became an order gives its code's use back
     // (DEC-104): an abandoned bag must not use up a limited code. A staff

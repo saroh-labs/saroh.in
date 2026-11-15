@@ -84,14 +84,21 @@ export function Carousel({
 export function AlsoList({
     children,
     count,
+    newCount = 0,
 }: {
     children: ReactNode;
     count: number;
+    /** How many of the items are new: on a phone they come first (U13). */
+    newCount?: number;
 }) {
     const [all, setAll] = useState(false);
     return (
         <>
-            <ul id="sp-also-list" data-all={all ? "" : undefined}>
+            <ul
+                id="sp-also-list"
+                data-all={all ? "" : undefined}
+                data-new={newCount || undefined}
+            >
                 {children}
             </ul>
             <button

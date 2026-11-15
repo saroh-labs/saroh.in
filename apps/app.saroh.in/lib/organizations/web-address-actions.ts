@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import type { WebAddressAvailability } from "./web-address";
+import type { WebAddressAvailability, WebAddressRead } from "./web-address";
 import type { ChangeWebAddressResult } from "./web-address-service";
 import {
     changeWebAddress as changeWebAddressApi,
+    readWebAddress,
     webAddressAvailability,
 } from "./web-address-service";
 
@@ -13,6 +14,11 @@ import {
  * What the Change dialog calls (DEC-069, L4). Thin: who may change the
  * address, what is free and what a change holds are all the API's.
  */
+
+/** The address and who may change it, for the Turn on sheet's Website field. */
+export async function readWebAddressAction(): Promise<WebAddressRead> {
+    return readWebAddress();
+}
 
 /** Whether `address` is free to this business; null when it can't be asked. */
 export async function checkWebAddress(

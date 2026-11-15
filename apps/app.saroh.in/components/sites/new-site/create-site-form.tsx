@@ -27,12 +27,14 @@ import {
 } from "@/lib/organizations/address";
 import { createSite } from "@/lib/sites/actions";
 import type { NewSiteDefaults, Template } from "@/lib/sites/service";
+import type { TemplateKind } from "@saroh/templates";
+
 import type { ModuleStates } from "@/lib/sites/template-picker";
 import { lostNew, useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
+import { TemplateChoice } from "@/components/sites/templates/template-choice";
 import { PAGE_FORM, toFirstError } from "@/lib/hooks/page-form";
 import { TextLink } from "@saroh/ui/text-link";
-import { TemplatePicker } from "./template-picker";
 
 /**
  * Sentinel for "none picked": the API then starts the site from the kind's
@@ -82,9 +84,10 @@ type FormValues = z.infer<typeof formSchema>;
  * The template starts on the one for what is being set up (DEC-070, K15):
  * Portfolio for "A site for my work", Personal for "Just me", the starter
  * for a business; or the one the address names (`?template=`, the gallery's
- * link). The picker (U12) shows the templates suggested for the business
- * first and every one under "All"; any can be picked, with one of its
- * colourways, and the choice is always sent.
+ * link). The picker (DEC-216, `TemplateChoice`) shows the templates
+ * suggested for the business's trade first and every one under "All", each
+ * with a preview drawn with the business's own details; any can be picked,
+ * with one of its colourways, and the choice is always sent.
  *
  * With the template choice switched off (`choice` false, DEC-135) there is
  * no picker and no template is sent: the API starts the site from the one
@@ -96,9 +99,14 @@ export function CreateSiteForm({
     defaults = null,
     defaultTemplateId = null,
     startTemplateId = null,
-    suggested = [],
+    trade = null,
+    tradeOther = null,
+    kind,
     modules = null,
+    canSetTrade = false,
 }: {
+    /** `org:update`: with no trade, the picker offers to set it (DEC-216). */
+    canSetTrade?: boolean;
     /** The catalogue; null when it could not be read (said, not hidden). */
     templates: Template[] | null;
     /** Whether a template may be chosen (`templateChoiceOn`); else none is. */
@@ -109,8 +117,12 @@ export function CreateSiteForm({
     defaultTemplateId?: string | null;
     /** The one to start on (`?template=`, else the kind's); else the first. */
     startTemplateId?: string | null;
-    /** The ids suggested for this business (`suggestedTemplates`). */
-    suggested?: readonly string[];
+    /** The business's trade (DEC-216); null suggests by its kind. */
+    trade?: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"), for the Suggested heading. */
+    tradeOther?: string | null;
+    /** What is being set up (DEC-070). */
+    kind?: unknown;
     /** The business's modules, for "shows once Sell is on". */
     modules?: ModuleStates | null;
 }) {
@@ -256,16 +268,25 @@ export function CreateSiteForm({
                         name="templateId"
                         render={({ field }) => (
                             <FormItem className="min-w-0">
-                                <TemplatePicker
+                                <TemplateChoice
                                     templates={listed}
-                                    suggested={suggested}
+                                    basis={{
+                                        trade,
+                                        tradeOther,
+                                        kind,
+                                        modules,
+                                        defaultId: defaultTemplateId,
+                                    }}
                                     value={field.value}
-                                    onChange={field.onChange}
+                                    onChange={(id, styleId) => {
+                                        field.onChange(id);
+                                        form.setValue("styleId", styleId);
+                                    }}
                                     styleId={form.watch("styleId")}
                                     onStyleChange={(id) =>
                                         form.setValue("styleId", id)
                                     }
-                                    modules={modules}
+                                    canSetTrade={canSetTrade}
                                     disabled={isSubmitting}
                                 />
                                 <FormMessage />

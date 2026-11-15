@@ -74,6 +74,31 @@ export function moneyWords(
     return `${negative ? "-" : ""}${moneySign(currency)}${grouped}${paise}`;
 }
 
+/**
+ * A total or summary in whole units, rounded half up: "₹36,86,246" for
+ * 3686245.68. A sum reads better without paise; a single bill keeps them
+ * (`moneyWords`).
+ */
+export function moneyWordsWhole(
+    amount: { toString(): string },
+    currency: string,
+): string {
+    const fixed = toMoneyString(amount);
+    const negative = fixed.startsWith("-");
+    const [whole = "0", frac = "00"] = fixed.replace("-", "").split(".");
+    const rounded = BigInt(whole) + (Number(frac) >= 50 ? 1n : 0n);
+    return moneyWords(
+        `${negative && rounded > 0n ? "-" : ""}${rounded}`,
+        currency,
+    );
+}
+
+/** `moneyWordsWhole` from minor units: 368624568 paise is "₹36,86,246". */
+export function moneyWordsWholeMinor(minor: number, currency: string): string {
+    const whole = Math.round(Math.abs(Math.trunc(minor)) / 100);
+    return moneyWords(`${minor < 0 && whole > 0 ? "-" : ""}${whole}`, currency);
+}
+
 /** The same, from minor units: 125050 paise is "₹1,250.50". */
 export function moneyWordsMinor(minor: number, currency: string): string {
     const sign = minor < 0 ? "-" : "";

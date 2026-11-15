@@ -2,9 +2,9 @@ import { FeaturePoints as Points } from "@saroh/marketing/feature-points";
 import { FeatureUsedBy as UsedBy } from "@saroh/marketing/feature-used-by";
 import { FeatureWorksWith as WorksWith } from "@saroh/marketing/feature-works-with";
 
-import { featureHref, features } from "@/content/features";
+import { featureHref, featureList, features } from "@/content/features";
 import { solutions } from "@/content/solutions";
-import type { Feature } from "@/content/types";
+import type { Feature, FeatureSlug } from "@/content/types";
 import type { LaunchMode } from "@/lib/links";
 import { solutionLink } from "@/lib/search-pages";
 
@@ -32,12 +32,15 @@ export function FeaturePoints({
     );
 }
 
-/** "Works with": a card for each feature it works with. */
+/**
+ * "Works with": a card for each feature it works with that this build
+ * shows, so a switched-off page is never linked.
+ */
 export function FeatureWorksWith({ feature }: { feature: Feature }) {
     return (
         <WorksWith
             lead={feature.worksLead}
-            items={feature.worksWith.map((slug) => ({
+            items={feature.worksWith.filter(shown).map((slug) => ({
                 href: featureHref(slug),
                 title: features[slug].name,
                 body: features[slug].cardLine,
@@ -45,6 +48,8 @@ export function FeatureWorksWith({ feature }: { feature: Feature }) {
         />
     );
 }
+
+const shown = (slug: FeatureSlug) => featureList.some((f) => f.slug === slug);
 
 /** "Used by": a chip for each solution page the feature serves. */
 export function FeatureUsedBy({ feature }: { feature: Feature }) {

@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // Applying a discount code when an order is created: the API decides what
 // comes off, records it in the order's own transaction, and refuses rather
 // than charging full price. The real DiscountsService runs against a mocked
@@ -43,6 +45,7 @@ jest.mock("@saroh/database", () => {
         discount: { findUnique: jest.fn() },
         category: { findMany: jest.fn() },
         discountRedemption: { count: jest.fn(), create: jest.fn() },
+        orderEvent: { create: jest.fn() },
     };
     return {
         ...actual,

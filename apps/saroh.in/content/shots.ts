@@ -129,6 +129,102 @@ const designed = {
     "g-subs": pending(
         "Memberships at Pulse Fitness (demo gym) with their next charge",
     ),
+    // AI apps, Ask AI and Share (plan 2026-11-13-002): placeholders until
+    // captured. Share's and AI apps' Saroh screens (consent, AI activity)
+    // have specs in `e2e/marketing-shots/shots.config.ts`; AI apps' hero and
+    // `ai-ask` are another company's chat, drawn on the page instead;
+    // Ask AI's wait for its screens (plan 2026-11-13-001), and the release
+    // check refuses its switch while any is a placeholder. Not built while
+    // their switch is off. The demo salon is the seed's Gulmohar.
+    "ai-hero": pending(
+        "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
+    ),
+    "ai-connect": pending(
+        "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
+    ),
+    "ai-consent": pending(
+        "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
+    ),
+    "ai-ask": pending(
+        "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
+    ),
+    "ai-activity": pending(
+        "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
+    ),
+    "ask-hero": pending(
+        "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
+    ),
+    "ask-hero-phone": pending(
+        "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+    ),
+    "r-money": pending(
+        "Money to chase on Rye & Co.'s Home (demo bakery): overdue bills, cheques waiting to clear and a failed renewal",
+    ),
+    "g-site-train": pending(
+        "Ways to train on Pulse Fitness's site (demo gym): its classes and memberships with their prices",
+    ),
+    "r-supply": pending(
+        "A bill of supply from Rye & Co. (demo bakery) for nil-rated sourdough loaves",
+    ),
+    "k-visits": pending(
+        "Rahul Verma's root canal at Kavi Dental (demo clinic): visits attended, booked and left",
+    ),
+    "k-note": pending(
+        "A note Rahul Verma wrote when booking at Kavi Dental (demo clinic)",
+    ),
+    "k-flags": pending(
+        "Needs attention on Rahul Verma's record at Kavi Dental (demo clinic)",
+    ),
+    "g-subdetail": pending(
+        "A member's membership at Pulse Fitness (demo gym): a renewal not paid",
+    ),
+    "g-plans": pending("The membership plans at Pulse Fitness (demo gym)"),
+    "k-needs": pending("Needs you on the Home of Kavi Dental (demo clinic)"),
+    "k-today": pending(
+        "Today on the Home of Kavi Dental (demo clinic): the day's patients in order",
+    ),
+    "k-money": pending("Unpaid bills on the Home of Kavi Dental (demo clinic)"),
+    "k-calendar": pending(
+        "This month on the calendar at Kavi Dental (demo clinic)",
+    ),
+    "k-orders": pending(
+        "Orders at Kavi Dental (demo clinic): treatments of several visits",
+    ),
+    "k-invoice": pending(
+        "The bill for Rahul Verma's root canal from Kavi Dental (demo clinic): a bill of supply",
+    ),
+    "g-ptblock": pending(
+        "A personal training block at Pulse Fitness (demo gym): three sessions",
+    ),
+    "t-invoice": pending("An invoice made from an order (saroh.tech's bakery)"),
+    "ask-start": pending(
+        "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
+    ),
+    "ask-answer": pending(
+        "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
+    ),
+    "ask-confirm": pending(
+        "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+    ),
+    "ask-history": pending("Ask AI's history at Rye & Co. (demo bakery)"),
+    "sh-sheet": pending(
+        "The Share sheet for a product at Rye & Co. (demo bakery): a card in the bakery's look, its sizes and caption",
+    ),
+    "sh-button": pending(
+        "A live product at Rye & Co. (demo bakery) with its Share button",
+    ),
+    "sh-cards": pending(
+        "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
+    ),
+    "sh-phone": pending(
+        "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
+    ),
+    "sh-post": pending(
+        "Create post at Rye & Co. (demo bakery): a headline, a link and the card drawn in the bakery's look",
+    ),
+    "sh-post-card": pending(
+        "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+    ),
 } satisfies Record<string, Shot>;
 
 /** A captured shot (U20) replaces its placeholder, alt included: the

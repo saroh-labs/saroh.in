@@ -1,5 +1,5 @@
 import type { HomeWeekChange } from "../home/home-need-model";
-import type { InsightsPeriod } from "./period";
+import type { SellsPeriod } from "./period";
 
 /**
  * The shapes of Insights' What sells (`sells.ts` has the rules): the rows
@@ -162,7 +162,7 @@ export interface BestCustomers {
 
 /** `GET organizations/:organizationId/analytics/sells?period=`. */
 export interface SellsRead {
-    period: InsightsPeriod;
+    period: SellsPeriod;
     zone: string;
     /** The currency amounts are in; null before the business has one. */
     currency: string | null;

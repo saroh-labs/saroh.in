@@ -2,7 +2,8 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { FEATURE_SLUGS, SOLUTION_SLUGS } from "@/content/types";
+import { featureList } from "@/content/features";
+import { SOLUTION_SLUGS } from "@/content/types";
 import { fakeCatalog } from "@/lib/pricing.fixture";
 
 import HomePage, { metadata } from "./page";
@@ -85,13 +86,13 @@ describe("/ (Home)", () => {
         expect(metadata.alternates?.canonical).toBe("/");
     });
 
-    it("lists the nine features, Dashboard first, and the four solutions", async () => {
+    it("lists the shown features, Dashboard first, and the four solutions", async () => {
         const { container } = render(await HomePage());
         const features = container.querySelector("#features");
         const hrefs = Array.from(features?.querySelectorAll("a") ?? []).map(
             (a) => a.getAttribute("href"),
         );
-        expect(hrefs).toEqual(FEATURE_SLUGS.map((s) => `/features/${s}`));
+        expect(hrefs).toEqual(featureList.map((f) => `/features/${f.slug}`));
         expect(hrefs[0]).toBe("/features/dashboard");
         const solutions = container.querySelector("#solutions");
         expect(

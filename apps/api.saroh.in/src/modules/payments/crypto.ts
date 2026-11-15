@@ -14,7 +14,7 @@ import { env } from "../../env";
 
 export type { EncryptedSecret };
 
-function paymentsKey(): EncryptionKey {
+export function paymentsKey(): EncryptionKey {
     return {
         name: "PAYMENTS_ENC_KEY",
         value: env.PAYMENTS_ENC_KEY,

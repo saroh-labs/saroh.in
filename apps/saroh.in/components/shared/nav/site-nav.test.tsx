@@ -124,7 +124,7 @@ describe("SiteNav", () => {
         launch.mode = "waitlist";
     });
 
-    it("Features opens a menu of nine, focused on the first", () => {
+    it("Features opens a menu of every shown feature, focused on the first", () => {
         render(<Nav />);
         const chevron = () =>
             button("Features").querySelector("[data-chevron]")?.classList;
@@ -133,7 +133,7 @@ describe("SiteNav", () => {
         expect(chevron()?.contains("rotate-180")).toBe(true);
         expect(button("Features").getAttribute("aria-expanded")).toBe("true");
         const items = screen.getAllByRole("menuitem");
-        expect(items).toHaveLength(9);
+        expect(items).toHaveLength(FEATURE_ITEMS.length);
         expect(document.activeElement).toBe(items[0]);
     });
 

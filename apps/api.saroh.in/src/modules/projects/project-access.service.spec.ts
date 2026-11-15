@@ -122,6 +122,24 @@ describe("ProjectAccessService.listAccessibleProjects", () => {
         projectFindMany.mockResolvedValue([]);
         expect(await service.listAccessibleProjects(ctx("MEMBER"))).toEqual([]);
     });
+
+    it("a custom role holding project:access:manage sees every project", async () => {
+        projectFindMany.mockResolvedValue([
+            { id: "p1", name: "Alpha", slug: "alpha" },
+        ]);
+        const custom = {
+            ...ctx("MEMBER"),
+            actions: new Set(["org:read", "project:access:manage"] as const),
+        };
+        expect(await service.listAccessibleProjects(custom)).toEqual([
+            { id: "p1", name: "Alpha", slug: "alpha", role: "MANAGER" },
+        ]);
+        expect(projectFindMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { organizationId: ORG },
+            }),
+        );
+    });
 });
 
 describe("ProjectAccessService.resolveProjectRole", () => {
@@ -134,11 +152,7 @@ describe("ProjectAccessService.resolveProjectRole", () => {
     it.each<OrgRole>(["OWNER", "ADMIN"])(
         "%s resolves to MANAGER without any grant lookup",
         async (role) => {
-            const result = await service.resolveProjectRole(
-                "user_1",
-                PROJECT,
-                role,
-            );
+            const result = await service.resolveProjectRole(ctx(role), PROJECT);
             expect(result).toBe("MANAGER");
             expect(accessFindMany).not.toHaveBeenCalled();
         },
@@ -149,23 +163,44 @@ describe("ProjectAccessService.resolveProjectRole", () => {
             { role: "EDITOR" },
             { role: "MANAGER" },
         ]);
-        expect(
-            await service.resolveProjectRole("user_1", PROJECT, "MEMBER"),
-        ).toBe("MANAGER");
+        expect(await service.resolveProjectRole(ctx("MEMBER"), PROJECT)).toBe(
+            "MANAGER",
+        );
     });
 
     it("MEMBER: VIEWER direct only → VIEWER", async () => {
         accessFindMany.mockResolvedValue([{ role: "VIEWER" }]);
-        expect(
-            await service.resolveProjectRole("user_1", PROJECT, "MEMBER"),
-        ).toBe("VIEWER");
+        expect(await service.resolveProjectRole(ctx("MEMBER"), PROJECT)).toBe(
+            "VIEWER",
+        );
     });
 
     it("MEMBER with no grant → null (no access)", async () => {
         accessFindMany.mockResolvedValue([]);
         expect(
-            await service.resolveProjectRole("user_1", PROJECT, "MEMBER"),
+            await service.resolveProjectRole(ctx("MEMBER"), PROJECT),
         ).toBeNull();
+    });
+
+    // Permissions, never the role's name (audit 2026-11-12 #7).
+    it("a custom role holding project:access:manage is MANAGER everywhere", async () => {
+        const custom = {
+            ...ctx("MEMBER"),
+            actions: new Set(["org:read", "project:access:manage"] as const),
+        };
+        expect(await service.resolveProjectRole(custom, PROJECT)).toBe(
+            "MANAGER",
+        );
+        expect(accessFindMany).not.toHaveBeenCalled();
+    });
+
+    it("an Admin whose role lost project:access:manage needs a grant", async () => {
+        accessFindMany.mockResolvedValue([]);
+        const narrowed = {
+            ...ctx("ADMIN"),
+            actions: new Set(["org:read"] as const),
+        };
+        expect(await service.resolveProjectRole(narrowed, PROJECT)).toBeNull();
     });
 });
 

@@ -26,6 +26,7 @@ import {
 } from "../invoices/order-invoicing";
 import { assertPaymentsOn } from "../invoices/payments-on";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
+import { emitOrderWebhook, emitWebhook } from "../outbound-webhooks/emitter";
 import { requireOrderRead } from "../stores/order-read-access";
 import { StoresService } from "../stores/stores.service";
 import { assertLocationTakingOrders } from "./checkout-paused";
@@ -80,6 +81,9 @@ import { serializeOrderDetail, serializeOrderSummary } from "./serialize";
 const CUSTOMER_SELECT = {
     select: { email: true, firstName: true, lastName: true },
 } as const;
+
+/** The step a staff-taken order starts its timeline with. */
+export const ORDER_TAKEN_NOTE = "Order taken";
 
 /** What a store-scoped order write says to a role without its power (B16). */
 const ORDER_WRITE_REFUSAL = {
@@ -444,12 +448,33 @@ export class OrdersService {
                                 },
                             },
                         });
+                        await emitWebhook(tx, {
+                            organizationId,
+                            type: "order.created",
+                            id: order.id,
+                        });
                         await applyInventoryTransition(
                             tx,
                             items,
                             "RELEASED",
                             "RESERVED",
                         );
+                        // Who took it, on its timeline (owner, 13 Nov
+                        // 2026): every change names its person, and so
+                        // does taking it.
+                        if (organizationId) {
+                            await tx.orderEvent.create({
+                                data: {
+                                    organizationId,
+                                    orderId: order.id,
+                                    kind: "STATUS",
+                                    actorUserId: userId,
+                                    fromStatus: null,
+                                    toStatus: null,
+                                    note: ORDER_TAKEN_NOTE,
+                                },
+                            });
+                        }
                         if (applied) {
                             await recordRedemptionInTx(
                                 tx,
@@ -686,6 +711,9 @@ export class OrdersService {
                     ...(kitchen ?? {}),
                 },
             });
+            if (statusChanging) {
+                await emitOrderWebhook(tx, "order.status_changed", orderId);
+            }
             // Paid by hand (pay later, cash at the counter): the order's
             // invoice is made now, once — the same one a payment webhook
             // would have made (ADR-008). Refunded by hand: what is left of
@@ -706,6 +734,7 @@ export class OrdersService {
                 });
                 // Insights' orders figure (#867), with the payment.
                 await recordOrderPaidInTx(tx, orderId);
+                await emitOrderWebhook(tx, "order.paid", orderId);
                 if (order.organizationId) {
                     // On the timeline, with no amount in the note; the
                     // step's amount says it to a money reader.

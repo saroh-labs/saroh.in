@@ -1,0 +1,53 @@
+// The public API docs: static files from `pnpm cf:build` (out/), behind
+// worker/index.mjs (the dev access key, noindex, `/` -> /api, headers).
+// The top level is dev; `env.production` is production. The hosts are Worker
+// custom domains, so Cloudflare makes their DNS records on deploy.
+// Global's Workers are made from this file in a deploy's own checkout:
+// development by scripts/cf-global-dev.mjs, production by
+// scripts/cf-global-prod.mjs.
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "saroh-docs-dev",
+    "main": "worker/index.mjs",
+    "compatibility_date": "2026-10-01",
+    "assets": {
+        "directory": "out",
+        "binding": "ASSETS",
+        "run_worker_first": true,
+        "html_handling": "auto-trailing-slash",
+        "not_found_handling": "404-page",
+    },
+    "observability": { "enabled": true },
+    "workers_dev": false,
+    "preview_urls": false,
+    "routes": [{ "pattern": "docs.saroh.io", "custom_domain": true }],
+    // Settings that aren't secret; the build reads them too (scripts/cf-env.mjs).
+    // VERCEL_ENV "preview" makes `pnpm cf:build` write the OpenAPI files with
+    // this environment's API (packages/api-contract/scripts/openapi.ts).
+    // No INDEXED_HOST: nothing here is indexed.
+    "vars": {
+        "VERCEL_ENV": "preview",
+        "VERCEL_GIT_COMMIT_REF": "development",
+        "DEV_ACCESS_COOKIE_DOMAIN": ".saroh.io",
+    },
+    "env": {
+        "production": {
+            "name": "saroh-docs",
+            "workers_dev": false,
+            "preview_urls": false,
+            "routes": [{ "pattern": "docs.saroh.in", "custom_domain": true }],
+            "vars": {
+                "VERCEL_ENV": "production",
+                "VERCEL_GIT_COMMIT_REF": "main",
+                "INDEXED_HOST": "docs.saroh.in",
+            },
+            "assets": {
+                "directory": "out",
+                "binding": "ASSETS",
+                "run_worker_first": true,
+                "html_handling": "auto-trailing-slash",
+                "not_found_handling": "404-page",
+            },
+        },
+    },
+}

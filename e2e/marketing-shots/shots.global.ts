@@ -54,7 +54,8 @@ const invoicePaper: Partial<Shot> = {
  * Needs you groups, so the column reaches the bottom of Today.
  */
 const homeRegion = (open = 0): Partial<Shot> => ({
-    viewport: { width: 1440, height: 1200 },
+    // Tall enough for a Home whose Needs you runs long (1,423px, 14 Nov 2026).
+    viewport: { width: 1440, height: 1600 },
     steps: Array.from({ length: open }, () => ({
         click: '[data-need-group] button[aria-label="Show the rows"]',
     })),
@@ -146,39 +147,56 @@ export const GLOBAL_SHOTS: Shot[] = [
     ),
     shop(
         "i-compare",
-        "/analytics?tab=from",
-        "Four numbers for the site of Thistlewick Bakery (demo bakery): visits, visitors, enquiries, and paid orders and bookings",
+        "/analytics",
+        "Insights at Thistlewick Bakery (demo bakery): what to do next, from its own sales, with the button that acts on it",
         {
-            viewport: { width: 1440, height: 1100 },
-            clip: {
-                selector:
-                    'main section:has(h2:text-is("Your website")) > div.grid > :first-child',
-                pad: 12,
-            },
+            viewport: { width: 1100, height: 1500 },
+            clip: { selector: '[data-testid="insights-suggestion"]', pad: 8 },
         },
     ),
+
     shop(
         "i-weeks",
-        "/analytics?tab=from&period=3m",
-        "Three months of visits to the site of Thistlewick Bakery (demo bakery), a bar for each day",
+        "/analytics",
+        "Am I making more money? at Thistlewick Bakery (demo bakery): the last 4 weeks against the 4 before",
         {
-            viewport: { width: 1440, height: 1800 },
-            clip: {
-                selector: 'main section:has(h3:text-is("Visits each day"))',
-                pad: 8,
-            },
+            viewport: { width: 1100, height: 1500 },
+            clip: { selector: '[data-testid="answer-money"]', pad: 8 },
         },
     ),
+
     shop(
         "i-store",
-        "/analytics?tab=from",
-        "The pages people open most on the site of Thistlewick Bakery (demo bakery), with their visits",
+        "/analytics",
+        "What sells at Thistlewick Bakery (demo bakery): the best sellers with units and money",
         {
-            viewport: { width: 1440, height: 2000 },
+            viewport: { width: 1100, height: 1500 },
+            clip: { selector: '[data-testid="answer-sells"]', pad: 8 },
+        },
+    ),
+
+    shop(
+        "t-invoice",
+        `/billing/invoices/${SHOP}_invoice_order_0`,
+        "An invoice made from an order at Thistlewick Bakery (demo bakery), in dollars, with its sales tax line",
+        invoicePaper,
+    ),
+    shop(
+        "r-money",
+        "/",
+        "Unpaid invoices on the Home of Thistlewick Bakery (demo bakery): the overdue ones with Remind all",
+        {
+            viewport: { width: 1100, height: 1500 },
+            steps: [
+                { hide: '[data-moment="new-ai-apps"]' },
+                {
+                    click: '[data-home-layout="desk"] [data-need-group]:has-text("unpaid") button[aria-label="Show the rows"]',
+                },
+            ],
             clip: {
                 selector:
-                    'main section:has(h3:text-is("Which pages do people open?"))',
-                pad: 16,
+                    '[data-home-layout="desk"] [data-need-group]:has-text("unpaid")',
+                pad: 8,
             },
         },
     ),
@@ -302,12 +320,138 @@ export const GLOBAL_SHOTS: Shot[] = [
         "Invoices at Ironvale Fitness (demo gym), with the overdue ones flagged",
     ),
     gym(
+        "g-ptblock",
+        "site:/book",
+        "The booking page of Ironvale Fitness (demo gym) with the Personal training block chosen: three sessions, booked one at a time",
+        bookingPage("Personal training block"),
+    ),
+    gym(
+        "g-site-train",
+        "site:/",
+        "Classes and coaching on the site of Ironvale Fitness (demo gym): its sessions and classes with their prices, read from Saroh",
+        {
+            viewport: { width: 1100, height: 1500 },
+            clip: {
+                selector: 'section:has(h2:text-is("Classes and coaching"))',
+                pad: 0,
+            },
+        },
+    ),
+    gym(
         "g-site",
         "site:/",
         "The site of Ironvale Fitness (demo gym): what's on today and Book a free trial",
     ),
 
     // ── Wrenfield Dental ───────────────────────────────────────────────
+    // Dashboard, Orders and Customers follow Wrenfield (owner, 15 Nov 2026).
+    clinic(
+        "k-needs",
+        "/",
+        "Needs you on the Home of Wrenfield Dental (demo clinic): unpaid invoices, a note to answer and what to set up",
+        {
+            viewport: { width: 1100, height: 1500 },
+            steps: [{ hide: '[data-moment="new-ai-apps"]' }],
+            clip: {
+                selector:
+                    '[data-home-layout="desk"] section:has(h2:text-is("Needs you"))',
+                pad: 8,
+            },
+        },
+    ),
+    clinic(
+        "k-today",
+        "/",
+        "Today on the Home of Wrenfield Dental (demo clinic): the day's patients in order, with their dentist and flags",
+        {
+            viewport: { width: 1100, height: 1500 },
+            steps: [{ hide: '[data-moment="new-ai-apps"]' }],
+            clip: {
+                selector:
+                    '[data-home-layout="desk"] section:has(h2:text-is("Today"))',
+                pad: 8,
+            },
+        },
+    ),
+    clinic(
+        "k-money",
+        "/",
+        "Unpaid invoices on the Home of Wrenfield Dental (demo clinic): the overdue ones with Remind all",
+        {
+            viewport: { width: 1100, height: 1500 },
+            steps: [
+                { hide: '[data-moment="new-ai-apps"]' },
+                {
+                    click: '[data-home-layout="desk"] [data-need-group]:has-text("unpaid") button[aria-label="Show the rows"]',
+                },
+            ],
+            clip: {
+                selector:
+                    '[data-home-layout="desk"] [data-need-group]:has-text("unpaid")',
+                pad: 8,
+            },
+        },
+    ),
+    clinic(
+        "k-calendar",
+        "/calendar",
+        "This month on the calendar at Wrenfield Dental (demo clinic), with each day's bookings and money",
+        {
+            viewport: { width: 900, height: 1000 },
+        },
+    ),
+    clinic(
+        "k-orders",
+        "/commerce/orders",
+        "Orders at Wrenfield Dental (demo clinic): treatments of several visits, each with where it's up to",
+        {
+            steps: [{ hide: '[data-moment="new-ai-apps"]' }],
+        },
+    ),
+    clinic(
+        "k-visits",
+        `/commerce/orders/${CLINIC}_order_daniel`,
+        "Daniel's root canal at Wrenfield Dental (demo clinic): visits attended, booked and left, with his flags above",
+        {
+            viewport: { width: 1100, height: 1000 },
+            clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        },
+    ),
+    clinic(
+        "k-invoice",
+        `/billing/invoices/${CLINIC}_invoice_treat_daniel`,
+        "The invoice for a root canal at Wrenfield Dental (demo clinic), made from the order",
+        invoicePaper,
+    ),
+    clinic(
+        "d-customer",
+        `/contacts/${CLINIC}_contact_daniel`,
+        "Daniel's record at Wrenfield Dental (demo clinic): his flags, a note from the booking page and his visits",
+        {
+            viewport: { width: 900, height: 1000 },
+        },
+    ),
+    clinic(
+        "k-note",
+        `/contacts/${CLINIC}_contact_daniel`,
+        "A note Daniel wrote when booking at Wrenfield Dental (demo clinic), ready to label and add where you'll see it",
+        {
+            viewport: { width: 1100, height: 1000 },
+            clip: {
+                selector: 'section[aria-label$="from the booking page"]',
+                pad: 8,
+            },
+        },
+    ),
+    clinic(
+        "k-flags",
+        `/contacts/${CLINIC}_contact_daniel`,
+        "Needs attention on Daniel's record at Wrenfield Dental (demo clinic): an allergy, and a medical flag marked Sensitive",
+        {
+            viewport: { width: 1100, height: 1600 },
+            clip: { selector: 'section[aria-label="Needs attention"]', pad: 8 },
+        },
+    ),
     clinic(
         "d-home",
         "/",
@@ -318,6 +462,7 @@ export const GLOBAL_SHOTS: Shot[] = [
         "d-order",
         `/commerce/orders/${CLINIC}_order_daniel`,
         "A root canal at Wrenfield Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
+        { viewport: { width: 900, height: 1000 } },
     ),
     clinic(
         "d-customers",

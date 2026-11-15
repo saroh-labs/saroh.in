@@ -4,7 +4,10 @@ import { AuthModule } from "@thallesp/nestjs-better-auth";
 
 import { mountedAuth } from "./common/auth/auth";
 import { AdminModule } from "./modules/admin/admin.module";
+import { AiModule } from "./modules/ai/ai.module";
+import { AiOpsModule } from "./modules/ai/ops/ai-ops.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { ApiKeysModule } from "./modules/api-keys/api-keys.module";
 import { AuditModule } from "./modules/audit/audit.module";
 import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
@@ -36,11 +39,13 @@ import { InvoicesModule } from "./modules/invoices/invoices.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { LeadsModule } from "./modules/leads/leads.module";
 import { LinkPreviewModule } from "./modules/link-preview/link-preview.module";
+import { McpModule } from "./modules/mcp/mcp.module";
 import { MediaModule } from "./modules/media/media.module";
 import { MembersModule } from "./modules/members/members.module";
 import { NotificationsModule } from "./modules/notifications/notifications.module";
 import { OrdersModule } from "./modules/orders/orders.module";
 import { OrganizationsModule } from "./modules/organizations/organizations.module";
+import { OutboundWebhooksModule } from "./modules/outbound-webhooks/outbound-webhooks.module";
 import { PaymentsModule } from "./modules/payments/payments.module";
 import { PipelinesModule } from "./modules/pipelines/pipelines.module";
 import { PricingModule } from "./modules/pricing/pricing.module";
@@ -48,10 +53,12 @@ import { ProductReviewsModule } from "./modules/product-reviews/product-reviews.
 import { ProductsModule } from "./modules/products/products.module";
 import { ProjectsModule } from "./modules/projects/projects.module";
 import { ProviderHealthModule } from "./modules/provider-health/provider-health.module";
+import { PublicApiModule } from "./modules/public-api/public-api.module";
 import { SavedViewsModule } from "./modules/saved-views/saved-views.module";
 import { SearchPagesModule } from "./modules/search-pages/search-pages.module";
 import { SearchModule } from "./modules/search/search.module";
 import { SelfTestModule } from "./modules/self-test/self-test.module";
+import { SharePostsModule } from "./modules/share-posts/share-posts.module";
 import { SignInOptionsModule } from "./modules/sign-in-options/sign-in-options.module";
 import { SiteAccountsModule } from "./modules/site-accounts/site-accounts.module";
 import { SitesModule } from "./modules/sites/sites.module";
@@ -110,6 +117,11 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         SavedViewsModule,
         OrganizationsModule,
         DataExportModule,
+        ApiKeysModule,
+        PublicApiModule,
+        // AI apps' sign-in and connections (plan 2026-11-10-001, U9).
+        McpModule,
+        OutboundWebhooksModule,
         ProjectsModule,
         AuditModule,
         StoresModule,
@@ -128,6 +140,12 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         ContentModule,
         MediaModule,
         SitesModule,
+        // Share pictures and own posts (#1375, #1378).
+        SharePostsModule,
+        // Ask AI's layer (DEC-220): settings, history, retention.
+        AiModule,
+        // Its alarms, halt, reports and Request more's end (U8).
+        AiOpsModule,
         SiteAccountsModule,
         DomainsModule,
         JobsModule,

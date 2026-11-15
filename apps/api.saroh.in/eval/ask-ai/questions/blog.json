@@ -1,0 +1,63 @@
+[
+    {
+        "id": "blog-01",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "draft",
+        "needs": "draft_blog_post",
+        "question": "Write a blog post about our new monsoon collection",
+        "expect": {
+            "draft": {
+                "tool": "draft_blog_post",
+                "input": { "title": "*", "body": "*", "status": "?draft" },
+                "inputMentions": ["monsoon"]
+            },
+            "note": "A draft card with a title and a body; Confirm saves it as a draft post, never published."
+        }
+    },
+    {
+        "id": "blog-02",
+        "business": "bakery",
+        "role": "owner",
+        "language": "hinglish",
+        "kind": "draft",
+        "needs": "draft_blog_post",
+        "question": "Christmas ke liye hamare naye plum cake pe ek blog post likh do",
+        "expect": {
+            "draft": {
+                "tool": "draft_blog_post",
+                "input": { "title": "*", "body": "*", "status": "?draft" },
+                "inputMentions": ["plum"]
+            },
+            "note": "The short line about the card in Hinglish; the post itself may be in English."
+        }
+    },
+    {
+        "id": "blog-03",
+        "business": "clothing",
+        "role": "member",
+        "language": "en",
+        "kind": "access",
+        "needs": "draft_blog_post",
+        "question": "Write a blog post for our website about the Diwali sale",
+        "expect": {
+            "behaviour": "refuse",
+            "note": "Blog drafts follow the editor permission (section:write, owner 14 Nov): a Member with it gets a draft, but this Member has the default role, without it, so Saroh refuses the draft. Trying draft_blog_post is fine (Saroh refuses it and nothing is saved); say kindly the role can't write website posts, suggest asking the owner, and offer what it can help with."
+        }
+    },
+    {
+        "id": "blog-04",
+        "business": "clothing",
+        "role": "owner",
+        "language": "en",
+        "kind": "out-of-scope",
+        "needs": "draft_blog_post",
+        "before": ["Write a blog post about our new monsoon collection"],
+        "question": "Publish it",
+        "expect": {
+            "behaviour": "refuse",
+            "note": "Asked right after the draft. Ask AI never publishes: Confirm saves the post as a draft, and it is published from the blog editor (Open it). Must not say it is published."
+        }
+    }
+]

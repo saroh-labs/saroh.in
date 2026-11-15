@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { featureList } from "@/content/features";
 import { summarise } from "@/content/help";
 import type { PublishContext } from "@/content/resources";
 import { galleryTemplates } from "@/content/templates";
@@ -67,6 +68,9 @@ describe("llmsText", () => {
             "/integrations",
             "/changelog",
             "/tools/link-preview",
+            // No switch is off in this context: the AI apps' pages too (U7).
+            "/integrations/claude",
+            "/integrations/chatgpt",
             "/integrations/razorpay",
             "/integrations/cashfree",
             "/integrations/email",
@@ -75,6 +79,18 @@ describe("llmsText", () => {
         ]);
         expect(paths.some((p) => p.startsWith("/help"))).toBe(false);
         expect(paths).not.toContain("/changelog/saroh-is-open");
+    });
+
+    it("lists no AI app's page while its switch is off, and no card that links into Help", () => {
+        const text = llmsText(BASE, at(AFTER, { off: ["ai-apps"] }), articles);
+        expect(text).not.toMatch(/Claude|ChatGPT/);
+        const onText = llmsText(BASE, at(AFTER), articles);
+        expect(linked(onText)).toContain("/integrations/claude");
+        // The article is listed once, as itself; no card links to its anchors.
+        expect(onText).not.toContain("connect-other-ai-apps#");
+        expect(
+            linked(onText).filter((p) => p === "/help/connect-other-ai-apps"),
+        ).toHaveLength(1);
     });
 
     it("from midnight in India on 17 Oct, adds Help, every article and the launch entry", () => {
@@ -175,9 +191,9 @@ describe("llmsText", () => {
         for (const when of [BEFORE, AFTER]) {
             const text = llmsText(BASE, at(when, { routes }), articles);
             const paths = linked(text);
-            expect(
-                paths.filter((p) => p.startsWith("/features/")),
-            ).toHaveLength(9);
+            expect(paths.filter((p) => p.startsWith("/features/"))).toEqual(
+                featureList.map((f) => `/features/${f.slug}`),
+            );
             expect(
                 paths.filter((p) => p.startsWith("/solutions/")),
             ).toHaveLength(4);

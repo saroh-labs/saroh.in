@@ -19,6 +19,7 @@ import {
     TopBarVerdict,
     youApproved,
 } from "@/components/sites/review/verdict-controls";
+import { TemplateRow } from "@/components/sites/templates/template-row";
 import {
     testReleaseActions,
     TestReleaseSheets,
@@ -43,6 +44,7 @@ import type { SiteEditorProps } from "./site-editor-props";
 import { useEditorDraft } from "./use-editor-draft";
 import { takePendingNote, useEditorJumps } from "./use-editor-jumps";
 import { useEditorLayout, useEditorSheets } from "./use-editor-layout";
+
 import { useEditorLeave } from "./use-editor-leave";
 import { useEditorReview } from "./use-editor-review";
 import { activeSection, useEditorSelection } from "./use-editor-selection";
@@ -85,6 +87,7 @@ export function SiteEditor({
     liveLook: initialLiveLook = null,
     styleAccess = null,
     templateId = null,
+    templateRow = null,
     shopOpen = false,
     packsOpen = false,
     addablePageKinds,
@@ -502,6 +505,28 @@ export function SiteEditor({
                                     },
                                 }}
                                 styleRules={styleRules}
+                                // The site's template (DEC-216): changed by
+                                // whoever may change the site, read by others.
+                                templateRow={
+                                    templateRow ? (
+                                        <TemplateRow
+                                            source={templateRow}
+                                            pages={pages}
+                                            starter={
+                                                canUpdateSite ? starter : null
+                                            }
+                                            look={style.look ?? null}
+                                        />
+                                    ) : null
+                                }
+                                templateName={
+                                    templateRow
+                                        ? (templateRow.templates?.find(
+                                              (t) =>
+                                                  t.id === templateRow.current,
+                                          )?.name ?? null)
+                                        : undefined
+                                }
                             />
                         }
                         canvas={

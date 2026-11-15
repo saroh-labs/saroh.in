@@ -8,6 +8,7 @@ import Link from "next/link";
 
 import { JsonLd } from "@/components/shared/json-ld";
 import { INTEGRATIONS as page } from "@/content/integrations";
+import { featuresOff } from "@/lib/feature-switches";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -15,6 +16,12 @@ import { pageOf } from "@/lib/site-map";
 const entry = pageOf("/integrations");
 
 export const metadata = pageMetadata(entry);
+
+/** The AI apps first, while their switch is on (plan 2026-11-13-002, U16). */
+const live = [
+    ...(featuresOff().includes("ai-apps") ? [] : page.aiApps),
+    ...page.live,
+];
 
 /** saroh.in's Integrations: its cards, not links here as there's no page behind them. */
 export default function IntegrationsPage() {
@@ -34,7 +41,7 @@ export default function IntegrationsPage() {
             <Container className="pt-12">
                 <h2 className="sr-only">Available now</h2>
                 <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[18px] p-0">
-                    {page.live.map((item) => (
+                    {live.map((item) => (
                         <li
                             key={item.name}
                             className="grid content-start gap-3.5 rounded-mk-card border border-border bg-card p-[22px] text-foreground"

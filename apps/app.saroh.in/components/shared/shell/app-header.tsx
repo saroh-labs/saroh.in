@@ -1,6 +1,7 @@
 import { SarohSymbol, Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
 
+import { AskAiButton } from "@/components/ask-ai/ask-ai-button";
 import { OrganizationSwitcher } from "@/components/organizations/switcher/organization-switcher";
 import { CommandTrigger } from "@/components/shared/navigation/command-trigger";
 import { PROFILE } from "@/lib/edition";
@@ -51,6 +52,12 @@ type AppHeaderProps =
            * nothing shows.
            */
           accountManager?: AccountManager | null;
+          /**
+           * Ask AI's button (plan 2026-11-13-001 U10): null hides it (the
+           * screen switch off, a Reviewer, no business open); `locked`
+           * draws it with a lock on a plan without Ask AI.
+           */
+          askAi?: { locked: boolean; upgradeTo: string | null } | null;
       };
 
 export function AppHeader(props: AppHeaderProps) {
@@ -77,6 +84,7 @@ export function AppHeader(props: AppHeaderProps) {
         unread,
         moduleKeys = null,
         accountManager = null,
+        askAi = null,
     } = props;
 
     return (
@@ -110,6 +118,12 @@ export function AppHeader(props: AppHeaderProps) {
                         kind: activeOrg?.kind,
                     }}
                 />
+                {askAi ? (
+                    <AskAiButton
+                        locked={askAi.locked}
+                        upgradeTo={askAi.upgradeTo}
+                    />
+                ) : null}
                 {unread !== null ? <NotificationsLink unread={unread} /> : null}
                 {/* Renders nothing while only one skin is offered. */}
                 <SkinSwitcher />

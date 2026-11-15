@@ -278,6 +278,16 @@ describe("create", () => {
         ]);
     });
 
+    it("stores webhooks on a custom role, never API keys (plan 2026-11-10-001, U2)", async () => {
+        await service().create(OWNER, {
+            label: "Integrations",
+            actions: ["webhook:manage", "apikey:manage"],
+        });
+        expect(role.create!.mock.calls[0][0].data.actions).toEqual([
+            "webhook:manage",
+        ]);
+    });
+
     it("drops unknown and repeated permissions rather than failing the save", async () => {
         await service().create(OWNER, {
             label: "Deputy",

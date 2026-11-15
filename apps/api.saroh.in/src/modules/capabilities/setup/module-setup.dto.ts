@@ -159,6 +159,12 @@ export class WebsiteSetupDto {
         message: "Choose one of the templates offered.",
     })
     templateId?: string;
+
+    /** One of that template's colourways (DEC-216); absent: its first. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    styleId?: string;
 }
 
 /**

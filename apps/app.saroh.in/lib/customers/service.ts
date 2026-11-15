@@ -1,3 +1,4 @@
+import type { SharedCustomer } from "@/lib/api/client";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, getJson, getList, readError } from "@/lib/api/http";
@@ -8,12 +9,8 @@ import { apiFetch, getJson, getList, readError } from "@/lib/api/http";
  * Server-only.
  */
 
-export interface Customer {
-    id: string;
-    email: string;
-    firstName: string | null;
-    lastName: string | null;
-    phone: string | null;
+/** The flat address is this route's own; `/v1` nests it. */
+export interface Customer extends SharedCustomer {
     country: string | null;
     state: string | null;
     city: string | null;

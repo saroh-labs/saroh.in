@@ -118,6 +118,27 @@ describe("IdempotencyService", () => {
         expect(operation).not.toHaveBeenCalled();
     });
 
+    it("replays a retry stored under an older form of the request (a replaced key)", async () => {
+        const operation = jest.fn();
+        const service = new IdempotencyService(
+            dbWith(
+                {
+                    fingerprint: fingerprintOf({ taxId: "old-digest" }),
+                    status: "COMPLETED",
+                    response: { ok: true },
+                },
+                P2002,
+            ),
+        );
+
+        await expect(
+            service.run(ctx, { taxId: "v2:new-digest" }, operation, [
+                { taxId: "old-digest" },
+            ]),
+        ).resolves.toEqual({ ok: true });
+        expect(operation).not.toHaveBeenCalled();
+    });
+
     it("explains how to recover from a conflict", async () => {
         const service = new IdempotencyService(
             dbWith(

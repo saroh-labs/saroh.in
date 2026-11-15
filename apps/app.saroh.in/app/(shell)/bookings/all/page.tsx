@@ -30,6 +30,7 @@ import { permitsFor } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { canTakeDeskPayments } from "@/lib/services/booking-money";
+import { readBookingsByDay } from "@/lib/services/bookings-by-day";
 import {
     flattenCalendar,
     listServices,
@@ -41,6 +42,11 @@ import { requireSession } from "@/lib/session";
 import { BOOKINGS_FIRST_RUN, shareLink } from "@/lib/sites/share-links";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import { listStaff } from "@/lib/staff/service";
+import {
+    dateRangeAsk,
+    dateRangeOn,
+    readDateRange,
+} from "@/lib/views/date-range";
 import { viewParam } from "@/lib/views/search-params";
 import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
 
@@ -54,6 +60,9 @@ import { isSince, sinceParam, withoutSince } from "@/lib/views/since";
  * PAST bookings are included (#241): the appointments waiting to be
  * marked have to be somewhere a merchant can find them. Every time is in
  * the business's zone, labelled (Q10, decided 19 Oct).
+ *
+ * `?date=` (a preset, or `custom` with `?from=`/`?to=`, Orders' params) asks
+ * the API for the bookings starting on those days, however far back.
  *
  * The page reads and decides what the viewer may do; `BookingsView` draws.
  * A read that fails says so, with Try again: an empty register would be a
@@ -80,7 +89,14 @@ export default async function BookingsPage({
 
     const [calendar, params, services, organization, staffList] =
         await Promise.all([
-            readBookingsRegister(),
+            searchParams.then((p) => {
+                // A date filter asks the API for those days (by start);
+                // without one, the register's two years.
+                const ask = dateRangeAsk(readDateRange(p));
+                return ask.date || ask.from || ask.to
+                    ? readBookingsByDay(ask)
+                    : readBookingsRegister();
+            }),
             searchParams,
             listServices().catch(() => []),
             resolveActiveOrganization(),
@@ -99,6 +115,8 @@ export default async function BookingsPage({
         );
     }
 
+    const dates = readDateRange(params);
+    const dated = dateRangeOn(dates);
     const every = flattenCalendar(calendar);
     // New booking finds the customer by search (E4) and can send a payment
     // link; someone who can't take payment sees it locked, saying why (U8).
@@ -120,13 +138,14 @@ export default async function BookingsPage({
         : every;
 
     // The business's first booking (wave G), said once.
-    const moment = await bookingsListMoment(every, organization);
+    // Only the whole register can say it is the first.
+    const moment = dated ? null : await bookingsListMoment(every, organization);
 
     // No bookings at all yet: "Share your booking page" while it is live
     // (DEC-069, L8). Only then is the web address read, and a read that
     // fails (or a role it isn't shown to) just leaves the button out.
     const share =
-        every.length === 0 && !since
+        every.length === 0 && !since && !dated
             ? shareLink(await readWebAddressLinks(), BOOKINGS_FIRST_RUN)
             : null;
 
@@ -169,7 +188,12 @@ export default async function BookingsPage({
                     bookings={rows}
                     timezone={timezone}
                     now={readNow()}
-                    initialView={viewParam(params)}
+                    // Dated, every booking in the days unless a view is
+                    // asked for: those days may all be past.
+                    initialView={
+                        viewParam(params) ?? (dated ? "all" : undefined)
+                    }
+                    dates={dates}
                     share={share}
                     can={{
                         book: canBook,

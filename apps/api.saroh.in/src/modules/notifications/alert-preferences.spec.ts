@@ -32,6 +32,9 @@ describe("alerts", () => {
             "mine",
             // Members (#1150).
             "member",
+            // A new enquiry and a customer's message (audit 2026-11-12).
+            "enquiry",
+            "message",
         ]);
     });
 
@@ -42,7 +45,9 @@ describe("alerts", () => {
                 event === "failed" ||
                     event === "site" ||
                     event === "request" ||
-                    event === "mine",
+                    event === "mine" ||
+                    event === "enquiry" ||
+                    event === "message",
             );
             expect(defaultOn(event, "whatsapp")).toBe(false);
         }
@@ -145,7 +150,26 @@ describe("alerts", () => {
             expect(alertEventOfType("booking.cancelled")).toBe("booking");
             expect(alertEventOfType("payment.failed")).toBe("failed");
             expect(alertEventOfType("team.joined")).toBe("team");
-            expect(alertEventOfType("enquiry.new")).toBeNull();
+            expect(alertEventOfType("enquiry.new")).toBe("enquiry");
+            expect(alertEventOfType("message.new")).toBe("message");
+            expect(alertEventOfType("site.review.unknown")).toBeNull();
+        });
+
+        // The bell carries what was written (audit 2026-11-12 #3).
+        it("shows enquiries only to lead:read and messages only to message:read", () => {
+            const without = hiddenNotificationTypes([], () => false);
+            expect(without).toEqual(
+                expect.arrayContaining(["enquiry.new", "message.new"]),
+            );
+            const leads = hiddenNotificationTypes([], (a) => a === "lead:read");
+            expect(leads).not.toContain("enquiry.new");
+            expect(leads).toContain("message.new");
+            const messages = hiddenNotificationTypes(
+                [],
+                (a) => a === "message:read",
+            );
+            expect(messages).toContain("enquiry.new");
+            expect(messages).not.toContain("message.new");
         });
 
         it("hides nothing from someone who reads everything and changed nothing", () => {

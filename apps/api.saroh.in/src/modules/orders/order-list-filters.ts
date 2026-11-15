@@ -145,6 +145,40 @@ export function presetRange(
     return { gte: from.toJSDate(), lt: to.toJSDate() };
 }
 
+/** A list's date filter as the query string has it (B4). */
+export interface ListDateQuery {
+    date?: DatePreset;
+    from?: string;
+    to?: string;
+}
+
+/** Whether the query asks for a date range at all (and so the zone). */
+export function asksDates(query: ListDateQuery): boolean {
+    return [query.date, query.from, query.to].some(Boolean);
+}
+
+/**
+ * The instants a list's date filter covers, `[gte, lt)`, in the business's
+ * zone: a preset, or the `from`/`to` days. Orders' rule, shared by every
+ * list that filters by day (Invoices, All bookings, the stock log): never
+ * both, a backwards range refused, no range when none is asked for.
+ */
+export function listRange(
+    query: ListDateQuery,
+    zone: string,
+    now: Date,
+): { gte?: Date; lt?: Date } {
+    if (query.date && (query.from || query.to)) {
+        throw new BadRequestException({
+            message: "Pick a date range or a preset, not both.",
+            details: { field: "date" },
+        });
+    }
+    return query.date
+        ? presetRange(query.date, zone, now)
+        : dayRange(query.from, query.to, zone);
+}
+
 /** `%`, `_` and `\` taken literally in an ILIKE pattern. */
 function likeEscape(text: string): string {
     return text.replace(/[\\%_]/g, (c) => `\\${c}`);

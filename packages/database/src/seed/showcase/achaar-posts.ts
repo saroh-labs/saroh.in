@@ -7,7 +7,7 @@ import type { DemoPost } from "./demo-shop-types";
  */
 
 const unsplash = (id: string): string =>
-    `https://images.unsplash.com/photo-${id}?w=1600&q=80&auto=format&fit=crop`;
+    `https://media.saroh.io/demo/photo-${id}.jpg`;
 
 const figure = (
     id: string,

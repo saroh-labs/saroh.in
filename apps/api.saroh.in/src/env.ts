@@ -185,6 +185,12 @@ const envSchema = z.object({
     // NODE_ENV=production (below), and honoured only in a test run, as
     // DOMAIN_HOSTING_FAKE is (`payments/providers/stripe-fake.ts`).
     STRIPE_FAKE: z.enum(["1"]).optional(),
+    // TEST ONLY. `1`: Ask AI answers from a script instead of a model (the
+    // Ask AI browser spec): a known question streams its scripted words, a
+    // tool or a draft first where the script says; nothing calls Anthropic.
+    // Refused at boot under NODE_ENV=production (below), and honoured only in
+    // a test run, as STRIPE_FAKE is (`ai/providers/fake-script.ts`).
+    AI_PROVIDER_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -225,9 +231,25 @@ const envSchema = z.object({
     // public client config the browser loads the widget with.
     MSG91_WIDGET_ID: z.string().optional(),
     MSG91_WIDGET_TOKEN: z.string().optional(),
-    // Which adapter sends: `msg91` or `fake` (the fake only in development
-    // and test). Unset, MSG91 when configured, else the fake in dev/test.
-    MESSAGING_PROVIDER: z.enum(["msg91", "fake"]).optional(),
+    // Which adapter sends: `msg91`, `meta` or `fake` (the fake only in
+    // development and test). Unset, MSG91 when configured, else the fake in
+    // dev/test. `meta` sends WhatsApp through Meta's Cloud API directly and
+    // keeps SMS and the OTP widget on MSG91 (DEC-213).
+    MESSAGING_PROVIDER: z.enum(["msg91", "meta", "fake"]).optional(),
+    // Saroh's own WhatsApp number on Meta's Cloud API (DEC-213), read only
+    // when MESSAGING_PROVIDER=meta: the number's phone number ID, a system
+    // user's access token, the app secret Meta signs webhooks with, the
+    // verify token typed into the app's webhook settings, and the templates'
+    // language (unset, en_US). Template names are MSG91_WHATSAPP_TEMPLATE and
+    // MSG91_WHATSAPP_UTILITY_TEMPLATES: the same WhatsApp account's names.
+    // The token and the secret are never logged.
+    META_WA_PHONE_NUMBER_ID: z.string().optional(),
+    META_WA_TOKEN: z.string().optional(),
+    META_APP_SECRET: z.string().optional(),
+    META_WA_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+    META_WA_TEMPLATE_LANG: z.string().optional(),
+    // TEST ONLY in practice: where Graph API calls go, version included.
+    META_GRAPH_BASE_URL: z.url().optional(),
     // A 32-byte AES-256-GCM key (base64 or 64-hex) sealing a queued
     // WhatsApp send's number and words until the provider accepts it (a
     // retry). Its own key, never the payments one. Development and test
@@ -262,6 +284,12 @@ const envSchema = z.object({
     // pages they changed. Anything else (unset included) queues nothing.
     // Switch it on before the Worker's own `SITE_PAGE_CACHE`.
     SITE_PAGE_CACHE: z.enum(["on", "off"]).optional(),
+    // Share as a post and Create post (#1375, #1378, DEC-217): `on` serves
+    // the share pictures (`public/share/...`), the signed-in booking card
+    // and own posts; anything else (unset included) answers 404 for all of
+    // them (`share-posts/share-posts-switch.ts`). Off in production until
+    // the owner opens it; the app's NEXT_PUBLIC_SHARE_POSTS hides the screens.
+    SHARE_POSTS: z.enum(["on", "off"]).optional(),
     // `on` adds `X-Robots-Tag: noindex, nofollow` to every answer
     // (`src/common/robots-header.ts`): set on the dev API (api.saroh.io) so
     // search engines never list it. Unset or `off`: no header (production).
@@ -294,6 +322,25 @@ const envSchema = z.object({
     // refuses with a clear error when it is missing or malformed. Never
     // logged, never in an example file with a value.
     STAFF_PII_ENC_KEY: z.string().optional(),
+    // Public API keys and webhook signing secrets (plan 2026-11-10-001, U3/U5):
+    // each its own 32-byte AES-256-GCM key (base64 or 64-hex), checked at use
+    // like PAYMENTS_ENC_KEY. Never logged, never in an example file with a value.
+    // All five encryption keys may be a ring, `v2:<key>,v1:<key>` (DEC-214).
+    APIKEY_ENC_KEY: z.string().optional(),
+    WEBHOOK_SECRET_KEY: z.string().optional(),
+    // Ask AI (DEC-220): seals conversation and report text. Its own 32-byte
+    // key or ring, checked at use like the keys above; never logged.
+    AI_TEXT_ENC_KEY: z.string().optional(),
+    // Ask AI's provider (DEC-220): Anthropic's API key. Optional at boot;
+    // read only by `modules/ai/providers/ai-sdk.adapter.ts`, which refuses
+    // a call without it. Never logged, never in an example file with a value.
+    ANTHROPIC_API_KEY: z.string().optional(),
+    // Durable public-API rate limits (U4, `modules/rate-limits/`). Unset, or
+    // Redis down: each replica limits in process at the cap / API_REPLICAS.
+    REDIS_URL: z.url().optional(),
+    API_REPLICAS: z.coerce.number().int().positive().default(1),
+    // The pg pool's `max` (`@saroh/database` reads it); unset keeps pg's 10.
+    DB_POOL_MAX: z.coerce.number().int().positive().optional(),
     // Which Cashfree the API talks to, for merchants' payments and Saroh's own
     // billing alike: `sandbox` for test credentials, `production` (default)
     // for live ones. The API sends the mode with every checkout's client
@@ -412,6 +459,7 @@ const TEST_ONLY = [
     "LINK_PREVIEW_TEST_HOSTS",
     "DOMAIN_HOSTING_FAKE",
     "STRIPE_FAKE",
+    "AI_PROVIDER_FAKE",
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {

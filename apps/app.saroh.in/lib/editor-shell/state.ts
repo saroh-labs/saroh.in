@@ -285,8 +285,13 @@ export function shellActions(input: {
     problems: EditorProblem[];
     /** Busy with a publish, discard or delete. */
     busy: boolean;
+    /**
+     * The fields whose problem is drawn under them now (`fieldErrors`).
+     * Left out, every one is taken as drawn.
+     */
+    marked?: ReadonlySet<string>;
 }): ShellActions {
-    const { save, record, problems, busy } = input;
+    const { save, record, problems, busy, marked } = input;
     const p = publishState(record);
     const live = p === "live" || p === "changes";
     const typed = save.edits > 0;
@@ -299,10 +304,18 @@ export function shellActions(input: {
     } else if (problems.length > 0) {
         // Not before anything is typed: a new, empty record isn't wrong yet.
         if (record || typed) {
+            // "They're marked below" only when they are: a field nobody has
+            // reached yet says nothing, so the line names what is left.
+            const allMarked =
+                !marked || problems.every((x) => marked.has(x.field));
             why =
                 problems.length === 1
                     ? `1 thing to fix before publishing: ${lowerFirst(problems[0].message)}.`
-                    : `${problems.length} things to fix before publishing. They're marked below.`;
+                    : allMarked
+                      ? `${problems.length} things to fix before publishing. They're marked below.`
+                      : `${problems.length} things to fix before publishing: ${joinAnd(
+                            problems.map((x) => lowerFirst(x.message)),
+                        )}.`;
         }
     } else if (p === "live" && !unsaved) {
         why = "Nothing to publish yet. Edits appear here as a draft first.";
@@ -320,6 +333,35 @@ export function shellActions(input: {
         deleteDraft: p === "draft" && !!record?.canDelete,
         view: record !== null,
     };
+}
+
+/**
+ * The message drawn under each field. A field's problem shows once that
+ * field has been changed or left, or Publish has been pressed (or the page
+ * opened a draft, whose problems are its to-do list), as a page says nothing
+ * of a field until then (`frontend-forms.md`): typing a new plan's name
+ * doesn't turn its untouched price red. Until then the line beside Publish
+ * names it. A failed save or a refused publish always shows on its field.
+ */
+export function fieldErrors(input: {
+    problems: readonly EditorProblem[];
+    /** The fields changed or left since the page opened. */
+    touched: ReadonlySet<string>;
+    /** Say every problem: Publish was pressed, or a draft was opened. */
+    tried: boolean;
+    save: Pick<SaveState, "phase" | "errorField" | "error">;
+    refused: { field: string; message: string } | null;
+}): Partial<Record<string, string>> {
+    const { problems, touched, tried, save, refused } = input;
+    const errors: Partial<Record<string, string>> = {};
+    for (const p of problems) {
+        if (tried || touched.has(p.field)) errors[p.field] ??= p.message;
+    }
+    if (save.phase === "failed" && save.errorField && save.error) {
+        errors[save.errorField] = save.error;
+    }
+    if (refused) errors[refused.field] = refused.message;
+    return errors;
 }
 
 // ---------------------------------------------------------------------------

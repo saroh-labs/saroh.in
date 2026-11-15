@@ -377,7 +377,8 @@ describe("paying from an order's pay link (real database)", () => {
         const text = JSON.stringify(view);
         expect(text).not.toContain("@example.in");
         expect(text).not.toContain("+91");
-        expect(text).not.toContain("Rao");
+        // A whole word: the random pay token can hold the letters by chance.
+        expect(text).not.toMatch(/\bRao\b/);
         expect(text).not.toContain(id);
 
         // An amount in the body is ignored: the order says what is due.

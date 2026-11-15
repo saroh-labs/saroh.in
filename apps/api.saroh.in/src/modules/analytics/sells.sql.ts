@@ -88,6 +88,27 @@ export function bestSellersSql(
 }
 
 /**
+ * The day, in `zone`, of the last paid order with a product on it before
+ * `to`, as best sellers count a sale; `day` null when none ever.
+ */
+export function lastProductSaleSql(
+    organizationId: string,
+    zone: string,
+    to: Date,
+): Prisma.Sql {
+    return Prisma.sql`
+        SELECT to_char((MAX(${ORDER_PAID_AT}) AT TIME ZONE 'UTC') AT TIME ZONE ${zone}::text, 'YYYY-MM-DD') AS day
+        FROM "Order" o
+        WHERE o."organizationId" = ${organizationId}
+          AND o."paymentStatus" = 'PAID'
+          AND ${ORDER_PAID_AT} < ${ts(to)}
+          AND EXISTS (
+              SELECT 1 FROM "OrderItem" oi
+              WHERE oi."orderId" = o.id AND oi."productId" IS NOT NULL
+          )`;
+}
+
+/**
  * Every service's bookings starting in `[beforeFrom, to)`, per window:
  * `bookings` (places held: CONFIRMED, came or not), `people` (different
  * people among them: the contact, else the booker's email), `sessions`

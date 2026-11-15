@@ -45,6 +45,8 @@ const CLASS_LEVEL: Record<string, string> = {
     // Each person's own booking rules and their requests (#1038).
     "staff/staff-rules.controller.ts": "APPOINTMENTS",
     "sites/sites.controller.ts": "WEBSITE",
+    // An AI app's publish request, answered by a person (DEC-215).
+    "mcp/publish-requests.controller.ts": "WEBSITE",
     // "Your booking page" in Bookings (DEC-175): published from Bookings.
     "sites/booking-page.controller.ts": "APPOINTMENTS",
     // DEC-071 T2: a site's test releases and their links.
@@ -55,6 +57,9 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    "share-posts/share-posts.controller.ts": "WEBSITE",
+    // The booking page's card with the sheet's headline (#1375).
+    "share-posts/share-cards.controller.ts": "WEBSITE",
     // A look's starter content copied into the draft, and its Undo (DEC-182).
     "sites/starter-content.controller.ts": "WEBSITE",
     "forms/forms.controller.ts": "WEBSITE",
@@ -106,6 +111,13 @@ const METHOD_LEVEL: Record<string, string> = {
     "subscriptions/subscriptions.controller.ts": "PAYMENTS",
     "class-packs/class-packs.controller.ts": "CLASS_PACKS",
     "courses/courses.controller.ts": "COURSES",
+    // Plan 2026-11-10-001 U8: `/v1` gates what the app's own routes gate
+    // (catalogue and services, making and moving a booking, taking and
+    // moving an order); history reads and a booking's cancel stay open.
+    // The catalogue file gates services on APPOINTMENTS too.
+    "public-api/catalogue.v1.controller.ts": "COMMERCE",
+    "public-api/bookings.v1.controller.ts": "APPOINTMENTS",
+    "public-api/orders.v1.controller.ts": "COMMERCE",
 };
 
 /**
@@ -224,6 +236,10 @@ const NEVER: Record<string, string> = {
         "published sites, and the business's place and hours",
     // A QR code's short link, relayed by the site's server. It forwards
     // to a page that answers for its own module, so it carries none.
+    // DEC-216: the Turn on sheet previews a template with the business's
+    // own details before Website is on.
+    "sites/template-preview.controller.ts":
+        "previews a template before Website is on, to turn it on",
     "sites/public-qr.controller.ts":
         "a scan of a QR code's short link on a published site — no organization context",
     // A customer signs in on a merchant's site (ADR-011): sign-in is always
@@ -298,6 +314,11 @@ const NEVER: Record<string, string> = {
     // (`commerceOpen`), which answers 404, as a site with no shop does.
     "products/public-catalogue.controller.ts":
         "a published site's shop and product pages — Commerce checked by the service",
+    // #1375: a published site's share picture. Each kind is read through
+    // its own public read (the shop, the booking page), which answers 404
+    // when its module is off.
+    "share-posts/public-share.controller.ts":
+        "a published site's share picture — each kind's own read checks its module",
     // U23: "Tell me when it's back" and its stop page on a published site.
     "stock/stock-watch.controller.ts":
         "a published site's back-in-stock sign-up and stop page — Commerce checked by the service",
@@ -329,6 +350,8 @@ const NEVER: Record<string, string> = {
     "webhooks/webhooks.controller.ts": "provider webhook inbox",
     "messaging/msg91-webhook.controller.ts":
         "Saroh's own MSG91 delivery reports, across businesses",
+    "messaging/meta-webhook.controller.ts":
+        "Saroh's own WhatsApp delivery reports from Meta, across businesses",
     // P1: the buyer's browser reports a payment the moment the provider's
     // window closes. Never module-gated: a payment already taken is settled
     // whatever the business has switched off since.
@@ -399,6 +422,51 @@ const NEVER: Record<string, string> = {
     // Messaging core: Saroh's own sender's monthly counts, no business.
     "messaging/admin-messaging-usage.controller.ts":
         "staff control plane (Saroh's own sender's usage), not a tenant surface",
+    // Plan 2026-11-10-001 U5: the owner's API keys, gated by the API's own
+    // kill switches and plan rows, not by a module.
+    "api-keys/api-keys.controller.ts":
+        "the owner's API keys — the API's own flags and plan rows gate them, no module holds them",
+    // U14: this minute's calls and the caps, for Settings › API and AI apps › Usage.
+    "api-keys/api-usage.controller.ts":
+        "the API's usage read — gated by the API's own flags and plan rows, no module holds it",
+    // Plan 2026-11-10-001 U13: webhook endpoints, gated like the keys.
+    "outbound-webhooks/endpoints.controller.ts":
+        "webhook endpoints — the API_WEBHOOKS flag and the webhooks plan row gate them, no module holds them",
+    // Plan 2026-11-10-001 U7: the storefront API calls the same services
+    // as `/public/*`, which close with their module (a shop off is a 404).
+    "public-api/storefront.controller.ts":
+        "the storefront API — its services close with their module, as /public/* does",
+    // Plan 2026-11-10-001 U8: as the app's customers and enquiry reads.
+    "public-api/customers.v1.controller.ts":
+        "customers on /v1 — the app's customer workspace is never gated",
+    "public-api/enquiries.v1.controller.ts":
+        "enquiries and form entries on /v1 — read-only history",
+    // Plan 2026-11-10-001 U9: AI apps' sign-in and connections, gated by
+    // the API_MCP switch, not by a module.
+    "mcp/ai-connections.controller.ts":
+        "a person's AI app connections — the API_MCP switch gates them, no module holds them",
+    "mcp/oauth-flow.controller.ts":
+        "the accounts pages' half of an AI app's sign-in, before any business is in context",
+    "mcp/well-known.controller.ts":
+        "Saroh's OAuth discovery documents, not a tenant surface",
+    // U10: `/mcp` — each tool is authorized by its own capability.
+    "mcp/mcp.controller.ts":
+        "the MCP endpoint — the API_MCP switch gates it, each tool checks its own capability",
+    // Plan 2026-11-13-001 U5: Ask AI's Confirm, Undo and Draft again.
+    "ai/drafts/drafts.controller.ts":
+        "Ask AI's drafts — the ASK_AI switch gates them, each draft's tool checks its own module",
+    // U9: the panel — a question, Stop, a person's own history and language,
+    // and the business's switch. History stays readable with anything off.
+    "ai/ask-ai.controller.ts":
+        "Ask AI's panel — the ASK_AI switch, the plan's Ask AI row and ai:use gate a question, history stays readable",
+    // U7: Request more — the plan's Ask AI row and ASK_AI gate it, no module holds it.
+    "ai/requests/ai-requests.controller.ts":
+        "Ask AI's Request more — the ASK_AI switch and the plan gate it, no module holds it",
+    // U8: Report this answer — a person's own history, readable with anything off.
+    "ai/reports/ai-reports.controller.ts":
+        "Ask AI's Report this answer — the asker's own history, no module holds it",
+    "ai/ops/ai-admin.controller.ts":
+        "staff control plane (Ask AI's settings, halt, requests and reports), not a tenant surface",
 };
 
 /** Controllers with a test of their own below, not a row above. */

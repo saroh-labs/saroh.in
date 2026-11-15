@@ -21,6 +21,7 @@ import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
 import { activeCut, pausedByCut, pausedWords } from "@/lib/billing/paused";
 import { listCollections } from "@/lib/collections/service";
+import { formatMoneyMajor } from "@/lib/format/money";
 import { knownRoleName } from "@/lib/organizations/role-name";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { recordTitle } from "@/lib/page-title";
@@ -30,13 +31,14 @@ import {
     getProductOverview,
     withStorefrontFallback,
 } from "@/lib/products/overview";
-import { stockBadge } from "@/lib/products/overview-rules";
+import { priceLabel, stockBadge } from "@/lib/products/overview-rules";
 import { accessLine, shopProductUrl } from "@/lib/products/overview-words";
 import { listCategories } from "@/lib/products/service";
 import { listAllergens } from "@/lib/products/settings";
 import { countsStock, trackingControl } from "@/lib/products/tracking";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { readShareSetup } from "@/lib/share-item/read";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
 import type { ProductStock } from "@/lib/stock/product-stock";
 import { productStock } from "@/lib/stock/product-stock";
@@ -184,6 +186,7 @@ export default async function ProductPage({
         priceHistory,
         allergens,
         waiting,
+        shareSetup,
     ] = await Promise.all([
         // Its shelves at every storefront — optional: without them, the
         // Overview shows the address's storefront and the Stock tab says
@@ -219,7 +222,32 @@ export default async function ProductPage({
         view === "team" && tab === "stock"
             ? getWaitingCount(productId)
             : Promise.resolve(null),
+        // Share as a post (#1375): only for a page that is live.
+        shopUrl ? readShareSetup(web) : Promise.resolve(null),
     ]);
+    // The Offer card: a discount set on this product that is live now.
+    const offer =
+        overview.discounts.status === "ok"
+            ? overview.discounts.data.find(
+                  (d) => d.state === "ACTIVE" && d.appliesTo === "PRODUCT",
+              )
+            : undefined;
+    const share =
+        shareSetup && shopUrl && overview.product.slug
+            ? {
+                  setup: shareSetup,
+                  item: {
+                      kind: "product" as const,
+                      ref: overview.product.slug,
+                      name: overview.product.name,
+                      price: priceLabel(overview.price, (amount) =>
+                          formatMoneyMajor(amount, overview.product.currency),
+                      ),
+                      url: shopUrl,
+                      offerId: offer?.id ?? null,
+                  },
+              }
+            : null;
     const stock: ProductStock | null = levels
         ? productStock(levels, productId)
         : null;
@@ -247,6 +275,7 @@ export default async function ProductPage({
                 paused={isPaused}
                 view={view}
                 shopUrl={shopUrl}
+                share={share}
             />
             {isPaused ? (
                 <div className="border-b border-border px-4 py-2.5 sm:px-[22px]">

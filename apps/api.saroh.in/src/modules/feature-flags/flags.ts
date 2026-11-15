@@ -163,6 +163,40 @@ export const FlagKey = {
      * `GET /billing/offered`, which the workspace asks before it shows plans.
      */
     SAROH_BILLING_GLOBAL: "SAROH_BILLING_GLOBAL",
+
+    /**
+     * Choosing a website template (DEC-216, DEC-135): the API half of the
+     * workspace's `NEXT_PUBLIC_TEMPLATES`. On in local development, CI and
+     * the development environment; off in production until MCP testing
+     * ends. Off, an AI app's `create_site_from_template` starts from the
+     * kind's default template whatever it asked for, and `list_templates`
+     * says templates aren't chosen yet. Readers: `mcp/tools/site.tools.ts`.
+     */
+    SITE_TEMPLATE_CHOICE: "SITE_TEMPLATE_CHOICE",
+
+    /**
+     * The public API's kill switches (plan 2026-11-10-001), one per surface,
+     * each off for everyone until the release turns it on (U18); a business's
+     * override turns one on or off for it alone. Off, that surface answers
+     * 404. Global's keys and webhooks are held back by the plan gate, not
+     * here. Readers so far: `api-keys/api-keys.service.ts` (making or rolling
+     * a secret or publishable key). The surfaces' own guards come in U6–U13.
+     */
+    API_MCP: "API_MCP",
+    API_SECRET: "API_SECRET",
+    API_STOREFRONT: "API_STOREFRONT",
+    API_WEBHOOKS: "API_WEBHOOKS",
+
+    /**
+     * Ask AI (DEC-220): the rollout switch, off for everyone until the owner
+     * opens it, a business's override first (Saroh's own test business).
+     * Not the Saroh-wide halt: that is an AI setting the spend alarm sets,
+     * checked before this and ignoring overrides. Not `API_MCP` either, so
+     * switching off outside AI apps leaves Ask AI alone, and the reverse.
+     * Readers: none yet; the AI module asks it at turn start, before every
+     * provider round and at Confirm (plan 2026-11-13-001, U3–U5).
+     */
+    ASK_AI: "ASK_AI",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -216,6 +250,15 @@ const MODULE_ROLLOUT = (label: string): FlagMetadata => ({
     owner: "Release manager",
     reviewBy: "2027-03-31",
     removeWhen: `${label} is on for every business on every instance and has needed no kill switch for a release.`,
+});
+
+const API_SURFACE = (shownAs: string, what: string): FlagMetadata => ({
+    shownAs,
+    group: "safety",
+    purpose: `The kill switch for ${what}. Turn it on only after the release's security checks, Cloudflare rules and pentests have passed; off, that surface answers not found and its tab is hidden.`,
+    owner: "Release manager",
+    reviewBy: "2027-06-30",
+    removeWhen: `${shownAs} has been on for every business on every instance for a release with no need to switch it off.`,
 });
 
 export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
@@ -358,5 +401,41 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-03-31",
         removeWhen:
             "Saroh's plans have been on for every Global business for a release, and SarohBillsService no longer asks it.",
+    },
+    SITE_TEMPLATE_CHOICE: {
+        shownAs: "Website templates",
+        group: "feature",
+        purpose:
+            "Lets an AI app start a website from the template it chose (DEC-216). Turn it on in production with the workspace's NEXT_PUBLIC_TEMPLATES, once MCP testing ends; off, an AI app's new site starts from the default template for what the business is, as the workspace's does.",
+        owner: "Owner",
+        reviewBy: "2027-03-31",
+        removeWhen:
+            "Templates have been on in production for a release, NEXT_PUBLIC_TEMPLATES is gone, and site.tools.ts no longer asks it.",
+    },
+    API_MCP: API_SURFACE(
+        "AI apps (MCP)",
+        "AI assistants connecting to a business over MCP",
+    ),
+    API_SECRET: API_SURFACE(
+        "API keys",
+        "the secret-key API (/v1) and making secret keys",
+    ),
+    API_STOREFRONT: API_SURFACE(
+        "Website API keys",
+        "the read-only API a business's own website calls with a publishable key, and making those keys",
+    ),
+    API_WEBHOOKS: API_SURFACE(
+        "Webhooks",
+        "webhooks to a business's own systems",
+    ),
+    ASK_AI: {
+        shownAs: "Ask AI",
+        group: "feature",
+        purpose:
+            "Lets a business on a paying plan ask Ask AI about its own data and get drafts to confirm (DEC-220). Turn it on for Saroh's own test business first, and for merchants only once Anthropic has confirmed zero data retention in writing; off, Ask AI says \"Ask AI isn't available right now\" and its button stays, history is still readable, and nothing is counted.",
+        owner: "Owner",
+        reviewBy: "2027-06-30",
+        removeWhen:
+            "Ask AI has been on for every paying business on every instance for a release with no need to switch it off, and the AI module no longer asks it (the Saroh-wide halt stays).",
     },
 };

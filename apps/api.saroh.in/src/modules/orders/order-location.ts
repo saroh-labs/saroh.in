@@ -7,16 +7,28 @@ import { STOREFRONT_TEAM_ROLE_KEY } from "../organizations/storefront-team-role"
 /**
  * A location's team works that location's orders (DEC-074, amends F16).
  *
- * The "Storefront team" role (`storefront-team`) holds `order:stage`: the
- * kitchen's view of an order, with no money, and moving its stage. What it
- * reaches is narrowed to the storefronts the person works on — their
- * `StoreMembers` rows, the same grant F11's staff Home narrows by. Like a
- * Reviewer's sites (`reviewerScope`), the narrowing is a `where` spread into
- * every order lookup, so it can't be forgotten by a guard:
+ * The "Storefront team" role (`storefront-team`) holds `order:stage`,
+ * `order:create` and `order:edit` (owner, 13 Nov 2026): it takes, changes
+ * and moves orders, and — because taking or changing an order shows the
+ * whole of it — reads them with their money (`order:read`). What it reaches
+ * is narrowed to the storefronts the person works on: their `StoreMembers`
+ * rows, the same grant F11's staff Home narrows by. Like a Reviewer's sites
+ * (`reviewerScope`), the narrowing is a `where` spread into every order
+ * lookup, so it can't be forgotten by a guard:
  *
  * - a read of another location's order is a 404, as if it weren't there;
- * - a move of one (a stage, its Undo, a visit, the courier's details, a
- *   bulk move) is a 403 in words.
+ * - a move or change of one (a stage, its Undo, a visit, the courier's
+ *   details, an edit, a change of how it leaves, a pay link, a payment
+ *   recorded by hand, a bulk move) is a 403 in words;
+ * - a new order, or a payment, at another location, on the storefront
+ *   routes, is refused by `StoresService`, which asks the same rule of the
+ *   storefront.
+ *
+ * It takes payments for its own storefronts' orders at the counter (owner,
+ * 13 Nov 2026): cash, UPI or card with a new order, marking one paid, a
+ * payment recorded by hand, a pay link. Refunds, cancels and export stay
+ * with powers it doesn't hold (`order:refund`, `order:export`), and so do
+ * payment settings.
  *
  * Everyone else — every built-in role, and every role a business made — is
  * not narrowed: the scope is the role's, not the person's storefronts.

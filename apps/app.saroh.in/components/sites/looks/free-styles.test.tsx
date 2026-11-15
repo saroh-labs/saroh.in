@@ -138,6 +138,7 @@ function starter(over: Partial<StarterContentActions> = {}) {
     return {
         blocked: null,
         copy: vi.fn().mockResolvedValue({ ok: true }),
+        copyTemplate: vi.fn().mockResolvedValue({ ok: true }),
         fillDetails: vi.fn().mockResolvedValue(undefined),
         listVersions: vi.fn().mockResolvedValue({ ok: true, versions: [] }),
         rollback: vi.fn().mockResolvedValue({ ok: true }),

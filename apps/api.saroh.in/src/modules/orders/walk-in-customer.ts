@@ -6,6 +6,7 @@ import {
     normaliseEmail,
     normalisePhone,
 } from "../customer-workspace/duplicates";
+import { emitWebhook } from "../outbound-webhooks/emitter";
 
 /**
  * A walk-in who gives their phone is a customer (B13b, the user's rule of
@@ -240,6 +241,11 @@ export async function walkInCustomerInTx(
             source: `store-customer:${customer.id}`,
         },
         select: { id: true },
+    });
+    await emitWebhook(tx, {
+        organizationId: organizationId,
+        type: "customer.created",
+        id: contact.id,
     });
     await tx.customerIdentityLink.create({
         data: {

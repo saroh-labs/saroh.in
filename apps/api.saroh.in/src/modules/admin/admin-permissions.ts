@@ -121,6 +121,14 @@ export const AdminPermission = {
     // of which can rebuild the site (DEC-193). Platform Owners only: no
     // role owns the marketing site yet.
     SearchPagesPublish: "search-pages:publish",
+    // Ask AI's reports (DEC-220, U8): the question and answer a person
+    // reported, personal data. Platform Owners and Support; each one
+    // opened is on the admin ledger.
+    AiReportsRead: "ai-reports:read",
+    // Ask AI's settings, the Saroh-wide halt, a business's override, and
+    // granting Request more (a paid add-on for the period). Platform
+    // Owners only: no other role carries it.
+    AiSettingsWrite: "ai-settings:write",
 } as const;
 
 export type AdminPermission =
@@ -161,6 +169,8 @@ const ROLE_PERMISSIONS = {
         AdminPermission.SarohLeadsRead,
         AdminPermission.SarohLeadsWrite,
         AdminPermission.PeopleSignInHelp,
+        // Ask AI's reports: Support reads what people reported (U8).
+        AdminPermission.AiReportsRead,
     ],
     [AdminRole.Operations]: [
         AdminPermission.PlatformRead,

@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free unit tests for the customer's booking page (U19): the page's read,
 // its two weeks of days, pay now (a hold and its draft invoice) and pay at
 // the desk. @saroh/database is mocked; `$transaction` runs its callback on the
@@ -17,7 +19,11 @@ jest.mock("@saroh/database", () => {
             update: jest.fn(),
             count: jest.fn().mockResolvedValue(0),
         },
-        contact: { upsert: jest.fn(), update: jest.fn() },
+        contact: {
+            findUnique: jest.fn().mockResolvedValue(null),
+            upsert: jest.fn(),
+            update: jest.fn(),
+        },
         bookingEvent: { create: jest.fn().mockResolvedValue({ id: "ev_1" }) },
         job: { create: jest.fn() },
         invoice: {

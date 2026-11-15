@@ -323,9 +323,31 @@ export class PublicCheckoutService {
         dto: CheckoutStartDto,
     ): Promise<CheckoutStarted> {
         if (customer.siteId !== siteId) throw signedOut();
+        return this.startAs(
+            siteId,
+            customer.organizationId,
+            () => this.account(customer),
+            clientHash,
+            dto,
+        );
+    }
+
+    /**
+     * {@link start} for whoever `accountOf` names, at a site of
+     * `organizationId`: the session's account, or a storefront API guest
+     * (plan 2026-11-10-001, U7), whose order names no account. Read inside
+     * the shop's organization context.
+     */
+    async startAs(
+        siteId: string,
+        organizationId: string,
+        accountOf: () => Promise<SiteAccount>,
+        clientHash: string,
+        dto: CheckoutStartDto,
+    ): Promise<CheckoutStarted> {
         if (!this.startLimiter.take(clientHash)) throw tooManyRequests();
         return this.inShop(siteId, async (scope) => {
-            if (scope.organizationId !== customer.organizationId) {
+            if (scope.organizationId !== organizationId) {
                 throw signedOut();
             }
             // Not taking orders — a paused site (#800), or a business
@@ -346,7 +368,7 @@ export class PublicCheckoutService {
                     details: { reason: "cant-order" },
                 });
             }
-            const account = await this.account(customer);
+            const account = await accountOf();
 
             // The same key again: the same order, and the same intent.
             const existing = await prisma.order.findUnique({

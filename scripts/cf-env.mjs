@@ -134,7 +134,10 @@ export function appRoutes(appDir, environment) {
 if (import.meta.url === `file://${process.argv[1]}`) {
     // `--routes`: "zone pattern" lines for the deploy's fail-open step.
     if (process.argv[2] === "--routes") {
-        for (const r of appRoutes(process.argv[3], process.argv[4])) {
+        // A custom domain is the Worker's own origin: nothing to fall through to.
+        for (const r of appRoutes(process.argv[3], process.argv[4]).filter(
+            (route) => !route.custom_domain,
+        )) {
             console.log(`${r.zone_name} ${r.pattern}`);
         }
         process.exit(0);

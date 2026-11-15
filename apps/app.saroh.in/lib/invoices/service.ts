@@ -525,6 +525,10 @@ export interface InvoiceListAsk {
     /** One pack's or course's, as `listInvoicesIn` reads them (D18). */
     packId?: string;
     courseId?: string;
+    /** Issued in a preset, or between two days (`dateRangeAsk`). */
+    date?: string;
+    from?: string;
+    to?: string;
 }
 
 /**

@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { isTypingIn } from "@/lib/editor-shell/address";
+import {
+    isTypingIn,
+    leavePlace,
+    placeWaiting,
+    takePlace,
+} from "@/lib/editor-shell/address";
 import { Autosave } from "@/lib/editor-shell/autosave";
 import type { SaveState } from "@/lib/editor-shell/state";
 import { initialSave } from "@/lib/editor-shell/state";
@@ -42,6 +47,13 @@ export function useAutosave<V>({
     const [record, setRecord] = useState(initial);
     const [values, setValues] = useState<V>(initial?.values ?? emptyValues);
     const [firstSave, setFirstSave] = useState(false);
+    // Mounted where a record just made moved its address: this page carries
+    // that record on, it isn't a draft opened again (`lib/editor-shell/address.ts`).
+    const [continued] = useState(
+        () =>
+            typeof window !== "undefined" &&
+            placeWaiting(window.location.pathname + window.location.search),
+    );
     const [save, setSave] = useState<SaveState>(() =>
         initialSave(initial?.revision ?? null),
     );
@@ -58,7 +70,35 @@ export function useAutosave<V>({
         const href = pendingHref.current;
         if (!href) return;
         pendingHref.current = null;
+        // Next mounts the edit route at the new address: leave it this
+        // page's place to take up (`lib/editor-shell/address.ts`).
+        const focused = document.activeElement;
+        leavePlace(
+            href,
+            window.scrollY,
+            focused instanceof HTMLElement && focused.id ? focused.id : null,
+        );
         window.history.replaceState(null, "", href);
+    }, []);
+
+    // Mounted at an address a new record just moved to: carry on from
+    // where that page was, not from the top.
+    useEffect(() => {
+        const place = takePlace(
+            window.location.pathname + window.location.search,
+        );
+        if (!place) return;
+        const restore = () => {
+            window.scrollTo({ top: place.y });
+            if (place.focus)
+                document
+                    .getElementById(place.focus)
+                    ?.focus({ preventScroll: true });
+        };
+        const frame = requestAnimationFrame(() =>
+            requestAnimationFrame(restore),
+        );
+        return () => cancelAnimationFrame(frame);
     }, []);
 
     const [ctrl] = useState(
@@ -199,6 +239,7 @@ export function useAutosave<V>({
         values,
         save,
         firstSave,
+        continued,
         edit,
         flush,
         retry,

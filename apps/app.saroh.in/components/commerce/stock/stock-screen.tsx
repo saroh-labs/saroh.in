@@ -19,6 +19,7 @@ import {
 } from "@/lib/stock/screen";
 import { countStock, undoStock } from "@/lib/stock/screen-actions";
 import type { StockChecks, StockLevels, StockLog } from "@/lib/stock/service";
+import type { DateRange } from "@/lib/views/date-range";
 import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
 import { Notice } from "@saroh/ui/notice";
@@ -65,7 +66,7 @@ export function StockScreen({
     storefronts: { id: string; name: string }[];
     checks: StockChecks | "failed";
     log: StockLog | "failed" | null;
-    logFilter: { kind: LogKindId; store: string; product: string };
+    logFilter: { kind: LogKindId; store: string; product: string } & DateRange;
     products: { id: string; name: string }[];
     canWrite: boolean;
     /** Each list's page and rows per page, as the address has them. */
@@ -78,11 +79,14 @@ export function StockScreen({
     const attempt = useRef<string | null>(null);
 
     /** This screen's address with some of its parts changed. */
-    const { kind, store, product } = logFilter;
+    const { kind, store, product, date, from, to } = logFilter;
     const href = useCallback<StockHref>(
         (change) =>
-            stockHref({ tab, show, q, kind, store, product, pages }, change),
-        [tab, show, q, kind, store, product, pages],
+            stockHref(
+                { tab, show, q, kind, store, product, date, from, to, pages },
+                change,
+            ),
+        [tab, show, q, kind, store, product, date, from, to, pages],
     );
 
     // Cancel offers Undo, which puts the typed numbers back (`useCountMode`).

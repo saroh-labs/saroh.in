@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { StockLog, StockLogEntry } from "@/lib/stock/service";
+import type { DateRange } from "@/lib/views/date-range";
 
 import { LogList } from "./log-list";
 
@@ -46,7 +47,11 @@ function entry(over: Partial<StockLogEntry> = {}): StockLogEntry {
 
 function render(
     entries: StockLogEntry[],
-    { total, page = 1 }: { total?: number; page?: number } = {},
+    {
+        total,
+        page = 1,
+        dates = {},
+    }: { total?: number; page?: number; dates?: Partial<DateRange> } = {},
 ) {
     const log: StockLog = {
         entries,
@@ -59,7 +64,15 @@ function render(
     return renderToStaticMarkup(
         <LogList
             log={log}
-            filter={{ kind: "all", store: "all", product: "" }}
+            filter={{
+                kind: "all",
+                store: "all",
+                product: "",
+                date: null,
+                from: null,
+                to: null,
+                ...dates,
+            }}
             storefronts={[
                 { id: "s1", name: "Hill Road" },
                 { id: "s2", name: "Online" },
@@ -187,5 +200,31 @@ describe("LogList on a phone", () => {
         expect(html).not.toContain(">Everything<");
         // One row: no chips under it, no tabs.
         expect(html).not.toMatch(/role="(?:tab|radio)"|data-slot="list-chips"/);
+    });
+});
+
+describe("LogList's date filter", () => {
+    it("is the last dropdown, with a custom range's two days", () => {
+        const html = render([entry()], {
+            total: 1,
+            dates: { date: "custom", from: "2026-08-01", to: "2026-10-31" },
+        });
+        expect(html.indexOf('aria-label="Date"')).toBeGreaterThan(
+            html.indexOf('aria-label="Product"'),
+        );
+        expect(html).toContain("Custom range…");
+        expect(html).toContain('aria-label="From"');
+        expect(html).toContain('aria-label="To"');
+        // A range narrows the log: the way back is offered.
+        expect(html).toContain("Clear filters");
+    });
+
+    it("says an empty range as a filter, never 'No stock changes yet'", () => {
+        const html = render([], {
+            total: 0,
+            dates: { date: "7d" },
+        });
+        expect(html).toContain("No stock changes match these filters");
+        expect(html).not.toContain("No stock changes yet");
     });
 });

@@ -77,6 +77,15 @@
         // Choosing a template for a new website (DEC-135): "on" here.
         // Production leaves it out, which is off: no template picker.
         "NEXT_PUBLIC_TEMPLATES": "on",
+        // Settings › API and AI apps (#1357): "on" here, on development.
+        // Production leaves it out, which is off: no tab, no page.
+        "NEXT_PUBLIC_API_AREA": "on",
+        // Share as a post and Create post (DEC-217): "on" here, on
+        // development. Production leaves it out, which is off.
+        "NEXT_PUBLIC_SHARE_POSTS": "on",
+        // Ask AI's screens (DEC-220): "on" here, on development; the API's
+        // ASK_AI flag still decides who may ask. Production leaves it out.
+        "NEXT_PUBLIC_ASK_AI": "on",
     },
     "env": {
         "production": {

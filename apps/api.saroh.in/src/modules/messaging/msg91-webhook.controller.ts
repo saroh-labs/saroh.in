@@ -8,34 +8,15 @@ import {
     Post,
     UnauthorizedException,
 } from "@nestjs/common";
-import type { MessagingSendStatus } from "@saroh/database";
-import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import { phoneE164 } from "@saroh/block-contract";
 
-import { prismaErrorCode } from "../../common/prisma-errors";
 import { env } from "../../env";
-import { noteInbound, numberHash } from "./messaging-records";
+import { applyInbound, applyStatus } from "./delivery-reports";
 import { WalletService } from "./wallet.service";
 
 /** The header the owner adds in MSG91's webhook settings, carrying `MSG91_WEBHOOK_SECRET`. */
 export const MSG91_SECRET_HEADER = "x-saroh-webhook-secret";
-
-/** The statuses a report may move a send from: forward only, never back. */
-const FROM: Partial<Record<string, MessagingSendStatus[]>> = {
-    SENT: ["QUEUED"],
-    DELIVERED: ["QUEUED", "SENT"],
-    READ: ["QUEUED", "SENT", "DELIVERED"],
-    FAILED: ["QUEUED", "SENT"],
-};
-
-/** When each status was reached, on a MessagingMessage. */
-const STAMP = {
-    SENT: "sentAt",
-    DELIVERED: "deliveredAt",
-    READ: "readAt",
-    FAILED: "failedAt",
-} as const;
 
 interface Msg91Report {
     requestId?: unknown;
@@ -51,15 +32,8 @@ interface Msg91Report {
 /**
  * PUBLIC, platform-level MSG91 WhatsApp webhook (DEC-191, #1243; messaging
  * core, 27 Oct): Saroh's own MSG91 account posts every send's status and
- * every inbound message here, so there is no business in the URL.
- * - A verification send (MessagingSend) is found by its MSG91 id across
- *   businesses: DELIVERED (or READ first) charges the held price once,
- *   FAILED gives it back.
- * - Any other send (MessagingMessage) gets its status and its time.
- * - An inbound message opens the number's 24-hour reply window (stored by
- *   the number's hash, never the number or the words).
- * Statuses only move forward, and each event (MSG91's id plus the status)
- * is recorded once it is applied, so a repeat is a no-op.
+ * every inbound message here, so there is no business in the URL. What
+ * each report changes is `delivery-reports.ts`, shared with Meta's webhook.
  *
  * MSG91 documents no signature, only custom headers sent with every report
  * (https://msg91.com/help/webhook-new/how-to-receive-whatsapp-delivery-reports-via-webhook-new),
@@ -93,92 +67,17 @@ export class Msg91WebhookController {
         const uuid = text(r.uuid);
         if (isInbound(r)) {
             const number = text(r.customerNumber);
-            if (!uuid || !number || (await this.seen(uuid, "INBOUND"))) return;
+            if (!number) return;
             // As our sends hash it: "9845012345" and "919845012345" are one number.
-            await noteInbound(numberHash(phoneE164(number)), inboundAt(r.ts));
-            await this.record(uuid, "INBOUND");
+            await applyInbound(uuid, phoneE164(number), inboundAt(r.ts));
             return;
         }
-
-        const status =
-            typeof r.eventName === "string" ? r.eventName.toUpperCase() : "";
-        const from = FROM[status];
         // Our send stored MSG91's request id (or its message uuid); either matches.
-        const ids = [text(r.requestId), uuid].filter(Boolean);
-        if (!from || ids.length === 0) return;
-        const eventId = ids[0];
-        if (await this.seen(eventId, status)) return;
-
-        await prisma.messagingMessage.updateMany({
-            where: { providerMessageId: { in: ids }, status: { in: from } },
-            data: {
-                status: status as MessagingSendStatus,
-                [STAMP[status as keyof typeof STAMP]]: new Date(),
-                ...(status === "FAILED"
-                    ? { failureReason: failureCode(r.reason) }
-                    : {}),
-            },
+        await applyStatus(this.wallet, {
+            ids: [text(r.requestId), uuid],
+            status: typeof r.eventName === "string" ? r.eventName : "",
+            failureReason: failureCode(r.reason),
         });
-        await this.applyVerificationSend(ids, status, from, r.reason);
-        await this.record(eventId, status);
-    }
-
-    private async applyVerificationSend(
-        ids: string[],
-        status: string,
-        from: MessagingSendStatus[],
-        reason: unknown,
-    ): Promise<void> {
-        const send = await outsideOrgContext(() =>
-            prisma.messagingSend.findFirst({
-                where: { providerMessageId: { in: ids } },
-                select: { id: true, organizationId: true, channel: true },
-            }),
-        );
-        if (!send) return;
-
-        await runInOrgContext(send.organizationId, () =>
-            prisma.messagingSend.updateMany({
-                where: { id: send.id, status: { in: from } },
-                data: {
-                    status: status as MessagingSendStatus,
-                    ...(status === "FAILED"
-                        ? { failureReason: failureCode(reason) }
-                        : {}),
-                },
-            }),
-        );
-
-        // SMS reports are status only; the wallet settles each send once.
-        if (send.channel !== "WHATSAPP") return;
-        if (status === "DELIVERED" || status === "READ") {
-            await this.wallet.debit(send.id);
-        } else if (status === "FAILED") {
-            await this.wallet.release(send.id);
-        }
-    }
-
-    private async seen(eventId: string, status: string): Promise<boolean> {
-        const row = await prisma.messagingWebhookEvent.findUnique({
-            where: { eventId_status: { eventId, status } },
-            select: { id: true },
-        });
-        return !!row;
-    }
-
-    /**
-     * Written after the event is applied: every step above is idempotent on
-     * its own, so a crash before this line only means the repeat runs them
-     * again, and a duplicate arriving at once loses here harmlessly.
-     */
-    private async record(eventId: string, status: string): Promise<void> {
-        try {
-            await prisma.messagingWebhookEvent.create({
-                data: { eventId, status },
-            });
-        } catch (error) {
-            if (prismaErrorCode(error) !== "P2002") throw error;
-        }
     }
 }
 

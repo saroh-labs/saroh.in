@@ -241,7 +241,7 @@ describe("a business's Overview (U3)", () => {
         render(<Overview />);
         for (const title of [
             "Plan and access",
-            "Usage this month",
+            "Usage this period",
             "Modules",
             "Website and payments",
             "Team",

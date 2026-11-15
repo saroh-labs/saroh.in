@@ -555,6 +555,11 @@ export interface PlanLockedStateProps extends Omit<
     title?: React.ReactNode;
     /** A second way on, beside the plan link (a way back). */
     secondary?: React.ReactNode;
+    /**
+     * In place of the plan link, where no plan can be chosen yet (an
+     * edition before its paid plans): its own ask, such as "Tell me when".
+     */
+    way?: React.ReactNode;
 }
 
 /**
@@ -572,6 +577,7 @@ export function PlanLockedState({
     icon = <Gem />,
     description = planLocked.body,
     secondary,
+    way,
     size = "page",
     ...props
 }: PlanLockedStateProps) {
@@ -586,16 +592,17 @@ export function PlanLockedState({
             description={description}
             action={
                 <Actions size={size}>
-                    {canChangePlan ? (
-                        <StateAction
-                            size={size}
-                            label={planLabel(plan)}
-                            href={href}
-                            variant="default"
-                        />
-                    ) : (
-                        <WhoLine size={size}>{WHO_CAN_CHANGE_PLAN}</WhoLine>
-                    )}
+                    {way ??
+                        (canChangePlan ? (
+                            <StateAction
+                                size={size}
+                                label={planLabel(plan)}
+                                href={href}
+                                variant="default"
+                            />
+                        ) : (
+                            <WhoLine size={size}>{WHO_CAN_CHANGE_PLAN}</WhoLine>
+                        ))}
                     {secondary}
                 </Actions>
             }

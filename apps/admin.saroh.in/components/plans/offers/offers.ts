@@ -100,6 +100,11 @@ export const ADDON_KIND_WORDS: Record<
         unit: "connection",
         name: "Extra integrations",
     },
+    "ask-ai": {
+        label: "Ask AI questions a month",
+        unit: "question a month",
+        name: "More Ask AI questions",
+    },
     module: { label: "A module on its own", unit: "module", name: "" },
 };
 
@@ -109,6 +114,7 @@ export const ADDON_KIND_ORDER: AddonKind[] = [
     "orders",
     "bookings",
     "integrations",
+    "ask-ai",
     "module",
 ];
 

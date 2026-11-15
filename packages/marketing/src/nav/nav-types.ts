@@ -6,7 +6,7 @@ export interface NavItem {
     href: string;
     /** Its column's heading in a desk menu; the other menus and lists ignore it. */
     group?: string;
-    /** The footer's small "new" tag beside it. */
+    /** The small "new" tag beside it, in the menus and the footer. */
     isNew?: boolean;
 }
 

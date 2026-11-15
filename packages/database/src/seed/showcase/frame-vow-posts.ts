@@ -547,7 +547,7 @@ const PHOTOS = {
 type PhotoKey = keyof typeof PHOTOS;
 
 function src(key: PhotoKey): string {
-    return `https://images.unsplash.com/${PHOTOS[key].id}?w=1600&q=80&auto=format&fit=crop`;
+    return `https://media.saroh.io/demo/${PHOTOS[key].id}.jpg`;
 }
 
 /** The cover a post index and share card show, credited to its photographer. */

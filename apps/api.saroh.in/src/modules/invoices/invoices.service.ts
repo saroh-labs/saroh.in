@@ -16,6 +16,7 @@ import {
 } from "../billing/online-payments-plan";
 import { businessTimezone } from "../bookings/staff-availability";
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { asksDates, listRange } from "../orders/order-list-filters";
 import { businessPayInstructionsOf } from "../organizations/business-pay-instructions";
 import { authorize } from "../organizations/organization-policy";
 import {
@@ -272,14 +273,14 @@ export class InvoicesService {
         const now = new Date();
         const organizationId = ctx.organizationId;
         const { q, paidFrom: paidFromDay } = query;
-        const [search, paidFrom] = await Promise.all([
-            q ? this.searchFor(organizationId, q) : null,
-            paidFromDay
-                ? businessTimezone(prisma, organizationId).then((zone) =>
-                      startOfDayIn(paidFromDay, zone),
-                  )
-                : null,
-        ]);
+        const zone =
+            paidFromDay || asksDates(query)
+                ? await businessTimezone(prisma, organizationId)
+                : "UTC";
+        // Issued in the range, in the business's zone (Orders' rule).
+        const issued = listRange(query, zone, now);
+        const search = q ? await this.searchFor(organizationId, q) : null;
+        const paidFrom = paidFromDay ? startOfDayIn(paidFromDay, zone) : null;
         // What it was for (D18), then search and Paid this month (DEC-173,
         // U4), all ANDed on: each brings its own OR, and hidden drafts stay
         // hidden. Searched on the server, so an invoice older than the
@@ -289,6 +290,9 @@ export class InvoicesService {
             ...((narrowed.AND as Prisma.InvoiceWhereInput[] | undefined) ?? []),
             ...(search ? [search] : []),
             ...(paidFrom ? [paidFromWhere(paidFrom)] : []),
+            ...(issued.gte || issued.lt
+                ? [{ issuedAt: { gte: issued.gte, lt: issued.lt } }]
+                : []),
             // Home's money figures' link: the same money-in rule from an
             // instant (`money-in.ts`).
             ...(query.paidSince

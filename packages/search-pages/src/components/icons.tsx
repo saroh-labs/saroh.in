@@ -116,6 +116,23 @@ const ALSO: Record<AlsoIcon, React.ReactNode> = {
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
         </>
     ),
+    chat: (
+        <path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H10l-4 3v-3H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+    ),
+    ask: (
+        <>
+            <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+            <circle cx="12" cy="12" r="4" />
+        </>
+    ),
+    share: (
+        <>
+            <circle cx="18" cy="5" r="2.5" />
+            <circle cx="6" cy="12" r="2.5" />
+            <circle cx="18" cy="19" r="2.5" />
+            <path d="m8.2 10.8 7.6-4.4M8.2 13.2l7.6 4.4" />
+        </>
+    ),
 };
 
 export function AlsoSvg({ icon }: { icon: AlsoIcon }) {

@@ -9,6 +9,7 @@ import { env } from "../../env";
 import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-freshness";
 import { signedUp } from "../../modules/analytics/product-milestones";
 import { noticeProfilesOfDeletedOwnerInTx } from "../../modules/billing/billing-profile-owner";
+import { oauthGate } from "../../modules/mcp/oauth-gate";
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
@@ -136,12 +137,15 @@ const instanceByAddress = new Map<string, Auth>();
  * right for every address; what differs is the cookie a sign-in sets.
  */
 export function authFor(host: string | null | undefined): Auth {
-    const address = otherAuthAddress(host, env.BETTER_AUTH_URL);
+    // An edition's MCP address (`mcp.<edition>`) is served by that edition's
+    // sign-in instance: its tokens' issuer and resource (U9).
+    const name = host?.trim().replace(/^mcp\./i, "api.");
+    const address = otherAuthAddress(name, env.BETTER_AUTH_URL);
     if (!address) return auth;
     let instance = instanceByAddress.get(address);
     if (!instance) {
         instance = createAuth({
-            ...servicesFor(authEditionOf(host, env.BETTER_AUTH_URL)),
+            ...servicesFor(authEditionOf(name, env.BETTER_AUTH_URL)),
             baseURL: address,
         });
         instanceByAddress.set(address, instance);
@@ -157,5 +161,7 @@ export function authOfEdition(edition: Edition | null | undefined): Auth {
 /** What `/api/auth/*` is mounted on: `auth`, answering by address. */
 export const mountedAuth: Auth = {
     ...auth,
-    handler: (request) => authFor(request.headers.get("host")).handler(request),
+    handler: async (request) =>
+        (await oauthGate(request)) ??
+        authFor(request.headers.get("host")).handler(request),
 };

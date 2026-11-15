@@ -22,8 +22,9 @@ export function storefrontNoticeTitle(count: number, roleLabel: string) {
  * Team's one-time notice after storefront people were put on the team
  * (F16, DEC-048 amended 2026-09-27). One roster underneath: everyone who
  * works on a storefront is now on the business's team, in the narrow
- * Storefront team role — their storefront's orders without the money
- * (DEC-074), and no customers, bookings or money. The owner
+ * Storefront team role — taking, changing and moving their storefront's
+ * orders and taking their payments (DEC-074; owner, 13 Nov 2026), and no
+ * refunds, customers or bookings. The owner
  * is told who, and can change anyone's role from here, so any widening is
  * on purpose.
  *
@@ -77,10 +78,10 @@ export function StorefrontTeamNotice({
                         data-ph-unmask=""
                         className="mt-0.5 text-[12px] leading-[1.5] text-muted-foreground"
                     >
-                        They can see the team, and see and move their own
-                        location&apos;s orders, but not customers, bookings or
-                        money. What they do in their location hasn&apos;t
-                        changed. Change a role if someone needs more.
+                        They can see the team, and take, change and move their
+                        own location&apos;s orders and take payments for them,
+                        but not refunds, customers or bookings. Change a role if
+                        someone needs more.
                     </p>
                 </div>
                 <Button

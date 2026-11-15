@@ -4,6 +4,9 @@ jest.mock("../../common/guards/better-auth.guard", () => ({
 jest.mock("../../common/guards/platform-admin.guard", () => ({
     PlatformAdminGuard: class PlatformAdminGuard {},
 }));
+// The module now reaches Ask AI's (U8), and through it MCP's, which loads
+// Better Auth (ESM, not loadable here); this reads route metadata only.
+jest.mock("../mcp/mcp.module", () => ({ McpModule: class McpModule {} }));
 
 import { PATH_METADATA } from "@nestjs/common/constants";
 

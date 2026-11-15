@@ -1,18 +1,26 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { byComingGroup } from "@/content/coming";
 import {
-    liveIntegrations,
     integrationsIndex as page,
     plannedIntegrations,
+    shownIntegrations,
 } from "@/content/integrations";
 
 import ProviderPage, { generateMetadata } from "./[provider]/page";
 import IntegrationsPage, { metadata } from "./page";
 
-afterEach(cleanup);
+// The switches this "build" has off: each test sets them (U7).
+const switches = vi.hoisted(() => ({ off: [] as string[] }));
+vi.mock("@/lib/feature-switches", () => ({ featuresOff: () => switches.off }));
+vi.mock("@/env", () => ({ env: {} }));
+
+afterEach(() => {
+    cleanup();
+    switches.off = [];
+});
 
 describe("/integrations", () => {
     it("has one H1 and its own canonical", () => {
@@ -22,16 +30,17 @@ describe("/integrations", () => {
         expect(metadata.description).toBeTruthy();
     });
 
-    it("gives each live card one link, to its page, and no second Connect", () => {
+    it("gives each shown card one link, to its page, and no second Connect", () => {
+        const shown = shownIntegrations(switches.off);
         const { container } = render(IntegrationsPage());
         const cards = Array.from(container.querySelectorAll("li > a"));
         expect(cards.map((a) => a.getAttribute("href"))).toEqual(
-            liveIntegrations.map((i) => `/integrations/${i.slug}`),
+            shown.map((i) => i.href),
         );
         cards.forEach((card, i) => {
-            const item = liveIntegrations[i];
+            const item = shown[i];
             expect(card.textContent).toContain(item.cta);
-            expect(card.textContent).toContain(`Connect in ${item.where}`);
+            expect(card.textContent).toContain(item.connect);
             expect(card.textContent).not.toMatch(/\bConnect\b(?! in)/);
             expect(card.querySelectorAll("a, button")).toHaveLength(0);
         });
@@ -101,8 +110,77 @@ describe("/integrations", () => {
     });
 });
 
+describe("/integrations with the AI apps switch", () => {
+    function pageWith(aiApps: "on" | "off") {
+        switches.off = aiApps === "on" ? [] : ["ai-apps"];
+        return IntegrationsPage;
+    }
+
+    it("off: today's flat list, with no AI app and no group heading", () => {
+        const Page = pageWith("off");
+        const { container } = render(Page());
+        expect(screen.getByText(page.intro)).toBeTruthy();
+        expect(
+            Array.from(container.querySelectorAll("li > a")).map((a) =>
+                a.getAttribute("href"),
+            ),
+        ).toEqual([
+            "/integrations/razorpay",
+            "/integrations/cashfree",
+            "/integrations/email",
+        ]);
+        expect(screen.queryByRole("heading", { name: "AI apps" })).toBeNull();
+        expect(container.textContent).not.toMatch(/Claude|ChatGPT/);
+    });
+
+    it("on: the AI apps group first, a card per walked app, then Payments and email", () => {
+        const Page = pageWith("on");
+        const { container } = render(Page());
+        expect(screen.getByText(page.introWithAi)).toBeTruthy();
+        const groups = screen
+            .getAllByRole("heading", { level: 2 })
+            .map((h) => h.textContent);
+        expect(groups.slice(0, 2)).toEqual(["AI apps", "Payments and email"]);
+        const ai = screen
+            .getByRole("heading", { name: "AI apps" })
+            .closest("section");
+        if (!ai) throw new Error("no AI apps group");
+        expect(
+            Array.from(ai.querySelectorAll("li > a")).map((a) =>
+                a.getAttribute("href"),
+            ),
+        ).toEqual(["/integrations/claude", "/integrations/chatgpt"]);
+        // The group's own link, to what AI apps can do.
+        expect(
+            within(ai)
+                .getByRole("link", { name: /How AI apps work with Saroh/ })
+                .getAttribute("href"),
+        ).toBe("/features/ai-apps");
+        // A card whose dev sign-in walk isn't done is never shown.
+        expect(container.textContent).not.toMatch(/Perplexity|Zapier|n8n/);
+    });
+});
+
+describe("shownIntegrations", () => {
+    it("hides an AI app card until its dev sign-in walk, and the group while the switch is off", () => {
+        const on = shownIntegrations([]).map((c) => c.slug);
+        expect(on).toEqual([
+            "claude",
+            "chatgpt",
+            "razorpay",
+            "cashfree",
+            "email",
+        ]);
+        expect(shownIntegrations(["ai-apps"]).map((c) => c.slug)).toEqual([
+            "razorpay",
+            "cashfree",
+            "email",
+        ]);
+    });
+});
+
 describe("/integrations/[provider]", () => {
-    it.each(["razorpay", "cashfree", "email"])(
+    it.each(["razorpay", "cashfree", "email", "claude", "chatgpt"])(
         "%s renders its steps and never links to itself",
         async (provider) => {
             const params = Promise.resolve({ provider });
@@ -131,7 +209,13 @@ describe("/integrations/[provider]", () => {
     );
 
     it("names no plan on any page", async () => {
-        for (const provider of ["razorpay", "cashfree", "email"]) {
+        for (const provider of [
+            "razorpay",
+            "cashfree",
+            "email",
+            "claude",
+            "chatgpt",
+        ]) {
             const params = Promise.resolve({ provider });
             const { container } = render(await ProviderPage({ params }));
             expect(container.textContent).not.toMatch(
@@ -139,5 +223,49 @@ describe("/integrations/[provider]", () => {
             );
             cleanup();
         }
+    });
+});
+
+describe("/integrations/claude and /integrations/chatgpt", () => {
+    it.each(["claude", "chatgpt"])(
+        "%s sits under AI apps, points to what AI apps can do, and draws Saroh's own screens",
+        async (provider) => {
+            const params = Promise.resolve({ provider });
+            const { container } = render(await ProviderPage({ params }));
+            expect(container.textContent).toContain("AI apps");
+            expect(
+                screen
+                    .getByRole("link", { name: /See what AI apps can do/ })
+                    .getAttribute("href"),
+            ).toBe("/features/ai-apps");
+            const panels = Array.from(container.querySelectorAll("figure")).map(
+                (f) => f.getAttribute("aria-label"),
+            );
+            expect(panels).toEqual([
+                expect.stringMatching(
+                    /^Step 1 in (Claude|ChatGPT) › Connectors$/,
+                ),
+                "Step 2 in Saroh › Sign in",
+                "Step 3 in Saroh › Connect an app",
+                "Step 4 in Saroh › Allow an app",
+            ]);
+            expect(container.textContent).toContain("https://mcp.saroh.in/mcp");
+            // Unconfirmed third-party words stay out (plan: [CHECK] marks).
+            expect(container.textContent).not.toMatch(
+                /\[CHECK|Customize ›|Plugins/,
+            );
+        },
+    );
+
+    it("draws no link to a Help article that isn't live", async () => {
+        const params = Promise.resolve({ provider: "claude" });
+        const { container } = render(await ProviderPage({ params }));
+        const hrefs = Array.from(container.querySelectorAll("a")).map((a) =>
+            a.getAttribute("href"),
+        );
+        const { helpArticles } = await import("@/lib/help-docs");
+        const exists = helpArticles().some((a) => a.slug === "connect-claude");
+        if (!exists) expect(hrefs).not.toContain("/help/connect-claude");
+        expect(hrefs).toContain("/integrations/chatgpt");
     });
 });

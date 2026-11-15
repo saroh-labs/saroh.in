@@ -34,7 +34,7 @@ what the API allows.
 | Role       | What it may do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `OWNER`    | Everything, including `org:delete`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update` and `billing:manage` (it reads Plan and billing with `billing:read`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `ADMIN`    | Everything except the owner-only powers: `org:delete`, `org:address:update`, `billing:manage` and `apikey:manage` (it reads Plan and billing with `billing:read`), and `webhook:manage`, which is the Owner's by default but may be given to an Admin as an extra or to a custom role (`OWNER_DEFAULT_ACTIONS`).                                                                                                                                                                                                                                                                                                                      |
 | `MEMBER`   | The read-only floor: `org:read`, `member:read`, `store:read`, `site:read`, `media:read`, `module:read`, and the diary — `booking:read`, `service:read`, `contact:read` (DEC-020) — plus `order:stage` (DEC-024, adopted): an order's kitchen view without money, and moving its stage; and the front desk (DEC-170): `booking:write` (book, mark Came / Didn't come, move, cancel) and `hours:write` (anyone's weekly hours, extra hours and time off); and `notification:read-own` (the alerts addressed to them alone, DEC-170). No leads, no pipeline, no money: "Paid now", desk payments and pay links also ask `invoice:write`. |
 | `REVIEWER` | `site:read`, `site:comment`, `site:approve` — and nothing else, not even the floor.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
@@ -123,6 +123,29 @@ what the API allows.
   "Your role can't …" (`bookings/booking-access.ts`).
   `booking-permissions.db.spec.ts` pins one row per endpoint; a new booking,
   service or pack endpoint adds its row there.
+- **Current** (#1378, owner 12 Nov 2026) — **Posts follow the Social
+  permissions.** `social:read` ("See posts") and `social:post` ("Make and
+  share posts", implies `social:read`) are their own group, Social, in the
+  role catalogue: Owner and Admin by default, never a Member's or a
+  Reviewer's, grantable to a role or a person (F17). Own posts
+  (`share-posts`) ask them, never `section:write` or a role's name; the
+  module gate stays WEBSITE until a Social module exists. Saroh Social
+  asks the same two. The booking page's card with a typed headline is
+  drawn only through `organizations/:id/share/book/image` (`social:read`);
+  the public share picture never draws words from its address.
+  `share-posts.permissions.spec.ts`, `share-cards.controller.spec.ts`.
+- **Current** (DEC-220, plan 2026-11-13-001 U7) — **Ask AI follows `ai:use`
+  and the plan.** `ai:use` ("Use Ask AI") is its own group, Ask AI: Owner
+  and Admin by default, never a Reviewer's, grantable to a role or a person;
+  everyone holding it shares the business's question allowance. It is not
+  a tool's action, so no outside AI app reaches Ask AI with it. A turn
+  start asks, in order: the Saroh-wide halt, `ASK_AI`, the plan's `ask-ai`
+  row (fails closed: off the catalogue is locked), `ai:use`, the business's
+  switch, then on one locked transaction the allowance, the business's and
+  Saroh's day (all usage rows' cost plus a turn's maximum per RUNNING row),
+  one running turn a person and the per-person rate (`ai/access/`). Drafts'
+  Confirm, Undo and Draft again ask the first five again. Request more is
+  `billing:read`; Saroh grants it as `ask-ai` add-on packs.
 - **Current** (DEC-170, owner 19 Oct) — **Hours are their own power.**
   `hours:write` ("Set hours and time off") covers a person's weekly hours,
   extra hours and time off; adding or removing people, their services, the
@@ -289,8 +312,10 @@ what the API allows.
   `Membership` in the store's business, in the same transaction, in the
   narrow **"Storefront team"** role (key `storefront-team`: `org:read`,
   `member:read`, `module:read`, `media:read`, `store:read`,
-  `product-review:read`, and since DEC-074 `order:stage` for its own
-  storefronts — no customers, bookings or money), unless
+  `product-review:read`, since DEC-074 `order:stage` and since 13 Nov 2026
+  `order:create` and `order:edit` (payments at the counter included), all
+  for its own storefronts — no customers, bookings, refunds, cancels,
+  export or payment settings), unless
   the person already holds a role, which is never lowered or replaced. The
   rule is `joinTeamFromStorefront` in `@saroh/database`
   (`backfill/store-members-to-memberships.ts`, shared with the one-off
@@ -299,16 +324,43 @@ what the API allows.
   `StoreOwner` check, and the Storefront team role as the business has it
   must be within the inviter's reach. Removing someone from the team deletes
   their `StoreMembers` rows in that business's storefronts, in the removal's
-  serializable transaction. What anyone does inside a storefront still comes
-  from their storefront role.
-- **Current** (DEC-074) — **A location's team works only its storefronts'
-  orders.** Storefront team holds `order:stage` (migration
-  `20261019120000_storefront_team_orders` added it to existing roles), and
-  every order lookup spreads `orderLocationWhere(ctx)` /
-  `orderLocationSql` (`orders/order-location.ts`), keyed on the role, like
-  `reviewerScope`: another storefront's order is a 404 to read, and every
-  move asks `assertOrdersAtOwnLocation` (a 403). A new order read or move
-  spreads the same; Home, the calendar and New order alerts follow it.
+  serializable transaction.
+- **Current** (owner, 12 Nov 2026, amends DEC-048 and F16) — **The business
+  role always wins over a storefront role.** On the organization path
+  (`ORG_AUTHORIZATION` on) `StoresService` asks the caller's resolved
+  permissions and nothing else: a `StoreOwner` row or a storefront Admin,
+  Manager or Editor never opens, edits or takes orders where the business
+  role denies it (no `store:write`, no product or price edits). The roster
+  fallback is gone; storefront roles and their rows stay (their future is
+  the owner's to decide). The storefront team routes (`members.service.ts`)
+  ask `member:read`, `member:role:update`, `member:remove` and
+  `member:invite` in the store's business, like Settings › Team; a stranger
+  to the business gets 404. The legacy store customers route
+  (`customers.service.ts`) creates, edits and deletes on `contact:write`,
+  never `store:write`. Who is emailed or shown an alert follows resolved
+  permissions with extras too (`organizations/team-powers.ts`,
+  `notifications/alert-recipients.ts`): New enquiry (`lead:read`) and
+  Customer messages (`message:read`) are alert rows like the others.
+- **Current** (DEC-074; order-taking, owner 13 Nov 2026) — **A location's
+  team works only its storefronts' orders.** Storefront team holds
+  `order:stage`, `order:create` and `order:edit` (migrations
+  `20261019120000_storefront_team_orders` and
+  `20270204120000_storefront_team_take_orders` added them to existing
+  roles), so it reads its orders whole (`order:read` is implied). Every
+  order lookup spreads `orderLocationWhere(ctx)` / `orderLocationSql`
+  (`orders/order-location.ts`), keyed on the role, like `reviewerScope`:
+  another storefront's order is a 404 to read, and every move or change
+  asks `assertOrdersAtOwnLocation` (a 403). The storefront-scoped order
+  routes ask the same of the storefront in `StoresService.orgAllows` (an
+  order action for this role, money included, needs a `StoreMembers` row
+  there), so a new order or a payment is taken only where they work. It
+  takes payments for those orders (owner, 13 Nov 2026): with a new order,
+  marked paid, recorded by hand, or a pay link; refunds and cancels stay
+  `order:refund`'s, which it lacks. The storefront customer list stays
+  refused (no `contact:read`). A new order
+  read or write spreads the same; Home, the calendar, search, the product
+  page's orders, the review invitation, the closing notice, `/v1` and the
+  MCP order tools and New order alerts follow it.
 - **Current** (#868, owner decision 2026-10-08) — **A diary person given a
   login is Calendar only by default.** Someone taking bookings with no login
   (DEC-105) is invited from Team by naming them (`staffId` on the invite,
@@ -389,6 +441,33 @@ what the API allows.
       this.
 
 ## Rules
+
+- **Current** (11 Nov 2026, plan 2026-11-10-001 U9, R1) — **An AI app acts
+  as the person, in the businesses ticked at consent, through
+  `McpAuthGuard`.** Better Auth's `mcp()`, `jwt()` and `cimd()` plugins
+  (`packages/auth/src/mcp-oauth.ts`) sign tokens on `api.<edition>` for the
+  resource `mcp.<edition>/mcp`; the person ticks one, several or all their
+  businesses on accounts `/oauth/pick-business` ("all" is stored as the ids
+  they have then, never a wildcard). The set rides as the consent's
+  `referenceId` (`businessSetKey`: sorted ids, so another set is another
+  consent) and the token's `orgs` claim; the grant's `organizationIds` is
+  the set it reaches **now**. The guard (`modules/mcp/mcp-auth.guard.ts`)
+  never reads the cookie, verifies issuer and audience, and loads the grant
+  on **every** request (a signed token can't be revoked): gone, idle 90
+  days, its app disabled, its refresh tokens revoked or no business left is 401. It fixes no business: each tool call names one in its `business`
+  argument (the registry adds it to every tool; the only one is assumed),
+  and `contextIn` builds that business's context then: `actions` = granted
+  scopes (`saroh:read`, `saroh:write`, `site:publish`) ∩ the person's live
+  actions **there**, minus `NEVER_FOR_AI` (`OWNER_ONLY_ACTIONS`,
+  `apikey:manage`, `webhook:manage`, `customer:sensitive`). A business not
+  in the set, one the person left, one of another edition or one with
+  `API_MCP` off is a tool error for that business only. A secret key stays
+  one business. Disconnecting in a business takes only it off the grant; the
+  last one deletes the grant **and** revokes its refresh tokens (Better Auth
+  revokes nothing on a consent delete). The OAuth tables are auth-owned (no
+  org RLS); read them only by the context's business
+  (`organizationIds has`). `API_MCP` off makes every OAuth route, document
+  and page 404.
 
 - **Current** (10 Oct 2026) — **A refusal by role is a sentence, with the
   permission in `details`.** `authorize()` throws a 403 whose message is
@@ -679,6 +758,17 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   `organization:pii:read`. It is read-only and adds no permission. The
   public write (`POST /public/contact-messages`) is guardless, rate-limited
   per visitor and answers nothing back; rows go after 12 months.
+- **Current** (DEC-220, U8) — **Ask AI in the console** (`/admin/ask-ai/*`,
+  `ai/ops/ai-admin.controller.ts`, registered by the admin module).
+  `ai-settings:write` (Platform owners only) sets an AI setting (a reason,
+  the value checked against its key's schema), the Saroh-wide halt, a
+  business's override, and grants or declines Request more (one pack of
+  the plan's Ask AI add-on, this period only); each write is on the admin
+  ledger, settings in the same transaction. `ai-reports:read` (Platform
+  owners and Support: it is personal data) lists and opens Report this
+  answer's reports; every list and every report opened is on the ledger.
+  The summary, the settings and their history read with `platform:read`,
+  Request more's list with `organization:read`.
 - **Current** (DEC-179) — **Saroh's own billing across businesses**
   (`/admin/billing/*`: every Saroh invoice, its PDF, the month's GST CSV,
   every business's Saroh subscription, its checkouts and the provider's

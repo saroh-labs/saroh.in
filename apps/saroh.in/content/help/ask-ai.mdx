@@ -1,0 +1,51 @@
+---
+# The words are board VHAskAi's (release visibility, approved 13 Nov 2026),
+# from the Ask AI spec (DEC-220) and its boards. The panel and its Settings
+# tab aren't built yet (plan 2026-11-13-001), so every label here is the
+# designs' and is checked against the built screens, and each shot captured
+# on Gulmohar Salon & Bridal, before NEXT_PUBLIC_ASK_AI is turned on. No
+# allowance numbers and no plan names (DEC-078: they live in the admin).
+title: Ask AI about your business
+slug: ask-ai
+area: AI apps and API
+group: Use AI apps and the API
+order: 40
+feature: ask-ai
+intro: "Ask AI answers questions about your business from your own Saroh data, in English, Hinglish or Hindi, and drafts changes for you to check and confirm. It's in the Saroh app."
+description: "Ask AI in Saroh: ask about your bookings, orders and customers in your own words, and confirm the changes it drafts. Every answer says where it came from."
+readMinutes: 3
+updated: "2026-11-14"
+steps:
+    - title: Open Ask AI
+      body: "Press Ask AI at the top of any screen, next to Search. The panel opens beside the screen you're on. The common questions under Ask about your business don't use a question."
+      shot: help-ask-ai-1
+      caption: "Ask AI's first open at Gulmohar Salon & Bridal (a demo salon)."
+      marker: Ask AI
+    - title: Ask in your own words
+      body: "Type in Ask a question and press Enter: “How many bookings this week?”, “Who hasn't paid?”, “Kal kitne appointments hain?”. Each answer says where it came from, like From Bookings · this week, and Open in Bookings shows you the same list."
+      shot: help-ask-ai-2
+      caption: "An answer with its source, at Gulmohar Salon & Bridal (a demo salon)."
+      tip: "Answers use only figures Saroh has. If one doesn't look right, press Report this answer under it: that sends that one question and answer to Saroh, and only with your yes."
+    - title: Ask it to add or change something
+      body: "Ask, like “Move Priya's booking to Saturday 11 AM”. Ask AI never saves by itself. It shows a card with what will change, the old value struck through. Check it, then press the card's button, like Move booking, or Edit in full to finish it in the usual form. It can add and change products, services, bookings, customers and orders you take by hand, and set hours. It never deletes, cancels or refunds."
+      shot: help-ask-ai-3
+      caption: "A booking move waiting for a yes, at Gulmohar Salon & Bridal (a demo salon)."
+      marker: Move booking
+    - title: Undo, or change its language
+      body: "Once confirmed, the card says what happened, with Undo until the end of the day if nobody changed it since, or Open it for something new. To choose the language it answers in, open the panel's ⋯ menu: Match my question, English, Hinglish or Hindi."
+      shot: help-ask-ai-4
+      caption: "Moved, with Undo, and the language menu, at Gulmohar Salon & Bridal (a demo salon)."
+      marker: Undo
+troubles:
+    - title: Ask AI has a lock on it.
+      body: "Ask AI isn't part of your business's plan. The lock shows the way to move up."
+    - title: There's no Ask AI button, or it says you can't use it.
+      body: "Your role needs Use Ask AI. Owners and admins have it; an owner can give it to a role or a person in Settings › Team."
+    - title: It says Ask AI is off.
+      body: "An owner or admin turned it off for the business in Settings › API and AI apps. They can turn it back on; your old conversations stay readable."
+    - title: It says you've reached your questions, or it couldn't answer.
+      body: "At the limit it tells you when it resets, and an owner or admin can press Request more. “Ask AI couldn't answer that” didn't use a question: press Try again."
+next: [connect-claude, connect-chatgpt, take-your-first-order]
+---
+
+Your question and the business details needed to answer it go to Anthropic, our AI provider, outside India. Ask AI only sees what you can see, and only you can read your conversations. They're kept for 90 days. More in [Ask AI](/features/ask-ai).

@@ -6,6 +6,8 @@ import { PlatformAdminGuard } from "../../common/guards/platform-admin.guard";
 import { PlatformPermissionGuard } from "../../common/guards/platform-permission.guard";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
 import { env } from "../../env";
+import { AdminAskAiController } from "../ai/ops/ai-admin.controller";
+import { AiOpsModule } from "../ai/ops/ai-ops.module";
 import { BillingModule } from "../billing/billing.module";
 import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { DomainsModule } from "../domains/domains.module";
@@ -133,6 +135,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         SarohLeadsModule,
         // Search pages' publish records (DEC-193).
         SearchPagesModule,
+        // Ask AI's console page (DEC-220, U8).
+        AiOpsModule,
     ],
     controllers: [
         AdminController,
@@ -160,6 +164,8 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         AdminAccountManagersController,
         // What the team is owed, and the rates (DEC-169, U21).
         AdminCommissionController,
+        // Ask AI: settings, halt, overrides, Request more, reports (U8).
+        AdminAskAiController,
     ],
     providers: [
         IdempotencyService,

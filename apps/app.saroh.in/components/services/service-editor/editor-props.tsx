@@ -6,6 +6,7 @@ import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { PriceHistoryPage } from "@/lib/price-history/words";
 import type { AvailabilityRule, Service } from "@/lib/services/service";
 import type { ServiceUsage } from "@/lib/services/usage";
+import type { ShareSetup } from "@/lib/share-item/share";
 import type {
     BookingPaymentView,
     StaffView,
@@ -62,6 +63,11 @@ export interface EditorProps {
     payment?: BookingPaymentView | null;
     /** The business's services, for a name another already has. */
     others?: readonly { id: string; name: string }[];
+    /**
+     * Share as a post (#1375): the live booking page and the live site's
+     * read. Null or left out when either isn't live: no Share button.
+     */
+    share?: { setup: ShareSetup; bookUrl: string } | null;
 }
 
 export const SERVICES_HREF = "/services";

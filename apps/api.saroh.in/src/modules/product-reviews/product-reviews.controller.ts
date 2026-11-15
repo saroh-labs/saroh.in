@@ -81,7 +81,7 @@ export class ProductReviewsController {
     ) {
         authorize(ctx, "product-review:read");
         authorize(ctx, "order:read");
-        return this.reviews.invitationState(ctx.organizationId, orderId);
+        return this.reviews.invitationState(ctx.organizationId, orderId, ctx);
     }
 
     @Post("invitations")

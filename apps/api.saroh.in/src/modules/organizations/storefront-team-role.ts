@@ -15,9 +15,13 @@ import { resolveCapabilities } from "./organization-policy";
  * `@saroh/database` (`backfill/store-members-to-memberships.ts`), because the
  * one-off backfill runs there and cannot import the API. This file types
  * the list as the policy's actions — its spec proves each one exists and
- * that none of them reads customers, bookings or money, and of orders only
- * the kitchen's view, `order:stage` (DEC-074, narrowed to the person's
- * storefronts by `orders/order-location.ts`) — and says
+ * that none of them reads customers, bookings, payment settings or
+ * invoices, and that of orders it holds taking, changing and moving them
+ * and taking their payments at the counter (`order:create`, `order:edit`,
+ * `order:stage`; owner, 13 Nov 2026), which reads them whole
+ * (`order:read`), and never refunds, cancels or exports them. All of it is
+ * narrowed to the person's storefronts by `orders/order-location.ts`
+ * (DEC-074) — and says
  * what the role resolves to in a business, for the reach check on a
  * storefront invite.
  */

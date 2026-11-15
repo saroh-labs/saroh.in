@@ -24,7 +24,7 @@ export function IntegrationSteps({
     initialStep = 0,
 }: {
     steps: readonly IntegrationStep[];
-    /** The panel's breadcrumb, as the app names the screens. */
+    /** The panel's breadcrumb, as the app names the screens; a step may name its own. */
     panelPath: readonly string[];
     initialStep?: number;
 }) {
@@ -106,7 +106,11 @@ export function IntegrationSteps({
                             i === current ? "grid" : "hidden",
                         )}
                     >
-                        <StepPanel step={step} path={panelPath} n={i + 1} />
+                        <StepPanel
+                            step={step}
+                            path={step.panelPath ?? panelPath}
+                            n={i + 1}
+                        />
                         <p className="m-0 max-w-[62ch] text-[16px] leading-[1.65] text-mk-prose [text-wrap:pretty]">
                             {step.body}
                         </p>
@@ -154,10 +158,15 @@ function StepPanel({
             </div>
             <div className="grid min-h-[230px] content-start gap-3 p-[22px]">
                 {step.rows.map((row) => (
-                    <div key={row.label} className="grid gap-[5px]">
-                        <span className="text-[12.5px] font-semibold text-muted-foreground">
-                            {row.label}
-                        </span>
+                    <div
+                        key={`${row.label ?? ""}:${row.value}`}
+                        className="grid gap-[5px]"
+                    >
+                        {row.label ? (
+                            <span className="text-[12.5px] font-semibold text-muted-foreground">
+                                {row.label}
+                            </span>
+                        ) : null}
                         <div
                             className={cn(
                                 "flex min-h-10 items-center justify-between gap-3 rounded-mk-control border px-3 py-2 text-[14px]",

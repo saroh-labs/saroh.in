@@ -173,14 +173,36 @@ export const OWNER_ONLY_ACTIONS: readonly OrgAction[] = [
     "org:delete",
     "org:address:update",
     "billing:manage",
+    // API keys (R7): a key acts for the business with no person behind it.
+    "apikey:manage",
+    // Labels only (audit 2026-11-12 #14, #15): both are decided by the
+    // Owner role where they are used (`publish-approval.ts`,
+    // `closing-notice.ts`), and listed here so the Roles screen shows them
+    // as Owner only, never grantable or an extra.
+    "site:approval:override",
+    "org:export",
 ];
 
 const OWNER_ONLY: ReadonlySet<OrgAction> = new Set(OWNER_ONLY_ACTIONS);
 
+/**
+ * Powers the built-in Owner holds and the built-in Admin does not, which an
+ * Owner may still give: to an Admin (or anyone) as an extra, or to a custom
+ * role. Unlike `OWNER_ONLY_ACTIONS`, nothing strips them from a stored list.
+ */
+export const OWNER_DEFAULT_ACTIONS: readonly OrgAction[] = [
+    // Webhooks (R8) send the business's data to an address someone typed.
+    "webhook:manage",
+];
+
 const CAPABILITIES: Record<OrgRole, ReadonlySet<OrgAction>> = {
     OWNER: new Set<OrgAction>(ORG_ACTIONS),
     ADMIN: new Set<OrgAction>(
-        ORG_ACTIONS.filter((action) => !OWNER_ONLY_ACTIONS.includes(action)),
+        ORG_ACTIONS.filter(
+            (action) =>
+                !OWNER_ONLY_ACTIONS.includes(action) &&
+                !OWNER_DEFAULT_ACTIONS.includes(action),
+        ),
     ),
     MEMBER: new Set<OrgAction>([...READ_ONLY_ACTIONS, ...MEMBER_ACTIONS]),
     /*
@@ -485,6 +507,8 @@ function withImplied(set: Set<OrgAction>): ReadonlySet<OrgAction> {
     if (set.has("hours:write")) set.add("service:read");
     if (set.has("pack:write")) set.add("pack:sell");
     if (set.has("pack:sell")) set.add("pack:read");
+    // Making a post means seeing the posts (#1378).
+    if (set.has("social:post")) set.add("social:read");
     if (set.has("order:write")) {
         for (const part of ORDER_WRITE_PARTS) set.add(part);
     }

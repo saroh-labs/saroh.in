@@ -305,20 +305,6 @@
         {
             "lines": 10,
             "files": [
-                "apps/saroh.in/components/customers/report-form.tsx",
-                "apps/saroh.tech/components/customers/report-form.tsx"
-            ],
-            "windows": [
-                "6efc3ef4072a",
-                "2c0295ebd939",
-                "cf32d27e03dd",
-                "dc5f825c6019",
-                "0c0ca782f0e2"
-            ]
-        },
-        {
-            "lines": 10,
-            "files": [
                 "apps/saroh.in/components/shared/nav/mobile-menu.tsx",
                 "apps/saroh.tech/components/shared/phone-menu.tsx"
             ],
@@ -463,18 +449,6 @@
                 "d3d55003f6e7",
                 "1efa38466796",
                 "0ced5e7beb0f"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "apps/saroh.in/app/(site)/integrations/page.tsx",
-                "apps/saroh.tech/app/integrations/page.tsx"
-            ],
-            "windows": [
-                "11487d103ec7",
-                "768ac6702c4b",
-                "0879a6653b18"
             ]
         },
         {
@@ -665,17 +639,6 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/(site)/features/[slug]/page.tsx",
-                "apps/saroh.tech/app/features/[slug]/page.tsx"
-            ],
-            "windows": [
-                "f44f48216d47",
-                "a845272c213c"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
                 "apps/saroh.in/app/(site)/solutions/[slug]/page.tsx",
                 "apps/saroh.tech/app/solutions/[slug]/page.tsx"
             ],
@@ -747,17 +710,6 @@
                 "apps/saroh.tech/app/about/page.tsx"
             ],
             "windows": [
-                "5dfb8297a0c4",
-                "b836fcc9c2dc"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
                 "ef40d67ebe4a",
                 "5208b87e3f1a"
             ]
@@ -793,6 +745,17 @@
             "windows": [
                 "466812e67909",
                 "8713d0745c3e"
+            ]
+        },
+        {
+            "lines": 7,
+            "files": [
+                "apps/saroh.in/lib/browser/env.ts",
+                "apps/saroh.tech/lib/feature-switches.ts"
+            ],
+            "windows": [
+                "1018765fbb5b",
+                "62c69639ee95"
             ]
         },
         {
@@ -911,6 +874,16 @@
             ],
             "windows": [
                 "29ea624d66cd"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "apps/saroh.in/app/(site)/integrations/page.tsx",
+                "apps/saroh.tech/app/integrations/page.tsx"
+            ],
+            "windows": [
+                "11487d103ec7"
             ]
         },
         {

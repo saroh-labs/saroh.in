@@ -8,7 +8,8 @@
  * speaks of is tried: the rename (`PUT stores/:id`), a new order with
  * nothing paid, a new order paid in cash, and a status change. What the
  * read said and what happened must be the same thing, at the location they
- * work at and at one they don't.
+ * work at and at one they don't. The business role always wins over the
+ * location role (owner, 12 Nov 2026, amending DEC-048).
  *
  * Runs in the integration project (TEST_DATABASE_URL), which empties the
  * tables after each file. ORG_AUTHORIZATION is on, as it is in production.
@@ -210,31 +211,32 @@ beforeAll(async () => {
 });
 
 describe("what a location's read says its people may do (real database)", () => {
-    it.each(["ADMIN", "MANAGER", "EDITOR"] as const)(
-        "a location %s renames it and takes and changes its orders, never the money",
+    // The business role always wins (owner, 12 Nov 2026, amending
+    // DEC-048): every location role holds the Storefront team role, which
+    // takes and changes its location's orders and their payments (owner,
+    // 13 Nov 2026), and never changes the location itself.
+    const TAKES_ORDERS: LocationAbilities = {
+        edit: false,
+        takeOrders: true,
+        takePayments: true,
+        changeOrders: true,
+    };
+
+    it.each(["ADMIN", "MANAGER", "EDITOR", "VIEWER"] as const)(
+        "a location %s is told it takes and changes orders and their payments, and exactly that goes through",
         async (role) => {
             const read = await said(people[role], hill);
-            expect(read).toEqual({
-                edit: true,
-                takeOrders: true,
-                takePayments: false,
-                changeOrders: true,
-            });
+            expect(read).toEqual(TAKES_ORDERS);
             expect(await happens(people[role], hill, "Hill Road")).toEqual(
                 read,
             );
         },
     );
 
-    it("a location Viewer is told nothing can be changed, and nothing can", async () => {
-        const read = await said(people.VIEWER, hill);
-        expect(read).toEqual(NOTHING);
-        expect(await happens(people.VIEWER, hill, "Hill Road")).toEqual(read);
-    });
-
     it("at a location they don't work at, each is told and can do nothing", async () => {
         for (const role of ["ADMIN", "VIEWER"] as const) {
-            // The team role reads every location; it writes only its own.
+            // The team role reads every location; it takes and changes
+            // orders only at its own (DEC-074).
             const read = await said(people[role], market);
             expect(read).toEqual(NOTHING);
             expect(await happens(people[role], market, "Market")).toEqual(
@@ -260,12 +262,14 @@ describe("what a location's read says its people may do (real database)", () => 
         expect(await happens(memberId, hill, "Hill Road")).toEqual(read);
     });
 
-    it("a rename by a location Editor is saved", async () => {
-        await locations.update(people.EDITOR, hill.id, { name: "Hill Rd" });
+    it("a rename by a location Editor whose business role lacks store:write is refused", async () => {
+        await expect(
+            locations.update(people.EDITOR, hill.id, { name: "Hill Rd" }),
+        ).rejects.toBeDefined();
         const store = await prisma.store.findUnique({
             where: { id: hill.id },
             select: { name: true },
         });
-        expect(store?.name).toBe("Hill Rd");
+        expect(store?.name).toBe("Hill Road");
     });
 });

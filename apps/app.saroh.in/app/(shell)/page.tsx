@@ -20,7 +20,7 @@ import { getHome } from "@/lib/home/service";
 import { hasAnyInvoice } from "@/lib/invoices/service";
 import type { ModuleView } from "@/lib/modules/schema";
 import { listModules } from "@/lib/modules/service";
-import { homeMoment } from "@/lib/moments/read";
+import { homeMoment, homeNewFeature } from "@/lib/moments/read";
 import { getSeenMoments } from "@/lib/moments/service";
 import type { OrganizationKind } from "@/lib/organizations/kind";
 import { firstRunOrder, INVOICE_JOB, kindOf } from "@/lib/organizations/kind";
@@ -36,6 +36,7 @@ import {
     checklistSubject,
     firstSteps,
     firstStepsLead,
+    mayFinishSetup,
 } from "@/lib/settings/ready";
 import { loadReadyChecklist } from "@/lib/settings/ready-service";
 import { shareLink } from "@/lib/sites/share-links";
@@ -113,6 +114,11 @@ export default async function Home() {
         return (
             <PageContainer width="full">
                 <StaffHome
+                    moment={
+                        home.hasAnyModule && home.unavailable.length === 0
+                            ? await homeNewFeature(business)
+                            : null
+                    }
                     home={home}
                     modules={modules}
                     name={session.user.name}
@@ -141,7 +147,16 @@ export default async function Home() {
                 (m) => m.key === "INSIGHTS" && m.readiness !== "DISABLED",
             ));
     // The first order or booking, in its first day (wave G), said once.
-    const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
+    // Else one new feature (release visibility U14), only while nothing
+    // else holds the slot: a part that couldn't load, or Finish setup
+    // while it leads. One message at a time, never stacked.
+    const moment = home.hasAnyModule
+        ? ((await homeMoment(home, business)) ??
+          (home.unavailable.length === 0 &&
+          !(setup && firstStepsLead(setup.first))
+              ? await homeNewFeature(business)
+              : null))
+        : null;
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -208,10 +223,7 @@ async function loadSetup(
     business: Organization | null,
     modules: ModuleView[] | null,
 ): Promise<HomeSetup | null> {
-    const may = business?.actions
-        ? business.actions.includes("org:update")
-        : business?.role === "OWNER" || business?.role === "ADMIN";
-    if (!business || !may) return null;
+    if (!business || !mayFinishSetup(business)) return null;
     const settings = await getOrganizationSettings().catch(() => null);
     if (!settings) return null;
     // The 4 first steps lead until done (#1194); the money card then.

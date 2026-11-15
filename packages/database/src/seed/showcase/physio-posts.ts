@@ -17,7 +17,7 @@ const fig = (image: DsImage, caption: string) =>
 /** Every photograph the journal uses, each looked at before it was chosen. */
 const ph = {
     H1c: {
-        url: "https://images.unsplash.com/photo-1608979827489-2b855e79debe?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1608979827489-2b855e79debe.jpg",
         alt: "A bright clinic reception with a white front desk",
         width: 1600,
         height: 1067,
@@ -25,7 +25,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@dr_kanapon",
     },
     H1i: {
-        url: "https://images.unsplash.com/photo-1764727291644-5dcb0b1a0375?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1764727291644-5dcb0b1a0375.jpg",
         alt: "A clean reception desk under a lit Reception sign",
         width: 1600,
         height: 2400,
@@ -33,7 +33,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@malcolm_choong",
     },
     H2c: {
-        url: "https://images.unsplash.com/photo-1649751361457-01d3a696c7e6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1649751361457-01d3a696c7e6.jpg",
         alt: "A physiotherapist examining a patient's bent knee on a treatment table",
         width: 1600,
         height: 1067,
@@ -41,7 +41,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@relievemassage",
     },
     H2i: {
-        url: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1588776814546-1ffcf47267a5.jpg",
         alt: "A clinician holding up X-ray films to the light",
         width: 1600,
         height: 1067,
@@ -49,7 +49,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@jonathanborba",
     },
     H3c: {
-        url: "https://images.unsplash.com/photo-1645005513713-9e2b92a687d3?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1645005513713-9e2b92a687d3.jpg",
         alt: "A physio guiding a patient through an arm exercise with light dumbbells",
         width: 1600,
         height: 1067,
@@ -57,7 +57,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     H3i: {
-        url: "https://images.unsplash.com/photo-1645005512942-a17817fb7c11?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1645005512942-a17817fb7c11.jpg",
         alt: "A physio correcting a patient's position during a resistance band exercise",
         width: 1600,
         height: 1067,
@@ -65,7 +65,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     H4c: {
-        url: "https://images.unsplash.com/photo-1762331658154-8aa265ca21e5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1762331658154-8aa265ca21e5.jpg",
         alt: "A woman resting her hand on her knee as she sits on a ledge",
         width: 1600,
         height: 1067,
@@ -73,7 +73,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@zulfugarkarimov",
     },
     H4i: {
-        url: "https://images.unsplash.com/photo-1510278248113-c757b233ccbc?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1510278248113-c757b233ccbc.jpg",
         alt: "A man walking up a flight of outdoor steps",
         width: 1600,
         height: 1067,
@@ -81,7 +81,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@khiettam",
     },
     H5c: {
-        url: "https://images.unsplash.com/photo-1723725776967-78606a070730?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1723725776967-78606a070730.jpg",
         alt: "A hand holding a paper receipt",
         width: 1600,
         height: 2133,
@@ -89,7 +89,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@shotbykayven",
     },
     H5i: {
-        url: "https://images.unsplash.com/photo-1626207887298-da2fc1f50e82?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1626207887298-da2fc1f50e82.jpg",
         alt: "A hand holding an itemised paper bill",
         width: 1600,
         height: 2400,
@@ -97,7 +97,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@dearseymour",
     },
     H6c: {
-        url: "https://images.unsplash.com/photo-1643467220785-49612855af5a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1643467220785-49612855af5a.jpg",
         alt: "A metro train pulling into an elevated station",
         width: 1600,
         height: 1106,
@@ -105,7 +105,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@asidahmed",
     },
     H6i: {
-        url: "https://images.unsplash.com/photo-1613223352622-52cbeb8f6868?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1613223352622-52cbeb8f6868.jpg",
         alt: "Two scooters parked against a wall in a covered parking area",
         width: 1600,
         height: 1067,
@@ -113,7 +113,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@kovah",
     },
     H7c: {
-        url: "https://images.unsplash.com/photo-1584797802294-190bd128cc83?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1584797802294-190bd128cc83.jpg",
         alt: "An older couple walking out through a glass door, one with a walker",
         width: 1600,
         height: 1067,
@@ -121,7 +121,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@purzlbaum",
     },
     H7i: {
-        url: "https://images.unsplash.com/photo-1708884831332-56f4e081fabe?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1708884831332-56f4e081fabe.jpg",
         alt: "A tree-lined Bengaluru road with an autorickshaw",
         width: 1600,
         height: 1200,
@@ -129,7 +129,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@zoshuacolah",
     },
     H8c: {
-        url: "https://images.unsplash.com/photo-1616587226960-4a03badbe8bf?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1616587226960-4a03badbe8bf.jpg",
         alt: "A man on a video call at a laptop on his dining table",
         width: 1600,
         height: 1067,
@@ -137,7 +137,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@linkedinsalesnavigator",
     },
     H8i: {
-        url: "https://images.unsplash.com/photo-1746796751590-a8c0f15d4900?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1746796751590-a8c0f15d4900.jpg",
         alt: "An exercise mat with light dumbbells and a folded towel",
         width: 1600,
         height: 1200,
@@ -145,7 +145,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@andreastuart",
     },
     H9c: {
-        url: "https://images.unsplash.com/photo-1598555763574-dca77e10427e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1598555763574-dca77e10427e.jpg",
         alt: "Fine needles being placed in the muscles of a patient's back",
         width: 1600,
         height: 1035,
@@ -153,7 +153,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@tinymountain",
     },
     H9i: {
-        url: "https://images.unsplash.com/photo-1627518788331-b3b7fdaa382f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1627518788331-b3b7fdaa382f.jpg",
         alt: "A hand signing a printed form with a pen",
         width: 1600,
         height: 1280,
@@ -161,7 +161,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@signaturepro",
     },
     H10c: {
-        url: "https://images.unsplash.com/photo-1418874586588-88661ed80c4a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1418874586588-88661ed80c4a.jpg",
         alt: "A person in a red jacket out on an early-morning walk down a quiet road",
         width: 1600,
         height: 1066,
@@ -169,7 +169,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@jordanfmcqueen",
     },
     H10i: {
-        url: "https://images.unsplash.com/photo-1706353399656-210cca727a33?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1706353399656-210cca727a33.jpg",
         alt: "A physio stretching a patient's shoulder as she lies on a treatment table",
         width: 1600,
         height: 1067,
@@ -177,7 +177,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@der_zeman",
     },
     N1c: {
-        url: "https://images.unsplash.com/photo-1571008887538-b36bb32f4571?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1571008887538-b36bb32f4571.jpg",
         alt: "A runner's legs mid-stride on a city road",
         width: 1600,
         height: 1067,
@@ -185,7 +185,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sporlab",
     },
     N1i: {
-        url: "https://images.unsplash.com/photo-1597892657493-6847b9640bac?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1597892657493-6847b9640bac.jpg",
         alt: "A runner's well-used grey running shoes on the road",
         width: 1600,
         height: 2400,
@@ -193,7 +193,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@jakobowens1",
     },
     N2c: {
-        url: "https://images.unsplash.com/photo-1645005512968-0c1fe99f0093?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1645005512968-0c1fe99f0093.jpg",
         alt: "A physio holding and moving a patient's shoulder",
         width: 1600,
         height: 1067,
@@ -201,7 +201,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     N2i: {
-        url: "https://images.unsplash.com/photo-1540205895360-4ad4cffb3aa8?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1540205895360-4ad4cffb3aa8.jpg",
         alt: "A physio guiding a patient into a hip stretch on a mat",
         width: 1600,
         height: 2399,
@@ -209,7 +209,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@anniespratt",
     },
     N3c: {
-        url: "https://images.unsplash.com/photo-1708884831398-b9b7cca1b2ba?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1708884831398-b9b7cca1b2ba.jpg",
         alt: "Morning sun through the trees on a Bengaluru road, a motorbike passing",
         width: 1600,
         height: 1200,
@@ -217,7 +217,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@zoshuacolah",
     },
     N3i: {
-        url: "https://images.unsplash.com/photo-1652035247233-b4b077703f47?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1652035247233-b4b077703f47.jpg",
         alt: "A leafy residential street with parked cars",
         width: 1600,
         height: 2846,
@@ -225,7 +225,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@jsensarma",
     },
     N4c: {
-        url: "https://images.unsplash.com/photo-1606367199370-4852f9506648?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1606367199370-4852f9506648.jpg",
         alt: "Three people walking along a misty path in the early morning",
         width: 1600,
         height: 2400,
@@ -233,7 +233,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@ravinepz",
     },
     N4i: {
-        url: "https://images.unsplash.com/photo-1771011521821-e3d984f30522?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1771011521821-e3d984f30522.jpg",
         alt: "A person walking along a path at sunrise",
         width: 1600,
         height: 2131,
@@ -241,7 +241,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@nimbus_vulpis",
     },
     N5c: {
-        url: "https://images.unsplash.com/photo-1628645339131-0c39c7527856?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1628645339131-0c39c7527856.jpg",
         alt: "A woman with a cup of tea talking on a video call at her laptop",
         width: 1600,
         height: 1067,
@@ -249,7 +249,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@helenalopesph",
     },
     N5i: {
-        url: "https://images.unsplash.com/photo-1612831455359-970e23a1e4e9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1612831455359-970e23a1e4e9.jpg",
         alt: "A man gesturing to a group on a laptop video call",
         width: 1600,
         height: 1280,
@@ -257,7 +257,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@surface",
     },
     N6c: {
-        url: "https://images.unsplash.com/photo-1713450106884-502021ee5e61?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1713450106884-502021ee5e61.jpg",
         alt: "A wide Bengaluru road with buses and cars under a hazy sky",
         width: 1600,
         height: 1061,
@@ -265,7 +265,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@bhargavpanchal1986",
     },
     N6i: {
-        url: "https://images.unsplash.com/photo-1592389209483-02dea6bc5a4f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1592389209483-02dea6bc5a4f.jpg",
         alt: "An older man walking along a street with two walking sticks",
         width: 1600,
         height: 1067,
@@ -273,7 +273,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@mluotio83",
     },
     N7c: {
-        url: "https://images.unsplash.com/photo-1762331660777-840a589195f0?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1762331660777-840a589195f0.jpg",
         alt: "A woman holding the front of her knee as she sits",
         width: 1600,
         height: 1067,
@@ -281,7 +281,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@zulfugarkarimov",
     },
     N7i: {
-        url: "https://images.unsplash.com/photo-1598286987849-41663a539ff9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1598286987849-41663a539ff9.jpg",
         alt: "An older couple walking together along a street",
         width: 1600,
         height: 1067,
@@ -289,7 +289,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@mtimber71",
     },
     N8c: {
-        url: "https://images.unsplash.com/photo-1706102005390-2d1f41fdddcd?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1706102005390-2d1f41fdddcd.jpg",
         alt: "A bowler running in on a cricket ground lined with palm trees",
         width: 1600,
         height: 1067,
@@ -297,7 +297,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@fiftymm",
     },
     N8i: {
-        url: "https://images.unsplash.com/photo-1567943346767-72780dd14cd5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1567943346767-72780dd14cd5.jpg",
         alt: "A bowler delivering the ball in a club cricket match",
         width: 1600,
         height: 1200,
@@ -305,7 +305,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@image_marks",
     },
     N9c: {
-        url: "https://images.unsplash.com/photo-1635192592106-77a5aacbe1a3?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1635192592106-77a5aacbe1a3.jpg",
         alt: "A rangoli of marigolds ringed with lit diyas",
         width: 1600,
         height: 1207,
@@ -313,7 +313,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@artsy_lens21",
     },
     N9i: {
-        url: "https://images.unsplash.com/photo-1636619773834-c7e0762ddfe1?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1636619773834-c7e0762ddfe1.jpg",
         alt: "Three lit clay diyas in the evening",
         width: 1600,
         height: 1197,
@@ -321,7 +321,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@_raj_28",
     },
     A1c: {
-        url: "https://images.unsplash.com/photo-1758876201884-8695c9c98203?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1758876201884-8695c9c98203.jpg",
         alt: "A woman at her desk rubbing the back of her neck",
         width: 1600,
         height: 900,
@@ -329,7 +329,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@silverkblack",
     },
     A1i: {
-        url: "https://images.unsplash.com/photo-1535957998253-26ae1ef29506?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1535957998253-26ae1ef29506.jpg",
         alt: "A desk with a monitor, a laptop and a separate keyboard by a window",
         width: 1600,
         height: 2133,
@@ -337,7 +337,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@olenkasergienko",
     },
     A2c: {
-        url: "https://images.unsplash.com/photo-1586274955503-7dc869e7fd23?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1586274955503-7dc869e7fd23.jpg",
         alt: "A person holding their ankle above a running shoe",
         width: 1600,
         height: 1067,
@@ -345,7 +345,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     A2i: {
-        url: "https://images.unsplash.com/photo-1758599881247-b7a28d9297e5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1758599881247-b7a28d9297e5.jpg",
         alt: "A woman balancing on one leg on an exercise mat",
         width: 1600,
         height: 900,
@@ -353,7 +353,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@silverkblack",
     },
     A3c: {
-        url: "https://images.unsplash.com/photo-1594144497858-64c1b1d79f92?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1594144497858-64c1b1d79f92.jpg",
         alt: "A runner on a wet promenade in the rain at dusk",
         width: 1600,
         height: 1083,
@@ -361,7 +361,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@naseem_buras",
     },
     A3i: {
-        url: "https://images.unsplash.com/photo-1649887974297-4be052375a67?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1649887974297-4be052375a67.jpg",
         alt: "A woman doing a bodyweight squat at home",
         width: 1600,
         height: 2400,
@@ -369,7 +369,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@sunday2sunday",
     },
     A4c: {
-        url: "https://images.unsplash.com/photo-1620939068789-fc0c88ddb71e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1620939068789-fc0c88ddb71e.jpg",
         alt: "A man sitting on the edge of a bed holding his lower back",
         width: 1600,
         height: 2400,
@@ -377,7 +377,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@roscoadrian",
     },
     A4i: {
-        url: "https://images.unsplash.com/photo-1639287569032-7300f2f7b36f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1639287569032-7300f2f7b36f.jpg",
         alt: "Two people walking along a path through the fields",
         width: 1600,
         height: 2240,
@@ -385,7 +385,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@joehan330",
     },
     A5c: {
-        url: "https://images.unsplash.com/photo-1453928582365-b6ad33cbcf64?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1453928582365-b6ad33cbcf64.jpg",
         alt: "A laptop, a coffee and notes on a wooden table",
         width: 1600,
         height: 1064,
@@ -393,7 +393,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@laurenmancke",
     },
     A5i: {
-        url: "https://images.unsplash.com/photo-1518655048521-f130df041f66?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1518655048521-f130df041f66.jpg",
         alt: "A wireless keyboard on a clean white desk beside a cup of tea",
         width: 1600,
         height: 1067,
@@ -401,7 +401,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@fempreneurstyledstock",
     },
     A6c: {
-        url: "https://images.unsplash.com/photo-1740512922093-9c2756ab5844?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1740512922093-9c2756ab5844.jpg",
         alt: "A man sitting on a step holding his knee",
         width: 1600,
         height: 2000,
@@ -409,7 +409,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@bynikolavu",
     },
     A6i: {
-        url: "https://images.unsplash.com/photo-1701826478825-8d975e7883f4?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1701826478825-8d975e7883f4.jpg",
         alt: "A man lowering himself slowly towards the floor in a controlled squat",
         width: 1600,
         height: 899,
@@ -417,7 +417,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@gmb",
     },
     A7c: {
-        url: "https://images.unsplash.com/photo-1786025065474-cb3a3b4cd56c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1786025065474-cb3a3b4cd56c.jpg",
         alt: "A group doing running drills on a grass field",
         width: 1600,
         height: 1065,
@@ -425,7 +425,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@astuardom",
     },
     A7i: {
-        url: "https://images.unsplash.com/photo-1785427615102-0d9d48edf38b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1785427615102-0d9d48edf38b.jpg",
         alt: "A yellow training cone on a running track",
         width: 1600,
         height: 2400,
@@ -433,7 +433,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@geometryline",
     },
     A8c: {
-        url: "https://images.unsplash.com/photo-1601228008055-bcae7a02862c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1601228008055-bcae7a02862c.jpg",
         alt: "A man holding his sore shoulder",
         width: 1600,
         height: 2400,
@@ -441,7 +441,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@roscoadrian",
     },
     A8i: {
-        url: "https://images.unsplash.com/photo-1701826510629-051bb954fb8f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1701826510629-051bb954fb8f.jpg",
         alt: "A woman reaching back to stretch her neck and shoulder",
         width: 1600,
         height: 1067,
@@ -449,7 +449,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@gmb",
     },
     A9c: {
-        url: "https://images.unsplash.com/photo-1652354989460-ecccd5644412?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1652354989460-ecccd5644412.jpg",
         alt: "A knee wrapped in a support sleeve",
         width: 1600,
         height: 1067,
@@ -457,7 +457,7 @@ const ph = {
         creditUrl: "https://unsplash.com/@alexeydemidov",
     },
     A9i: {
-        url: "https://images.unsplash.com/photo-1695918427235-2d6faaae356a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1695918427235-2d6faaae356a.jpg",
         alt: "A man in shorts stretching his knee before a run",
         width: 1600,
         height: 2400,

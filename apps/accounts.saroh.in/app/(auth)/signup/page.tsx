@@ -5,7 +5,11 @@ import { SIGNUP_JOIN_PANEL, SIGNUP_PANEL } from "@/components/auth/panel-copy";
 import { SignupForm } from "@/components/auth/signup-form";
 import { isJoining } from "@/lib/joining";
 import { phoneOptions } from "@/lib/phone-sign-in";
-import { onboardingForInvite, onboardingForPlan } from "@/lib/plan-intent";
+import {
+    onboardingForInvite,
+    onboardingForPlan,
+    withTemplate,
+} from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
 import { recordSignupView } from "@/lib/signup-viewed";
@@ -34,6 +38,10 @@ export const metadata: Metadata = {
  * Someone invited off the waitlist arrives with `?invite=&email=` (plan
  * U31): the address fills the form, and the invite rides to onboarding,
  * where it gives the business the launch offer. It wins over a plan.
+ *
+ * A template picked in the public gallery arrives as `?template=` (DEC-216)
+ * and rides to onboarding beside either, or alone, where setup starts on
+ * its trade. An invitation's `redirect` drops it: an invitee makes nothing.
  */
 export default async function SignupPage({
     searchParams,
@@ -41,12 +49,14 @@ export default async function SignupPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const params = await searchParams;
-    const { redirect, email, plan, cycle, invite } = params;
+    const { redirect, email, plan, cycle, invite, template } = params;
     await recordSignupView(params);
     const returnTo =
         safeDestination(redirect) ??
-        onboardingForInvite(invite) ??
-        onboardingForPlan(plan, cycle);
+        withTemplate(
+            onboardingForInvite(invite) ?? onboardingForPlan(plan, cycle),
+            template,
+        );
     const [providers, phone] = await Promise.all([
         signInProviders(),
         phoneOptions(),

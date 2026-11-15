@@ -12,6 +12,7 @@ export const DEPLOY_APPS = [
     "auth",
     "admin",
     "sites",
+    "docs",
 ] as const;
 export type DeployApp = (typeof DEPLOY_APPS)[number];
 
@@ -55,6 +56,11 @@ export const DEPLOY_APP_INFO: Record<
         label: "Merchant sites",
         workers: { development: "saroh-sites-dev", production: "saroh-sites" },
         dir: "apps/saroh.app",
+    },
+    docs: {
+        label: "API docs",
+        workers: { development: "saroh-docs-dev", production: "saroh-docs" },
+        dir: "apps/docs.saroh.in",
     },
 };
 

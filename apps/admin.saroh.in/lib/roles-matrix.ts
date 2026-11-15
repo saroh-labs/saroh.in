@@ -197,6 +197,16 @@ export const MATRIX_AREAS: readonly MatrixAreaDef[] = [
                 change: ["search-pages:publish"],
             },
             {
+                key: "ask-ai",
+                label: "Ask AI: settings, the halt and Request more",
+                change: ["ai-settings:write"],
+            },
+            {
+                key: "ask-ai-reports",
+                label: "Ask AI reports: the answers people reported",
+                see: "ai-reports:read",
+            },
+            {
                 key: "deployments",
                 label: "Deploy Saroh's apps",
                 change: ["deployments:run"],

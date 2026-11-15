@@ -38,9 +38,10 @@ const OPENS: Readonly<Record<string, string>> = {
     MEMBER: "You can see its bookings, contacts and orders, and move orders along.",
     REVIEWER:
         "You can read and comment on the pages you were asked to look at.",
-    // A location's team (DEC-074): its own locations' orders, no money.
+    // A location's team (DEC-074; order-taking, owner 13 Nov 2026): its own
+    // locations' orders and their payments, never a refund.
     "storefront-team":
-        "You can work the orders at the locations you were added to.",
+        "You can take, change and move orders at the locations you were added to, and take their payments.",
     // A diary person given a login (#868).
     "calendar-only": "You can see and change your own bookings.",
 };

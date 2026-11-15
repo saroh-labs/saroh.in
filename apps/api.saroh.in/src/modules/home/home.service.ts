@@ -13,7 +13,9 @@ import {
 } from "../invoices/overdue-bills";
 import { accountAreaOn } from "../site-accounts/account-area";
 import { ThreadsService } from "../site-accounts/threads.service";
+import type { StockCheck } from "../stock/stock-checks.service";
 import { StockChecksService } from "../stock/stock-checks.service";
+import { businessTracksStock } from "../stock/tracking";
 import { businessDetailsGap } from "./home-business-details";
 import { readHomeCheques } from "./home-cheques";
 import { overdueFollowUps } from "./home-crm-sources";
@@ -59,8 +61,18 @@ import { failedOrderRefunds } from "./home-refunds-failed";
 import { readReviews } from "./home-reviewer";
 import type { HomeSchedule } from "./home-schedule";
 import { NO_SCHEDULE, readSchedule } from "./home-schedule";
-import { sitesNotLive, stockShort } from "./home-site-stock-sources";
-import { isStaffView, readStaffNarrow, WHOLE_BUSINESS } from "./home-staff";
+import type { LowShelfRow } from "./home-site-stock-sources";
+import {
+    readLowShelves,
+    sitesNotLive,
+    stockShort,
+} from "./home-site-stock-sources";
+import {
+    inStores,
+    isStaffView,
+    readStaffNarrow,
+    WHOLE_BUSINESS,
+} from "./home-staff";
 import { buildTiles } from "./home-tiles";
 import { readToday, todayScope } from "./home-today";
 import { readTodayFirst } from "./home-today-first";
@@ -217,6 +229,42 @@ export class HomeService {
             return { actions: [], unavailable: [] };
         }
         return (await this.compose(input, "rail")).rail;
+    }
+
+    /**
+     * Home's two stock sources in full, for Ask AI's `get_needs_attention`,
+     * which names every product: shelves short for open orders and shelves
+     * running low, behind Home's gates (Commerce available, `store:read`)
+     * and a staff member's storefronts (F11). Null when Home shows this
+     * person no stock; `tracked` false when the business counts none.
+     */
+    async stockWatch(input: HomeInput): Promise<{
+        tracked: boolean;
+        short: StockCheck[];
+        low: LowShelfRow[];
+    } | null> {
+        if (input.organizationRole === "REVIEWER") return null;
+        if (!holds(input, "store:read")) return null;
+        const [views, staffView] = await Promise.all([
+            this.availability.listViews(input),
+            isStaffView(input) ? readStaffNarrow(this.db, input) : null,
+        ]);
+        const commerce = views.find((v) => v.key === "COMMERCE");
+        if (!commerce || commerce.readiness === "DISABLED") return null;
+        const org = input.organizationId;
+        if (!(await businessTracksStock(this.db, org))) {
+            return { tracked: false, short: [], low: [] };
+        }
+        const storeIds = (staffView?.narrow ?? WHOLE_BUSINESS).storeIds;
+        const [short, low] = await Promise.all([
+            this.stockChecks
+                ? this.stockChecks
+                      .openShort(org)
+                      .then((c) => inStores(c, storeIds))
+                : [],
+            readLowShelves(this.db, org, storeIds),
+        ]);
+        return { tracked: true, short, low };
     }
 
     private async compose(

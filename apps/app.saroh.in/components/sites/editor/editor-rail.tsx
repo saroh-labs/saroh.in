@@ -5,6 +5,7 @@ import { resolveVariant } from "@saroh/block-contract";
 import { EmptyState } from "@saroh/ui/data-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { Lock, PanelBottom, PanelTop } from "lucide-react";
+import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
 import { AddBlockPanel } from "@/components/sites/blocks/add-block-panel";
@@ -72,7 +73,13 @@ export function EditorRail({
     looks,
     styleRules,
     onPicked,
+    templateRow = null,
+    templateName,
 }: {
+    /** The Brand tab's Template row (DEC-216); null draws none. */
+    templateRow?: ReactNode;
+    /** The site's template as a Reviewer reads it; null: not recorded; absent: no row. */
+    templateName?: string | null;
     /** A block was chosen from a phone's list: the page scrolls to it. */
     onPicked?: (index: number) => void;
     /** The Brand tab's Look row (DEC-172, U16); absent draws none. */
@@ -155,6 +162,7 @@ export function EditorRail({
                     style={style}
                     options={styleOptions}
                     looks={looks?.available === true}
+                    template={templateName}
                 />
             ) : tab === "brand" ? (
                 <StylePanel
@@ -169,6 +177,7 @@ export function EditorRail({
                     onTry={tryStyle}
                     heroInText={heroDrawsInText(sections, style.look)}
                     phoneTabs={phone}
+                    templateRow={templateRow}
                 />
             ) : (
                 <>

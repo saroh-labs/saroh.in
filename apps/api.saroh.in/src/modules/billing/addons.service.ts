@@ -175,6 +175,94 @@ export class AddonsService {
         now: Date = new Date(),
     ): Promise<AddonsView> {
         authorize(ctx, "billing:manage");
+        const payment = await this.change(ctx, addonId, () => quantity, now);
+        return { ...(await this.list(ctx, now)), payment };
+    }
+
+    /**
+     * Saroh adds `more` of the business's plan's add-on of `kind`, held and
+     * billed as if the owner had bought it (Ask AI's Request more granted
+     * from the console, DEC-220): the rest of this period prorated, after
+     * it; every period after, whole, until the owner removes it. Staff
+     * only: the caller checks the console permission. A plan paid one
+     * month at a time can't take it yet (that needs a payment first).
+     */
+    async addBySaroh(
+        organizationId: string,
+        kind: string,
+        more: number,
+        staffUserId: string,
+        now: Date = new Date(),
+    ): Promise<{ addonId: string }> {
+        if (!Number.isInteger(more) || more < 1) {
+            throw new BadRequestException("Add at least one.");
+        }
+        const sub = await prisma.subscription.findUnique({
+            where: { organizationId },
+            select: SUB_SELECT,
+        });
+        const catalog = sub
+            ? await catalogueOfVersion(prisma, sub.plan.version)
+            : null;
+        const planId = sub ? catalogPlanIdForKey(sub.plan.key) : null;
+        const addon =
+            catalog && planId
+                ? catalog.addons.find(
+                      (a) => a.kind === kind && addonOfferedOn(a, planId),
+                  )
+                : undefined;
+        if (!sub || !addon) {
+            throw new ConflictException(
+                "This business's plan has no add-on for that.",
+            );
+        }
+        if (!autopayTakes(sub.plan.currency)) {
+            throw new ConflictException(
+                "This business pays one month at a time, so Saroh can't add this for it yet.",
+            );
+        }
+        await this.change(
+            { organizationId, userId: staffUserId, role: "OWNER" },
+            addon.id,
+            (held) => held + more,
+            now,
+        );
+        return { addonId: addon.id };
+    }
+
+    /**
+     * Saroh takes back `less` of an add-on it added ({@link addBySaroh}),
+     * through the same change as the owner's own Remove: held now, never
+     * below none, and what the period already owes stays owed. Ask AI's
+     * Request more is granted for its period only (owner, 13 Nov 2026), so
+     * its packs come off at the period's end (`ai.grant.end`).
+     */
+    async removeBySaroh(
+        organizationId: string,
+        addonId: string,
+        less: number,
+        staffUserId: string,
+        now: Date = new Date(),
+    ): Promise<void> {
+        if (!Number.isInteger(less) || less < 1) {
+            throw new BadRequestException("Take off at least one.");
+        }
+        await this.change(
+            { organizationId, userId: staffUserId, role: "OWNER" },
+            addonId,
+            (held) => Math.max(0, held - less),
+            now,
+        );
+    }
+
+    /** {@link set}'s change, once the caller may make it; any payment to start. */
+    private async change(
+        ctx: OrganizationContext,
+        addonId: string,
+        quantityFor: (held: number) => number,
+        now: Date,
+    ): Promise<AddonPayment | null> {
+        let quantity = quantityFor(0);
         // Taking one off is upkeep; adding one is a purchase (stage 9).
         await (quantity > 0 ? assertSarohSells : assertSarohKeeps)(ctx, now);
         const toPay: { buy: MonthPurchase | null } = { buy: null };
@@ -201,6 +289,7 @@ export class AddonsService {
             }
             const held =
                 sub.addons.find((a) => a.addonId === addonId)?.quantity ?? 0;
+            quantity = quantityFor(held);
             if (quantity === held) return null;
             // More is a charge: never for a closing or deleted business
             // (#921), nor a suspended one (its route is `lower-charges`).
@@ -305,10 +394,7 @@ export class AddonsService {
                 actorRoleKey: ctx.roleKey,
             });
         }
-        const payment = toPay.buy
-            ? await this.startPurchase(ctx, toPay.buy)
-            : null;
-        return { ...(await this.list(ctx, now)), payment };
+        return toPay.buy ? this.startPurchase(ctx, toPay.buy) : null;
     }
 
     /**

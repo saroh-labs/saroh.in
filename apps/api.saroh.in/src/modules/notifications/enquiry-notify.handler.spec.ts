@@ -16,6 +16,9 @@ jest.mock("../../common/email", () => ({
 
 // Avoid the real env validation (requires DATABASE_URL etc.) — the handler only
 // reads APP_URL to build the lead link.
+// Who is emailed is `emailedAbout`'s (alert-recipients.spec.ts).
+jest.mock("./alert-recipients", () => ({ emailedAbout: jest.fn() }));
+
 jest.mock("../../env", () => ({ env: { APP_URL: "https://app.saroh.in" } }));
 
 import type { Job } from "@saroh/database";
@@ -23,6 +26,7 @@ import { prisma } from "@saroh/database";
 
 import { sendEnquiryNotificationEmail } from "../../common/email";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
+import { emailedAbout } from "./alert-recipients";
 import {
     ENQUIRY_NEW_NOTIFICATION_TYPE,
     ENQUIRY_NOTIFY_TYPE,
@@ -31,7 +35,7 @@ import {
 
 const leadFindUnique = prisma.lead.findUnique as jest.Mock;
 const notificationCreate = prisma.notification.create as jest.Mock;
-const membershipFindMany = prisma.membership.findMany as jest.Mock;
+const emailed = emailedAbout as jest.Mock;
 const submissionFindFirst = prisma.submission.findFirst as jest.Mock;
 const sendEmail = sendEnquiryNotificationEmail as jest.Mock;
 
@@ -74,10 +78,7 @@ describe("EnquiryNotifyHandler", () => {
         jest.clearAllMocks();
         leadFindUnique.mockResolvedValue(lead);
         submissionFindFirst.mockResolvedValue(null);
-        membershipFindMany.mockResolvedValue([
-            { role: "OWNER", user: { email: "owner@example.com" } },
-            { role: "ADMIN", user: { email: "admin@example.com" } },
-        ]);
+        emailed.mockResolvedValue(["owner@example.com", "admin@example.com"]);
     });
 
     it("creates exactly one enquiry.new Notification for the lead and emails each owner/admin", async () => {

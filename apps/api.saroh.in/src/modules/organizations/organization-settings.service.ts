@@ -7,6 +7,7 @@ import type { SocialLinks } from "@saroh/block-contract";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
+import type { TemplateKind } from "@saroh/templates";
 import { IANAZone } from "luxon";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -58,6 +59,11 @@ import { mapLinkRead, mapLinkWrite } from "./map-link";
 import type { OrganizationKind } from "./organization-kind";
 import { kindRead } from "./organization-kind";
 import { authorize } from "./organization-policy";
+import {
+    tradeOtherRead,
+    tradeOtherWrite,
+    tradeRead,
+} from "./organization-trade";
 import { settingsChanges, settingsSnapshot } from "./settings-audit";
 
 /** The org's editable identity: display name plus optional business profile. */
@@ -70,6 +76,13 @@ export interface OrganizationSettings {
      * ("A site for my work"). Words and defaults only.
      */
     kind: OrganizationKind;
+    /**
+     * The kind of place it is (DEC-216), one of the template kinds; null
+     * when never said. Words and suggestions only.
+     */
+    trade: TemplateKind | null;
+    /** The trade typed beside Other ("Bakery"); null unless trade is other. */
+    tradeOther: string | null;
     profile: {
         legalName: string | null;
         type: string | null;
@@ -587,6 +600,12 @@ export class OrganizationSettingsService {
         const changed: string[] = [
             ...(dto.name !== undefined ? ["name"] : []),
             ...(dto.kind !== undefined ? ["kind"] : []),
+            ...(dto.trade !== undefined ? ["trade"] : []),
+            // The typed trade goes with it (DEC-216): set beside Other,
+            // cleared when the trade changes away.
+            ...(dto.trade !== undefined || dto.tradeOther !== undefined
+                ? ["tradeOther"]
+                : []),
             ...Object.keys(profileData),
             ...Object.keys(phone),
             ...Object.keys(taxData),
@@ -609,6 +628,8 @@ export class OrganizationSettingsService {
                 name: true,
                 slug: true,
                 kind: true,
+                trade: true,
+                tradeOther: true,
                 edition: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
@@ -617,10 +638,13 @@ export class OrganizationSettingsService {
             // As it was, inside the write's own transaction, so the audit
             // row's "before" is what this save replaced.
             const before = await tx.organization.findUnique(read);
-            // The name and the kind are the organization's own columns.
+            // The name, the kind and the trade are the organization's own
+            // columns.
             const own = {
                 ...(dto.name !== undefined ? { name: dto.name } : {}),
                 ...(dto.kind !== undefined ? { kind: dto.kind } : {}),
+                ...(dto.trade !== undefined ? { trade: dto.trade } : {}),
+                ...tradeOtherWrite(dto, before?.trade),
             };
             if (Object.keys(own).length > 0) {
                 await tx.organization.update({
@@ -666,6 +690,13 @@ export class OrganizationSettingsService {
         // one place (`audit/audit-changes.ts`): never the contact email, the
         // phone or the website, which stay names only (S1-009).
         const now = new Date();
+        // The typed trade is listed only when it really changed: a trade
+        // moving between two categories clears a value that was already empty.
+        const recorded = changed.filter(
+            (f) =>
+                f !== "tradeOther" ||
+                (before?.tradeOther ?? null) !== (settings.tradeOther ?? null),
+        );
         await this.audit.record({
             action: AuditAction.ProfileUpdate,
             actorUserId: ctx.userId,
@@ -675,9 +706,9 @@ export class OrganizationSettingsService {
             targetId: ctx.organizationId,
             outcome: AuditOutcome.Success,
             metadata: {
-                fields: changed,
+                fields: recorded,
                 changes: settingsChanges(
-                    changed,
+                    recorded,
                     settingsSnapshot(before, now),
                     settingsSnapshot(settings, now),
                 ) as unknown as Prisma.InputJsonArray,
@@ -700,6 +731,8 @@ export class OrganizationSettingsService {
             name: settings.name,
             slug: settings.slug,
             kind: kindRead(settings.kind),
+            trade: tradeRead(settings.trade),
+            tradeOther: tradeOtherRead(settings.trade, settings.tradeOther),
             ...splitProfile(
                 settings.businessProfile,
                 await this.counters(
@@ -897,6 +930,8 @@ export class OrganizationSettingsService {
                 name: true,
                 slug: true,
                 kind: true,
+                trade: true,
+                tradeOther: true,
                 edition: true,
                 businessProfile: { select: PROFILE_SELECT },
             },
@@ -909,6 +944,11 @@ export class OrganizationSettingsService {
             name: organization.name,
             slug: organization.slug,
             kind: kindRead(organization.kind),
+            trade: tradeRead(organization.trade),
+            tradeOther: tradeOtherRead(
+                organization.trade,
+                organization.tradeOther,
+            ),
             ...splitProfile(
                 organization.businessProfile,
                 await this.counters(

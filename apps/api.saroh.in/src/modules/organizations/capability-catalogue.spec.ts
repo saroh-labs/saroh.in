@@ -4,7 +4,7 @@ import {
     CAPABILITY_GROUPS,
     grantableCapabilities,
 } from "./capability-catalogue";
-import { isNeverExtra, ORG_ACTIONS } from "./organization-policy";
+import { can, isNeverExtra, ORG_ACTIONS } from "./organization-policy";
 
 /**
  * The catalogue is what an owner picks permissions from, and `ORG_ACTIONS` is
@@ -234,5 +234,60 @@ describe("Count and move stock (#513)", () => {
         expect(grantableCapabilities().map((c) => c.action)).toContain(
             "inventory:write",
         );
+    });
+});
+
+describe("the public API powers (plan 2026-11-10-001, U2)", () => {
+    it("keeps API keys the Owner's alone, off the grantable list", () => {
+        expect(CAPABILITY_BY_ACTION.get("apikey:manage")?.ownerOnly).toBe(true);
+        expect(grantableCapabilities().map((c) => c.action)).not.toContain(
+            "apikey:manage",
+        );
+        expect(isNeverExtra("apikey:manage")).toBe(true);
+    });
+
+    it("offers webhooks to custom roles and as an extra", () => {
+        const webhooks = CAPABILITY_BY_ACTION.get("webhook:manage");
+        expect(webhooks?.label).toBe(
+            "Manage notifications to your systems (webhooks)",
+        );
+        expect(grantableCapabilities().map((c) => c.action)).toContain(
+            "webhook:manage",
+        );
+        expect(isNeverExtra("webhook:manage")).toBe(false);
+    });
+});
+
+describe("the Social powers (#1378, owner 12 Nov 2026)", () => {
+    it("lists See posts and Make and share posts under Social, grantable", () => {
+        expect(CAPABILITY_GROUPS).toContain("social");
+        const grantable = grantableCapabilities().map((c) => c.action);
+        for (const [action, label] of [
+            ["social:read", "See posts"],
+            ["social:post", "Make and share posts"],
+        ] as const) {
+            expect(CAPABILITY_BY_ACTION.get(action)?.label).toBe(label);
+            expect(CAPABILITY_BY_ACTION.get(action)?.group).toBe("social");
+            expect(grantable).toContain(action);
+            expect(isNeverExtra(action)).toBe(false);
+        }
+    });
+});
+
+describe("the Ask AI power (DEC-220, plan 2026-11-13-001 U7)", () => {
+    it("lists Use Ask AI under its own group, grantable, Owner and Admin by default", () => {
+        expect(CAPABILITY_GROUPS).toContain("ai");
+        expect(CAPABILITY_BY_ACTION.get("ai:use")).toMatchObject({
+            group: "ai",
+            label: "Use Ask AI",
+        });
+        expect(grantableCapabilities().map((c) => c.action)).toContain(
+            "ai:use",
+        );
+        expect(isNeverExtra("ai:use")).toBe(false);
+        expect(can("OWNER", "ai:use")).toBe(true);
+        expect(can("ADMIN", "ai:use")).toBe(true);
+        expect(can("MEMBER", "ai:use")).toBe(false);
+        expect(can("REVIEWER", "ai:use")).toBe(false);
     });
 });

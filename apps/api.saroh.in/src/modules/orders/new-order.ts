@@ -8,6 +8,7 @@ import { isReservedContactEmail } from "../contacts/contact-email";
 import { normalisePhone } from "../customer-workspace/duplicates";
 import { resolveContact } from "../customer-workspace/resolve-contact";
 import { ensureOrderInvoice } from "../invoices/order-invoicing";
+import { emitOrderWebhook } from "../outbound-webhooks/emitter";
 import { feeCents } from "./checkout-quote";
 import type { CreateOrderDto } from "./dto";
 import type { FulfilmentType, StorefrontFulfilmentType } from "./fulfilment";
@@ -435,6 +436,7 @@ export async function takeCounterPaymentInTx(
     });
     // Insights' orders figure (#867), with the payment.
     await recordOrderPaidInTx(tx, orderId, at);
+    await emitOrderWebhook(tx, "order.paid", orderId);
     if (!organizationId) return;
     await tx.orderEvent.create({
         data: {
@@ -633,6 +635,7 @@ export async function handOverAtCounterInTx(
         where: { id: orderId },
         data: { stage: "COLLECTED", status: "DELIVERED" },
     });
+    await emitOrderWebhook(tx, "order.status_changed", orderId);
     if (!organizationId) return;
     await tx.orderEvent.create({
         data: {

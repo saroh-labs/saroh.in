@@ -77,6 +77,8 @@ const NO_SLEEP_RULES = [
 
 export default [
     ...config,
+    // k6 runs these, not Node: `__ENV`, `k6/http` and no tsconfig to type them.
+    { ignores: ["load/**/*.k6.js"] },
     {
         files: ["**/*.ts"],
         rules: {

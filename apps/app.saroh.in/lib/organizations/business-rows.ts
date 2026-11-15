@@ -27,6 +27,7 @@ export const BUSINESS_TAB_PARAM = "section";
 /** The sheets, by tab, in the rows' order. */
 export const BUSINESS_SHEETS = [
     "kind",
+    "trade",
     "name",
     "logo",
     "legalName",
@@ -52,6 +53,7 @@ export type BusinessSheet = (typeof BUSINESS_SHEETS)[number];
 /** The tab a sheet's row is on. */
 export const BUSINESS_SHEET_TAB: Record<BusinessSheet, BusinessTab> = {
     kind: "identity",
+    trade: "identity",
     name: "identity",
     logo: "identity",
     legalName: "identity",
@@ -102,6 +104,7 @@ export const businessEditHref = (sheet: BusinessSheet) =>
  */
 export const BUSINESS_ROW_ID: Record<BusinessSheet, string> = {
     kind: "business-kind",
+    trade: "business-trade",
     name: "business-name",
     logo: "business-logo",
     legalName: "business-legal-name",

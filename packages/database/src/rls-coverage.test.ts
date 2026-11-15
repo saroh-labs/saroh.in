@@ -23,6 +23,22 @@ const NOT_TENANT_OWNED: Record<string, string> = {
     Session: "Better Auth session of a user; spans organizations.",
     Account: "Better Auth credential of a user; spans organizations.",
     Verification: "Better Auth email and reset tokens; no organization.",
+    // Sign-in for AI apps (plan 2026-11-10-001, U9): auth-owned like
+    // Session and Account. McpAuthGuard enforces the business on every call.
+    Jwks: "Better Auth's keys that sign AI apps' access tokens; no organization.",
+    OauthClient:
+        "An AI app registered with Saroh's sign-in (CIMD or dynamic registration); serves people of many businesses.",
+    OauthResource: "Better Auth's record of the MCP resource; no organization.",
+    OauthClientResource:
+        "Which AI app may ask for which resource; no organization.",
+    OauthRefreshToken:
+        "Better Auth refresh token of a person for an AI app; the business is its referenceId, checked by McpAuthGuard.",
+    OauthAccessToken:
+        "Better Auth opaque access token of a person for an AI app; refused by McpAuthGuard, which takes only signed tokens.",
+    OauthConsent:
+        "A person's grant to an AI app; the business is its referenceId, and AI connections read it only by that id from the context.",
+    OauthClientAssertion:
+        "A used client assertion id, kept against replay; no organization.",
     FeatureFlag:
         "Platform-wide flag definitions; no organizationId column (per-org overrides live in FeatureFlagOverride, which has its own policy).",
     Plan: "The global plan catalogue, shared by every organization.",
@@ -44,6 +60,10 @@ const NOT_TENANT_OWNED: Record<string, string> = {
         "An invitation to join Saroh's team (DEC-169, admin console U24), for someone who may have no account yet. Saroh's staff, not a business.",
     SarohLead:
         "Saroh's own sales lead (DEC-169, U20): someone who may become a business, from a saroh.in enquiry, the waitlist or a manager. Saroh's, not a business; the business it became is a plain wonOrganizationId.",
+    AiSetting:
+        "Saroh-wide AI settings (DEC-220): the model, effort, caps and prices every business's Ask AI runs on; a business's own change is an AiSettingOverride, which has its own policy.",
+    AiAlert:
+        "Saroh's own Ask AI alarms (DEC-220, U8): one row per alarm and window so each email goes once; Saroh-wide numbers, no business.",
     CommissionRate:
         "A commission rate for one kind of account-manager link (DEC-169, U21), set in the console; Saroh's own terms with its team, the same for every business.",
     CommissionPayout:

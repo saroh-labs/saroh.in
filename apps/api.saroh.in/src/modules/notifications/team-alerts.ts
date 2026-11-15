@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import type { OrgAction } from "../organizations/organization-actions";
 import type { AlertEvent } from "./alert-preferences";
 import type { NoticeColumns } from "./notice-target";
 
@@ -233,11 +234,12 @@ export interface WordedAlert extends NoticeColumns {
     /** No inbox notice: it is for people with no bell (a site's reviewers). */
     noBell?: boolean;
     /**
-     * A new website order (UX-042): the owners and admins are emailed
-     * unless they turned this row's email off, as of an enquiry, whatever
-     * the row's default.
+     * A new website order (UX-042): whoever holds this permission (the
+     * whole order, `order:read`: the owners and admins by default) is
+     * emailed unless they turned this row's email off, as of an enquiry,
+     * whatever the row's default. A permission, never a role's name.
      */
-    ownersAdminsByDefault?: boolean;
+    emailOnByDefaultFor?: OrgAction;
     /**
      * Email this site's reviewers instead of the row's choices (UX-043): a
      * review asked of them, or a new test release.

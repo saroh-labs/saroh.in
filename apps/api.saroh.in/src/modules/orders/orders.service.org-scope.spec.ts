@@ -1,3 +1,5 @@
+// Outbound webhooks (U13) have their own specs; these mocks have no endpoints table.
+jest.mock("../outbound-webhooks/emitter");
 // DB-free regression tests for organization stamping on create (#173).
 //
 // `20260719184929_commerce_org_scope` added a NULLABLE `organizationId` to the
@@ -38,6 +40,7 @@ jest.mock("@saroh/database", () => {
     const product = { findFirst: jest.fn() };
     const inventory = { findUnique: jest.fn(), update: jest.fn() };
     const storeSettings = { findUnique: jest.fn() };
+    const orderEvent = { create: jest.fn() };
     // A storefront is always a business's: its org numbers the order (P3).
     const store = {
         findUniqueOrThrow: jest
@@ -54,8 +57,9 @@ jest.mock("@saroh/database", () => {
             customer,
             product,
             inventory,
+            orderEvent,
             $transaction: jest.fn((cb) =>
-                cb({ order, customer, product, inventory }),
+                cb({ order, customer, product, inventory, orderEvent }),
             ),
         },
     };
@@ -67,7 +71,7 @@ import { prisma } from "@saroh/database";
 import type { ActivationEvents } from "../analytics/activation-events";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import type { StoresService } from "../stores/stores.service";
-import { OrdersService } from "./orders.service";
+import { ORDER_TAKEN_NOTE, OrdersService } from "./orders.service";
 
 const orderCreate = prisma.order.create as jest.Mock;
 const orderCount = prisma.order.count as jest.Mock;
@@ -179,6 +183,22 @@ describe("OrdersService.create — organization stamping (#173)", () => {
             ORG,
             { event: "order", orderId: "order_1", actorUserId: USER },
         ]);
+    });
+
+    it("puts who took it on the order's timeline (owner, 13 Nov 2026)", async () => {
+        await makeService({ organizationId: ORG }).create(STORE, USER, DTO);
+
+        const event = prisma.orderEvent.create as jest.Mock;
+        expect(event).toHaveBeenCalledTimes(1);
+        expect(event.mock.calls[0][0].data).toEqual({
+            organizationId: ORG,
+            orderId: "order_1",
+            kind: "STATUS",
+            actorUserId: USER,
+            fromStatus: null,
+            toStatus: null,
+            note: ORDER_TAKEN_NOTE,
+        });
     });
 
     it("queues no alert for a legacy org-less store: there is no team to tell", async () => {

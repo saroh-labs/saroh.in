@@ -5,7 +5,7 @@
 
 /** A free-licence Unsplash photograph, hot-linked and credited, or a generated image (`data:`). */
 export interface StudioImage {
-    /** `https://images.unsplash.com/photo-…?w=1600&q=80&auto=format&fit=crop`, or a `data:image/svg+xml` URI. */
+    /** `https://media.saroh.io/demo/photo-.jpg…?w=1600&q=80&auto=format&fit=crop`, or a `data:image/svg+xml` URI. */
     url: string;
     alt: string;
     width: number;

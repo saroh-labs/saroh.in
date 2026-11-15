@@ -9,7 +9,7 @@ import { isLive } from "./resources";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-10-31";
+export const UPDATED = "2026-11-14";
 
 /**
  * Help (Resources plan U5, design "Saroh Resources - Help" 1a and 2a): the
@@ -23,8 +23,14 @@ export const UPDATED = "2026-10-31";
  *
  * - only published articles are listed (KTD-2); a group or area with none
  *   is not drawn, and nothing shows a count;
- * - every step's picture is a real capture (`shots.captured.ts`), never a
- *   drawn panel: an article whose step has none fails validation;
+ * - every picture of a Saroh screen is a real capture
+ *   (`shots.captured.ts`): an article whose step has none fails validation.
+ *   Only a step in another company's app (Claude, ChatGPT) is a drawn
+ *   panel, captioned as a drawing, and a step listing apps has app cards
+ *   instead (plan 2026-11-13-002, U9). An article waiting on a release
+ *   switch (`feature`) may name a shot still to be captured: it draws a
+ *   placeholder until then, and is captured before the switch turns on;
+ * - an article waiting on a switch is live only while it is on;
  * - "Updated" is the article's own `updated` day, set by hand when its
  *   words or shots change (R20);
  * - no price, plan limit or plan contents anywhere (DEC-078);
@@ -44,6 +50,8 @@ export const HELP_AREAS = [
     "Payments",
     "Website",
     "Team and roles",
+    "AI apps and API",
+    "Share and posts",
 ] as const;
 export type HelpArea = (typeof HELP_AREAS)[number];
 
@@ -57,6 +65,8 @@ export const HELP_GROUPS = [
     "Monthly plans",
     "Your website",
     "Invoices and GST",
+    "Use AI apps and the API",
+    "Share and post",
 ] as const;
 export type HelpGroup = (typeof HELP_GROUPS)[number];
 
@@ -91,6 +101,8 @@ export interface HelpSummary {
     group: HelpGroup;
     order: number;
     publishOn: IsoDay;
+    /** The release switch it waits for, when it waits for one. */
+    feature?: string;
 }
 
 /** An article's summary, from its frontmatter (or anything with those fields). */
@@ -102,18 +114,23 @@ export function summarise(fm: HelpSummary): HelpSummary {
         group: fm.group,
         order: fm.order,
         publishOn: fm.publishOn,
+        ...(fm.feature ? { feature: fm.feature } : {}),
     };
 }
 
 const byOrder = (a: HelpSummary, b: HelpSummary) =>
     a.order - b.order || a.title.localeCompare(b.title);
 
-/** The articles live at `ctx`, in order. */
+/** The articles live at `ctx`, in order: published, and not waiting on a switch that is off. */
 export function liveArticles<T extends HelpSummary>(
     articles: readonly T[],
     ctx: PublishContext,
 ): T[] {
-    return articles.filter((a) => isLive(a, ctx)).sort(byOrder);
+    return articles
+        .filter((a) =>
+            isLive({ publishOn: a.publishOn, waitsFor: a.feature }, ctx),
+        )
+        .sort(byOrder);
 }
 
 /** The home's groups, each with its articles; a group with none is left out (R17). */

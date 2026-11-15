@@ -42,6 +42,7 @@ import {
     tellOrderCustomer,
 } from "./order-customer-note";
 import { isServiceLine } from "./order-line";
+import { assertOrdersAtOwnLocation } from "./order-location";
 import { fromCents, toCents, withGstRates } from "./order-pricing";
 import { lockOrder } from "./order-stage-write";
 
@@ -104,6 +105,8 @@ export class OrderFulfilmentChangeService {
         dto: ChangeFulfilmentDto,
     ): Promise<FulfilmentChangeOutcome> {
         authorize(ctx, "order:edit");
+        // A location's team changes its own storefronts' orders (DEC-074).
+        await assertOrdersAtOwnLocation(ctx, [orderId]);
         const newShippingCents = toCents(dto.shipping);
 
         if (dto.address) {

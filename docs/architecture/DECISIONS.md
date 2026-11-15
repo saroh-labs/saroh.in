@@ -159,7 +159,7 @@ Unless an entry says otherwise, its status is **Proposed — requires audit revi
 
 ## DEC-015 AI provider abstraction
 
-**Status: Deferred — revisit after Stages 0–7 are operating**
+**Status: Superseded by DEC-220 (2026-11-13)** · was Deferred — revisit after Stages 0–7 are operating
 
 - Context: AI is roadmap-only.
 - Options considered for later: direct SDK per feature; generic text endpoint; job-based AI domain with provider adapters.
@@ -2873,3 +2873,104 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - **The other entry points keep DEC-068's minimum**: Home's first run, the module picker and "Also sell" still ask for it.
 - The API accepts each module's setup with any field blank or absent, makes nothing it wasn't asked for, and still takes the full payload the sheet sent before.
 - Known limit: Bookings' hours live on its services, so hours set in the sheet with no first service are not kept. They are set again on the first service.
+
+## DEC-213 Saroh's own WhatsApp sender goes to Meta's Cloud API directly
+
+**Status: Accepted — 2026-11-10** · owner · amends DEC-191's sender
+
+- Decision (owner, 10 Nov 2026): Saroh's own WhatsApp sender (sign-in and verification codes, utility templates, replies inside the 24-hour window) moves from MSG91 to Meta's WhatsApp Cloud API, called directly. The WhatsApp account already belongs to Saroh Labs, so nothing migrates: the same number, display name and approved templates.
+- **SMS and the MSG91 phone sign-in widget stay on MSG91.** The Meta adapter hands `sendSms` and the widget's token check to the MSG91 adapter unchanged.
+- **The switch is one server setting, `MESSAGING_PROVIDER=meta`.** MSG91 stays the default until the cut-over day, so nothing changes in production on merge.
+- Meta's delivery reports and inbound messages come to Saroh's own webhook, checked by Meta's signature over the raw body, and change the same records MSG91's do: a verification send charged once or given back, statuses forward only, the 24-hour reply window.
+- Trade-off: no partner fee and direct control over the number. In exchange Saroh runs the webhook, template approvals and Meta support itself.
+- **MSG91's WhatsApp code path is kept, not deleted**, until Meta has run in production for a while.
+- Rules: `apps/api.saroh.in/src/modules/messaging/providers/meta-cloud.provider.ts`, `meta-webhook.controller.ts`, `delivery-reports.ts`; setup in `docs/architecture/MESSAGING_MSG91.md`.
+
+## DEC-214 Encryption keys are key rings in the server settings
+
+**Status: Accepted — 2026-11-12** · owner
+
+- Decision (owner, 12 Nov 2026, "keep it simple"): each of the API's five encryption keys (`PAYMENTS_ENC_KEY`, `STAFF_PII_ENC_KEY`, `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY`) is a key ring in the server settings. The variable holds one key, as before (id `v1`), or several, newest first: `v2:<key>,v1:<key>`.
+- New values are sealed and fingerprinted with the newest key and carry its id at the front of the stored ciphertext or fingerprint (`v2:...`), with no schema change. A value with no id is `v1`, so everything stored before the ring still opens, and values under `v1` are still stored with no id.
+- A lookup by fingerprint matches under any key on the ring. An API key's fingerprint moves to the newest key the next time the key is used; it can't be redone otherwise, as the token isn't kept.
+- After a new key is added, `keys-reseal` moves every sealed value onto it, and the old id is then removed (`docs/architecture/runbooks/KEY_ROTATION.md`).
+- A managed key service (Google Cloud KMS or AWS KMS) may come later. It fits the ring as another key id whose entry names it, so stored values don't change. Nothing is built for it now.
+- Why: any key can be replaced, routinely or after a leak, without breaking stored data; it stays simple, with no new service.
+- Rules: `apps/api.saroh.in/src/common/crypto.ts`, `src/cli/keys-reseal.ts`.
+
+## DEC-215 An AI app publishes a website in two steps
+
+**Status: Accepted — 2026-11-12** · owner
+
+- Decision (owner, 12 Nov 2026, "to let the users know what is happening"): an AI app can't publish in one call. `preview_publish` answers with what will go live, the preview link, whether it goes live or to the reviewers, and a confirmation code; `publish_site` publishes only with that code.
+- The code is single-use, lasts 10 minutes, and is bound to the connection, the business, the site and the exact draft the summary described. A draft changed since is refused, and the app is told to ask again.
+- Why: the tool's description and its destructive hint only ask the AI app to check with the person; a misbehaving app could skip that. The code makes Saroh, not the app, enforce that the person saw what goes live.
+- Rules: `apps/api.saroh.in/src/modules/mcp/publish-codes.ts`, `tools/site.tools.ts`.
+
+## DEC-216 A business has a trade, and the website template choice is pictures, a preview of your own site, and the trade's suggestions first
+
+**Status: Accepted — 2026-11-12** · owner · after the website templates UX audit (NOT DONE 4.3/10)
+
+- Decision (owner, 12 Nov 2026, "it should store the trade" and "a mix of A, B and C"):
+    - **A business stores its trade**, one of the template kinds (`salon`, `gym`, `clinic`, `coach`, `food`, `shop`, `creator`, `other`), or none. Setup asks "What kind of place is it?" on its first step for every business, not only under Bookings, and a template picked in the public gallery (`?template=`) carries through sign-up into setup. Settings › Business shows it and lets the Owner change it. This takes up DEC-189's deferred "picking the trade at signup".
+    - **The template choice is one pattern in every place it appears** (Turn on Website, New site, the editor's Template row): picture cards, "Suggested for <trade>" first, then the templates that need a module the business has off, with the reason, and All one press away.
+    - **Pressing a card opens a full preview**, desk and phone with its colourways, drawn with the business's own name and details, and says what goes in. Choosing is a separate press.
+    - **In the editor**, changing template opens the same preview, then asks before replacing any pages.
+    - **An AI app's `list_templates` suggests the same way** (the trade first, the rest "also available"); while the app's template choice is off (`NEXT_PUBLIC_TEMPLATES`, DEC-135), an AI app starts a site from the trade's default template, as the app does.
+- Rollout: templates stay off in production (DEC-135) until MCP testing ends; on in development.
+- Designs: canvas "Saroh App Designs 2", page "Website templates: audit and previews", row D.
+- 12 Nov: the trade is a dropdown of the categories with Other and a typed trade; it ships before templates. (`Organization.tradeOther`, 2 to 60 characters, kept only while the trade is `other`.)
+- 13 Nov (owner, "1 and 2 are fine for now", "let me know if we can add image previews"): `list_templates` gives each template a `preview_url` (the business's own app, `/open/:business?to=/sites/new?template=:id`, where the picker previews their own site in it; null while templates aren't chosen) and a `picture_url` (the app's card picture, `public/templates/:id.webp`; also null while templates aren't chosen, so production shows none until `SITE_TEMPLATE_CHOICE` is on), and sends the first four pictures as MCP image content so the AI app can see them. Picture cards drawn in the chat (MCP Apps, as Canva does) are later. Rules: `apps/api.saroh.in/src/modules/mcp/tools/template-previews.ts`.
+- Rules: `Organization.trade` (CHECK on the template kinds) and `Organization.startTemplate` (the gallery's `?template=`, carried by accounts' `withTemplate`), read through `apps/api.saroh.in/src/modules/organizations/organization-trade.ts`; the suggestion rule is `packages/templates/src/suggest.ts`, read by the app's picker and MCP's `list_templates`; the API half of the template switch is the `SITE_TEMPLATE_CHOICE` flag (seeded on; turned on in the development admin; off in production with `NEXT_PUBLIC_TEMPLATES`); setup's chips and Settings' row are `apps/app.saroh.in/lib/organizations/trade.ts`.
+- Rules: `apps/api.saroh.in/src/modules/mcp/publish-requests.ts`, `tools/site.tools.ts`.
+- **Superseded in part, 12 Nov 2026 (owner, "make sure the app asks for confirmation always"): the person confirms in Saroh; an AI app can't publish.** `preview_publish` makes a publish request bound to the connection, the business, the site and the exact draft, and answers with the summary, the preview link, whether it goes live or to the reviewers, and a link into the business's own app (`/open/:business?to=/sites/:site/publish-requests/:request`). `publish_site` is gone; its place is the read-only `get_publish_request` (waiting, published, sent for approval, declined or expired), so the tool count is unchanged and no tool an app can call publishes. On that screen a signed-in person with `site:publish` there, whoever asked, chooses Publish (or Send for approval) or Don't publish; the POST to `…/publish-requests/:request/confirm` or `/decline` checks the request is open and for this business and site, and, under the site's lock, that the draft is still the one prepared, then publishes or makes the approval request as the Website screen does. It is audited as that person, naming the app (`ai_connection.publish_request_answered`), and shown on the connection's change list. A request lasts 24 hours, is single-use, and a newer preview for the site ends older open ones. The link carries only the request's unguessable token, stored as a digest; opening it never publishes. Rules: `publish-requests.ts`, `publish-requests.service.ts`, `apps/app.saroh.in/app/(shell)/sites/[siteId]/publish-requests/`.
+
+## DEC-218 Access follows the permission matrix; the business role wins; Storefront team takes orders and payments at its own storefronts
+
+**Status: Accepted — 2026-11-13** · owner · amends DEC-048 and DEC-074
+
+- Decision (owner, 12 Nov 2026): who may do something is decided by the permissions a person holds (their role's row in the matrix plus their own extra permissions, F17), never by a role's name, in every module. Emails, alerts, the bell, Home's staff view, project access and storefront team management read permissions. Approving a publish without review and downloading everything stay Owner only and are shown locked on the Roles screen (`site:approval:override`, `org:export`).
+- Decision (owner, 12 Nov 2026), amends DEC-048: **the business role wins.** A storefront role (Owner, Admin, Manager, Editor on one storefront) no longer adds powers on top of the person's business role; storefront writes, customers and orders ask the business permissions. Storefront roles may be retired later.
+- Decision (owner, 13 Nov 2026), amends DEC-074: the built-in **Storefront team** role takes, changes and moves orders and takes their payments (cash, UPI, card, pay links, a payment recorded by hand), **only at the storefronts the person works on**; an order elsewhere is not found, and a write to one is refused. Taking orders shows their prices. It still has no refunds, cancels, export, customers, bookings or payment settings. Every business's existing Storefront team role gains `order:create` and `order:edit` (migration `20270204120000_storefront_team_take_orders`); owners see it on the Roles screen and the Team notice.
+- Every order a person takes, and every payment and pay link, names them on the order's timeline.
+- Later (owner, 12 Nov): a per-role "sees only their own" scope, so a business can make roles like "own diary only".
+- Rules: `docs/patterns/backend-auth-and-access.md`, `apps/api.saroh.in/src/modules/orders/order-location.ts`, `apps/api.saroh.in/src/modules/stores/stores.service.ts`, `apps/api.saroh.in/src/modules/organizations/team-powers.ts`.
+
+## DEC-217 Share as a post is free on every plan, in the business's own look
+
+**Status: Accepted — 2026-11-12** · owner
+
+- Decision (owner, 12 Nov 2026): a business shares a product, a service or class, a blog post, an offer or its booking page as a ready post from its page or from Create post (Grow › Social), and makes its own post from a headline, its own photo or both. Share now (download, copy the caption, WhatsApp, Facebook, a phone's share sheet) is free on every plan. A single booking is never shareable: it is private and has no page.
+- Ready cards are drawn in the business's own look (its site's colours, fonts and logo, never Saroh's): styles Photo, Price tag, Offer, Simple and Colour, in sizes Post, Square and Story. A layout that needs what the item hasn't got (a price, a live offer, a photo) isn't offered.
+- The API draws them with Takumi, not next/og: next/og can't shape Indian scripts (it drew दिवाली as दविाली), and the API bundles Noto fonts for eight of them. Public pictures are live items only.
+- Own posts are stored per business (`SharePost`, tenant-isolated like its neighbours), so their picture can be drawn; their words are capped and drawn only as text. Who may see and make them follows the Social permissions in the role matrix (`social:read`, `social:post`; Owner and Admin by default, grantable per role or person), never role names.
+- Words someone types for a card that isn't saved (the booking page's headline) are drawn only through a signed-in route for the business's own people, so nobody can draw any text in a business's look from a public address.
+- Saroh Social later adds channels and scheduling to the same Create post page; until then Channels and Schedule are drawn locked, and Share now still works.
+- It ships dark: `SHARE_POSTS` (API, 404 while off) and `NEXT_PUBLIC_SHARE_POSTS` (app) are on in development and off in production until the owner opens it.
+- Rules: `apps/api.saroh.in/src/modules/share-posts/`, `apps/app.saroh.in/components/shared/share-item/`, `apps/app.saroh.in/components/social/create-post/`, `docs/plans/2026-11-12-003-feat-share-cards-and-create-post-plan.md`.
+
+## DEC-219 Monthly plan limits count over the billing period
+
+**Status: Accepted — 2026-11-13** · owner
+
+- Decision (owner, 13 Nov 2026): "Limits reset when the billing cycle resets." Every monthly plan limit (orders, bookings and visits a month, and any monthly limit added later) counts over the business's current billing period when it is on a paid plan, a trial or a payment due included.
+- A business with no billing period (Free, no subscription, a cancelled one, the legacy floor) keeps the calendar month in its own zone, as before.
+- A yearly plan's monthly limits still reset every month, on its anniversary day (the day its period starts), not once a year. A period that starts on a day a short month hasn't got (the 31st) resets on that month's last day.
+- A limit notice is told once per window, so a new period (or a move between Free and a paid plan) can tell it again; its "resets on" date is the window's end, in the business's zone.
+- One rule for every limit, in one place: `meterWindow` in `apps/api.saroh.in/src/modules/billing/metering.ts`. Enforcement, usage on Plan and billing, limit notices and the admin's impact counts all read it.
+
+## DEC-220 Saroh's AI layer and Ask AI (replaces DEC-015)
+
+**Status: Accepted — 2026-11-13** · owner
+
+- Context: DEC-015 deferred all AI work until the core platform was operating. It is, and businesses ask for answers about their own data in their own words, in English, Hinglish and Hindi.
+- Decision: build one **AI layer** in the API (`modules/ai/`) that every agent uses, and **Ask AI** as its first agent, in the Saroh app only, on paying plans.
+    - The agent loop runs on the Vercel AI SDK core, pinned and kept inside the module behind Saroh's own stream events. Claude comes from Anthropic directly; Saroh chooses each agent's model as an admin setting; merchants never choose a model or bring keys.
+    - Answers come only from Saroh's own MCP v1 tool functions, called in-process with the asker's permissions, plus summary tools that share Home and Insights figures. No AI-written SQL, no screen APIs.
+    - The AI never saves. A write is a draft validated by the forms' own rules; the person's Confirm runs the normal action, audited "via Ask AI". No deletes, cancels or refunds.
+    - Access follows the permission matrix ("Use Ask AI") and the plan; answers cover only what the person may see; customer-written text is never an instruction.
+    - Conversations are kept for 90 days, visible only to the person who had them, encrypted at rest; logs hold no text. Data is processed by Anthropic outside India, disclosed in the privacy policy and the sub-processor list.
+    - Usage is counted per question per billing period (DEC-219), with per-person records; cost guards per question, per business per day, and Saroh-wide with an automatic off switch.
+    - A quality test of real questions with fixed pass marks must pass before the merchant screens are built, and again before any model or instruction change reaches businesses.
+- Consequences: one module, one event stream and one tool registry serve every later agent; switching a provider later touches only the module. Prices, allowances and cost limits live in the plan catalogue and admin settings, not in the code.
+- Supersedes: DEC-015.

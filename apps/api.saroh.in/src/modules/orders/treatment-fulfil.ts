@@ -1,6 +1,7 @@
 import type { OrderStage, Prisma } from "@saroh/database";
 
 import { treatmentProgressInTx } from "../bookings/visits";
+import { emitOrderWebhook } from "../outbound-webhooks/emitter";
 
 /*
  * A treatment's order is fulfilled by its visits (B14, DEC-050, default 40):
@@ -68,6 +69,7 @@ export async function settleTreatmentInTx(
             data: { stage: "DELIVERED", status: "DELIVERED" },
             select: { id: true },
         });
+        await emitOrderWebhook(tx, "order.status_changed", orderId);
         await tx.orderEvent.create({
             data: {
                 organizationId: actor.organizationId,
@@ -99,6 +101,7 @@ export async function settleTreatmentInTx(
             data: { stage, status },
             select: { id: true },
         });
+        await emitOrderWebhook(tx, "order.status_changed", orderId);
         await tx.orderEvent.create({
             data: {
                 organizationId: actor.organizationId,

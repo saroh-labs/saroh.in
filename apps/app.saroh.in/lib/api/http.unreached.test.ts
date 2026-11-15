@@ -80,6 +80,21 @@ describe("a write that didn't reach the API", () => {
         ).resolves.toEqual({ ok: false, error: UNREACHED, unreached: true });
     });
 
+    it("a 5xx says the action's own sentence, never 'Internal server error'", async () => {
+        write(() =>
+            Promise.resolve(
+                json(503, {
+                    statusCode: 503,
+                    message: "Internal server error",
+                }),
+            ),
+        );
+        const made = await mutate("/x", "POST", {}, "Could not save.");
+        expect(made).toMatchObject({ ok: false, error: "Could not save." });
+        const gone = await destroy("/x", "Could not delete.");
+        expect(gone).toMatchObject({ ok: false, error: "Could not delete." });
+    });
+
     it("destroy offline answers it too", async () => {
         write(offline);
         await expect(

@@ -8,6 +8,7 @@ export const NOT_AVAILABLE = [
     /sends? (a |the )?reminders?/,
     /whatsapp (message )?sent/,
     /sent (on|by|via|over) whatsapp/,
+    /whatsapp reminders?/,
     /saroh sends/,
     /buy now/,
     /cart\b/,

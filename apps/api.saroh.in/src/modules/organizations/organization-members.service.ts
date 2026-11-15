@@ -16,6 +16,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { workspaceAction } from "../analytics/product-milestones";
+import { keyContextCache } from "../api-keys/key-context.cache";
 import {
     AuditAction,
     AuditOutcome,
@@ -790,6 +791,8 @@ export class OrganizationMembersService {
             },
             { isolationLevel: "Serializable" },
         );
+        // Keys this person made act with their new role on the next call.
+        keyContextCache.forgetOrganization(ctx.organizationId);
 
         await this.audit.record({
             action: AuditAction.MembershipRoleUpdate,
@@ -933,6 +936,7 @@ export class OrganizationMembersService {
                 "Someone changed this person's role or permissions while you were editing. Reload to see them, then try again.",
             );
         }
+        keyContextCache.forgetOrganization(organizationId);
 
         await this.audit.record({
             action: AuditAction.MembershipExtrasUpdate,
@@ -1067,7 +1071,7 @@ export class OrganizationMembersService {
             await this.assertNotLastOwner(organizationId, userId, what);
         }
 
-        return prisma.$transaction(
+        const detached = await prisma.$transaction(
             async (tx) => {
                 if (role === "OWNER") {
                     // Again inside the transaction: two owners removing each
@@ -1140,6 +1144,9 @@ export class OrganizationMembersService {
             },
             { isolationLevel: "Serializable" },
         );
+        // Their keys stop at once (401 key_owner_inactive) on this replica.
+        keyContextCache.forgetOrganization(organizationId);
+        return detached;
     }
 
     private async requireMembership(ctx: OrganizationContext, userId: string) {

@@ -1,6 +1,7 @@
 import { holdOpenLines } from "../backfill/held-stock";
 import { assertDatabaseTarget } from "../database-target";
 import { alignOrderNumberSequence } from "../order-number";
+import { seedAskAi } from "./ask-ai";
 import { seedCalendarOnlyTeammate } from "./calendar-only-teammate";
 import {
     ANALYTICS_DAYS,
@@ -276,6 +277,23 @@ export async function seed(): Promise<void> {
         },
     });
 
+    /*
+     * Choosing a website template from an AI app (DEC-216): on in local
+     * development, CI and the gate, as on the development environment (set
+     * in its admin). Production has no row until templates open (DEC-135).
+     */
+    await prisma.featureFlag.upsert({
+        where: { key: "SITE_TEMPLATE_CHOICE" },
+        update: {},
+        create: {
+            id: "flag_SITE_TEMPLATE_CHOICE",
+            key: "SITE_TEMPLATE_CHOICE",
+            description:
+                "An AI app's website starts from the template it chose (DEC-216). On in development, off in production until templates open.",
+            enabledByDefault: true,
+        },
+    });
+
     await prisma.featureFlag.upsert({
         where: { key: "WEB_ADDRESS_CHANGE" },
         update: {},
@@ -373,6 +391,9 @@ export async function seed(): Promise<void> {
     // Three with no email of their own, Communications rolled out for them
     // alone, one on an enforced entry plan (#850; `email-setup-prompt.spec.ts`).
     await seedEmailPromptBusinesses(prisma, founderId, now);
+    // Ask AI on for Northwind and one entry-plan business, and the AI
+    // settings a turn reads, as made-up test values (`ask-ai.spec.ts`).
+    await seedAskAi(prisma, org.id, user.id);
     // One of Asha's on a plan that ends in ten days (#805;
     // `plan-ending.spec.ts`).
     await seedPlanEndingBusiness(prisma, founderId, now);

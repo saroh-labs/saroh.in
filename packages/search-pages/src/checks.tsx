@@ -159,7 +159,8 @@ function drawingsText(p: SearchPageData): string {
 const word = (w: string) => new RegExp(`(?<![\\w-])${w}(?![\\w-])`);
 
 export function searchPageChecks(p: SearchPageData): SearchPageCheck[] {
-    const page = `${textOf(renderToStaticMarkup(<SearchPage page={p} />))} ${p.title} ${p.description}`;
+    // Every switch on, so the AI asks and the new Also items are held to the claims too.
+    const page = `${textOf(renderToStaticMarkup(<SearchPage page={p} off={[]} />))} ${p.title} ${p.description}`;
     const t = page.toLowerCase();
     const drawn = drawingsText(p);
     const dt = drawn.toLowerCase();

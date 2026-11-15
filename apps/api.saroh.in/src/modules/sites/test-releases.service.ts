@@ -20,6 +20,7 @@ import { queueReviewAlert } from "./review-alert-queue";
 import { draftFingerprint } from "./review-route";
 import { assertSiteInOrg } from "./site-access";
 import { publicationTemplate } from "./site-template-record";
+import type { ConfirmDraft } from "./sites.service";
 import { SitesService } from "./sites.service";
 import { goLiveWithRelease } from "./test-release-go-live";
 import type {
@@ -100,6 +101,7 @@ export class TestReleasesService {
         ctx: OrganizationContext,
         siteId: string,
         input: { name?: string; note?: string | null },
+        options: { confirm?: ConfirmDraft } = {},
     ): Promise<CreatedTestReleaseView> {
         const site = await this.gate(ctx, "site:update", siteId);
 
@@ -122,6 +124,7 @@ export class TestReleasesService {
             // them (`lockSite`): the TEST row's foreign key needs the
             // business's row, which a web-address change holds.
             await lockSite(tx, site.id);
+            await options.confirm?.(tx, draft);
             const last = await tx.siteTestRelease.findFirst({
                 where: { siteId, organizationId: ctx.organizationId },
                 orderBy: { number: "desc" },

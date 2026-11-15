@@ -47,13 +47,33 @@ export interface HomeNarrow {
 export const WHOLE_BUSINESS: HomeNarrow = { storeIds: null, staff: null };
 
 /**
- * Whether this viewer lands on the staff view: anyone below Admin who
- * isn't a Reviewer. A role the business made resolves to `MEMBER` in the
- * request context, so Front desk and Dentist are staff too; what each of
- * them sees is still their own capabilities'.
+ * The reads that make Home the business's: its money, whole. Someone who
+ * holds none of them runs a part of the day, not the business.
+ */
+const BUSINESS_HOME_READS = [
+    "order:read",
+    "invoice:read",
+    "payment:read",
+] as const;
+
+/**
+ * Whether this viewer lands on the staff view: asked of their resolved
+ * permissions (role and extras), never the role's name (audit 2026-11-12
+ * #8). Anyone but a Reviewer who holds none of {@link BUSINESS_HOME_READS}
+ * is staff, so a role the business made with every power gets the
+ * business's Home, and an Admin narrowed to the front desk gets the staff
+ * one. The two scoped roles (Calendar only, a location's team) are always
+ * staff: their reads are their own diary's and storefronts' only.
  */
 export function isStaffView(input: HomeInput): boolean {
-    return input.organizationRole === "MEMBER" && Boolean(input.userId);
+    if (!input.userId || input.organizationRole === "REVIEWER") return false;
+    if (
+        isDiaryScoped(input.organizationRoleKey) ||
+        isLocationScoped(input.organizationRoleKey)
+    ) {
+        return true;
+    }
+    return !BUSINESS_HOME_READS.some((action) => holds(input, action));
 }
 
 /**

@@ -14,6 +14,7 @@ import {
     PublicVerificationsController,
 } from "./messaging.controller";
 import { MESSAGING_SEND_TYPE, MessagingService } from "./messaging.service";
+import { MetaWebhookController } from "./meta-webhook.controller";
 import { Msg91WebhookController } from "./msg91-webhook.controller";
 import { TopupService } from "./topup.service";
 import { WALLET_SWEEP_TYPE, WalletSweepHandler } from "./wallet-sweep.handler";
@@ -38,6 +39,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         MessagingController,
         PublicVerificationsController,
         Msg91WebhookController,
+        MetaWebhookController,
     ],
     providers: [
         billingProviderFactoryProvider,

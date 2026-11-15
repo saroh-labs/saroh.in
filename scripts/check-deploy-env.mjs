@@ -53,6 +53,13 @@ function workflowSecrets(pkg, environment) {
     if (pkg === "web" || pkg === "sites") names.push("SITE_RELAY_SECRET");
     return names;
 }
+/**
+ * Apps whose build needs no setting, so their next.config has nothing to
+ * refuse: the docs, a static export whose one setting (the environment's API
+ * host) falls back to India's production one, never to a broken page.
+ */
+const NO_REQUIRED_VARS = new Set(["docs"]);
+
 const WORKFLOW_CONDITIONS = [
     '[ "${{ matrix.env }}" = development ] && [ "${{ matrix.pkg }}" != sites ]',
     '[ "${{ matrix.pkg }}" = web ] || [ "${{ matrix.pkg }}" = sites ]',
@@ -134,7 +141,7 @@ for (const [pkg, dir] of Object.entries(APPS)) {
             );
 
         const bareError = loadError(config, markers);
-        if (!bareError)
+        if (!bareError && !NO_REQUIRED_VARS.has(pkg))
             problems.push(
                 `${config}: a ${environment} build with no settings loads; its required-variables check is gone`,
             );

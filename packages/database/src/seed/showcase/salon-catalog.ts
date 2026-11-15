@@ -47,7 +47,7 @@ const SHEESHAM = {
 /** Every photograph used below, looked at before it was chosen. */
 const P = {
     shampoo: {
-        url: "https://images.unsplash.com/photo-1597931752949-98c74b5b159f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1597931752949-98c74b5b159f.jpg",
         alt: "A plain white pump bottle of shampoo standing on folded brown linen",
         width: 1600,
         height: 2400,
@@ -55,7 +55,7 @@ const P = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     shampooB: {
-        url: "https://images.unsplash.com/photo-1655892810227-c0cffe1d9717?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1655892810227-c0cffe1d9717.jpg",
         alt: "A white pump bottle leaning against a pink wall in striped window light",
         width: 1600,
         height: 1067,
@@ -63,7 +63,7 @@ const P = {
         creditUrl: "https://unsplash.com/@andrzejgdula",
     },
     conditioner: {
-        url: "https://images.unsplash.com/photo-1585232350744-974fc9804d65?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1585232350744-974fc9804d65.jpg",
         alt: "A tall white pump bottle of conditioner on a plain white surface",
         width: 1600,
         height: 2400,
@@ -71,7 +71,7 @@ const P = {
         creditUrl: "https://unsplash.com/@sincerelymedia",
     },
     colourProtect: {
-        url: "https://images.unsplash.com/photo-1740327123574-05b0efdec29f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1740327123574-05b0efdec29f.jpg",
         alt: "A dark pump bottle with a simple numbered label in warm side light",
         width: 1600,
         height: 1600,
@@ -79,7 +79,7 @@ const P = {
         creditUrl: "https://unsplash.com/@eladepure",
     },
     keratinShampoo: {
-        url: "https://images.unsplash.com/photo-1655892817271-c66841c2506e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1655892817271-c66841c2506e.jpg",
         alt: "A white pump bottle on a dark tray with leaves and a glass soap dish",
         width: 1600,
         height: 1062,
@@ -87,7 +87,7 @@ const P = {
         creditUrl: "https://unsplash.com/@andrzejgdula",
     },
     antiDandruff: {
-        url: "https://images.unsplash.com/photo-1574670700790-fa314ab37787?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1574670700790-fa314ab37787.jpg",
         alt: "An amber glass bottle with a blank label on a dark mat",
         width: 1600,
         height: 2400,
@@ -95,7 +95,7 @@ const P = {
         creditUrl: "https://unsplash.com/@trine",
     },
     volume: {
-        url: "https://images.unsplash.com/photo-1707539159841-40a0db23ddc6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1707539159841-40a0db23ddc6.jpg",
         alt: "A blush-pink pump bottle on linen against a terracotta wall with palm shadows",
         width: 1600,
         height: 2400,
@@ -103,7 +103,7 @@ const P = {
         creditUrl: "https://unsplash.com/@dagerotip",
     },
     purple: {
-        url: "https://images.unsplash.com/photo-1631390179103-56176154bc95?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1631390179103-56176154bc95.jpg",
         alt: "A violet glass bottle against a sage-green wall",
         width: 1600,
         height: 2344,
@@ -111,7 +111,7 @@ const P = {
         creditUrl: "https://unsplash.com/@pmvch",
     },
     neem: {
-        url: "https://images.unsplash.com/photo-1775126454577-4846f3e55cc5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1775126454577-4846f3e55cc5.jpg",
         alt: "A dark pump bottle of botanical shampoo beside a small amber dropper bottle",
         width: 1600,
         height: 2405,
@@ -119,7 +119,7 @@ const P = {
         creditUrl: "https://unsplash.com/@apothecary87",
     },
     mask: {
-        url: "https://images.unsplash.com/photo-1763503839418-2b45c3d7a3c3?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1763503839418-2b45c3d7a3c3.jpg",
         alt: "An open white jar of thick cream hair mask resting on a grey rock",
         width: 1600,
         height: 1600,
@@ -127,7 +127,7 @@ const P = {
         creditUrl: "https://unsplash.com/@eve__3d",
     },
     mask2: {
-        url: "https://images.unsplash.com/photo-1631438420064-8f1b2b52b2e6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1631438420064-8f1b2b52b2e6.jpg",
         alt: "An amber glass jar with a gold lid on a warm beige surface",
         width: 1600,
         height: 1067,
@@ -135,7 +135,7 @@ const P = {
         creditUrl: "https://unsplash.com/@pmvch",
     },
     serum: {
-        url: "https://images.unsplash.com/photo-1781344116880-029945a42b75?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1781344116880-029945a42b75.jpg",
         alt: "An amber dropper bottle with a white label on a stone plinth",
         width: 1600,
         height: 1067,
@@ -143,7 +143,7 @@ const P = {
         creditUrl: "https://unsplash.com/@avtar9w",
     },
     oil: {
-        url: "https://images.unsplash.com/photo-1608571424634-58ae03e6edcf?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1608571424634-58ae03e6edcf.jpg",
         alt: "A slim amber dropper bottle of oil on a turned wooden stand with leaf shadows",
         width: 1600,
         height: 2400,
@@ -151,7 +151,7 @@ const P = {
         creditUrl: "https://unsplash.com/@kseegars",
     },
     oil2: {
-        url: "https://images.unsplash.com/photo-1655892836674-1df10277925e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1655892836674-1df10277925e.jpg",
         alt: "A small amber dropper bottle of hair oil on a round wooden plate with pink flowers",
         width: 1600,
         height: 1067,
@@ -159,7 +159,7 @@ const P = {
         creditUrl: "https://unsplash.com/@andrzejgdula",
     },
     oil3: {
-        url: "https://images.unsplash.com/photo-1669281393403-e1f3248dce2b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1669281393403-e1f3248dce2b.jpg",
         alt: "Three amber dropper bottles of scalp oil on a stone with palm leaves",
         width: 1600,
         height: 1280,
@@ -167,7 +167,7 @@ const P = {
         creditUrl: "https://unsplash.com/@diasplora",
     },
     tonic: {
-        url: "https://images.unsplash.com/photo-1550572017-4b7a301b9d81?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1550572017-4b7a301b9d81.jpg",
         alt: "A small clear spray bottle of scalp tonic on a grey background",
         width: 1600,
         height: 1253,
@@ -175,7 +175,7 @@ const P = {
         creditUrl: "https://unsplash.com/@brett_jordan",
     },
     heat: {
-        url: "https://images.unsplash.com/photo-1632243575963-3143700087ed?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1632243575963-3143700087ed.jpg",
         alt: "A glass mist spray bottle with a black trigger by a window",
         width: 1600,
         height: 2397,
@@ -183,7 +183,7 @@ const P = {
         creditUrl: "https://unsplash.com/@switch_dtp_fotografie",
     },
     dry: {
-        url: "https://images.unsplash.com/photo-1707143598173-944230c2de24?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1707143598173-944230c2de24.jpg",
         alt: "Two amber glass spray bottles on a dark table",
         width: 1600,
         height: 2240,
@@ -191,7 +191,7 @@ const P = {
         creditUrl: "https://unsplash.com/@andrealacasse",
     },
     leavein: {
-        url: "https://images.unsplash.com/photo-1712168044214-f5a272c23a5b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1712168044214-f5a272c23a5b.jpg",
         alt: "Two plain white cream tubes on a peach plinth",
         width: 1600,
         height: 2000,
@@ -199,7 +199,7 @@ const P = {
         creditUrl: "https://unsplash.com/@normals",
     },
     curl: {
-        url: "https://images.unsplash.com/photo-1638609927040-8a7e97cd9d6a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1638609927040-8a7e97cd9d6a.jpg",
         alt: "A white tube of styling cream with a swirl of cream beside it",
         width: 1600,
         height: 1999,
@@ -207,7 +207,7 @@ const P = {
         creditUrl: "https://unsplash.com/@msbirgith",
     },
     colour: {
-        url: "https://images.unsplash.com/photo-1707720531504-ce087725861a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1707720531504-ce087725861a.jpg",
         alt: "A colourist painting hair colour onto a section of hair over foil",
         width: 1600,
         height: 1067,
@@ -215,7 +215,7 @@ const P = {
         creditUrl: "https://unsplash.com/@ionelaaaaa",
     },
     developer: {
-        url: "https://images.unsplash.com/photo-1617391654484-2894196c2cc9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1617391654484-2894196c2cc9.jpg",
         alt: "A stylist in black gloves applying lightener to hair on foils",
         width: 1600,
         height: 1067,
@@ -223,7 +223,7 @@ const P = {
         creditUrl: "https://unsplash.com/@primipil",
     },
     bowl: {
-        url: "https://images.unsplash.com/photo-1587225438173-701d7edc94f9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1587225438173-701d7edc94f9.jpg",
         alt: "A stylist applying hair colour with a tint brush, holding the bowl",
         width: 1600,
         height: 1067,
@@ -231,7 +231,7 @@ const P = {
         creditUrl: "https://unsplash.com/@liacastelli",
     },
     beardoil: {
-        url: "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1515377905703-c4788e51af15.jpg",
         alt: "Hands tipping a dropper of beard oil into a palm",
         width: 1600,
         height: 1067,
@@ -239,7 +239,7 @@ const P = {
         creditUrl: "https://unsplash.com/@christinhumephoto",
     },
     beardoil2: {
-        url: "https://images.unsplash.com/photo-1672761431764-61b8d9a00dbb?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1672761431764-61b8d9a00dbb.jpg",
         alt: "A bearded man running his fingers through his beard",
         width: 1600,
         height: 2000,
@@ -247,7 +247,7 @@ const P = {
         creditUrl: "https://unsplash.com/@lancereis",
     },
     beardwash: {
-        url: "https://images.unsplash.com/photo-1616750819574-7e38aa8046fa?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1616750819574-7e38aa8046fa.jpg",
         alt: "A white tube of face wash on a blue surface with water drops",
         width: 1600,
         height: 1067,
@@ -255,7 +255,7 @@ const P = {
         creditUrl: "https://unsplash.com/@msbirgith",
     },
     clay: {
-        url: "https://images.unsplash.com/photo-1739979701278-a1a39e16da5a?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1739979701278-a1a39e16da5a.jpg",
         alt: "A round jar of matte styling wax on a soft pink background",
         width: 1600,
         height: 2400,
@@ -263,7 +263,7 @@ const P = {
         creditUrl: "https://unsplash.com/@wowcontly",
     },
     nail: {
-        url: "https://images.unsplash.com/photo-1667242197482-ffe672de74da?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1667242197482-ffe672de74da.jpg",
         alt: "A row of nail lacquer bottles with white caps in many colours",
         width: 1600,
         height: 1067,
@@ -271,7 +271,7 @@ const P = {
         creditUrl: "https://unsplash.com/@luandmario",
     },
     basecoat: {
-        url: "https://images.unsplash.com/photo-1640958903443-1e49d720650d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1640958903443-1e49d720650d.jpg",
         alt: "A bottle of nude nail lacquer with its brush laid beside it",
         width: 1600,
         height: 1067,
@@ -279,7 +279,7 @@ const P = {
         creditUrl: "https://unsplash.com/@lovelyscape",
     },
     remover: {
-        url: "https://images.unsplash.com/photo-1644052024906-5c9ad358e341?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1644052024906-5c9ad358e341.jpg",
         alt: "Round cotton pads and a small bottle on a stone surface",
         width: 1600,
         height: 2133,
@@ -287,7 +287,7 @@ const P = {
         creditUrl: "https://unsplash.com/@miskasage",
     },
     cuticle: {
-        url: "https://images.unsplash.com/photo-1560521166-99f8bed834f5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1560521166-99f8bed834f5.jpg",
         alt: "A row of tiny amber glass bottles on a dark grey surface",
         width: 1600,
         height: 1067,
@@ -295,7 +295,7 @@ const P = {
         creditUrl: "https://unsplash.com/@kellysikkema",
     },
     paddle: {
-        url: "https://images.unsplash.com/photo-1674566566071-1cee4f5263eb?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1674566566071-1cee4f5263eb.jpg",
         alt: "A black paddle hair brush lying on a concrete surface",
         width: 1600,
         height: 1200,
@@ -303,7 +303,7 @@ const P = {
         creditUrl: "https://unsplash.com/@jamalyaliyazul",
     },
     round: {
-        url: "https://images.unsplash.com/photo-1734111719430-fe4a3973f8af?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1734111719430-fe4a3973f8af.jpg",
         alt: "A round ceramic brush being used to blow-dry blonde hair",
         width: 1600,
         height: 2400,
@@ -311,7 +311,7 @@ const P = {
         creditUrl: "https://unsplash.com/@jennaoslin",
     },
     comb: {
-        url: "https://images.unsplash.com/photo-1774301844178-c9ce96b76d92?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1774301844178-c9ce96b76d92.jpg",
         alt: "A carved wooden comb with hair scrunchies on a woven cloth",
         width: 1600,
         height: 1067,
@@ -319,7 +319,7 @@ const P = {
         creditUrl: "https://unsplash.com/@dlinnaya88",
     },
     tailcomb: {
-        url: "https://images.unsplash.com/photo-1527799820374-dcf8d9d4a388?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1527799820374-dcf8d9d4a388.jpg",
         alt: "A tail comb, paddle brush and other styling tools laid out on white",
         width: 1600,
         height: 919,
@@ -327,7 +327,7 @@ const P = {
         creditUrl: "https://unsplash.com/@sharisocial",
     },
     clip: {
-        url: "https://images.unsplash.com/photo-1635423760085-e10fceef0756?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1635423760085-e10fceef0756.jpg",
         alt: "A tortoiseshell claw clip on a white background",
         width: 1600,
         height: 1068,
@@ -342,7 +342,7 @@ const P = {
 
 export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
     "cut-women": {
-        url: "https://images.unsplash.com/photo-1711274094763-ff442e4719ef?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1711274094763-ff442e4719ef.jpg",
         alt: "A stylist cutting the ends of long, straight dark hair with scissors",
         width: 1600,
         height: 2400,
@@ -350,7 +350,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@dimores",
     },
     "cut-men": {
-        url: "https://images.unsplash.com/photo-1593702275687-f8b402bf1fb5?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1593702275687-f8b402bf1fb5.jpg",
         alt: "A barber cutting a man's hair with scissors and a comb",
         width: 1600,
         height: 1067,
@@ -358,7 +358,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@demoya",
     },
     beard: {
-        url: "https://images.unsplash.com/photo-1599011176306-4a96f1516d4d?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1599011176306-4a96f1516d4d.jpg",
         alt: "A barber trimming a client's beard with scissors",
         width: 1600,
         height: 2400,
@@ -366,7 +366,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@mrshave",
     },
     "cut-kids": {
-        url: "https://images.unsplash.com/photo-1704072650662-76df3af134a7?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1704072650662-76df3af134a7.jpg",
         alt: "A young boy in a cape sitting in a barber's chair",
         width: 1600,
         height: 2400,
@@ -374,7 +374,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@himo_beast1996",
     },
     blowdry: {
-        url: "https://images.unsplash.com/photo-1580618672591-eb180b1a973f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1580618672591-eb180b1a973f.jpg",
         alt: "A stylist blow-drying a client's hair with a round brush",
         width: 1600,
         height: 1068,
@@ -382,7 +382,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@awcreativeut",
     },
     "hair-spa": {
-        url: "https://images.unsplash.com/photo-1634449571010-02389ed0f9b0?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1634449571010-02389ed0f9b0.jpg",
         alt: "A client leaning back at a basin while her hair is washed",
         width: 1600,
         height: 1067,
@@ -390,7 +390,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@lindsayrc81",
     },
     "root-touchup": {
-        url: "https://images.unsplash.com/photo-1587225438173-701d7edc94f9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1587225438173-701d7edc94f9.jpg",
         alt: "A colourist painting colour onto the roots with a tint brush, bowl in hand",
         width: 1600,
         height: 1067,
@@ -398,7 +398,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@liacastelli",
     },
     "global-colour": {
-        url: "https://images.unsplash.com/photo-1712213396688-c6f2d536671f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1712213396688-c6f2d536671f.jpg",
         alt: "A colourist applying colour with a brush over foil in a salon",
         width: 1600,
         height: 1067,
@@ -406,7 +406,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@ionelaaaaa",
     },
     highlights: {
-        url: "https://images.unsplash.com/photo-1554519934-e32b1629d9ee?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1554519934-e32b1629d9ee.jpg",
         alt: "Long hair with soft blonde balayage, seen from behind in a salon",
         width: 1600,
         height: 2400,
@@ -414,7 +414,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@jessiedeexx",
     },
     keratin: {
-        url: "https://images.unsplash.com/photo-1758315949140-1972ace0644e?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1758315949140-1972ace0644e.jpg",
         alt: "Long, glossy, straight brown hair falling past the shoulders",
         width: 1600,
         height: 2400,
@@ -422,7 +422,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@masihaolfi",
     },
     smoothening: {
-        url: "https://images.unsplash.com/photo-1673465781892-6be0f7bca292?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1673465781892-6be0f7bca292.jpg",
         alt: "Long, sleek blonde hair after straightening, a client seated in the salon chair",
         width: 1600,
         height: 1068,
@@ -430,7 +430,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@awcreativeut",
     },
     cleanup: {
-        url: "https://images.unsplash.com/photo-1761718210089-ba3bb5ccb54f?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1761718210089-ba3bb5ccb54f.jpg",
         alt: "A client with a cleansing mask on, during a facial at the salon",
         width: 1600,
         height: 2400,
@@ -438,7 +438,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@kimick",
     },
     "facial-hydrating": {
-        url: "https://images.unsplash.com/photo-1616394584738-fc6e612e71b9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1616394584738-fc6e612e71b9.jpg",
         alt: "A therapist applying a white hydrating mask from a bowl",
         width: 1600,
         height: 1067,
@@ -446,7 +446,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@enginakyurt",
     },
     "facial-brightening": {
-        url: "https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1570172619644-dfd03ed5d881.jpg",
         alt: "A brush applying a brightening mask to a client's face",
         width: 1600,
         height: 1067,
@@ -454,7 +454,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@rosarafael",
     },
     detan: {
-        url: "https://images.unsplash.com/photo-1761718209708-9ab9ba1c7252?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1761718209708-9ab9ba1c7252.jpg",
         alt: "A client with a de-tan pack on, eyes closed, in a treatment room",
         width: 1600,
         height: 2400,
@@ -462,7 +462,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@kimick",
     },
     waxing: {
-        url: "https://images.unsplash.com/photo-1677091508049-d8ae041b1582?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1677091508049-d8ae041b1582.jpg",
         alt: "A therapist stirring warm wax in a wax heater",
         width: 1600,
         height: 1067,
@@ -470,7 +470,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@grovebrands",
     },
     threading: {
-        url: "https://images.unsplash.com/photo-1519415387722-a1c3bbef716c?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1519415387722-a1c3bbef716c.jpg",
         alt: "Eyebrows being shaped with a thread",
         width: 1600,
         height: 1068,
@@ -478,7 +478,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@runejohs",
     },
     manicure: {
-        url: "https://images.unsplash.com/photo-1690749138086-7422f71dc159?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1690749138086-7422f71dc159.jpg",
         alt: "A manicurist painting a client's nails at the nail table",
         width: 1600,
         height: 2844,
@@ -486,7 +486,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@pabloescobar98",
     },
     pedicure: {
-        url: "https://images.unsplash.com/photo-1519419451778-14599a49ec41?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1519419451778-14599a49ec41.jpg",
         alt: "Feet soaking in a steel basin during a pedicure",
         width: 1600,
         height: 1068,
@@ -494,7 +494,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@runejohs",
     },
     "gel-polish": {
-        url: "https://images.unsplash.com/photo-1632345031435-8727f6897d53?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1632345031435-8727f6897d53.jpg",
         alt: "A nail technician working on a client's nails beside a gel lamp",
         width: 1600,
         height: 1067,
@@ -502,7 +502,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@giorgiotrovato",
     },
     hairstyling: {
-        url: "https://images.unsplash.com/photo-1581674210501-c760093514e8?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1581674210501-c760093514e8.jpg",
         alt: "A stylist pinning flowers into a soft, loose bridal hairstyle",
         width: 1600,
         height: 1067,
@@ -510,7 +510,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@enginakyurt",
     },
     "party-makeup": {
-        url: "https://images.unsplash.com/photo-1709477542170-f11ee7d471a0?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1709477542170-f11ee7d471a0.jpg",
         alt: "A makeup artist applying eye makeup to a client",
         width: 1600,
         height: 2400,
@@ -518,7 +518,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@kalpa_mahagamage",
     },
     "bridal-trial": {
-        url: "https://images.unsplash.com/photo-1684868682581-4cac3af5b8d4?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1684868682581-4cac3af5b8d4.jpg",
         alt: "A bride in a red lehenga and maang tikka, looking down, getting ready",
         width: 1600,
         height: 2405,
@@ -526,7 +526,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@ajay_gill8054",
     },
     "engagement-makeup": {
-        url: "https://images.unsplash.com/photo-1600685890506-593fdf55949b?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1600685890506-593fdf55949b.jpg",
         alt: "A smiling bride in a pink lehenga and jewellery",
         width: 1600,
         height: 2398,
@@ -534,7 +534,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@aayushrawat",
     },
     "bridal-makeup": {
-        url: "https://images.unsplash.com/photo-1684868268327-7e5590bcfbd6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1684868268327-7e5590bcfbd6.jpg",
         alt: "A bride in red with a nath and full bridal makeup",
         width: 1600,
         height: 2405,
@@ -542,7 +542,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@ajay_gill8054",
     },
     "party-mehendi": {
-        url: "https://images.unsplash.com/photo-1630833944682-b8b4569eb039?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1630833944682-b8b4569eb039.jpg",
         alt: "A mehendi artist drawing a pattern on a hand with a cone",
         width: 1600,
         height: 1067,
@@ -550,7 +550,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
         creditUrl: "https://unsplash.com/@sibeeshvenu",
     },
     "bridal-mehendi": {
-        url: "https://images.unsplash.com/photo-1588175768004-4e8a770cc099?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1588175768004-4e8a770cc099.jpg",
         alt: "A bride's hands covered in fine bridal mehendi, held out with gold bangles",
         width: 1600,
         height: 2398,
@@ -561,7 +561,7 @@ export const NOOR_SERVICE_IMAGES: Record<string, DsImage> = {
 
 export const NOOR_GALLERY: DsImage[] = [
     {
-        url: "https://images.unsplash.com/photo-1626383137804-ff908d2753a2?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1626383137804-ff908d2753a2.jpg",
         alt: "A long salon floor with black styling chairs, mirrors and retail shelves",
         width: 1600,
         height: 1067,
@@ -569,7 +569,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@giorgiotrovato",
     },
     {
-        url: "https://images.unsplash.com/photo-1562322140-8baeececf3df?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1562322140-8baeececf3df.jpg",
         alt: "A stylist smiling as she blow-dries a client's bob",
         width: 1600,
         height: 1068,
@@ -577,7 +577,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@awcreativeut",
     },
     {
-        url: "https://images.unsplash.com/photo-1610173827043-9db50e0d8ef9?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1610173827043-9db50e0d8ef9.jpg",
         alt: "A bride in pink and gold with bridal jewellery, eyes lowered",
         width: 1600,
         height: 2400,
@@ -585,7 +585,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@theweddingfocus",
     },
     {
-        url: "https://images.unsplash.com/photo-1771992228898-79342c9c1c39?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1771992228898-79342c9c1c39.jpg",
         alt: "Hands with dark bridal mehendi holding marigold garlands",
         width: 1600,
         height: 1067,
@@ -593,7 +593,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@rejaul_creativedesign",
     },
     {
-        url: "https://images.unsplash.com/photo-1785456283212-338f5bc44d50?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1785456283212-338f5bc44d50.jpg",
         alt: "Two women seen from behind with honey and blonde balayage",
         width: 1600,
         height: 1600,
@@ -601,7 +601,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@yovankaloriasalon",
     },
     {
-        url: "https://images.unsplash.com/photo-1746723378067-83a345ff3160?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1746723378067-83a345ff3160.jpg",
         alt: "A bright salon reception with shelves of hair care",
         width: 1600,
         height: 1067,
@@ -609,7 +609,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@sumup",
     },
     {
-        url: "https://images.unsplash.com/photo-1612887390768-fb02affea7a6?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1612887390768-fb02affea7a6.jpg",
         alt: "Pale pink manicured nails against a white towel",
         width: 1600,
         height: 2133,
@@ -617,7 +617,7 @@ export const NOOR_GALLERY: DsImage[] = [
         creditUrl: "https://unsplash.com/@jojobean24",
     },
     {
-        url: "https://images.unsplash.com/photo-1629332791370-77208e6cbb67?w=1600&q=80&auto=format&fit=crop",
+        url: "https://media.saroh.io/demo/photo-1629332791370-77208e6cbb67.jpg",
         alt: "A bride's mehendi-covered hands holding sweets over her lehenga",
         width: 1600,
         height: 898,

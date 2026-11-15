@@ -11,7 +11,8 @@
         "test:permissions": "playwright test --config=permissions.config.ts",
         "shots": "tsx marketing-shots/capture.ts",
         "shots:templates": "tsx marketing-shots/template-shots.ts",
-        "test:shots": "tsx --test marketing-shots/template-shots-manifest.test.ts"
+        "test:shots": "tsx --test marketing-shots/template-shots-manifest.test.ts",
+        "shots:connect-claude": "tsx marketing-shots/connect-claude.ts"
     },
     "devDependencies": {
         "@axe-core/playwright": "^4.13.0",

@@ -81,7 +81,12 @@ autosave sends leaves out a field the API would refuse ("4500.", 5 days) so
 the rest still saves while that field's problem keeps Publish off. The Plan
 Editor's rules (problems, the save blocker, "When you publish" lines) are pure
 in `lib/subscriptions/plan-editor.ts`, and `plan-editor-adapter.ts` turns the
-typed form into the API's values and back.
+typed form into the API's values and back. A field's problem is drawn under it
+only once that field has been changed or left, or Publish pressed, or the page
+opened a never-published draft (`fieldErrors` in `state.ts`); until then the
+line beside Publish names it. A section that has a field nobody types into
+(a picker, a rate box) calls the shell's `leave(field)` when it is left, or
+its problem shows only on Publish.
 
 **Current** — **A form with no publish step saves as it is typed on the
 shell's autosave alone** (New invoice A, DEC-173 U14 #1126). An invoice
@@ -436,7 +441,9 @@ preview under its fields, from the draft.
   have been left and shows a field's problem from then on (the Service
   Editor: `serviceFieldProblems`, `problemFor`), and calls
   `focusFirstError(form)` when Save is pressed. The product editor's Basics
-  says what is wrong once a field is left (`seen`). Gap: its Details,
+  says what is wrong once a field is left (`seen`), and its header, section
+  card and jump dot stay quiet about an MRP still being typed: the section
+  reports `quiet`, which still blocks Create and Save (13 Nov 2026). Gap: its Details,
   Description and Made-by sections still check as you type.
 - **Current** — **A main button is never off without saying why.** A short
   form keeps it on and explains on submit (Create location, Create site,

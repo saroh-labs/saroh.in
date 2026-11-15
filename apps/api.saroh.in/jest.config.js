@@ -18,13 +18,16 @@ module.exports = {
     // gate's quick run) sat at 0% CPU until killed (DEV_LEARNINGS, 10 Oct
     // 2026). The plain file crawl is a second slower and always returns.
     watchman: false,
-    // sanitize-html 2.17.7 uses ESM-only HTML parser packages. Node 24 loads
-    // them natively; Jest's CommonJS runtime needs them transformed too.
+    // sanitize-html 2.17.7 uses ESM-only HTML parser packages, and the AI SDK
+    // (`ai`, `@ai-sdk/*` and two of its dependencies, DEC-220) ships ESM only,
+    // and loads zod's locale by its ESM file (zod's own `.cjs` files never
+    // match the transform, so only that is transformed). Node 24 loads them natively; Jest's CommonJS runtime needs them
+    // transformed too.
     transform: {
         "^.+\\.[tj]s$": ["ts-jest", { tsconfig: { allowJs: true } }],
     },
     transformIgnorePatterns: [
-        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities)(?:@|/))",
+        "node_modules/(?!(?:\\.pnpm/)?(?:htmlparser2|domhandler|domutils|domelementtype|dom-serializer|entities|ai|@ai-sdk[+/][^/]+|@vercel[+/]oidc|@workflow[+/]serde|zod)(?:@|/))",
     ],
     testEnvironment: "node",
     rootDir: ".",
@@ -127,6 +130,9 @@ module.exports = {
         // $transaction) that run the REAL @saroh/templates instantiate against
         // the real starter template — never touch a DB.
         "<rootDir>/src/modules/sites/**/*.spec.ts",
+        // Share pictures and own posts (#1375, #1378): the card renderer
+        // and the route rules, DB-free; the rows are in *.db.spec.ts.
+        "<rootDir>/src/modules/share-posts/**/*.spec.ts",
         "<rootDir>/src/modules/domains/**/*.spec.ts",
         // The category refusal's words (UX-066); the rest of content's
         // specs read the dev database.
@@ -184,7 +190,11 @@ module.exports = {
         // they last bought — is pure serialization over rows handed to it.
         "<rootDir>/src/modules/customers/serialize.spec.ts",
         "<rootDir>/src/modules/customers/customers.service.remove.spec.ts",
+        // Storefront team routes ask business permissions (audit 2026-11-12 #4).
+        "<rootDir>/src/modules/members/members.permissions.spec.ts",
         "<rootDir>/src/modules/orders/order-state.spec.ts",
+        // DEC-074: a location's team's orders, narrowed, and no payments.
+        "<rootDir>/src/modules/orders/order-location.spec.ts",
         // ADR-008 kitchen flow (U6): the pure stage machine, refund-by-line
         // arithmetic, the order read's money hiding, and the kitchen service
         // with a jest-mocked Prisma.
@@ -231,6 +241,17 @@ module.exports = {
         "<rootDir>/src/modules/products/product-path.spec.ts",
         "<rootDir>/src/modules/products/sku-holder.spec.ts",
         // #513 the stock log's words and arithmetic — pure.
+        // Plan 2026-11-10-001 U4: public API rate limits, with a fake Redis.
+        "<rootDir>/src/modules/rate-limits/**/*.spec.ts",
+        // U5: API keys' rules with a jest-mocked Prisma; rows in api-keys.db.spec.ts.
+        "<rootDir>/src/modules/api-keys/**/*.spec.ts",
+        // U7/U8: the public API's pure specs; rows in public-api *.db.spec.ts.
+        "<rootDir>/src/modules/public-api/**/*.spec.ts",
+        // U9: AI apps' scopes, names and the OAuth gate — pure; rows in mcp.db.spec.ts.
+        "<rootDir>/src/modules/mcp/**/*.spec.ts",
+        // U13: outbound webhooks' signing, emit inventory and handler, mocked;
+        // rows in outbound-webhooks *.db.spec.ts.
+        "<rootDir>/src/modules/outbound-webhooks/**/*.spec.ts",
         "<rootDir>/src/modules/stock/stock-words.spec.ts",
         // #514 the Stock API: sign-in, organization and COMMERCE gates.
         "<rootDir>/src/modules/stock/stock.gate.spec.ts",
@@ -505,6 +526,9 @@ module.exports = {
         "<rootDir>/src/modules/messaging/**/*.spec.ts",
         // Phone sign-in's options (DEC-196): mocked services, no database.
         "<rootDir>/src/modules/account-phone/**/*.spec.ts",
+        // The AI layer (DEC-220): the provider adapter with the SDK's mock
+        // model, and later specs with the fake provider. No DB.
+        "<rootDir>/src/modules/ai/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

@@ -104,7 +104,7 @@ export async function inReplyWindow(
 const DEV_KEY =
     "6d6573736167696e672d6465762d6b65792d6e6f742d7365637265742d2d2d21";
 
-function messagingKey(): EncryptionKey {
+export function messagingKey(): EncryptionKey {
     const devOrTest =
         declaredNodeEnv === "development" || declaredNodeEnv === "test";
     return {

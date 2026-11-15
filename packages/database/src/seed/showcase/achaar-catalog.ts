@@ -33,7 +33,7 @@ function photo(
     username: string,
 ): DemoPhoto {
     return {
-        url: `https://images.unsplash.com/photo-${id}?w=1600&q=80&auto=format&fit=crop`,
+        url: `https://media.saroh.io/demo/photo-${id}.jpg`,
         alt,
         width: 1600,
         height,

@@ -28,7 +28,10 @@ import type { ContactDetail } from "@/lib/contacts/service";
 import { getContact } from "@/lib/contacts/service";
 import { contactSourceLabel } from "@/lib/contacts/source";
 import { isRemovedContact, shownEmail } from "@/lib/crm/format";
-import { rolesThatSeeSensitive } from "@/lib/customer-workspace/attention";
+import {
+    maySeeSensitive,
+    rolesThatSeeSensitive,
+} from "@/lib/customer-workspace/attention";
 import { listDataRequests } from "@/lib/customer-workspace/data-requests";
 import { openRequestFor } from "@/lib/customer-workspace/data-requests-view";
 import { getCustomerDetail } from "@/lib/customer-workspace/detail";
@@ -287,10 +290,7 @@ export default async function PersonPage({
         ...tabsFor(detail, thread, reviews),
         ...extra.map(({ key, label, count }) => ({ key, label, count })),
     ];
-    const canSensitive =
-        may("customer:sensitive") ||
-        organization?.role === "OWNER" ||
-        organization?.role === "ADMIN";
+    const canSensitive = maySeeSensitive(organization);
     // C12's sensitive tick names who can read the note (DEC-073).
     const sensitiveRoles =
         canWrite && canSensitive && detail.attention?.suggestions?.length

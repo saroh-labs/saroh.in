@@ -17,6 +17,7 @@ import {
 } from "../organizations/organization-policy";
 
 import { NEW_STOREFRONT_TYPES } from "../orders/fulfilment";
+import { isLocationScoped } from "../orders/order-location";
 import { businessCurrency } from "./currency";
 import type { CreateStoreDto, UpdateStoreDto } from "./dto";
 import type { LogoPatch } from "./location-logo";
@@ -58,20 +59,21 @@ export interface LocationAbilities {
  *  - Flag OFF (legacy, unchanged): a StoreOwner has full access; a StoreMembers
  *    staffer can read, and can write only with a write-capable role
  *    (ADMIN/MANAGER/EDITOR — not VIEWER).
- *  - Flag ON (Organization path): the caller's `Membership` role for the
- *    Store's Organization is evaluated against the pure org policy
- *    (`can(role, action)`). Because legacy StoreMembers staff were NOT all
- *    migrated to Membership, the org path DUAL-READS: if the org policy does not
- *    grant access (no membership, or the role denies), it FALLS BACK to the
- *    legacy StoreOwner/StoreMembers check so no current user loses access during
- *    the transition. Access is granted if EITHER path grants it.
+ *  - Flag ON (Organization path): the caller's resolved permissions in the
+ *    Store's Organization (their role's row plus their extras) decide, and
+ *    nothing else. **The business role always wins over a storefront role**
+ *    (owner, 12 Nov 2026, amending DEC-048): a `StoreOwner` row or a
+ *    storefront Admin, Manager or Editor role never allows what the
+ *    business permissions deny. The old dual-read fallback to the
+ *    storefront roster is gone; every storefront person is on the team
+ *    since F16, so it only ever widened. Storefront roles and their rows
+ *    are kept (owner: their future is decided later).
  *
  * Precedence when the flag is ON, for a given store operation → OrgAction:
  *   1. Store missing / soft-deleted            → NotFound (no existence leak).
  *   2. Store has a null organizationId         → reject (org-less guard below).
- *   3. Membership exists AND can(role, action) → ALLOW.
- *   4. Otherwise                               → legacy dual-read fallback.
- *   5. Legacy also denies                      → DENY.
+ *   3. Membership exists AND its permissions hold the action → ALLOW.
+ *   4. Otherwise                               → DENY.
  *
  * Store-op → OrgAction mapping: read (getForUser) → "store:read";
  * write (canWrite) → "store:write".
@@ -114,8 +116,8 @@ export class StoresService {
         if (await this.orgAllows(store.organizationId, userId, "store:read")) {
             return store;
         }
-        // DUAL-READ fallback: legacy grant keeps un-migrated staff in.
-        return this.getForUserLegacy(storeId, userId);
+        // The business role wins: a storefront role doesn't open it.
+        throw new NotFoundException("Location not found");
     }
 
     async isOwner(storeId: string, userId: string): Promise<boolean> {
@@ -167,11 +169,14 @@ export class StoresService {
         }
 
         this.assertStoreHasOrg(store.organizationId);
-        if (await this.orgAllows(store.organizationId, userId, "store:write")) {
-            return writable;
-        }
-        // DUAL-READ fallback to the legacy owner/member write check.
-        return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
+        // The business role wins (amending DEC-048): no storefront fallback.
+        return (await this.orgAllows(
+            store.organizationId,
+            userId,
+            "store:write",
+        ))
+            ? writable
+            : null;
     }
 
     /**
@@ -182,9 +187,10 @@ export class StoresService {
      * On the organization path it is the caller's business role that
      * decides — `order:create`, `order:edit` or `order:refund`, never
      * `store:write`, which changes storefronts, not orders (matrix §3). A
-     * storefront role that writes to this storefront (a `StoreOwner`, or a
-     * storefront Admin, Manager or Editor) keeps taking and changing its
-     * orders (DEC-048) — but never its money (DEC-106). A write that
+     * storefront role adds nothing on this path (the business role wins,
+     * owner 12 Nov 2026, amending DEC-048); with ORG_AUTHORIZATION off a
+     * `StoreOwner` or a storefront Admin, Manager or Editor still takes and
+     * changes its orders, never its money (DEC-106). A write that
      * records or takes a payment, or refunds or cancels (`money`, and every
      * `order:refund`), is asked of the permissions only: `moneyAllows`.
      */
@@ -219,10 +225,13 @@ export class StoresService {
         }
 
         this.assertStoreHasOrg(store.organizationId);
-        if (await this.orgAllows(store.organizationId, userId, action)) {
-            return writable;
-        }
-        return (await this.canWriteLegacy(storeId, userId)) ? writable : null;
+        // The business role wins (amending DEC-048): no storefront fallback.
+        // A location's team, at a storefront they work on only (DEC-074).
+        return (await this.orgAllows(store.organizationId, userId, action, {
+            storeId,
+        }))
+            ? writable
+            : null;
     }
 
     /**
@@ -259,6 +268,24 @@ export class StoresService {
     }
 
     /**
+     * A storefront write the business role decides by `action` — a
+     * customer's details ask `contact:write`, never `store:write`. With
+     * ORG_AUTHORIZATION off (no permissions to ask) the storefront's owner or
+     * a write-capable member keeps it, as before. The same rule as an order
+     * write without money: `orderWriteOrganization`.
+     */
+    async writeAllows(
+        storeId: string,
+        userId: string,
+        action: OrgAction,
+    ): Promise<boolean> {
+        return (
+            (await this.orderWriteOrganization(storeId, userId, action)) !==
+            null
+        );
+    }
+
+    /**
      * Whether the caller's membership in the store's business permits an
      * action beyond the store's own read/write — `order:read` or
      * `product-review:read` on a product page that shows orders and reviews.
@@ -274,7 +301,32 @@ export class StoresService {
             select: { organizationId: true },
         });
         if (!store?.organizationId) return false;
-        return this.orgAllows(store.organizationId, userId, action);
+        return this.orgAllows(store.organizationId, userId, action, {
+            storeId,
+        });
+    }
+
+    /**
+     * The caller's role key in the storefront's business, or null: for the
+     * storefront routes that narrow a location's team (DEC-074,
+     * `orders/order-location.ts`) beyond what an action says.
+     */
+    async roleKeyAt(storeId: string, userId: string): Promise<string | null> {
+        const store = await prisma.store.findFirst({
+            where: { id: storeId, deletedAt: null },
+            select: { organizationId: true },
+        });
+        if (!store?.organizationId) return null;
+        const membership = await prisma.membership.findUnique({
+            where: {
+                organizationId_userId: {
+                    organizationId: store.organizationId,
+                    userId,
+                },
+            },
+            select: { role: true },
+        });
+        return membership?.role ?? null;
     }
 
     /**
@@ -315,7 +367,7 @@ export class StoresService {
     ): Promise<boolean> {
         if (
             organizationId &&
-            (await this.orgAllows(organizationId, userId, action))
+            (await this.orgAllows(organizationId, userId, action, { storeId }))
         ) {
             return true;
         }
@@ -363,15 +415,20 @@ export class StoresService {
      *
      * A team member past the plan's limit (#800) is refused here as they
      * are at the organization context: 403 `MEMBER_PAUSED`, before their
-     * role is asked and before the legacy dual-read fallback, so a
+     * role is asked, so a
      * storefront route that never builds the context neither lets them in
      * nor answers with a generic denial (`member-paused.ts`). The legacy
      * path (ORG_AUTHORIZATION off) never reads membership, and is unchanged.
+     *
+     * `at` narrows an order action — money included — to one storefront for
+     * a location's team (DEC-074, `orders/order-location.ts`): only one
+     * they work on.
      */
     private async orgAllows(
         organizationId: string,
         userId: string,
         action: OrgAction,
+        at?: { storeId: string },
     ): Promise<boolean> {
         const membership = await prisma.membership.findUnique({
             where: { organizationId_userId: { organizationId, userId } },
@@ -403,11 +460,24 @@ export class StoresService {
                   select: { actions: true },
               });
         // The person's own extras count too (F17).
-        return resolveCapabilities(
+        const holds = resolveCapabilities(
             membership.role,
             stored?.actions,
             membership.extraActions,
         ).has(action);
+        if (
+            !holds ||
+            !at ||
+            !action.startsWith("order:") ||
+            !isLocationScoped(membership.role)
+        ) {
+            return holds;
+        }
+        const works = await prisma.storeMembers.findUnique({
+            where: { storeId_userId: { storeId: at.storeId, userId } },
+            select: { id: true },
+        });
+        return works !== null;
     }
 
     /** Original read authorization: owner OR member, else 404. */

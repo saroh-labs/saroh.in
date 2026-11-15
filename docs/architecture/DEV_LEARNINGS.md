@@ -6036,6 +6036,7 @@ The specs' own mistakes, for the next unit that writes one: Insights specs read 
 - **Cause:** `scripts/check-content-dates.test.mjs` builds a throwaway repo in a temp folder and runs `git init/add/commit/tag` there. Inside `.husky/pre-push` (a worktree), git exports `GIT_DIR` and related variables, which win over `cwd`, so those commands ran against the real repo.
 - **Fix:** the branch was reset to its last real commit (files untouched) and the tag deleted; the test now runs git with every `GIT_*` variable removed (`ENV`), and passes with `GIT_DIR` set to the real repo.
 - **Rule:** any script or test that runs git in a repo of its own passes an env without `GIT_*`. Run it once with `GIT_DIR=$(git rev-parse --git-dir)` set to prove it.
+- **Again, 12 Nov 2026:** `scripts/check-edition-branches.test.mjs` ("fails when it scans nothing") listed the real repo from inside the pre-push hook and blocked a worktree push; fixed the same way.
 
 ## Local pentest: two low access-control gaps on the API (24 Oct 2026)
 
@@ -6622,6 +6623,15 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the page passes `takenPlans` (id and name), and the editor leaves out the record's own id (`namesBesides`) when it checks the name. Tests: `plan-editor.test.tsx` (a new plan's own draft is not a clash) and `plan-editor.test.ts`.
 - **Rule:** a "name already taken" list for an editor that creates its record on the first save carries ids, and the check leaves out the record's own id. A list keyed on names alone breaks the moment the record exists.
 - **Category:** app · editors
+
+## A new plan's untouched price turned red while its name was typed (11 Nov 2026)
+
+- **Symptom:** on Payments → Plans → New plan, typing the name and the "What's included" line showed "Add the price" in red under the empty price, before anyone had reached it. Caught by OCR on the gym demo's Memberships re-film (laptop and phone, about 0:21), and present in the 9 Nov take too.
+- **Cause:** the editor shell drew every field's problem under its field as soon as anything was typed or the record existed. The page-form rule (`PAGE_FORM` is `onTouched`) says nothing of a field until it is left; the shell kept that only for problems a published record was opened with.
+- **Fix:** `fieldErrors` (`lib/editor-shell/state.ts`) draws a problem only for a field changed or left, after Publish is pressed, or on a never-published draft opened again. The line beside Publish names what is left, and says "They're marked below" only when they are. Tests: `state.test.ts` (which fields say their problem), `plan-editor.test.tsx` (an untouched price stays quiet after autosave) and the two GST tests that had pinned the old behaviour.
+- **Rule:** an autosaving editor says a field's problem once that field has been reached, like any page form; the Publish line carries the rest.
+- **Category:** app · editors
+
 ## The dark Global Workers failed their first production deploy: "routes assigned to another worker" (9 Nov 2026)
 
 - **Symptom:** release #1337's frontend deploy failed `Deploy application-global`, `admin-global` and `auth-global` (production): wrangler refused routes held by `saroh-app-dev`, `saroh-admin-dev` and `saroh-accounts-dev` on the dev zone. India's Workers and saroh.tech deployed.
@@ -6637,3 +6647,124 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** the step builds `@saroh/database`'s dependencies first (`turbo run build --filter=@saroh/database^...`, cached when already built).
 - **Rule:** a CI step that runs outside turbo's affected filter builds what it imports itself.
 - **Category:** CI
+
+## The storefront browser spec failed with "Failed to fetch" though the API answered CORS correctly (11 Nov 2026)
+
+- **Symptom:** `e2e/tests/api-storefront.spec.ts` failed in `pnpm prepush --all` (desk-serial and phone-serial): the in-page `fetch` from the test's website at `http://localhost:4599` threw `TypeError: Failed to fetch`, and the API logged no `/v1/storefront/*` call. curl with the same Origin got the right preflight and `Access-Control-Allow-Origin`.
+- **Cause:** Chrome's Local Network Access (Playwright 1.63's Chromium). A page served by `page.route` has no address, so Chrome counts it public, and a public page may not call loopback (`localhost:3333`) without the `local-network-access` permission. The console says "Permission was denied for this request to access the `loopback` address space". A page from a real server on localhost is loopback itself and passes, which is why the API, its db spec and curl all looked right.
+- **Fix:** the spec grants `local-network-access` for its website's origin (`page.context().grantPermissions([...], { origin })`). No API change: a real merchant site and the API are both public addresses.
+- **Rule:** a browser spec whose page is served by `page.route` at a made-up origin and calls the stack on localhost grants `local-network-access` for that origin. When a browser `fetch` fails with no server log, read the page's console before the API's CORS code.
+- **Category:** e2e · browser
+
+## AI connections were built for one business though the plan's requirement said several (11 Nov 2026)
+
+- **Symptom:** a review of the MCP build found the sign-in pick page offered one business, where the plan's requirement (owner decision) says a connection covers the businesses ticked at consent, with a `business` argument on every tool and a `list_businesses` tool.
+- **Cause:** the plan's unit text for the sign-in unit still said "one business" from an earlier draft. The build briefs were written from the unit text, and every unit after it built on that.
+- **Fix:** tick boxes at pick and consent; the business set on the grant and in the token; the guard checks the set and the tool registry resolves the target business per call against the person's live role there; `list_businesses`; disconnect takes one business off the set.
+- **Rule:** a build brief starts from the plan's Requirements and Key Decisions, then the unit; where the unit text and a requirement disagree, the requirement wins and the brief says so. Before calling a unit done, check its report against the requirements it traces to.
+- **Category:** process · planning
+
+## Storefront catalogue reads sent their refusals with a public Cache-Control (11 Nov 2026)
+
+- **Symptom:** the load test (U17) found that a storefront catalogue read (`GET /v1/storefront/{pk}/products…`) refused by the shop's per-visitor limiter answered 429 with `Cache-Control: public, max-age=30, s-maxage=30`, as would a 500: Cloudflare could keep one visitor's refusal and serve it to every visitor for 30 seconds.
+- **Cause:** Nest sets a route's `@Header(...)` once its guards pass, before the handler runs, so the header is already on the response when the handler throws, and the exception filter wrote its error body under it. The live public reads avoid this by keeping `no-store` on the route and marking only a success (`common/live-read-headers.ts`); U7's catalogue routes put the public value on the route.
+- **Fix:** `AllExceptionsFilter` sets `Cache-Control: no-store` on every error except 404 and 410, which are the same for every visitor and may be kept like a success (the launch offer keeps its 404 on purpose). Unit test in the filter's spec; the storefront db spec checks a 200's header and ETag.
+- **Rule:** a `public` Cache-Control on a route covers its success and its "not there"; any other refusal is `no-store` (the filter enforces it). Pattern: `docs/patterns/backend-nestjs.md` → Responses and errors.
+- **Category:** api · caching
+
+## The webhook browser specs failed because the test stack had no WEBHOOK_SECRET_KEY (12 Nov 2026)
+
+- **Symptom:** in the full gate, "an Owner makes a key" and "Send a test" in `settings-api-and-ai-apps.spec.ts` failed: no signing secret was shown, and the key's sheet stayed open after "I've saved it". The same gap had stopped keys and webhooks on the local stack and on the development API, each found by hand.
+- **Cause:** `WEBHOOK_SECRET_KEY` was added to the API's env (U3) and its specs set it themselves, but no stack had it: not `scripts/prepush.sh`'s browser stack, not CI, not local `.env`, not development. The spec, written with the screens, was never run before the gate. Separately, the spec pressed "Copy key" without the clipboard permission, so the copy failed and "I've saved it" asked first.
+- **Fix:** a test `WEBHOOK_SECRET_KEY` beside `APIKEY_ENC_KEY` in the gate's stack and every CI job; the spec grants the clipboard like the other copy specs; development got its keys made on the box.
+- **Rule:** a new API env variable that a feature can't work without lands in the same commit as: its test value in `scripts/prepush.sh` and `ci.yml`, its name in `.env.example`, and a line in the batch's PR body naming each environment that needs it set. A new browser spec runs once (`pnpm prepush --e2e`) before its batch's gate.
+- **Category:** process · environments
+
+## Every server render of the workspace logged use-intl's ENVIRONMENT_FALLBACK (12 Nov 2026)
+
+- **Symptom:** `[WebServer] Error: ENVIRONMENT_FALLBACK: There is no timeZone configured…` in the app's server log on page loads, seen while filming demos.
+- **Cause:** `app/providers.tsx` gave `IntlProvider` a locale and messages but no `timeZone`. use-intl checks for one on the server, the first time a component asks for a translator, and reports the fallback through `onError` (a console error). No date was wrong: every date is formatted with its business's own zone, never through intl.
+- **Fix:** `timeZone={PROFILE.defaultZone}`, the edition's default, which is India's until a business saves its own (the time zone decision in DECISIONS.md). `lib/language/intl-time-zone.test.tsx` server-renders the providers and fails on the report.
+- **Rule:** an intl provider always gets a `timeZone`; a test of it renders on the server, because use-intl only checks there.
+- **Category:** app · i18n
+
+## A new product said "MRP can't be lower than the price" while the MRP was still being typed (13 Nov 2026)
+
+- **Symptom:** filming the gym tour, typing an MRP of 2,999 under a price of 2,499 flashed the header's red "MRP can't be lower than the price it sells for." at the first "2". The MRP box itself already waited until it was left.
+- **Cause:** the product editor's sections report one `problem` that both blocks Create/Save and is what the header, the section card and the jump dots say. Basics worked its problem out from the values as typed, so a half-typed MRP was "wrong" on the first keystroke. The same rule had been fixed for the plan and pack editors on 12 Nov (an untouched field says nothing while others are typed), but this editor has its own section state.
+- **Fix:** `SectionState.quiet`: Basics marks its problem quiet when only the MRP is wrong and the box hasn't been left (and Create hasn't been pressed). A quiet problem still blocks Create and Save; the header, the card and the dot don't say it until the box is left or Create is pressed. `useSection` passes the new field through (its comparison lists fields by name, so a new field must be added there too). Tests in `editor-fixes.test.tsx`.
+- **Rule:** in every editor, a problem with a field still being typed blocks but isn't said until that field is left or the action is pressed (`docs/patterns/frontend-forms.md`). A field added to a section's reported state goes through `useSection`'s destructure, its report and its dependency list.
+- **Category:** app · forms
+
+## Claude rejected list_templates after it gained two fields (13 Nov 2026)
+
+- **Symptom:** after #1382 deployed to development, calling `list_templates` from Claude failed: "Structured content does not match the tool's output schema … must NOT have additional properties", once for each template.
+- **Cause:** the MCP SDK lists each tool's output schema as Zod writes it, with `additionalProperties: false` on every object. Claude.ai keeps the tool list from when the connector connected and checks each answer against it, so `preview_url` and `picture_url`, added later, failed every call until the person reconnected. In production, every added field would have broken every connected Claude and ChatGPT user.
+- **Fix:** `src/modules/mcp/open-output.ts`: the registry lists each output schema without `additionalProperties: false`, at every depth. Answers are still checked against the contract's Zod schema. `open-output.spec.ts` checks both, and `mcp.controller.db.spec.ts` asserts that no tool in `tools/list` carries it.
+- **Rule:** a tool's answer can gain fields; it never loses one or changes one's type without a new tool name. Apps that hold an older tool list must keep working.
+- **Category:** api · mcp
+
+## A new plan's form jumped to the top when its first save moved the address (13 Nov 2026)
+
+- **Symptom:** filming the gym tour on a phone, picking a plan's sessions (4, 8, 12) threw the page back to the top of the form, and the camera had to scroll down again. A probe in Chromium showed why: about 300 ms after the address moved from `/billing/plans/new` to `/billing/plans/<id>/edit`, the form's element was gone and the page sat at scroll 0.
+- **Cause:** the first autosave moves the address with `history.replaceState` (UX-080). Next 16 follows that write, as it must (the 20 Oct entry above), and renders the route at the new address: `[planId]/edit` is a different page from `new`, so the editor mounts again, fresh, at the top. The record is saved by then, so only the page's place is lost: its scroll and its focus.
+- **Fix:** `leavePlace` / `takePlace` (`lib/editor-shell/address.ts`): the old page leaves its scroll and focused control's id in sessionStorage for the new address, and the editor mounted there takes it once, within five seconds, and carries on from there. Unit tests in `address.test.ts`; checked in Chromium with the probe scene.
+- **Then:** carried across, the editor at the new address took the draft for one opened again and said every problem at once: an untouched empty price turned red. It now reads `placeWaiting` on its first render (`continued`), so a record it carries on keeps the quiet rule (12 Nov) until its fields are reached or Publish is pressed.
+- **Rule:** an editor whose address moves from `/new` to the record's own page (the shell's plans and packs, and any page that follows) carries the page's place across; never write the address past Next's router to avoid the remount.
+- **Category:** app · editors
+
+## Share card thumbnails showed as broken pictures (13 Nov 2026)
+
+- **Symptom:** on saroh.io, Create post's style picker (Photo, Price tag, Simple, Colour) showed four broken images, while the large previews beside them drew. Fetching the same address answered 200 with a PNG.
+- **Cause:** Helmet adds `Cross-Origin-Resource-Policy: same-origin` to every API answer. The previews fetch the picture with CORS and show a blob, so they pass; the thumbnails are plain `<img>` tags on app.saroh.io, and the browser refuses a same-origin resource from api.saroh.io. Any other site showing the card (a post, a chat preview) would be refused the same way. The unit test checked the headers the handler set, never what Helmet adds.
+- **Fix:** `public-share.controller.ts` sends `Cross-Origin-Resource-Policy: cross-origin` with each public card; the controller spec asserts it.
+- **Rule:** an API answer meant to be shown on another site (a public picture, a file link) sets `Cross-Origin-Resource-Policy: cross-origin` itself; `Access-Control-Allow-Origin` alone covers `fetch`, not `<img>`.
+- **Category:** api · share
+
+## A new section scrolled sideways on a 320px phone, seen only in CI (14 Nov 2026)
+
+- **Symptom:** PR #1408's browser suite failed "every page … doesn't roll sideways at 390 or 320" on `/features/website`: the new templates preview figure was 336px wide in a 278px column. The visual pass had compared every new page with its board and passed.
+- **Cause:** the visual pass shot pages at 1440 and 390 only, though `frontend-verification.md` names 320px as the floor. Inside the figure, an auto grid column sized to the browser frame's address bar, and the swatch row couldn't wrap.
+- **Fix:** the figure's grid takes `grid-cols-[minmax(0,1fr)]`, the frame `min-w-0`, and the swatch row wraps (`feature-templates.tsx`). Also in that run: `/developers` joined the sitemap spec's Resources list, and the AI assistants spec expects the copy-address step only where the API has an `api.` host (CI's localhost has none).
+- **Rule:** a visual pass, or a brief for one, shoots 320 as well as 390 and 1440, and checks that nothing inside `main` passes the viewport's right edge at 320. A drawn figure in a grid gets `minmax(0,1fr)` columns.
+- **Category:** frontend · verification
+
+## A new catalogue row never reached businesses on an older version (14 Nov 2026)
+
+- **Symptom:** after Ask AI's row was published on saroh.io, a business on Grow still read Ask AI as locked. Its subscription sits on an older catalogue version, as every existing business's does after a `keep` publish.
+- **Cause:** `withLiveAdditions` (DEC-186) only turned on cells of rows the older version already had. A row added since, such as `ask-ai`, was missing entirely, and Ask AI fails closed on a missing row. Its tests covered only rows present in both versions.
+- **Fix:** `withLiveAdditions` appends any live row the older version lacks, as the live version has it; `moves.test.ts` covers it.
+- **Rule:** a rule that merges two catalogue versions is tested with a row only the newer one has, as well as with a changed cell.
+- **Category:** billing · catalogue
+
+## A changed fallback broke a database spec only CI runs (15 Nov 2026)
+
+- **Symptom:** PR #1413's integration shard failed `mcp.controller.db.spec.ts`: an AI app's activity summary read `Rename a site`, not the expected `Renamed site <id>.`
+- **Cause:** the activity line's fallback moved from the reply's first line to the tool's title, done (`doneLine`). The unit spec covered the real tools' titles; the database spec's own test tool (`rename_site`) relied on the old fallback, and its verb wasn't one `doneLine` knew. The database specs don't run in the quick gate.
+- **Fix:** `Rename` joins the done verbs; the spec expects `Renamed a site`.
+- **Rule:** when a shared fallback changes, grep the `*.db.spec.ts` files for what they assert about it before pushing (`git grep -n summary -- '*.db.spec.ts'`), and run that spec where a test database is set up.
+- **Category:** api · mcp
+
+## A retaken shot kept serving its old sized copies (15 Nov 2026)
+
+- **Symptom:** after Ask AI's shots were retaken with product photos, `shot-sizes.mjs` reported `0 written`; phones and narrow desks still got the old copies with initials on the cards.
+- **Cause:** the script wrote a sized copy only when it was missing (or with `--force`), so a retaken capture at the same key kept its stale copies.
+- **Fix:** a copy older than its capture is written again (`apps/saroh.in/scripts/shot-sizes.mjs`); its output doesn't change between runs, so a fresh checkout's times only rewrite identical files.
+- **Rule:** a derived file is rebuilt when its source is newer, never only when it is missing.
+- **Category:** marketing · tooling
+
+## Ask AI's own page had no way to the history on a phone (15 Nov 2026)
+
+- **Symptom:** at 390px, `/ask` showed one conversation and no list; the marketing capture couldn't open a past conversation there. The follow-up box also sat half under the tab bar.
+- **Cause:** the page's list is `hidden` below 760px, and only the panel's header (not the page's) had the "Your conversations" button. The page's height left out `--tab-bar-inset`.
+- **Fix:** the page header gets the button under 760px, swapping the conversation for the list until one is picked; the page's height subtracts `--tab-bar-inset` (`ask-ai-panel.tsx`).
+- **Rule:** a list hidden at a breakpoint needs a control that reaches it at that breakpoint; a full-height workspace screen subtracts `--tab-bar-inset`.
+- **Category:** frontend · ask-ai
+
+## A page couldn't change twice on the day it was dated (15 Nov 2026)
+
+- **Symptom:** the push of batch-2026-11-15-1 failed content-dates: `features.ts`'s words changed but its date was still 2026-11-15, though that was today. The morning's merge had already set it.
+- **Cause:** the check asked for a new date whenever the words changed, and a date can't move past today.
+- **Fix:** a page already dated today passes (`scripts/check-content-dates.mjs`, `CONTENT_DATES_TODAY` for its test); a test covers it.
+- **Rule:** a freshness check accepts "already today" as fresh.
+- **Category:** tooling · content

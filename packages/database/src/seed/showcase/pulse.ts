@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { ensureCalendarOnlyRole } from "../../calendar-only-role";
 import type { Db } from "../helpers";
 import type { SeededService } from "./appointments";
+import { bookingSnapshot } from "./appointments";
 import type {
     BillingContact,
     InvoiceSpec,
@@ -11,7 +12,8 @@ import type {
     SubscriptionPlanRows,
 } from "./billing";
 import { rupees } from "./billing";
-import type { ShowcasePack, ShowcasePlan } from "./data";
+import type { ShowcasePack, ShowcasePlan, ShowcaseService } from "./data";
+import { TIMEZONE } from "./data";
 import {
     describeInvoiceStates,
     invoiceStateCounts,
@@ -1132,4 +1134,280 @@ export async function checkPulse(
         );
     }
     return counts;
+}
+
+// --- A personal training block, sold as one order (E9) ---------------------
+
+const MINUTE = 60_000;
+
+/**
+ * One member's "Personal training block" (three sessions, one order), as
+ * Kavi Dental's root canal is modelled: visit 1 attended last week, visit 2
+ * booked for the coming week, visit 3 not booked yet. Written once the diary
+ * and the front desk exist, so it is placed around them as the slot engine
+ * would: on the service's grid, with a coach who takes it and is working,
+ * nobody booked twice. Still to pay at the desk: no invoice until it is.
+ */
+export async function seedPulseTrainingBlock(
+    prisma: Db,
+    a: {
+        orgId: string;
+        now: Date;
+        storeId: string;
+        ownerUserId: string;
+        services: readonly ShowcaseService[];
+        id: Id;
+    },
+): Promise<void> {
+    const { orgId, now, id } = a;
+    const t = now.getTime();
+    const index = a.services.findIndex((s) => (s.visits ?? 1) > 1);
+    if (index < 0) return;
+    const service: SeededService = {
+        id: id("service", index),
+        fixture: a.services[index],
+    };
+    const step = service.fixture.minutes * MINUTE;
+    const from = istAt(now, -11, 0);
+    const until = istAt(now, 9, 0);
+
+    const coaches = PULSE_STAFF.filter((s) => s.services.includes(index));
+    const ids = coaches.map((c) => id("staff", c.key));
+    const [offs, extras, booked, members] = await Promise.all([
+        prisma.staffTimeOff.findMany({
+            where: { staffId: { in: ids } },
+            select: { staffId: true, startAt: true, endAt: true },
+        }),
+        prisma.staffExtraHours.findMany({
+            where: { staffId: { in: ids } },
+            select: {
+                staffId: true,
+                date: true,
+                startMinute: true,
+                endMinute: true,
+            },
+        }),
+        prisma.booking.findMany({
+            where: {
+                organizationId: orgId,
+                status: { not: "CANCELLED" },
+                startAt: { lt: until },
+                endAt: { gt: from },
+            },
+            select: {
+                staffId: true,
+                contactId: true,
+                startAt: true,
+                endAt: true,
+            },
+        }),
+        prisma.contact.findMany({
+            where: {
+                organizationId: orgId,
+                id: { startsWith: id("contact", "") },
+                subscriptions: { some: { status: "ACTIVE" } },
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+            },
+            orderBy: { id: "asc" },
+        }),
+    ]);
+    const staff: PulseStaff[] = coaches.map((fixture, i) => ({
+        id: ids[i],
+        fixture,
+        timeOff: offs
+            .filter((o) => o.staffId === ids[i])
+            .map((o) => ({
+                start: o.startAt.getTime(),
+                end: o.endAt.getTime(),
+            })),
+        // A @db.Date is the UTC midnight of its Kolkata date.
+        extra: extras
+            .filter((x) => x.staffId === ids[i])
+            .map((x) => ({
+                start: x.date.getTime() - IST + x.startMinute * MINUTE,
+                end: x.date.getTime() - IST + x.endMinute * MINUTE,
+            })),
+    }));
+    const busy = (key: string | null, start: number, end: number) =>
+        booked.some(
+            (b) =>
+                (b.staffId === key || b.contactId === key) &&
+                b.startAt.getTime() < end &&
+                start < b.endAt.getTime(),
+        );
+    /** The first free start on these days, with a coach, for this member. */
+    const slot = (days: readonly number[], contactId: string) => {
+        for (const d of days) {
+            const weekday = istWeekday(now, d);
+            for (const rule of service.fixture.rules) {
+                if (!rule.days.includes(weekday)) continue;
+                for (
+                    let m = minuteOf(rule.from);
+                    m * MINUTE + step <= minuteOf(rule.to) * MINUTE;
+                    m += service.fixture.minutes
+                ) {
+                    const start = istAt(now, d, m).getTime();
+                    const end = start + step;
+                    if (busy(contactId, start, end)) continue;
+                    const coach = staff.find(
+                        (s) =>
+                            isWorking(s, start, end) && !busy(s.id, start, end),
+                    );
+                    if (coach) return { start, end, staffId: coach.id };
+                }
+            }
+        }
+        return null;
+    };
+    const past = [-3, -4, -5, -6, -7, -8, -9, -10];
+    const ahead = [1, 2, 3, 4, 5, 6, 7, 8];
+    let chosen: {
+        member: (typeof members)[number];
+        visits: { start: number; end: number; staffId: string }[];
+    } | null = null;
+    for (const member of members) {
+        const one = slot(past, member.id);
+        const two = one && slot(ahead, member.id);
+        if (one && two) {
+            chosen = { member, visits: [one, two] };
+            break;
+        }
+    }
+    if (!chosen) {
+        throw new Error(
+            "Pulse Fitness: no member and coach free for the training block",
+        );
+    }
+    const { member, visits } = chosen;
+    const email = member.email;
+    const first = member.firstName ?? "";
+    const last = member.lastName ?? "";
+    const name = `${first} ${last}`.trim();
+    const price = rupees(service.fixture.priceCents ?? 0);
+    const placedAt = new Date(Math.min(visits[0].start - 2 * DAY, t - HOUR));
+
+    // The member may already buy at the counter: the same store customer.
+    const existing = await prisma.customer.findFirst({
+        where: { storeId: a.storeId, email },
+        select: { id: true },
+    });
+    const customerId = existing?.id ?? id("customer", "ptblock");
+    if (!existing) {
+        await prisma.customer.create({
+            data: {
+                id: customerId,
+                storeId: a.storeId,
+                organizationId: orgId,
+                email,
+                firstName: member.firstName,
+                lastName: member.lastName,
+                phone: member.phone,
+                createdAt: placedAt,
+            },
+        });
+    }
+    // After the counter's PF-1001…, in the business's one series.
+    const numbers = await prisma.order.findMany({
+        where: { store: { organizationId: orgId } },
+        select: { orderId: true },
+    });
+    const last4 = Math.max(
+        1000,
+        ...numbers.map((o) => Number(/^PF-(\d+)$/.exec(o.orderId)?.[1] ?? 0)),
+    );
+    const orderId = id("order", "ptblock");
+    await prisma.order.create({
+        data: {
+            id: orderId,
+            storeId: a.storeId,
+            organizationId: orgId,
+            orderId: `PF-${last4 + 1}`,
+            customerId,
+            currency: "INR",
+            subtotal: price,
+            tax: "0.00",
+            total: price,
+            fulfilment: "APPOINTMENT_IN_PERSON",
+            paymentStatus: "UNPAID",
+            createdAt: placedAt,
+            items: {
+                create: {
+                    id: id("orderitem", "ptblock"),
+                    serviceId: service.id,
+                    quantity: 1,
+                    price,
+                    stockRow: "NONE",
+                },
+            },
+        },
+    });
+
+    const rows: Prisma.BookingCreateManyInput[] = [];
+    const events: Prisma.BookingEventCreateManyInput[] = [];
+    visits.forEach((v, i) => {
+        const bookingId = id("booking", "ptblock", i + 1);
+        // Visit 1 booked with the order; visit 2 at the end of visit 1.
+        const createdAt = new Date(
+            i === 0 ? placedAt.getTime() : visits[0].end + 10 * MINUTE,
+        );
+        const attended = v.end <= t;
+        const outcomeAt = new Date(Math.min(t, v.end + 15 * MINUTE));
+        const slotDates = {
+            startAt: new Date(v.start),
+            endAt: new Date(v.end),
+        };
+        rows.push({
+            id: bookingId,
+            organizationId: orgId,
+            serviceId: service.id,
+            contactId: member.id,
+            staffId: v.staffId,
+            ...slotDates,
+            timezone: TIMEZONE,
+            status: "CONFIRMED",
+            outcome: attended ? "ATTENDED" : null,
+            // Paid for on the order, never on the visit.
+            paidWith: null,
+            orderId,
+            visitNumber: i + 1,
+            bookerName: name,
+            bookerEmail: email,
+            bookerPhone: member.phone,
+            snapshot: bookingSnapshot(service, slotDates, {
+                name,
+                email,
+                phone: member.phone ?? "",
+            }),
+            createdAt,
+            updatedAt: attended ? outcomeAt : createdAt,
+        });
+        events.push({
+            id: id("bookingevent", "ptblock", i + 1, "booked"),
+            bookingId,
+            organizationId: orgId,
+            type: "BOOKED",
+            actorUserId: a.ownerUserId,
+            toStartAt: slotDates.startAt,
+            createdAt,
+        });
+        if (attended) {
+            events.push({
+                id: id("bookingevent", "ptblock", i + 1, "outcome"),
+                bookingId,
+                organizationId: orgId,
+                type: "ATTENDED",
+                actorUserId: a.ownerUserId,
+                fromStartAt: slotDates.startAt,
+                createdAt: outcomeAt,
+            });
+        }
+    });
+    await prisma.booking.createMany({ data: rows });
+    await prisma.bookingEvent.createMany({ data: events });
 }

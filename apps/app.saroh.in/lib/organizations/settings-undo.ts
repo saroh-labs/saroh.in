@@ -1,6 +1,7 @@
 import { businessModeOf } from "@/lib/gst/price-mode";
 import { kindOf } from "@/lib/organizations/kind";
 import { sameWeek } from "@/lib/organizations/opening-hours";
+import { tradeOf } from "@/lib/organizations/trade";
 import type { OpeningHoursDay } from "@/lib/stores/storefronts";
 
 import type {
@@ -103,6 +104,9 @@ export function touchedFields(
     const out: Record<string, unknown> = {};
     if (sent.name !== undefined) out.name = settings.name;
     if (sent.kind !== undefined) out.kind = kindOf(settings.kind);
+    if (sent.trade !== undefined) out.trade = tradeOf(settings.trade);
+    if (sent.trade !== undefined || sent.tradeOther !== undefined)
+        out.tradeOther = settings.tradeOther ?? null;
     for (const key of keysOf(sent.profile)) {
         out[`profile.${key}`] = settings.profile?.[key] ?? null;
     }
@@ -149,6 +153,12 @@ export function settingsUndo(
     if (sent.name !== undefined) input.name = before.name;
     // An API older than DEC-070 sent none: it was a business.
     if (sent.kind !== undefined) input.kind = kindOf(before.kind);
+    // The typed trade goes back with its trade (DEC-216).
+    if (sent.trade !== undefined || sent.tradeOther !== undefined) {
+        input.trade = tradeOf(before.trade);
+        if (input.trade === "other" && before.tradeOther)
+            input.tradeOther = before.tradeOther;
+    }
     if (sent.profile) {
         input.profile = Object.fromEntries(
             keysOf(sent.profile).map((key) => [

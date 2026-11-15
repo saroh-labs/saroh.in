@@ -12,6 +12,7 @@ import type {
     OrgRole,
 } from "../../common/types/organization-context";
 import { ORG_ROLES } from "../../common/types/organization-context";
+import { keyContextCache } from "../api-keys/key-context.cache";
 import { planMeter } from "../billing/metering.service";
 import {
     CAPABILITY_BY_ACTION,
@@ -44,7 +45,7 @@ export interface RoleView {
 }
 
 /** What a built-in is called, before a business ever stores a row for it. */
-const BUILT_IN_LABEL: Record<OrgRole, string> = {
+export const BUILT_IN_LABEL: Record<OrgRole, string> = {
     OWNER: "Owner",
     ADMIN: "Admin",
     MEMBER: "Member",
@@ -249,6 +250,7 @@ export class OrganizationRolesService {
             },
         });
         if (count === 0) throw roleChangedMeanwhile();
+        keyContextCache.forgetOrganization(organizationId);
         const updated = await prisma.organizationRole.findUnique({
             where: { id: role.id },
         });

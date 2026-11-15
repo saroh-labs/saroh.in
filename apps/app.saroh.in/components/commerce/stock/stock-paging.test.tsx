@@ -40,6 +40,9 @@ function hrefAt(tab: "levels" | "checks", page: number, size: number) {
                 kind: "all",
                 store: "all",
                 product: "",
+                date: null,
+                from: null,
+                to: null,
                 pages: {
                     levels: FIRST,
                     log: FIRST,

@@ -43,7 +43,7 @@ import { StoresService } from "../stores/stores.service";
 import type { CreateOrderDto } from "./dto";
 import { OrderKitchenService } from "./order-kitchen.service";
 import { listOrderRows } from "./order-list";
-import { OrdersService } from "./orders.service";
+import { ORDER_TAKEN_NOTE, OrdersService } from "./orders.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 const flags = {
@@ -99,7 +99,9 @@ const stored = (id: string) =>
             paidAt: true,
             total: true,
             payTokenHash: true,
+            // Past the "Order taken" step every staff-taken order starts with.
             events: {
+                where: { note: { not: ORDER_TAKEN_NOTE } },
                 select: { kind: true, note: true, amountCents: true },
             },
             invoices: {

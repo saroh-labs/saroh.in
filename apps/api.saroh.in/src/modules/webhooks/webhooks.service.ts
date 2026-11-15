@@ -46,6 +46,7 @@ import {
 } from "../orders/order-pay-link";
 import { assertPaymentTransition } from "../orders/order-state";
 import { orderMoneyIntents } from "../orders/treatment-ledger";
+import { emitOrderWebhook } from "../outbound-webhooks/emitter";
 import {
     AUTHORISATION_PURPOSE,
     captureCheckInTx,
@@ -1825,7 +1826,10 @@ export class WebhooksService {
         // Insights' orders figure (#867), in the payment's transaction:
         // paid online, by pay link or confirmed by a lookup, it counts;
         // every rupee of it back, it is taken off again.
-        if (target === "PAID") await recordOrderPaidInTx(tx, orderId);
+        if (target === "PAID") {
+            await recordOrderPaidInTx(tx, orderId);
+            await emitOrderWebhook(tx, "order.paid", orderId);
+        }
         if (target === "REFUNDED") await recordOrderRefundedInTx(tx, orderId);
         return true;
     }

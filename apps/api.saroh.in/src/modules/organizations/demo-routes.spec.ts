@@ -124,6 +124,9 @@ const ASKS: Record<string, How> = {
         exempt: "a provider's callback",
     },
     "POST public/webhooks/msg91": { exempt: "Saroh's MSG91 delivery reports" },
+    "POST public/webhooks/meta": {
+        exempt: "Saroh's WhatsApp delivery reports from Meta",
+    },
 };
 
 const modules = join(__dirname, "..");

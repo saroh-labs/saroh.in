@@ -11,7 +11,7 @@ import { SAROH_SOCIAL } from "@/content/social";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 import { ring } from "@saroh/marketing/ring";
 
-import { Pill } from "@saroh/marketing/pill";
+import { NewTag } from "@saroh/marketing/pill";
 import { SocialMark } from "@saroh/marketing/social-mark";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import { CookieChoicesButton } from "./cookie-choices-button";
@@ -107,6 +107,7 @@ export function SiteFooter({
                                 className={LINK}
                             >
                                 {item.name}
+                                {item.isNew ? <NewTag /> : null}
                             </Link>
                         ))}
                     </Column>
@@ -130,14 +131,7 @@ export function SiteFooter({
                                     className={LINK}
                                 >
                                     {item.name}
-                                    {item.isNew ? (
-                                        <Pill
-                                            tone="soon"
-                                            className="ml-1.5 px-1.5 py-px text-[10.5px]"
-                                        >
-                                            new
-                                        </Pill>
-                                    ) : null}
+                                    {item.isNew ? <NewTag /> : null}
                                 </Link>
                             ))}
                         </Column>

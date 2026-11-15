@@ -9,6 +9,7 @@ import { discountState } from "../discounts/discount-state";
 import type { PriceTerms } from "../invoices/gst-price";
 import { sellUnit } from "../invoices/gst-price";
 import { loadPriceTerms } from "../invoices/price-terms";
+import { orderLocationWhere } from "../orders/order-location";
 import { orderPartyName } from "../orders/walk-in";
 import type { OrgAction } from "../organizations/organization-policy";
 import { productLines } from "../stock/product-lines";
@@ -204,8 +205,8 @@ export class ProductOverviewService {
             needs,
             terms,
         ] = await Promise.all([
-            this.panel(scope, "order:read", "orders", () =>
-                this.orders(productId, now),
+            this.panel(scope, "order:read", "orders", async () =>
+                this.orders(productId, now, await this.orderScope(scope)),
             ),
             this.panel(scope, "product-review:read", "reviews", () =>
                 this.reviews(productId, product),
@@ -313,14 +314,29 @@ export class ProductOverviewService {
         }
     }
 
+    /**
+     * A location's team counts and lists its own storefronts' orders only
+     * (DEC-074). The storefront route carries no role key, so it is read.
+     */
+    private async orderScope(
+        scope: ProductScope,
+    ): Promise<Prisma.OrderWhereInput> {
+        const roleKey = await this.products.access.roleKeyOf(scope);
+        return orderLocationWhere({
+            roleKey: roleKey ?? undefined,
+            userId: scope.userId,
+        });
+    }
+
     private async orders(
         productId: string,
         now: Date,
+        viewer: Prisma.OrderWhereInput,
     ): Promise<OverviewOrders> {
         const monthStart = new Date(
             Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1),
         );
-        const withProduct = { items: { some: { productId } } };
+        const withProduct = { items: { some: { productId } }, ...viewer };
         const [openCount, thisMonthCount, soldRows, recent] = await Promise.all(
             [
                 prisma.order.count({
@@ -336,6 +352,7 @@ export class ProductOverviewService {
                         order: {
                             createdAt: { gte: monthStart },
                             status: { not: "CANCELLED" },
+                            ...viewer,
                         },
                     },
                     _sum: { quantity: true },

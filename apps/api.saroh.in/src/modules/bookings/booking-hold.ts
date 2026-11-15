@@ -15,6 +15,7 @@ import {
     writeDocumentLines,
 } from "../invoices/order-invoicing";
 import { mintPayToken } from "../invoices/pay-token";
+import { emitOrderWebhook } from "../outbound-webhooks/emitter";
 import { businessPayLinkProvider } from "../payments/pay-link-provider";
 import { paysInWindow } from "../payments/stripe-checkout-style";
 import { BookingEventType, classCancelledData } from "./booking-event-type";
@@ -578,7 +579,10 @@ export async function confirmHoldInTx(
             data: { paymentStatus: "PAID", paidAt: now },
         });
         // Insights' orders figure (#867), only when this made it paid.
-        if (count > 0) await recordOrderPaidInTx(tx, invoice.orderId, now);
+        if (count > 0) {
+            await recordOrderPaidInTx(tx, invoice.orderId, now);
+            await emitOrderWebhook(tx, "order.paid", invoice.orderId);
+        }
     }
     return "confirmed";
 }

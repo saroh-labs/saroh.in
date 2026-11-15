@@ -23,6 +23,11 @@ export type OrgAction =
     // the business — every change holds an address, and it moves every link
     // the business has shared.
     | "org:address:update"
+    // Download everything the business holds (DEC-131 closing notice, data
+    // export). The Owner's alone, by their role, as closing is. Listed so
+    // the Roles screen shows it as Owner only (audit 2026-11-12 #15); the
+    // export still asks the Owner role, not this key.
+    | "org:export"
     | "member:read"
     | "member:invite"
     | "member:remove"
@@ -52,6 +57,12 @@ export type OrgAction =
     // leaving a note is not a read, and signing a site off is not an edit.
     | "site:comment"
     | "site:approve"
+    // Publish without the approval "Publishing needs approval" asks for, and
+    // switch that setting: the Owner's alone (separation of duties, the
+    // gate can't be given to whoever it gates). Listed so the Roles screen
+    // shows it as Owner only (audit 2026-11-12 #14); publishing still asks
+    // the Owner role, not this key.
+    | "site:approval:override"
     | "domain:manage"
     | "form:read"
     | "form:write"
@@ -171,7 +182,32 @@ export type OrgAction =
     // `module:manage` (OWNER/ADMIN) enables/disables Organization modules and
     // manages Project selection.
     | "module:read"
-    | "module:manage";
+    | "module:manage"
+    // The public API (R7, plan 2026-11-10-001): make and revoke API keys,
+    // and disconnect anyone's AI app. The Owner's alone, never a custom
+    // role's, never an extra and never a key's: a key that could make keys
+    // would outlive whoever revoked it.
+    | "apikey:manage"
+    // Notifications to the business's own systems (webhooks, R8). The
+    // Owner's by default; an Owner may give it to an Admin as an extra or
+    // to a custom role. Connecting one's own AI app needs no action.
+    | "webhook:manage"
+    // Let a website take bookings, orders and enquiries through the public
+    // API: a secret key with it mints a short-lived token for one visitor
+    // (plan 2026-11-10-001, U7). Owner and Admin by default.
+    | "storefront:mint"
+    // Posts about the business (#1375, #1378; owner 12 Nov 2026): see the
+    // business's own posts, and make and share them. Owner and Admin by
+    // default, grantable to a role or a person. `social:post` implies
+    // `social:read`. Today they cover Create post's own posts; Saroh Social
+    // (channels, scheduling) asks the same two when it exists.
+    | "social:read"
+    | "social:post"
+    // Ask AI (DEC-220, plan 2026-11-13-001 U7): ask questions and get
+    // drafts to confirm. Owner and Admin by default, grantable to a role or
+    // a person; the business's question allowance is shared by everyone who
+    // holds it. Not a tool's action, so no AI app can reach Ask AI with it.
+    | "ai:use";
 
 /** Every action, for exhaustive iteration/testing and building capability sets. */
 export const ORG_ACTIONS: readonly OrgAction[] = [
@@ -180,6 +216,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "org:update",
     "org:delete",
     "org:address:update",
+    "org:export",
     "member:read",
     "member:invite",
     "member:remove",
@@ -201,6 +238,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "site:publish",
     "site:comment",
     "site:approve",
+    "site:approval:override",
     "domain:manage",
     "form:read",
     "form:write",
@@ -265,4 +303,13 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     // Modular capabilities (ADR-003).
     "module:read",
     "module:manage",
+    // Public API and MCP (plan 2026-11-10-001, U2).
+    "apikey:manage",
+    "webhook:manage",
+    "storefront:mint",
+    // Posts (#1378).
+    "social:read",
+    "social:post",
+    // Ask AI (DEC-220).
+    "ai:use",
 ];
