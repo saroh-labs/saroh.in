@@ -49,7 +49,7 @@ test("nothing connected: copy the address, then pick an app", async ({
     await expect(apps).toHaveCount(2);
     await expect(
         page.getByRole("link", { name: "Connect Claude (opens in a new tab)" }),
-    ).toHaveAttribute("href", "https://claude.ai/settings/connectors");
+    ).toHaveAttribute("href", "https://claude.ai/new#customize/connectors");
     await expect(
         page.getByRole("link", {
             name: "Connect ChatGPT (opens in a new tab)",

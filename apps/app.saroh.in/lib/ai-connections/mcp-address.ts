@@ -28,7 +28,7 @@ export function mcpAddress(): string | null {
  * there and signs in to Saroh when it asks.
  */
 export const CONNECT_IN = {
-    claude: "https://claude.ai/settings/connectors",
+    claude: "https://claude.ai/new#customize/connectors",
     chatgpt: "https://chatgpt.com/#settings/Connectors",
 } as const;
 

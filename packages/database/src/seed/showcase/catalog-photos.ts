@@ -17,8 +17,7 @@ export interface ProductPhoto {
     variant?: string;
 }
 
-const unsplash = (photo: string) =>
-    `https://images.unsplash.com/${photo}?w=1600&q=80&auto=format&fit=crop`;
+const unsplash = (photo: string) => `https://media.saroh.io/demo/${photo}.jpg`;
 
 export const PULSE_PHOTOS: Record<string, readonly ProductPhoto[]> = {
     "whey-protein-1kg": [

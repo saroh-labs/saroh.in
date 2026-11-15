@@ -1,5 +1,6 @@
 import type { Shot } from "@saroh/marketing/shot";
 
+import PLACEHOLDERS from "@/content/shot-placeholders.json";
 import WIDTHS from "@/content/shot-widths.json";
 
 /**
@@ -59,5 +60,14 @@ export function sizedShot(shot: Shot): Shot {
         : {
               ...shot,
               srcSet: shotSources({ src: shot.src, width: shot.width }).srcSet,
+              placeholder: placeholderOf(shot.src),
           };
+}
+
+/** The blurred stand-in `scripts/shot-sizes.mjs` made for a captured shot. */
+export function placeholderOf(src: string): string | undefined {
+    const [, dir, key] = CAPTURED_SHOT.exec(src) ?? [];
+    return dir && key
+        ? (PLACEHOLDERS as Record<string, string>)[`${dir}/${key}`]
+        : undefined;
 }

@@ -28,7 +28,7 @@ export interface DemoImage {
 
 /** An Unsplash photo at the width the boutique hot-links. */
 export const unsplash = (photo: string) =>
-    `https://images.unsplash.com/${photo}?w=1600&q=80&auto=format&fit=crop`;
+    `https://media.saroh.io/demo/${photo}.jpg`;
 
 /** Where the local app serves the pictures the seed draws. */
 export const DEMO_ASSET_BASE = "https://app.saroh.localhost/demo";

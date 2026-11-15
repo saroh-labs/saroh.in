@@ -162,6 +162,12 @@ export interface Shot {
      * The image itself stays clean.
      */
     mark?: string;
+    /**
+     * Another product's own screen (Claude's, ChatGPT's), which the stack
+     * can't open: the image is put in place by hand and kept, never taken.
+     * Says where it came from.
+     */
+    supplied?: string;
 }
 
 /** Notices that would only be put away by a write. */
@@ -1471,7 +1477,7 @@ const SHARE_SHOTS: Shot[] = [
         steps: [
             ...OPEN_SHARE,
             { click: '[role="dialog"] [data-card="price"]' },
-            { waitFor: '[role="dialog"] [data-preview] img' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
         ],
         clip: { selector: '[role="dialog"]' },
         alt: "The Share sheet for the Sourdough loaf at Rye & Co. (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
@@ -1484,39 +1490,50 @@ const SHARE_SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: RYE_SOURDOUGH_PAGE,
-        viewport: DESK,
+        // Taken at 900 wide, so the page lays out in about the width a
+        // step's half draws it at, and cropped from the breadcrumb through
+        // the photos: Share and "On the online shop" read at near full size
+        // (owner, 14 Nov 2026).
+        viewport: { width: 900, height: 1300 },
+        clip: {
+            selector: 'main nav[aria-label="Breadcrumb"]',
+            until: 'main [role="tabpanel"] div.bg-card:has-text("Photos and videos")',
+            pad: 12,
+        },
         alt: "The Sourdough loaf's page at Rye & Co. (demo bakery), live on the shop, with the Share button beside QR",
         caption:
             "A live product page in Saroh, Cardamom bun box, with the Share button beside QR",
         gap: "The Sourdough loaf, not a Cardamom bun box.",
     },
     {
+        // The same Sourdough loaf as the hero (owner, 14 Nov 2026: one
+        // example through the page), its weekend offer on the Offer card.
         key: "sh-cards",
-        business: "gulmohar",
+        business: "rye",
         role: "owner",
-        route: "/services/seed_sc_ns_service_hair-spa",
+        route: RYE_SOURDOUGH_PAGE,
         viewport: DESK,
         steps: [
             ...OPEN_SHARE,
             { click: '[role="dialog"] button:has-text("Square")' },
+            { click: '[role="dialog"] [data-card="offer"]' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
         ],
         clip: { selector: '[role="dialog"]' },
-        alt: "Card styles for Hair spa at Gulmohar Salon & Bridal (demo salon) in the salon's own look, with Square chosen",
+        alt: "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
         caption:
-            "Card styles for Kesar Salon's Hair spa in the salon's own plum colours, Square chosen, and the Offer card greyed out because there's no live offer",
-        gap: "The board's Kesar Salon is the seed's Gulmohar Salon & Bridal; with no live offer the Offer card is not offered at all.",
+            "The Sourdough loaf's card styles in Rye & Co.'s colours, Square chosen, and the Offer card showing its weekend discount",
     },
     {
         key: "sh-phone",
-        business: "pulse",
+        business: "rye",
         role: "owner",
-        // HIIT class (`data.ts`, PULSE services[1]).
-        route: "/services/seed_sc_pulse_service_1",
+        route: RYE_SOURDOUGH_PAGE,
         viewport: PHONE,
         steps: OPEN_SHARE,
-        alt: "The Share sheet on a phone for a class at Pulse Fitness (demo gym), with Share now",
+        alt: "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
         caption:
-            "A phone share sheet with a Morning HIIT card in Pulse Fitness's navy, a note saying the caption is copied for Instagram, and WhatsApp, Instagram, Facebook and More",
+            "A phone share sheet with the Sourdough loaf's card in Rye & Co.'s colours, a note saying the caption is copied for Instagram, and Share now",
         gap: "The phone's own share sheet can't be captured; this is Saroh's sheet before Share now opens it.",
     },
     {
@@ -1540,6 +1557,34 @@ const SHARE_SHOTS: Shot[] = [
             "Create post with Text only chosen, the headline We're hiring a morning baker, a link to the Work with us page, and the card drawn in the bakery's green",
         gap: "The link is left as offered; the seed may have no Work with us page.",
     },
+    {
+        // Step 4's close-up of the hero's post, finished (owner, 14 Nov
+        // 2026): narrower than DESK and cropped to the form and its card.
+        key: "sh-post-card",
+        business: "rye",
+        role: "owner",
+        route: "/social/new",
+        viewport: { width: 1100, height: 1000 },
+        steps: [
+            { click: '[data-own-post] button:has-text("Text only")' },
+            { waitFor: "[data-own-headline]" },
+            {
+                fill: "[data-own-headline]",
+                value: "We're hiring a morning baker",
+            },
+            {
+                fill: "[data-own-caption]",
+                value: "Early starts, good pay and all the bread you can eat. Come and see us on Hill Road.",
+            },
+            { click: 'main [role="radiogroup"] label:has-text("Shop")' },
+            // Out of the field, so no focus ring is in the picture.
+            { click: "main h1" },
+        ],
+        clip: { selector: "[data-own-composer]", pad: 20 },
+        alt: "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+        caption:
+            "Create post filled in: the headline We're hiring a morning baker, a short caption, the Shop link chosen, and the card drawn in the bakery's colours",
+    },
 ];
 
 /* ── AI apps (plan 2026-11-13-002, U3; board VFAiApps) ─────────────────
@@ -1551,18 +1596,163 @@ const SHARE_SHOTS: Shot[] = [
  * one (see `gap`). Read-only: the consent screen is shot before Allow, and
  * opening a connection's sheet only changes the page.
  */
+
+/**
+ * Ask AI (owner, 15 Nov 2026): Rye & Co. through the page, each shot a
+ * conversation already asked on the capture database, opened from the
+ * history list by its question; the capture never asks. Ask them first
+ * (`gap`): "How did this week go, and which products sold the most?",
+ * "Is hafte sabse zyada kya bika?" and "Change the Sourdough loaf's
+ * description to: …", the change card left unconfirmed.
+ */
+const ASK_GAP =
+    "Asked by hand on the capture database first (Anthropic key in .env.local), with the API's R2_PUBLIC_BASE_URL set so the product cards show photos.";
+const openAsk = (question: string): Step[] => [
+    {
+        click: `nav[aria-label="Your conversations"] button:has-text("${question}")`,
+    },
+    { waitFor: 'button:has-text("Report this answer")' },
+];
+const ASK_PANE = 'section[aria-label="Ask AI"]';
+const ASK_AI_SHOTS: Shot[] = [
+    {
+        key: "ask-hero",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        // Tall enough that the question shows above the answer.
+        viewport: { width: 1440, height: 1200 },
+        steps: openAsk("How did this week go"),
+        alt: "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
+        caption:
+            "Ask AI's page: How did this week go, and which products sold the most? Answered from the bakery's own orders, with the best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-start",
+        business: "rye",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 900 },
+        steps: [
+            { click: 'header button:has-text("Ask AI")' },
+            {
+                waitFor:
+                    'aside[aria-label="Ask AI"] button:has-text("Who hasn\'t paid")',
+            },
+        ],
+        clip: { selector: 'aside[aria-label="Ask AI"]' },
+        alt: "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
+        caption:
+            "The Ask AI panel opened over Home: Ask about Rye & Co., and ready questions such as Who hasn't paid and Top products this month",
+    },
+    {
+        key: "ask-answer",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 1000 },
+        steps: openAsk("Is hafte sabse zyada"),
+        clip: { selector: ASK_PANE },
+        alt: "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
+        caption:
+            "Is hafte sabse zyada kya bika? Answered in Hinglish from the bakery's own orders, with the week's best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-confirm",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 640 },
+        steps: openAsk("Change the Sourdough"),
+        clip: { selector: ASK_PANE },
+        alt: "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+        caption:
+            "A change to the Sourdough loaf's description comes back as a card: the old words struck through, the new ones, and Change product or Cancel",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-history",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 900 },
+        steps: [{ waitFor: 'nav[aria-label="Your conversations"] button' }],
+        clip: {
+            selector: 'nav[aria-label="Your conversations"] h1',
+            until: 'nav[aria-label="Your conversations"] button:has-text("How did this week go")',
+            pad: 20,
+        },
+        alt: "Ask AI's history at Rye & Co. (demo bakery)",
+        caption:
+            "Your conversations: each kept for 90 days and seen only by you, newest first",
+        gap: ASK_GAP,
+    },
+];
 const AI_APPS_SHOTS: Shot[] = [
+    {
+        key: "ai-hero",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude connected to Rye & Co. on saroh.io, asked to add a button to the home page as a draft; cropped to the request and the answer (15 Nov 2026)",
+        alt: "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
+        caption:
+            "In Claude: add a button near the top of Rye & Co.'s home page that says Order tomorrow's sourdough. Claude, using Saroh, adds it as a draft visitors don't see yet and says where it sits",
+    },
+    {
+        key: "ai-ask",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude connected to Rye & Co. on saroh.io, asked to mark an order ready for pickup; the request and the answer joined without the tool line, which shows internal ids (15 Nov 2026)",
+        alt: "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
+        caption:
+            "In Claude: mark order 1067 as ready for pickup. Claude marks it ready, leaves the courier order alone, and says 13 orders are still to pack",
+    },
+    {
+        key: "ai-connect",
+        role: "visitor",
+        route: "/",
+        viewport: DESK,
+        supplied:
+            "Claude's Settings › Connectors › Add custom connector with Saroh's address, shot by the owner (14 Nov 2026)",
+        alt: "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
+        caption:
+            "An AI app's Add a connector form with the name Saroh and Saroh's MCP address filled in",
+    },
     {
         key: "ai-consent",
         business: "rye",
         role: "owner",
-        route: "accounts:/oauth/consent",
+        // Claude's own sign-in, as claude.ai starts it (its published client
+        // document), through Pick a business to the consent page; shot before
+        // Allow, so no code is issued. The challenge is a fixed, valid one: the
+        // capture never trades a code.
+        route: `api:/api/auth/oauth2/authorize?${new URLSearchParams({
+            response_type: "code",
+            client_id: "https://claude.ai/oauth/mcp-oauth-client-metadata",
+            redirect_uri: "https://claude.ai/api/mcp/auth_callback",
+            scope: "saroh:read saroh:write offline_access",
+            code_challenge: "p7ZuqXBBQMmAPxlhacRYlz9GkdSucYGHKSxCZ05PETA",
+            code_challenge_method: "S256",
+            state: "shots",
+        }).toString()}&resource={mcp}`,
         viewport: DESK,
-        steps: [{ waitFor: 'button:has-text("Don\'t allow")' }],
+        steps: [
+            { click: 'role=checkbox[name="Rye & Co."]' },
+            { click: 'button:has-text("Continue")' },
+            { waitFor: 'button:has-text("Don\'t allow")' },
+        ],
+        // The consent column alone: full page it was a small card in white.
+        clip: { selector: "h1 >> xpath=..", pad: 32 },
         alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
         caption:
             "An AI app wants to use Saroh as you: two of three businesses ticked, what it may do and what it can't, and Allow",
-        gap: "The page needs the signed query of a sign-in an AI app started (its /oauth/authorize redirect); append it to the route by hand for the run. The seed has one Rye & Co., not three.",
+        gap: "The seed's owner ticks Rye & Co. only, not two of three businesses.",
     },
     {
         key: "ai-activity",
@@ -1574,10 +1764,12 @@ const AI_APPS_SHOTS: Shot[] = [
             { click: 'button[aria-label^="Open "]' },
             { waitFor: '[role="dialog"]' },
         ],
+        // The connection's sheet alone; the page behind it is dimmed.
+        clip: { selector: '[role="dialog"]' },
         alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
         caption:
             "Settings › API and AI apps › AI assistants: Claude connected to two businesses, its last three changes, and Roll back site draft and Disconnect",
-        gap: "The seed connects no AI app: connect one to Rye & Co. on the capture database and make a change or two through it first.",
+        gap: "The seed connects no AI app: run `pnpm --filter @saroh/e2e shots:connect-claude` and make a change or two through it first (see that script).",
     },
 ];
 
@@ -1983,4 +2175,5 @@ export const SHOTS: Shot[] = [
     ...STOCK_SHOTS,
     ...SHARE_SHOTS,
     ...AI_APPS_SHOTS,
+    ...ASK_AI_SHOTS,
 ];

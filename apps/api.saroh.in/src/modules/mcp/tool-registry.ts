@@ -436,8 +436,7 @@ export class McpToolRegistry {
                         tool: tool.name,
                         target: result.activity?.target,
                         summary:
-                            result.activity?.summary ??
-                            result.text.split("\n")[0],
+                            result.activity?.summary ?? doneLine(tool.title),
                     }),
                 );
             }
@@ -510,6 +509,39 @@ export class McpToolRegistry {
  * An in-process call's input checked against the tool's contract, with
  * `business` dropped; or the refusal saying what doesn't fit.
  */
+/**
+ * A write tool's line in a business's AI activity when it gives no summary
+ * of its own: its title, done ("Change a product" → "Changed a product").
+ * Never the reply written for the AI app, which carries ids and figures a
+ * merchant shouldn't read (owner, 15 Nov 2026).
+ */
+const DONE: Record<string, string> = {
+    Add: "Added",
+    Book: "Booked",
+    Change: "Changed",
+    Delete: "Deleted",
+    Edit: "Edited",
+    Make: "Made",
+    Move: "Moved",
+    Prepare: "Prepared",
+    Remove: "Removed",
+    Rename: "Renamed",
+    Set: "Set",
+    Start: "Started",
+    Take: "Took",
+    Undo: "Undid",
+    Write: "Wrote",
+};
+
+export function doneLine(title: string): string {
+    const [verb, ...rest] = title.split(" ");
+    const done = DONE[verb];
+    return done ? [done, ...rest].join(" ") : title;
+}
+
+/** Whether `doneLine` knows the title's verb: every write tool's must. */
+export const knowsDoneVerb = (title: string) => title.split(" ")[0] in DONE;
+
 export function parseInProcess(
     tool: McpTool,
     input: unknown,

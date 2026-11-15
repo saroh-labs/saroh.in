@@ -419,6 +419,15 @@ async function seedOne(
         serviceId: (i) => sid("service", biz.services[i].key),
         footer: { format: "text", value: biz.site.footer },
     });
+    // A business that sells has its site sell from its first store (G11),
+    // as an owner's setup leaves it: else Home asks to choose one and the
+    // shop page isn't live.
+    if (biz.products.length) {
+        await prisma.site.update({
+            where: { id: siteId },
+            data: { storefrontId: storeIds[0] },
+        });
+    }
     for (let i = 0; i < biz.services.length; i++) {
         const s = biz.services[i];
         await prisma.service.create({

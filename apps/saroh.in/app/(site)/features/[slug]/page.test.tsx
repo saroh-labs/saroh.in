@@ -215,14 +215,16 @@ describe("/features/[slug]", () => {
             });
         });
 
-        it("draws the hero and step 3 as chats, the rest as shots", async () => {
+        it("shows the hero and every step as real shots, Claude's chats included", async () => {
             env.NEXT_PUBLIC_AI_APPS = "on";
             const { container } = render(await FeaturePage(params("ai-apps")));
-            const chats = container.querySelectorAll("figure[data-chat]");
-            expect(chats).toHaveLength(2);
-            expect(chats[0].textContent).toContain("Draft to publish");
-            expect(chats[1].textContent).toContain("Changed at once");
-            expect(container.querySelector('[data-shot="ai-hero"]')).toBeNull();
+            // Real chats in Claude now, not drawings (owner, 15 Nov 2026).
+            expect(
+                container.querySelectorAll("figure[data-chat]"),
+            ).toHaveLength(0);
+            expect(
+                container.querySelector('[data-shot="ai-hero"]'),
+            ).not.toBeNull();
             const how = found(
                 screen
                     .getByRole("heading", {
@@ -231,7 +233,7 @@ describe("/features/[slug]", () => {
                     .closest("section"),
             );
             expect(how.querySelectorAll("ol > li")).toHaveLength(4);
-            expect(how.querySelectorAll("[data-shot]")).toHaveLength(3);
+            expect(how.querySelectorAll("[data-shot]")).toHaveLength(4);
         });
 
         it("lists only the live AI apps under Apps you can use", async () => {

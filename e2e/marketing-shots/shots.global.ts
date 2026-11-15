@@ -54,7 +54,8 @@ const invoicePaper: Partial<Shot> = {
  * Needs you groups, so the column reaches the bottom of Today.
  */
 const homeRegion = (open = 0): Partial<Shot> => ({
-    viewport: { width: 1440, height: 1200 },
+    // Tall enough for a Home whose Needs you runs long (1,423px, 14 Nov 2026).
+    viewport: { width: 1440, height: 1600 },
     steps: Array.from({ length: open }, () => ({
         click: '[data-need-group] button[aria-label="Show the rows"]',
     })),

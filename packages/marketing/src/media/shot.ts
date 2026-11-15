@@ -8,6 +8,8 @@ export interface Shot {
     height: number;
     /** The sized copies the site has of it (`srcset`), when it has any. */
     srcSet?: string;
+    /** A tiny blurred copy (a data URL) shown while the image loads. */
+    placeholder?: string;
 }
 
 /** A screenshot as one place shows it. */

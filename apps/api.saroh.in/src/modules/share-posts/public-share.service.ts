@@ -7,6 +7,7 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { ObjectStorage } from "@saroh/object-storage";
+import { sanitizeSegment } from "@saroh/object-storage";
 
 import {
     dayWords,
@@ -556,7 +557,9 @@ export class PublicShareService {
             const path = decodeURIComponent(new URL(url).pathname);
             const at = path.indexOf("/org/");
             const key = at < 0 ? "" : path.slice(at + 1);
-            if (!key.startsWith(`org/${organizationId.toLowerCase()}/`)) {
+            // The folder as storage names it (`buildObjectKey`): an id with
+            // `_` (the seeded businesses') is stored under `-`.
+            if (!key.startsWith(`org/${sanitizeSegment(organizationId)}/`)) {
                 return null;
             }
             if (this.storage.getPublicUrl(key) !== url) return null;

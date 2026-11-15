@@ -6736,3 +6736,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `withLiveAdditions` appends any live row the older version lacks, as the live version has it; `moves.test.ts` covers it.
 - **Rule:** a rule that merges two catalogue versions is tested with a row only the newer one has, as well as with a changed cell.
 - **Category:** billing · catalogue
+
+## A changed fallback broke a database spec only CI runs (15 Nov 2026)
+
+- **Symptom:** PR #1413's integration shard failed `mcp.controller.db.spec.ts`: an AI app's activity summary read `Rename a site`, not the expected `Renamed site <id>.`
+- **Cause:** the activity line's fallback moved from the reply's first line to the tool's title, done (`doneLine`). The unit spec covered the real tools' titles; the database spec's own test tool (`rename_site`) relied on the old fallback, and its verb wasn't one `doneLine` knew. The database specs don't run in the quick gate.
+- **Fix:** `Rename` joins the done verbs; the spec expects `Renamed a site`.
+- **Rule:** when a shared fallback changes, grep the `*.db.spec.ts` files for what they assert about it before pushing (`git grep -n summary -- '*.db.spec.ts'`), and run that spec where a test database is set up.
+- **Category:** api · mcp

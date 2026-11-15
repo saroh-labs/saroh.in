@@ -25,8 +25,7 @@ export interface RyePhoto {
     variant?: string;
 }
 
-const unsplash = (photo: string) =>
-    `https://images.unsplash.com/${photo}?w=1600&q=80&auto=format&fit=crop`;
+const unsplash = (photo: string) => `https://media.saroh.io/demo/${photo}.jpg`;
 
 /** Photos by product slug, in order; the first is the cover. */
 export const PHOTOS: Record<string, readonly RyePhoto[]> = {

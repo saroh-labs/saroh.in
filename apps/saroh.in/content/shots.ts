@@ -137,35 +137,33 @@ const designed = {
     // check refuses its switch while any is a placeholder. Not built while
     // their switch is off. The demo salon is the seed's Gulmohar.
     "ai-hero": pending(
-        "An AI assistant adding a section to the home page of Rye & Co. (demo bakery) as a draft",
+        "Claude adding an Order tomorrow's sourdough button to the home page of Rye & Co. (demo bakery), saved as a draft",
     ),
     "ai-connect": pending(
-        "An AI app's Add a connector form with Saroh's address",
+        "Claude's Add custom connector form with the name Saroh and Saroh's address, https://mcp.saroh.in/mcp",
     ),
     "ai-consent": pending(
         "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
     ),
     "ai-ask": pending(
-        "An AI assistant moving a booking at Gulmohar Salon & Bridal (demo salon)",
+        "Claude marking a Rye & Co. (demo bakery) order ready for pickup and saying what is left to pack",
     ),
     "ai-activity": pending(
         "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
     ),
     "ask-hero": pending(
-        "Ask AI at Gulmohar Salon & Bridal (demo salon) answering how the week went",
+        "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
     ),
     "ask-start": pending(
-        "Ask AI at Pulse Fitness (demo gym) before a question, with ready questions",
+        "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
     ),
     "ask-answer": pending(
-        "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish",
+        "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
     ),
     "ask-confirm": pending(
-        "Ask AI at Gulmohar Salon & Bridal (demo salon): a new service card to check before it is added",
+        "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
     ),
-    "ask-history": pending(
-        "Ask AI's history at Gulmohar Salon & Bridal (demo salon)",
-    ),
+    "ask-history": pending("Ask AI's history at Rye & Co. (demo bakery)"),
     "sh-sheet": pending(
         "The Share sheet for a product at Rye & Co. (demo bakery): a card in the bakery's look, its sizes and caption",
     ),
@@ -173,13 +171,16 @@ const designed = {
         "A live product at Rye & Co. (demo bakery) with its Share button",
     ),
     "sh-cards": pending(
-        "Card styles for a service at Gulmohar Salon & Bridal (demo salon) in the salon's own colours",
+        "Card styles for the Sourdough loaf at Rye & Co. (demo bakery) in the bakery's own look, the Offer card in Square",
     ),
     "sh-phone": pending(
-        "The Share sheet on a phone for a class at Pulse Fitness (demo gym), with Share now",
+        "The Share sheet on a phone for the Sourdough loaf at Rye & Co. (demo bakery), with Share now",
     ),
     "sh-post": pending(
         "Create post at Rye & Co. (demo bakery): a headline, a link and the card drawn in the bakery's look",
+    ),
+    "sh-post-card": pending(
+        "A finished own post at Rye & Co. (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
     ),
 } satisfies Record<string, Shot>;
 

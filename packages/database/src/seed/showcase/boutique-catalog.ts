@@ -197,7 +197,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1608571423902-eed4a5ad8108?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1608571423902-eed4a5ad8108.jpg",
                 alt: "Amber glass dropper bottle of vitamin C serum on a turned wooden stand, with soft palm-leaf shadows on a cream wall",
                 width: 1600,
                 height: 2400,
@@ -205,7 +205,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@kseegars",
             },
             {
-                url: "https://images.unsplash.com/photo-1608571424266-edeb9bbefdec?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1608571424266-edeb9bbefdec.jpg",
                 alt: "Larger 30 ml amber serum bottle on a wooden pedestal in warm afternoon light",
                 width: 1600,
                 height: 2400,
@@ -213,7 +213,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@kseegars",
             },
             {
-                url: "https://images.unsplash.com/photo-1608571702419-f1267e9a18fb?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1608571702419-f1267e9a18fb.jpg",
                 alt: "Hand lifting the glass dropper out of an amber serum bottle",
                 width: 1600,
                 height: 2400,
@@ -221,7 +221,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@kseegars",
             },
             {
-                url: "https://images.unsplash.com/photo-1608571702600-5a5419d31475?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1608571702600-5a5419d31475.jpg",
                 alt: "Amber dropper bottle standing on a marble ledge with a long soft shadow",
                 width: 1600,
                 height: 1067,
@@ -339,7 +339,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1764694187721-a5035d777fdf?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1764694187721-a5035d777fdf.jpg",
                 alt: "Clear glass serum bottle with its dropper lying beside it on a glossy black reflective surface",
                 width: 1600,
                 height: 2000,
@@ -347,7 +347,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pavlo_talpa",
             },
             {
-                url: "https://images.unsplash.com/photo-1764694187667-f28a05a52c0e?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1764694187667-f28a05a52c0e.jpg",
                 alt: "A single drop of clear serum falling from a glass dropper into an open bottle",
                 width: 1600,
                 height: 2000,
@@ -355,7 +355,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pavlo_talpa",
             },
             {
-                url: "https://images.unsplash.com/photo-1764694187688-454d172e5ca0?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1764694187688-454d172e5ca0.jpg",
                 alt: "Serum bottle resting among clear gel-like bubbles on a white backdrop",
                 width: 1600,
                 height: 2000,
@@ -363,7 +363,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pavlo_talpa",
             },
             {
-                url: "https://images.unsplash.com/photo-1710410815589-dd83514104d0?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1710410815589-dd83514104d0.jpg",
                 alt: "Empty clear glass dropper bottle with a silver collar, lid set beside it",
                 width: 1600,
                 height: 1600,
@@ -468,7 +468,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1576426863848-c21f53c60b19?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1576426863848-c21f53c60b19.jpg",
                 alt: "White dropper bottle with a gold collar on a marble tray beside a soft knit throw",
                 width: 1600,
                 height: 1067,
@@ -476,7 +476,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@contentpixie",
             },
             {
-                url: "https://images.unsplash.com/photo-1770048792339-d8f8d8d2dbeb?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1770048792339-d8f8d8d2dbeb.jpg",
                 alt: "White serum bottle balanced on a mossy branch with tiny white flowers",
                 width: 1600,
                 height: 2560,
@@ -484,7 +484,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@route4design",
             },
             {
-                url: "https://images.unsplash.com/photo-1715750972096-a4820ab5f7f5?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1715750972096-a4820ab5f7f5.jpg",
                 alt: "White dropper bottle floating against a soft grey background",
                 width: 1600,
                 height: 2844,
@@ -492,7 +492,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@cosminursea",
             },
             {
-                url: "https://images.unsplash.com/photo-1715750968540-841103c78d47?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1715750968540-841103c78d47.jpg",
                 alt: "Small frosted serum bottle with a white dropper, floating mid-air",
                 width: 1600,
                 height: 2844,
@@ -572,7 +572,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1671493235081-5842463637cd?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1671493235081-5842463637cd.jpg",
                 alt: "Amber glass bottle of face oil lying on a striped cotton cloth",
                 width: 1600,
                 height: 1067,
@@ -580,7 +580,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@elchan",
             },
             {
-                url: "https://images.unsplash.com/photo-1671493234884-b1611bcf3e69?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1671493234884-b1611bcf3e69.jpg",
                 alt: "Two amber face oil bottles resting on pale linen",
                 width: 1600,
                 height: 1067,
@@ -588,7 +588,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@elchan",
             },
             {
-                url: "https://images.unsplash.com/photo-1671493229048-4dddd00ca84a?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1671493229048-4dddd00ca84a.jpg",
                 alt: "Pair of amber bottles side by side on a white table, catching window light",
                 width: 1600,
                 height: 1066,
@@ -596,7 +596,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@elchan",
             },
             {
-                url: "https://images.unsplash.com/photo-1671493227667-a1c472392c45?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1671493227667-a1c472392c45.jpg",
                 alt: "Hand holding an amber face oil bottle up to the light",
                 width: 1600,
                 height: 1067,
@@ -714,7 +714,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1763503839418-2b45c3d7a3c3?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1763503839418-2b45c3d7a3c3.jpg",
                 alt: "Open glass jar of white gel moisturiser hovering above a rock, lid floating over it",
                 width: 1600,
                 height: 1600,
@@ -722,7 +722,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@eve__3d",
             },
             {
-                url: "https://images.unsplash.com/photo-1763503836825-97f5450d155a?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1763503836825-97f5450d155a.jpg",
                 alt: "Open jar of moisturiser on dark stone against a black backdrop",
                 width: 1600,
                 height: 1600,
@@ -730,7 +730,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@eve__3d",
             },
             {
-                url: "https://images.unsplash.com/photo-1763503834047-ac85c4105c0b?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1763503834047-ac85c4105c0b.jpg",
                 alt: "Moisturiser jar on a grey rock with its lid tilted open",
                 width: 1600,
                 height: 1600,
@@ -738,7 +738,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@eve__3d",
             },
             {
-                url: "https://images.unsplash.com/photo-1585945037805-5fd82c2e60b1?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1585945037805-5fd82c2e60b1.jpg",
                 alt: "A swipe of white moisturiser on a warm beige surface showing its whipped texture",
                 width: 1600,
                 height: 1702,
@@ -832,7 +832,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1772191530787-b9546da02fbc?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1772191530787-b9546da02fbc.jpg",
                 alt: "Small cream jar on stepped white plinths with a bare branch behind",
                 width: 1600,
                 height: 1600,
@@ -840,7 +840,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@adryan_studio",
             },
             {
-                url: "https://images.unsplash.com/photo-1764694071508-e4b1efcd39bc?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1764694071508-e4b1efcd39bc.jpg",
                 alt: "Open silver-lidded jar of rich night cream on a glossy black reflective surface",
                 width: 1600,
                 height: 2000,
@@ -848,7 +848,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pavlo_talpa",
             },
             {
-                url: "https://images.unsplash.com/photo-1785581778868-79100f7fe56c?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1785581778868-79100f7fe56c.jpg",
                 alt: "Night cream jar with its lid off, beside a dropper bottle, eucalyptus and dried flowers on marble",
                 width: 1600,
                 height: 1067,
@@ -931,7 +931,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1712168044214-f5a272c23a5b?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1712168044214-f5a272c23a5b.jpg",
                 alt: "Plain white sunscreen tube with its cap off, on a peach block",
                 width: 1600,
                 height: 2000,
@@ -939,7 +939,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@normals",
             },
             {
-                url: "https://images.unsplash.com/photo-1632127579802-ff69469091a4?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1632127579802-ff69469091a4.jpg",
                 alt: "A swirl of creamy tinted sunscreen on an orange background",
                 width: 1600,
                 height: 1845,
@@ -947,7 +947,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@onnela_",
             },
             {
-                url: "https://images.unsplash.com/photo-1706067002722-3833714ba7ae?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1706067002722-3833714ba7ae.jpg",
                 alt: "Squares of foundation-like colour in light, medium and deep shades on pink",
                 width: 1600,
                 height: 1280,
@@ -955,7 +955,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@nikfrdszrsln_",
             },
             {
-                url: "https://images.unsplash.com/photo-1603401712778-ab0575182f12?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1603401712778-ab0575182f12.jpg",
                 alt: "Three dots of sunscreen on a forearm, laid on cream linen",
                 width: 1600,
                 height: 2418,
@@ -1078,7 +1078,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1638609927040-8a7e97cd9d6a?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1638609927040-8a7e97cd9d6a.jpg",
                 alt: "Plain white sunscreen tube lying on a swirl of white gel",
                 width: 1600,
                 height: 1999,
@@ -1086,7 +1086,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@msbirgith",
             },
             {
-                url: "https://images.unsplash.com/photo-1638609927252-9982beed7af8?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1638609927252-9982beed7af8.jpg",
                 alt: "White sunscreen tube on a pale surface next to soft pampas grass",
                 width: 1600,
                 height: 2132,
@@ -1094,7 +1094,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@msbirgith",
             },
             {
-                url: "https://images.unsplash.com/photo-1689163642429-279f59082ab5?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1689163642429-279f59082ab5.jpg",
                 alt: "Hand holding a small white tube of sunscreen by the sea",
                 width: 1600,
                 height: 2405,
@@ -1166,7 +1166,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1597931752949-98c74b5b159f?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1597931752949-98c74b5b159f.jpg",
                 alt: "White pump bottle of face cleanser on folded taupe linen",
                 width: 1600,
                 height: 2400,
@@ -1174,7 +1174,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@sincerelymedia",
             },
             {
-                url: "https://images.unsplash.com/photo-1623143445418-40c192fa3d11?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1623143445418-40c192fa3d11.jpg",
                 alt: "Frosted pink pump bottle on a warm orange background",
                 width: 1600,
                 height: 2400,
@@ -1182,7 +1182,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@msbirgith",
             },
             {
-                url: "https://images.unsplash.com/photo-1631730486572-226d1f595b68?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1631730486572-226d1f595b68.jpg",
                 alt: "Flat lay of pink and bronze skincare bottles with white tubes on blush pink",
                 width: 1600,
                 height: 1956,
@@ -1267,7 +1267,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1714479140002-62d1824fffb5?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1714479140002-62d1824fffb5.jpg",
                 alt: "Blush pink face wash tube standing upright on a small wooden shelf",
                 width: 1600,
                 height: 1143,
@@ -1275,7 +1275,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@normals",
             },
             {
-                url: "https://images.unsplash.com/photo-1711553102487-17d221102837?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1711553102487-17d221102837.jpg",
                 alt: "Tubes in orange, pink and peach on pastel plinths against yellow",
                 width: 1600,
                 height: 1168,
@@ -1283,7 +1283,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@normals",
             },
             {
-                url: "https://images.unsplash.com/photo-1778665654058-dcd700142738?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1778665654058-dcd700142738.jpg",
                 alt: "Pink squeeze tube next to its plain carton on a soft pink background",
                 width: 1600,
                 height: 1067,
@@ -1291,7 +1291,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@avtar9w",
             },
             {
-                url: "https://images.unsplash.com/photo-1711779187539-ef05cbaf5ff6?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1711779187539-ef05cbaf5ff6.jpg",
                 alt: "Pair of plain white tubes leaning together in a bright studio",
                 width: 1600,
                 height: 900,
@@ -1367,7 +1367,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1598341276221-975f3f1c5e4f?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1598341276221-975f3f1c5e4f.jpg",
                 alt: "Tall pink glass bottle of rose water lying on pink bedsheet with a single rosebud",
                 width: 1600,
                 height: 1067,
@@ -1375,7 +1375,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@darkandflawed",
             },
             {
-                url: "https://images.unsplash.com/photo-1550572017-4b7a301b9d81?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1550572017-4b7a301b9d81.jpg",
                 alt: "Clear spray bottle standing alone on a soft grey background",
                 width: 1600,
                 height: 1253,
@@ -1383,7 +1383,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@brett_jordan",
             },
             {
-                url: "https://images.unsplash.com/photo-1694101455025-bc2f91667841?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1694101455025-bc2f91667841.jpg",
                 alt: "White spray bottle standing upright on a white surface",
                 width: 1600,
                 height: 1067,
@@ -1430,7 +1430,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1599305090598-fe179d501227?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1599305090598-fe179d501227.jpg",
                 alt: "Glass jar of grainy face scrub with its lid set aside on a sunlit stone",
                 width: 1600,
                 height: 2000,
@@ -1438,7 +1438,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@brittneyweng",
             },
             {
-                url: "https://images.unsplash.com/photo-1779437141537-62577b216307?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1779437141537-62577b216307.jpg",
                 alt: "Frosted glass jar of scrub beside a plain kraft box",
                 width: 1600,
                 height: 1067,
@@ -1446,7 +1446,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@avtar9w",
             },
             {
-                url: "https://images.unsplash.com/photo-1609097164502-59a1f0f9a66f?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1609097164502-59a1f0f9a66f.jpg",
                 alt: "Pink jar with the lid off on a weathered stone ledge",
                 width: 1600,
                 height: 2016,
@@ -1454,7 +1454,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@msbirgith",
             },
             {
-                url: "https://images.unsplash.com/photo-1629732097571-b042b35aa3ed?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1629732097571-b042b35aa3ed.jpg",
                 alt: "Skincare jars arranged on a wooden tray",
                 width: 1600,
                 height: 1067,
@@ -1526,7 +1526,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1781344116880-029945a42b75?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1781344116880-029945a42b75.jpg",
                 alt: "Amber dropper bottle with a blank label on a stone plinth against beige",
                 width: 1600,
                 height: 1067,
@@ -1534,7 +1534,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@avtar9w",
             },
             {
-                url: "https://images.unsplash.com/photo-1696894756287-aab1aaca87d3?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1696894756287-aab1aaca87d3.jpg",
                 alt: "Dark glass beard oil bottle with a black dropper on a sand-coloured background",
                 width: 1600,
                 height: 1067,
@@ -1542,7 +1542,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mockupfreenet",
             },
             {
-                url: "https://images.unsplash.com/photo-1672062519629-abe610383152?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1672062519629-abe610383152.jpg",
                 alt: "Golden oil dripping from a glass dropper onto an open palm",
                 width: 1600,
                 height: 2400,
@@ -1550,7 +1550,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@denleyphotography",
             },
             {
-                url: "https://images.unsplash.com/photo-1627876311940-69de8657d470?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1627876311940-69de8657d470.jpg",
                 alt: "Close-up of a clear oil droplet spread on grey",
                 width: 1600,
                 height: 2400,
@@ -1677,7 +1677,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1694101123622-7e4a160f8e6c?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1694101123622-7e4a160f8e6c.jpg",
                 alt: "Matte black face wash tube standing on a black background",
                 width: 1600,
                 height: 1067,
@@ -1685,7 +1685,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mockupfreenet",
             },
             {
-                url: "https://images.unsplash.com/photo-1694101123655-1695a0e99bc5?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1694101123655-1695a0e99bc5.jpg",
                 alt: "Black squeeze tube upright on a clean white surface",
                 width: 1600,
                 height: 1067,
@@ -1693,7 +1693,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mockupfreenet",
             },
             {
-                url: "https://images.unsplash.com/photo-1694101123781-f178d9d325a8?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1694101123781-f178d9d325a8.jpg",
                 alt: "Three matte black tubes of different sizes lined up on white",
                 width: 1600,
                 height: 1067,
@@ -1701,7 +1701,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mockupfreenet",
             },
             {
-                url: "https://images.unsplash.com/photo-1694101123579-82108651698b?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1694101123579-82108651698b.jpg",
                 alt: "Black tube lying diagonally on a white surface",
                 width: 1600,
                 height: 1067,
@@ -1799,7 +1799,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1633793565780-deeea84f167b?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1633793565780-deeea84f167b.jpg",
                 alt: "Matte black and copper grooming set: a jar and two tubes on a black background",
                 width: 1600,
                 height: 1067,
@@ -1807,7 +1807,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pmvch",
             },
             {
-                url: "https://images.unsplash.com/photo-1633793566211-7e7355c24a96?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1633793566211-7e7355c24a96.jpg",
                 alt: "Black jar with copper lid beside two dropper bottles on black",
                 width: 1600,
                 height: 1067,
@@ -1815,7 +1815,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pmvch",
             },
             {
-                url: "https://images.unsplash.com/photo-1633793566102-ee7793834059?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1633793566102-ee7793834059.jpg",
                 alt: "Jar, dropper bottle and pump bottle in matte black with copper accents",
                 width: 1600,
                 height: 1067,
@@ -1823,7 +1823,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@pmvch",
             },
             {
-                url: "https://images.unsplash.com/photo-1633793565865-4aa4af4d5ca3?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1633793565865-4aa4af4d5ca3.jpg",
                 alt: "Grooming jars and bottles in black and copper laid at an angle on dark stone",
                 width: 1600,
                 height: 1067,
@@ -1899,7 +1899,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1524230616393-d6229fcd2eff?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1524230616393-d6229fcd2eff.jpg",
                 alt: "Straight razor and shaving brush resting on a cream-filled mug",
                 width: 1600,
                 height: 1067,
@@ -1907,7 +1907,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@joshsorenson",
             },
             {
-                url: "https://images.unsplash.com/photo-1778909217268-99979b449160?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1778909217268-99979b449160.jpg",
                 alt: "Green shaving bowl full of thick white lather with a razor and brush",
                 width: 1600,
                 height: 2008,
@@ -1915,7 +1915,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@dtrinksrph",
             },
             {
-                url: "https://images.unsplash.com/photo-1644258559678-2eac1b8b79b6?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1644258559678-2eac1b8b79b6.jpg",
                 alt: "Shaving brush and razor tucked into a brown leather travel pouch",
                 width: 1600,
                 height: 1067,
@@ -1990,7 +1990,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1632072907857-d2cae8f52888?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1632072907857-d2cae8f52888.jpg",
                 alt: "Shaving brush with a pale wooden handle standing in warm light",
                 width: 1600,
                 height: 2400,
@@ -1998,7 +1998,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@gamanalice3012",
             },
             {
-                url: "https://images.unsplash.com/photo-1784098489443-0b15ecfe7ce2?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1784098489443-0b15ecfe7ce2.jpg",
                 alt: "White shaving brush standing on a black stand against a blue backdrop",
                 width: 1600,
                 height: 2400,
@@ -2006,7 +2006,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@dtrinksrph",
             },
             {
-                url: "https://images.unsplash.com/photo-1755910022796-b58133275668?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1755910022796-b58133275668.jpg",
                 alt: "Shaving brush resting in a metal bowl under warm amber light",
                 width: 1600,
                 height: 2400,
@@ -2054,7 +2054,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1672062519512-ef6821193510?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1672062519512-ef6821193510.jpg",
                 alt: "Amber glass spray bottle in front of rolled white towels",
                 width: 1600,
                 height: 2400,
@@ -2062,7 +2062,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@denleyphotography",
             },
             {
-                url: "https://images.unsplash.com/photo-1570658872037-24bea83fad5c?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1570658872037-24bea83fad5c.jpg",
                 alt: "Flat lay of aftershave spray, cream jar, safety razor and shaving brush on marble",
                 width: 1600,
                 height: 1067,
@@ -2070,7 +2070,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@supply",
             },
             {
-                url: "https://images.unsplash.com/photo-1734397909844-84a573cd704c?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1734397909844-84a573cd704c.jpg",
                 alt: "Shaving bowl, brush and bottles on a dim bathroom shelf in soft light",
                 width: 1600,
                 height: 2472,
@@ -2138,7 +2138,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1772037533346-203fc4d2dca0?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1772037533346-203fc4d2dca0.jpg",
                 alt: "Three pump bottles, two black and one white, against a deep red wall",
                 width: 1600,
                 height: 1753,
@@ -2146,7 +2146,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@arny231104",
             },
             {
-                url: "https://images.unsplash.com/photo-1705155726510-42d218dad8c1?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1705155726510-42d218dad8c1.jpg",
                 alt: "Dark green and black pump bottle lying on its side on grey",
                 width: 1600,
                 height: 1067,
@@ -2154,7 +2154,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mockupfreenet",
             },
             {
-                url: "https://images.unsplash.com/photo-1697201358031-0fe639beff86?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1697201358031-0fe639beff86.jpg",
                 alt: "Slim dark green pump bottle standing on a black background",
                 width: 1600,
                 height: 1067,
@@ -2221,7 +2221,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1763757933131-93f78c24f012?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1763757933131-93f78c24f012.jpg",
                 alt: "Black jar with a plain white label against a bright turquoise background",
                 width: 1600,
                 height: 2400,
@@ -2229,7 +2229,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@nutraseller",
             },
             {
-                url: "https://images.unsplash.com/photo-1764184661156-e8803cef9b67?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1764184661156-e8803cef9b67.jpg",
                 alt: "Black hair clay jar with a white label on a white counter, turquoise behind",
                 width: 1600,
                 height: 2092,
@@ -2237,7 +2237,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@nutraseller",
             },
             {
-                url: "https://images.unsplash.com/photo-1763747958224-7726941b0b15?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1763747958224-7726941b0b15.jpg",
                 alt: "Black jar with a white label on a shelf with blurred bottles behind",
                 width: 1600,
                 height: 2110,
@@ -2308,7 +2308,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1789110853872-f416085557fa?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1789110853872-f416085557fa.jpg",
                 alt: "Model in a terracotta linen shirt dress with a tied belt, against a white background",
                 width: 1600,
                 height: 2400,
@@ -2316,7 +2316,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@enginakyurt",
             },
             {
-                url: "https://images.unsplash.com/photo-1789110853833-bc1a883da2d6?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1789110853833-bc1a883da2d6.jpg",
                 alt: "Back view of the terracotta linen shirt dress showing the collar and belt",
                 width: 1600,
                 height: 2400,
@@ -2324,7 +2324,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@enginakyurt",
             },
             {
-                url: "https://images.unsplash.com/photo-1789110520302-3df8ce0410f0?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1789110520302-3df8ce0410f0.jpg",
                 alt: "Model in the ivory linen dress with a braided rope belt, short cuffed sleeves",
                 width: 1600,
                 height: 2400,
@@ -2332,7 +2332,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@enginakyurt",
             },
             {
-                url: "https://images.unsplash.com/photo-1578747522302-b987fbec4465?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1578747522302-b987fbec4465.jpg",
                 alt: "Close-up of undyed linen fabric with a round gold pendant resting on it",
                 width: 1600,
                 height: 1067,
@@ -2471,7 +2471,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1786865573488-220ead0edf93?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1786865573488-220ead0edf93.jpg",
                 alt: "Model in a red polka dot midi dress leaning on a black railing in front of curved white buildings",
                 width: 1600,
                 height: 1067,
@@ -2479,7 +2479,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@zulfugarkarimov",
             },
             {
-                url: "https://images.unsplash.com/photo-1786865573002-92ac24616f0a?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1786865573002-92ac24616f0a.jpg",
                 alt: "Model walking across a white pedestrian bridge in the red polka dot dress",
                 width: 1600,
                 height: 2400,
@@ -2487,7 +2487,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@zulfugarkarimov",
             },
             {
-                url: "https://images.unsplash.com/photo-1786865574009-9bc54bc51642?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1786865574009-9bc54bc51642.jpg",
                 alt: "Close-up of the red and white polka dot crepe fabric with sunglasses in hand",
                 width: 1600,
                 height: 2400,
@@ -2495,7 +2495,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@zulfugarkarimov",
             },
             {
-                url: "https://images.unsplash.com/photo-1786865573964-4da881ffd53c?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1786865573964-4da881ffd53c.jpg",
                 alt: "Smiling model in sunglasses showing the scoop neckline of the red polka dress",
                 width: 1600,
                 height: 2400,
@@ -2503,7 +2503,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@zulfugarkarimov",
             },
             {
-                url: "https://images.unsplash.com/photo-1786865573632-4ae5f7fc5561?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1786865573632-4ae5f7fc5561.jpg",
                 alt: "Wide shot of the model in the red dress on a modern bridge",
                 width: 1600,
                 height: 1067,
@@ -2638,7 +2638,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1759992878340-665575a0832e?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1759992878340-665575a0832e.jpg",
                 alt: "Model in an ivory floral wrap dress with green vine print among leaves",
                 width: 1600,
                 height: 2417,
@@ -2646,7 +2646,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@reistor",
             },
             {
-                url: "https://images.unsplash.com/photo-1759992878336-a5dd342ea245?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1759992878336-a5dd342ea245.jpg",
                 alt: "Full-length view of the floral wrap maxi showing the side slit, in a sunlit courtyard",
                 width: 1600,
                 height: 2413,
@@ -2654,7 +2654,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@reistor",
             },
             {
-                url: "https://images.unsplash.com/photo-1759992878609-841a9da45381?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1759992878609-841a9da45381.jpg",
                 alt: "Close-up of the three-quarter sleeve and printed georgette in garden light",
                 width: 1600,
                 height: 2409,
@@ -2775,7 +2775,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1759992878772-e83a691a6d8f?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1759992878772-e83a691a6d8f.jpg",
                 alt: "Model in a powder-blue tiered cotton dress leaning in a rustic wooden doorway",
                 width: 1600,
                 height: 2406,
@@ -2783,7 +2783,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@reistor",
             },
             {
-                url: "https://images.unsplash.com/photo-1759992878545-a7f170147856?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1759992878545-a7f170147856.jpg",
                 alt: "Model in the blue block-print dress standing among trees",
                 width: 1600,
                 height: 2409,
@@ -2791,7 +2791,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@reistor",
             },
             {
-                url: "https://images.unsplash.com/photo-1759992878624-f21049fb10d5?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1759992878624-f21049fb10d5.jpg",
                 alt: "Seated model in a pale printed tiered dress on a carved wooden bench",
                 width: 1600,
                 height: 2399,
@@ -2908,7 +2908,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1727867246475-270f9783d5a2?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1727867246475-270f9783d5a2.jpg",
                 alt: "Model in a sage green tiered sundress standing by a lake with trees behind",
                 width: 1600,
                 height: 2400,
@@ -2916,7 +2916,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mutecevvil",
             },
             {
-                url: "https://images.unsplash.com/photo-1727867246581-644449adc01d?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1727867246581-644449adc01d.jpg",
                 alt: "Model in the sage sundress turning towards the camera beside the lake",
                 width: 1600,
                 height: 2400,
@@ -2924,7 +2924,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mutecevvil",
             },
             {
-                url: "https://images.unsplash.com/photo-1727867246510-75472d1e2e43?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1727867246510-75472d1e2e43.jpg",
                 alt: "Back view of the sage tiered sundress by the water",
                 width: 1600,
                 height: 2400,
@@ -2932,7 +2932,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@mutecevvil",
             },
             {
-                url: "https://images.unsplash.com/photo-1727867246571-f642f43d288f?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1727867246571-f642f43d288f.jpg",
                 alt: "Model walking by the lakeside in the sage sundress, hair blowing",
                 width: 1600,
                 height: 2400,
@@ -3014,7 +3014,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1678801868819-4e17d4ea7cde?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1678801868819-4e17d4ea7cde.jpg",
                 alt: "Model in a rust maxi dress with bishop sleeves against a pale sky",
                 width: 1600,
                 height: 1999,
@@ -3022,7 +3022,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@lancereis",
             },
             {
-                url: "https://images.unsplash.com/photo-1682723840177-8c0dcd71f4a7?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1682723840177-8c0dcd71f4a7.jpg",
                 alt: "Model in the rust cottage dress standing on rocks with a falcon on her arm",
                 width: 1600,
                 height: 2000,
@@ -3030,7 +3030,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@lancereis",
             },
             {
-                url: "https://images.unsplash.com/photo-1683660107856-cdad7a562d12?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1683660107856-cdad7a562d12.jpg",
                 alt: "Model in the rust maxi dress standing in a dim stone doorway",
                 width: 1600,
                 height: 2000,
@@ -3038,7 +3038,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@lancereis",
             },
             {
-                url: "https://images.unsplash.com/photo-1677537946961-7b1ffd75d959?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1677537946961-7b1ffd75d959.jpg",
                 alt: "Moody portrait of the rust dress in a dark studio, showing the gathered sleeve",
                 width: 1600,
                 height: 2000,
@@ -3153,7 +3153,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1760287363878-1a09af715b80?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1760287363878-1a09af715b80.jpg",
                 alt: "Mustard yellow tiered kurta dress with a colourful embroidered yoke on a boutique mannequin",
                 width: 1600,
                 height: 2400,
@@ -3161,7 +3161,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@zayed_ahmed_zadu",
             },
             {
-                url: "https://images.unsplash.com/photo-1760287364219-160c234ded00?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1760287364219-160c234ded00.jpg",
                 alt: "Indigo kurta dress with a red and cream paisley print on a mannequin",
                 width: 1600,
                 height: 2400,
@@ -3169,7 +3169,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@zayed_ahmed_zadu",
             },
             {
-                url: "https://images.unsplash.com/photo-1612459093652-5f67333a0c88?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1612459093652-5f67333a0c88.jpg",
                 alt: "Model in a rust paisley-printed A-line kurta dress, photographed from below against a blue sky",
                 width: 1600,
                 height: 2400,
@@ -3288,7 +3288,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1594019739447-6c8a1d744d61?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1594019739447-6c8a1d744d61.jpg",
                 alt: "Model in a black satin slip dress with thin straps by a sheer cream curtain",
                 width: 1600,
                 height: 2397,
@@ -3296,7 +3296,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@eugenivy_now",
             },
             {
-                url: "https://images.unsplash.com/photo-1618037208874-021263b58d69?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1618037208874-021263b58d69.jpg",
                 alt: "Model in the black slip dress leaning against a white door frame",
                 width: 1600,
                 height: 2000,
@@ -3304,7 +3304,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@filipp_roman_photography",
             },
             {
-                url: "https://images.unsplash.com/photo-1572004862713-255fc4866dad?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1572004862713-255fc4866dad.jpg",
                 alt: "Model in a wine-red satin slip dress among dark green leaves",
                 width: 1600,
                 height: 2405,
@@ -3312,7 +3312,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@domenika",
             },
             {
-                url: "https://images.unsplash.com/photo-1584163334626-ad11183efdc2?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1584163334626-ad11183efdc2.jpg",
                 alt: "Model in a short rust satin slip dress in a kitchen, holding a mug",
                 width: 1600,
                 height: 3024,
@@ -3387,7 +3387,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         variants: [],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1740205731496-589b26545712?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1740205731496-589b26545712.jpg",
                 alt: "Model in a light blue chambray shirt dress with bell sleeves in front of an arched mirror",
                 width: 1600,
                 height: 2400,
@@ -3395,7 +3395,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@jrlightcolor",
             },
             {
-                url: "https://images.unsplash.com/photo-1740205732463-8daff9ff0e57?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1740205732463-8daff9ff0e57.jpg",
                 alt: "Model sitting in a white chair wearing the blue chambray dress",
                 width: 1600,
                 height: 1067,
@@ -3403,7 +3403,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@jrlightcolor",
             },
             {
-                url: "https://images.unsplash.com/photo-1760287363750-1c888c75578f?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1760287363750-1c888c75578f.jpg",
                 alt: "Slate blue button-down shirt dress displayed on a mannequin in a boutique",
                 width: 1600,
                 height: 2400,
@@ -3470,7 +3470,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
         ],
         images: [
             {
-                url: "https://images.unsplash.com/photo-1789110854238-ca55b1a3559c?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1789110854238-ca55b1a3559c.jpg",
                 alt: "Model in an ivory georgette dress with large black dots and flutter sleeves, white background",
                 width: 1600,
                 height: 2434,
@@ -3478,7 +3478,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@enginakyurt",
             },
             {
-                url: "https://images.unsplash.com/photo-1789110853555-6a2d8ed60d57?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1789110853555-6a2d8ed60d57.jpg",
                 alt: "Back view of the black dot-print dress with sheer sleeves, holding out the skirt",
                 width: 1600,
                 height: 2400,
@@ -3486,7 +3486,7 @@ export const BOUTIQUE_PRODUCTS: BoutiqueProduct[] = [
                 creditUrl: "https://unsplash.com/@enginakyurt",
             },
             {
-                url: "https://images.unsplash.com/photo-1729465435485-c1502924932a?w=1600&q=80&auto=format&fit=crop",
+                url: "https://media.saroh.io/demo/photo-1729465435485-c1502924932a.jpg",
                 alt: "Model in a white dress with small black dots posing against a grey backdrop",
                 width: 1600,
                 height: 2000,

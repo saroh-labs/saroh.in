@@ -154,18 +154,32 @@ export function editorHref(siteId: string, draftId: string): string {
 }
 
 /** A field's value as text: the card never draws a value as markup. */
-export function valueText(value: unknown): string {
+/** Fields stored as HTML by the editor. */
+const RICH_TEXT = new Set(["description"]);
+
+export function valueText(value: unknown, field?: string): string {
     if (value === null || value === undefined || value === "") return "";
     if (typeof value === "boolean") return value ? "Yes" : "No";
-    if (typeof value === "string" || typeof value === "number") {
-        return String(value);
+    if (typeof value === "number") return String(value);
+    if (typeof value === "string") {
+        // A rich-text field is stored as HTML: show its words. Any other is
+        // shown exactly as written, tags and all (drawn as text, never markup).
+        return field && RICH_TEXT.has(field)
+            ? value
+                  .replace(/<[^>]*>/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim()
+            : value;
     }
     if (Array.isArray(value)) {
-        return value.map(valueText).filter(Boolean).join(", ");
+        return value
+            .map((v) => valueText(v))
+            .filter(Boolean)
+            .join(", ");
     }
     if (typeof value === "object") {
         return Object.values(value as Record<string, unknown>)
-            .map(valueText)
+            .map((v) => valueText(v))
             .filter(Boolean)
             .join(" ");
     }
