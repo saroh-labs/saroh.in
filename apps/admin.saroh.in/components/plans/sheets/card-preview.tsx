@@ -1,6 +1,6 @@
 "use client";
 
-import { planMoney } from "@/lib/plan-money";
+import { planMoney, planTaxed } from "@/lib/plan-money";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { cardLines } from "@saroh/pricing-catalog";
 import { cn } from "@saroh/ui/lib/utils";
@@ -77,7 +77,11 @@ export function CardPreview({
                 >
                     {planMoney(plan.pricePaise)}
                     <span className="font-sans text-[13px] font-normal text-muted-foreground">
-                        {paid ? " a month + GST" : " · Free for good"}
+                        {paid
+                            ? planTaxed()
+                                ? " a month + GST"
+                                : " a month"
+                            : " · Free for good"}
                     </span>
                 </p>
                 {plan.tagline && (
