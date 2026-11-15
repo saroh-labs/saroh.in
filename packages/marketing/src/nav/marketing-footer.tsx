@@ -5,7 +5,9 @@ import type { ReactNode } from "react";
 
 import { cn } from "../cn";
 import { NewTag } from "../links/pill";
+import { textLinkClasses } from "../links/text-link";
 import { ring } from "../ring";
+import { SocialMark } from "./social-mark";
 
 export interface FooterLink {
     name: string;
@@ -134,5 +136,64 @@ export function MarketingFooter({
                 </div>
             </div>
         </footer>
+    );
+}
+
+const SOCIAL_LINK = textLinkClasses({
+    tone: "quiet",
+    className:
+        "grid size-9 place-items-center rounded-md hover:bg-foreground/5 [@media(pointer:coarse)]:size-11",
+});
+
+/**
+ * What sits under the footer's line on every edition: what the name means
+ * ("Let's rise together", सारोह: sa + aaroh) and Saroh's own accounts, each
+ * a mark named for a screen reader. The words are the site's.
+ */
+export function FooterBrand({
+    motto,
+    word,
+    parts,
+    socials,
+}: {
+    motto: string;
+    /** सारोह, set in Devanagari. */
+    word: string;
+    /** "sa (with) + aaroh (rising)". */
+    parts: string;
+    socials: readonly { label: string; href: string }[];
+}) {
+    return (
+        <>
+            <div className="grid gap-1.5">
+                <p className="m-0 text-[19px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
+                    {motto}
+                </p>
+                <p className="m-0 text-[13.5px] leading-normal text-muted-foreground">
+                    <span lang="hi">{word}</span>
+                    {": "}
+                    {parts}
+                </p>
+            </div>
+            <ul
+                aria-label="Follow Saroh"
+                className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
+            >
+                {socials.map((link) => (
+                    <li key={link.href}>
+                        <a
+                            href={link.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={`Saroh on ${link.label}`}
+                            title={link.label}
+                            className={SOCIAL_LINK}
+                        >
+                            <SocialMark label={link.label} />
+                        </a>
+                    </li>
+                ))}
+            </ul>
+        </>
     );
 }

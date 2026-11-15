@@ -1,5 +1,7 @@
-import { MarketingFooter } from "@saroh/marketing/marketing-footer";
-import { SocialMark } from "@saroh/marketing/social-mark";
+import {
+    FooterBrand,
+    MarketingFooter,
+} from "@saroh/marketing/marketing-footer";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
@@ -8,12 +10,6 @@ import { FOOTER_COLUMNS, LEGAL_LINKS } from "@/lib/nav";
 import { signInHref, site } from "@/site.config";
 
 const LINK = textLinkClasses({ tone: "quiet", className: "w-fit" });
-
-const SOCIAL_LINK = textLinkClasses({
-    tone: "quiet",
-    className:
-        "grid size-9 place-items-center rounded-md hover:bg-foreground/5 [@media(pointer:coarse)]:size-11",
-});
 
 /**
  * saroh.tech's footer, on the redesign's shared `MarketingFooter` (DEC-221):
@@ -34,36 +30,12 @@ export function Footer() {
         <MarketingFooter
             line="Your site, orders, bookings and billing, for small businesses."
             brand={
-                <>
-                    <div className="grid gap-1.5">
-                        <p className="m-0 text-[19px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
-                            Let's rise together.
-                        </p>
-                        <p className="m-0 text-[13.5px] leading-normal text-muted-foreground">
-                            <span lang="hi">सारोह</span>: sa (with) + aaroh
-                            (rising)
-                        </p>
-                    </div>
-                    <ul
-                        aria-label="Follow Saroh"
-                        className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
-                    >
-                        {SAROH_SOCIAL.map((link) => (
-                            <li key={link.href}>
-                                <a
-                                    href={link.href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={`Saroh on ${link.label}`}
-                                    title={link.label}
-                                    className={SOCIAL_LINK}
-                                >
-                                    <SocialMark label={link.label} />
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </>
+                <FooterBrand
+                    motto="Let's rise together."
+                    word="सारोह"
+                    parts="sa (with) + aaroh (rising)"
+                    socials={SAROH_SOCIAL}
+                />
             }
             groups={groups}
             prefetch={false}

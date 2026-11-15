@@ -2,7 +2,6 @@
 
 import { cn } from "@saroh/marketing/cn";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
 
 import type { Visitor } from "@/lib/browser/session";
 import { DASHBOARD_URL } from "@/lib/links";
@@ -10,6 +9,7 @@ import { ring } from "@saroh/marketing/ring";
 
 import { NAV_WORDS } from "@/content/nav";
 import { ButtonLink } from "@saroh/marketing/button";
+import { usePhoneMenu } from "@saroh/marketing/use-phone-menu";
 import { CtaLink } from "../buttons/cta-link";
 
 import type { NavMenus, NavSection } from "./nav-section";
@@ -47,23 +47,9 @@ export function MobileMenu({
     /** On the start button: hidden while the page's sticky bar shows. */
     startClassName?: string;
 }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = usePhoneMenu(pathname);
     const close = () => setOpen(false);
     const split = splitResources(menus.resources ?? []);
-
-    // A new page, or a window widened past 760px, closes the sheet.
-    const [shownFor, setShownFor] = useState(pathname);
-    if (shownFor !== pathname) {
-        setShownFor(pathname);
-        setOpen(false);
-    }
-    useEffect(() => {
-        if (!open) return;
-        const wide = window.matchMedia("(min-width: 760px)");
-        const onChange = () => wide.matches && setOpen(false);
-        wide.addEventListener("change", onChange);
-        return () => wide.removeEventListener("change", onChange);
-    }, [open]);
 
     return (
         <div

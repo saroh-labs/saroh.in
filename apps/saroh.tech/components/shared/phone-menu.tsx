@@ -4,8 +4,9 @@ import { ButtonLink } from "@saroh/marketing/button";
 import { cn } from "@saroh/marketing/cn";
 import type { NavSection } from "@saroh/marketing/nav-types";
 import { ring } from "@saroh/marketing/ring";
+import { usePhoneMenu } from "@saroh/marketing/use-phone-menu";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 
 import type { NavMenus } from "@/lib/nav";
 import { NAV_WORDS } from "@/lib/nav";
@@ -24,11 +25,11 @@ const PhoneSheet = dynamic(
 export function PhoneMenu({
     section,
     pathname,
+    startClassName,
     signIn,
     start,
     startInSheet,
     className,
-    startClassName,
     ...menus
 }: NavMenus & {
     section: NavSection;
@@ -40,26 +41,12 @@ export function PhoneMenu({
     /** On the start button: hidden while the page's sticky bar shows. */
     startClassName?: string;
 }) {
-    const [open, setOpen] = useState(false);
+    const [open, setOpen] = usePhoneMenu(pathname);
     const button = useRef<HTMLButtonElement>(null);
     const close = () => {
         setOpen(false);
         button.current?.focus();
     };
-
-    // A new page, or a window widened past the phone nav, closes the sheet.
-    const [shownFor, setShownFor] = useState(pathname);
-    if (shownFor !== pathname) {
-        setShownFor(pathname);
-        setOpen(false);
-    }
-    useEffect(() => {
-        if (!open) return;
-        const wide = window.matchMedia("(min-width: 760px)");
-        const onChange = () => wide.matches && setOpen(false);
-        wide.addEventListener("change", onChange);
-        return () => wide.removeEventListener("change", onChange);
-    }, [open]);
 
     return (
         <div

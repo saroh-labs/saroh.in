@@ -135,7 +135,7 @@ export function SiteDrawing({
                             <li
                                 key={item.name}
                                 className={cn(
-                                    "grid gap-2",
+                                    "grid content-start gap-2",
                                     phone &&
                                         "grid-cols-[64px_1fr] items-center gap-3",
                                 )}

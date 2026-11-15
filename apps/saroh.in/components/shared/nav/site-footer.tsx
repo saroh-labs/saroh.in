@@ -2,9 +2,11 @@ import type {
     FooterGroup,
     FooterLink,
 } from "@saroh/marketing/marketing-footer";
-import { MarketingFooter } from "@saroh/marketing/marketing-footer";
+import {
+    FooterBrand,
+    MarketingFooter,
+} from "@saroh/marketing/marketing-footer";
 import { ring } from "@saroh/marketing/ring";
-import { SocialMark } from "@saroh/marketing/social-mark";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
@@ -24,12 +26,6 @@ import type { NavItem } from "./nav-items";
 import { SOLUTION_ITEMS } from "./nav-items";
 
 const LINK = textLinkClasses({ tone: "quiet", className: "w-fit" });
-
-const SOCIAL_LINK = textLinkClasses({
-    tone: "quiet",
-    className:
-        "grid size-9 place-items-center rounded-md hover:bg-foreground/5 [@media(pointer:coarse)]:size-11",
-});
 
 const shown = new Set<string>(featureList.map((f) => f.slug));
 
@@ -120,37 +116,12 @@ export function SiteFooter({
         <MarketingFooter
             line={FOOTER_WORDS.line}
             brand={
-                <>
-                    <div className="grid gap-1.5">
-                        <p className="m-0 text-[19px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
-                            {SAROH_NAME.line}
-                        </p>
-                        <p className="m-0 text-[13.5px] leading-normal text-muted-foreground">
-                            <span lang="hi">{SAROH_NAME.word}</span>
-                            {": "}
-                            {SAROH_NAME.parts}
-                        </p>
-                    </div>
-                    <ul
-                        aria-label="Follow Saroh"
-                        className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
-                    >
-                        {SAROH_SOCIAL.map((link) => (
-                            <li key={link.href}>
-                                <a
-                                    href={link.href}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    aria-label={`Saroh on ${link.label}`}
-                                    title={link.label}
-                                    className={SOCIAL_LINK}
-                                >
-                                    <SocialMark label={link.label} />
-                                </a>
-                            </li>
-                        ))}
-                    </ul>
-                </>
+                <FooterBrand
+                    motto={SAROH_NAME.line}
+                    word={SAROH_NAME.word}
+                    parts={SAROH_NAME.parts}
+                    socials={SAROH_SOCIAL}
+                />
             }
             groups={groups}
             note={`${MADE_BY}. © ${new Date().getFullYear()}. All rights reserved.`}

@@ -54,3 +54,15 @@ limit; the staff draft preview's marks stay in `apps/saroh.in`.
 
 `ring`'s and `cn`'s callers need nothing else. Pieces that read a site's links or
 switches (`CtaLink`, `HeroActions`, `DemoLink`, `TourVideo`) stay in `apps/saroh.in`.
+
+## The redesign's kit (DEC-221)
+
+`src/kit/` holds the 2026 redesign's pieces, each its own export
+(`@saroh/marketing/kit/<name>`), with `MarketingNav` and `MarketingFooter`
+in `src/nav/`, `Mark` in `src/sections/` and the example world's types in
+`src/content/world.ts` (`@saroh/marketing/world`). They take words, links,
+start buttons (`cta()`), switches and a world's facts as props, and hold
+none. Their purposes and rules are in `apps/saroh.in/DESIGN.md`; every one
+is drawn on saroh.in's `/dev/kit` under `next dev`. The claim switches
+(`CLAIM_SWITCHES`, `claimsOffSet`) sit beside the release switches in
+`src/content/feature-switches.ts`.

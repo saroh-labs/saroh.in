@@ -88,7 +88,8 @@
         "./kit/money-path": "./src/kit/money-path.tsx",
         "./kit/frames": "./src/kit/frames.tsx",
         "./kit/site-drawing": "./src/kit/site-drawing.tsx",
-        "./kit/claim": "./src/kit/claim.tsx"
+        "./kit/claim": "./src/kit/claim.tsx",
+        "./use-phone-menu": "./src/nav/use-phone-menu.ts"
     },
     "scripts": {
         "lint": "eslint src/",
