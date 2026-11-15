@@ -294,6 +294,8 @@ describe("search page redirects (DEC-193)", () => {
         expect(searchRedirects(null, family)).toEqual([]);
     });
 
+    const HUB = { source: "/solutions", destination: "/for", statusCode: 301 };
+
     it("moves /solutions/<x> for good only once /for/<x> is live and in the code", () => {
         expect(searchRedirects(list(["/for/salons"]), family)).toEqual([
             {
@@ -301,13 +303,21 @@ describe("search page redirects (DEC-193)", () => {
                 destination: "/for/salons",
                 statusCode: 301,
             },
+            HUB,
         ]);
         // Live in the API, but no file for it in this commit: no redirect.
         expect(searchRedirects(list(["/for/gyms"]), family)).toEqual([]);
-        // A /for/ page that isn't a solution moves nothing.
-        expect(searchRedirects(list(["/for/dental-clinics"]), family)).toEqual(
-            [],
-        );
+        // A /for/ page that isn't a solution moves only the hub.
+        expect(searchRedirects(list(["/for/dental-clinics"]), family)).toEqual([
+            HUB,
+        ]);
+    });
+
+    it("moves /solutions to the /for hub only while a /for/ page is live", () => {
+        expect(searchRedirects(list([]), family)).toEqual([]);
+        expect(
+            searchRedirects(list(["/tools/gst-calculator"]), family),
+        ).toEqual([]);
     });
 
     it("sends a page taken off to its live family page, else Home, for now (302)", () => {
@@ -328,6 +338,7 @@ describe("search page redirects (DEC-193)", () => {
         );
         expect(to).toEqual({
             "/solutions/salons": ["/for/salons", 301],
+            "/solutions": ["/for", 301],
             "/for/nail-studios": ["/for/salons", 302],
             // Clinics isn't live: Home.
             "/for/dental-clinics": ["/", 302],
@@ -372,6 +383,7 @@ describe("search page redirects (DEC-193)", () => {
                 destination: "/for/salons",
                 statusCode: 301,
             },
+            HUB,
         ]);
     });
 });
