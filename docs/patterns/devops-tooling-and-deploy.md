@@ -461,6 +461,29 @@ backfills the release names.
 
 On each unit's GitHub issue, comment when the unit lands on development.
 
+### Marketing screenshots are taken fresh for every production release — **Adopted** (owner, 17 Nov 2026)
+
+Every picture of the app on saroh.in and saroh.tech is a capture from the
+app as it ships, never a stale one. Once per release, before the
+`development` → `main` PR is merged:
+
+1. **Seed both demo worlds**: India (`pnpm --filter @saroh/database db:seed`
+   plus the showcase businesses) and Global (`db:seed:global`).
+2. **Capture both editions with one list**: `e2e/marketing-shots/capture.ts`
+   for India (`shots.config.ts`) and `--edition=global` (`shots.global.ts`).
+3. **Check every key.** A slot names one shot key, and both editions fill it
+   with the same crop and frame. A key the pages use that has no fresh
+   capture fails the release check. A Global key whose screen Global can't
+   show yet stays in saroh.tech's `PENDING_SHOTS` with a reason, and that
+   slot draws the same fallback as India, never another kind of visual.
+4. **Look at every changed image** against its page's claims
+   (FEATURE_RELEASE.md step 3), then commit the images on the release batch.
+
+The release-time job that runs steps 1–3 (`.github/workflows/`, triggered by
+the release PR and by hand, never on a schedule: see "no scheduled
+deploys") is part of the marketing redesign batch (`batch-2026-11-15-4`).
+Until it lands, run the steps by hand on each release.
+
 ## Shipping the API
 
 - **Current** — `.github/workflows/deploy-api.yml` builds

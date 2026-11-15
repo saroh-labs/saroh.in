@@ -68,7 +68,10 @@ One commit on the batch branch, for one feature, after the owner's go:
 2. **The app's help links.** Drop `waitsFor` from that feature's entries in
    `HELP_ARTICLES` (`apps/app.saroh.in/lib/help/links.ts`), so the command
    menu links them.
-3. **Shots.** Capture every placeholder the check names
+3. **Shots.** Every production release retakes all marketing shots for both
+   editions (`devops-tooling-and-deploy.md` → "Marketing screenshots are taken
+   fresh for every production release"); a feature release adds its new keys
+   to both lists. Capture every placeholder the check names
    (`e2e/marketing-shots/`, `shots.config.ts`), then read each shot
    against its page's claims (DEV_LEARNINGS, 4 Nov):
     - feature pages: `AI_APPS_SHOTS` (consent, AI activity) and
