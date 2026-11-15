@@ -208,20 +208,17 @@ export function freeUsage(
 }
 
 /**
- * The pricing page's plans. While Saroh doesn't sell its paid plans here
- * (DEC-211), only Free's limits come from a catalogue and paid plans say
- * they come later. Once it does (`offered`, stage 9), the whole catalogue
- * in its own money, dollars with no tax: never an India catalogue, which
- * is in rupees.
+ * The pricing page's plans: the whole catalogue in its own money, dollars
+ * with no tax, once a paid plan is published (owner, 15 Nov 2026: show the
+ * prices, coming soon, before Saroh sells them). The paid plans' cards keep
+ * Coming soon and Tell me when until billing is on (`components/pricing`).
+ * Never an India catalogue, which is in rupees; with no catalogue, Free's
+ * general lines and paid plans with no price.
  */
-export function pricingModel(
-    catalog: Catalog | null = null,
-    offered = false,
-): PricingPageModel {
+export function pricingModel(catalog: Catalog | null = null): PricingPageModel {
     const money = catalog ? catalogMoney(catalog) : null;
     if (
         catalog &&
-        offered &&
         money?.tax === "none" &&
         catalog.plans.some((p) => p.pricePaise > 0)
     ) {
