@@ -171,6 +171,8 @@ export const MENUS: NavMenus = {
 /** The nav's own words (the redesign, DEC-221). */
 export const NAV_WORDS = {
     solutions: "Solutions",
+    /** The Solutions menu's see-all: the /solutions hub. */
+    allTrades: "See all trades",
     /** The nav entry for /features (owner, 17 Nov 2026: "Features"). */
     howItWorks: "Features",
     templates: "Templates",

@@ -84,6 +84,10 @@ export function PhoneMenu({
                     pathname={pathname}
                     featureItems={menus.features}
                     solutionItems={menus.solutions}
+                    allTrades={{
+                        name: NAV_WORDS.allTrades,
+                        href: "/solutions",
+                    }}
                     resources={menus.resources}
                     tools={menus.tools}
                     allTools={menus.allTools}

@@ -38,7 +38,12 @@ export function SiteNav({
         {
             id: "solutions",
             label: NAV_WORDS.solutions,
-            menu: { items: menus.solutions, columns: 2 },
+            menu: {
+                items: menus.solutions,
+                columns: 2,
+                // The /solutions hub: every trade at one moment of its day.
+                seeAll: { name: NAV_WORDS.allTrades, href: "/solutions" },
+            },
         },
         {
             id: "features",
