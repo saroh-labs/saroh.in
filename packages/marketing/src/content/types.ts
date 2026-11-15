@@ -102,6 +102,7 @@ export const SHOT_KEYS = [
     "k-orders",
     "k-invoice",
     "g-ptblock",
+    "t-invoice",
     "k-visits",
     "k-note",
     "k-flags",

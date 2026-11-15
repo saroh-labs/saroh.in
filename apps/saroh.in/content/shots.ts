@@ -196,6 +196,7 @@ const designed = {
     "g-ptblock": pending(
         "A personal training block at Pulse Fitness (demo gym): three sessions",
     ),
+    "t-invoice": pending("An invoice made from an order (saroh.tech's bakery)"),
     "ask-start": pending(
         "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
     ),
