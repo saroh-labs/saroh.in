@@ -183,6 +183,8 @@ export interface GlobalBusiness {
     people: number;
     /** Share of a day's free times that get booked, today and after. */
     busyness?: number;
+    /** Bookings today, whatever the weekday: Home's Today is never empty. */
+    todayAtLeast?: number;
     /** Treatments sold as orders: one over several visits, paid or not. */
     treatments?: readonly {
         person: string;
@@ -191,6 +193,8 @@ export interface GlobalBusiness {
         /** Day from today, and minute of the day, of each visit made so far. */
         visits: readonly (readonly [number, number])[];
         paid: boolean;
+        /** Half paid at the desk as a deposit, the balance due. */
+        deposit?: boolean;
     }[];
     orders: number;
     manualInvoices: readonly GlobalManualInvoice[];
@@ -831,7 +835,7 @@ export const IRONVALE: GlobalBusiness = {
         THU: ["06:30", "15:00"],
         FRI: ["09:00", "18:30"],
         SAT: ["08:30", "12:00"],
-        SUN: null,
+        SUN: ["09:00", "12:00"],
     }),
     services: [
         {
@@ -842,6 +846,17 @@ export const IRONVALE: GlobalBusiness = {
             capacity: 1,
             price: 7500,
             weight: 4,
+        },
+        {
+            key: "ptblock",
+            name: "Personal training block",
+            description:
+                "Three hour-long sessions with your coach. We book the rest with you after the first.",
+            minutes: 60,
+            capacity: 1,
+            price: 19500,
+            visits: 3,
+            weight: 0,
         },
         {
             key: "assess",
@@ -870,7 +885,7 @@ export const IRONVALE: GlobalBusiness = {
             price: 2200,
             weight: 0,
             classAt: [{ days: [1], at: "17:30" }],
-            fill: [1, 2],
+            fill: [1, 1],
         },
         {
             key: "yoga",
@@ -881,7 +896,7 @@ export const IRONVALE: GlobalBusiness = {
             price: 2000,
             weight: 0,
             classAt: [{ days: [6], at: "09:00" }],
-            fill: [1, 2],
+            fill: [1, 1],
         },
         {
             key: "foundations",
@@ -902,6 +917,7 @@ export const IRONVALE: GlobalBusiness = {
             owner: true,
             services: [
                 "pt",
+                "ptblock",
                 "assess",
                 "trial",
                 "strength",
@@ -913,6 +929,7 @@ export const IRONVALE: GlobalBusiness = {
                 { days: [2], from: "06:30", to: "18:30" },
                 { days: [4], from: "06:30", to: "15:00" },
                 { days: [6], from: "08:30", to: "12:00" },
+                { days: [0], from: "09:00", to: "12:00" },
             ],
         },
     ],
@@ -952,7 +969,22 @@ export const IRONVALE: GlobalBusiness = {
         { key: "marcus", first: "Marcus", last: "Hale", visits: 3 },
     ],
     people: 60,
-    busyness: 0.02,
+    busyness: 0.01,
+    todayAtLeast: 4,
+    // Nora's block: the first session last week, the second this week, the
+    // third not booked yet. Paid at the desk when she finishes.
+    treatments: [
+        {
+            person: "priscilla",
+            service: "ptblock",
+            number: "ORD-001",
+            visits: [
+                [-6, 660],
+                [3, 660],
+            ],
+            paid: false,
+        },
+    ],
     orders: 0,
     manualInvoices: [
         {
@@ -1037,7 +1069,7 @@ export const IRONVALE: GlobalBusiness = {
                 },
             ],
         },
-        visit: "<h2>Come and see us</h2><p>2400 Sample Avenue, Denver, CO 80205</p><p>Monday to Saturday, from 6:30 am on Tuesdays and Thursdays.</p>",
+        visit: "<h2>Come and see us</h2><p>2400 Sample Avenue, Denver, CO 80205</p><p>Every day, from 6:30 am on Tuesdays and Thursdays and 9 am on Sundays.</p>",
         footer: "Ironvale Fitness. A demo business.",
     },
     rules: {
@@ -1074,8 +1106,8 @@ export const WRENFIELD: GlobalBusiness = {
         WED: ["08:00", "17:00"],
         THU: ["08:00", "17:00"],
         FRI: ["08:00", "15:00"],
-        SAT: null,
-        SUN: null,
+        SAT: ["09:00", "13:00"],
+        SUN: ["10:00", "13:00"],
     }),
     services: [
         {
@@ -1118,6 +1150,37 @@ export const WRENFIELD: GlobalBusiness = {
             weight: 0,
         },
         {
+            key: "implant",
+            name: "Dental implant",
+            description:
+                "Three visits of an hour: the implant, a check, then the crown.",
+            minutes: 60,
+            capacity: 1,
+            price: 320000,
+            visits: 3,
+            weight: 0,
+        },
+        {
+            key: "scaling",
+            name: "Deep cleaning",
+            description: "Two visits of 45 minutes, half the mouth at a time.",
+            minutes: 45,
+            capacity: 1,
+            price: 36000,
+            visits: 2,
+            weight: 0,
+        },
+        {
+            key: "braces",
+            name: "Braces adjustment series",
+            description: "Four visits of 30 minutes, about a month apart.",
+            minutes: 30,
+            capacity: 1,
+            price: 60000,
+            visits: 4,
+            weight: 0,
+        },
+        {
             key: "video",
             name: "Video consultation",
             description:
@@ -1151,12 +1214,17 @@ export const WRENFIELD: GlobalBusiness = {
                 "review",
                 "rootcanal",
                 "whitening",
+                "implant",
+                "scaling",
+                "braces",
                 "video",
                 "xray",
             ],
             hours: [
                 { days: [1, 2, 3, 4], from: "08:00", to: "17:00" },
                 { days: [5], from: "08:00", to: "15:00" },
+                { days: [6], from: "09:00", to: "13:00" },
+                { days: [0], from: "10:00", to: "13:00" },
             ],
         },
     ],
@@ -1216,9 +1284,19 @@ export const WRENFIELD: GlobalBusiness = {
             ],
             visits: 3,
         },
+        // Treatment patients: an order each, and no check-up diary of their own.
+        { key: "olivia", first: "Olivia", last: "Grant" },
+        { key: "sofia", first: "Sofia", last: "Reyes" },
+        { key: "ethan", first: "Ethan", last: "Brooks" },
+        { key: "ruby", first: "Ruby", last: "Chen" },
+        { key: "noah", first: "Noah", last: "Fischer" },
     ],
     people: 70,
-    busyness: 0.03,
+    busyness: 0.02,
+    todayAtLeast: 4,
+    // The Orders list: one done, one part-paid, one with its next visit not
+    // booked, Liam's braces due today. A time a weekend can't hold moves to
+    // the next day it can.
     treatments: [
         {
             person: "daniel",
@@ -1235,6 +1313,66 @@ export const WRENFIELD: GlobalBusiness = {
             service: "whitening",
             number: "ORD-002",
             visits: [[3, 780]],
+            paid: false,
+        },
+        {
+            person: "olivia",
+            service: "scaling",
+            number: "ORD-003",
+            visits: [
+                [-20, 600],
+                [-13, 600],
+            ],
+            paid: true,
+        },
+        {
+            person: "liam",
+            service: "braces",
+            number: "ORD-004",
+            visits: [
+                [-56, 630],
+                [-28, 630],
+                [0, 720],
+            ],
+            paid: true,
+        },
+        {
+            person: "sofia",
+            service: "implant",
+            number: "ORD-005",
+            visits: [
+                [-14, 660],
+                [2, 660],
+            ],
+            paid: false,
+            deposit: true,
+        },
+        {
+            person: "ethan",
+            service: "rootcanal",
+            number: "ORD-006",
+            visits: [[-6, 720]],
+            paid: false,
+        },
+        {
+            person: "ruby",
+            service: "implant",
+            number: "ORD-007",
+            visits: [
+                [-45, 600],
+                [-24, 600],
+                [5, 720],
+            ],
+            paid: true,
+        },
+        {
+            person: "noah",
+            service: "whitening",
+            number: "ORD-008",
+            visits: [
+                [-10, 690],
+                [1, 690],
+            ],
             paid: false,
         },
     ],
@@ -1293,7 +1431,7 @@ export const WRENFIELD: GlobalBusiness = {
                 },
             ],
         },
-        visit: "<h2>Come and see us</h2><p>610 Sample Boulevard, Austin, TX 78701</p><p>Monday to Friday, from 8 am.</p>",
+        visit: "<h2>Come and see us</h2><p>610 Sample Boulevard, Austin, TX 78701</p><p>Monday to Friday from 8 am, and weekend mornings.</p>",
         footer: "Wrenfield Dental. A demo business.",
     },
     rules: {
