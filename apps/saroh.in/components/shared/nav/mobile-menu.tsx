@@ -21,7 +21,7 @@ const MobileSheet = dynamic(
     { ssr: false },
 );
 /**
- * The phone nav (below 760px, Nav design): the start button and a Menu
+ * The phone nav (below 1240px, Nav design): the start button and a Menu
  * button that opens a full-screen sheet: Solutions, How it works, Templates,
  * Pricing (once the launch switch is open), Developers and (when any page is
  * live) Resources and Tools,

@@ -208,38 +208,55 @@ describe("SiteNav: Resources (plan U1)", () => {
         );
     });
 
-    it("folds the Resources pages into How it works' strip; arrows move; Escape closes to its button", () => {
+    it("opens by keyboard on its first item; arrows move; Escape closes to its button", () => {
         render(<Nav resources={RESOURCES} />);
-        const how = button("How it works");
-        how.focus();
-        fireEvent.click(how);
-        expect(how.getAttribute("aria-expanded")).toBe("true");
+        const resources = button("Resources");
+        resources.focus();
+        // A <button>: Enter and Space click it.
+        fireEvent.click(resources);
+        expect(resources.getAttribute("aria-expanded")).toBe("true");
+        const menu = screen.getByRole("menu", { name: "Resources" });
         const items = screen.getAllByRole("menuitem");
         expect(items.map((i) => i.getAttribute("href"))).toEqual([
-            ...FEATURE_ITEMS.map((f) => f.href),
-            "/features",
             "/help",
             "/integrations",
             "/changelog",
+            "/about",
+            "/#faq",
+            "/contact",
         ]);
         expect(document.activeElement).toBe(items[0]);
+        fireEvent.keyDown(items[0], { key: "ArrowDown" });
+        expect(document.activeElement).toBe(items[1]);
+        fireEvent.keyDown(items[1], { key: "ArrowUp" });
         fireEvent.keyDown(items[0], { key: "ArrowUp" });
-        expect(document.activeElement).toBe(items.at(-1));
+        expect(document.activeElement).toBe(items[5]);
+        expect(menu).toBeTruthy();
 
         fireEvent.keyDown(document, { key: "Escape" });
         expect(screen.queryByRole("menu")).toBeNull();
-        expect(how.getAttribute("aria-expanded")).toBe("false");
-        expect(document.activeElement).toBe(how);
+        expect(resources.getAttribute("aria-expanded")).toBe("false");
+        expect(document.activeElement).toBe(resources);
     });
 
-    it("on a changelog entry, underlines no entry: Resources isn't one of the five", () => {
+    it("on a changelog entry, underlines Resources", () => {
         pathname = "/changelog/saroh-is-open";
         render(<Nav resources={RESOURCES} />);
-        for (const name of ["How it works", "Solutions"]) {
-            expect(button(name).className).not.toContain(
-                "decoration-brand-500",
-            );
-        }
+        expect(button("Resources").className).toContain("decoration-brand-500");
+        expect(button("How it works").className).not.toContain(
+            "decoration-brand-500",
+        );
+    });
+
+    it("on /changelog, the menu marks Changelog as the page", () => {
+        pathname = "/changelog";
+        render(<Nav resources={RESOURCES} />);
+        fireEvent.click(button("Resources"));
+        expect(
+            screen
+                .getByRole("menuitem", { name: /^Changelog/ })
+                .getAttribute("aria-current"),
+        ).toBe("page");
     });
 
     it("draws Templates and Developers as entries of their own once live, marked on their pages", () => {
@@ -303,36 +320,25 @@ describe("SiteNav: Tools, a menu of its own", () => {
         expect(screen.queryAllByRole("button", { name: /^Tools/ })).toEqual([]);
     });
 
-    it("folds the tools into How it works' strip, after Resources, or their hub once it has a page", () => {
-        const { unmount } = render(<Nav resources={RESOURCES} tools={TOOLS} />);
-        fireEvent.click(button("How it works"));
+    it("lists the tools under Tools, and Resources never has them", () => {
+        render(<Nav resources={RESOURCES} tools={TOOLS} />);
+        fireEvent.click(button("Tools"));
         expect(
-            screen
+            within(screen.getByRole("menu", { name: "Tools" }))
                 .getAllByRole("menuitem")
-                .map((i) => i.getAttribute("href"))
-                .slice(-5),
+                .map((i) => i.getAttribute("href")),
+        ).toEqual(["/tools/link-preview", "/tools/qr-code-maker"]);
+        fireEvent.click(button("Resources"));
+        expect(
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
         ).toEqual([
             "/help",
             "/integrations",
             "/changelog",
-            "/tools/link-preview",
-            "/tools/qr-code-maker",
+            "/about",
+            "/#faq",
+            "/contact",
         ]);
-        unmount();
-        render(
-            <Nav
-                resources={RESOURCES}
-                tools={TOOLS}
-                allTools={{ name: "See all free tools", href: "/tools" }}
-            />,
-        );
-        fireEvent.click(button("How it works"));
-        expect(
-            screen
-                .getAllByRole("menuitem")
-                .map((i) => i.getAttribute("href"))
-                .at(-1),
-        ).toBe("/tools");
     });
 
     it("draws a grouped menu in named columns, then its see-all", () => {
@@ -371,6 +377,15 @@ describe("SiteNav: Tools, a menu of its own", () => {
         expect(
             screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
         ).toEqual(["/for/shops", "/for/salons", "/for/barbers", "/for"]);
+    });
+
+    it("on a tool, underlines Tools and not Resources", () => {
+        pathname = "/tools/qr-code-maker";
+        render(<Nav resources={RESOURCES} tools={TOOLS} />);
+        expect(button("Tools").className).toContain("decoration-brand-500");
+        expect(button("Resources").className).not.toContain(
+            "decoration-brand-500",
+        );
     });
 
     it("the phone sheet has Tools as a level, marked on a tool", async () => {

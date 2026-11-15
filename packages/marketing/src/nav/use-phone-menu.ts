@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 /**
  * A phone menu's open state: closed on a new page, and when the window
- * widens past the phone nav (760px, `MarketingNav`'s breakpoint).
+ * widens past the phone nav (1240px, `MarketingNav`'s breakpoint).
  */
 export function usePhoneMenu(pathname: string) {
     const [open, setOpen] = useState(false);
@@ -17,7 +17,7 @@ export function usePhoneMenu(pathname: string) {
     }
     useEffect(() => {
         if (!open) return;
-        const wide = window.matchMedia("(min-width: 760px)");
+        const wide = window.matchMedia("(min-width: 1240px)");
         const onChange = () => wide.matches && setOpen(false);
         wide.addEventListener("change", onChange);
         return () => wide.removeEventListener("change", onChange);

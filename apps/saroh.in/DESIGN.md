@@ -180,7 +180,10 @@ fonts from `packages/site-blocks/fonts/` and sets `--font-site-serif` /
   `clamp(20px, 5vw, 56px)` gutters.
 - Section space: 120px above and below on desk, 72px on a phone
   (`Section space="kit"`). More space above a heading than below it.
-- The breakpoint is **760px**: below it the phone layout and the phone nav.
+- The breakpoint is **760px**: below it the phone layout. The **nav** switches
+  at **1240px**: its seven entries (Solutions · How it works · Templates ·
+  Pricing · Developers · Resources · Tools) need the room (1,200px with Pricing and Sign in), so tablets and small laptops get the
+  phone menu.
 - Check every page at **1440, 390 and 320**: nothing scrolls sideways, no
   text under 12px. Rows that scroll (SwipeRow, HourStrip, TradeSwitcher)
   scroll inside themselves, never the page.
@@ -338,6 +341,10 @@ price is ever drawn into an image.
   and kept as phone-sheet levels) and footer (Product first, LOCKED order;
   groups fold on a phone); page bands edge to edge; the `/features` route
   shell (noindex until drawn); the kit sheet at `/dev/kit`.
+- **17 Nov 2026, Resources and Tools stay menus (owner).** The guides and the
+  free tools are how people find Saroh, so Resources and Tools are their own
+  desk menus again after Developers (saroh.tech: after Pricing), not folded
+  into How it works. The desk nav starts at 1240px.
 - Pages move to the kit one by one after this; each adds its line here.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).

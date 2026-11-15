@@ -174,6 +174,8 @@ export const NAV_WORDS = {
     howItWorks: "How it works",
     templates: "Templates",
     pricing: "Pricing",
+    resources: "Resources",
+    tools: "Tools",
     signIn: "Sign in",
 } as const;
 

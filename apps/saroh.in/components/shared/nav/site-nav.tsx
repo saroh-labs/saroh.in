@@ -23,7 +23,7 @@ import {
 import { CtaLink } from "../buttons/cta-link";
 import { MobileMenu } from "./mobile-menu";
 import type { NavMenus, NavSection } from "./nav-section";
-import { sectionOf, splitResources } from "./nav-section";
+import { ABOUT_LINKS, sectionOf, splitResources } from "./nav-section";
 
 /** A menu's panel, under its button (the account menu). */
 const PANEL =
@@ -31,18 +31,17 @@ const PANEL =
 
 /**
  * saroh.in's nav, on the redesign's shared `MarketingNav` (DEC-221): from
- * 760px, the wordmark, then Solutions (every trade, by family, and "See all
- * trades"), How it works (every shown feature, "How Saroh works" to
- * /features, and the rest of Resources and the free tools folded into its
- * strip), Templates and Developers (once their pages are live), Pricing
- * (once the launch switch is open; before that it would only bounce to the
- * waitlist), then Sign in (also once open) and the start button. Below
- * 760px: the start button and Menu, whose sheet keeps every level,
+ * 1240px, the wordmark, then Solutions (every trade, by family, and "See all
+ * trades"), How it works (every shown feature and "How Saroh works" to
+ * /features), Templates, Pricing (once the launch switch is open; before
+ * that it would only bounce to the waitlist), Developers (once live),
+ * Resources and Tools, then Sign in (also once open) and the start button. Below
+ * 1240px: the start button and Menu, whose sheet keeps every level,
  * Resources and Tools included.
  *
- * Every link it had before the redesign is still one click from the nav:
- * the Resources and Tools menus moved into How it works' strip on a desk
- * and stayed levels of the phone sheet, and the footer lists them all.
+ * Resources and Tools stay their own desk menus after Developers (owner,
+ * 17 Nov 2026), as before the redesign: the guides and free tools are how
+ * people find Saroh, so they aren't folded into How it works.
  *
  * `resources` and `tools` are worked out by the server (published and
  * built, `content/resources.ts`), so the browser never judges a date.
@@ -65,14 +64,6 @@ export function SiteNav({
     const section = sectionOf(pathname, features, solutions, resources, tools);
     const { visitor, signOut } = useVisitor();
     const split = splitResources(resources);
-    // What the old Resources and Tools menus held, in How it works' strip.
-    const folded = [
-        ...split.rest.map((r) => ({ name: r.name, href: r.href })),
-        ...(allTools
-            ? [allTools]
-            : tools.map((t) => ({ name: t.name, href: t.href }))),
-    ];
-
     const entries: NavEntry[] = [
         {
             id: "solutions",
@@ -92,7 +83,6 @@ export function SiteNav({
                 items: features,
                 columns: 3,
                 seeAll: { name: NAV_WORDS.howItWorksAll, href: "/features" },
-                links: folded,
             },
         },
         ...(split.templates
@@ -113,6 +103,34 @@ export function SiteNav({
                       id: "developers",
                       label: split.developers.name,
                       href: split.developers.href,
+                  },
+              ]
+            : []),
+        // Resources and Tools keep their own desk menus (owner, 17 Nov 2026):
+        // the guides and the free tools are how people find Saroh.
+        ...(split.rest.length > 0
+            ? [
+                  {
+                      id: "resources",
+                      label: NAV_WORDS.resources,
+                      menu: {
+                          items: split.rest,
+                          columns: 3,
+                          links: ABOUT_LINKS,
+                      },
+                  },
+              ]
+            : []),
+        ...(tools.length > 0
+            ? [
+                  {
+                      id: "tools",
+                      label: NAV_WORDS.tools,
+                      menu: {
+                          items: tools,
+                          columns: 2,
+                          ...(allTools ? { seeAll: allTools } : {}),
+                      },
                   },
               ]
             : []),

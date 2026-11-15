@@ -1,6 +1,7 @@
 /**
  * The nav's and footer's own words (the redesign, DEC-221): the five on the
- * nav (Solutions · How it works · Templates · Pricing · Developers; the
+ * nav (Solutions · How it works · Templates · Pricing · Developers ·
+ * Resources · Tools; the
  * Templates and Developers pages bring their own names), and the footer's
  * groups, the Product group in the LOCKED order (WORLD.md).
  */
@@ -10,6 +11,8 @@ export const NAV_WORDS = {
     /** The How it works menu's see-all: the /features page. */
     howItWorksAll: "How Saroh works",
     pricing: "Pricing",
+    resources: "Resources",
+    tools: "Tools",
     signIn: "Sign in",
 } as const;
 

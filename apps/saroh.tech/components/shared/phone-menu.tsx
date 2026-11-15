@@ -18,7 +18,7 @@ const PhoneSheet = dynamic(
 );
 
 /**
- * Below 760px: the start button and a Menu button that opens the shared
+ * Below 1240px: the start button and a Menu button that opens the shared
  * full-screen sheet. Esc or × closes it and returns focus to Menu; while it is
  * open, focus stays inside.
  */

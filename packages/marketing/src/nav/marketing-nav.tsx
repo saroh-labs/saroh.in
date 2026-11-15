@@ -36,7 +36,7 @@ export interface NavControl {
 }
 
 /** A top-level control: 44px to tap, 10px corners, Paper-dark on hover. */
-export const NAV_TOP = `flex h-11 cursor-pointer items-center rounded-[10px] px-3.5 text-[15px] font-medium text-mk-copy no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: 1 })}`;
+export const NAV_TOP = `flex h-11 cursor-pointer whitespace-nowrap items-center rounded-[10px] px-3 text-[15px] font-medium text-mk-copy no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: 1 })}`;
 
 /** The section the page is in: Ink, 600, the Saffron rule under it. */
 export const NAV_CURRENT =
@@ -46,7 +46,8 @@ export const NAV_CURRENT =
  * The redesign's nav (KIT.md, the TS board), shared by every edition: the
  * wordmark, then `entries` (Solutions · How it works · Templates · Pricing
  * · Developers, as the site words and switches them), then `end` (Sign in
- * and Start free, from the site's `cta()`), from 760px; below it the
+ * and Start free, from the site's `cta()`), from 1240px (seven entries need
+ * the room; owner kept Resources and Tools as menus, 17 Nov); below it the
  * wordmark and `phone` (the site's start button and Menu sheet).
  *
  * The site decides what shows and where it links; this file decides how it
@@ -123,7 +124,7 @@ export function MarketingNav({
             }}
             className="sticky top-0 z-30 border-b border-border bg-background font-sans"
         >
-            <div className="mx-auto flex h-16 max-w-mk-page items-center gap-6 px-mk-gutter max-[399px]:gap-3 min-[760px]:h-20">
+            <div className="mx-auto flex h-16 max-w-mk-page items-center gap-6 px-mk-gutter max-[399px]:gap-3 min-[1240px]:h-20">
                 <IntentLink
                     href="/"
                     aria-label={homeLabel}
@@ -132,7 +133,7 @@ export function MarketingNav({
                     <Wordmark aria-hidden style={{ fontSize: 24 }} />
                 </IntentLink>
 
-                <div className="ml-4 hidden items-center gap-1 min-[760px]:flex">
+                <div className="ml-2 hidden items-center gap-0.5 min-[1240px]:flex">
                     {entries.map((entry) => {
                         const on = current === entry.id;
                         if ("href" in entry) {
@@ -196,10 +197,10 @@ export function MarketingNav({
                     })}
                 </div>
 
-                <div className="ml-auto hidden items-center gap-4 min-[760px]:flex">
+                <div className="ml-auto hidden items-center gap-3 min-[1240px]:flex">
                     {end(control)}
                 </div>
-                <div className="ml-auto flex items-center min-[760px]:hidden">
+                <div className="ml-auto flex items-center min-[1240px]:hidden">
                     {phone(control)}
                 </div>
             </div>
