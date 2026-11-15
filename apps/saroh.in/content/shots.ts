@@ -157,6 +157,21 @@ const designed = {
     "ask-hero-phone": pending(
         "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
     ),
+    "r-needs": pending(
+        "Needs you on Rye & Co.'s Home (demo bakery): late orders first, each with its next step",
+    ),
+    "r-money": pending(
+        "Money to chase on Rye & Co.'s Home (demo bakery): overdue bills, cheques waiting to clear and a failed renewal",
+    ),
+    "g-site-train": pending(
+        "Ways to train on Pulse Fitness's site (demo gym): its classes and memberships with their prices",
+    ),
+    "r-flag": pending(
+        "Priya Raman at Rye & Co. (demo bakery): Allergy: Sesame beside her name, with the team's note",
+    ),
+    "r-cheques": pending(
+        "Cheques not in the bank at Rye & Co. (demo bakery): two invoices paid by cheque, waiting to clear",
+    ),
     "ask-start": pending(
         "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
     ),

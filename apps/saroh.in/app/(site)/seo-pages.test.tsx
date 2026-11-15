@@ -117,7 +117,7 @@ describe("/features/website, before launch", () => {
             Array.from(container.querySelectorAll("[data-shot]")).map((el) =>
                 el.getAttribute("data-shot"),
             ),
-        ).toEqual(["g-site", "d-site", "g-book"]);
+        ).toEqual(["g-site", "g-site-train", "g-book"]);
     });
 
     it("names no plan and no price: the own-domain note waits for launch", async () => {
