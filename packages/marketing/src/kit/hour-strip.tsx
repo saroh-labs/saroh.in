@@ -42,7 +42,8 @@ export function stripGradient(stops: readonly { at: string }[]): string {
  * A day's index (the trade page under the hero): the light of the day as a
  * bar in the hour tints, a dot at each hour, and under each dot the hour,
  * what happens (to its scene) and the part of Saroh it uses. `current` is
- * the hour the visitor is at, its dot Saffron. Scrolls sideways inside
+ * the `href` of the hour the visitor is at (two stops can share a clock
+ * time: 7 am and Tue 7 am), its dot Saffron. Scrolls sideways inside
  * itself on a phone.
  */
 export function HourStrip({
@@ -54,6 +55,7 @@ export function HourStrip({
     /** "Her day, hour by hour": a small heading, not a section's h2 size. */
     title: ReactNode;
     stops: readonly HourStop[];
+    /** The current stop's `href`. */
     current?: string;
     className?: string;
 }) {
@@ -78,7 +80,7 @@ export function HourStrip({
                         style={{ background: stripGradient(stops) }}
                     />
                     {stops.map((s) => {
-                        const on = s.at === current;
+                        const on = s.href === current;
                         return (
                             <li
                                 key={s.href}

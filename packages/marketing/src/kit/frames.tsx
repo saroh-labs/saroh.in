@@ -31,10 +31,10 @@ export function PhoneFrame({
         <figure
             aria-label={label}
             className={cn(
-                "m-0 aspect-[400/812] max-w-full rounded-[56px] bg-foreground p-[11px] shadow-[0_30px_60px_-20px_rgba(40,44,40,0.35),0_10px_24px_rgba(40,44,40,0.12)]",
+                "m-0 aspect-[400/812] w-full rounded-[56px] bg-foreground p-[11px] shadow-[0_30px_60px_-20px_rgba(40,44,40,0.35),0_10px_24px_rgba(40,44,40,0.12)]",
                 className,
             )}
-            style={{ width }}
+            style={{ maxWidth: width }}
         >
             <div
                 className="relative flex h-full flex-col overflow-hidden rounded-[46px]"
