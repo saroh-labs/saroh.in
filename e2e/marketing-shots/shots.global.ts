@@ -1,11 +1,14 @@
 /**
  * saroh.tech's screenshots (global edition plan, U11): the Global demo
  * businesses from `db:seed:global`, taken by `capture.ts --edition=global`.
- * Keys are the ones saroh.tech's pages name; the `l-` keys are the salon's.
+ * Keys are the ones saroh.tech's pages name, plus each key saroh.in's pages
+ * use that Global can show, taken with India's crop and frame (`sameAs`,
+ * DEC-221); the `l-` keys are the salon's.
  *
  * A person looks at every image: nothing checks pixels for ₹ or GST. A screen
  * that still shows India's details, or a feature a Global business can't use
- * (working subscriptions, online payments, pay links) isn't listed here, and its
+ * (subscriptions and class packs, online payments, pay links, Ask AI, which is
+ * for paying plans, or India's GST bill of supply) isn't listed here, and its
  * key stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS. Nothing is
  * hidden from a shot: what's on the page is what a Free business sees, with
  * Insights (the bakery) and Courses (the gym) turned on, as Free can.
@@ -18,7 +21,7 @@
  */
 import { morningZone } from "../../packages/database/src/seed/global/morning-zone";
 import type { Shot } from "./shots.config";
-import { DESK } from "./shots.config";
+import { DESK, SHOTS } from "./shots.config";
 
 export { morningZone };
 
@@ -95,6 +98,106 @@ const clinic = (
     alt: string,
     extra?: Partial<Shot>,
 ) => shop(key, route, alt, { business: "wrenfield", ...extra });
+
+/**
+ * India's spec for `key`, taken at Thistlewick Bakery: the same viewport,
+ * steps and crop, so both editions' slot shows the same kind of image. `over`
+ * names the business's own route, words and alt; India's `gap` is dropped.
+ */
+function sameAs(key: string, over: Partial<Shot> & { alt: string }): Shot {
+    const india = SHOTS.find((s) => s.key === key);
+    if (!india) throw new Error(`${key}: no India spec to match`);
+    return {
+        ...india,
+        business: india.business && "thistlewick",
+        gap: undefined,
+        caption: over.alt,
+        ...over,
+    };
+}
+
+/* Share and posts: the Sourdough loaf, live on the Downtown shop. */
+const SOURDOUGH_PAGE = `/commerce/products/${SHOP}_product_0?storefront=${SHOP}_store_main`;
+const HIRING = "We're hiring a morning baker";
+const SHARE_SHOTS: Shot[] = [
+    sameAs("sh-sheet", {
+        route: SOURDOUGH_PAGE,
+        alt: "The Share sheet for the Sourdough loaf at Thistlewick Bakery (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
+    }),
+    sameAs("sh-button", {
+        route: SOURDOUGH_PAGE,
+        alt: "The Sourdough loaf's page at Thistlewick Bakery (demo bakery), live on the shop, with the Share button beside QR",
+    }),
+    // The seed gives Thistlewick no discount, so there's no Offer card:
+    // the Colour card in Square, in the same crop.
+    sameAs("sh-cards", {
+        route: SOURDOUGH_PAGE,
+        steps: [
+            { click: "button[data-share-item]:visible" },
+            { waitFor: '[role="dialog"] [role="radiogroup"]' },
+            { click: '[role="dialog"] button:has-text("Square")' },
+            { click: '[role="dialog"] [data-card="colour"]' },
+            { waitFor: '[role="dialog"] img[data-preview]' },
+        ],
+        alt: "Card styles for the Sourdough loaf at Thistlewick Bakery (demo bakery) in the bakery's own look, the Colour card in Square",
+    }),
+    sameAs("sh-phone", {
+        route: SOURDOUGH_PAGE,
+        alt: "The Share sheet on a phone for the Sourdough loaf at Thistlewick Bakery (demo bakery), with Share now",
+    }),
+    sameAs("sh-post", {
+        alt: `Create post at Thistlewick Bakery (demo bakery): Text only, the headline ${HIRING}, a link and the card drawn in the bakery's look`,
+    }),
+    sameAs("sh-post-card", {
+        steps: [
+            { click: '[data-own-post] button:has-text("Text only")' },
+            { waitFor: "[data-own-headline]" },
+            { fill: "[data-own-headline]", value: HIRING },
+            {
+                fill: "[data-own-caption]",
+                value: "Early starts, fair pay and all the bread you can eat. Come and see us Downtown.",
+            },
+            { click: 'main [role="radiogroup"] label:has-text("Shop")' },
+            { click: "main h1" },
+        ],
+        alt: "A finished own post at Thistlewick Bakery (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+    }),
+];
+
+/*
+ * AI apps (every plan, Free too). The hero, the request and the connector
+ * form are Claude's own screens, put in place by hand like India's.
+ */
+const AI_APPS_SHOTS: Shot[] = [
+    sameAs("ai-hero", {
+        supplied:
+            "Claude connected to Thistlewick Bakery on the Global dev stack, asked to add an Order tomorrow's sourdough button to the home page as a draft; cropped to the request and the answer",
+        alt: "Claude adding an Order tomorrow's sourdough button to the home page of Thistlewick Bakery (demo bakery), saved as a draft",
+    }),
+    sameAs("ai-ask", {
+        supplied:
+            "Claude connected to Thistlewick Bakery on the Global dev stack, asked to mark an order ready for pickup; the request and the answer, without the tool line",
+        alt: "Claude marking a Thistlewick Bakery (demo bakery) order ready for pickup and saying what is left to pack",
+    }),
+    sameAs("ai-connect", {
+        supplied:
+            "Claude's Settings › Connectors › Add custom connector with saroh.tech's MCP address, shot by hand",
+        alt: "Claude's Add custom connector form with the name Saroh and saroh.tech's address",
+    }),
+    sameAs("ai-consent", {
+        steps: [
+            { click: 'role=checkbox[name="Thistlewick Bakery"]' },
+            { click: 'button:has-text("Continue")' },
+            { waitFor: 'button:has-text("Don\'t allow")' },
+        ],
+        alt: "Saroh's sign-in for an AI app at Thistlewick Bakery (demo bakery): the businesses it may use, and what it may and may not do",
+        gap: "The API sends the sign-in to its own accounts app; check the image shows saroh.tech's, not saroh.in's.",
+    }),
+    sameAs("ai-activity", {
+        alt: "AI assistants in Settings at Thistlewick Bakery (demo bakery): a connected AI app and the changes it made",
+        gap: "Connect Claude first: `pnpm --filter @saroh/e2e shots:connect-claude --edition=global`, then make a change or two through it.",
+    }),
+];
 
 export const GLOBAL_SHOTS: Shot[] = [
     // ── Thistlewick Bakery ─────────────────────────────────────────────
@@ -215,6 +318,9 @@ export const GLOBAL_SHOTS: Shot[] = [
         "/commerce/stock",
         "Stock at Thistlewick Bakery (demo bakery): each size at Downtown and Online, with what can be sold and what's promised",
     ),
+    sameAs("p-site", {
+        alt: "The shop of Thistlewick Bakery (demo bakery) on its Saroh website: breads, cakes and coffee with photos and prices",
+    }),
     shop(
         "p-detail",
         `/commerce/products/${SHOP}_product_0`,
@@ -485,4 +591,6 @@ export const GLOBAL_SHOTS: Shot[] = [
         "site:/",
         "The site of Wrenfield Dental (demo clinic): free times today and Book an appointment",
     ),
+    ...SHARE_SHOTS,
+    ...AI_APPS_SHOTS,
 ];

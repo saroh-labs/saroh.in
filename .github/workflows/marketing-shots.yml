@@ -1,0 +1,215 @@
+name: Marketing shots
+
+# Retakes saroh.in's and saroh.tech's product screenshots from the app as it
+# ships, once per production release (DEC-221; docs/patterns/
+# devops-tooling-and-deploy.md → "Marketing screenshots are taken fresh for
+# every production release"). On the release PR into main, or by hand from
+# the Actions tab. Never on a schedule: the owner starts every release.
+#
+# It seeds a throwaway Postgres with India's showcase and Global's demo
+# businesses, starts the stack the way CI's browser shards do (bare ports,
+# production builds), captures both editions (`e2e/marketing-shots/
+# capture.ts`), makes the sized copies, and runs `pnpm check:shots --since`
+# for this run: a key a page names that has no image, or wasn't retaken here,
+# fails. The new images go up as an artifact. It never commits: a person
+# looks at each image against its page's claims (FEATURE_RELEASE.md step 3),
+# then commits them on the release batch.
+#
+# Secrets: none. Every key below is a throwaway for this runner's stack, as
+# in ci.yml's browser shards; nothing calls a provider.
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marketing-shots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  shots:
+    name: Capture both editions' shots
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: saroh_shots
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -h 127.0.0.1 -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+
+    # ci.yml's browser-shard stack, less what only its specs need. The
+    # switches are what production's screens show, plus the release-gated
+    # screens the shots take (Share, Ask AI, Settings › API and AI apps).
+    env:
+      SKIP_ENV_VALIDATION: "1"
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_shots
+      DATABASE_TARGET_CONFIRM: saroh_shots
+      PORT: 3333
+      TRUST_PROXY: private
+      BETTER_AUTH_SECRET: ci-placeholder-secret-at-least-32-characters # gitleaks:allow (CI placeholder, no live service)
+      APIKEY_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      WEBHOOK_SECRET_KEY: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789 # gitleaks:allow (test key, 32 bytes hex, no live service)
+      PAYMENTS_ENC_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
+      AI_PROVIDER_FAKE: "1"
+      AI_TEXT_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
+      SITE_RELAY_SECRET: saroh-dev-insecure-site-relay-secret-not-for-production
+      SITE_ACCOUNTS_CODE_SECRET: ci-placeholder-site-code-secret-at-least-32-chars
+      SITE_CODES_EMAIL_FAKE: log
+      SITE_ACCOUNT_AREA: "on"
+      STRIPE_FAKE: "1"
+      BETTER_AUTH_URL: http://localhost:3333
+      BETTER_AUTH_TRUSTED_ORIGINS: http://localhost:3000,http://localhost:3003,http://localhost:3007,http://localhost:3008,http://localhost:3333
+      APP_URL: http://localhost:3003
+      ACCOUNTS_URL: http://localhost:3000
+      RENDERER_URL: http://localhost:3005
+      NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3000
+      NEXT_PUBLIC_APP_URL: http://localhost:3003
+      NEXT_PUBLIC_API_URL: http://localhost:3333
+      NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3333
+      NEXT_PUBLIC_ROOT_DOMAIN: localhost
+      NEXT_PUBLIC_API_AREA: "on"
+      NEXT_PUBLIC_ASK_AI: "on"
+      NEXT_PUBLIC_SHARE_POSTS: "on"
+      SHARE_POSTS: "on"
+      EMAIL_FROM: Saroh <noreply@saroh.in>
+      E2E_APP_URL: http://localhost:3003
+      E2E_ACCOUNTS_URL: http://localhost:3000
+      E2E_API_URL: http://localhost:3333
+      E2E_RENDERER_URL: http://localhost:3005
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Every commit, so the check can date each image by its last one.
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+        with:
+          playwright: "true"
+
+      - name: Apply migrations
+        run: pnpm --filter @saroh/database db:migrate:deploy
+
+      # The seed validates sections through built packages, so the builds
+      # come first (ci.yml's note on the seed and the build).
+      - name: Build the apps the shots open
+        run: >-
+          pnpm turbo run build --log-order=grouped
+          --filter=@saroh/database --filter=@saroh/api --filter=auth
+          --filter=application --filter=sites
+      - name: Build the Global app and accounts (NEXT_PUBLIC_EDITION=GLOBAL)
+        env:
+          NEXT_PUBLIC_APP_URL: http://localhost:3007
+          NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3008
+        run: >-
+          pnpm turbo run build:global --log-order=grouped
+          --filter=application --filter=auth
+
+      # Both worlds on one throwaway database: Global's rows are `seed_gl_*`
+      # and leave the showcase alone. Seeded just before the capture: the
+      # diaries are laid out from now, and Global's zone is the one where it's
+      # mid-morning now (SHOTS_ZONE, from the seed's log).
+      - name: Seed India's showcase and Global's demo businesses
+        run: |
+          set -euo pipefail
+          pnpm --filter @saroh/database db:seed:showcase
+          pnpm --filter @saroh/database db:seed:global | tee /tmp/seed-global.log
+          zone=$(sed -n 's/.*SHOTS_ZONE for the capture): //p' /tmp/seed-global.log)
+          test -n "$zone"
+          echo "SHOTS_ZONE=$zone" >> "$GITHUB_ENV"
+
+      - name: Start the stack
+        run: |
+          set -euo pipefail
+          pnpm --filter @saroh/api start > /tmp/api.log 2>&1 &
+          pnpm --filter auth exec next start -p 3000 > /tmp/accounts.log 2>&1 &
+          pnpm --filter application exec next start -p 3003 > /tmp/app.log 2>&1 &
+          pnpm --filter sites exec next start -p 3005 > /tmp/renderer.log 2>&1 &
+          export NEXT_DIST_DIR=.next-global NEXT_PUBLIC_EDITION=GLOBAL
+          NEXT_PUBLIC_APP_URL=http://localhost:3007 NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3008 \
+            pnpm --filter auth exec next start -p 3008 > /tmp/accounts-global.log 2>&1 &
+          NEXT_PUBLIC_APP_URL=http://localhost:3007 NEXT_PUBLIC_ACCOUNTS_URL=http://localhost:3008 \
+            pnpm --filter application exec next start -p 3007 > /tmp/app-global.log 2>&1 &
+          unset NEXT_DIST_DIR NEXT_PUBLIC_EDITION
+
+          wait_for() {
+            accept="${3:-200 307}"
+            for _ in $(seq 1 60); do
+              code=$(curl -s -o /dev/null -w '%{http_code}' "$2" || echo 000)
+              for want in $accept; do
+                if [ "$code" = "$want" ]; then echo "$1 is up ($code)"; return 0; fi
+              done
+              sleep 2
+            done
+            echo "::error::$1 never came up (last status ${code})"
+            return 1
+          }
+          wait_for api http://localhost:3333/health
+          wait_for accounts http://localhost:3000/login
+          wait_for app http://localhost:3003/
+          wait_for renderer http://localhost:3005/preview/not-a-token '200 307 404'
+          wait_for accounts-global http://localhost:3008/login
+          wait_for app-global http://localhost:3007/
+          echo "SHOTS_SINCE=$(date -u +%s)" >> "$GITHUB_ENV"
+
+      # A key that fails here keeps its old image, and the check below names
+      # it as not retaken; so the capture's own exit code doesn't stop the run.
+      # Global first: its zone was worked out for this hour.
+      - name: Capture saroh.tech's shots (Global)
+        continue-on-error: true
+        env:
+          E2E_APP_URL: http://localhost:3007
+          E2E_ACCOUNTS_URL: http://localhost:3008
+        run: pnpm --filter @saroh/e2e shots --edition=global
+      - name: Capture saroh.in's shots (India)
+        continue-on-error: true
+        run: pnpm --filter @saroh/e2e shots
+
+      - name: Make the sized copies
+        run: |
+          pnpm --filter web shots:sizes --force
+          pnpm --filter tech shots:sizes --force
+
+      - name: Check every named key was retaken
+        run: |
+          set -o pipefail
+          mkdir -p /tmp/shots
+          node scripts/check-shots.mjs --since="$SHOTS_SINCE" 2>&1 | tee /tmp/shots/REPORT.md
+      - name: Add the report to the run's summary
+        if: always()
+        run: cat /tmp/shots/REPORT.md >> "$GITHUB_STEP_SUMMARY" || true
+
+      # Only what changed, at its repo path: unzip at the repo root to review.
+      - name: Gather the new images
+        if: always()
+        run: |
+          mkdir -p /tmp/shots
+          git ls-files -m -o --exclude-standard -z -- apps/saroh.in apps/saroh.tech \
+            | xargs -0 -r cp --parents -t /tmp/shots
+      - name: Upload the new images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketing-shots
+          path: /tmp/shots/
+          retention-days: 14
+      - name: Upload the servers' logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketing-shots-stack-logs
+          path: /tmp/*.log
+          retention-days: 3

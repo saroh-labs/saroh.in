@@ -10,34 +10,49 @@ import type { Shot, ShotView } from "@saroh/marketing/shot";
 import PLACEHOLDERS from "./shot-placeholders.json";
 import { CAPTURED } from "./shots.captured";
 
-/**
- * Keys pages name but this site doesn't show, each with why. Retake them after
- * the app edition work; `lib/shots.test.ts` fails on any other missing image.
- */
-/** AI apps, Ask AI and Share (plan 2026-11-13-002): taken in U16. */
-const NOT_YET_SHOWN =
-    "Its page isn't built while its switch is off; taken when Global turns it on.";
+/** A spec in `shots.global.ts` with no capture yet: the next release run takes it. */
+const NOT_TAKEN =
+    "Its spec is in shots.global.ts; not captured yet (the marketing-shots workflow takes it).";
+/** Claude's own screens, put in place by hand (`supplied` in shots.global.ts). */
+const SUPPLIED = "Claude's own screen, put in place by hand; not supplied yet.";
+const NO_SUBSCRIPTIONS = "Subscriptions isn't usable on Global yet.";
+/** Ask AI refuses a Free business, and Global is Free until paid plans open (DEC-211). */
+const NO_ASK_AI =
+    "Ask AI is for paying plans, and Global's businesses are on Free.";
 
+/**
+ * Keys pages name but this site doesn't show, each with why; the slot draws
+ * no shot. `lib/shots.test.ts` and `pnpm check:shots` fail on any other
+ * missing image. A key comes off once its capture is committed.
+ */
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
-    "r-subdetail": "Subscriptions isn't usable on Global yet.",
-    "s-subs": "Subscriptions isn't usable on Global yet.",
-    "ai-hero": NOT_YET_SHOWN,
-    "ai-connect": NOT_YET_SHOWN,
-    "ai-consent": NOT_YET_SHOWN,
-    "ai-ask": NOT_YET_SHOWN,
-    "ai-activity": NOT_YET_SHOWN,
-    "ask-hero": NOT_YET_SHOWN,
-    "ask-hero-phone": NOT_YET_SHOWN,
-    "ask-start": NOT_YET_SHOWN,
-    "ask-answer": NOT_YET_SHOWN,
-    "ask-confirm": NOT_YET_SHOWN,
-    "ask-history": NOT_YET_SHOWN,
-    "sh-sheet": NOT_YET_SHOWN,
-    "sh-button": NOT_YET_SHOWN,
-    "sh-cards": NOT_YET_SHOWN,
-    "sh-phone": NOT_YET_SHOWN,
-    "sh-post": NOT_YET_SHOWN,
-    "sh-post-card": NOT_YET_SHOWN,
+    "r-subdetail": NO_SUBSCRIPTIONS,
+    "s-subs": NO_SUBSCRIPTIONS,
+    "g-subs": NO_SUBSCRIPTIONS,
+    "g-subdetail": NO_SUBSCRIPTIONS,
+    "g-plans": NO_SUBSCRIPTIONS,
+    "g-packs":
+        "Class packs are a paid module, and Global's businesses are on Free.",
+    "r-supply":
+        "A bill of supply is India's GST rule; Global's invoices have no exempt-supply wording.",
+    "p-site": NOT_TAKEN,
+    "ai-hero": SUPPLIED,
+    "ai-connect": SUPPLIED,
+    "ai-ask": SUPPLIED,
+    "ai-consent": NOT_TAKEN,
+    "ai-activity": NOT_TAKEN,
+    "ask-hero": NO_ASK_AI,
+    "ask-hero-phone": NO_ASK_AI,
+    "ask-start": NO_ASK_AI,
+    "ask-answer": NO_ASK_AI,
+    "ask-confirm": NO_ASK_AI,
+    "ask-history": NO_ASK_AI,
+    "sh-sheet": NOT_TAKEN,
+    "sh-button": NOT_TAKEN,
+    "sh-cards": NOT_TAKEN,
+    "sh-phone": NOT_TAKEN,
+    "sh-post": NOT_TAKEN,
+    "sh-post-card": NOT_TAKEN,
 };
 
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */
