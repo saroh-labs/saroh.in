@@ -122,7 +122,13 @@ const RULES: Rule[] = [
     {
         name: "a question list is Faq (V3)",
         pattern: /<details\b/,
-        home: [`${MK}/sections/faq.tsx`],
+        // The redesign's folds (DEC-221): a cropped card's "See the whole …"
+        // and the footer's phone groups keep their content in the HTML.
+        home: [
+            `${MK}/sections/faq.tsx`,
+            `${MK}/kit/cropped-card.tsx`,
+            `${MK}/nav/marketing-footer.tsx`,
+        ],
         allow: {},
         files: SITE,
     },
@@ -255,7 +261,8 @@ const RULES: Rule[] = [
     {
         name: "a choice chip is ChoiceChip (V9, A13)",
         pattern: both("\\bh-9\\b", "\\brounded-full\\b"),
-        home: [`${MK}/fields/choice-chip.tsx`],
+        // The redesign's chip (DEC-221: filter, chapter, source, plan).
+        home: [`${MK}/fields/choice-chip.tsx`, `${MK}/kit/chip.tsx`],
         allow: {},
         files: SITE,
     },

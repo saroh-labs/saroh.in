@@ -21,6 +21,7 @@ const Nav = (props: {
     solutions?: NavItem[];
     solutionMenu?: NavItem[];
     allTrades?: { name: string; href: string };
+    allTools?: { name: string; href: string };
 }) => (
     <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} {...props} />
 );
@@ -73,10 +74,10 @@ const button = (name: string) =>
     screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0];
 
 describe("SiteNav", () => {
-    it("on /features/orders, underlines Features and marks Orders as the page", () => {
+    it("on /features/orders, underlines How it works and marks Orders as the page", () => {
         pathname = "/features/orders";
         render(<Nav />);
-        const features = button("Features");
+        const features = button("How it works");
         expect(features.className).toMatch(/(^| )underline( |$)/);
         expect(features.className).toContain("decoration-brand-500");
         expect(button("Solutions").className).not.toMatch(
@@ -124,16 +125,21 @@ describe("SiteNav", () => {
         launch.mode = "waitlist";
     });
 
-    it("Features opens a menu of every shown feature, focused on the first", () => {
+    it("How it works opens a menu of every shown feature and /features, focused on the first", () => {
         render(<Nav />);
         const chevron = () =>
-            button("Features").querySelector("[data-chevron]")?.classList;
+            button("How it works").querySelector("[data-chevron]")?.classList;
         expect(chevron()?.contains("rotate-180")).toBe(false);
-        fireEvent.click(button("Features"));
+        fireEvent.click(button("How it works"));
         expect(chevron()?.contains("rotate-180")).toBe(true);
-        expect(button("Features").getAttribute("aria-expanded")).toBe("true");
+        expect(button("How it works").getAttribute("aria-expanded")).toBe(
+            "true",
+        );
         const items = screen.getAllByRole("menuitem");
-        expect(items).toHaveLength(FEATURE_ITEMS.length);
+        expect(items.map((i) => i.getAttribute("href"))).toEqual([
+            ...FEATURE_ITEMS.map((f) => f.href),
+            "/features",
+        ]);
         expect(document.activeElement).toBe(items[0]);
     });
 
@@ -154,7 +160,7 @@ describe("SiteNav", () => {
                 <p>Elsewhere</p>
             </>,
         );
-        fireEvent.click(button("Features"));
+        fireEvent.click(button("How it works"));
         expect(screen.getByRole("menu")).toBeTruthy();
         fireEvent.click(screen.getByText("Elsewhere"));
         expect(screen.queryByRole("menu")).toBeNull();
@@ -202,55 +208,65 @@ describe("SiteNav: Resources (plan U1)", () => {
         );
     });
 
-    it("opens by keyboard on its first item; arrows move; Escape closes to its button", () => {
+    it("folds the Resources pages into How it works' strip; arrows move; Escape closes to its button", () => {
         render(<Nav resources={RESOURCES} />);
-        const resources = button("Resources");
-        resources.focus();
-        // A <button>: Enter and Space click it.
-        fireEvent.click(resources);
-        expect(resources.getAttribute("aria-expanded")).toBe("true");
-        const menu = screen.getByRole("menu", { name: "Resources" });
+        const how = button("How it works");
+        how.focus();
+        fireEvent.click(how);
+        expect(how.getAttribute("aria-expanded")).toBe("true");
         const items = screen.getAllByRole("menuitem");
         expect(items.map((i) => i.getAttribute("href"))).toEqual([
+            ...FEATURE_ITEMS.map((f) => f.href),
+            "/features",
             "/help",
             "/integrations",
             "/changelog",
-            "/about",
-            "/#faq",
-            "/contact",
         ]);
         expect(document.activeElement).toBe(items[0]);
-        fireEvent.keyDown(items[0], { key: "ArrowDown" });
-        expect(document.activeElement).toBe(items[1]);
-        fireEvent.keyDown(items[1], { key: "ArrowUp" });
         fireEvent.keyDown(items[0], { key: "ArrowUp" });
-        expect(document.activeElement).toBe(items[5]);
-        expect(menu).toBeTruthy();
+        expect(document.activeElement).toBe(items.at(-1));
 
         fireEvent.keyDown(document, { key: "Escape" });
         expect(screen.queryByRole("menu")).toBeNull();
-        expect(resources.getAttribute("aria-expanded")).toBe("false");
-        expect(document.activeElement).toBe(resources);
+        expect(how.getAttribute("aria-expanded")).toBe("false");
+        expect(document.activeElement).toBe(how);
     });
 
-    it("on a changelog entry, underlines Resources", () => {
+    it("on a changelog entry, underlines no entry: Resources isn't one of the five", () => {
         pathname = "/changelog/saroh-is-open";
         render(<Nav resources={RESOURCES} />);
-        expect(button("Resources").className).toContain("decoration-brand-500");
-        expect(button("Features").className).not.toContain(
-            "decoration-brand-500",
-        );
+        for (const name of ["How it works", "Solutions"]) {
+            expect(button(name).className).not.toContain(
+                "decoration-brand-500",
+            );
+        }
     });
 
-    it("on /changelog, the menu marks Changelog as the page", () => {
-        pathname = "/changelog";
-        render(<Nav resources={RESOURCES} />);
-        fireEvent.click(button("Resources"));
+    it("draws Templates and Developers as entries of their own once live, marked on their pages", () => {
+        pathname = "/templates/bakery";
+        render(
+            <Nav
+                resources={[
+                    ...RESOURCES,
+                    { name: "Templates", line: "", href: "/templates" },
+                    { name: "Developers", line: "", href: "/developers" },
+                ]}
+            />,
+        );
+        const nav = desktop();
+        const templates = within(nav).getAllByRole("link", {
+            name: "Templates",
+        })[0];
+        expect(templates.className).toContain("decoration-brand-500");
         expect(
-            screen
-                .getByRole("menuitem", { name: /^Changelog/ })
-                .getAttribute("aria-current"),
-        ).toBe("page");
+            within(nav)
+                .getAllByRole("link", { name: "Developers" })[0]
+                .getAttribute("href"),
+        ).toBe("/developers");
+        fireEvent.click(button("How it works"));
+        expect(
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+        ).not.toContain("/templates");
     });
 
     it("the phone sheet has Resources as a level, marked on a Resources page", async () => {
@@ -287,25 +303,36 @@ describe("SiteNav: Tools, a menu of its own", () => {
         expect(screen.queryAllByRole("button", { name: /^Tools/ })).toEqual([]);
     });
 
-    it("lists the tools under Tools, and Resources never has them", () => {
-        render(<Nav resources={RESOURCES} tools={TOOLS} />);
-        fireEvent.click(button("Tools"));
+    it("folds the tools into How it works' strip, after Resources, or their hub once it has a page", () => {
+        const { unmount } = render(<Nav resources={RESOURCES} tools={TOOLS} />);
+        fireEvent.click(button("How it works"));
         expect(
-            within(screen.getByRole("menu", { name: "Tools" }))
+            screen
                 .getAllByRole("menuitem")
-                .map((i) => i.getAttribute("href")),
-        ).toEqual(["/tools/link-preview", "/tools/qr-code-maker"]);
-        fireEvent.click(button("Resources"));
-        expect(
-            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+                .map((i) => i.getAttribute("href"))
+                .slice(-5),
         ).toEqual([
             "/help",
             "/integrations",
             "/changelog",
-            "/about",
-            "/#faq",
-            "/contact",
+            "/tools/link-preview",
+            "/tools/qr-code-maker",
         ]);
+        unmount();
+        render(
+            <Nav
+                resources={RESOURCES}
+                tools={TOOLS}
+                allTools={{ name: "See all free tools", href: "/tools" }}
+            />,
+        );
+        fireEvent.click(button("How it works"));
+        expect(
+            screen
+                .getAllByRole("menuitem")
+                .map((i) => i.getAttribute("href"))
+                .at(-1),
+        ).toBe("/tools");
     });
 
     it("draws a grouped menu in named columns, then its see-all", () => {
@@ -346,15 +373,6 @@ describe("SiteNav: Tools, a menu of its own", () => {
         ).toEqual(["/for/shops", "/for/salons", "/for/barbers", "/for"]);
     });
 
-    it("on a tool, underlines Tools and not Resources", () => {
-        pathname = "/tools/qr-code-maker";
-        render(<Nav resources={RESOURCES} tools={TOOLS} />);
-        expect(button("Tools").className).toContain("decoration-brand-500");
-        expect(button("Resources").className).not.toContain(
-            "decoration-brand-500",
-        );
-    });
-
     it("the phone sheet has Tools as a level, marked on a tool", async () => {
         pathname = "/tools/link-preview";
         render(<Nav resources={RESOURCES} tools={TOOLS} />);
@@ -380,7 +398,7 @@ describe("MobileMenu (below 760px)", () => {
         const row = (name: string) =>
             within(sheet).getByRole("button", { name });
         expect(row("Solutions").getAttribute("aria-current")).toBe("true");
-        expect(row("Features").getAttribute("aria-current")).toBeNull();
+        expect(row("How it works").getAttribute("aria-current")).toBeNull();
         expect(sheet.querySelector("#nav-sheet-solutions")).toBeNull();
 
         fireEvent.click(row("Solutions"));

@@ -121,7 +121,11 @@ export function SiteChrome({
     );
 }
 
-/** Paper, the 1280px page, and what sits outside it (the WhatsApp button). */
+/**
+ * Paper, and what sits outside the page (the WhatsApp button). The page is
+ * as wide as the window, so the redesign's bands (`Section`'s `tone`) run
+ * edge to edge; each section keeps its own 1280px column (`Container`).
+ */
 function Shell({
     banner,
     after,
@@ -133,7 +137,7 @@ function Shell({
 }) {
     return (
         <div className="min-h-screen bg-background text-foreground [line-height:normal]">
-            <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
+            <div className="overflow-x-clip bg-background">
                 {banner}
                 {children}
             </div>

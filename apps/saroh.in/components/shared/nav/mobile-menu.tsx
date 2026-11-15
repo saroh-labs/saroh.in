@@ -8,9 +8,12 @@ import type { Visitor } from "@/lib/browser/session";
 import { DASHBOARD_URL } from "@/lib/links";
 import { ring } from "@saroh/marketing/ring";
 
+import { NAV_WORDS } from "@/content/nav";
 import { ButtonLink } from "@saroh/marketing/button";
 import { CtaLink } from "../buttons/cta-link";
+
 import type { NavMenus, NavSection } from "./nav-section";
+import { splitResources } from "./nav-section";
 
 /** The sheet, fetched on the first tap of Menu. */
 const MobileSheet = dynamic(
@@ -19,8 +22,9 @@ const MobileSheet = dynamic(
 );
 /**
  * The phone nav (below 760px, Nav design): the start button and a Menu
- * button that opens a full-screen sheet: Features, Solutions, Pricing (once
- * the launch switch is open) and (when any page is live) Resources and Tools,
+ * button that opens a full-screen sheet: Solutions, How it works, Templates,
+ * Pricing (once the launch switch is open), Developers and (when any page is
+ * live) Resources and Tools,
  * each menu a level of its own with a Back, and Sign in and the start button
  * held at the bottom (owner, 1 Nov). Esc or × closes it and returns focus to
  * Menu; while it is open, focus stays inside. Signed in, the start button is
@@ -32,6 +36,7 @@ export function MobileMenu({
     visitor = null,
     onSignOut,
     className,
+    startClassName,
     ...menus
 }: NavMenus & {
     section: NavSection;
@@ -39,9 +44,12 @@ export function MobileMenu({
     visitor?: Visitor | null;
     onSignOut?: () => Promise<void>;
     className?: string;
+    /** On the start button: hidden while the page's sticky bar shows. */
+    startClassName?: string;
 }) {
     const [open, setOpen] = useState(false);
     const close = () => setOpen(false);
+    const split = splitResources(menus.resources ?? []);
 
     // A new page, or a window widened past 760px, closes the sheet.
     const [shownFor, setShownFor] = useState(pathname);
@@ -77,7 +85,7 @@ export function MobileMenu({
                     src="nav"
                     size="sm"
                     short
-                    className="px-4 max-[399px]:px-3.5"
+                    className={cn("px-4 max-[399px]:px-3.5", startClassName)}
                 />
             )}
             <button
@@ -98,7 +106,10 @@ export function MobileMenu({
                 <MobileSheet
                     section={section}
                     pathname={pathname}
-                    resources={menus.resources ?? []}
+                    featuresLabel={NAV_WORDS.howItWorks}
+                    templatesPage={split.templates}
+                    developers={split.developers}
+                    resources={split.rest}
                     tools={menus.tools ?? []}
                     featureItems={menus.features}
                     solutionItems={menus.solutions}
