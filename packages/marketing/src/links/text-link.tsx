@@ -10,6 +10,11 @@ const TONE = {
     quiet: "text-muted-foreground no-underline hover:text-foreground active:text-mk-copy",
     copy: "text-mk-copy no-underline hover:text-brand-700 active:text-foreground",
     prose: "text-brand-700 underline underline-offset-[3px] hover:text-foreground",
+    /** The redesign's TextLink (KIT.md): Ink, a 1px underline 3px below. */
+    ink: "inline-flex min-h-11 items-center font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] hover:text-foreground hover:decoration-foreground",
+    /** The same on a dark band (lamp, Ink, ledger). */
+    "on-ink":
+        "inline-flex min-h-11 items-center font-semibold text-mk-lamp-fg underline decoration-mk-on-ink-line decoration-1 underline-offset-[3px] hover:text-mk-lamp-fg hover:decoration-mk-lamp-fg",
 } as const;
 
 export type TextLinkTone = keyof typeof TONE;
@@ -23,6 +28,9 @@ export type TextLinkTone = keyof typeof TONE;
  * - `quiet` — Ink 500, Ink on hover: crumbs, the footer, "On this page".
  * - `copy` — body Ink, Saffron on hover: Help's article lists.
  * - `prose` — always underlined: a link inside a sentence.
+ * - `ink` and `on-ink` — the redesign's (KIT.md): Ink, underlined 1px at
+ *   3px, 44px tall to tap; `arrow` when it goes to another page, none when
+ *   it opens something on this one, never ↗.
  *
  * Size and weight come from the caller's `className`.
  */

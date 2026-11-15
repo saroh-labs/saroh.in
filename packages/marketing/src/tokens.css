@@ -9,7 +9,7 @@
  */
 :root {
     /* The sticky nav's height (each site's header), for what sticks or lands below it. */
-    --mk-nav-h: 85px;
+    --mk-nav-h: 65px;
 
     color-scheme: light;
 
@@ -45,6 +45,31 @@
     --mk-hint: 41.3 6.4% 51%; /* #8A857A — a field's placeholder */
     --mk-code: 42.9 23.3% 88.2%; /* #E8E4DA — text in a code block on Ink */
 
+    /*
+     * The 2026 redesign's kit (KIT.md, DEC-221): what the boards add beyond
+     * the values above. Paper, Ink, Ink 700 (`mk-copy`), meta
+     * (`muted-foreground`), line (`border`), Saffron and its text shade
+     * (`brand-500`, `brand-700`) and ok (`mk-ok`) are already here.
+     */
+    --mk-ledger: 154.3 43.2% 15.9%; /* #173A2B — the money's own account, 4 pm only */
+    --mk-ledger-fg: 138 25% 92.2%; /* #EAF2EC — words on ledger */
+    --mk-ledger-muted: 138.5 22.4% 77.3%; /* #B8D2C0 — a label on ledger */
+    --mk-warn: 20.5 90.2% 40.2%; /* #C2410C — "2 left", running low */
+    /*
+     * The hour tints, Solutions only: a scene's background by the light at
+     * that hour (`hourTint`). Lamp is the night's own dark band.
+     */
+    --mk-dawn: 90 7.7% 92.4%; /* #ECEEE9 */
+    --mk-noon: 42 46.7% 97.1%; /* #FAF7F0 */
+    --mk-afternoon: 36.5 54.4% 88.8%; /* #F2E6D3 */
+    --mk-dusk: 34.2 55.2% 82.2%; /* #E9D5BA */
+    --mk-lamp: 34.3 13.7% 10.4%; /* #1E1B17 */
+    --mk-lamp-2: 37.5 12.5% 14.5%; /* #2A2620 — a panel on lamp */
+    --mk-lamp-line: 37.5 12.1% 20.6%; /* #3B362E */
+    --mk-lamp-fg: 39.1 37.5% 92.2%; /* #F3EEE4 */
+    --mk-lamp-meta: 38.2 16.5% 70.2%; /* #C2B9A9 */
+    --mk-lamp-saff: 35.4 80.1% 57.3%; /* #E9A23B — the moon, Saffron at night */
+
     /* The design's three shadows: cards on hover, screenshots, the hero. */
     --mk-shadow-card: 0 10px 30px rgba(28, 28, 26, 0.08);
     --mk-shadow-shot: 0 18px 50px rgba(28, 28, 26, 0.14);
@@ -60,5 +85,18 @@
 @media (min-width: 760px) {
     :root {
         --mk-nav-h: 81px;
+    }
+
+    /*
+     * A group folded on a phone and open on a desk (the footer's groups,
+     * PHONE.md): a closed `<details>`, so its links are in the HTML Google
+     * reads, shown from 760px without script.
+     */
+    .mk-fold::details-content {
+        content-visibility: visible;
+        display: contents;
+    }
+    .mk-fold > summary {
+        cursor: default;
     }
 }

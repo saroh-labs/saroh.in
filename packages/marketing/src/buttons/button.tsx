@@ -22,8 +22,10 @@ export type ButtonVariant =
  * - `md` — 46px, full width, the plan cards.
  * - `sm` — 40px, the nav's start button.
  * - `xs` — 38px, an action inside a panel ("Copy link", "Check again").
+ * - `kit` — 48px with 10px corners, the redesign's one button (KIT.md), on
+ *   desk and phone alike; outlined, it is 48px too.
  */
-export type ButtonSize = "lg" | "md" | "sm" | "xs";
+export type ButtonSize = "lg" | "md" | "sm" | "xs" | "kit";
 
 const BASE =
     "inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97]";
@@ -40,6 +42,7 @@ const SIZE: Record<ButtonSize, string> = {
     md: "h-[46px] w-full gap-2 rounded-[11px] px-4 text-[15px]",
     sm: "h-10 gap-2 rounded-[10px] px-[18px] text-mk-nav",
     xs: "h-[38px] gap-1.5 rounded-[9px] px-3.5 text-sm",
+    kit: "h-12 gap-2 rounded-mk-kit-btn px-[22px] text-base",
 };
 
 /** The class list, for a `<button>` or a link that is not `ButtonLink`. */
@@ -58,10 +61,15 @@ export function buttonClasses({
         SIZE[size],
         // The design pads the Saffron band button wider than the Ink one.
         variant === "saffron" && size === "lg" && "px-[26px]",
+        // The kit's outlined button is a 1px Ink line on white.
+        variant === "secondary" &&
+            size === "kit" &&
+            "border-foreground bg-card",
         // The design's outlined buttons are links sized content-box: 52px
         // plus the 1px border each side, so they stand 2px taller than the
         // filled one beside them. Drawn that way, kept that way.
         (variant === "secondary" || variant === "secondary-on-ink") &&
+            size !== "kit" &&
             (size === "lg"
                 ? "h-[54px] px-[22px]"
                 : size === "md"

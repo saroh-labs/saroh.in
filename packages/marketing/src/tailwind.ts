@@ -46,6 +46,21 @@ export function marketingTheme(shared: Record<string, unknown>) {
                 "bad-bg": mk("bad-bg"),
                 hint: mk("hint"),
                 code: mk("code"),
+                // The redesign's kit (KIT.md): ledger, warn and the hour tints.
+                ledger: mk("ledger"),
+                "ledger-fg": mk("ledger-fg"),
+                "ledger-muted": mk("ledger-muted"),
+                warn: mk("warn"),
+                dawn: mk("dawn"),
+                noon: mk("noon"),
+                afternoon: mk("afternoon"),
+                dusk: mk("dusk"),
+                lamp: mk("lamp"),
+                "lamp-2": mk("lamp-2"),
+                "lamp-line": mk("lamp-line"),
+                "lamp-fg": mk("lamp-fg"),
+                "lamp-meta": mk("lamp-meta"),
+                "lamp-saff": mk("lamp-saff"),
                 scrim: "var(--mk-scrim)",
             },
         },
@@ -119,6 +134,23 @@ export function marketingTheme(shared: Record<string, unknown>) {
             "mk-nav": "14.5px",
             "mk-note": "13.5px",
             "mk-eyebrow": ["13px", { letterSpacing: "0.12em" }],
+            // The redesign's three heading sizes (KIT.md): 72/42, 44/30 and
+            // 20 on desk and phone. Fluid between, landing on 72 and 44 at
+            // 1440 wide; nothing else on a page is a heading size.
+            "mk-kit-h1": [
+                "clamp(42px, 5vw, 72px)",
+                { lineHeight: "1.04", letterSpacing: "-0.04em" },
+            ],
+            "mk-kit-h2": [
+                "clamp(30px, 3.06vw, 44px)",
+                { lineHeight: "1.06", letterSpacing: "-0.035em" },
+            ],
+            "mk-kit-h3": [
+                "20px",
+                { lineHeight: "1.2", letterSpacing: "-0.02em" },
+            ],
+            // A scene's lead: 20px on desk, 17px on a phone.
+            "mk-kit-lead": ["clamp(17px, 1.4vw, 20px)", { lineHeight: "1.55" }],
         } satisfies Record<
             string,
             string | [string, { lineHeight?: string; letterSpacing?: string }]
@@ -141,6 +173,9 @@ export function marketingTheme(shared: Record<string, unknown>) {
             "mk-btn": "12px",
             "mk-card": "16px",
             "mk-band": "24px",
+            // The kit's radii (KIT.md): cards 16, crops 12, buttons 10.
+            "mk-crop": "12px",
+            "mk-kit-btn": "10px",
         },
         boxShadow: {
             ...(shared.boxShadow as Record<string, string>),
