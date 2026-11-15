@@ -4,11 +4,11 @@
 #   NAV   apps/app.saroh.in/components/shared/navigation/nav-items.tsx (Presence ›
 #         Website); components/sites/header/website-header.tsx (tabs Pages, Posts,
 #         Forms, Settings: /sites/‹site›/settings)
-#   SECT  apps/app.saroh.in/components/sites/settings/site-settings.tsx ("Web
-#         address": "Your own domain, below, is added alongside it, and this
-#         one keeps working."; "Your own domain": "Point a domain you own at
-#         this site. You prove you own it with one DNS record; nothing
-#         changes for visitors until it is verified.")
+#   SECT  apps/app.saroh.in/components/sites/contact/address-group.tsx (the
+#         group "Address": row "Web address", then "Your own domain": "Point
+#         a domain you own at this site. Visitors see no change until it's
+#         verified."); re-checked in the code on 15 Nov 2026, after Website ›
+#         Settings was regrouped (shot 1 is to be captured again)
 #   ADD   apps/app.saroh.in/components/sites/domain/custom-domain.tsx and
 #         add-domain-dialog.tsx (placeholder "shop.example.com", "A domain
 #         you already own, like www.yourshop.in. Leave out www and Saroh
@@ -63,42 +63,42 @@ slug: connect-your-own-domain
 area: Website
 group: Your website
 order: 10
-intro: "Your site already has an address on Saroh. If you own a domain, like yourshop.in, you can point it at your site as well. You add two DNS records at the place you bought the domain, and set the domain without www to forward to www. This takes about ten minutes, plus the time DNS takes to spread."
+intro: "Your site already has a web address on Saroh, like yourname.saroh.app. If you own a domain, like yourshop.in, you can point it at your site as well. You add two DNS records at the place you bought the domain, and set the domain without www to forward to www. This takes about ten minutes, plus the time DNS takes to spread."
 description: "Point a domain you own at your Saroh site: add it, prove it's yours with a DNS record, then send visitors with a second record."
 readMinutes: 3
-updated: "2026-10-12"
+updated: "2026-11-15"
 publishOn: "2026-10-17"
 steps:
     # NAV.
     - title: Open your website's settings
-      body: "In Saroh, open Website in the sidebar and choose the Settings tab. Scroll down to Your own domain. Your address on Saroh, under Web address, keeps working alongside your own."
+      body: "In Saroh, open Website in the sidebar and choose the Settings tab. Under Address, find Your own domain. Your web address on Saroh, in the Web address row above it, keeps working alongside your own."
       shot: help-own-domain-1
-      caption: "The website of Northwind Supply (demo store), on its Settings tab."
+      caption: "The website of Northwind Supply (demo business), on its Settings tab."
       marker: Settings
     # ADD.
     - title: Add the domain
       body: "Type the domain you own, without https://, and press Add domain. If you leave out www and type yourshop.in, Saroh adds www.yourshop.in: your site will live there, and yourshop.in will forward to it. A name like shop.yourshop.in is added as it is."
       shot: help-own-domain-2
-      caption: "Your own domain at Northwind Supply (demo store), with a second domain typed in."
+      caption: "Your own domain at Northwind Supply (demo business), with a second domain typed in."
       marker: Add domain
     # ADD (the TXT record).
     - title: Add the record that proves it's yours
       body: "Saroh shows one record: Type TXT, a Name and a Value. Sign in where you bought the domain (your registrar), open its DNS settings and add a TXT record with that name and value. Press Copy beside each part and paste it exactly. Nothing changes for your visitors yet."
       shot: help-own-domain-3
-      caption: "The TXT record Northwind Supply (demo store) is asked to add, each part with Copy."
+      caption: "The TXT record Northwind Supply (demo business) is asked to add, each part with Copy."
       marker: Name
     # ADD (states), CHECK.
     - title: Check it
       body: "Back in Saroh, press Check now. Until it finds the record, the domain says Waiting for DNS, and under the record Saroh says what it found: no record yet, or a record whose value doesn't match. A new record can take as long as two days to spread, so check again later."
       shot: help-own-domain-4
-      caption: "Northwind Supply's domain (demo store), waiting for DNS, with Check now."
+      caption: "Northwind Supply's domain (demo business), waiting for DNS, with Check now."
       tip: "Value doesn't match? Copy it again and replace what's there. A space or a missing character is enough to fail."
       marker: Check now
     # ADD (verified), CAP1.
     - title: Send visitors to your site
       body: "Once it's found, the domain is verified, and Saroh shows a second record: Type CNAME, your domain as the Name, and the Value Saroh shows. Add it at your registrar the same way. That's what sends visitors to your site. Until it does, the domain says Not live yet; press Check again later. Once it works, Saroh says Live at your domain, with a link, and tucks the records away under DNS records. If something's wrong, it says Needs attention and what to fix. For a domain with www, there is one more thing to set at your registrar: find Forwarding, Redirect or URL redirect, and forward yourshop.in to https://www.yourshop.in. Saroh shows both parts with Copy, looks each day, and says under the domain if yourshop.in doesn't forward."
       shot: help-own-domain-5
-      caption: "A verified domain at Northwind Supply (demo store), and the CNAME record that sends visitors to the site."
+      caption: "A verified domain at Northwind Supply (demo business), and the CNAME record that sends visitors to the site."
       tip: "Your site not opening on your domain a day after adding the CNAME? Write to contact@saroh.in with the domain, and we'll look."
       marker: CNAME
 next: [make-your-link-look-right-when-shared, verify-your-site-and-add-analytics]

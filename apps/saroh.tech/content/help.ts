@@ -32,7 +32,7 @@ const ALL_HELP_GROUPS = [
     "Orders",
     "Bookings",
     "Your website",
-    "Invoices and payments",
+    "Billing",
     "AI apps",
     "Share and posts",
     "Free tools",
@@ -378,7 +378,7 @@ export const ALL_HELP: readonly HelpArticle[] = [
     {
         slug: "write-an-invoice",
         task: "Write an invoice",
-        group: "Invoices and payments",
+        group: "Billing",
         minutes: 2,
         line: "A numbered invoice in your currency.",
         intro: "Write a numbered invoice in your currency, for bulk orders or anything else outside your orders.",
@@ -402,7 +402,7 @@ export const ALL_HELP: readonly HelpArticle[] = [
     {
         slug: "add-your-tax-line",
         task: "Add your tax line to an invoice you write",
-        group: "Invoices and payments",
+        group: "Billing",
         minutes: 2,
         line: "One tax line you name, with your tax ID.",
         intro: "You set one tax line for your business, like VAT 20%. You choose the name and the rate, and it prints on each new invoice you write. Saroh doesn't work out tax for you.",
@@ -431,7 +431,7 @@ export const ALL_HELP: readonly HelpArticle[] = [
     {
         slug: "share-an-invoice",
         task: "Share an invoice by link or WhatsApp",
-        group: "Invoices and payments",
+        group: "Billing",
         minutes: 1,
         line: "WhatsApp opens with the words typed. You press send.",
         intro: "Share an invoice from Saroh yourself. Your customer gets it from you, in your own WhatsApp or wherever you paste the link.",
@@ -459,7 +459,7 @@ export const ALL_HELP: readonly HelpArticle[] = [
     {
         slug: "record-a-payment",
         task: "Record a payment",
-        group: "Invoices and payments",
+        group: "Billing",
         minutes: 1,
         line: "Mark the invoice as paid. It becomes a receipt.",
         intro: "Your customers pay you directly, so we never see the money. You record that it happened, and the invoice becomes a receipt.",
