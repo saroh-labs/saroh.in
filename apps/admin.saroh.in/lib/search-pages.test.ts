@@ -35,19 +35,15 @@ describe("loadPage (plan 2026-10-31-002, U3)", () => {
 });
 
 describe("docEntries (plan 2026-10-31-002, U6)", () => {
-    it("lists the 19 GST pages, each grouped, with its failing checks", async () => {
+    it("lists the 19 GST pages, each grouped, and none held (confirmed 15 Nov 2026)", async () => {
         const { docEntries } = await import("./search-pages");
         const gst = docEntries().filter((e) => e.kind === "gst");
         expect(gst).toHaveLength(19);
         const salon = gst.find((e) => e.slug === "salon-and-beauty-services");
         expect(salon?.group).toBe("By trade");
-        // Unconfirmed facts hold it back.
-        expect(salon?.blocked).toContain("Every fact is confirmed");
-        // The same checks in a few words, each with its count (U14).
-        expect(salon?.why).toHaveLength(salon?.blocked.length ?? -1);
-        expect(
-            salon?.why[salon.blocked.indexOf("Every fact is confirmed")],
-        ).toMatch(/^\d+ facts? to confirm$/);
+        // Every fact confirmed: each can be published. The held wording is
+        // covered in search-page-words.test.ts.
+        expect(gst.filter((e) => e.blocked.length > 0)).toEqual([]);
         expect(gst.find((e) => e.slug === "composition-scheme")?.group).toBe(
             "The basics",
         );

@@ -105,7 +105,7 @@ describe("GstPage", () => {
         );
         const checked = container.querySelector(".sp-gst-checked");
         expect(checked?.textContent).toMatch(
-            /^Checked on 24 Oct 2026 against the CBIC/,
+            /^Checked on 15 Nov 2026 against the CBIC/,
         );
         expect(checked?.querySelector("a")?.getAttribute("href")).toBe(
             salon.sources[0]?.href,
