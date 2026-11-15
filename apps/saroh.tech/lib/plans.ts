@@ -29,6 +29,13 @@ import { PRICING } from "@/content/pricing";
 const indiaOnly = (text: string) => indiaOnlyWord(text) !== null;
 
 /**
+ * Rows for what a Global business can't use yet, hidden whatever the
+ * catalogue says (15 Nov 2026): renewing memberships, until Subscriptions
+ * works on Global. Take an id out once its feature does.
+ */
+const NOT_ON_GLOBAL_YET: ReadonlySet<string> = new Set(["subscriptions"]);
+
+/**
  * The catalogue as this edition's pricing page may show it (owner, 8 Nov
  * 2026: "filter and flag"): a row whose name says something India-only is
  * hidden, and a plan's words that do are left blank, so the page never
@@ -38,7 +45,7 @@ export function withoutIndiaWords(catalog: Catalog): Catalog {
     return {
         ...catalog,
         modules: catalog.modules.map((m) =>
-            indiaOnly(`${m.name} ${m.what}`)
+            NOT_ON_GLOBAL_YET.has(m.id) || indiaOnly(`${m.name} ${m.what}`)
                 ? { ...m, pricing: "hidden" }
                 : {
                       ...m,

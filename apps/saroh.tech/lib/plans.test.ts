@@ -354,6 +354,29 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
         expect(all).toContain("Products");
     });
 
+    it("leaves out renewing memberships while Global can't do them (15 Nov 2026)", () => {
+        const input = fakeInput();
+        input.modules.push({
+            id: "subscriptions",
+            name: "Memberships that renew",
+            group: "one",
+            cells: {
+                grow: { inc: true, text: "Included", card: "Renewing members" },
+                pro: { inc: true, text: "Included", card: "Renewing members" },
+            },
+        });
+        const catalog = parseCatalog({
+            ...input,
+            currency: "USD",
+            tax: "none",
+            yearly: { on: false, paid: 10 },
+        });
+        const model = pricingModel(catalog, true);
+        const all = JSON.stringify([model.views["month-excl"], model.rows]);
+        expect(all).not.toMatch(/Memberships that renew|Renewing members/);
+        expect(all).toContain("Products");
+    });
+
     it("keeps today's Free-only page while it isn't offered", () => {
         const view = pricingModel(usd(), false).views["month-excl"];
         expect(JSON.stringify(view)).not.toMatch(/\$|111|222/);
