@@ -164,6 +164,34 @@ describe("behind the access key", () => {
         expect(e.ASSETS.fetch).toHaveBeenCalled();
     });
 
+    it("Global production: sends anyone without the key to saroh.in, for now, and indexes nothing", async () => {
+        const e = {
+            ...env(),
+            DEV_REDIRECT_ORIGIN: "https://saroh.in",
+            DEV_REDIRECT_PATH: "/",
+        };
+        const res = await handle(get("https://saroh.tech/pricing"), e);
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("https://saroh.in/");
+        expect(e.ASSETS.fetch).not.toHaveBeenCalled();
+        const post = await handle(
+            new Request("https://saroh.tech/", { method: "POST" }),
+            e,
+        );
+        expect(post.status).toBe(404);
+        const set = (
+            await handle(get("https://saroh.tech/?access=right-key"), e)
+        ).headers.get("set-cookie");
+        const inside = await handle(
+            get("https://saroh.tech/pricing", {
+                cookie: (set ?? "").split(";")[0] ?? "",
+            }),
+            e,
+        );
+        expect(inside.status).toBe(200);
+        expect(inside.headers.get("x-robots-tag")).toContain("noindex");
+    });
+
     it("stays open where no key is set", async () => {
         const res = await handle(get("https://saroh.tech/"), {
             ASSETS: assets(),

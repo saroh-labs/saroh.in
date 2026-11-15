@@ -130,6 +130,8 @@ jobs:
             CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
             # Part of Global's fingerprints: flipping it redeploys them.
             GLOBAL_ROUTES: ${{ vars.GLOBAL_ROUTES }}
+            # Global production behind the dev access key (owner, 15 Nov 2026).
+            GLOBAL_ACCESS_GATE: ${{ vars.GLOBAL_ACCESS_GATE }}
         steps:
             - uses: actions/checkout@v4
               with:
@@ -200,6 +202,8 @@ jobs:
             CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
             NEXT_TELEMETRY_DISABLED: "1"
             GLOBAL_ROUTES: ${{ vars.GLOBAL_ROUTES }}
+            # Global production behind the dev access key (owner, 15 Nov 2026).
+            GLOBAL_ACCESS_GATE: ${{ vars.GLOBAL_ACCESS_GATE }}
             # A production build never falls back to local hosts (saroh.tech's site.config.ts).
             CF_DEPLOY: ${{ matrix.env == 'production' && '1' || '' }}
             # saroh.tech's "Tell me when" form: the public key of the API's
@@ -255,7 +259,18 @@ jobs:
                   # on its own key. Set to "off" (17 Oct), the key is taken off
                   # the Worker: a secret outlives the deploys that stop setting it.
                   echo "" > "$RUNNER_TEMP/prelaunch-off"
-                  if [ "${{ matrix.env }}" = production ]; then
+                  # Global production behind the access key (GLOBAL_ACCESS_GATE,
+                  # written into its settings by cf-global-prod.mjs): the dev
+                  # environment's own key, so one key opens both. "off" takes it
+                  # off the Worker, as the prelaunch gate does.
+                  if [ "${{ matrix.env }}" = production ] && [ "${{ matrix.variant }}" = global ]; then
+                    if [ "${GLOBAL_ACCESS_GATE:-}" = on ]; then
+                      [ -n "$DEV_ACCESS_KEY" ] || { echo "::error::DEV_ACCESS_KEY is missing: gated Global would be public"; exit 1; }
+                      names+=(DEV_ACCESS_KEY)
+                    else
+                      echo off > "$RUNNER_TEMP/prelaunch-off"
+                    fi
+                  elif [ "${{ matrix.env }}" = production ]; then
                     if [ "${PRELAUNCH_GATE:-}" = on ]; then
                       [ -n "$PRELAUNCH_ACCESS_KEY" ] || { echo "::error::PRELAUNCH_ACCESS_KEY is missing: a gated app would be public"; exit 1; }
                       DEV_ACCESS_KEY="$PRELAUNCH_ACCESS_KEY"
