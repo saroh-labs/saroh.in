@@ -129,7 +129,10 @@ const RULES: Rule[] = [
             `${MK}/kit/cropped-card.tsx`,
             `${MK}/nav/marketing-footer.tsx`,
         ],
-        allow: {},
+        allow: {
+            "components/home/fold.tsx":
+                "the landing's phone folds (DEC-221): CroppedCard's fold with no screen to crop; the questions themselves are FaqItems",
+        },
         files: SITE,
     },
     {

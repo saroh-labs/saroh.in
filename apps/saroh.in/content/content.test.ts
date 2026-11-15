@@ -193,7 +193,8 @@ describe("solution pages", () => {
 
 describe("questions", () => {
     it("Home asks the design's questions, without the Hindi one", () => {
-        expect(HOME_FAQ).toHaveLength(5);
+        // The landing board's five, then the earlier design's other four.
+        expect(HOME_FAQ).toHaveLength(9);
         for (const id of HOME_FAQ) expect(faqs[id]).toBeDefined();
     });
 
@@ -217,7 +218,6 @@ describe("questions", () => {
  */
 describe("captions", () => {
     const refs: ShotRef[] = [
-        home.hero,
         ...Object.values(features).flatMap((f) => [f.hero, ...f.steps]),
         ...Object.values(solutions).flatMap((s) => [
             ...(s.hero ? [s.hero] : []),

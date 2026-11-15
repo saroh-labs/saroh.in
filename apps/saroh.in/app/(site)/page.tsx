@@ -1,20 +1,31 @@
 import type { Metadata } from "next";
+import localFont from "next/font/local";
 
-import { HomeHero } from "@/components/home/home-hero";
+import type { DoorOption } from "@/components/home/day-door";
+import { DayDoor } from "@/components/home/day-door";
+import { Fold } from "@/components/home/fold";
+import { PlansAndQuestions, YoursLine } from "@/components/home/home-endings";
+import { HERO_CTA_ID, HomeHero } from "@/components/home/home-hero";
+import { MoneyBand } from "@/components/home/money-band";
+import { NewInSaroh } from "@/components/home/new-in-saroh";
+import { OrdersChapter } from "@/components/home/orders-chapter";
+import { SiteChapter } from "@/components/home/site-chapter";
 import { TourVideo } from "@/components/home/tour-video";
-import { PricingSection } from "@/components/pricing/pricing-section";
+import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { CtaBand } from "@/components/shared/sections/cta-band";
 import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList, NEW_FEATURES } from "@/content/features";
 import { home } from "@/content/home";
-import { solutionList } from "@/content/solutions";
+import { shownResources } from "@/content/resources";
+import { solutionList, solutions } from "@/content/solutions";
+import { WORLD } from "@/content/world";
+import { claimOn } from "@/lib/feature-switches";
 import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
 import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
-import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
-import { solutionLink } from "@/lib/search-pages";
+import { resourcesContext } from "@/lib/resources-context";
+import { isPublished, solutionLink } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import {
     faqPageLd,
@@ -22,40 +33,112 @@ import {
     softwareApplicationLd,
     webSiteLd,
 } from "@/lib/structured-data";
-import { Faq } from "@saroh/marketing/faq";
-import { FeatureCards } from "@saroh/marketing/feature-cards";
-import { SolutionCards } from "@saroh/marketing/solution-cards";
-import { WorksFor } from "@saroh/marketing/works-for";
+import { ButtonLink } from "@saroh/marketing/button";
+import { Container } from "@saroh/marketing/container";
+import { Chip } from "@saroh/marketing/kit/chip";
+import { Claim } from "@saroh/marketing/kit/claim";
+import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
+import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
+import { TextLink } from "@saroh/marketing/text-link";
+import { dayLink } from "@saroh/marketing/world";
 
 /**
- * `/` (plan U21): the Home design, "saroh" hero and "band" closer. The hero,
- * then "Works for", the eight features (`#features`, Dashboard first), the
- * tour video once there is one (`#video`), Solutions (`#solutions`), the
- * pricing teaser (`#pricing`), Questions (`#faq`) and the dark CTA band.
+ * `/`, the landing (DEC-221; boards LAHomeDesk and LAHomePhone2, one
+ * responsive page): the hero with its three phones and trade switcher, the
+ * website and orders chapters, the money band, the door to a whole day,
+ * New in Saroh, the "stays yours" line, plans and questions, and the close.
  *
- * Prices, plan lines and the free-plan line come from the published pricing
- * catalogue, read when the site is built (a publish starts a build, KTD-10);
- * with none, the placeholders (`PRICE_NOTE`). Before the launch
- * switch opens the catalogue isn't read at all (DEC-136), as on a feature
- * page: one published ahead of launch must not put a plan's name or price
- * in the answers below or in the page's structured data.
+ * Moved, not cut (rule 15): the feature grid is folded under "Everything in
+ * Saroh" (`#features`); the Solutions cards under the door (`#solutions`);
+ * the plan cards are /pricing's, this page keeps the plan line (`#pricing`);
+ * the acronym line is the share card's title.
+ *
+ * Before the launch switch opens the catalogue isn't read at all (DEC-136):
+ * one published ahead of launch must not put a plan's name or price in the
+ * answers or the structured data, and no plan or Pricing link is drawn.
  */
+
+// The example sites wear their own fonts, never Saroh's.
+const siteSerif = localFont({
+    src: "../../../../packages/site-blocks/fonts/fraunces/Fraunces-wght-latin.woff2",
+    weight: "400 700",
+    variable: "--font-site-serif",
+});
+const siteSans = localFont({
+    src: "../../../../packages/site-blocks/fonts/figtree/Figtree-400-700-latin.woff2",
+    weight: "400 700",
+    variable: "--font-site-sans",
+});
 
 export const metadata: Metadata = pageMetadata({
     title: pageTitle(home.seoTitle),
-    // The share card keeps the line the page opens with.
-    socialTitle: home.headlineLabel,
+    socialTitle: home.titleLabel,
     description: home.seoDescription,
     path: "/",
     image: { url: "/opengraph-image", alt: HOME_OG_ALT },
 });
 
+/** The door's picker: a trade's written day where it is live, else its page. */
+function doorOptions(): DoorOption[] {
+    const days = [WORLD.lead, ...WORLD.others].flatMap((b) => {
+        const first = b.day?.[0];
+        return b.tradePage && first && isPublished(b.tradePage)
+            ? [
+                  {
+                      trade: b.trade,
+                      link: `${home.day.spend} ${b.name}`,
+                      href: dayLink(b, first),
+                  },
+              ]
+            : [];
+    });
+    const dayOf = (trade: string) => days.find((d) => d.trade === trade);
+    const page = (slug: "shops" | "salons" | "gyms") => ({
+        link: solutions[slug].card.link,
+        href: solutionLink(slug),
+    });
+    const florist = dayOf("florist");
+    return [
+        {
+            id: "bakery",
+            label: "Bakery",
+            ...(dayOf("bakery") ?? page("shops")),
+        },
+        { id: "salon", label: "Salon", ...page("salons") },
+        { id: "gym", label: "Gym", ...page("gyms") },
+        ...(florist ? [{ id: "florist", label: "Florist", ...florist }] : []),
+    ];
+}
+
 export default async function HomePage() {
-    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
-    const faq = faqWithPlans(catalog, HOME_FAQ);
+    const open = LAUNCH_MODE === "open";
+    const catalog = open ? await readLivePricing() : null;
+    const shown = new Set(featureList.map((f) => f.slug));
+    const resources = new Set(
+        shownResources(resourcesContext()).map((p) => p.href),
+    );
+    const templates = resources.has("/templates");
+    const news = {
+        askAi: shown.has("ask-ai"),
+        share: shown.has("social"),
+        aiApps: shown.has("ai-apps"),
+        api: resources.has("/developers"),
+        claims: {
+            askAiPlans: open && claimOn("ask-ai-plans"),
+            askAiLanguages: claimOn("ask-ai-languages"),
+            askAiWebsite: claimOn("ask-ai-website"),
+            shareFree: claimOn("share-every-plan"),
+            socialPosting: claimOn("social-posting"),
+        },
+    };
+    const anyNews = news.askAi || news.share || news.aiApps || news.api;
+    const faq = faqWithPlans(
+        catalog,
+        HOME_FAQ.filter((id) => id !== "ai-apps" || shown.has("ai-apps")),
+    );
 
     return (
-        <>
+        <div className={`${siteSerif.variable} ${siteSans.variable}`}>
             <JsonLd
                 data={[
                     organizationLd(),
@@ -65,60 +148,152 @@ export default async function HomePage() {
                     faqPageLd(faq),
                 ]}
             />
-            <HomeHero freeLine={freePlanLine(catalog)} />
+            <HomeHero />
+            <TourVideo />
 
-            <WorksFor
-                label={home.worksFor}
-                items={solutionList.map((s) => ({
-                    href: solutionLink(s.slug),
-                    name: s.card.name,
-                }))}
-            />
+            <Container
+                as="nav"
+                aria-label={home.chapters.label}
+                className="pt-5 min-[760px]:hidden"
+            >
+                <ul className="m-0 -mr-mk-gutter flex list-none gap-2 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    {home.chapters.items
+                        .filter((c) => c.href !== "#new" || anyNews)
+                        .map((c) => (
+                            <li key={c.href}>
+                                <Chip variant="chapter" href={c.href}>
+                                    {c.label}
+                                </Chip>
+                            </li>
+                        ))}
+                </ul>
+            </Container>
 
-            <FeatureCards
-                eyebrow={home.featuresEyebrow}
-                title={home.featuresTitle}
-                items={featureList.map((f) => ({
+            <SiteChapter templates={templates} />
+            <OrdersChapter />
+            <MoneyBand />
+
+            <Container
+                as="section"
+                id="day"
+                className="scroll-mt-24 pt-12 min-[760px]:pt-16"
+            >
+                <DayDoor
+                    title={home.day.title}
+                    line={home.day.line}
+                    legend={home.day.legend}
+                    options={doorOptions()}
+                >
+                    <div
+                        id="solutions"
+                        className="mt-5 grid scroll-mt-24 gap-1 border-t border-border pt-4"
+                    >
+                        <nav
+                            aria-label={home.worksFor}
+                            className="flex flex-wrap items-center gap-2"
+                        >
+                            <span className="mr-1 text-[14px] text-muted-foreground">
+                                {home.worksFor}
+                            </span>
+                            {solutionList.map((s) => (
+                                <Chip
+                                    key={s.slug}
+                                    variant="filter"
+                                    href={solutionLink(s.slug)}
+                                >
+                                    {s.card.name}
+                                </Chip>
+                            ))}
+                        </nav>
+                        <Fold summary={home.solutionsMore}>
+                            <ul className="m-0 mt-2 grid list-none gap-5 p-0 min-[760px]:grid-cols-2">
+                                {solutionList.map((s) => (
+                                    <li key={s.slug} className="grid gap-1">
+                                        <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                                            {s.card.name}
+                                        </h3>
+                                        <p className="m-0 text-[15px] leading-normal text-mk-copy">
+                                            {s.card.body}
+                                        </p>
+                                        <p className="m-0 text-[13px] text-muted-foreground">
+                                            {s.card.uses}
+                                        </p>
+                                        <TextLink
+                                            href={solutionLink(s.slug)}
+                                            tone="ink"
+                                            arrow
+                                            className="text-[15px]"
+                                        >
+                                            {s.card.link}
+                                        </TextLink>
+                                    </li>
+                                ))}
+                            </ul>
+                        </Fold>
+                    </div>
+                </DayDoor>
+            </Container>
+
+            <div className="mt-16 min-[760px]:mt-20">
+                <NewInSaroh on={news} />
+            </div>
+
+            <YoursLine
+                features={featureList.map((f) => ({
                     href: featureHref(f.slug),
-                    title: f.name,
+                    name: f.name,
                     body: f.homeBody,
                     isNew: NEW_FEATURES.includes(f.slug),
                 }))}
             />
 
-            <TourVideo />
-
-            <SolutionCards
-                title={home.solutionsTitle}
-                items={solutionList.map((s) => ({
-                    href: solutionLink(s.slug),
-                    title: s.card.name,
-                    body: s.card.body,
-                    meta: s.card.uses,
-                    action: s.card.link,
-                }))}
+            <PlansAndQuestions
+                planLede={catalog ? freePlanLine(catalog) : home.plans.lede}
+                planLine={
+                    open ? (
+                        <>
+                            {home.plans.start}{" "}
+                            <Claim
+                                on={
+                                    shown.has("ask-ai") &&
+                                    claimOn("ask-ai-plans")
+                                }
+                            >
+                                {home.plans.askAi}
+                            </Claim>
+                        </>
+                    ) : null
+                }
+                start={<CtaLink src="home-pricing" size="kit" />}
+                faq={faq}
             />
 
-            {/* Plans show once the site's launch switch opens: before
-                that Pricing waits at the waitlist (Gate W), so no page draws
-                a plan or links to it. */}
-            {LAUNCH_MODE === "open" ? (
-                <PricingSection
-                    id="pricing"
-                    className="scroll-mt-6 pt-[110px]"
-                    title={home.pricingTitle}
-                    src="home-pricing"
-                    model={
-                        catalog
-                            ? pricingPageModel(catalog)
-                            : placeholderPricingModel()
-                    }
-                />
-            ) : null}
-
-            <Faq items={faq} title={home.faqTitle} />
-
-            <CtaBand title={home.closer} src="home-band" />
-        </>
+            <ClosingCTA
+                title={home.closer}
+                primary={<CtaLink src="home-band" size="kit" />}
+                secondary={
+                    templates ? (
+                        <ButtonLink
+                            href="/templates"
+                            variant="secondary"
+                            size="kit"
+                        >
+                            {home.templates}
+                        </ButtonLink>
+                    ) : (
+                        <ButtonLink
+                            href="/features"
+                            variant="secondary"
+                            size="kit"
+                        >
+                            {home.how.label}
+                        </ButtonLink>
+                    )
+                }
+            />
+            <StickyBar watch={HERO_CTA_ID}>
+                <CtaLink src="home-sticky" size="kit" className="w-full" />
+            </StickyBar>
+        </div>
     );
 }

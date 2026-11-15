@@ -26,7 +26,8 @@ export function StickyBar({
 
     useEffect(() => {
         const target = document.getElementById(watch);
-        if (!target) return;
+        // No observer (an old browser, a test's DOM): the bar never shows.
+        if (!target || typeof IntersectionObserver === "undefined") return;
         const seen = new IntersectionObserver(([e]) => {
             // Shown once the hero's button is above the window, not below it.
             setShown(!e.isIntersecting && e.boundingClientRect.top < 0);

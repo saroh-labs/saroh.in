@@ -1,5 +1,5 @@
 import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
-import type { World, WorldBusiness } from "@saroh/marketing/world";
+import type { World, WorldBusiness, WorldTrade } from "@saroh/marketing/world";
 
 /**
  * saroh.in's example world (DEC-221): every name, number, time and address
@@ -243,7 +243,21 @@ const NEEL: WorldBusiness = {
         radius: 14,
     },
     customers: [{ name: "Ishita Rao" }, { name: "Tanvi Desai" }],
-    items: [],
+    // The landing's site drawing and hero (round 4 boards).
+    items: [
+        {
+            key: "keratin",
+            name: "Keratin smoothing",
+            price: "₹2,800",
+            unit: "90 min",
+        },
+        {
+            key: "haircut",
+            name: "Haircut and finish",
+            price: "₹900",
+            unit: "45 min",
+        },
+    ],
 };
 
 const PULSE: WorldBusiness = {
@@ -404,4 +418,297 @@ export const RYE_MONDAY = {
         items: ["plum-cake", "hamper"],
         page: "/christmas",
     },
+    /** The landing (round 4): what Home says came in yesterday. */
+    paidYesterday: "₹4,860",
+    /** The landing's Ask AI answer: this week's two best sellers. */
+    weekSales: [
+        { item: "bun-box", sold: 46, total: "₹16,560" },
+        { item: "sourdough", sold: 31, total: "₹6,820" },
+    ],
+    /** The landing's post, scheduled by Saroh Social. */
+    scheduledPost: { when: "Thu, 6 pm", where: "Instagram" },
+    /** The landing's API key and webhook. */
+    apiKey: { name: "Key for the accounts sheet", ends: "7f2a" },
+    webhook: { event: "When an order is paid", to: "Send it to your sheet" },
 } as const;
+
+/**
+ * The landing hero's three phones for a trade (round 4, LAHomeDesk): the
+ * customer on the business's own site, the owner's morning in Saroh, and
+ * the customer's done screen. The words on the site phones are the
+ * merchant's; the middle phone uses Saroh's own Home words. Each trade the
+ * hero's switcher offers has one; Global writes its own from its seed.
+ */
+export interface HomeHeroScene {
+    trade: WorldTrade;
+    business: WorldBusiness;
+    /** Under the phones: "Example: Rye & Co., a bakery on Hill Road. …". */
+    caption: string;
+    site: {
+        time: string;
+        hero: string;
+        items: readonly { name: string; line: string }[];
+        note: string;
+        action: string;
+    };
+    home: {
+        time: string;
+        greeting: string;
+        summary: string;
+        rows: readonly {
+            icon: "bag" | "alert" | "box" | "calendar" | "user";
+            title: string;
+            line: string;
+            warn?: boolean;
+        }[];
+        paid?: { title: string; line: string };
+    };
+    done: {
+        time: string;
+        title: string;
+        line: string;
+        rows: readonly (readonly [string, string])[];
+        back: string;
+    };
+}
+
+const itemLine = (b: WorldBusiness, key: string) => {
+    const i = b.items.find((x) => x.key === key);
+    return i ? `${i.price}${i.unit ? ` · ${i.unit}` : ""}` : "";
+};
+const itemName = (b: WorldBusiness, key: string) =>
+    b.items.find((x) => x.key === key)?.name ?? key;
+const ORD_1044 = RYE.orders?.find((o) => o.id === "ORD-1044");
+const ORD_1049 = RYE.orders?.find((o) => o.id === "ORD-1049");
+
+export const HOME_HERO_SCENES: readonly HomeHeroScene[] = [
+    {
+        trade: "bakery",
+        business: RYE,
+        caption:
+            "Example: Rye & Co., a bakery on Hill Road. The customer orders and pays on the left and right; Asha sees her morning in the middle.",
+        site: {
+            time: "9:41",
+            hero: "Baked this morning on Hill Road",
+            items: [
+                {
+                    name: itemName(RYE, "bun-box"),
+                    line: itemLine(RYE, "bun-box"),
+                },
+                {
+                    name: itemName(RYE, "sourdough"),
+                    line: itemLine(RYE, "sourdough"),
+                },
+            ],
+            note: "Pick up tomorrow, 8 am",
+            action: `Place order · ${ORD_1049?.total ?? ""}`,
+        },
+        home: {
+            time: "7:02",
+            greeting: `Good morning, ${RYE.owner}`,
+            summary: "Monday · 3 things need you",
+            rows: [
+                {
+                    icon: "bag",
+                    title: "Bake 3 cakes",
+                    line: "First pick-up at 11 am",
+                },
+                {
+                    icon: "alert",
+                    title: "Anjali hasn't paid yet",
+                    line: `${ORD_1044?.id ?? ""} · ${ORD_1044?.total ?? ""}`,
+                    warn: true,
+                },
+                {
+                    icon: "box",
+                    title: "Brownie box is low",
+                    line: "2 left of 12",
+                },
+            ],
+            paid: {
+                title: `${RYE_MONDAY.paidYesterday} paid in yesterday`,
+                line: `Into your own ${WORLD.money.provider} account`,
+            },
+        },
+        done: {
+            time: "9:43",
+            title: `Paid ${ORD_1049?.total ?? ""}`,
+            line: `to ${RYE.name} by ${WORLD.money.method}`,
+            rows: [
+                ["Order", ORD_1049?.id ?? ""],
+                ["Pick up", "Tue, 8 am"],
+                ["Invoice", "Sent to email"],
+            ],
+            back: "Back to the shop",
+        },
+    },
+    {
+        trade: "salon",
+        business: NEEL,
+        caption:
+            "Example: Studio Neel, a salon. The client books and pays on the left and right; Neel sees the day in the middle.",
+        site: {
+            time: "9:41",
+            hero: "Hair and skin, by appointment",
+            items: [
+                {
+                    name: itemName(NEEL, "keratin"),
+                    line: itemLine(NEEL, "keratin"),
+                },
+                {
+                    name: itemName(NEEL, "haircut"),
+                    line: itemLine(NEEL, "haircut"),
+                },
+            ],
+            note: "Tomorrow, 11 am with Neel",
+            action: `Book · ${NEEL.items[1]?.price ?? ""}`,
+        },
+        home: {
+            time: "8:02",
+            greeting: `Good morning, ${NEEL.owner}`,
+            summary: "Monday · 3 things need you",
+            rows: [
+                {
+                    icon: "calendar",
+                    title: "6 appointments today",
+                    line: "First one at 10 am",
+                },
+                {
+                    icon: "alert",
+                    title: "Tanvi hasn't paid her deposit",
+                    line: `${itemName(NEEL, "keratin")} · 4 pm`,
+                    warn: true,
+                },
+                {
+                    icon: "user",
+                    title: "Ishita moved to 12 pm",
+                    line: itemName(NEEL, "haircut"),
+                },
+            ],
+        },
+        done: {
+            time: "9:43",
+            title: "Booked",
+            line: `${itemName(NEEL, "haircut")} with ${NEEL.owner}`,
+            rows: [
+                ["When", "Tue, 11 am"],
+                [
+                    "Paid",
+                    `${NEEL.items[1]?.price ?? ""} by ${WORLD.money.method}`,
+                ],
+                ["Invoice", "Sent to email"],
+            ],
+            back: "Back to Studio Neel",
+        },
+    },
+    {
+        trade: "gym",
+        business: PULSE,
+        caption:
+            "Example: Pulse Fitness, a gym. The member books a class on the left and right; the front desk sees the day in the middle.",
+        site: {
+            time: "5:41",
+            hero: "Train at 6 am. Or 7 pm.",
+            items: [
+                { name: "HIIT · 6 am", line: "4 places left" },
+                { name: "Strength · 7 pm", line: "Full · waitlist" },
+            ],
+            note: "Tomorrow, 6 am",
+            action: "Book HIIT",
+        },
+        home: {
+            time: "5:32",
+            greeting: "Good morning",
+            summary: "Monday · 3 things need you",
+            rows: [
+                {
+                    icon: "calendar",
+                    title: "Strength at 7 pm is full",
+                    line: "2 waiting for a place",
+                },
+                {
+                    icon: "alert",
+                    title: "Sana's membership is unpaid",
+                    line: "Pay link sent",
+                    warn: true,
+                },
+                {
+                    icon: "user",
+                    title: "Rohan's pack runs out",
+                    line: "1 class left",
+                },
+            ],
+        },
+        done: {
+            time: "5:43",
+            title: "Booked",
+            line: `HIIT at ${PULSE.name}`,
+            rows: [
+                ["When", "Tue, 6 am"],
+                ["Paid", "From your class pack"],
+                ["Places left", "3"],
+            ],
+            back: "Back to Pulse",
+        },
+    },
+];
+
+/**
+ * The landing's example sites (round 4, LAHomeDesk "A website that looks
+ * like your shop"): each business's own site as its owner wrote it.
+ */
+export const HOME_SITE_SHOWCASE: readonly {
+    business: WorldBusiness;
+    /** The address the frame shows: the own domain where there is one. */
+    address: string;
+    nav: readonly string[];
+    cta: string;
+    hero: { title: string; line: string };
+    items: readonly { name: string; price: string }[];
+}[] = [
+    {
+        business: RYE,
+        address: RYE.domain ?? RYE.site,
+        nav: ["Shop", "Classes", "Visit"],
+        cta: "Order",
+        hero: {
+            title: "Baked this morning on Hill Road",
+            line: "Open 7 am to 8 pm. Cake orders by 8 pm for the next day.",
+        },
+        items: [
+            { name: itemName(RYE, "bun-box"), price: itemLine(RYE, "bun-box") },
+            {
+                name: itemName(RYE, "sourdough"),
+                price: itemLine(RYE, "sourdough"),
+            },
+        ],
+    },
+    {
+        business: NEEL,
+        address: NEEL.site,
+        nav: ["Services", "Book"],
+        cta: "Book",
+        hero: {
+            title: "Hair and skin, by appointment",
+            line: "Pick a time with the stylist you want.",
+        },
+        items: NEEL.items.map((i) => ({
+            name: i.name,
+            price: `${i.price} · ${i.unit ?? ""}`,
+        })),
+    },
+    {
+        business: PULSE,
+        address: PULSE.site,
+        nav: ["Classes", "Packs", "Join"],
+        cta: "Join",
+        hero: {
+            title: "Train at 6 am. Or 7 pm.",
+            line: "Book a class, see the places left.",
+        },
+        items: [
+            { name: "HIIT · 6 am", price: "4 places left" },
+            { name: "Strength · 7 pm", price: "Full · waitlist" },
+        ],
+    },
+];

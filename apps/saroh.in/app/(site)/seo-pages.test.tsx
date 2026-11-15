@@ -73,7 +73,9 @@ function jsonLd(container: HTMLElement): Record<string, unknown>[] {
 
 /** The questions and answers the page draws, in order. */
 function drawnFaq(container: HTMLElement) {
-    return Array.from(container.querySelectorAll("#faq details")).map((d) => ({
+    return Array.from(
+        container.querySelectorAll("#faq details:not([data-more])"),
+    ).map((d) => ({
         q: d.querySelector("summary")?.textContent,
         a: d.querySelector("p")?.textContent,
     }));
@@ -246,7 +248,7 @@ describe("Home and the waitlist", () => {
         render(await HomePage());
         const homeH1 = screen.getAllByRole("heading", { level: 1 });
         expect(homeH1).toHaveLength(1);
-        expect(homeH1[0].getAttribute("aria-label")).toBe(home.headlineLabel);
+        expect(homeH1[0].textContent).toBe(home.titleLabel);
         cleanup();
 
         const { default: WaitlistPage } =
@@ -255,7 +257,7 @@ describe("Home and the waitlist", () => {
         const waitlistH1 = screen.getAllByRole("heading", { level: 1 });
         expect(waitlistH1).toHaveLength(1);
         expect(waitlistH1[0].textContent).toBe(WAITLIST_PAGE.h1);
-        expect(waitlistH1[0].textContent).not.toBe(home.headlineLabel);
+        expect(waitlistH1[0].textContent).not.toBe(home.titleLabel);
         // The acronym line is still drawn, as the design has it.
         expect(
             screen.getByText(
@@ -266,7 +268,7 @@ describe("Home and the waitlist", () => {
         ).toBeTruthy();
     });
 
-    it("Home says its category above the headline", async () => {
+    it("Home says its category in the first screen", async () => {
         const { default: HomePage } = await import("./page");
         const { container } = render(await HomePage());
         expect(words(container)).toContain("Small business software");

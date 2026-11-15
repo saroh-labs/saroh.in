@@ -346,5 +346,26 @@ price is ever drawn into an image.
   desk menus again after Developers (saroh.tech: after Pricing), not folded
   into How it works. The desk nav starts at 1240px.
 - Pages move to the kit one by one after this; each adds its line here.
+- **17 Nov 2026, the landing (`/`, boards LAHomeDesk + LAHomePhone2).**
+  One responsive page: the h1 "Your website and orders, sorted before you
+  open." (Mark on "website"); the hero's three phones (`HeroStage`, a
+  `SwipeRow` on a phone, the owner's morning first, cropped to 360px) with
+  "Show it for a" Bakery · Salon · Gym from `HOME_HERO_SCENES`; the website
+  chapter (`#online`, three `SiteDrawing`s from `HOME_SITE_SHOWCASE`); orders
+  (`#orders`); the ledger money band (`#money`, the landing's one ledger
+  use, as the board draws it); the door (`#day`, picker + link to
+  `/for/home-bakers#7am` once that page is live, else the trade's page);
+  New in Saroh (`#new`, four cards, each only while its feature is on, its
+  unlive claims behind `ask-ai-plans`, `ask-ai-languages`,
+  `ask-ai-website`, `share-every-plan`, `social-posting`); the "stays
+  yours" line; plan line + questions (`#pricing` only once open, `#faq`, a
+  phone shows three then "All questions", CSS only); `ClosingCTA`;
+  `StickyBar`. Moved, not cut: the feature grid folds under "Everything in
+  Saroh" (`#features`), the Solutions cards under the door (`#solutions`,
+  with the "Works for" chips), the plan cards to /pricing, the acronym
+  line to the share card, the trust chips into the money band, the old
+  sub's "add it once" into the orders chapter. `components/home/fold.tsx` is
+  the landing's one `<details>` fold. No captured shot on the landing (the
+  hero is drawn); `s-home` stays on Shops.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).

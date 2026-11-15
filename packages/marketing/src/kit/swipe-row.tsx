@@ -35,7 +35,8 @@ export function SwipeRow({
 
     useEffect(() => {
         const list = row.current;
-        if (!list) return;
+        // No observer (an old browser, a test's DOM): the count stays "1 of N".
+        if (!list || typeof IntersectionObserver === "undefined") return;
         const cards = [...list.children];
         const watch = new IntersectionObserver(
             (entries) => {
