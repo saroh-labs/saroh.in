@@ -72,7 +72,7 @@ export default function RootLayout({
                 </a>
                 <div className="min-h-screen bg-background text-foreground [line-height:normal]">
                     <RegionBar />
-                    <div className="mx-auto max-w-mk-page overflow-x-clip bg-background">
+                    <div className="overflow-x-clip bg-background">
                         <Header />
                         <main id="main">{children}</main>
                         <Footer />

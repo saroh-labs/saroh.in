@@ -23,13 +23,19 @@ const LINK = `inline-flex min-h-11 w-fit items-center rounded-sm text-[15px] tex
 const isExternal = (href: string) => /^(https?:|mailto:|tel:)/.test(href);
 
 /** A footer link: a page, or an address elsewhere. */
-export function FooterAnchor({ link }: { link: FooterLink }) {
+export function FooterAnchor({
+    link,
+    prefetch,
+}: {
+    link: FooterLink;
+    prefetch?: boolean;
+}) {
     return isExternal(link.href) ? (
         <a href={link.href} className={LINK}>
             {link.name}
         </a>
     ) : (
-        <Link href={link.href} className={LINK}>
+        <Link href={link.href} prefetch={prefetch} className={LINK}>
             {link.name}
             {link.isNew ? <NewTag /> : null}
         </Link>
@@ -56,6 +62,7 @@ export function MarketingFooter({
     note,
     legal,
     homeLabel = "Saroh home",
+    prefetch,
 }: {
     line: ReactNode;
     brand?: ReactNode;
@@ -63,6 +70,8 @@ export function MarketingFooter({
     note: ReactNode;
     legal?: ReactNode;
     homeLabel?: string;
+    /** `false` on a static site that shouldn't fetch every linked page. */
+    prefetch?: boolean;
 }) {
     const shown = groups.filter((g) => g.links.length > 0);
     return (
@@ -72,6 +81,7 @@ export function MarketingFooter({
                     <div className="grid content-start gap-4">
                         <Link
                             href="/"
+                            prefetch={prefetch}
                             aria-label={homeLabel}
                             className={`w-fit rounded-sm text-foreground no-underline ${ring()}`}
                         >
@@ -103,7 +113,10 @@ export function MarketingFooter({
                                 <ul className="m-0 grid list-none p-0 pb-3 min-[760px]:pb-0 min-[760px]:pt-1">
                                     {group.links.map((link) => (
                                         <li key={link.href}>
-                                            <FooterAnchor link={link} />
+                                            <FooterAnchor
+                                                link={link}
+                                                prefetch={prefetch}
+                                            />
                                         </li>
                                     ))}
                                 </ul>

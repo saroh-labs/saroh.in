@@ -8,6 +8,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
 import type { NavMenus } from "@/lib/nav";
+import { NAV_WORDS } from "@/lib/nav";
 
 /** The sheet, fetched on the first tap of Menu. */
 const PhoneSheet = dynamic(
@@ -16,7 +17,7 @@ const PhoneSheet = dynamic(
 );
 
 /**
- * Below 1100px: the start button and a Menu button that opens the shared
+ * Below 760px: the start button and a Menu button that opens the shared
  * full-screen sheet. Esc or × closes it and returns focus to Menu; while it is
  * open, focus stays inside.
  */
@@ -27,6 +28,7 @@ export function PhoneMenu({
     start,
     startInSheet,
     className,
+    startClassName,
     ...menus
 }: NavMenus & {
     section: NavSection;
@@ -35,6 +37,8 @@ export function PhoneMenu({
     start: string;
     startInSheet: string;
     className?: string;
+    /** On the start button: hidden while the page's sticky bar shows. */
+    startClassName?: string;
 }) {
     const [open, setOpen] = useState(false);
     const button = useRef<HTMLButtonElement>(null);
@@ -51,7 +55,7 @@ export function PhoneMenu({
     }
     useEffect(() => {
         if (!open) return;
-        const wide = window.matchMedia("(min-width: 1100px)");
+        const wide = window.matchMedia("(min-width: 760px)");
         const onChange = () => wide.matches && setOpen(false);
         wide.addEventListener("change", onChange);
         return () => wide.removeEventListener("change", onChange);
@@ -68,7 +72,7 @@ export function PhoneMenu({
                 size="sm"
                 href={start}
                 data-cta="start-free"
-                className="px-4 max-[399px]:px-3.5"
+                className={cn("px-4 max-[399px]:px-3.5", startClassName)}
             >
                 Start free
             </ButtonLink>
@@ -100,6 +104,7 @@ export function PhoneMenu({
                     allTemplates={menus.allTemplates}
                     aboutLinks={[]}
                     pricing
+                    featuresLabel={NAV_WORDS.howItWorks}
                     onClose={close}
                     actions={
                         <>

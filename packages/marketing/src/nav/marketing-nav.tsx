@@ -64,6 +64,7 @@ export function MarketingNav({
     end,
     phone,
     homeLabel = "Saroh home",
+    prefetch,
 }: {
     entries: readonly NavEntry[];
     /** The entry the page is in, by id. */
@@ -72,6 +73,8 @@ export function MarketingNav({
     end: (control: NavControl) => ReactNode;
     phone: (control: NavControl) => ReactNode;
     homeLabel?: string;
+    /** `false` on a static site that shouldn't fetch every linked page. */
+    prefetch?: boolean;
 }) {
     const [open, setOpen] = useState<string | null>(null);
     const nav = useRef<HTMLElement>(null);
@@ -137,6 +140,7 @@ export function MarketingNav({
                                 <Link
                                     key={entry.id}
                                     href={entry.href}
+                                    prefetch={prefetch}
                                     aria-current={
                                         pathname === entry.href
                                             ? "page"

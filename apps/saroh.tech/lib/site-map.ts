@@ -39,6 +39,7 @@ import {
 export type PageType =
     | "home"
     | "feature"
+    | "features"
     | "solution"
     | "pricing"
     | "changelog"
@@ -174,6 +175,19 @@ export const PAGES: SitePage[] = [
         description: home.seoDescription,
         h1: home.headlineLabel,
         updated: HOME_UPDATED,
+    },
+    // How it works (DEC-221): a noindex shell until its page is drawn.
+    {
+        ...hub(
+            "/features",
+            "features",
+            "How Saroh works | Saroh",
+            "How Saroh keeps your records, reaches your customers and answers your questions, and how the money moves.",
+            "How Saroh works",
+            "How it works",
+        ),
+        unreviewed: true,
+        updated: FEATURES_UPDATED,
     },
     ...featureList.map((f): SitePage => ({
         path: featureHref(f.slug),
