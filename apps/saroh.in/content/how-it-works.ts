@@ -84,7 +84,7 @@ export interface IndexItem extends Gate {
 
 export const HOW_IT_WORKS = {
     href: "/features",
-    seoTitle: "How Saroh works",
+    seoTitle: "Features: how Saroh works",
     seoDescription:
         "How Saroh keeps your records, reaches your customers and answers your questions, and how the money moves to your own account.",
     /** The h1, around the one word the Saffron mark sits under. */

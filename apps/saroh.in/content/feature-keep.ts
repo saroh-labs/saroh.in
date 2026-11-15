@@ -58,7 +58,7 @@ export interface KeepWords {
 
 /** Words every Keep page shares. */
 export const KEEP = {
-    crumb: "How it works",
+    crumb: "Features",
     secondary: (hour: string, business: string) => `See ${hour} at ${business}`,
     heroNote: "Free to start. No card needed.",
     chapters: "On this page",

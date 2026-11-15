@@ -1,15 +1,16 @@
 /**
  * The nav's and footer's own words (the redesign, DEC-221): the five on the
- * nav (Solutions · How it works · Templates · Pricing · Developers ·
+ * nav (Solutions · Features · Templates · Pricing · Developers ·
  * Resources · Tools; the
  * Templates and Developers pages bring their own names), and the footer's
  * groups, the Product group in the LOCKED order (WORLD.md).
  */
 export const NAV_WORDS = {
     solutions: "Solutions",
-    howItWorks: "How it works",
-    /** The How it works menu's see-all: the /features page. */
-    howItWorksAll: "How Saroh works",
+    /** The nav entry for /features (owner, 17 Nov 2026: "Features", not "How it works"). */
+    howItWorks: "Features",
+    /** The Features menu's see-all: the /features page. */
+    howItWorksAll: "All features",
     pricing: "Pricing",
     resources: "Resources",
     tools: "Tools",

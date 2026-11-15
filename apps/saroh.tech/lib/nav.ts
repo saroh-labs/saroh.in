@@ -171,7 +171,8 @@ export const MENUS: NavMenus = {
 /** The nav's own words (the redesign, DEC-221). */
 export const NAV_WORDS = {
     solutions: "Solutions",
-    howItWorks: "How it works",
+    /** The nav entry for /features (owner, 17 Nov 2026: "Features"). */
+    howItWorks: "Features",
     templates: "Templates",
     pricing: "Pricing",
     resources: "Resources",
@@ -179,9 +180,9 @@ export const NAV_WORDS = {
     signIn: "Sign in",
 } as const;
 
-/** How it works' see-all: the /features page. */
+/** The Features menu's see-all: the /features page. */
 export const HOW_IT_WORKS_ALL: MenuLink = {
-    name: "How Saroh works",
+    name: "All features",
     href: "/features",
 };
 

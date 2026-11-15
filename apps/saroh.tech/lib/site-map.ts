@@ -176,15 +176,15 @@ export const PAGES: SitePage[] = [
         h1: home.headlineLabel,
         updated: HOME_UPDATED,
     },
-    // How it works (DEC-221): a noindex shell until its page is drawn.
+    // Features (DEC-221; "Features", not "How it works", owner 17 Nov): a noindex shell until its page is drawn.
     {
         ...hub(
             "/features",
             "features",
-            "How Saroh works | Saroh",
+            "Features: how Saroh works | Saroh",
             "How Saroh keeps your records, reaches your customers and answers your questions, and how the money moves.",
             "How Saroh works",
-            "How it works",
+            "Features",
         ),
         unreviewed: true,
         updated: FEATURES_UPDATED,

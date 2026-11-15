@@ -74,10 +74,10 @@ const button = (name: string) =>
     screen.getAllByRole("button", { name: new RegExp(`^${name}`) })[0];
 
 describe("SiteNav", () => {
-    it("on /features/orders, underlines How it works and marks Orders as the page", () => {
+    it("on /features/orders, underlines Features and marks Orders as the page", () => {
         pathname = "/features/orders";
         render(<Nav />);
-        const features = button("How it works");
+        const features = button("Features");
         expect(features.className).toMatch(/(^| )underline( |$)/);
         expect(features.className).toContain("decoration-brand-500");
         expect(button("Solutions").className).not.toMatch(
@@ -125,16 +125,14 @@ describe("SiteNav", () => {
         launch.mode = "waitlist";
     });
 
-    it("How it works opens a menu of every shown feature and /features, focused on the first", () => {
+    it("Features opens a menu of every shown feature and /features, focused on the first", () => {
         render(<Nav />);
         const chevron = () =>
-            button("How it works").querySelector("[data-chevron]")?.classList;
+            button("Features").querySelector("[data-chevron]")?.classList;
         expect(chevron()?.contains("rotate-180")).toBe(false);
-        fireEvent.click(button("How it works"));
+        fireEvent.click(button("Features"));
         expect(chevron()?.contains("rotate-180")).toBe(true);
-        expect(button("How it works").getAttribute("aria-expanded")).toBe(
-            "true",
-        );
+        expect(button("Features").getAttribute("aria-expanded")).toBe("true");
         const items = screen.getAllByRole("menuitem");
         expect(items.map((i) => i.getAttribute("href"))).toEqual([
             ...FEATURE_ITEMS.map((f) => f.href),
@@ -160,7 +158,7 @@ describe("SiteNav", () => {
                 <p>Elsewhere</p>
             </>,
         );
-        fireEvent.click(button("How it works"));
+        fireEvent.click(button("Features"));
         expect(screen.getByRole("menu")).toBeTruthy();
         fireEvent.click(screen.getByText("Elsewhere"));
         expect(screen.queryByRole("menu")).toBeNull();
@@ -243,7 +241,7 @@ describe("SiteNav: Resources (plan U1)", () => {
         pathname = "/changelog/saroh-is-open";
         render(<Nav resources={RESOURCES} />);
         expect(button("Resources").className).toContain("decoration-brand-500");
-        expect(button("How it works").className).not.toContain(
+        expect(button("Features").className).not.toContain(
             "decoration-brand-500",
         );
     });
@@ -280,7 +278,7 @@ describe("SiteNav: Resources (plan U1)", () => {
                 .getAllByRole("link", { name: "Developers" })[0]
                 .getAttribute("href"),
         ).toBe("/developers");
-        fireEvent.click(button("How it works"));
+        fireEvent.click(button("Features"));
         expect(
             screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
         ).not.toContain("/templates");
@@ -413,7 +411,7 @@ describe("MobileMenu (below 760px)", () => {
         const row = (name: string) =>
             within(sheet).getByRole("button", { name });
         expect(row("Solutions").getAttribute("aria-current")).toBe("true");
-        expect(row("How it works").getAttribute("aria-current")).toBeNull();
+        expect(row("Features").getAttribute("aria-current")).toBeNull();
         expect(sheet.querySelector("#nav-sheet-solutions")).toBeNull();
 
         fireEvent.click(row("Solutions"));

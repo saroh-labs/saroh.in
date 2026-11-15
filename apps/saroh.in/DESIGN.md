@@ -218,7 +218,7 @@ none; the world file supplies names, numbers and times. The kit sheet,
 | `PhoneFrame`, `BrowserFrame`         | `@saroh/marketing/kit/frames`                  | Frames for drawn screens. `BrowserFrame look="app"` (app.saroh.in) or `look="site"` (a merchant address, in the site's colours).                                                                                                                                                        |
 | `SiteDrawing`                        | `@saroh/marketing/kit/site-drawing`            | A merchant's site drawn from its `SiteLook` (`--site-*` HSL channels and its own fonts); `phone` for the single column.                                                                                                                                                                 |
 | `Claim`                              | `@saroh/marketing/kit/claim`                   | A claim behind its claim switch: drawn while on, else nothing or "Not available yet".                                                                                                                                                                                                   |
-| `MarketingNav`                       | `@saroh/marketing/marketing-nav`               | Solutions · How it works · Templates · Pricing · Developers, then Sign in and Start free; each site passes its entries, switches and `cta()` buttons. Sticky; one menu open at a time.                                                                                                  |
+| `MarketingNav`                       | `@saroh/marketing/marketing-nav`               | Solutions · Features · Templates · Pricing · Developers, then Sign in and Start free; each site passes its entries, switches and `cta()` buttons. Sticky; one menu open at a time.                                                                                                      |
 | `MarketingFooter`                    | `@saroh/marketing/marketing-footer`            | Wordmark, one line, then groups: **Product first in the LOCKED order** (Website builder, Orders, Bookings, Billing, Share and posts, Saroh Social, Ask AI, AI apps, API and webhooks), every other link folded into the groups after it. On a phone each group is a closed `<details>`. |
 
 Every clickable element has hover, focus (`ring()`), pressed and keyboard
@@ -345,6 +345,12 @@ price is ever drawn into an image.
   free tools are how people find Saroh, so Resources and Tools are their own
   desk menus again after Developers (saroh.tech: after Pricing), not folded
   into How it works. The desk nav starts at 1240px.
+- **17 Nov 2026, "Features", not "How it works" (owner).** The nav entry,
+  its menu's see-all ("All features"), the breadcrumbs ("Features / Orders")
+  and the phone menu say Features on both sites: it's the word visitors scan
+  and search for, and it matches `/features`. The /features page itself still
+  opens with "How it works, and why it all stays yours" and keeps its
+  chapters; the story ownership (DEC-221) is unchanged.
 - Pages move to the kit one by one after this; each adds its line here.
 - **17 Nov 2026, the landing (`/`, boards LAHomeDesk + LAHomePhone2).**
   One responsive page: the h1 "Your website and orders, sorted before you
