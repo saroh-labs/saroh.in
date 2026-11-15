@@ -363,7 +363,8 @@ describe("/mcp (U10)", () => {
             connectionId: current.connection.id,
             clientName: "Claude",
             target: siteTarget(site.id),
-            summary: `Renamed site ${site.id}.`,
+            // The title done, never the reply to the app (doneLine).
+            summary: "Renamed a site",
         });
         expect(
             await prisma.auditEvent.count({

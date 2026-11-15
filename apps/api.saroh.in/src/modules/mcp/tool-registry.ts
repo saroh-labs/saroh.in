@@ -525,6 +525,7 @@ const DONE: Record<string, string> = {
     Move: "Moved",
     Prepare: "Prepared",
     Remove: "Removed",
+    Rename: "Renamed",
     Set: "Set",
     Start: "Started",
     Take: "Took",
