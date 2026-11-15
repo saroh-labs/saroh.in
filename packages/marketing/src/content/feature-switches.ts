@@ -68,13 +68,18 @@ export const CLAIM_SWITCHES = {
     "ask-ai-plans": "NEXT_PUBLIC_CLAIM_ASK_AI_PLANS",
     /** A plan named beside AI apps. */
     "ai-apps-plans": "NEXT_PUBLIC_CLAIM_AI_APPS_PLANS",
+    /** Products and the online shop on the merchant's site (`SITE_SHOP`, claims ledger H12). */
+    "site-shop": "NEXT_PUBLIC_CLAIM_SITE_SHOP",
+    /** Share's "Worth posting today" ideas and the visits a post's link brought. */
+    "share-insights": "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS",
 } as const;
 export type ClaimSwitch = keyof typeof CLAIM_SWITCHES;
 
-/** The release switch each claim sits under. */
-export const CLAIM_PARENT: Record<ClaimSwitch, ReleaseSwitch> = {
+/** The release switch each claim sits under; a Website claim has none. */
+export const CLAIM_PARENT: Partial<Record<ClaimSwitch, ReleaseSwitch>> = {
     "social-posting": "social",
     "share-every-plan": "social",
+    "share-insights": "social",
     "ask-ai-stock": "ask-ai",
     "ask-ai-website": "ask-ai",
     "ask-ai-social": "ask-ai",
@@ -93,7 +98,7 @@ export function claimsOffSet(env: ClaimEnv): ClaimSwitch[] {
     const releaseOff = switchedOffSet(env);
     return (Object.keys(CLAIM_SWITCHES) as ClaimSwitch[]).filter(
         (key) =>
-            releaseOff.includes(CLAIM_PARENT[key]) ||
+            releaseOff.some((r) => r === CLAIM_PARENT[key]) ||
             !switchOn(env[CLAIM_SWITCHES[key]], env.NODE_ENV),
     );
 }

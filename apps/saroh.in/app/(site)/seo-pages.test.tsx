@@ -108,7 +108,9 @@ describe("/features/website, before launch", () => {
         );
         const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
         expect(
-            within(crumb).getByText("Website").getAttribute("aria-current"),
+            within(crumb)
+                .getByText("Website builder")
+                .getAttribute("aria-current"),
         ).toBe("page");
         expect(words(container).toLowerCase()).toContain("website builder");
     });
@@ -134,7 +136,12 @@ describe("/features/website, before launch", () => {
             points: features.website.points.map(({ openNote: _, ...p }) => p),
         });
         expect(own).not.toMatch(PLAN_WORDS);
-        expect(container.querySelector('a[href^="/pricing"]')).toBeNull();
+        // The redesign's PlanLine links Compare plans, as every feature page
+        // does; before launch its sentence names no plan. Merchant prices on
+        // the drawings are the example world's, not Saroh's (DESIGN.md).
+        expect(said).not.toMatch(
+            /paid plan|\bGrow\b|\bPro\b|Free plan|upgrade|per month|a month|every plan/i,
+        );
     });
 
     it("says nothing about a template, in either mode's words (DEC-135)", async () => {

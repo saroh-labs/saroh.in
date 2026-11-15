@@ -462,6 +462,7 @@ export const RYE_MONDAY = {
     stock: [
         { item: "brownie-box", left: 2, of: 12, note: "from yesterday's bake" },
         { item: "bun-box", left: 38 },
+        { item: "sourdough", left: 6 },
     ],
     class: {
         name: "Sourdough basics",

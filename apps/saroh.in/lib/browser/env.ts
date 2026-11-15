@@ -43,6 +43,9 @@ export const browserEnv = {
     NEXT_PUBLIC_CLAIM_ASK_AI_PLANS: process.env.NEXT_PUBLIC_CLAIM_ASK_AI_PLANS,
     NEXT_PUBLIC_CLAIM_AI_APPS_PLANS:
         process.env.NEXT_PUBLIC_CLAIM_AI_APPS_PLANS,
+    NEXT_PUBLIC_CLAIM_SITE_SHOP: process.env.NEXT_PUBLIC_CLAIM_SITE_SHOP,
+    NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS:
+        process.env.NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS,
     NODE_ENV: process.env.NODE_ENV,
     /** `API_URL`, written in by next.config.js `env` (the header's session check). */
     SAROH_API_URL: process.env.SAROH_API_URL,
@@ -70,5 +73,7 @@ export const browserEnv = {
     | "NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES"
     | "NEXT_PUBLIC_CLAIM_ASK_AI_PLANS"
     | "NEXT_PUBLIC_CLAIM_AI_APPS_PLANS"
+    | "NEXT_PUBLIC_CLAIM_SITE_SHOP"
+    | "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS"
     | "NODE_ENV"
 >;

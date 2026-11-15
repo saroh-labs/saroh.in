@@ -144,6 +144,8 @@ const RULES: Rule[] = [
                 "keep (DEC-221): a problem's answer and a day trade's other parts fold, kept in the HTML",
             "components/solution/hub-finder.tsx":
                 "keep (DEC-221): the phone's closed A to Z list of every trade",
+            "components/feature-pages/reach/fold.tsx":
+                "keep: the Reach and Ask pages' phone folds and crop toggles (FWPhone2, FSPhone2, FAPhone2, FMPhone2), content in the HTML",
         },
         files: SITE,
     },

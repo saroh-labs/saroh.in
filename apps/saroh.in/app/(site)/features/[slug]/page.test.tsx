@@ -153,35 +153,28 @@ describe("/features/[slug]", () => {
             expect(document.querySelector('a[href="/templates"]')).toBeNull();
         });
 
-        it("sits between How it works and What it does when on, linking to /templates", async () => {
+        it("folds its words under the looks when on, linking to /templates", async () => {
             env.NEXT_PUBLIC_TEMPLATES = "on";
-            render(await FeaturePage(params("website")));
-            const s = found(section());
-            const how = found(
-                screen
-                    .getByRole("heading", { name: features.website.howTitle })
-                    .closest("section"),
+            const { container } = render(await FeaturePage(params("website")));
+            const words = found(features.website.templates);
+            // The redesign (FWDesk) folds the section into the looks: its
+            // title is the fold's label, its lead and points inside it.
+            const fold = found(
+                Array.from(container.querySelectorAll("details")).find((d) =>
+                    d
+                        .querySelector("summary")
+                        ?.textContent.includes(words.title),
+                ),
             );
-            const what = found(
-                screen
-                    .getByRole("heading", { name: "What it does" })
-                    .closest("section"),
+            expect(fold.textContent).toContain(words.lead);
+            expect(fold.querySelectorAll("ul > li")).toHaveLength(
+                words.points.length,
             );
-            const after = (a: Node, b: Node) =>
-                Boolean(
-                    a.compareDocumentPosition(b) &
-                    Node.DOCUMENT_POSITION_FOLLOWING,
-                );
-            expect(after(how, s)).toBe(true);
-            expect(after(s, what)).toBe(true);
             expect(
-                within(s)
+                within(fold as HTMLElement)
                     .getByRole("link", { name: /See every template/ })
                     .getAttribute("href"),
             ).toBe("/templates");
-            // Three points, and the two drawings say what they are.
-            expect(s.querySelectorAll("ul > li")).toHaveLength(3);
-            expect(s.querySelectorAll("figure figcaption")).toHaveLength(2);
         });
 
         it("draws only gallery templates, and claims no lossless switching", async () => {
@@ -196,15 +189,21 @@ describe("/features/[slug]", () => {
         });
     });
 
-    it("/features/social and /features/ask-ai render every step", async () => {
+    it("/features/social and /features/ask-ai render every step, each with its shot", async () => {
         for (const slug of ["social", "ask-ai"] as const) {
             const { unmount } = render(await FeaturePage(params(slug)));
             const how = screen
                 .getByRole("heading", { name: features[slug].howTitle })
                 .closest("section");
-            expect(how?.querySelectorAll("ol > li")).toHaveLength(
-                features[slug].steps.length,
-            );
+            // The hero's shot leads the row, then a shot per step.
+            expect(
+                Array.from(how?.querySelectorAll("[data-shot]") ?? []).map(
+                    (el) => el.getAttribute("data-shot"),
+                ),
+            ).toEqual([
+                features[slug].hero.shot,
+                ...features[slug].steps.map((st) => st.shot),
+            ]);
             unmount();
         }
     });
@@ -233,8 +232,8 @@ describe("/features/[slug]", () => {
                     })
                     .closest("section"),
             );
-            expect(how.querySelectorAll("ol > li")).toHaveLength(4);
-            expect(how.querySelectorAll("[data-shot]")).toHaveLength(4);
+            // The hero's shot, then the four steps'.
+            expect(how.querySelectorAll("[data-shot]")).toHaveLength(5);
         });
 
         it("lists only the live AI apps under Apps you can use", async () => {

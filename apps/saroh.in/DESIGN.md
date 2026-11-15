@@ -311,6 +311,8 @@ claim is off whenever its feature's release switch is off.
 | `ask-ai-languages` (Hinglish or Hindi)                      | `NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES` | `ask-ai`  |
 | `ask-ai-plans` (a plan named beside Ask AI)                 | `NEXT_PUBLIC_CLAIM_ASK_AI_PLANS`     | `ask-ai`  |
 | `ai-apps-plans` (a plan named beside AI apps)               | `NEXT_PUBLIC_CLAIM_AI_APPS_PLANS`    | `ai-apps` |
+| `site-shop` (products and the shop on a merchant's site)    | `NEXT_PUBLIC_CLAIM_SITE_SHOP`        | none      |
+| `share-insights` (worth-posting ideas, visits per post)     | `NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS`   | `social`  |
 
 Wrap the claim in `<Claim on={claimOn("…")}>`. A new unlive claim gets a
 switch here first, with its test.
@@ -330,6 +332,22 @@ price is ever drawn into an image.
 
 ## Changes
 
+- **17 Nov 2026, the Reach and Ask feature pages (DEC-221, unit/web-reach).**
+  Website builder (FWDesk/FWPhone2), Share and posts (FSDesk/FSPhone2, with
+  `#saroh-social`), Ask AI (FADesk/FAPhone2) and AI apps (FMDesk/FMPhone2),
+  each in `components/feature-pages/<slug>.tsx` with its parts in
+  `components/feature-pages/<slug>/` and words in `content/reach-*.ts`
+  (facts from the world). Shared by the four, in `components/feature-pages/reach/`:
+  `PageTop`, `Fold` and `CropToggle` (a phone crop that opens in place, the
+  whole screen always in the HTML), `Questions` (three, then "All
+  questions"), `Tail`, `AppCard`/`AppRow`, drawn `Photo`s, and `InTheApp`,
+  which keeps each old page's captured shots, steps, Help links, every point
+  (folded) and Used by. Merchant drawings (`ShopSite`, `PostCard`) wear the
+  business's `--site-*` look and its own fonts (`reach/site-fonts.ts`);
+  `PostCard` scales by container units. Ask AI's hero wires are measured
+  from the laid-out rows and redrawn on resize, from 1080px. New claim
+  switches: `site-shop` (stands alone; `CLAIM_PARENT` is partial) and
+  `share-insights`.
 - **17 Nov 2026, the redesign's foundation (DEC-221, batch-2026-11-15-4).**
   The kit (tokens: ledger, warn, hour tints; the three heading sizes; Mark;
   the 48px button; the Ink TextLink; Chip, SourceChips, TimeStamp,

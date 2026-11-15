@@ -64,4 +64,16 @@ describe("claim switches (DEC-221, decision 1)", () => {
             ]),
         );
     });
+
+    it("a claim with no feature switch (the site shop) follows only its own", () => {
+        const off = Object.fromEntries(
+            Object.values(RELEASE_SWITCHES).map((n) => [n, "off"]),
+        );
+        expect(claimsOffSet({ ...allOn(), ...off }).includes("site-shop")).toBe(
+            false,
+        );
+        expect(
+            claimsOffSet({ ...allOn(), NEXT_PUBLIC_CLAIM_SITE_SHOP: "off" }),
+        ).toEqual(["site-shop"]);
+    });
 });
