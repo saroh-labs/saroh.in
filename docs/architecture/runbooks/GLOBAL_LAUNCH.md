@@ -50,8 +50,8 @@ Each is a gate: launch only when all are done.
 Global production can go up before it opens, behind the development
 environment's access key (the repo secret `DEV_ACCESS_KEY`):
 
-1. Set the repo variable `GLOBAL_ACCESS_GATE` to `on` **before** `GLOBAL_ROUTES`.
-   Each Global production Worker (saroh.tech, app, accounts, admin, docs) then
+1. Nothing to set: the gate is on unless the repo variable `GLOBAL_ACCESS_GATE`
+   is `off` (`scripts/cf-global-prod.mjs`). Each Global production Worker (saroh.tech, app, accounts, admin, docs) then
    gets the key, one cookie on `.saroh.tech`, and sends anyone without it to
    saroh.in's home with a temporary redirect (302); docs answers 404.
    Nothing on saroh.tech is indexed meanwhile.

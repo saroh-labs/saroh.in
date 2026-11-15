@@ -174,7 +174,8 @@ if (process.argv[1]?.endsWith("cf-global-prod.mjs")) {
     const config = parseJsonc(readFileSync(path, "utf8"));
     const out = globalProductionConfig(config, dir, {
         routes: process.env.GLOBAL_ROUTES === "on",
-        gate: process.env.GLOBAL_ACCESS_GATE === "on",
+        // On unless switched off: Global production is never public by accident.
+        gate: process.env.GLOBAL_ACCESS_GATE !== "off",
     });
     writeFileSync(path, JSON.stringify(out));
     console.log(
