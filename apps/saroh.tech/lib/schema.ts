@@ -93,6 +93,7 @@ export function pageSchema(page: SitePage): Ld[] {
         case "tool":
             return [application(page), ...breadcrumbs(page)];
         case "tools-hub":
+        case "solutions":
         case "templates":
         case "guides":
             return [collection(page), ...breadcrumbs(page)];

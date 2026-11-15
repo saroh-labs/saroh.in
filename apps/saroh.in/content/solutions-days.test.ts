@@ -1,8 +1,8 @@
 import { hourAnchor } from "@saroh/marketing/kit/time";
 import { describe, expect, it } from "vitest";
 
-import { say } from "@/components/solution/words";
 import { searchPages } from "@/lib/search-pages";
+import { say } from "@saroh/marketing/solutions/words";
 
 import { TRADE_DAYS } from "./solutions-days";
 import { HUB_GROUPS } from "./solutions-hub";

@@ -1,9 +1,3 @@
-import { cn } from "@saroh/marketing/cn";
-import { CroppedCard } from "@saroh/marketing/kit/cropped-card";
-import { BrowserFrame, PhoneFrame } from "@saroh/marketing/kit/frames";
-import { MoneyPath } from "@saroh/marketing/kit/money-path";
-import { SiteDrawing, siteVars } from "@saroh/marketing/kit/site-drawing";
-import { ring } from "@saroh/marketing/ring";
 import {
     Bot,
     CalendarDays,
@@ -20,6 +14,12 @@ import {
     User,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { cn } from "../../cn";
+import { CroppedCard } from "../../kit/cropped-card";
+import { BrowserFrame, PhoneFrame } from "../../kit/frames";
+import { MoneyPath } from "../../kit/money-path";
+import { SiteDrawing, siteVars } from "../../kit/site-drawing";
+import { ring } from "../../ring";
 
 import type {
     AiAppMoment,

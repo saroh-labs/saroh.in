@@ -1,17 +1,24 @@
-import type { ClaimSwitch } from "@saroh/marketing/feature-switches";
 import type { WorldBusiness, WorldOrder } from "@saroh/marketing/world";
 
 import type {
-    HomeMoment,
+    DayHour as AnyDayHour,
+    TradeDay as AnyTradeDay,
+    UsedLink as AnyUsedLink,
+} from "@saroh/marketing/solutions/day";
+import type {
     MomentData,
     MomentTone,
     OrderMoment,
-    WaitingMoment,
-} from "@/components/solution/moments/types";
-import type { Words } from "@/components/solution/words";
+} from "@saroh/marketing/solutions/moment-types";
+import type { Words } from "@saroh/marketing/solutions/words";
 
 import type { FeatureSlug } from "./types";
 import { RYE_MONDAY, WORLD } from "./world";
+
+/** The day's shapes (`@saroh/marketing/solutions/day`), over saroh.in's features. */
+export type UsedLink = AnyUsedLink<FeatureSlug>;
+export type DayHour = AnyDayHour<FeatureSlug>;
+export type TradeDay = AnyTradeDay<FeatureSlug>;
 
 /**
  * The written days (DEC-221, owner 17 Nov 2026): a trade page tells its day
@@ -24,69 +31,6 @@ import { RYE_MONDAY, WORLD } from "./world";
  * Boards: SOTradeDesk / SOTradePhone2 (home bakers, Rye & Co.) and
  * SLFloristDesk / SLFloristPhone2 (florists, Petal Lane).
  */
-
-/** A "how it works" chip under a scene: a feature page, or another link. */
-export type UsedLink =
-    | { feature: FeatureSlug }
-    | { label: string; href: string; needs?: "templates" };
-
-export interface DayHour {
-    /** The world day's anchor: "9am", "tue7am". */
-    anchor: string;
-    mood: Words;
-    title: Words;
-    lead: Words;
-    moments: readonly MomentData[];
-    used: readonly UsedLink[];
-    /**
-     * Moments that follow a claim: `on` while it is, else `off` (9 pm's
-     * answer in Hinglish, or in English).
-     */
-    claimed?: {
-        claim: ClaimSwitch;
-        on: readonly MomentData[];
-        off: readonly MomentData[];
-    };
-    /** A line under the moments, which may hold claims. */
-    after?: Words;
-    /** A dark note under the moments ("Have a developer…"). */
-    note?: { text: string; link: { label: string; href: string } };
-}
-
-export interface TradeDay {
-    /** The /for page it belongs to. */
-    slug: string;
-    business: WorldBusiness;
-    /** Said after the page's own lead: "Follow Monday at …". */
-    intro: string;
-    /** The phone's one line under the h1, instead of the lead. */
-    phoneIntro: string;
-    /** "Follow Asha's day", to the first hour. */
-    follow: string;
-    /** The day it is: "Mon 16 Nov". */
-    date: string;
-    /** The trade bar's line: "Rye & Co., an example bakery". */
-    example: string;
-    /** That everything is made up, under the hero. */
-    exampleNote?: string;
-    stripTitle: string;
-    /** Under the problems' heading: each one has an hour in the day. */
-    problemsLine: string;
-    /** The hero's picture: Home at the start of the day. */
-    hero: HomeMoment;
-    /** The first hour, drawn under the hero (its anchor, its line). */
-    start: Omit<DayHour, "title" | "lead"> & { line: string };
-    hours: readonly DayHour[];
-    /** The next morning, told big after the night. */
-    next?: {
-        anchor: string;
-        title: string;
-        body: string;
-        moment: WaitingMoment;
-    };
-    /** The closest written day, for a trade page without one. */
-    doorLine: string;
-}
 
 /* ------------------------------------------------------------------ shared words */
 

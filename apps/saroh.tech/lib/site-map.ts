@@ -30,6 +30,8 @@ import {
     UPDATED as SOLUTIONS_UPDATED,
 } from "@/content/solutions";
 
+import { HUB_PATH, HUB_WORDS } from "@/content/solutions-hub";
+
 /**
  * Every page, as the site map and page-spec boards list them. Title,
  * description and H1 are the specs' own words. An `unreviewed` page is noindex
@@ -41,6 +43,7 @@ export type PageType =
     | "feature"
     | "features"
     | "solution"
+    | "solutions"
     | "pricing"
     | "changelog"
     | "about"
@@ -199,13 +202,26 @@ export const PAGES: SitePage[] = [
         unreviewed: true,
         updated: FEATURES_UPDATED,
     })),
+    // The Solutions hub (DEC-221): saroh.in's /for hub over saroh.tech's trades.
+    {
+        ...hub(
+            HUB_PATH,
+            "solutions",
+            "Software for your trade: shops, salons, gyms, clinics | Saroh",
+            "Software for shops, salons, gyms and clinics: pick your trade to see what Saroh does for a business like yours.",
+            `${HUB_WORDS.h1Before} ${HUB_WORDS.h1Mark}`,
+            HUB_WORDS.crumb,
+        ),
+        unreviewed: true,
+        updated: SOLUTIONS_UPDATED,
+    },
     ...solutionList.map((s): SitePage => ({
         path: solutionHref(s.slug),
         type: "solution",
         title: `${s.seoTitle} | Saroh`,
         description: s.seoDescription,
         h1: s.headline,
-        crumb: [{ name: "Solutions", path: "/#solutions" }, { name: s.name }],
+        crumb: [{ name: "Solutions", path: HUB_PATH }, { name: s.name }],
         unreviewed: true,
         updated: SOLUTIONS_UPDATED,
     })),

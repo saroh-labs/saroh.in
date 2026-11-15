@@ -138,11 +138,11 @@ const RULES: Rule[] = [
                 "keep: a chapter's Read more links, folded on a phone, open from 760px",
             "components/feature-pages/keep-page.tsx":
                 "keep: the Keep template's folded points and its questions (FOPhone2), every answer in the HTML",
-            "components/solution/moments/moments.tsx":
+            "packages/marketing/src/solutions/moments/moments.tsx":
                 "keep (DEC-221): a moment's second picture folds on a phone, kept in the HTML",
-            "components/solution/trade-page.tsx":
+            "packages/marketing/src/solutions/trade-page.tsx":
                 "keep (DEC-221): a problem's answer and a day trade's other parts fold, kept in the HTML",
-            "components/solution/hub-finder.tsx":
+            "packages/marketing/src/solutions/hub-finder.tsx":
                 "keep (DEC-221): the phone's closed A to Z list of every trade",
             "components/feature-pages/reach/fold.tsx":
                 "keep: the Reach and Ask pages' phone folds and crop toggles (FWPhone2, FSPhone2, FAPhone2, FMPhone2), content in the HTML",
@@ -276,7 +276,7 @@ const RULES: Rule[] = [
     {
         name: "a text field is fieldClasses() (V11, A15)",
         pattern: /placeholder:text-/,
-        home: ["components/shared/fields/"],
+        home: ["components/shared/fields/", `${MK}/fields/field-classes.ts`],
         allow: {},
         files: SITE,
     },

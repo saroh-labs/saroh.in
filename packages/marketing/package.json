@@ -90,7 +90,15 @@
         "./kit/frames": "./src/kit/frames.tsx",
         "./kit/site-drawing": "./src/kit/site-drawing.tsx",
         "./kit/claim": "./src/kit/claim.tsx",
-        "./use-phone-menu": "./src/nav/use-phone-menu.ts"
+        "./use-phone-menu": "./src/nav/use-phone-menu.ts",
+        "./solutions/words": "./src/solutions/words.ts",
+        "./solutions/day": "./src/solutions/day.ts",
+        "./solutions/moment-types": "./src/solutions/moments/types.ts",
+        "./solutions/moments": "./src/solutions/moments/moments.tsx",
+        "./solutions/hub-finder": "./src/solutions/hub-finder.tsx",
+        "./solutions/hub": "./src/solutions/hub.tsx",
+        "./solutions/trade-page": "./src/solutions/trade-page.tsx",
+        "./field-classes": "./src/fields/field-classes.ts"
     },
     "scripts": {
         "lint": "eslint src/",

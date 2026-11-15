@@ -1,3 +1,5 @@
+import type { HubDetail } from "@saroh/marketing/solutions/hub-finder";
+
 import { NAV_WORDS } from "./nav";
 
 /**
@@ -7,13 +9,6 @@ import { NAV_WORDS } from "./nav";
  * holds only the hub's words, its groups and each trade's moment. A built
  * page missing here still shows, under its family, with its own hero line.
  */
-
-/** The small drawn detail on a trade's tile. */
-export type HubDetail =
-    | { kind: "pill"; text: string; tone?: "warn" | "paid" }
-    | { kind: "bar"; label: string; n: number; of: number }
-    | { kind: "slots"; label: string; taken: number; of: number }
-    | { kind: "bill"; label: string; amount: string };
 
 export interface HubMoment {
     slug: string;

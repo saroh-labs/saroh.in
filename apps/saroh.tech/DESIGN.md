@@ -54,3 +54,17 @@ lists only where Global differs (DEC-221).
   referral's steps and related pages are `SwipeRow`s; each template page
   gets the `StickyBar`. Tool UIs keep their controls as they were. Words,
   routes, titles and SEO fields are unchanged.
+- **17 Nov 2026, Solutions (unit/web-techsol).** saroh.in's /for hub and
+  trade-page layout, from `@saroh/marketing/solutions/*`, over saroh.tech's
+  own trades and words. New hub at `/solutions` (noindex until reviewed):
+  the four trades at the hour their demo business opens on the world's
+  Tuesday, by group and by how customers come; words in
+  `content/solutions-hub.ts`. `/solutions/<trade>` keeps every word of
+  `content/solutions.ts`: the headline and sub as h1 and lead, the hero
+  shot with its "Shown with…" note, each segment as a problem (pain, area,
+  and its title, body, screen and "See <feature>" folded under "How Saroh
+  helps"), the change title under the problems' heading, Free's card under
+  the trade's pricing title, the questions, the closer and the closing
+  band's words. The crumbs now name `/solutions`. No Global trade has a
+  written day yet, so no page tells one; a day written for one later drops
+  in through `TradePageLayout`'s `day`. Same shot keys as before.

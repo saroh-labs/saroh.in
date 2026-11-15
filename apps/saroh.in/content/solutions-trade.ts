@@ -40,5 +40,7 @@ export const TRADE_WORDS = {
     /** The closing band's link to /features (owner, 17 Nov: "Features"). */
     howItWorks: NAV_WORDS.howItWorks,
     tradeBar: "A day at a",
+    /** A link chip's tail under a scene. */
+    seeIt: "see it",
     allTradesShort: "All trades",
 } as const;

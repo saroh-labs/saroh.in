@@ -1,4 +1,4 @@
-import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
+import type { SiteLook } from "../../kit/site-drawing";
 
 /**
  * The moment library (board SLLibrary): one data shape per kind of moment a

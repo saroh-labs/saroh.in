@@ -1,18 +1,23 @@
 "use client";
 
-import { cn } from "@saroh/marketing/cn";
-import { Chip } from "@saroh/marketing/kit/chip";
-import { SunArc } from "@saroh/marketing/kit/sun-arc";
-import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
-import { clockLabel, hourTint } from "@saroh/marketing/kit/time";
-import { ring } from "@saroh/marketing/ring";
-import { TONE_BAND } from "@saroh/marketing/section";
 import { ChevronDown, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
+import { cn } from "../cn";
+import { fieldClasses } from "../fields/field-classes";
+import { Chip } from "../kit/chip";
+import { SunArc } from "../kit/sun-arc";
+import { SwipeRow } from "../kit/swipe-row";
+import { clockLabel, hourTint } from "../kit/time";
+import { ring } from "../ring";
+import { TONE_BAND } from "../sections/section";
 
-import { fieldClasses } from "@/components/shared/fields/field-classes";
-import type { HubDetail } from "@/content/solutions-hub";
+/** The small drawn detail on a trade's tile. */
+export type HubDetail =
+    | { kind: "pill"; text: string; tone?: "warn" | "paid" }
+    | { kind: "bar"; label: string; n: number; of: number }
+    | { kind: "slots"; label: string; taken: number; of: number }
+    | { kind: "bill"; label: string; amount: string };
 
 /** How a trade's customers come to it: the search pages' shapes. */
 export type HubWay = "appointments" | "classes" | "orders";
@@ -51,6 +56,8 @@ export interface HubFinderWords {
     azLine: string;
     count: { all: string; some: string };
     trades: string;
+    /** For a group of one, when it reads differently: "{n} trade". */
+    trade?: string;
     none: string;
 }
 
@@ -439,7 +446,12 @@ export function HubFinder({
                                     {g.title}
                                 </h2>
                                 <p className="m-0 font-mono text-[13px] text-mk-copy">
-                                    {fill(words.trades, { n: g.tiles.length })}
+                                    {fill(
+                                        g.tiles.length === 1 && words.trade
+                                            ? words.trade
+                                            : words.trades,
+                                        { n: g.tiles.length },
+                                    )}
                                 </p>
                                 <p className="m-0 text-[15px] leading-snug text-mk-copy">
                                     {g.how}

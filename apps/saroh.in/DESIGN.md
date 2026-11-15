@@ -479,3 +479,17 @@ registry.ts` (stubs drawing the old page until agent reach lands).
       to /contact until the hub has its own form.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).
+
+### Solutions' parts shared with saroh.tech (unit/web-techsol, 17 Nov 2026)
+
+- The /for hub's layout (`SolutionsHub`, `@saroh/marketing/solutions/hub`),
+  its search and filters (`@saroh/marketing/solutions/hub-finder`), the
+  trade-page layout (`TradePageLayout`, `@saroh/marketing/solutions/trade-page`),
+  the moment library (`@saroh/marketing/solutions/moments` and
+  `/moment-types`), a written day's shape (`/solutions/day`) and `say`
+  (`/solutions/words`) moved into the kit. `fieldClasses` moved with the
+  hub's search (`@saroh/marketing/field-classes`; the old path re-exports).
+- saroh.in keeps its adapters (`components/solution/for-hub.tsx`,
+  `trade-page.tsx`): the search pages' sample day, "What changes" drawings
+  and starter list stay here. Every page renders byte for byte as before
+  (`live-pages` snapshots unchanged).
