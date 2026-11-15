@@ -152,20 +152,18 @@ const designed = {
         "Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
     ),
     "ask-hero": pending(
-        "Ask AI at Gulmohar Salon & Bridal (demo salon) answering how the week went",
+        "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
     ),
     "ask-start": pending(
-        "Ask AI at Pulse Fitness (demo gym) before a question, with ready questions",
+        "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
     ),
     "ask-answer": pending(
-        "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish",
+        "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
     ),
     "ask-confirm": pending(
-        "Ask AI at Gulmohar Salon & Bridal (demo salon): a new service card to check before it is added",
+        "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
     ),
-    "ask-history": pending(
-        "Ask AI's history at Gulmohar Salon & Bridal (demo salon)",
-    ),
+    "ask-history": pending("Ask AI's history at Rye & Co. (demo bakery)"),
     "sh-sheet": pending(
         "The Share sheet for a product at Rye & Co. (demo bakery): a card in the bakery's look, its sizes and caption",
     ),

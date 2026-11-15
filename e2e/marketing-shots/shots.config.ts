@@ -1596,6 +1596,100 @@ const SHARE_SHOTS: Shot[] = [
  * one (see `gap`). Read-only: the consent screen is shot before Allow, and
  * opening a connection's sheet only changes the page.
  */
+
+/**
+ * Ask AI (owner, 15 Nov 2026): Rye & Co. through the page, each shot a
+ * conversation already asked on the capture database, opened from the
+ * history list by its question; the capture never asks. Ask them first
+ * (`gap`): "How did this week go, and which products sold the most?",
+ * "Is hafte sabse zyada kya bika?" and "Change the Sourdough loaf's
+ * description to: …", the change card left unconfirmed.
+ */
+const ASK_GAP =
+    "Asked by hand on the capture database first (Anthropic key in .env.local), with the API's R2_PUBLIC_BASE_URL set so the product cards show photos.";
+const openAsk = (question: string): Step[] => [
+    {
+        click: `nav[aria-label="Your conversations"] button:has-text("${question}")`,
+    },
+    { waitFor: 'button:has-text("Report this answer")' },
+];
+const ASK_PANE = 'section[aria-label="Ask AI"]';
+const ASK_AI_SHOTS: Shot[] = [
+    {
+        key: "ask-hero",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        // Tall enough that the question shows above the answer.
+        viewport: { width: 1440, height: 1200 },
+        steps: openAsk("How did this week go"),
+        alt: "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
+        caption:
+            "Ask AI's page: How did this week go, and which products sold the most? Answered from the bakery's own orders, with the best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-start",
+        business: "rye",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 900 },
+        steps: [
+            { click: 'header button:has-text("Ask AI")' },
+            {
+                waitFor:
+                    'aside[aria-label="Ask AI"] button:has-text("Who hasn\'t paid")',
+            },
+        ],
+        clip: { selector: 'aside[aria-label="Ask AI"]' },
+        alt: "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
+        caption:
+            "The Ask AI panel opened over Home: Ask about Rye & Co., and ready questions such as Who hasn't paid and Top products this month",
+    },
+    {
+        key: "ask-answer",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 1000 },
+        steps: openAsk("Is hafte sabse zyada"),
+        clip: { selector: ASK_PANE },
+        alt: "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
+        caption:
+            "Is hafte sabse zyada kya bika? Answered in Hinglish from the bakery's own orders, with the week's best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-confirm",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 640 },
+        steps: openAsk("Change the Sourdough"),
+        clip: { selector: ASK_PANE },
+        alt: "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+        caption:
+            "A change to the Sourdough loaf's description comes back as a card: the old words struck through, the new ones, and Change product or Cancel",
+        gap: ASK_GAP,
+    },
+    {
+        key: "ask-history",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 1100, height: 900 },
+        steps: [{ waitFor: 'nav[aria-label="Your conversations"] button' }],
+        clip: {
+            selector: 'nav[aria-label="Your conversations"] h1',
+            until: 'nav[aria-label="Your conversations"] button:has-text("How did this week go")',
+            pad: 20,
+        },
+        alt: "Ask AI's history at Rye & Co. (demo bakery)",
+        caption:
+            "Your conversations: each kept for 90 days and seen only by you, newest first",
+        gap: ASK_GAP,
+    },
+];
 const AI_APPS_SHOTS: Shot[] = [
     {
         key: "ai-hero",
@@ -2081,4 +2175,5 @@ export const SHOTS: Shot[] = [
     ...STOCK_SHOTS,
     ...SHARE_SHOTS,
     ...AI_APPS_SHOTS,
+    ...ASK_AI_SHOTS,
 ];

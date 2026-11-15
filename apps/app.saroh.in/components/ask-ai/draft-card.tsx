@@ -140,7 +140,7 @@ export function DraftCard({
                         {post ? null : (
                             <span className="mt-px block text-[13px] text-neutral-700 dark:text-foreground">
                                 {card.fields
-                                    .map((f) => valueText(f.new))
+                                    .map((f) => valueText(f.new, f.field))
                                     .filter(Boolean)
                                     .join(" · ")}
                             </span>
@@ -252,17 +252,18 @@ export function DraftCard({
                     .filter((f) => !missingIds.has(f.field))
                     .map((f, i) => (
                         <Row key={f.field} first={i === 0} label={f.label}>
-                            {card.action === "edit" && valueText(f.old) ? (
+                            {card.action === "edit" &&
+                            valueText(f.old, f.field) ? (
                                 <>
                                     <span className="font-normal text-muted-foreground line-through">
-                                        {valueText(f.old)}
+                                        {valueText(f.old, f.field)}
                                     </span>
                                     <span className="block font-semibold">
-                                        {valueText(f.new)}
+                                        {valueText(f.new, f.field)}
                                     </span>
                                 </>
                             ) : (
-                                valueText(f.new)
+                                valueText(f.new, f.field)
                             )}
                         </Row>
                     ))}

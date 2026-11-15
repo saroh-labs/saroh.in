@@ -797,4 +797,34 @@ export const CAPTURED: Record<
         width: 896,
         height: 1800,
     },
+    "ask-hero": {
+        src: "/shots/v2/ask-hero.webp",
+        alt: "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
+        width: 2880,
+        height: 2400,
+    },
+    "ask-start": {
+        src: "/shots/v2/ask-start.webp",
+        alt: "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
+        width: 880,
+        height: 1678,
+    },
+    "ask-answer": {
+        src: "/shots/v2/ask-answer.webp",
+        alt: "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
+        width: 1408,
+        height: 1878,
+    },
+    "ask-confirm": {
+        src: "/shots/v2/ask-confirm.webp",
+        alt: "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+        width: 1408,
+        height: 1158,
+    },
+    "ask-history": {
+        src: "/shots/v2/ask-history.webp",
+        alt: "Ask AI's history at Rye & Co. (demo bakery)",
+        width: 662,
+        height: 658,
+    },
 };

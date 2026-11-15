@@ -805,7 +805,7 @@ export const features: Record<FeatureSlug, Feature> = {
             {
                 title: "Open Ask AI from any screen",
                 body: "The Ask AI button sits at the top of Saroh. Type a question, or tap one of the ready ones to start.",
-                who: "Pulse Fitness (demo gym)",
+                who: "Rye & Co. (demo bakery)",
                 shot: "ask-start",
             },
             {
@@ -817,13 +817,13 @@ export const features: Record<FeatureSlug, Feature> = {
             {
                 title: "Changes come as a card you confirm",
                 body: "Ask it to add a service, move a booking or update a customer and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo an edit the same day.",
-                who: "Gulmohar Salon & Bridal (demo salon)",
+                who: "Rye & Co. (demo bakery)",
                 shot: "ask-confirm",
             },
             {
                 title: "Go back to an earlier question",
                 body: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
-                who: "Gulmohar Salon & Bridal (demo salon)",
+                who: "Rye & Co. (demo bakery)",
                 shot: "ask-history",
             },
         ],
