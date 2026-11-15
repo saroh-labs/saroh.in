@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { PageHero } from "@/components/resources/page-hero";
 import { ComingList } from "@/components/shared/sections/coming-list";
 import type { LiveIntegration } from "@/content/integrations";
 import {
@@ -14,10 +15,9 @@ import { Arrow } from "@saroh/marketing/arrow";
 import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { cn } from "@saroh/marketing/cn";
 import { Container } from "@saroh/marketing/container";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
 import { Pill } from "@saroh/marketing/pill";
-import { textLinkClasses } from "@saroh/marketing/text-link";
+import { TextLink } from "@saroh/marketing/text-link";
 
 /**
  * Integrations (Resources plan U3, design "Saroh Resources - Integrations"):
@@ -48,15 +48,11 @@ export default function IntegrationsPage() {
     const groupsOn = ai.length > 0;
     return (
         <>
-            <Container
-                as="header"
-                className="grid justify-items-center gap-3.5 pt-16 text-center"
-            >
-                <PageTitle size="page">{page.title}</PageTitle>
-                <p className="m-0 max-w-[54ch] text-mk-band-body text-mk-copy">
-                    {groupsOn ? page.introWithAi : page.intro}
-                </p>
-            </Container>
+            <PageHero
+                title={page.title}
+                lead={groupsOn ? page.introWithAi : page.intro}
+                className="pb-0 min-[760px]:pb-0"
+            />
 
             {groupsOn ? (
                 <>
@@ -73,7 +69,7 @@ export default function IntegrationsPage() {
                     />
                 </>
             ) : (
-                <Container className="pt-12">
+                <Container className="pt-10">
                     <h2 className="sr-only">Available now</h2>
                     <Cards cards={rest} />
                 </Container>
@@ -82,23 +78,26 @@ export default function IntegrationsPage() {
             <Container
                 as="section"
                 aria-labelledby="planned"
-                className="grid gap-1 pt-[72px]"
+                className="grid gap-5 pt-[72px] min-[760px]:pt-[120px]"
             >
-                <Eyebrow as="h2" id="planned" tone="muted" className="m-0 pb-1">
+                <h2
+                    id="planned"
+                    className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
+                >
                     {page.plannedTitle}
-                </Eyebrow>
-                <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
+                </h2>
+                <p className="m-0 mb-3 max-w-[70ch] text-[16px] leading-[1.6] text-mk-copy">
                     {page.plannedIntro}
                 </p>
                 <ComingList items={plannedIntegrations} idPrefix="planned" />
             </Container>
 
-            <Container className="pt-14">
-                <p className="m-0 border-t border-border pt-[22px] text-[15px] leading-[1.6] text-mk-copy">
+            <Container className="pb-[72px] pt-14 min-[760px]:pb-[120px]">
+                <p className="m-0 border-t border-border pt-6 text-[16px] leading-[1.6] text-mk-copy">
                     Need something else? Write to{" "}
                     <a
                         href={`mailto:${page.askEmail}?subject=Integration`}
-                        className="text-brand-700 hover:text-foreground"
+                        className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px] hover:decoration-foreground"
                     >
                         {page.askEmail}
                     </a>{" "}
@@ -130,30 +129,24 @@ function CardGroup({
         <Container
             as="section"
             aria-labelledby={id}
-            className="grid gap-[18px] pt-14"
+            className="grid grid-cols-[minmax(0,1fr)] gap-6 pt-10 min-[760px]:pt-14"
         >
             <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1.5">
                 <div className="grid gap-1.5">
                     <h2
                         id={id}
-                        className="m-0 font-display text-[22px] font-bold sm:text-[24px]"
+                        className="m-0 font-display text-mk-kit-h3 font-bold"
                     >
                         {title}
                     </h2>
-                    <p className="m-0 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy sm:text-[15.5px]">
+                    <p className="m-0 max-w-[70ch] text-[16px] leading-[1.6] text-mk-copy">
                         {line}
                     </p>
                 </div>
                 {link ? (
-                    <Link
-                        href={link.href}
-                        className={textLinkClasses({
-                            className: "text-[14.5px] font-semibold",
-                        })}
-                    >
+                    <TextLink href={link.href} tone="ink" arrow>
                         {link.label}
-                        <Arrow />
-                    </Link>
+                    </TextLink>
                 ) : null}
             </div>
             <Cards cards={cards} stack={stack} />
@@ -161,7 +154,10 @@ function CardGroup({
     );
 }
 
-/** The cards: each one link, naming where it's connected (R9). */
+/**
+ * The cards: each one link, naming where it's connected (R9). Three or
+ * more swipe on a phone (PHONE.md), one in full and the next peeking.
+ */
 function Cards({
     cards,
     stack = false,
@@ -170,6 +166,52 @@ function Cards({
     /** Four to a row: past phone width the connect line sits over the link. */
     stack?: boolean;
 }) {
+    const items = cards.map((item) => (
+        <Link
+            key={item.slug}
+            href={item.href}
+            className={cardLinkClasses(
+                // A column, so the line grows and the connect rows line up.
+                "flex h-full flex-col gap-3.5 p-[22px]",
+            )}
+        >
+            <span className="flex items-start gap-3">
+                <span className="grid">
+                    <span className="font-display text-mk-kit-h3 font-bold">
+                        {item.name}
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {item.kind ?? item.category}
+                    </span>
+                </span>
+                <Pill tone="ok" className="ml-auto">
+                    Available
+                </Pill>
+            </span>
+            <span className="flex-1 text-[15px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
+                {item.line}
+            </span>
+            <span
+                className={cn(
+                    "flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-mk-crop border border-mk-line-soft bg-background px-3 py-2.5 text-[13px]",
+                    stack && "sm:flex-col sm:items-start",
+                )}
+            >
+                <span className="text-muted-foreground">{item.connect}</span>
+                <span className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px]">
+                    {item.cta}
+                    <Arrow />
+                </span>
+            </span>
+        </Link>
+    ));
+    if (cards.length >= 3) {
+        return (
+            <SwipeRow label="Integrations" columns={stack ? 4 : 3}>
+                {items}
+            </SwipeRow>
+        );
+    }
     return (
         <ul
             className={cn(
@@ -179,47 +221,9 @@ function Cards({
                     : "grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))]",
             )}
         >
-            {cards.map((item) => (
-                <li key={item.slug} className="grid">
-                    <Link
-                        href={item.href}
-                        className={cardLinkClasses(
-                            // A column, so the line grows and the connect rows line up.
-                            "flex flex-col gap-3.5 p-[22px]",
-                        )}
-                    >
-                        <span className="flex items-start gap-3">
-                            <span className="grid">
-                                <span className="text-[17px] font-semibold">
-                                    {item.name}
-                                </span>
-                                <span className="text-[13px] text-muted-foreground">
-                                    {item.kind ?? item.category}
-                                </span>
-                            </span>
-                            <Pill tone="ok" className="ml-auto">
-                                Available
-                            </Pill>
-                        </span>
-                        <span className="flex-1 text-[14.5px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
-                            {item.line}
-                        </span>
-                        <span
-                            className={cn(
-                                "flex flex-wrap justify-between gap-x-3 gap-y-1 rounded-[10px] border border-mk-line-soft bg-background px-3 py-2.5 text-[13px]",
-                                "items-center",
-                                stack && "sm:flex-col sm:items-start",
-                            )}
-                        >
-                            <span className="text-muted-foreground">
-                                {item.connect}
-                            </span>
-                            <span className="font-semibold text-brand-700">
-                                {item.cta}
-                                <Arrow />
-                            </span>
-                        </span>
-                    </Link>
+            {items.map((card) => (
+                <li key={card.key} className="grid">
+                    {card}
                 </li>
             ))}
         </ul>

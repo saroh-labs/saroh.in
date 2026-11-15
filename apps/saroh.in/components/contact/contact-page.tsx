@@ -14,16 +14,16 @@ import { cn } from "@saroh/marketing/cn";
 import { Arrow } from "@saroh/marketing/arrow";
 import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { Container } from "@saroh/marketing/container";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { Section } from "@saroh/marketing/section";
 import { textLinkClasses } from "@saroh/marketing/text-link";
+import { PageHero } from "../resources/page-hero";
 import { ContactForm } from "./contact-form";
 
 /** The side column's white card. */
 const SIDE_CARD =
     "grid rounded-mk-card border border-border bg-card px-[22px] py-5";
 
-const SIDE_TITLE = "m-0 font-sans text-[16.5px] font-semibold text-foreground";
+const SIDE_TITLE = "m-0 font-display text-mk-kit-h3 font-bold text-foreground";
 
 /**
  * /contact (design "Contact", DEC-137): the message form on the left; on
@@ -56,25 +56,18 @@ export function ContactPage({
 
     return (
         <>
-            <Container
-                as="header"
-                className="grid justify-items-start gap-[18px] pt-[72px]"
-            >
-                <Eyebrow>{CONTACT_PAGE.eyebrow}</Eyebrow>
-                <h1 className="m-0 max-w-[15ch] font-display text-mk-pricing-hero font-bold [text-wrap:balance]">
-                    {CONTACT_PAGE.title}
-                </h1>
-                <p className="m-0 max-w-[56ch] text-mk-intro text-mk-copy [text-wrap:pretty]">
-                    {CONTACT_PAGE.lead}
-                </p>
-            </Container>
+            <PageHero
+                crumbs={[{ name: CONTACT_PAGE.eyebrow }]}
+                title={CONTACT_PAGE.title}
+                lead={CONTACT_PAGE.lead}
+            />
 
             <Container
                 as="section"
                 aria-label={CONTACT_PAGE.name}
-                className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start gap-8 pt-16"
+                className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))] items-start gap-8"
             >
-                <div className="rounded-[20px] border border-border bg-card p-[clamp(22px,4vw,36px)]">
+                <div className="rounded-mk-card border border-border bg-card p-[clamp(20px,4vw,36px)]">
                     <ContactForm />
                 </div>
 
@@ -96,11 +89,11 @@ export function ContactPage({
 
                     <div className={cn(SIDE_CARD, "gap-3")}>
                         <h2 className={SIDE_TITLE}>{ways.title}</h2>
-                        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-[18px] gap-y-2 text-[14.5px] leading-[1.5]">
+                        <dl className="m-0 grid grid-cols-[auto_minmax(0,1fr)] gap-x-[18px] gap-y-1 text-[15px] leading-[1.5]">
                             <Way label={ways.email}>
                                 <a
                                     href={`mailto:${SAROH_CONTACT_EMAIL}`}
-                                    className={textLinkClasses()}
+                                    className={textLinkClasses({ tone: "ink" })}
                                 >
                                     {SAROH_CONTACT_EMAIL}
                                 </a>
@@ -109,7 +102,9 @@ export function ContactPage({
                                 <Way label={ways.phone}>
                                     <a
                                         href={`tel:${company.phone.dial}`}
-                                        className={textLinkClasses()}
+                                        className={textLinkClasses({
+                                            tone: "ink",
+                                        })}
                                     >
                                         {company.phone.display}
                                     </a>
@@ -124,7 +119,9 @@ export function ContactPage({
                                         href={link.href}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className={textLinkClasses()}
+                                        className={textLinkClasses({
+                                            tone: "ink",
+                                        })}
                                     >
                                         {socialText(link.href)}
                                     </a>
@@ -135,9 +132,7 @@ export function ContactPage({
 
                     {lines.length > 0 || registration ? (
                         <div className="grid gap-1.5 rounded-mk-card bg-muted px-[22px] py-5 text-[14.5px] leading-[1.55] text-mk-copy">
-                            <h2 className="m-0 font-sans text-[14.5px] font-semibold leading-[1.55] text-foreground">
-                                {office.title}
-                            </h2>
+                            <h2 className={SIDE_TITLE}>{office.title}</h2>
                             <address className="not-italic">
                                 {company.legalName}
                                 {lines.map((line) => (
@@ -156,8 +151,9 @@ export function ContactPage({
                 <Section
                     titleId="contact-before"
                     title={before.title}
-                    size="sm"
-                    className="grid gap-[18px] pt-24"
+                    size="kit-h2"
+                    space="kit"
+                    className="grid gap-10"
                 >
                     <div
                         className={cn(
@@ -173,12 +169,12 @@ export function ContactPage({
                         {questions.map((item) => (
                             <div
                                 key={item.q}
-                                className="grid content-start gap-1.5 rounded-[14px] border border-border bg-card px-5 py-[18px]"
+                                className="grid content-start gap-1.5 rounded-mk-card border border-border bg-card px-5 py-5"
                             >
-                                <h3 className="m-0 font-sans text-[15.5px] font-semibold">
+                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
                                     {item.q}
                                 </h3>
-                                <p className="m-0 text-[14.5px] leading-[1.55] text-mk-copy">
+                                <p className="m-0 text-[16px] leading-[1.6] text-mk-copy">
                                     {item.a}
                                 </p>
                             </div>
@@ -202,11 +198,11 @@ function SideLink({
 }) {
     return (
         <Link href={href} className={cardLinkClasses("gap-1 px-[22px] py-5")}>
-            <span className="text-[16.5px] font-semibold">
+            <span className="font-display text-mk-kit-h3 font-bold">
                 {title}
                 <Arrow />
             </span>
-            <span className="text-[14.5px] leading-[1.5] text-mk-copy">
+            <span className="text-[15px] leading-[1.55] text-mk-copy">
                 {body}
             </span>
         </Link>

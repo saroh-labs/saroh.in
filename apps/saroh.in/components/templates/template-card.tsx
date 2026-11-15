@@ -47,14 +47,14 @@ export function TemplateCard({
             </BrowserFrame>
             <span className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <span className="grid gap-0.5">
-                    <Heading className="m-0 text-[19px] font-semibold tracking-[-0.01em]">
+                    <Heading className="m-0 font-display text-mk-kit-h3 font-bold">
                         {template.name}
                     </Heading>
                     <span className="text-[14px] text-muted-foreground">
                         {template.kindLabel}
                     </span>
                 </span>
-                <span className="text-[14px] font-semibold text-brand-700 group-hover:text-foreground">
+                <span className="text-[15px] font-semibold text-foreground underline decoration-border-strong underline-offset-[3px] group-hover:decoration-foreground">
                     {previewLabel}
                     <Arrow />
                 </span>

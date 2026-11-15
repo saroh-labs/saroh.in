@@ -4,7 +4,7 @@ import type { CardItem } from "./content-blocks";
 import { LinkCard } from "./content-blocks";
 import { ContentLayout } from "./content-layout";
 import type { Crumb } from "./page-parts";
-import { Crumbs } from "./page-parts";
+import { Crumbs, Marked } from "./page-parts";
 
 export interface HubGroup {
     title: string;
@@ -99,10 +99,16 @@ export function HubPage({
                 <Crumbs
                     crumbs={crumbs}
                     home={{ href: home }}
-                    sep="›"
+                    sep="/"
                     collapse
                 />
-                <h1 className="sp-hp-h1">{title}</h1>
+                <h1 className="sp-hp-h1">
+                    {typeof title === "string" ? (
+                        <Marked text={title} />
+                    ) : (
+                        title
+                    )}
+                </h1>
                 <p className="sp-hp-lead">{lead}</p>
                 {chips ? <HubChips {...chips} /> : null}
             </section>

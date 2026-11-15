@@ -36,7 +36,7 @@ export function ReportForm() {
         return (
             <p
                 role="status"
-                className="m-0 max-w-[600px] rounded-[10px] border border-border bg-card px-4 py-3 text-[15px] leading-[1.55] text-foreground"
+                className="m-0 max-w-[600px] rounded-mk-crop border border-border bg-card px-4 py-3 text-[15px] leading-[1.55] text-foreground"
             >
                 {copy.done}
             </p>
@@ -200,8 +200,7 @@ export function ReportForm() {
             <div>
                 <Button
                     type="submit"
-                    size="md"
-                    className="w-auto px-[18px]"
+                    size="kit"
                     disabled={state.at === "sending"}
                 >
                     {state.at === "sending" ? copy.sending : copy.submit}

@@ -26,10 +26,10 @@ export default function WelcomePage() {
             id="main"
             className="grid min-h-screen place-content-center gap-3 bg-background px-mk-gutter text-center font-sans text-foreground"
         >
-            <p className="m-0 text-[18px] leading-[1.55]">
+            <p className="m-0 text-mk-kit-lead">
                 One moment. Taking you to Saroh.
             </p>
-            <p className="m-0 text-[14.5px] text-mk-copy">
+            <p className="m-0 text-[16px] text-mk-copy">
                 <WelcomeForward
                     config={siteTagConfig()}
                     accountsUrl={ACCOUNTS_URL}

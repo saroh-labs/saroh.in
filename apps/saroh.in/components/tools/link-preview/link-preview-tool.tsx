@@ -33,7 +33,7 @@ type View =
     | { kind: "error"; message: string }
     | { kind: "results"; result: Checked };
 
-const GUTTER = "px-mk-gutter";
+const GUTTER = "mx-auto w-full max-w-mk-page px-mk-gutter";
 
 /**
  * The link preview checker (resources plan U2; design 1b, the email

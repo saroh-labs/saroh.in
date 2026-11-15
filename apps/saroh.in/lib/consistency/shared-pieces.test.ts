@@ -152,10 +152,7 @@ const RULES: Rule[] = [
         name: "the Ink closing band is CtaBand (V4, A10)",
         pattern: both("\\brounded-mk-band\\b", "\\bbg-foreground\\b"),
         home: [`${MK}/sections/cta-band.tsx`],
-        allow: {
-            "components/about/about-page.tsx":
-                "step 6 (V4): About's closing band (its 56px title, no body) becomes CtaBand; its सह name band is its own Ink block and stays",
-        },
+        allow: {},
         files: SITE,
     },
     {
@@ -233,14 +230,7 @@ const RULES: Rule[] = [
         name: "a page title is PageTitle, its size a token (V6, A7)",
         pattern: /text-\[clamp\(/,
         home: [`${MK}/sections/page-title.tsx`],
-        allow: {
-            "app/(standalone)/waitlist/page.tsx":
-                "keep: the waitlist's 68px opening line is a paragraph of its own design, not a page title",
-            "components/about/about-page.tsx":
-                "keep: About's 'Where' H2 (30-40px) is its own; its closing band title waits on V4 (CtaBand), not in step 6's picks",
-            "components/tools/link-preview/saroh-share-preview.tsx":
-                "keep: the 'Share Saroh' card's H2 (30-38px) is a card title, not a page title",
-        },
+        allow: {},
         files: SITE,
     },
     {

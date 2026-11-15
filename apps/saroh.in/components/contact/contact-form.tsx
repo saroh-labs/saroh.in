@@ -69,7 +69,7 @@ export function ContactForm() {
                 <h2
                     ref={thanks}
                     tabIndex={-1}
-                    className="m-0 font-display text-[28px] font-semibold tracking-[-0.02em] focus:outline-none"
+                    className="m-0 font-display text-mk-kit-h3 font-bold focus:outline-none"
                 >
                     {done.title(firstName(name))}
                 </h2>
@@ -95,7 +95,7 @@ export function ContactForm() {
             <div className="grid gap-1">
                 <h2
                     id="contact-form-title"
-                    className="m-0 font-display text-[24px] font-semibold tracking-[-0.02em]"
+                    className="m-0 font-display text-mk-kit-h3 font-bold"
                 >
                     {copy.title}
                 </h2>
@@ -269,14 +269,14 @@ export function ContactForm() {
             ) : null}
 
             <div className="flex flex-wrap items-center gap-x-[18px] gap-y-3">
-                <Button type="submit" disabled={sending}>
+                <Button type="submit" size="kit" disabled={sending}>
                     {sending ? copy.sending : copy.submit}
                 </Button>
                 <span className="text-mk-note text-muted-foreground">
                     {copy.orEmail}{" "}
                     <a
                         href={`mailto:${SAROH_CONTACT_EMAIL}`}
-                        className={textLinkClasses()}
+                        className={textLinkClasses({ tone: "prose" })}
                     >
                         {SAROH_CONTACT_EMAIL}
                     </a>

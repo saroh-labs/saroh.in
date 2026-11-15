@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PageHero } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { CtaBand } from "@/components/shared/sections/cta-band";
 import { TemplateCard } from "@/components/templates/template-card";
 import { TemplateViewer } from "@/components/templates/template-viewer";
 import type { GalleryTemplate } from "@/content/templates";
@@ -18,13 +18,14 @@ import {
 } from "@/content/templates";
 import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
-import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Container } from "@saroh/marketing/container";
 
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
+import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
 import { SectionHeading } from "@saroh/marketing/section-heading";
 
 /**
@@ -97,28 +98,31 @@ export default async function TemplatePage({ params }: Props) {
                     { name: t.name, path: t.href },
                 ])}
             />
-            <Container as="header" className="grid gap-6 pt-14">
-                <Breadcrumbs
-                    crumbs={[
-                        { name: detail.crumb, href: TEMPLATES_PATH },
-                        { name: t.name },
-                    ]}
-                />
-                <PageTitle size="article" className="max-w-[22ch]">
-                    {t.name}: {t.idea}.
-                </PageTitle>
-                <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
-                    {t.description}
-                </p>
+            <PageHero
+                crumbs={[
+                    { name: detail.crumb, href: TEMPLATES_PATH },
+                    { name: t.name },
+                ]}
+                title={`${t.name}: ${t.idea}.`}
+                mark={`${t.name}:`}
+                lead={t.description}
+                className="pb-8 min-[760px]:pb-12"
+            >
                 <div className="grid justify-items-start gap-3">
-                    <CtaLink src={`templates-${t.slug}`} template={save} />
-                    <span className="max-w-[60ch] text-mk-note text-muted-foreground">
+                    <span id="template-cta">
+                        <CtaLink
+                            src={`templates-${t.slug}`}
+                            template={save}
+                            size="kit"
+                        />
+                    </span>
+                    <span className="max-w-[60ch] text-[13px] text-muted-foreground">
                         {detail.saveNote(t.name)}
                     </span>
                 </div>
-            </Container>
+            </PageHero>
 
-            <Container className="pt-12">
+            <Container>
                 <TemplateViewer
                     template={t}
                     labels={{
@@ -128,7 +132,7 @@ export default async function TemplatePage({ params }: Props) {
                         phone: detail.phone,
                     }}
                 />
-                <p className="m-0 pt-4 text-mk-note text-muted-foreground">
+                <p className="m-0 pt-4 text-[13px] text-muted-foreground">
                     {templatesPage.sampleNote}
                 </p>
             </Container>
@@ -136,7 +140,7 @@ export default async function TemplatePage({ params }: Props) {
             <Container
                 as="section"
                 aria-label="About this template"
-                className="pt-16"
+                className="pt-[72px] min-[760px]:pt-[96px]"
             >
                 <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-x-10 gap-y-8 p-0">
                     {notes.map((n) => (
@@ -144,10 +148,10 @@ export default async function TemplatePage({ params }: Props) {
                             key={n.title}
                             className="grid content-start gap-2 border-t border-border pt-5"
                         >
-                            <h2 className="m-0 text-[18px] font-semibold tracking-[-0.01em]">
+                            <h2 className="m-0 font-display text-mk-kit-h3 font-bold">
                                 {n.title}
                             </h2>
-                            <p className="m-0 text-mk-card-body text-mk-copy [text-wrap:pretty]">
+                            <p className="m-0 text-[16px] leading-[1.6] text-mk-copy [text-wrap:pretty]">
                                 {n.body}
                             </p>
                         </li>
@@ -171,38 +175,51 @@ export default async function TemplatePage({ params }: Props) {
                 <Container
                     as="section"
                     aria-labelledby="related"
-                    className="pt-20"
+                    className="grid grid-cols-[minmax(0,1fr)] gap-10 pt-[72px] min-[760px]:pt-[120px]"
                 >
                     <SectionHeading
                         id="related"
                         title={detail.related}
-                        size="sm"
+                        size="kit-h2"
                     />
-                    <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(min(100%,300px),1fr))] gap-6 p-0 pt-8">
+                    <SwipeRow label={detail.related}>
                         {related.map((r) => (
-                            <li key={r.slug} className="grid min-w-0">
-                                <TemplateCard
-                                    template={r}
-                                    previewLabel={templatesPage.preview}
-                                    headingLevel={3}
-                                />
-                            </li>
+                            <TemplateCard
+                                key={r.slug}
+                                template={r}
+                                previewLabel={templatesPage.preview}
+                                headingLevel={3}
+                            />
                         ))}
-                    </ul>
+                    </SwipeRow>
                 </Container>
             ) : null}
 
-            <CtaBand
+            <ClosingCTA
+                id="template-start"
+                className="mt-[72px] min-[760px]:mt-[120px]"
                 title={
                     open
                         ? detail.band.after(t.name)
                         : detail.band.before(t.name)
                 }
-                body={templatesPage.band.body}
-                src={`templates-${t.slug}-band`}
-                template={save}
-                note={null}
+                primary={
+                    <CtaLink
+                        src={`templates-${t.slug}-band`}
+                        template={save}
+                        size="kit"
+                    />
+                }
+                note={templatesPage.band.body}
             />
+
+            <StickyBar watch="template-cta">
+                <CtaLink
+                    src={`templates-${t.slug}-sticky`}
+                    template={save}
+                    size="kit"
+                />
+            </StickyBar>
         </>
     );
 }

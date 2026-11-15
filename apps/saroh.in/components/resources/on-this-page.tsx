@@ -1,4 +1,3 @@
-import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 
 export interface PageHeading {
@@ -20,10 +19,10 @@ export function OnThisPage({ headings }: { headings: PageHeading[] }) {
             className="hidden min-w-0 min-[1100px]:sticky min-[1100px]:top-[calc(var(--mk-nav-h)+1.5rem)] min-[1100px]:block min-[1100px]:max-h-[calc(100dvh-var(--mk-nav-h)-3rem)] min-[1100px]:overflow-y-auto min-[1100px]:overscroll-contain"
         >
             <div className="grid gap-2">
-                <Eyebrow as="span" tone="muted" size="sm">
+                <span className="text-[13px] font-semibold text-foreground">
                     On this page
-                </Eyebrow>
-                <ul className="m-0 grid list-none gap-1.5 border-l border-border p-0 pl-3.5 text-[13.5px] leading-[1.4]">
+                </span>
+                <ul className="m-0 grid list-none gap-1.5 border-l border-border p-0 pl-3.5 text-[14px] leading-[1.4]">
                     {headings.map((h) => (
                         <li key={h.id}>
                             <a

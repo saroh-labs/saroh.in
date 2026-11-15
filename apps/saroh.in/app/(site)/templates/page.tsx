@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { CtaBand } from "@/components/shared/sections/cta-band";
+import { PageHero } from "@/components/resources/page-hero";
+import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { TemplatesGallery } from "@/components/templates/templates-gallery";
 import {
     earlyAccessOpen,
@@ -14,7 +15,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { Container } from "@saroh/marketing/container";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 
 export const metadata: Metadata = pageMetadata({
     title: page.seo.title,
@@ -42,35 +43,30 @@ export default function TemplatesPage() {
     const open = earlyAccessOpen(ctx.now);
     return (
         <>
-            <Container
-                as="header"
-                className="grid justify-items-center gap-4 pt-16 text-center"
-            >
-                <PageTitle size="page" className="max-w-[18ch]">
-                    {page.title}
-                </PageTitle>
-                <p className="m-0 max-w-[58ch] text-mk-band-body text-mk-copy [text-wrap:pretty]">
-                    {page.intro(templates)}
-                </p>
-            </Container>
+            <PageHero
+                title={page.title}
+                lead={page.intro(templates)}
+                className="pb-8 min-[760px]:pb-10"
+            />
 
-            <Container className="pt-10">
+            <Container>
                 <TemplatesGallery
                     templates={templates}
                     chips={galleryChips(templates)}
                     allLabel={page.allChip}
                     previewLabel={page.preview}
                 />
-                <p className="m-0 pt-8 text-center text-mk-note text-muted-foreground">
+                <p className="m-0 pt-8 text-[13px] text-muted-foreground">
                     {page.sampleNote}
                 </p>
             </Container>
 
-            <CtaBand
+            <ClosingCTA
+                id="templates-start"
+                className="mt-[72px] min-[760px]:mt-[120px]"
                 title={open ? page.band.after : page.band.before}
-                body={page.band.body}
-                src="templates-band"
-                note={null}
+                primary={<CtaLink src="templates-band" size="kit" />}
+                note={page.band.body}
             />
         </>
     );

@@ -1,17 +1,17 @@
+import { PageHero } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
-import { HeroActions } from "@/components/shared/buttons/hero-actions";
 import { docsHref, DEVELOPERS as page } from "@/content/developers";
-import { Arrow } from "@saroh/marketing/arrow";
-import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { ButtonLink } from "@saroh/marketing/button";
 import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { cn } from "@saroh/marketing/cn";
 import { CodeSample } from "@saroh/marketing/code-sample";
 import { Container } from "@saroh/marketing/container";
-import { CtaBand } from "@saroh/marketing/cta-band";
 import { FeaturePoints } from "@saroh/marketing/feature-points";
 import { FeatureSteps } from "@saroh/marketing/feature-steps";
+import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
+import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
 import { SectionHeading } from "@saroh/marketing/section-heading";
+import { TextLink } from "@saroh/marketing/text-link";
 
 /**
  * /developers (plan 2026-11-13-002, U6; board VFDevelopers), in the feature
@@ -37,38 +37,37 @@ export function DevelopersPage({
     const readDocs = docsHref(page.readDocs.path);
     return (
         <>
-            <Container
-                as="header"
-                className="grid justify-items-start gap-5 pt-[72px]"
+            <PageHero
+                crumbs={[{ name: "Resources" }, { name: page.name }]}
+                title={page.headline}
+                lead={page.sub}
             >
-                <Breadcrumbs
-                    current="brand"
-                    crumbs={[{ name: "Resources" }, { name: page.name }]}
-                />
-                <h1 className="m-0 max-w-[16ch] font-display text-mk-display font-bold [text-wrap:balance]">
-                    {page.headline}
-                </h1>
-                <p className="m-0 max-w-[60ch] text-mk-lead text-mk-copy [text-wrap:pretty]">
-                    {page.sub}
-                </p>
-                {docsOn ? (
-                    <div className="flex flex-wrap gap-3">
-                        <ButtonLink href={readDocs}>
+                <div className="flex flex-wrap gap-3">
+                    {docsOn ? (
+                        <ButtonLink
+                            id="developers-cta"
+                            href={readDocs}
+                            size="kit"
+                        >
                             {page.readDocs.label}
                         </ButtonLink>
-                        <CtaLink src="developers" variant="secondary" />
-                    </div>
-                ) : (
-                    <HeroActions src="developers" />
-                )}
-                <p className="m-0 text-mk-note text-muted-foreground">
+                    ) : null}
+                    <span id={docsOn ? undefined : "developers-cta"}>
+                        <CtaLink
+                            src="developers"
+                            size="kit"
+                            variant={docsOn ? "secondary" : "primary"}
+                        />
+                    </span>
+                </div>
+                <p className="m-0 -mt-2 text-[15px] text-muted-foreground">
                     {page.note}
                 </p>
-            </Container>
+            </PageHero>
 
-            <Container className="pt-14">
+            <Container>
                 <figure className="m-0 grid gap-3.5">
-                    <div className="grid items-start gap-6 rounded-mk-band border border-border bg-muted p-4 sm:p-7 lg:grid-cols-[1.15fr_1fr]">
+                    <div className="grid items-start gap-6 rounded-mk-card border border-border bg-muted p-4 sm:p-7 lg:grid-cols-[1.15fr_1fr]">
                         <CodeSample
                             title={page.hero.title}
                             code={page.hero.code}
@@ -88,7 +87,7 @@ export function DevelopersPage({
                     body: step.body,
                     who: step.who,
                     drawn: (
-                        <div className="rounded-mk-band border border-border bg-muted p-3.5 sm:p-[22px]">
+                        <div className="rounded-mk-card border border-border bg-muted p-3.5 sm:p-[22px]">
                             {"code" in step ? (
                                 <div className="grid gap-3.5">
                                     <CodeSample
@@ -113,13 +112,13 @@ export function DevelopersPage({
                 <Container
                     as="section"
                     aria-labelledby="docs"
-                    className="grid gap-7 pt-[110px]"
+                    className="grid gap-10 pt-[72px] min-[760px]:pt-[120px]"
                 >
                     <SectionHeading
                         id="docs"
                         title={page.docsTitle}
                         lead={page.docsLead}
-                        size="md"
+                        size="kit-h2"
                     />
                     <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,230px),1fr))] gap-[18px] p-0">
                         {page.docs.map((doc) => (
@@ -130,15 +129,14 @@ export function DevelopersPage({
                                         "gap-2.5 p-[22px]",
                                     )}
                                 >
-                                    <span className="text-[17px] font-semibold">
+                                    <span className="font-display text-mk-kit-h3 font-bold">
                                         {doc.title}
                                     </span>
-                                    <span className="flex-1 text-[14.5px] leading-[1.55] text-mk-copy">
+                                    <span className="flex-1 text-[15px] leading-[1.55] text-mk-copy">
                                         {doc.body}
                                     </span>
-                                    <span className="text-[14px] font-semibold text-brand-700">
-                                        {doc.cta}
-                                        <Arrow />
+                                    <span className="text-[15px] font-semibold underline decoration-border-strong underline-offset-[3px]">
+                                        {doc.cta} →
                                     </span>
                                 </a>
                             </li>
@@ -147,38 +145,47 @@ export function DevelopersPage({
                 </Container>
             ) : null}
 
-            <CtaBand
+            <ClosingCTA
+                id="developers-start"
                 title={page.closer}
-                body={
-                    docsOn
-                        ? page.bandBody
-                        : page.bandBody.replace(
-                              /^Read the docs, then ask/,
-                              "Ask",
-                          )
+                primary={
+                    docsOn ? (
+                        <ButtonLink href={readDocs} size="kit">
+                            {page.readDocs.label}
+                        </ButtonLink>
+                    ) : (
+                        <CtaLink src="developers-band" size="kit" />
+                    )
                 }
-                note={docsOn ? "docs.saroh.in" : null}
-                className="pt-[120px]"
-                actions={
-                    <div className="flex flex-wrap gap-3">
-                        {docsOn ? (
-                            <ButtonLink href={readDocs} variant="saffron">
-                                {page.readDocs.label}
-                            </ButtonLink>
-                        ) : (
-                            <CtaLink src="developers-band" variant="saffron" />
-                        )}
-                        {aiAppsOn ? (
-                            <ButtonLink
-                                href={page.seeAiApps.href}
-                                variant="secondary-on-ink"
-                            >
-                                {page.seeAiApps.label}
-                            </ButtonLink>
-                        ) : null}
-                    </div>
+                secondary={
+                    aiAppsOn ? (
+                        <TextLink href={page.seeAiApps.href} tone="ink" arrow>
+                            {page.seeAiApps.label}
+                        </TextLink>
+                    ) : null
+                }
+                note={
+                    <>
+                        {docsOn
+                            ? page.bandBody
+                            : page.bandBody.replace(
+                                  /^Read the docs, then ask/,
+                                  "Ask",
+                              )}
+                        {docsOn ? " docs.saroh.in" : null}
+                    </>
                 }
             />
+
+            <StickyBar watch="developers-cta">
+                {docsOn ? (
+                    <ButtonLink href={readDocs} size="kit">
+                        {page.readDocs.label}
+                    </ButtonLink>
+                ) : (
+                    <CtaLink src="developers-sticky" size="kit" />
+                )}
+            </StickyBar>
         </>
     );
 }
@@ -204,7 +211,7 @@ function WebhookPanel() {
                 <span className="font-mono text-[12px] text-muted-foreground [overflow-wrap:anywhere]">
                     {hook.url}
                 </span>
-                <span className="pt-1 text-[11.5px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                <span className="pt-1 text-[12px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                     {hook.deliveriesTitle}
                 </span>
                 <ul className="m-0 grid list-none p-0">
@@ -219,7 +226,7 @@ function WebhookPanel() {
                             <span className="text-[12.5px] text-muted-foreground">
                                 {d.line}
                             </span>
-                            <span className="ml-auto rounded-full bg-mk-ok-tint px-2 py-0.5 text-[11.5px] font-semibold text-mk-ok">
+                            <span className="ml-auto rounded-full bg-mk-ok-tint px-2 py-0.5 text-[12px] font-semibold text-mk-ok">
                                 {d.result}
                             </span>
                         </li>
@@ -267,7 +274,7 @@ function KeysPanel() {
                             </span>
                             <span
                                 className={cn(
-                                    "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-semibold",
+                                    "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold",
                                     row.on
                                         ? "bg-mk-ok-tint text-mk-ok"
                                         : "bg-muted text-muted-foreground",

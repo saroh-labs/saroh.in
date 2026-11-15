@@ -7,7 +7,9 @@ import { formatDay } from "@/lib/format/day";
 import { parseLegal } from "@/lib/legal-markdown";
 import { resourcesContext } from "@/lib/resources-context";
 import { Container } from "@saroh/marketing/container";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { SectionHeading } from "@saroh/marketing/section-heading";
+
+import { markTitle } from "@/components/resources/page-hero";
 
 /**
  * A legal page (plan U1, R6): the owner's text, verbatim, in a 720px reading
@@ -53,9 +55,9 @@ export function LegalFrame({
         <Container
             as="article"
             width="article"
-            className="grid gap-5 pt-[72px]"
+            className="grid gap-5 pt-12 min-[760px]:pt-[72px]"
         >
-            <PageTitle size="article">{title}</PageTitle>
+            <SectionHeading as="h1" size="kit-h1" title={markTitle(title)} />
             {children}
         </Container>
     );

@@ -20,11 +20,25 @@
 }
 
 <script type="application/ld+json">[{"@context":"https://schema.org","@type":"SoftwareApplication","name":"QR code maker","url":"https://www.saroh.in/tools/qr-code-maker","description":"A free QR code maker: type a link, add your logo, pick a colour and a label, and download the code as a PNG or an SVG. The code is made in your browser.","applicationCategory":"UtilitiesApplication","operatingSystem":"Web","isAccessibleForFree":true,"publisher":{"@type":"Organization","name":"Saroh","url":"https://www.saroh.in"}}]</script>
-<div class="flex flex-col gap-7 px-mk-gutter pb-14 pt-11">
-<div class="flex flex-wrap items-end justify-between gap-6">
-<h1 class="m-0 font-display font-bold [text-wrap:balance] text-mk-article">QR code maker</h1>
-<span class="text-[15px] text-mk-copy">Your link, your logo, your colour. Free.</span>
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-6 pt-8 min-[760px]:pt-10 pb-8 min-[760px]:pb-10">
+<nav aria-label="Breadcrumb">
+<ol class="m-0 flex list-none flex-wrap items-center gap-2 p-0 text-[14px] text-muted-foreground">
+<li class="flex items-center gap-2">
+<a class="cursor-pointer rounded-sm transition-colors duration-fast ease-out text-muted-foreground no-underline hover:text-foreground active:text-mk-copy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]" href="/tools">Free tools</a>
+</li>
+<li class="flex items-center gap-2">
+<span aria-hidden="true">/</span>
+<span aria-current="page" class="">QR code maker</span>
+</li>
+</ol>
+</nav>
+<div class="grid gap-5 min-[760px]:gap-6">
+<h1 class="m-0 font-display font-bold [text-wrap:balance] max-w-[18ch] text-mk-kit-h1">QR code <span class="underline decoration-brand-500 decoration-[0.08em] underline-offset-[0.14em] [text-decoration-skip-ink:none]">maker</span>
+</h1>
+<p class="m-0 [text-wrap:pretty] max-w-[62ch] text-mk-kit-lead">Your link, your logo, your colour. Free.</p>
 </div>
+</div>
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page">
 <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-start gap-7">
 <div class="flex min-w-0 flex-col gap-5">
 <label class="flex flex-col gap-2">
@@ -35,16 +49,16 @@
 </span>
 </label>
 <div class="flex flex-col gap-2">
-<span id="_R_aH1_" class="text-sm font-semibold">Logo</span>
-<div role="group" aria-labelledby="_R_aH1_" class="flex flex-wrap items-center gap-3">
+<span id="_R_3H1_" class="text-sm font-semibold">Logo</span>
+<div role="group" aria-labelledby="_R_3H1_" class="flex flex-wrap items-center gap-3">
 <label class="flex h-[42px] cursor-pointer items-center rounded-[10px] border border-border-strong bg-card px-4 text-sm font-semibold transition-colors duration-fast ease-out hover:bg-mk-hover active:bg-muted focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500 focus-within:[outline-style:solid]">Add your logo<input type="file" accept="image/*" class="sr-only"/>
 </label>
 <span class="min-w-0 flex-[1_1_220px] text-[13px] text-muted-foreground">Square works best. It covers about a fifth of the code, so it still scans.</span>
 </div>
 </div>
 <div class="flex flex-col gap-2">
-<span id="_R_a_" class="text-sm font-semibold">Colour</span>
-<div role="group" aria-labelledby="_R_a_" class="flex flex-wrap gap-2.5">
+<span id="_R_3_" class="text-sm font-semibold">Colour</span>
+<div role="group" aria-labelledby="_R_3_" class="flex flex-wrap gap-2.5">
 <button type="button" aria-label="Ink" aria-pressed="true" data-swatch="#1C1C1A" style="background-color:#1C1C1A" class="size-[34px] cursor-pointer rounded-full border-[3px] border-background ring-[1.5px] transition-transform duration-fast ease-out hover:scale-105 active:scale-95 ring-foreground focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
 </button>
 <button type="button" aria-label="Plum" aria-pressed="false" data-swatch="#5C2A48" style="background-color:#5C2A48" class="size-[34px] cursor-pointer rounded-full border-[3px] border-background ring-[1.5px] transition-transform duration-fast ease-out hover:scale-105 active:scale-95 ring-border focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
@@ -78,29 +92,29 @@
 </svg>
 <div aria-hidden="true" class="pointer-events-none absolute inset-0 flex items-center justify-center">
 <div style="width:24.444444444444443%" class="flex aspect-square items-center justify-center">
-<span data-logo-placeholder="true" style="width:81.81818181818183%" class="flex aspect-square items-center justify-center rounded-[22%] border-[1.5px] border-dashed border-border-strong text-[11px] text-mk-hint">logo</span>
+<span data-logo-placeholder="true" style="width:81.81818181818183%" class="flex aspect-square items-center justify-center rounded-[22%] border-[1.5px] border-dashed border-border-strong text-[12px] text-mk-hint">logo</span>
 </div>
 </div>
 </div>
 <span class="text-center text-[13px] text-muted-foreground">A sample that opens this page. Type your link to make yours.</span>
 <div class="sp tp qc-side w-full !bg-transparent">
 <form noValidate="" class="tp-gate">
-<label for="_R_mq_-email" class="tp-gate-label">Get your QR code</label>
+<label for="_R_bb_-email" class="tp-gate-label">Get your QR code</label>
 <div class="tp-gate-row">
-<input id="_R_mq_-email" type="email" autoComplete="email" placeholder="you@business.in" aria-describedby="_R_mq_-note" class="tp-input tp-gate-input" value=""/>
+<input id="_R_bb_-email" type="email" autoComplete="email" placeholder="you@business.in" aria-describedby="_R_bb_-note" class="tp-input tp-gate-input" value=""/>
 <button type="submit" class="tp-btn tp-gate-btn">Get my QR</button>
 </div>
-<span id="_R_mq_-note" class="tp-gate-note">We&#x27;ll email you a link back to this tool. No newsletter unless you ask. What you typed stays in your browser. <a href="/privacy">Privacy</a>
+<span id="_R_bb_-note" class="tp-gate-note">We&#x27;ll email you a link back to this tool. No newsletter unless you ask. What you typed stays in your browser. <a href="/privacy">Privacy</a>
 </span>
 </form>
 </div>
 </div>
 </div>
-<div class="flex flex-wrap items-center justify-between gap-5 rounded-mk-card bg-foreground px-[26px] py-[22px] text-background">
-<div class="flex min-w-0 max-w-[60ch] flex-col gap-1">
-<h2 class="m-0 font-display text-xl font-semibold tracking-[-0.02em]">Give your code a page to open</h2>
-<p class="m-0 text-sm leading-[1.5] text-mk-on-ink">Saroh puts your site, bookings, orders and GST invoices in one place. Point your code at your Saroh page and people can book from it.</p>
 </div>
-<a class="inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] bg-mk-saffron text-foreground hover:bg-mk-saffron-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-background focus-visible:[outline-style:solid] gap-2 rounded-[10px] px-[18px] disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100 h-11 text-[15px]" href="/waitlist?src=qr-code-maker">Join the waitlist</a>
+<section class="mx-auto w-full px-mk-gutter max-w-mk-page grid justify-items-center gap-7 py-[72px] text-center min-[760px]:py-[96px] mt-[72px] border-t border-border min-[760px]:mt-[96px]" aria-labelledby="qr-start-title">
+<h2 id="qr-start-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Give your code a page to open</h2>
+<div class="flex flex-wrap justify-center gap-3">
+<a class="inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] bg-foreground text-background hover:bg-mk-ink-hover hover:text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] h-12 gap-2 rounded-mk-kit-btn px-[22px] text-base disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100" href="/waitlist?src=qr-code-maker">Join the waitlist</a>
 </div>
-</div>
+<p class="m-0 text-[15px] text-muted-foreground">Saroh puts your site, bookings, orders and GST invoices in one place. Point your code at your Saroh page and people can book from it.</p>
+</section>

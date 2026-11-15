@@ -388,5 +388,34 @@ panels.tsx`, fed by the world, no Rye literals; words in
   apps render their own components from `components/feature-pages/
 registry.ts` (stubs drawing the old page until agent reach lands).
   `vitest.setup.ts` stands in an IntersectionObserver for jsdom.
+- **17 Nov 2026, the pages without a board (unit/web-pages).** About,
+  contact, customers, the legal pages, developers, the changelog and its
+  entries, Help and its articles, integrations and each provider, pricing's
+  head and closing, templates and each template, the QR code maker, the
+  link preview checker, the waitlist and welcome are in the kit, words and
+  functions unchanged:
+    - `PageHero` (`components/resources/page-hero.tsx`): crumbs, the one h1
+      at `kit-h1` with `markTitle` putting the Mark under a chosen word or
+      the last one, a lead, the page's actions. A page whose old eyebrow named
+      it shows that word as its single crumb ("About Saroh", "Pricing",
+      "Contact"); section eyebrows are gone (About's "Where we are").
+    - h2 at `kit-h2`, h3 at `kit-h3`; an h2 inside a reading column (legal,
+      a Help step, a changelog entry's parts) takes `kit-h3`. Cards 16px,
+      crops 12px, buttons `size="kit"`, Ink `TextLink`s with "→" to another
+      page. The Ink CtaBand closings became `ClosingCTA`; its body and "No
+      card needed" read as the note.
+    - Phone: developers and each template get the `StickyBar`; integration
+      cards and related templates are a `SwipeRow` from three. Templates'
+      filters are the kit's `filter` chips.
+    - Pricing still reads the catalogue (`lib/pricing.ts`); its plan cards
+      and compare table stay, the one plan strip KIT.md keeps.
+    - The GST, guide and download pages, their hubs, the tools hub and every
+      tool page are drawn by `@saroh/search-pages`: a `.sp-kit` layer on
+      their roots (not /for/) gives them the kit's Saffron, the h1 with the
+      mark under its last word (a reading page's h1 at the kit's 42px on
+      every screen, so a full search title keeps to a few lines), "/"
+      crumbs, the 48px Ink button, the closing as ClosingCTA, plain 13px
+      labels for the old small caps, nothing under 12px, and hub cards that
+      swipe on a phone. Tool UIs (Operate) keep their controls as they were.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).

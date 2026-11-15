@@ -6,7 +6,7 @@ import { Byline, Figure, OnThisPage, Related } from "./content-blocks";
 import { ContentLayout } from "./content-layout";
 import type { ContentLinks } from "./page-links";
 import { PageBand } from "./page-links";
-import { Crumbs, Questions } from "./page-parts";
+import { Crumbs, Marked, Questions } from "./page-parts";
 import { Prose } from "./prose";
 
 /*
@@ -48,10 +48,12 @@ export function GuidePage({
                         { name: p.name },
                     ]}
                     home={{ href: links.home }}
-                    sep="›"
+                    sep="/"
                     collapse
                 />
-                <h1 className="sp-gd-h1">{p.h1}</h1>
+                <h1 className="sp-gd-h1">
+                    <Marked text={p.h1} />
+                </h1>
                 <p className="sp-gd-lead">{p.lead}</p>
                 <Byline
                     variant="block"

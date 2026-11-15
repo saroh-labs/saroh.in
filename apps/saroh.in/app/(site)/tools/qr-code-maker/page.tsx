@@ -3,15 +3,18 @@ import "@saroh/search-pages/styles.css";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { PageHero, toolsCrumb } from "@/components/resources/page-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { QrCodeMaker } from "@/components/tools/qr-code-maker/qr-code-maker";
 import { qrCodeMaker as copy } from "@/content/qr-code-maker";
 import { qrCodeMakerLive } from "@/lib/qr-code-maker-live";
 import { resourcesContext } from "@/lib/resources-context";
+import { builtTools } from "@/lib/search-pages";
 import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { toolLd } from "@/lib/structured-data";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { Container } from "@saroh/marketing/container";
+import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 
 export const metadata: Metadata = pageMetadata({
     title: copy.metaTitle,
@@ -43,31 +46,25 @@ export default function QrCodeMakerPage() {
                     }),
                 ]}
             />
-            <div className="flex flex-col gap-7 px-mk-gutter pb-14 pt-11">
-                <div className="flex flex-wrap items-end justify-between gap-6">
-                    <PageTitle size="article">{copy.title}</PageTitle>
-                    <span className="text-[15px] text-mk-copy">{copy.sub}</span>
-                </div>
-
+            <PageHero
+                crumbs={[
+                    toolsCrumb(builtTools().length > 0),
+                    { name: copy.title },
+                ]}
+                title={copy.title}
+                lead={copy.sub}
+                className="pb-8 min-[760px]:pb-10"
+            />
+            <Container>
                 <QrCodeMaker />
-
-                <div className="flex flex-wrap items-center justify-between gap-5 rounded-mk-card bg-foreground px-[26px] py-[22px] text-background">
-                    <div className="flex min-w-0 max-w-[60ch] flex-col gap-1">
-                        <h2 className="m-0 font-display text-xl font-semibold tracking-[-0.02em]">
-                            {copy.band.title}
-                        </h2>
-                        <p className="m-0 text-sm leading-[1.5] text-mk-on-ink">
-                            {copy.band.body}
-                        </p>
-                    </div>
-                    <CtaLink
-                        src="qr-code-maker"
-                        variant="saffron"
-                        size="sm"
-                        className="h-11 text-[15px]"
-                    />
-                </div>
-            </div>
+            </Container>
+            <ClosingCTA
+                id="qr-start"
+                className="mt-[72px] border-t border-border min-[760px]:mt-[96px]"
+                title={copy.band.title}
+                primary={<CtaLink src="qr-code-maker" size="kit" />}
+                note={copy.band.body}
+            />
         </>
     );
 }

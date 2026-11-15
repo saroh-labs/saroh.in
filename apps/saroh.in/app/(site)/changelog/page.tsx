@@ -6,11 +6,11 @@ import {
     FirstEntrySoon,
 } from "@/components/changelog/changelog-list";
 import { ChangelogSignup } from "@/components/changelog/changelog-signup";
+import { PageHero } from "@/components/resources/page-hero";
 import { CHANGELOG, changelogView } from "@/content/changelog";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { Container } from "@saroh/marketing/container";
-import { PageTitle } from "@saroh/marketing/page-title";
 
 export const metadata: Metadata = pageMetadata({
     title: CHANGELOG.metaTitle,
@@ -30,22 +30,14 @@ export default function ChangelogPage() {
     const view = changelogView(resourcesContext());
     return (
         <>
-            <Container
-                as="header"
-                width="list"
-                className="grid gap-[18px] pt-20"
-            >
-                <PageTitle size="page">{CHANGELOG.title}</PageTitle>
-                <p className="m-0 text-mk-intro text-mk-copy">
-                    {CHANGELOG.sub}
-                </p>
+            <PageHero width="list" title={CHANGELOG.title} lead={CHANGELOG.sub}>
                 <ChangelogSignup />
-            </Container>
+            </PageHero>
             <Container
                 as="section"
                 width="list"
                 aria-label="Entries"
-                className="grid pt-14"
+                className="grid"
             >
                 {view.state === "entries" ? (
                     view.entries.map((entry) => (

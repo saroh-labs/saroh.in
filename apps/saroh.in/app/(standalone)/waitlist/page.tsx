@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import Link from "next/link";
 
+import { markTitle } from "@/components/resources/page-hero";
 import { WaitlistForm } from "@/components/waitlist/waitlist-form";
 import { linkShown } from "@/content/resources";
 import { SAROH_HANDLE, SAROH_SOCIAL } from "@/content/social";
@@ -22,7 +23,6 @@ import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
 import { openingShort } from "@/lib/waitlist";
 import { Arrow } from "@saroh/marketing/arrow";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { Pill } from "@saroh/marketing/pill";
 import { ring } from "@saroh/marketing/ring";
 import { textLinkClasses } from "@saroh/marketing/text-link";
@@ -116,15 +116,10 @@ export default async function WaitlistPage() {
                 className={`${FRAME} ${GUTTER} grid flex-1 grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-start gap-[clamp(28px,5vw,64px)] py-[clamp(24px,5vw,64px)]`}
             >
                 <div className="flex flex-col gap-[22px] pt-2">
-                    <Eyebrow
-                        as="h1"
-                        tone="muted"
-                        size="sm"
-                        className="m-0 leading-[1.5]"
-                    >
-                        {WAITLIST_PAGE.h1}
-                    </Eyebrow>
-                    <p className="m-0 font-display text-[clamp(40px,6vw,68px)] font-semibold leading-[1.06] tracking-[-0.04em] [text-wrap:balance]">
+                    <h1 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
+                        {markTitle(WAITLIST_PAGE.h1, "Saroh,")}
+                    </h1>
+                    <p className="m-0 font-display text-mk-kit-h1 font-bold [text-wrap:balance]">
                         {HERO.map(([initial, rest]) => (
                             <span key={initial}>
                                 <span className="text-brand-500">
@@ -134,14 +129,14 @@ export default async function WaitlistPage() {
                             </span>
                         ))}
                     </p>
-                    <p className="m-0 max-w-[46ch] text-[18px] leading-[1.55] text-neutral-600 [text-wrap:pretty]">
+                    <p className="m-0 max-w-[46ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
                         Sell, take bookings and run your website from one place.
                         Made in India, priced in rupees.
                     </p>
                     <div className="flex max-w-[460px] flex-col gap-2.5 border-t border-border pt-5">
-                        <Eyebrow as="span" tone="muted" size="sm">
+                        <span className="text-[13px] font-semibold text-foreground">
                             For people who run
-                        </Eyebrow>
+                        </span>
                         <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
                             {HERO_KINDS.map((kind) => (
                                 <li key={kind.id}>
@@ -150,7 +145,7 @@ export default async function WaitlistPage() {
                             ))}
                         </ul>
                     </div>
-                    <p className="m-0 max-w-[46ch] text-[14px] leading-[1.5] text-muted-foreground [text-wrap:pretty]">
+                    <p className="m-0 max-w-[46ch] text-[15px] leading-[1.55] text-muted-foreground [text-wrap:pretty]">
                         {WAITLIST_MONEY.line}
                         {integrations ? (
                             <>
@@ -158,8 +153,9 @@ export default async function WaitlistPage() {
                                 <Link
                                     href={WAITLIST_MONEY.link.href}
                                     className={textLinkClasses({
+                                        tone: "prose",
                                         className:
-                                            "whitespace-nowrap font-semibold",
+                                            "whitespace-nowrap font-semibold text-foreground",
                                     })}
                                 >
                                     {WAITLIST_MONEY.link.label}

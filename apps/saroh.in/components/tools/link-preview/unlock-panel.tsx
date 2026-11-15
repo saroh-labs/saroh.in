@@ -59,7 +59,7 @@ export function UnlockPanel({
                 <pre
                     tabIndex={0}
                     aria-label={copy.tagsTitle}
-                    className={`m-0 overflow-x-auto whitespace-pre-wrap rounded-lg bg-mk-on-ink-hover p-3 font-mono text-[11px] leading-[1.6] text-mk-code [overflow-wrap:anywhere] ${ring({ offset: 0, color: "paper" })}`}
+                    className={`m-0 overflow-x-auto whitespace-pre-wrap rounded-lg bg-mk-on-ink-hover p-3 font-mono text-[12px] leading-[1.6] text-mk-code [overflow-wrap:anywhere] ${ring({ offset: 0, color: "paper" })}`}
                 >
                     {unlocked.suggestedTags}
                 </pre>

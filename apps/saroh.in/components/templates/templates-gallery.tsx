@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import type { GalleryTemplate } from "@/content/templates";
 
-import { ChoiceChip } from "@saroh/marketing/choice-chip";
+import { Chip } from "@saroh/marketing/kit/chip";
 import { TemplateCard } from "./template-card";
 
 export interface GalleryChip {
@@ -41,19 +41,19 @@ export function TemplatesGallery({
             <div
                 role="group"
                 aria-label="Kind of business"
-                className="flex flex-wrap justify-center gap-2"
+                className="flex flex-wrap gap-2"
             >
                 {options.map((chip) => {
                     const on = chip.id === kind;
                     return (
-                        <ChoiceChip
+                        <Chip
                             key={chip.id ?? "all"}
-                            aria-pressed={on}
+                            variant="filter"
                             on={on}
                             onClick={() => setKind(chip.id)}
                         >
                             {chip.label}
-                        </ChoiceChip>
+                        </Chip>
                     );
                 })}
             </div>

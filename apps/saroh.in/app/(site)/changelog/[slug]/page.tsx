@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { markTitle } from "@/components/resources/page-hero";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import {
     CHANGELOG_ENTRIES,
@@ -12,11 +12,10 @@ import { linkShown, liveBySlug } from "@/content/resources";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { articleLd, breadcrumbLd } from "@/lib/structured-data";
-import { Arrow } from "@saroh/marketing/arrow";
 import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Article } from "@saroh/marketing/container";
-import { PageTitle } from "@saroh/marketing/page-title";
-import { textLinkClasses } from "@saroh/marketing/text-link";
+import { SectionHeading } from "@saroh/marketing/section-heading";
+import { TextLink } from "@saroh/marketing/text-link";
 
 /**
  * One changelog entry (plan U4, design "Saroh is open"). Every entry is
@@ -91,8 +90,12 @@ export default async function ChangelogEntryPage({ params }: Props) {
                     },
                 ]}
             />
-            <PageTitle size="article">{entry.title}</PageTitle>
-            <p className="m-0 text-mk-lead leading-[1.65] text-mk-prose [text-wrap:pretty]">
+            <SectionHeading
+                as="h1"
+                size="kit-h1"
+                title={markTitle(entry.title)}
+            />
+            <p className="m-0 text-mk-kit-lead text-mk-prose [text-wrap:pretty]">
                 {entry.lead}
             </p>
             {entry.sections.map((section) => (
@@ -100,22 +103,21 @@ export default async function ChangelogEntryPage({ params }: Props) {
                     key={section.name}
                     className="grid gap-1.5 border-t border-border pt-[18px]"
                 >
-                    <h2 className="m-0 font-display text-mk-card-lg font-bold">
+                    <h2 className="m-0 font-display text-mk-kit-h3 font-bold">
                         {section.name}
                     </h2>
-                    <p className="m-0 text-mk-body leading-[1.7] text-mk-prose">
+                    <p className="m-0 text-[16px] leading-[1.7] text-mk-prose">
                         {section.body}
                     </p>
                     {section.link && linkShown(section.link.href, ctx) ? (
-                        <Link
+                        <TextLink
                             href={section.link.href}
-                            className={textLinkClasses({
-                                className: "w-fit text-[14.5px] font-semibold",
-                            })}
+                            tone="ink"
+                            arrow
+                            className="w-fit"
                         >
                             {section.link.label}
-                            <Arrow />
-                        </Link>
+                        </TextLink>
                     ) : null}
                 </section>
             ))}
