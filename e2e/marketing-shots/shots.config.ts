@@ -117,7 +117,9 @@ export type Step =
      * Type into a field, as a person filling a form would. Only on a form
      * that is never submitted (the shot is taken before its button).
      */
-    | { fill: string; value: string };
+    | { fill: string; value: string }
+    /** Scroll this scrolling area back to its top. */
+    | { scrollTop: string };
 
 /**
  * What part of the page is kept. Omitted: the viewport. `selector`: the box
@@ -1626,6 +1628,25 @@ const ASK_AI_SHOTS: Shot[] = [
         alt: "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
         caption:
             "Ask AI's page: How did this week go, and which products sold the most? Answered from the bakery's own orders, with the best sellers as product cards",
+        gap: ASK_GAP,
+    },
+    {
+        // The hero on a phone: the same answer as the app draws it there.
+        key: "ask-hero-phone",
+        business: "rye",
+        role: "owner",
+        route: "/ask",
+        viewport: { width: 390, height: 844 },
+        // A phone opens the list from the page's header.
+        steps: [
+            { click: 'button[aria-label="Your conversations"]' },
+            ...openAsk("How did this week go"),
+            // It opens at the answer's end; show the question and the words.
+            { scrollTop: "#ask-ai-page .overflow-y-auto" },
+        ],
+        alt: "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+        caption:
+            "Ask AI on a phone: how the week went, answered from the bakery's own orders",
         gap: ASK_GAP,
     },
     {

@@ -69,3 +69,35 @@ describe("ScreenshotFrame with zoom", () => {
         ).toBeTruthy();
     });
 });
+
+describe("ScreenshotFrame with a phone capture", () => {
+    it("draws the phone capture under 640px and the desk one above", () => {
+        const { container } = render(
+            <ScreenshotFrame
+                shot={{
+                    id: "ask-hero",
+                    image: {
+                        src: "/shots/v2/ask-hero.webp",
+                        alt: "Desk",
+                        width: 2880,
+                        height: 2400,
+                        phone: {
+                            src: "/shots/v2/ask-hero-phone.webp",
+                            alt: "Phone",
+                            width: 780,
+                            height: 1688,
+                        },
+                    },
+                }}
+            />,
+        );
+        const source = container.querySelector("picture > source");
+        expect(source?.getAttribute("media")).toBe("(max-width: 639px)");
+        expect(source?.getAttribute("srcset")).toBe(
+            "/shots/v2/ask-hero-phone.webp",
+        );
+        expect(
+            container.querySelector("picture > img")?.getAttribute("src"),
+        ).toBe("/shots/v2/ask-hero.webp");
+    });
+});

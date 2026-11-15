@@ -154,6 +154,9 @@ const designed = {
     "ask-hero": pending(
         "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
     ),
+    "ask-hero-phone": pending(
+        "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+    ),
     "ask-start": pending(
         "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",
     ),

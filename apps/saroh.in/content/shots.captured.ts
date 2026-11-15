@@ -803,6 +803,12 @@ export const CAPTURED: Record<
         width: 2880,
         height: 2400,
     },
+    "ask-hero-phone": {
+        src: "/shots/v2/ask-hero-phone.webp",
+        alt: "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
+        width: 780,
+        height: 1688,
+    },
     "ask-start": {
         src: "/shots/v2/ask-start.webp",
         alt: "Ask AI at Rye & Co. (demo bakery) before a question, with ready questions",

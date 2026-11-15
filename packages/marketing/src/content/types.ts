@@ -89,6 +89,7 @@ export const SHOT_KEYS = [
     "ai-ask",
     "ai-activity",
     "ask-hero",
+    "ask-hero-phone",
     "ask-start",
     "ask-answer",
     "ask-confirm",
@@ -113,6 +114,8 @@ export type PlanId = "free" | "grow" | "pro";
 export interface ShotRef {
     shot: ShotKey;
     alt?: string;
+    /** A capture at phone width, shown in `shot`'s place on a phone. */
+    phone?: ShotKey;
 }
 
 /**

@@ -75,7 +75,11 @@ export function FeatureHero({
                 )
             }
             freeLine={line}
-            shot={shotView(feature.hero.shot, feature.hero.alt)}
+            shot={shotView(
+                feature.hero.shot,
+                feature.hero.alt,
+                feature.hero.phone,
+            )}
             chat={feature.heroChat}
         />
     );

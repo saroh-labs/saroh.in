@@ -799,7 +799,7 @@ export const features: Record<FeatureSlug, Feature> = {
             "Ask about your business inside Saroh, answered from your own bookings, orders and customers.",
         headline: "Ask about your business. Get a straight answer.",
         sub: "An AI business assistant inside Saroh. Ask in English, Hinglish or Hindi how the week went, what's selling or who hasn't come back, and get the answer from your own records, in the same figures Home and Insights show. Ask it to add or change something and it fills in a card for you to check. Nothing is saved until you confirm.",
-        hero: { shot: "ask-hero" },
+        hero: { shot: "ask-hero", phone: "ask-hero-phone" },
         howTitle: "Ask in your own words.",
         steps: [
             {

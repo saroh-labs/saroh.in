@@ -50,16 +50,19 @@ export function ShotImage({
         );
     }
     const { src, srcSet } = shot;
+    const phone = shot.phone?.src ? shot.phone : undefined;
     if (priority) {
         preload(src, {
             as: "image",
             imageSrcSet: srcSet,
             imageSizes: srcSet ? sizes : undefined,
             fetchPriority: "high",
-            media: priorityFrom,
+            media: phone
+                ? `${PHONE_UP}${priorityFrom ? ` and ${priorityFrom}` : ""}`
+                : priorityFrom,
         });
     }
-    return (
+    const img = (
         // Files with their own srcset; next/image's optimizer is what this replaces.
         <img
             // `sizes` and `srcSet` before `src`: a browser that reads `src`
@@ -85,4 +88,21 @@ export function ShotImage({
             className={cn("block h-auto w-full", className)}
         />
     );
+    if (!phone?.src) return img;
+    return (
+        <picture>
+            <source
+                media={PHONE}
+                sizes={phone.srcSet ? "100vw" : undefined}
+                srcSet={phone.srcSet ?? phone.src}
+                width={phone.width}
+                height={phone.height}
+            />
+            {img}
+        </picture>
+    );
 }
+
+/** Where a shot's `phone` capture is drawn instead. */
+const PHONE = "(max-width: 639px)";
+const PHONE_UP = "(min-width: 640px)";
