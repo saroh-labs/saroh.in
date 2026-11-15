@@ -206,15 +206,16 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
-            shot: "k-orders",
+            // Rye & Co.'s list, as the scene line above it says (never a clinic under a bakery's line).
+            shot: "s-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
                 body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. A shop's order prints a ticket for the kitchen.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-order",
+                who: "Rye & Co. (demo bakery)",
+                shot: "r-order",
             },
             {
                 title: "Orders that take several visits",

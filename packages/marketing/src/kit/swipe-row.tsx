@@ -41,7 +41,9 @@ export function SwipeRow({
         const watch = new IntersectionObserver(
             (entries) => {
                 for (const e of entries) {
-                    if (e.isIntersecting) setShown(cards.indexOf(e.target) + 1);
+                    // The first report covers every card, the peeking one too: count only a card mostly in view.
+                    if (e.intersectionRatio >= 0.6)
+                        setShown(cards.indexOf(e.target) + 1);
                 }
             },
             { root: list, threshold: 0.6 },

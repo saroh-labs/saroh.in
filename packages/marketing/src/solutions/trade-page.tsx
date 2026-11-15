@@ -8,10 +8,11 @@ import { Chip } from "../kit/chip";
 import { ClosingCTA } from "../kit/closing-cta";
 import { DayScene } from "../kit/day-scene";
 import { HourStrip } from "../kit/hour-strip";
+import { PhoneClip, PhoneFold } from "../kit/phone-fold";
 import { StickyBar } from "../kit/sticky-bar";
 import { SunArc } from "../kit/sun-arc";
 import { SwipeRow } from "../kit/swipe-row";
-import { hourAnchor, hourLabel } from "../kit/time";
+import { hourAnchor, hourLabel, hourTint } from "../kit/time";
 import { TradeSwitcher } from "../kit/trade-switcher";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
@@ -19,6 +20,7 @@ import { Breadcrumbs } from "../nav/breadcrumbs";
 import { FaqItems } from "../sections/faq";
 import type { DayHour, TradeDay, UsedLink } from "./day";
 import { HomePhone, Moment } from "./moments/moments";
+import type { MomentData } from "./moments/types";
 import { say } from "./words";
 
 /** A feature's chip: its name and page, or nothing while it is switched off. */
@@ -45,6 +47,10 @@ export interface TradePageWords {
     followDay: (kind: string) => string;
     tradeBar: string;
     allTradesShort: string;
+    /** On a phone, an hour's whole story folds behind this. */
+    wholeHour: string;
+    /** A scene's cut pictures, when none of them names its own fold. */
+    wholePicture: string;
 }
 
 /** A problem the trade knows, and its folded answer. */
@@ -118,7 +124,7 @@ export interface TradePageLayoutProps {
     bar: readonly { slug: string; label: string }[];
 }
 
-const SECTION = "py-[72px] min-[760px]:py-[120px]";
+const SECTION = "py-12 min-[760px]:py-[120px]";
 const H2 = "m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]";
 const BODY = "m-0 text-[16px] leading-relaxed text-mk-copy";
 
@@ -143,8 +149,9 @@ function UsedChips({
     });
     if (chips.length === 0) return null;
     return (
-        <>
-            <span className="text-[14px] text-mk-copy">{W.used}</span>
+        // A phone keeps the chips on one line that scrolls (PHONE.md: one row of chips).
+        <div className="flex items-center gap-2.5 max-[759px]:-mr-mk-gutter max-[759px]:overflow-x-auto max-[759px]:whitespace-nowrap max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:contents">
+            <span className="shrink-0 text-[14px] text-mk-copy">{W.used}</span>
             {chips.map((c) => (
                 // Own ink, so a chip on the night band keeps its words dark on white.
                 <Chip
@@ -154,12 +161,12 @@ function UsedChips({
                     className="text-[hsl(var(--foreground))]"
                 >
                     {c.label}
-                    <span className="font-normal text-[hsl(var(--mk-body))]">
+                    <span className="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only">
                         &nbsp;· {c.tail}
                     </span>
                 </Chip>
             ))}
-        </>
+        </div>
     );
 }
 
@@ -338,6 +345,18 @@ function anchorAt(anchor: string): string {
 
 /* ------------------------------------------------------------------ the day */
 
+/** Where a scene's pictures are cut on a phone, by its first moment's kind. */
+const CLIP: Partial<Record<MomentData["kind"], number>> = {
+    "site-order": 260,
+    post: 240,
+    payment: 300,
+    bill: 260,
+    "ai-app": 250,
+    ask: 280,
+    enquiry: 260,
+    shelf: 220,
+};
+
 function Hour({
     hour,
     claimOn,
@@ -358,13 +377,41 @@ function Hour({
             : hour.claimed.off
         : hour.moments;
     const after = hour.after ? say(hour.after, claimOn) : "";
+    const lead = say(hour.lead, claimOn);
+    const short = hour.phoneLead ? say(hour.phoneLead, claimOn) : "";
+    const onInk = hourTint(at) === "lamp";
+    const note = hour.note ? (
+        <p className="m-0 max-w-[560px] rounded-mk-card bg-foreground px-5 py-4 text-[15px] leading-normal text-background">
+            {hour.note.text}{" "}
+            <a
+                href={hour.note.link.href}
+                className="inline-flex min-h-11 items-center font-semibold text-background underline underline-offset-4"
+            >
+                {hour.note.link.label} →
+            </a>
+        </p>
+    ) : null;
+    const drawn = moments.map((m, i) => <Moment key={i} m={m} />);
+    // Pictures that don't crop themselves are cut on a phone (PHONE.md).
+    const clip = moments.some((m) => m.kind === "order" || m.kind === "home")
+        ? undefined
+        : CLIP[moments[0]?.kind ?? "home"];
     return (
         <DayScene
             at={at}
             id={hour.anchor}
             mood={say(hour.mood, claimOn)}
             title={say(hour.title, claimOn)}
-            lead={say(hour.lead, claimOn)}
+            lead={
+                short ? (
+                    <>
+                        <span className="max-[759px]:hidden">{lead}</span>
+                        <span className="min-[760px]:hidden">{short}</span>
+                    </>
+                ) : (
+                    lead
+                )
+            }
             used={
                 <UsedChips
                     used={hour.used}
@@ -374,26 +421,59 @@ function Hour({
                 />
             }
         >
-            <div className="grid gap-8">
-                {moments.map((m, i) => (
-                    <Moment key={i} m={m} />
-                ))}
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+                {/* A phone: the whole lead, the line after and the note fold here, once in the HTML. */}
+                {short || note || (after && !hour.claimed) ? (
+                    <PhoneFold
+                        summary={words.wholeHour}
+                        tone={onInk ? "on-ink" : "ink"}
+                        className="-mt-4 min-[760px]:hidden"
+                    >
+                        <div className="grid gap-4 pt-2">
+                            {short ? (
+                                <p className="m-0 text-[16px] leading-relaxed text-mk-copy">
+                                    {lead}
+                                </p>
+                            ) : null}
+                            {/* A claim's caveat (9 pm's plans) stays in sight. */}
+                            {after && !hour.claimed ? (
+                                <p className="m-0 text-[15px] leading-relaxed text-mk-copy">
+                                    {after}
+                                </p>
+                            ) : null}
+                            {note}
+                        </div>
+                    </PhoneFold>
+                ) : null}
+                {clip ? (
+                    <PhoneClip
+                        height={clip}
+                        label={
+                            moments
+                                .map((m) => ("more" in m ? m.more : undefined))
+                                .filter(Boolean)
+                                .pop() ?? words.wholePicture
+                        }
+                        tone={onInk ? "on-ink" : "ink"}
+                    >
+                        <div className="grid grid-cols-[minmax(0,1fr)] gap-8">
+                            {drawn}
+                        </div>
+                    </PhoneClip>
+                ) : (
+                    drawn
+                )}
                 {after ? (
-                    <p className="m-0 max-w-[62ch] text-[15px] leading-relaxed text-mk-copy">
+                    <p
+                        className={cn(
+                            "m-0 max-w-[62ch] text-[15px] leading-relaxed text-mk-copy",
+                            !hour.claimed && "max-[759px]:hidden",
+                        )}
+                    >
                         {after}
                     </p>
                 ) : null}
-                {hour.note ? (
-                    <p className="m-0 max-w-[560px] rounded-mk-card bg-foreground px-5 py-4 text-[15px] leading-normal text-background">
-                        {hour.note.text}{" "}
-                        <a
-                            href={hour.note.link.href}
-                            className="inline-flex min-h-11 items-center font-semibold text-background underline underline-offset-4"
-                        >
-                            {hour.note.link.label} →
-                        </a>
-                    </p>
-                ) : null}
+                {note ? <div className="max-[759px]:hidden">{note}</div> : null}
             </div>
         </DayScene>
     );
@@ -462,7 +542,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
             ) : null}
 
             {/* The hero: the page's own h1 and lead, then the day's picture. */}
-            <section className="bg-mk-dawn pb-16 pt-4 min-[760px]:pb-[72px]">
+            <section className="bg-mk-dawn pb-10 pt-4 min-[760px]:pb-[72px]">
                 <Container className="grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_400px] min-[1000px]:gap-[72px]">
                     <div className="grid min-w-0 content-start">
                         <Breadcrumbs
@@ -530,7 +610,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                     {startHalf}
                                 </small>
                             </p>
-                            <div className="grid content-start gap-3">
+                            <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3">
                                 <p className="m-0 text-[16px] leading-normal text-mk-copy">
                                     <span className="sr-only">
                                         {hourLabel(startHour)}:{" "}
@@ -553,12 +633,16 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                     ) : null}
                 </Container>
                 {day ? (
-                    <Container className="mt-14 min-[760px]:mt-[72px]">
-                        <HourStrip
-                            title={day.stripTitle}
-                            stops={stops}
-                            current={`#${day.start.anchor}`}
-                        />
+                    <Container className="mt-6 min-[760px]:mt-[72px]">
+                        {/* A phone: the day's index folds under its title (PHONE.md), once in the HTML. */}
+                        <PhoneFold summary={day.stripTitle}>
+                            <HourStrip
+                                title={day.stripTitle}
+                                stops={stops}
+                                current={`#${day.start.anchor}`}
+                                className="max-[759px]:mt-3 max-[759px]:[&>h2]:sr-only"
+                            />
+                        </PhoneFold>
                     </Container>
                 ) : null}
             </section>
@@ -592,15 +676,15 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                 SECTION,
                             )}
                         >
-                            <Container className="grid items-center gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_480px] min-[1000px]:gap-20">
+                            <Container className="grid items-center gap-6 min-[760px]:gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_480px] min-[1000px]:gap-20">
                                 <div className="grid gap-5">
                                     <SunArc
                                         at={anchorAt(day.next.anchor)}
-                                        className="w-20"
+                                        className="w-11 min-[760px]:w-20"
                                     />
                                     <h2
                                         id={`${day.next.anchor}-title`}
-                                        className="m-0 font-display text-mk-kit-h1 font-bold [text-wrap:balance]"
+                                        className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance] min-[760px]:text-mk-kit-h1"
                                     >
                                         {day.next.title}
                                     </h2>
@@ -608,14 +692,14 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                         {day.next.body}
                                     </p>
                                 </div>
-                                <Moment m={day.next.moment} />
+                                <PhoneClip height={200} label={W.wholePicture}>
+                                    <Moment m={day.next.moment} />
+                                </PhoneClip>
                             </Container>
                         </section>
                     ) : null}
                     {changes ? (
-                        <section
-                            className={cn("border-t border-border", "py-12")}
-                        >
+                        <section className="border-t border-border py-8 min-[760px]:py-12">
                             <Container>
                                 <details className="group rounded-mk-card border border-border bg-card">
                                     <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 font-display text-mk-kit-h3 font-bold [&::-webkit-details-marker]:hidden">
@@ -682,26 +766,39 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                         </div>
                         <div className="grid content-start gap-4">
                             {starter.template ? (
-                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold max-[759px]:hidden">
                                     {starter.title}
                                 </h3>
                             ) : null}
-                            <p className={BODY}>{starter.line}</p>
-                            <ul className="m-0 grid list-none gap-0 rounded-mk-card border border-border bg-card p-0">
-                                {starter.rows.map((x) => (
-                                    <li
-                                        key={x.name}
-                                        className="flex justify-between gap-4 border-t border-[#EEEBE4] px-5 py-3.5 text-[15px] first:border-t-0"
-                                    >
-                                        <b className="font-semibold">
-                                            {x.name}
-                                        </b>
-                                        <span className="text-mk-copy">
-                                            {x.detail}
-                                        </span>
-                                    </li>
-                                ))}
-                            </ul>
+                            {/* A phone: under a template, the starter list folds under its title. */}
+                            <PhoneFold
+                                summary={starter.title}
+                                className={cn(
+                                    "grid gap-4",
+                                    starter.template
+                                        ? "-mt-4 min-[760px]:mt-0"
+                                        : "[&>details]:hidden [&>div]:!block",
+                                )}
+                            >
+                                <div className="grid gap-4 max-[759px]:pt-2">
+                                    <p className={BODY}>{starter.line}</p>
+                                    <ul className="m-0 grid list-none gap-0 rounded-mk-card border border-border bg-card p-0">
+                                        {starter.rows.map((x) => (
+                                            <li
+                                                key={x.name}
+                                                className="flex justify-between gap-4 border-t border-[#EEEBE4] px-5 py-3.5 text-[15px] first:border-t-0"
+                                            >
+                                                <b className="font-semibold">
+                                                    {x.name}
+                                                </b>
+                                                <span className="text-mk-copy">
+                                                    {x.detail}
+                                                </span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </PhoneFold>
                         </div>
                     </Container>
                 </section>
@@ -739,7 +836,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                 aria-labelledby="others-title"
                 className={cn("bg-mk-noon", SECTION)}
             >
-                <Container className="grid grid-cols-[minmax(0,1fr)] gap-8">
+                <Container className="grid grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-8">
                     <div className="grid gap-3">
                         <h2 id="others-title" className={H2}>
                             {W.others}
@@ -756,14 +853,14 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                     <a
                                         key={d.slug}
                                         href={props.tradeHref(d.slug)}
-                                        className="grid h-full content-start gap-3 rounded-[24px] border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground"
+                                        className="grid h-full content-start gap-2 rounded-[24px] border border-border bg-card p-5 text-foreground no-underline shadow-mk-card hover:border-foreground min-[760px]:gap-3 min-[760px]:p-6"
                                     >
                                         <span className="font-mono text-[14px]">
                                             {first
                                                 ? anchorLabel(first.anchor)
                                                 : ""}
                                         </span>
-                                        <b className="font-display text-[26px] leading-tight tracking-[-0.03em]">
+                                        <b className="font-display text-[22px] leading-tight tracking-[-0.03em] min-[760px]:text-[26px]">
                                             {first
                                                 ? say(first.title, claimOn)
                                                 : d.example}
@@ -786,7 +883,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                         <h3 className="m-0 text-[15px] font-semibold text-mk-copy">
                             {props.related.title}
                         </h3>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&>*]:shrink-0">
                             {props.related.items.map((r) =>
                                 r.href ? (
                                     <Chip
@@ -806,7 +903,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                     </div>
                     <Link
                         href={props.hubHref}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] bg-card px-6 py-5 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground"
+                        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[18px] bg-card px-5 py-4 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground min-[760px]:px-6 min-[760px]:py-5"
                     >
                         <b className="font-display text-[22px] tracking-[-0.02em]">
                             {props.allTrades.label}

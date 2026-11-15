@@ -490,6 +490,8 @@ export function aiAppsWords({
         },
         close: { title: "Do your Saroh work by asking." },
         inTheApp: {
+            /** On a phone, the steps and what follows fold behind this. */
+            phone: "See it in the app, step by step",
             everything: "Everything AI apps does",
             usedBy: "Used by",
             of: "of",

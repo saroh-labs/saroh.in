@@ -121,6 +121,8 @@ export function socialWords({
         cards: { rye: ryeCard, neel: neelCard },
 
         stage: {
+            /** On a phone, the cards are cut; this opens them. */
+            more: "See all four cards",
             label: `The ${bun.name} shared as four cards in ${rye.name}'s look`,
             product: bun.name,
             productNote: `${bun.price} · Bakes · Sells online and at the counter`,
@@ -457,6 +459,8 @@ export function socialWords({
             note: "Free to start. No card needed.",
         },
         inTheApp: {
+            /** On a phone, the steps and what follows fold behind this. */
+            phone: "See it in the app, step by step",
             everything: "Everything Share does",
             usedBy: "Used by",
             of: "of",

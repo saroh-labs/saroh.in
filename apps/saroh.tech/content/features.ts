@@ -197,15 +197,16 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Take orders at the counter and follow each one to done, with its next step on the order. Late ones are flagged.",
         hero: {
-            shot: "k-orders",
+            // The same slot and key as saroh.in: the bakery's own list.
+            shot: "s-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
                 body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money.",
-                who: "Wrenfield Dental (demo clinic)",
-                shot: "d-order",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "r-order",
             },
             {
                 title: "Orders that take several visits",

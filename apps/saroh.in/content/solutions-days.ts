@@ -227,6 +227,7 @@ const RYE_DAY: TradeDay = {
             mood: "The buns are proving. Her phone buzzes on the flour bin.",
             title: "A WhatsApp order, written in once.",
             lead: `${neha.customer} messages for a black forest cake, 500 g, eggless, for 4 pm today. ${rye.owner} keeps chatting on WhatsApp and writes the order into Orders at 9:14 am: the time and the message for the cake go in the note. ${neha.customer.split(" ")[0]} moves pick-up to 5 pm and pays the link at 9:31 am; bill ${neha.invoice} writes itself. Her nut allergy is already on her page, so it prints on the kitchen ticket too.`,
+            phoneLead: `It goes in once, with the cake’s message. ${neha.customer.split(" ")[0]}’s nut allergy is already on her page.`,
             moments: [
                 {
                     kind: "order",
@@ -302,6 +303,7 @@ const RYE_DAY: TradeDay = {
             mood: "The shop’s open. Her website has been open all night.",
             title: "A cake is ordered on her own website.",
             lead: `${rye.name}’s site is the bakery template in her colours, fonts and logo, live at ${rye.site}. Her cakes and prices come straight from Saroh. ${kavya.customer.split(" ")[0]} orders a birthday cake for Saturday while ${rye.owner} is icing, and it lands in Orders with the bill already written.`,
+            phoneLead: `${kavya.customer.split(" ")[0]} orders a birthday cake on ${rye.owner}’s site. It lands in Orders, paid, bill written.`,
             moments: [
                 {
                     kind: "site-order",
@@ -352,6 +354,10 @@ const RYE_DAY: TradeDay = {
             mood: "The lunch rush is over. Ten minutes before the next batch.",
             title: "The bun box becomes a post, in her own look.",
             lead: `She taps Share on the ${bunBox.name.toLowerCase()}. Saroh draws it as a ready post in her website’s colours, fonts and logo, with the caption written. She picks a card and posts it to Instagram from her phone.`,
+            phoneLead: [
+                "She taps Share. Saroh draws the post in her site’s look, caption written.",
+                { text: "Free to share.", claim: "share-every-plan" },
+            ],
             moments: [
                 {
                     kind: "post",
@@ -391,6 +397,7 @@ const RYE_DAY: TradeDay = {
             mood: `${anjali.customer.split(" ")[0]} collects her cake at five. The pay link went at seven.`,
             title: `${anjali.total} lands in her account. Saroh never touches it.`,
             lead: `${anjali.customer.split(" ")[0]} pays the link by ${money.method}. The money goes from her bank to ${rye.name}’s own ${money.provider} account, then to ${rye.owner}’s bank. Saroh sees that it’s paid, marks the order and writes the bill.`,
+            phoneLead: `${anjali.customer.split(" ")[0]} pays by ${money.method} into ${rye.name}’s own ${money.provider} account, then on to ${rye.owner}’s bank.`,
             moments: [
                 {
                     kind: "payment",
@@ -452,6 +459,8 @@ const RYE_DAY: TradeDay = {
             mood: "Shutters half down. Christmas orders start this week.",
             title: `Closing up, ${rye.owner} asks Claude to add the Christmas menu.`,
             lead: "Saroh connects to Claude, ChatGPT and other AI apps. She asks in her own words; the products go in as drafts and the menu page waits. It can only do what she can do in Saroh, and nothing changes on her website until she publishes it.",
+            phoneLead:
+                "Saroh connects to Claude and ChatGPT. Both items go in as drafts; her site waits until she publishes.",
             moments: [
                 {
                     kind: "ai-app",
@@ -506,6 +515,14 @@ const RYE_DAY: TradeDay = {
                     claim: "ask-ai-languages",
                 },
                 "and shows the rows behind every number. Ask it to change something and it fills in a card for her to check. Nothing is saved until she confirms.",
+            ],
+            phoneLead: [
+                "Ask AI answers from her own records",
+                {
+                    text: ", in English, Hinglish or Hindi,",
+                    claim: "ask-ai-languages",
+                },
+                "with the rows behind every number.",
             ],
             moments: [],
             claimed: {
@@ -620,6 +637,8 @@ const PETAL_DAY: TradeDay = {
             mood: "The market roses are in buckets. Her hands are full of thorns when the phone rings.",
             title: "Twenty-four roses for tonight, card message and all.",
             lead: `${kabir.customer.split(" ")[0]} calls for his anniversary. ${petal.owner} puts it into Orders while they talk: the card message and the delivery time go in the note, and his page already says no lilies, because his wife is allergic.`,
+            phoneLead:
+                "The card message goes in the note; his page says no lilies.",
             moments: [
                 {
                     kind: "order",
@@ -695,6 +714,7 @@ const PETAL_DAY: TradeDay = {
             mood: "The first deliveries are out. A bride wrote in last night.",
             title: "A December bride asks for prices.",
             lead: `${ritika.split(" ")[0]} found the Weddings page on ${petal.name}’s site late last night. Her enquiry waits with the date and what she wants. ${petal.owner} sends prices from it, and Thursday is set to follow up if ${ritika.split(" ")[0]} goes quiet.`,
+            phoneLead: `${petal.owner} sends prices from the enquiry. Thursday is set to follow up.`,
             moments: [
                 {
                     kind: "enquiry",
@@ -746,6 +766,10 @@ const PETAL_DAY: TradeDay = {
                     claim: "social-posting",
                 },
             ],
+            phoneLead: [
+                `She taps Share: a ready post in ${petal.name}’s look, caption written.`,
+                { text: "Sharing is free.", claim: "share-every-plan" },
+            ],
             moments: [
                 {
                     kind: "post",
@@ -777,6 +801,7 @@ const PETAL_DAY: TradeDay = {
             mood: "The post has been up two hours. The 3 pm cut-off is close.",
             title: "Lilies for tonight, paid before she sees the order.",
             lead: `${aditi.customer.split(" ")[0]} orders a mixed lily bouquet on ${petal.site} for her mother, delivered tonight. The site is in ${petal.name}’s own look, with bouquets and prices straight from Saroh. The order lands paid, its bill written.`,
+            phoneLead: `Ordered on ${petal.name}’s own site, it lands paid, bill written.`,
             moments: [
                 {
                     kind: "site-order",
@@ -819,6 +844,7 @@ const PETAL_DAY: TradeDay = {
             mood: "Monday is when the hotel’s front desk settles the week.",
             title: "The hotel’s weekly flowers, paid to her own account.",
             lead: `${hotel.customer} pays this week’s ${hotel.total} from the link by ${money.method}, into ${petal.name}’s own ${money.provider} account and on to ${petal.owner}’s bank. Saroh marks ${hotel.invoice} paid and sends the bill.`,
+            phoneLead: `By ${money.method} into ${petal.name}’s own ${money.provider}, then on to ${petal.owner}’s bank.`,
             moments: [
                 {
                     kind: "payment",
@@ -861,6 +887,8 @@ const PETAL_DAY: TradeDay = {
                     claim: "ask-ai-plans",
                 },
             ],
+            phoneLead:
+                "Connected to Saroh, it counts stems and drafts the bouquet onto her site.",
             moments: [
                 {
                     kind: "ai-app",

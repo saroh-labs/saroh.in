@@ -30,7 +30,7 @@ export function YoursLine({
 }) {
     return (
         <Container as="section" aria-label={home.featuresEyebrow}>
-            <div className="border-b border-border py-12">
+            <div className="border-b border-border py-8 min-[760px]:py-12">
                 <p className="m-0 flex flex-wrap items-center gap-x-4 text-[17px] leading-normal text-foreground min-[760px]:text-[20px]">
                     {home.yours.line}
                     <TextLink
@@ -97,7 +97,7 @@ export function PlansAndQuestions({
         <Container
             as="section"
             aria-label={`${home.plans.title} ${home.faqTitle}`}
-            className="grid gap-11 pt-12 min-[760px]:pt-[72px] min-[960px]:grid-cols-[minmax(0,470px)_1fr] min-[960px]:gap-24"
+            className="grid gap-8 pt-8 min-[760px]:gap-11 min-[760px]:pt-[72px] min-[960px]:grid-cols-[minmax(0,470px)_1fr] min-[960px]:gap-24"
         >
             {/* `#pricing` only once Pricing is open (Gate W): nothing links here before. */}
             <div id={planLine ? "pricing" : undefined} className="scroll-mt-24">

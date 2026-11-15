@@ -1,6 +1,8 @@
 import type { CSSProperties } from "react";
 
 import { cn } from "../cn";
+import type { DrawnPhotoKind } from "./drawn-photo";
+import { DrawnPhoto } from "./drawn-photo";
 import { BrowserFrame } from "./frames";
 
 /**
@@ -46,6 +48,8 @@ export interface SiteItem {
     price: string;
     /** A real photo; without one, a block of the site's surface. */
     image?: { src: string; alt: string };
+    /** Without a real photo: a drawn one (`kit/drawn-photo`), the world's. */
+    drawn?: DrawnPhotoKind;
 }
 
 const HEAD =
@@ -147,6 +151,16 @@ export function SiteDrawing({
                                         loading="lazy"
                                         className={cn(
                                             "w-full rounded-[var(--site-radius)] object-cover",
+                                            phone
+                                                ? "aspect-square"
+                                                : "aspect-[4/3]",
+                                        )}
+                                    />
+                                ) : item.drawn ? (
+                                    <DrawnPhoto
+                                        kind={item.drawn}
+                                        className={cn(
+                                            "w-full rounded-[var(--site-radius)]",
                                             phone
                                                 ? "aspect-square"
                                                 : "aspect-[4/3]",

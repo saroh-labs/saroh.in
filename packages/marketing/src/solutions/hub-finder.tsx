@@ -277,7 +277,7 @@ export function HubFinder({
     return (
         <>
             <div className="bg-mk-dawn">
-                <div className="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-8 px-mk-gutter pb-10 pt-4 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:gap-16 min-[1000px]:pb-14">
+                <div className="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-6 px-mk-gutter pb-6 pt-4 min-[760px]:gap-8 min-[760px]:pb-10 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:gap-16 min-[1000px]:pb-14">
                     <div className="grid content-start">{intro}</div>
                     <div className="grid content-start gap-4 min-[1000px]:pt-14">
                         <div
@@ -390,7 +390,7 @@ export function HubFinder({
                         </p>
                     </div>
                 </div>
-                <div className="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-4 px-mk-gutter pb-10">
+                <div className="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-4 px-mk-gutter pb-4 min-[760px]:pb-10">
                     <details className="group rounded-mk-card border border-border bg-card min-[760px]:hidden">
                         <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-5 [&::-webkit-details-marker]:hidden">
                             <span className="grid">
@@ -424,7 +424,7 @@ export function HubFinder({
             </div>
             <div className="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-0 px-mk-gutter">
                 {shown.length === 0 && query.trim() ? (
-                    <h2 className="m-0 py-16 font-display text-mk-kit-h2 font-bold">
+                    <h2 className="m-0 py-10 font-display text-mk-kit-h2 font-bold min-[760px]:py-16">
                         {fill(words.none, { q: query.trim() })}
                     </h2>
                 ) : null}
@@ -436,7 +436,7 @@ export function HubFinder({
                             id={g.id}
                             aria-labelledby={`g-${g.id}`}
                             hidden={tiles.length === 0}
-                            className="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-border py-12 first:border-t-0 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16"
+                            className="grid grid-cols-[minmax(0,1fr)] gap-4 border-t border-border py-7 first:border-t-0 min-[760px]:gap-6 min-[760px]:py-12 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16"
                         >
                             <div className="grid content-start gap-2">
                                 <h2

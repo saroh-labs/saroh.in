@@ -41,7 +41,7 @@
 </span>
 </div>
 </div>
-<section class="bg-mk-dawn pb-16 pt-4 min-[760px]:pb-[72px]">
+<section class="bg-mk-dawn pb-10 pt-4 min-[760px]:pb-[72px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_400px] min-[1000px]:gap-[72px]">
 <div class="grid min-w-0 content-start">
 <nav aria-label="Breadcrumb">
@@ -243,19 +243,30 @@
 <div id="6am" class="grid max-w-[620px] scroll-mt-[calc(var(--mk-nav-h)+80px)] grid-cols-[auto_minmax(0,1fr)] gap-x-5 gap-y-3 border-t border-border pt-6 min-[1000px]:col-start-1">
 <p aria-hidden="true" class="m-0 flex items-start font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em]">6<small class="mt-1 text-[18px] font-medium">am</small>
 </p>
-<div class="grid content-start gap-3">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3">
 <p class="m-0 text-[16px] leading-normal text-mk-copy">
 <span class="sr-only">6 am: </span>Back from the flower market with the roses. Before the first bunch is cut, Zoya knows what needs her.</p>
 <div class="flex flex-wrap items-center gap-2.5">
-<span class="text-[14px] text-mk-copy">Used here</span>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/dashboard">Dashboard<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<div class="flex items-center gap-2.5 max-[759px]:-mr-mk-gutter max-[759px]:overflow-x-auto max-[759px]:whitespace-nowrap max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:contents">
+<span class="shrink-0 text-[14px] text-mk-copy">Used here</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/dashboard">Dashboard<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
 </div>
 </div>
 </div>
 </div>
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page mt-14 min-[760px]:mt-[72px]">
-<nav aria-label="Her day, hour by hour">
+</div>
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page mt-6 min-[760px]:mt-[72px]">
+<div class="group/pf">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Her day, hour by hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<nav aria-label="Her day, hour by hour" class="max-[759px]:mt-3 max-[759px]:[&amp;&gt;h2]:sr-only">
 <h2 class="m-0 mb-5 font-sans text-[15px] font-semibold tracking-normal text-mk-copy">Her day, hour by hour</h2>
 <div class="-mr-mk-gutter overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:mr-0 min-[760px]:pr-0 [&amp;::-webkit-scrollbar]:hidden">
 <ol class="relative m-0 grid min-w-[880px] list-none p-0 min-[760px]:min-w-0" style="grid-template-columns:repeat(7, minmax(0, 1fr))">
@@ -312,8 +323,10 @@
 </div>
 </nav>
 </div>
+</div>
+</div>
 </section>
-<section aria-labelledby="problems-title" class="border-t border-border py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="problems-title" class="border-t border-border py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[400px_minmax(0,1fr)] min-[1000px]:gap-16">
 <div class="grid content-start gap-4">
 <h2 id="problems-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">What goes wrong in a busy week.</h2>
@@ -472,9 +485,9 @@
 </div>
 </section>
 <section id="9am" aria-labelledby="9am-title" class="scroll-mt-[calc(var(--mk-nav-h)+16px)] bg-mk-noon text-foreground">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
-<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-16">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
+<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-11">
 <path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
 <path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
@@ -482,16 +495,33 @@
 <circle cx="24.6" cy="19.6" r="7" fill="hsl(var(--brand-500))">
 </circle>
 </svg>
-<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">9<small class="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">am</small>
+<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">9<small class="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">am</small>
 </p>
-<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">The market roses are in buckets. Her hands are full of thorns when the phone rings.</p>
+<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">The market roses are in buckets. Her hands are full of thorns when the phone rings.</p>
 </div>
-<div class="grid min-w-0 content-start gap-6">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
 <h2 id="9am-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
 <span class="sr-only">9 am: </span>Twenty-four roses for tonight, card message and all.</h2>
-<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">Kabir calls for his anniversary. Zoya puts it into Orders while they talk: the card message and the delivery time go in the note, and his page already says no lilies, because his wife is allergic.</p>
-<div class="mt-4 min-w-0 min-[760px]:mt-8">
-<div class="grid gap-8">
+<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
+<span class="max-[759px]:hidden">Kabir calls for his anniversary. Zoya puts it into Orders while they talk: the card message and the delivery time go in the note, and his page already says no lilies, because his wife is allergic.</span>
+<span class="min-[760px]:hidden">The card message goes in the note; his page says no lilies.</span>
+</p>
+<div class="mt-2 min-w-0 min-[760px]:mt-8">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+<div class="group/pf -mt-4 min-[760px]:hidden">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Read the whole hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 pt-2">
+<p class="m-0 text-[16px] leading-relaxed text-mk-copy">Kabir calls for his anniversary. Zoya puts it into Orders while they talk: the card message and the delivery time go in the note, and his page already says no lilies, because his wife is allergic.</p>
+</div>
+</div>
+</div>
 <div class="grid items-start gap-5 max-[759px]:hidden min-[1000px]:grid-cols-[minmax(0,1fr)_320px] min-[1000px]:gap-10">
 <figure aria-label="Petal Lane’s order list in Saroh, an example: five orders from a call, WhatsApp, a DM and the hotel’s weekly order" class="m-0 min-w-0 overflow-hidden rounded-mk-card bg-card shadow-[0_24px_50px_-18px_rgba(40,44,40,0.3),0_3px_10px_rgba(40,44,40,0.07)]">
 <div class="flex h-10 items-center gap-2 bg-mk-hover px-4 text-[13px] font-medium text-mk-copy">
@@ -659,19 +689,21 @@
 </div>
 </div>
 <div class="flex flex-wrap items-center gap-2.5">
-<span class="text-[14px] text-mk-copy">Used here</span>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/orders">Orders<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<div class="flex items-center gap-2.5 max-[759px]:-mr-mk-gutter max-[759px]:overflow-x-auto max-[759px]:whitespace-nowrap max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:contents">
+<span class="shrink-0 text-[14px] text-mk-copy">Used here</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/orders">Orders<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/customers">Customers<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/customers">Customers<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
+</div>
 </div>
 </div>
 </div>
 </section>
 <section id="11am" aria-labelledby="11am-title" class="scroll-mt-[calc(var(--mk-nav-h)+16px)] bg-mk-noon text-foreground">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
-<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-16">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
+<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-11">
 <path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
 <path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
@@ -679,16 +711,36 @@
 <circle cx="47.1" cy="6.7" r="7" fill="hsl(var(--brand-500))">
 </circle>
 </svg>
-<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">11<small class="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">am</small>
+<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">11<small class="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">am</small>
 </p>
-<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">The first deliveries are out. A bride wrote in last night.</p>
+<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">The first deliveries are out. A bride wrote in last night.</p>
 </div>
-<div class="grid min-w-0 content-start gap-6">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
 <h2 id="11am-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
 <span class="sr-only">11 am: </span>A December bride asks for prices.</h2>
-<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">Ritika found the Weddings page on Petal Lane’s site late last night. Her enquiry waits with the date and what she wants. Zoya sends prices from it, and Thursday is set to follow up if Ritika goes quiet.</p>
-<div class="mt-4 min-w-0 min-[760px]:mt-8">
-<div class="grid gap-8">
+<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
+<span class="max-[759px]:hidden">Ritika found the Weddings page on Petal Lane’s site late last night. Her enquiry waits with the date and what she wants. Zoya sends prices from it, and Thursday is set to follow up if Ritika goes quiet.</span>
+<span class="min-[760px]:hidden">Zoya sends prices from the enquiry. Thursday is set to follow up.</span>
+</p>
+<div class="mt-2 min-w-0 min-[760px]:mt-8">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+<div class="group/pf -mt-4 min-[760px]:hidden">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Read the whole hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 pt-2">
+<p class="m-0 text-[16px] leading-relaxed text-mk-copy">Ritika found the Weddings page on Petal Lane’s site late last night. Her enquiry waits with the date and what she wants. Zoya sends prices from it, and Thursday is set to follow up if Ritika goes quiet.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-[minmax(0,1fr)] gap-2 [&amp;:has(&gt;details[open])&gt;div]:max-h-none [&amp;:has(&gt;details[open])&gt;div]:[mask-image:none]">
+<div style="--clip:260px" class="min-w-0 max-[759px]:max-h-[var(--clip)] max-[759px]:overflow-hidden max-[759px]:[mask-image:linear-gradient(to_bottom,#000_calc(100%-64px),transparent)] max-[759px]:[&amp;_[data-pf=desk]]:!contents max-[759px]:[&amp;_[data-pf=phone]]:!hidden">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-8">
 <div class="grid items-start gap-5 min-[1000px]:grid-cols-2">
 <div role="img" aria-label="A wedding enquiry from Petal Lane’s Weddings page, an example, answered with prices, with a follow-up set for Thursday" class="rounded-mk-card bg-card text-foreground shadow-mk-card p-5">
 <p class="m-0 flex items-center gap-2 text-[13px] font-semibold text-foreground">
@@ -757,20 +809,28 @@
 </div>
 </div>
 </div>
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See all of it</summary>
+</details>
+</div>
+</div>
+</div>
 <div class="flex flex-wrap items-center gap-2.5">
-<span class="text-[14px] text-mk-copy">Used here</span>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/customers">Customers<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<div class="flex items-center gap-2.5 max-[759px]:-mr-mk-gutter max-[759px]:overflow-x-auto max-[759px]:whitespace-nowrap max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:contents">
+<span class="shrink-0 text-[14px] text-mk-copy">Used here</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/customers">Customers<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/website">Website<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/website">Website<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
+</div>
 </div>
 </div>
 </div>
 </section>
 <section id="1pm" aria-labelledby="1pm-title" class="scroll-mt-[calc(var(--mk-nav-h)+16px)] bg-mk-afternoon text-foreground">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
-<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-16">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
+<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-11">
 <path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
 <path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
@@ -778,19 +838,39 @@
 <circle cx="72.9" cy="6.7" r="7" fill="hsl(var(--brand-500))">
 </circle>
 </svg>
-<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">1<small class="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
+<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">1<small class="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
 </p>
-<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">A quiet hour between the lunch deliveries.</p>
+<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">A quiet hour between the lunch deliveries.</p>
 </div>
-<div class="grid min-w-0 content-start gap-6">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
 <h2 id="1pm-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
 <span class="sr-only">1 pm: </span>Today’s roses on Instagram, in Petal Lane’s colours.</h2>
-<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">She taps Share on the red rose bouquet. Saroh draws a ready post in her site’s colours, fonts and logo, and writes the caption: order by 3 pm for delivery tonight.</p>
-<div class="mt-4 min-w-0 min-[760px]:mt-8">
-<div class="grid gap-8">
+<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
+<span class="max-[759px]:hidden">She taps Share on the red rose bouquet. Saroh draws a ready post in her site’s colours, fonts and logo, and writes the caption: order by 3 pm for delivery tonight.</span>
+<span class="min-[760px]:hidden">She taps Share: a ready post in Petal Lane’s look, caption written.</span>
+</p>
+<div class="mt-2 min-w-0 min-[760px]:mt-8">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+<div class="group/pf -mt-4 min-[760px]:hidden">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Read the whole hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 pt-2">
+<p class="m-0 text-[16px] leading-relaxed text-mk-copy">She taps Share on the red rose bouquet. Saroh draws a ready post in her site’s colours, fonts and logo, and writes the caption: order by 3 pm for delivery tonight.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-[minmax(0,1fr)] gap-2 [&amp;:has(&gt;details[open])&gt;div]:max-h-none [&amp;:has(&gt;details[open])&gt;div]:[mask-image:none]">
+<div style="--clip:240px" class="min-w-0 max-[759px]:max-h-[var(--clip)] max-[759px]:overflow-hidden max-[759px]:[mask-image:linear-gradient(to_bottom,#000_calc(100%-64px),transparent)] max-[759px]:[&amp;_[data-pf=desk]]:!contents max-[759px]:[&amp;_[data-pf=phone]]:!hidden">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-8">
 <div class="grid items-center gap-8 min-[1000px]:grid-cols-[minmax(0,420px)_1fr]">
 <div class="max-[759px]:order-2">
-<div class="contents max-[759px]:hidden">
+<div data-pf="desk" class="contents max-[759px]:hidden">
 <div class="rounded-mk-card bg-card text-foreground shadow-mk-card grid gap-3 p-5" aria-label="Sharing the red rose bouquet from Saroh, an example" role="group">
 <p class="m-0 grid gap-0.5">
 <b class="text-[15px] font-semibold">Red rose bouquet</b>
@@ -813,7 +893,7 @@
 </p>
 </div>
 </div>
-<details class="group min-[760px]:hidden">
+<details data-pf="phone" class="group min-[760px]:hidden">
 <summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See the share sheet</summary>
 <div class="mt-3">
 <div class="rounded-mk-card bg-card text-foreground shadow-mk-card grid gap-3 p-5" aria-label="Sharing the red rose bouquet from Saroh, an example" role="group">
@@ -856,15 +936,21 @@
 </div>
 </div>
 </div>
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See the share sheet</summary>
+</details>
+</div>
+</div>
+</div>
 <div class="flex flex-wrap items-center gap-2.5">
 </div>
 </div>
 </div>
 </section>
 <section id="3pm" aria-labelledby="3pm-title" class="scroll-mt-[calc(var(--mk-nav-h)+16px)] bg-mk-afternoon text-foreground">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
-<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-16">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
+<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-11">
 <path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
 <path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
@@ -872,19 +958,39 @@
 <circle cx="95.4" cy="19.6" r="7" fill="hsl(var(--brand-500))">
 </circle>
 </svg>
-<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">3<small class="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
+<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">3<small class="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
 </p>
-<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">The post has been up two hours. The 3 pm cut-off is close.</p>
+<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">The post has been up two hours. The 3 pm cut-off is close.</p>
 </div>
-<div class="grid min-w-0 content-start gap-6">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
 <h2 id="3pm-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
 <span class="sr-only">3 pm: </span>Lilies for tonight, paid before she sees the order.</h2>
-<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">Aditi orders a mixed lily bouquet on petal-lane.saroh.app for her mother, delivered tonight. The site is in Petal Lane’s own look, with bouquets and prices straight from Saroh. The order lands paid, its bill written.</p>
-<div class="mt-4 min-w-0 min-[760px]:mt-8">
-<div class="grid gap-8">
+<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
+<span class="max-[759px]:hidden">Aditi orders a mixed lily bouquet on petal-lane.saroh.app for her mother, delivered tonight. The site is in Petal Lane’s own look, with bouquets and prices straight from Saroh. The order lands paid, its bill written.</span>
+<span class="min-[760px]:hidden">Ordered on Petal Lane’s own site, it lands paid, bill written.</span>
+</p>
+<div class="mt-2 min-w-0 min-[760px]:mt-8">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+<div class="group/pf -mt-4 min-[760px]:hidden">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Read the whole hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 pt-2">
+<p class="m-0 text-[16px] leading-relaxed text-mk-copy">Aditi orders a mixed lily bouquet on petal-lane.saroh.app for her mother, delivered tonight. The site is in Petal Lane’s own look, with bouquets and prices straight from Saroh. The order lands paid, its bill written.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-[minmax(0,1fr)] gap-2 [&amp;:has(&gt;details[open])&gt;div]:max-h-none [&amp;:has(&gt;details[open])&gt;div]:[mask-image:none]">
+<div style="--clip:260px" class="min-w-0 max-[759px]:max-h-[var(--clip)] max-[759px]:overflow-hidden max-[759px]:[mask-image:linear-gradient(to_bottom,#000_calc(100%-64px),transparent)] max-[759px]:[&amp;_[data-pf=desk]]:!contents max-[759px]:[&amp;_[data-pf=phone]]:!hidden">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-8">
 <div class="relative grid gap-5 min-[1000px]:block min-[1000px]:pb-16">
-<div class="min-[1000px]:mr-[200px]">
-<div class="contents max-[759px]:hidden">
+<div class="max-[759px]:order-2 min-[1000px]:mr-[200px]">
+<div data-pf="desk" class="contents max-[759px]:hidden">
 <div style="--site-bg:26.7 52.9% 96.7%;--site-surface:6.7 42.9% 91.8%;--site-fg:345 23.5% 13.3%;--site-muted:333.6 12.8% 38.2%;--site-accent:350.1 57.2% 39.4%;--site-accent-fg:26.7 52.9% 96.7%;--site-font-heading:var(--font-site-serif), Georgia, serif;--site-font-body:var(--font-site-sans), ui-sans-serif, system-ui, sans-serif;--site-heading-weight:600;--site-radius:10px">
 <figure aria-label="Petal Lane’s website at petal-lane.saroh.app, an example" class="m-0 min-w-0 overflow-hidden rounded-mk-card bg-card shadow-[0_24px_50px_-18px_rgba(40,44,40,0.3),0_3px_10px_rgba(40,44,40,0.07)]">
 <div class="flex h-11 items-center justify-center gap-2 text-[13px] font-medium" style="background:color-mix(in srgb, hsl(var(--site-bg, 40 31% 94%)) 88%, black);color:hsl(var(--site-fg, 60 4% 11%))">
@@ -939,7 +1045,7 @@
 </figure>
 </div>
 </div>
-<details class="group min-[760px]:hidden">
+<details data-pf="phone" class="group min-[760px]:hidden">
 <summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See the website</summary>
 <div class="mt-3">
 <div style="--site-bg:26.7 52.9% 96.7%;--site-surface:6.7 42.9% 91.8%;--site-fg:345 23.5% 13.3%;--site-muted:333.6 12.8% 38.2%;--site-accent:350.1 57.2% 39.4%;--site-accent-fg:26.7 52.9% 96.7%;--site-font-heading:var(--font-site-serif), Georgia, serif;--site-font-body:var(--font-site-sans), ui-sans-serif, system-ui, sans-serif;--site-heading-weight:600;--site-radius:10px">
@@ -1031,20 +1137,28 @@
 </div>
 </div>
 </div>
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See the website</summary>
+</details>
+</div>
+</div>
+</div>
 <div class="flex flex-wrap items-center gap-2.5">
-<span class="text-[14px] text-mk-copy">Used here</span>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/website">Website<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<div class="flex items-center gap-2.5 max-[759px]:-mr-mk-gutter max-[759px]:overflow-x-auto max-[759px]:whitespace-nowrap max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:contents">
+<span class="shrink-0 text-[14px] text-mk-copy">Used here</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/website">Website<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/products">Products<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/products">Products<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
+</div>
 </div>
 </div>
 </div>
 </section>
 <section id="4pm" aria-labelledby="4pm-title" class="scroll-mt-[calc(var(--mk-nav-h)+16px)] bg-mk-dusk text-foreground">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
-<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-16">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
+<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-11">
 <path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
 <path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
@@ -1052,16 +1166,36 @@
 <circle cx="103.3" cy="30" r="7" fill="hsl(var(--brand-500))">
 </circle>
 </svg>
-<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">4<small class="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
+<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">4<small class="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
 </p>
-<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">Monday is when the hotel’s front desk settles the week.</p>
+<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">Monday is when the hotel’s front desk settles the week.</p>
 </div>
-<div class="grid min-w-0 content-start gap-6">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
 <h2 id="4pm-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
 <span class="sr-only">4 pm: </span>The hotel’s weekly flowers, paid to her own account.</h2>
-<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">Saffron Court Hotel pays this week’s ₹8,800 from the link by UPI, into Petal Lane’s own Razorpay account and on to Zoya’s bank. Saroh marks INV-0228 paid and sends the bill.</p>
-<div class="mt-4 min-w-0 min-[760px]:mt-8">
-<div class="grid gap-8">
+<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
+<span class="max-[759px]:hidden">Saffron Court Hotel pays this week’s ₹8,800 from the link by UPI, into Petal Lane’s own Razorpay account and on to Zoya’s bank. Saroh marks INV-0228 paid and sends the bill.</span>
+<span class="min-[760px]:hidden">By UPI into Petal Lane’s own Razorpay, then on to Zoya’s bank.</span>
+</p>
+<div class="mt-2 min-w-0 min-[760px]:mt-8">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+<div class="group/pf -mt-4 min-[760px]:hidden">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Read the whole hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 pt-2">
+<p class="m-0 text-[16px] leading-relaxed text-mk-copy">Saffron Court Hotel pays this week’s ₹8,800 from the link by UPI, into Petal Lane’s own Razorpay account and on to Zoya’s bank. Saroh marks INV-0228 paid and sends the bill.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-[minmax(0,1fr)] gap-2 [&amp;:has(&gt;details[open])&gt;div]:max-h-none [&amp;:has(&gt;details[open])&gt;div]:[mask-image:none]">
+<div style="--clip:300px" class="min-w-0 max-[759px]:max-h-[var(--clip)] max-[759px]:overflow-hidden max-[759px]:[mask-image:linear-gradient(to_bottom,#000_calc(100%-64px),transparent)] max-[759px]:[&amp;_[data-pf=desk]]:!contents max-[759px]:[&amp;_[data-pf=phone]]:!hidden">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-8">
 <figure aria-label="The money’s path, an example: the hotel’s UPI app, to Petal Lane’s own Razorpay account, to Zoya’s bank. Saroh only records it." class="m-0">
 <ol class="m-0 grid list-none p-0 min-[760px]:grid-cols-[minmax(0,1fr)_96px_minmax(0,1fr)_96px_minmax(0,1fr)]">
 <li>
@@ -1128,18 +1262,26 @@
 </figure>
 </div>
 </div>
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See all of it</summary>
+</details>
+</div>
+</div>
+</div>
 <div class="flex flex-wrap items-center gap-2.5">
-<span class="text-[14px] text-mk-copy">Used here</span>
-<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/billing">Billing<span class="font-normal text-[hsl(var(--mk-body))]"> · how it works</span>
+<div class="flex items-center gap-2.5 max-[759px]:-mr-mk-gutter max-[759px]:overflow-x-auto max-[759px]:whitespace-nowrap max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:contents">
+<span class="shrink-0 text-[14px] text-mk-copy">Used here</span>
+<a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer text-[hsl(var(--foreground))]" href="/features/billing">Billing<span class="font-normal text-[hsl(var(--mk-body))] max-[759px]:sr-only"> · how it works</span>
 </a>
+</div>
 </div>
 </div>
 </div>
 </section>
 <section id="9pm" aria-labelledby="9pm-title" class="scroll-mt-[calc(var(--mk-nav-h)+16px)] bg-mk-lamp text-mk-lamp-fg [&amp;_.text-foreground]:text-mk-lamp-fg [&amp;_.text-mk-copy]:text-mk-lamp-meta">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
-<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-16">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]">
+<div class="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-[96px] max-[759px]:w-11">
 <path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round" stroke-dasharray="3 5">
 </path>
 <path d="M4 55h112" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round">
@@ -1147,16 +1289,36 @@
 <path d="M66 10a10 10 0 1 0 0 16a8 8 0 1 1 0-16z" fill="hsl(var(--mk-lamp-saff))">
 </path>
 </svg>
-<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">9<small class="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
+<p aria-hidden="true" class="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]">9<small class="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">pm</small>
 </p>
-<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">The shop’s dark and the buckets are rinsed. The market opens at five.</p>
+<p class="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">The shop’s dark and the buckets are rinsed. The market opens at five.</p>
 </div>
-<div class="grid min-w-0 content-start gap-6">
+<div class="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
 <h2 id="9pm-title" class="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
 <span class="sr-only">9 pm: </span>ChatGPT counts tomorrow’s roses.</h2>
-<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">Saroh connects to ChatGPT, Claude and other AI apps. Zoya asks in her own words; it reads her orders, counts the stems and adds the bridal bouquet to her Weddings page as a draft, which waits for her to publish.</p>
-<div class="mt-4 min-w-0 min-[760px]:mt-8">
-<div class="grid gap-8">
+<p class="m-0 max-w-[62ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
+<span class="max-[759px]:hidden">Saroh connects to ChatGPT, Claude and other AI apps. Zoya asks in her own words; it reads her orders, counts the stems and adds the bridal bouquet to her Weddings page as a draft, which waits for her to publish.</span>
+<span class="min-[760px]:hidden">Connected to Saroh, it counts stems and drafts the bouquet onto her site.</span>
+</p>
+<div class="mt-2 min-w-0 min-[760px]:mt-8">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
+<div class="group/pf -mt-4 min-[760px]:hidden">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-mk-lamp-fg decoration-mk-on-ink-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Read the whole hour<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 pt-2">
+<p class="m-0 text-[16px] leading-relaxed text-mk-copy">Saroh connects to ChatGPT, Claude and other AI apps. Zoya asks in her own words; it reads her orders, counts the stems and adds the bridal bouquet to her Weddings page as a draft, which waits for her to publish.</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-[minmax(0,1fr)] gap-2 [&amp;:has(&gt;details[open])&gt;div]:max-h-none [&amp;:has(&gt;details[open])&gt;div]:[mask-image:none]">
+<div style="--clip:250px" class="min-w-0 max-[759px]:max-h-[var(--clip)] max-[759px]:overflow-hidden max-[759px]:[mask-image:linear-gradient(to_bottom,#000_calc(100%-64px),transparent)] max-[759px]:[&amp;_[data-pf=desk]]:!contents max-[759px]:[&amp;_[data-pf=phone]]:!hidden">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-8">
 <div class="grid items-start gap-6 min-[1000px]:grid-cols-[minmax(0,1fr)_340px]">
 <div role="img" aria-label="A chat in ChatGPT, connected to Saroh, an example: it counts tomorrow’s roses from Petal Lane’s orders and adds the bridal bouquet to the Weddings page as a draft" class="rounded-mk-card bg-card text-foreground shadow-mk-card overflow-hidden">
 <p class="m-0 flex items-center gap-2 border-b border-border px-5 py-3 text-[14px] font-semibold">
@@ -1201,7 +1363,7 @@
 <p class="m-0 max-w-[90%] text-[15px] leading-relaxed">Tuesday has 4 red rose orders: 72 stems, two of 24 and two of 12. Wednesday to Saturday adds 10 more orders, 168 stems; the Mehra wedding is separate. The bridal bouquet is in your products and on the Weddings page, as a draft.</p>
 </div>
 </div>
-<div class="contents max-[759px]:hidden">
+<div data-pf="desk" class="contents max-[759px]:hidden">
 <div class="rounded-mk-card bg-card text-foreground shadow-mk-card grid gap-1 p-5">
 <p class="m-0 pb-2 text-[13px] font-semibold">Waiting for her in Saroh</p>
 <p class="m-0 flex items-center gap-3 border-t border-[#EEEBE4] py-2.5">
@@ -1215,7 +1377,7 @@
 <p class="text-[13px] leading-snug text-mk-copy m-0 mt-2">The site stays as it is until she taps Publish.</p>
 </div>
 </div>
-<details class="group min-[760px]:hidden">
+<details data-pf="phone" class="group min-[760px]:hidden">
 <summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See what waits as drafts</summary>
 <div class="mt-3">
 <div class="rounded-mk-card bg-card text-foreground shadow-mk-card grid gap-1 p-5">
@@ -1235,12 +1397,18 @@
 </div>
 </div>
 </div>
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-mk-lamp-fg decoration-mk-on-ink-line focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See what waits as drafts</summary>
+</details>
+</div>
+</div>
+</div>
 <div class="flex flex-wrap items-center gap-2.5">
 </div>
 </div>
 </div>
 </section>
-<section class="border-t border-border py-12">
+<section class="border-t border-border py-8 min-[760px]:py-12">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page">
 <details class="group rounded-mk-card border border-border bg-card">
 <summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-5 font-display text-mk-kit-h3 font-bold [&amp;::-webkit-details-marker]:hidden">Everything else Saroh does for florists<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-5 transition-transform group-open:rotate-180" aria-hidden="true">
@@ -1371,8 +1539,8 @@
 </div>
 </figure>
 </div>
-<div class="sp grid gap-12">
-<div class="grid gap-5 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
+<div class="sp grid grid-cols-[minmax(0,1fr)] gap-12 [&amp;_.vc-av]:!text-[12px] [&amp;_.vc-k]:!text-[12px] [&amp;_.vc-pill]:!text-[12px] [&amp;_.vc-sm]:!text-[12px] [&amp;_[style*=&#x27;font-size:11&#x27;]]:!text-[12px]">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-5 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
 <article class="grid content-start gap-4 rounded-mk-card border border-border bg-card p-5 min-[760px]:col-span-2 min-[1000px]:col-span-3">
 <div class="max-[759px]:hidden">
 <div class="vc-pic" aria-hidden="true" style="padding:0;background:var(--sp-sand);justify-content:flex-start">
@@ -1705,6 +1873,50 @@
 <span class="text-[15px] leading-snug text-mk-copy">Copy a link into your chat. They pay by UPI or card.</span>
 </span>
 </li>
+<li class="flex gap-3 max-[759px]:hidden">
+<span class="va-icon">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z">
+</path>
+</svg>
+</span>
+<span class="grid gap-1">
+<b class="text-[16px] font-semibold">Who sees the money</b>
+<span class="text-[15px] leading-snug text-mk-copy">Give each helper a role. Only the roles you pick see takings.</span>
+</span>
+</li>
+<li class="flex gap-3 max-[759px]:hidden">
+<span class="va-icon">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="12" cy="12" r="8">
+</circle>
+<path d="M12 8v4l3 2">
+</path>
+</svg>
+</span>
+<span class="grid gap-1">
+<b class="text-[16px] font-semibold">What&#x27;s running late</b>
+<span class="text-[15px] leading-snug text-mk-copy">Orders behind their step show as late in your list.</span>
+</span>
+</li>
+<li class="flex gap-3 max-[759px]:hidden">
+<span class="va-icon">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z">
+</path>
+<path d="M9 7h6M9 11h6M9 15h4">
+</path>
+</svg>
+</span>
+<span class="grid gap-1">
+<b class="text-[16px] font-semibold">Bills by hand</b>
+<span class="text-[15px] leading-snug text-mk-copy">Write a bill yourself for a wedding or a hotel.</span>
+</span>
+</li>
+</ul>
+<details class="group -mt-2 min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See all 6</summary>
+<ul class="m-0 mt-3 grid list-none gap-y-5 p-0">
 <li class="flex gap-3">
 <span class="va-icon">
 <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -1746,18 +1958,29 @@
 </span>
 </li>
 </ul>
+</details>
 </div>
 </div>
 </div>
 </details>
 </div>
 </section>
-<section aria-labelledby="starter-title" class="py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="starter-title" class="py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[420px_minmax(0,1fr)] min-[1000px]:gap-16">
 <div class="grid content-start gap-4">
 <h2 id="starter-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Add your products in a few minutes</h2>
 </div>
 <div class="grid content-start gap-4">
+<div class="group/pf grid gap-4 [&amp;&gt;details]:hidden [&amp;&gt;div]:!block">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Add your products in a few minutes<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 max-[759px]:pt-2">
 <p class="m-0 text-[16px] leading-relaxed text-mk-copy">Add each one once, with its price, sizes and how many you have. Here is how a list might start.</p>
 <ul class="m-0 grid list-none gap-0 rounded-mk-card border border-border bg-card p-0">
 <li class="flex justify-between gap-4 border-t border-[#EEEBE4] px-5 py-3.5 text-[15px] first:border-t-0">
@@ -1775,8 +1998,11 @@
 </ul>
 </div>
 </div>
+</div>
+</div>
+</div>
 </section>
-<section aria-labelledby="faq-title" class="border-t border-border py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="faq-title" class="border-t border-border py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-8 min-[1000px]:grid-cols-[400px_minmax(0,1fr)] min-[1000px]:gap-16">
 <h2 id="faq-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Questions florists ask.</h2>
 <div>
@@ -1817,8 +2043,8 @@
 </div>
 </div>
 </section>
-<section aria-labelledby="others-title" class="bg-mk-noon py-[72px] min-[760px]:py-[120px]">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-8">
+<section aria-labelledby="others-title" class="bg-mk-noon py-12 min-[760px]:py-[120px]">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-8">
 <div class="grid gap-3">
 <h2 id="others-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Same day, other trades.</h2>
 <p class="m-0 text-[16px] leading-relaxed text-mk-copy max-w-[520px]">The day runs the same way in other trades, with bookings and classes instead of orders.</p>
@@ -1826,9 +2052,9 @@
 <div>
 <ul aria-label="Same day, other trades." class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-2">
 <li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
-<a href="/for/home-bakers" class="grid h-full content-start gap-3 rounded-[24px] border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground">
+<a href="/for/home-bakers" class="grid h-full content-start gap-2 rounded-[24px] border border-border bg-card p-5 text-foreground no-underline shadow-mk-card hover:border-foreground min-[760px]:gap-3 min-[760px]:p-6">
 <span class="font-mono text-[14px]">9 am</span>
-<b class="font-display text-[26px] leading-tight tracking-[-0.03em]">A WhatsApp order, written in once.</b>
+<b class="font-display text-[22px] leading-tight tracking-[-0.03em] min-[760px]:text-[26px]">A WhatsApp order, written in once.</b>
 <span class="text-[14px] text-mk-copy">Rye &amp; Co., an example bakery</span>
 <span class="text-[16px] leading-normal text-mk-copy">Seven hours from the ovens at 7, with a cake ordered on the website, the Christmas menu added from Claude and a question at night.</span>
 <span class="mt-2 w-fit border-b-[1.5px] border-current text-[15px] font-semibold">Follow a day at a home bakery →</span>
@@ -1838,13 +2064,13 @@
 </div>
 <div class="grid gap-3">
 <h3 class="m-0 text-[15px] font-semibold text-mk-copy">Also for florists</h3>
-<div class="flex flex-wrap gap-2">
+<div class="flex flex-wrap gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&amp;&gt;*]:shrink-0">
 <a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer" href="/for/gift-shops">Gift shops</a>
 <a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer" href="/for/home-bakers">Home bakers</a>
 <a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer" href="/for/boutiques">Boutiques</a>
 </div>
 </div>
-<a class="flex flex-wrap items-center justify-between gap-3 rounded-[18px] bg-card px-6 py-5 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground" href="/for">
+<a class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[18px] bg-card px-5 py-4 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground min-[760px]:px-6 min-[760px]:py-5" href="/for">
 <b class="font-display text-[22px] tracking-[-0.02em]">All 34 trades</b>
 <span class="text-[15px] text-mk-copy">From the bakery at 7 to the tuition at 5, each at one moment of its day →</span>
 </a>

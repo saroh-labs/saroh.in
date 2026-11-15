@@ -16,6 +16,7 @@ import type { HomeHeroScene } from "@/content/world";
 
 import { cn } from "@saroh/marketing/cn";
 import { Container } from "@saroh/marketing/container";
+import { DrawnPhoto } from "@saroh/marketing/kit/drawn-photo";
 import { PhoneFrame } from "@saroh/marketing/kit/frames";
 import { siteVars } from "@saroh/marketing/kit/site-drawing";
 import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
@@ -53,10 +54,17 @@ function SitePhone({ scene }: { scene: HomeHeroScene }) {
                         </span>
                         <Menu aria-hidden className="size-5" />
                     </div>
-                    <div
-                        aria-hidden
-                        className="mx-3.5 h-[84px] rounded-[var(--site-radius)] bg-[hsl(var(--site-accent)/0.35)]"
-                    />
+                    {b.photo ? (
+                        <DrawnPhoto
+                            kind={b.photo}
+                            className="mx-3.5 h-[84px] rounded-[var(--site-radius)]"
+                        />
+                    ) : (
+                        <div
+                            aria-hidden
+                            className="mx-3.5 h-[84px] rounded-[var(--site-radius)] bg-[hsl(var(--site-accent)/0.35)]"
+                        />
+                    )}
                     <p
                         className={cn(
                             HEAD,
@@ -71,10 +79,17 @@ function SitePhone({ scene }: { scene: HomeHeroScene }) {
                                 key={i.name}
                                 className="flex items-center gap-2.5 rounded-[var(--site-radius)] bg-[hsl(var(--site-surface))] p-2"
                             >
-                                <span
-                                    aria-hidden
-                                    className="size-10 shrink-0 rounded-[var(--site-radius)] bg-[hsl(var(--site-accent)/0.3)]"
-                                />
+                                {i.photo ? (
+                                    <DrawnPhoto
+                                        kind={i.photo}
+                                        className="size-10 shrink-0 rounded-[var(--site-radius)]"
+                                    />
+                                ) : (
+                                    <span
+                                        aria-hidden
+                                        className="size-10 shrink-0 rounded-[var(--site-radius)] bg-[hsl(var(--site-accent)/0.3)]"
+                                    />
+                                )}
                                 <span className="min-w-0 flex-1 text-[13px] leading-snug">
                                     <b
                                         className={cn(

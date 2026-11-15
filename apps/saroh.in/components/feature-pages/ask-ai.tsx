@@ -43,7 +43,7 @@ import { shownChips, shownHref } from "./reach/links";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Questions } from "./reach/questions";
 
-const SCENE = "pt-[72px] min-[760px]:pt-[120px]";
+const SCENE = "pt-12 min-[760px]:pt-[120px]";
 const ROW =
     "grid items-center gap-3 border-t border-mk-line-row px-3.5 text-[14px] first:border-t-0";
 
@@ -711,7 +711,7 @@ function AskAiView() {
             <section
                 id={w.private.id}
                 aria-labelledby="private-title"
-                className="mt-[72px] scroll-mt-24 bg-mk-hover min-[760px]:mt-[140px]"
+                className="mt-12 scroll-mt-24 bg-mk-hover min-[760px]:mt-[140px]"
             >
                 <Container className="py-[72px] min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
                     <h2

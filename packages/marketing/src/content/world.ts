@@ -1,3 +1,4 @@
+import type { DrawnPhotoKind } from "../kit/drawn-photo";
 /**
  * The example world (DEC-221): one set of facts every drawing on an
  * edition's site reads, so a name, a number, a time or an address is the
@@ -32,6 +33,8 @@ export interface WorldItem {
     price: string;
     /** "box of 6", "12 stems". */
     unit?: string;
+    /** The drawn stand-in photo (`kit/drawn-photo`) where a drawing shows it. */
+    photo?: DrawnPhotoKind;
 }
 
 export interface WorldOrder {
@@ -98,6 +101,8 @@ export interface WorldBusiness {
     plan?: string;
     /** Its trade page: "/for/home-bakers". */
     tradePage?: string;
+    /** The drawn stand-in for the business's own photo (`kit/drawn-photo`). */
+    photo?: DrawnPhotoKind;
     look?: SiteLook;
     customers: readonly WorldPerson[];
     items: readonly WorldItem[];

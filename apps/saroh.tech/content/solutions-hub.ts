@@ -132,6 +132,8 @@ export const TRADE_WORDS: TradePageWords & {
     followDay: (kind) => `Follow a day at a ${kind}`,
     tradeBar: "A day at a",
     allTradesShort: "All trades",
+    wholeHour: "Read the whole hour",
+    wholePicture: "See all of it",
     questions: (longName) => `Questions ${longName.toLowerCase()} ask.`,
     related: "Saroh for other trades",
     allTrades: (n) => `All ${n} trades`,

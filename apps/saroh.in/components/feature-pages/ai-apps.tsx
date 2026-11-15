@@ -46,7 +46,7 @@ import { HERO_CTA } from "./reach/page-top";
 import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
 
-const SCENE = "pt-[72px] min-[760px]:pt-[120px]";
+const SCENE = "pt-12 min-[760px]:pt-[120px]";
 const PANEL = "overflow-hidden rounded-mk-card border border-border bg-card";
 
 /**
@@ -120,7 +120,7 @@ function AiAppsView() {
                         </p>
                     </div>
                     <div className="min-w-0">
-                        <CropToggle label={c.phoneMore} height={520}>
+                        <CropToggle label={c.phoneMore} height={400}>
                             <Chat w={w} />
                         </CropToggle>
                         <p className="m-0 mt-3 text-[13.5px] text-muted-foreground">
@@ -618,7 +618,7 @@ function AiAppsView() {
             {/* What it can't do. */}
             <section
                 aria-labelledby="cant-title"
-                className="mt-[72px] bg-mk-hover min-[760px]:mt-[140px]"
+                className="mt-12 bg-mk-hover min-[760px]:mt-[140px]"
             >
                 <Container className="py-[72px] min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
                     <h2

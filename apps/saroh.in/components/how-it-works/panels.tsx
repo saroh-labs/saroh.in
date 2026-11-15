@@ -1,5 +1,7 @@
 import { cn } from "@saroh/marketing/cn";
 import { SourceChips } from "@saroh/marketing/kit/chip";
+import type { DrawnPhotoKind } from "@saroh/marketing/kit/drawn-photo";
+import { DrawnPhoto } from "@saroh/marketing/kit/drawn-photo";
 import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
 import { siteVars } from "@saroh/marketing/kit/site-drawing";
 import { TimeStamp } from "@saroh/marketing/kit/time-stamp";
@@ -511,7 +513,7 @@ export function SharePanel({
     title: string;
     meta: string;
     button: string;
-    items: readonly { name: string; price: string }[];
+    items: readonly { name: string; price: string; photo?: DrawnPhotoKind }[];
     look: SiteLook;
 }) {
     return (
@@ -522,11 +524,20 @@ export function SharePanel({
                         key={item.name}
                         className="flex items-center gap-3 border-t border-border px-4 py-3 first:border-t-0"
                     >
-                        <span
-                            aria-hidden
-                            className="size-12 shrink-0 rounded-lg"
-                            style={{ background: `hsl(${look.accent} / 0.6)` }}
-                        />
+                        {item.photo ? (
+                            <DrawnPhoto
+                                kind={item.photo}
+                                className="size-12 shrink-0 rounded-lg"
+                            />
+                        ) : (
+                            <span
+                                aria-hidden
+                                className="size-12 shrink-0 rounded-lg"
+                                style={{
+                                    background: `hsl(${look.accent} / 0.6)`,
+                                }}
+                            />
+                        )}
                         <span className="grid min-w-0 flex-1 gap-0.5">
                             <b className="text-[14px] font-semibold">
                                 {item.name}

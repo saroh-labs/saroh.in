@@ -127,6 +127,7 @@ const RULES: Rule[] = [
         home: [
             `${MK}/sections/faq.tsx`,
             `${MK}/kit/cropped-card.tsx`,
+            `${MK}/kit/phone-fold.tsx`,
             `${MK}/nav/marketing-footer.tsx`,
         ],
         allow: {

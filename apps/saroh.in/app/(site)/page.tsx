@@ -176,7 +176,7 @@ export default async function HomePage() {
             <Container
                 as="section"
                 id="day"
-                className="scroll-mt-24 pt-12 min-[760px]:pt-16"
+                className="scroll-mt-24 pt-10 min-[760px]:pt-16"
             >
                 <DayDoor
                     title={home.day.title}
@@ -190,7 +190,8 @@ export default async function HomePage() {
                     >
                         <nav
                             aria-label={home.worksFor}
-                            className="flex flex-wrap items-center gap-2"
+                            // A phone: one row of chips that scrolls (PHONE.md).
+                            className="flex flex-wrap items-center gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&>*]:shrink-0"
                         >
                             <span className="mr-1 text-[14px] text-muted-foreground">
                                 {home.worksFor}

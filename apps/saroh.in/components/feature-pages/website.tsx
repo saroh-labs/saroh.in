@@ -44,7 +44,7 @@ import { Looks } from "./website/looks";
 import { lookStyle } from "./website/shop-site";
 
 const H3 = "m-0 font-display text-mk-kit-h3 font-bold";
-const SCENE = "pt-[72px] min-[760px]:pt-[120px]";
+const SCENE = "pt-12 min-[760px]:pt-[120px]";
 
 /**
  * /features/website (boards FWDesk, FWPhone2): one responsive page. The
@@ -196,7 +196,7 @@ function WebsiteView() {
             <Container
                 as="section"
                 aria-labelledby="looks-title"
-                className="pt-[72px] min-[760px]:pt-14"
+                className="pt-12 min-[760px]:pt-14"
             >
                 <h2
                     id="looks-title"
@@ -467,7 +467,7 @@ function WebsiteView() {
             {/* Your address. */}
             <section
                 aria-labelledby="address-title"
-                className="mt-[72px] bg-mk-hover min-[760px]:mt-[120px]"
+                className="mt-12 bg-mk-hover min-[760px]:mt-[120px]"
             >
                 <Container className="py-[72px] min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
                     <h2

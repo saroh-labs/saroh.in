@@ -49,28 +49,28 @@ export function DayScene({
         >
             <Container
                 className={cn(
-                    "grid gap-8 py-[72px] min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]",
+                    "grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]",
                     className,
                 )}
             >
-                <div className="grid content-start gap-4 max-[759px]:grid-cols-[auto_1fr] max-[759px]:items-end">
-                    <SunArc at={at} className="max-[759px]:w-16" />
+                <div className="grid content-start gap-4 max-[759px]:grid-cols-[auto_auto_minmax(0,1fr)] max-[759px]:items-center max-[759px]:gap-3">
+                    <SunArc at={at} className="max-[759px]:w-11" />
                     <p
                         aria-hidden
-                        className="m-0 flex items-start gap-1 font-display text-[64px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]"
+                        className="m-0 flex items-start gap-1 font-display text-[44px] font-bold leading-[0.86] tracking-[-0.05em] min-[760px]:text-[120px]"
                     >
                         {hour}
-                        <small className="mt-1 text-[18px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">
+                        <small className="mt-0.5 text-[15px] font-medium tracking-[-0.01em] text-mk-copy min-[760px]:mt-2 min-[760px]:text-[26px]">
                             {half}
                         </small>
                     </p>
                     {mood ? (
-                        <p className="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:col-span-2 min-[760px]:max-w-[220px]">
+                        <p className="m-0 text-[16px] leading-normal text-mk-copy max-[759px]:border-l max-[759px]:border-border max-[759px]:pl-3 max-[759px]:text-[13px] max-[759px]:leading-snug min-[760px]:max-w-[220px]">
                             {mood}
                         </p>
                     ) : null}
                 </div>
-                <div className="grid min-w-0 content-start gap-6">
+                <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-3 min-[760px]:gap-6">
                     <h2
                         id={`${id}-title`}
                         className="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
@@ -84,7 +84,7 @@ export function DayScene({
                         </p>
                     ) : null}
                     {children ? (
-                        <div className="mt-4 min-w-0 min-[760px]:mt-8">
+                        <div className="mt-2 min-w-0 min-[760px]:mt-8">
                             {children}
                         </div>
                     ) : null}

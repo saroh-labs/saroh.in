@@ -32,7 +32,7 @@ import { WORLD } from "@/content/world";
 import { claimOn } from "@/lib/feature-switches";
 
 import { LivePill } from "./reach/app-card";
-import { Fold } from "./reach/fold";
+import { CropToggle, Fold } from "./reach/fold";
 import { InTheApp } from "./reach/in-the-app";
 import { shownChips } from "./reach/links";
 import { HERO_CTA, PageTop } from "./reach/page-top";
@@ -43,7 +43,7 @@ import { Tail } from "./reach/tail";
 import { Feed, ItemCard, Seg, StateChip, StoryTime } from "./social/pieces";
 import { PostCard } from "./social/post-card";
 
-const SCENE = "pt-[72px] min-[760px]:pt-[120px]";
+const SCENE = "pt-12 min-[760px]:pt-[120px]";
 const KINDS = ["photo", "price", "offer", "simple"] as const;
 const PANEL = "rounded-mk-card border border-border bg-card";
 
@@ -114,99 +114,101 @@ function SocialView() {
                 note={w.note}
                 stacked
             >
-                <div
-                    role="group"
-                    aria-label={w.stage.label}
-                    className="rounded-mk-card bg-mk-hover/60 p-4 min-[760px]:p-7"
-                >
-                    <div className="flex flex-wrap items-center gap-4">
-                        <div className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[14px] bg-card py-3 pl-3 pr-3.5 shadow-[0_1px_2px_rgba(40,30,15,0.06),0_10px_24px_-14px_rgba(40,30,15,0.25)] min-[760px]:flex-none">
-                            <Photo
-                                kind="buns"
-                                className="size-[52px] shrink-0 rounded-[9px]"
-                            />
-                            <div className="min-w-0">
-                                <b className="flex items-center gap-2 text-[17px] font-semibold">
-                                    {w.stage.product}
-                                    <LivePill className="max-[759px]:hidden">
-                                        {w.stage.live}
-                                    </LivePill>
-                                </b>
-                                <small className="block text-[13.5px] text-muted-foreground">
-                                    <span className="min-[760px]:hidden">
-                                        {w.stage.phoneNote}
-                                    </span>
-                                    <span className="max-[759px]:hidden">
-                                        {w.stage.productNote}
-                                    </span>
-                                </small>
-                            </div>
-                            <span className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-[10px] bg-foreground px-4 text-[15px] font-semibold text-background shadow-[0_0_0_3px_#fff,0_0_0_5px_hsl(var(--foreground))] min-[760px]:ml-2.5">
-                                <Share2 aria-hidden className="size-4" />
-                                {w.stage.share}
-                            </span>
-                        </div>
-                        <span
-                            aria-hidden
-                            className="relative mx-1.5 hidden h-0.5 flex-1 border-t-2 border-dashed border-border-strong min-[1080px]:block"
-                        />
-                        <div className="hidden items-center gap-3 text-[15px] font-semibold min-[1080px]:flex">
-                            {w.stage.pick}
-                            <Seg items={w.stage.sizes} on={0} />
-                        </div>
-                    </div>
-                    <SwipeRow
-                        label={w.stage.label}
-                        columns={4}
-                        of={w.stage.of}
-                        className="mt-7"
+                <CropToggle label={w.stage.more} height={400}>
+                    <div
+                        role="group"
+                        aria-label={w.stage.label}
+                        className="rounded-mk-card bg-mk-hover/60 p-4 min-[760px]:p-7"
                     >
-                        {KINDS.map((kind) => (
-                            <figure
-                                key={kind}
-                                className="m-0 grid justify-items-center gap-3.5"
-                            >
-                                <ItemCard
-                                    set={card}
-                                    look={ryeLook}
-                                    kind={kind}
-                                    photo="buns"
-                                    className={cn(
-                                        "w-full max-w-[254px]",
-                                        kind === "price" &&
-                                            "rounded-[var(--site-radius)] outline outline-[3px] outline-offset-[5px] outline-foreground",
-                                    )}
+                        <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex min-w-0 flex-1 items-center gap-3.5 rounded-[14px] bg-card py-3 pl-3 pr-3.5 shadow-[0_1px_2px_rgba(40,30,15,0.06),0_10px_24px_-14px_rgba(40,30,15,0.25)] min-[760px]:flex-none">
+                                <Photo
+                                    kind="buns"
+                                    className="size-[52px] shrink-0 rounded-[9px]"
                                 />
-                                <figcaption
-                                    className={cn(
-                                        "flex min-h-7 items-center gap-1.5 text-[15px] font-semibold",
-                                        kind === "price"
-                                            ? "text-foreground"
-                                            : "text-mk-copy",
-                                    )}
+                                <div className="min-w-0">
+                                    <b className="flex items-center gap-2 text-[17px] font-semibold">
+                                        {w.stage.product}
+                                        <LivePill className="max-[759px]:hidden">
+                                            {w.stage.live}
+                                        </LivePill>
+                                    </b>
+                                    <small className="block text-[13.5px] text-muted-foreground">
+                                        <span className="min-[760px]:hidden">
+                                            {w.stage.phoneNote}
+                                        </span>
+                                        <span className="max-[759px]:hidden">
+                                            {w.stage.productNote}
+                                        </span>
+                                    </small>
+                                </div>
+                                <span className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-[10px] bg-foreground px-4 text-[15px] font-semibold text-background shadow-[0_0_0_3px_#fff,0_0_0_5px_hsl(var(--foreground))] min-[760px]:ml-2.5">
+                                    <Share2 aria-hidden className="size-4" />
+                                    {w.stage.share}
+                                </span>
+                            </div>
+                            <span
+                                aria-hidden
+                                className="relative mx-1.5 hidden h-0.5 flex-1 border-t-2 border-dashed border-border-strong min-[1080px]:block"
+                            />
+                            <div className="hidden items-center gap-3 text-[15px] font-semibold min-[1080px]:flex">
+                                {w.stage.pick}
+                                <Seg items={w.stage.sizes} on={0} />
+                            </div>
+                        </div>
+                        <SwipeRow
+                            label={w.stage.label}
+                            columns={4}
+                            of={w.stage.of}
+                            className="mt-7"
+                        >
+                            {KINDS.map((kind) => (
+                                <figure
+                                    key={kind}
+                                    className="m-0 grid justify-items-center gap-3.5"
                                 >
-                                    {kind === "price" ? (
-                                        <Check
-                                            aria-hidden
-                                            className="size-4 text-mk-ok"
-                                        />
-                                    ) : null}
-                                    {w.stage.styles[kind]}
-                                </figcaption>
-                            </figure>
-                        ))}
-                    </SwipeRow>
-                    <p className="m-0 mt-6 text-[15px] text-mk-copy">
-                        {w.stage.note}
-                    </p>
-                </div>
+                                    <ItemCard
+                                        set={card}
+                                        look={ryeLook}
+                                        kind={kind}
+                                        photo="buns"
+                                        className={cn(
+                                            "w-full max-w-[254px]",
+                                            kind === "price" &&
+                                                "rounded-[var(--site-radius)] outline outline-[3px] outline-offset-[5px] outline-foreground",
+                                        )}
+                                    />
+                                    <figcaption
+                                        className={cn(
+                                            "flex min-h-7 items-center gap-1.5 text-[15px] font-semibold",
+                                            kind === "price"
+                                                ? "text-foreground"
+                                                : "text-mk-copy",
+                                        )}
+                                    >
+                                        {kind === "price" ? (
+                                            <Check
+                                                aria-hidden
+                                                className="size-4 text-mk-ok"
+                                            />
+                                        ) : null}
+                                        {w.stage.styles[kind]}
+                                    </figcaption>
+                                </figure>
+                            ))}
+                        </SwipeRow>
+                        <p className="m-0 mt-6 text-[15px] text-mk-copy">
+                            {w.stage.note}
+                        </p>
+                    </div>
+                </CropToggle>
             </PageTop>
 
             {/* The same four in a salon's look. */}
             <Container
                 as="section"
                 aria-labelledby="salon-title"
-                className="pt-[72px] min-[760px]:pt-16"
+                className="pt-12 min-[760px]:pt-16"
             >
                 <div className="grid items-center gap-8 rounded-mk-card border border-border bg-card p-5 min-[760px]:p-8 min-[1080px]:grid-cols-[1fr_auto]">
                     <div>
@@ -714,7 +716,7 @@ function SocialView() {
             {/* 1:05 pm: posted. */}
             <section
                 aria-labelledby="posted-title"
-                className="mt-[72px] bg-mk-hover min-[760px]:mt-[140px]"
+                className="mt-12 bg-mk-hover min-[760px]:mt-[140px]"
             >
                 <Container className="grid items-center gap-10 py-12 min-[760px]:py-[110px] min-[1080px]:grid-cols-[420px_1fr] min-[1080px]:gap-16">
                     <div className="order-2 flex justify-center min-[1080px]:order-none">

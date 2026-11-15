@@ -137,7 +137,7 @@ export function OrdersChapter() {
             as="section"
             id="orders"
             aria-labelledby="orders-title"
-            className="grid scroll-mt-24 gap-6 pt-12 min-[760px]:pt-[72px] min-[960px]:grid-cols-[minmax(0,1fr)_420px] min-[960px]:items-center min-[960px]:gap-20"
+            className="grid scroll-mt-24 gap-6 pt-10 min-[760px]:pt-[72px] min-[960px]:grid-cols-[minmax(0,1fr)_420px] min-[960px]:items-center min-[960px]:gap-20"
         >
             <div className="min-[960px]:order-2">
                 <h2

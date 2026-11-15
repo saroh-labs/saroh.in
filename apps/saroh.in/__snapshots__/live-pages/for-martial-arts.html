@@ -40,7 +40,7 @@
 </span>
 </div>
 </div>
-<section class="bg-mk-dawn pb-16 pt-4 min-[760px]:pb-[72px]">
+<section class="bg-mk-dawn pb-10 pt-4 min-[760px]:pb-[72px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_400px] min-[1000px]:gap-[72px]">
 <div class="grid min-w-0 content-start">
 <nav aria-label="Breadcrumb">
@@ -67,6 +67,9 @@
 <p class="m-0 mt-3 text-[15px] text-muted-foreground">No card needed to start.</p>
 </div>
 <div class="flex justify-center min-[1000px]:col-start-2 min-[1000px]:row-span-2 min-[1000px]:row-start-1 min-[1000px]:block">
+<div class="w-full max-w-[360px]">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-2 [&amp;:has(&gt;details[open])&gt;div]:max-h-none [&amp;:has(&gt;details[open])&gt;div]:[mask-image:none]">
+<div style="--clip:380px" class="min-w-0 max-[759px]:max-h-[var(--clip)] max-[759px]:overflow-hidden max-[759px]:[mask-image:linear-gradient(to_bottom,#000_calc(100%-64px),transparent)] max-[759px]:[&amp;_[data-pf=desk]]:!contents max-[759px]:[&amp;_[data-pf=phone]]:!hidden">
 <figure aria-label="What a martial arts class&#x27;s day looks like in Saroh: belt grading booked like a class with places left, Tanvi booked into the 19:00 adults&#x27; class, a monthly fee paid by UPI Autopay set up on the dojo&#x27;s own Razorpay, and a note on a student&#x27;s belt." class="m-0 aspect-[400/812] w-full rounded-[56px] bg-foreground p-[11px] shadow-[0_30px_60px_-20px_rgba(40,44,40,0.35),0_10px_24px_rgba(40,44,40,0.12)]" style="max-width:360px">
 <div class="relative flex h-full flex-col overflow-hidden rounded-[46px]" style="background:#FBFAF7">
 <div aria-hidden="true" class="flex items-center justify-between px-[30px] pt-4 text-[14px] font-semibold">
@@ -187,9 +190,15 @@
 </div>
 </figure>
 </div>
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See the whole day</summary>
+</details>
+</div>
+</div>
+</div>
 </div>
 </section>
-<section aria-labelledby="problems-title" class="border-t border-border py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="problems-title" class="border-t border-border py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[400px_minmax(0,1fr)] min-[1000px]:gap-16">
 <div class="grid content-start gap-4">
 <h2 id="problems-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">What goes wrong in a busy week.</h2>
@@ -344,11 +353,11 @@
 </div>
 </div>
 </section>
-<section aria-labelledby="changes-title" class="border-t border-border py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="changes-title" class="border-t border-border py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10">
 <h2 id="changes-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">What gets easier in your dojo.</h2>
-<div class="sp grid gap-12">
-<div class="grid gap-5 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
+<div class="sp grid grid-cols-[minmax(0,1fr)] gap-12 [&amp;_.vc-av]:!text-[12px] [&amp;_.vc-k]:!text-[12px] [&amp;_.vc-pill]:!text-[12px] [&amp;_.vc-sm]:!text-[12px] [&amp;_[style*=&#x27;font-size:11&#x27;]]:!text-[12px]">
+<div class="grid grid-cols-[minmax(0,1fr)] gap-5 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
 <article class="grid content-start gap-4 rounded-mk-card border border-border bg-card p-5 min-[760px]:col-span-2 min-[1000px]:col-span-3">
 <div class="max-[759px]:hidden">
 <div class="vc-pic" aria-hidden="true" style="padding:0;background:var(--sp-sand);justify-content:flex-start">
@@ -669,6 +678,50 @@
 <span class="text-[15px] leading-snug text-mk-copy">Who teaches each class, their days and time off.</span>
 </span>
 </li>
+<li class="flex gap-3 max-[759px]:hidden">
+<span class="va-icon">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1">
+</path>
+<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1">
+</path>
+</svg>
+</span>
+<span class="grid gap-1">
+<b class="text-[16px] font-semibold">Payment links</b>
+<span class="text-[15px] leading-snug text-mk-copy">Send a link. They pay by UPI or card, straight to your account.</span>
+</span>
+</li>
+<li class="flex gap-3 max-[759px]:hidden">
+<span class="va-icon">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+<path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z">
+</path>
+</svg>
+</span>
+<span class="grid gap-1">
+<b class="text-[16px] font-semibold">Who sees the money</b>
+<span class="text-[15px] leading-snug text-mk-copy">Give each instructor a role. Only the roles you pick see fees.</span>
+</span>
+</li>
+<li class="flex gap-3 max-[759px]:hidden">
+<span class="va-icon">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+<rect x="4" y="5" width="16" height="15" rx="2">
+</rect>
+<path d="M4 10h16M9 3v4M15 3v4">
+</path>
+</svg>
+</span>
+<span class="grid gap-1">
+<b class="text-[16px] font-semibold">A new batch with set dates</b>
+<span class="text-[15px] leading-snug text-mk-copy">Add a holiday camp with its dates and seats, and add who&#x27;s in it.</span>
+</span>
+</li>
+</ul>
+<details class="group -mt-2 min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">See all 6</summary>
+<ul class="m-0 mt-3 grid list-none gap-y-5 p-0">
 <li class="flex gap-3">
 <span class="va-icon">
 <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--sp-amber-text)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -710,16 +763,27 @@
 </span>
 </li>
 </ul>
+</details>
 </div>
 </div>
 </div>
 </section>
-<section aria-labelledby="starter-title" class="py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="starter-title" class="py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[420px_minmax(0,1fr)] min-[1000px]:gap-16">
 <div class="grid content-start gap-4">
 <h2 id="starter-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Add your services in a few minutes</h2>
 </div>
 <div class="grid content-start gap-4">
+<div class="group/pf grid gap-4 [&amp;&gt;details]:hidden [&amp;&gt;div]:!block">
+<details class="group min-[760px]:hidden">
+<summary class="inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&amp;::-webkit-details-marker]:hidden text-foreground decoration-border-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">Add your services in a few minutes<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+</details>
+<div class="max-[759px]:hidden max-[759px]:group-has-[&gt;details[open]]/pf:block">
+<div class="grid gap-4 max-[759px]:pt-2">
 <p class="m-0 text-[16px] leading-relaxed text-mk-copy">Add each one once, with its time and price. Here is how a list might start.</p>
 <ul class="m-0 grid list-none gap-0 rounded-mk-card border border-border bg-card p-0">
 <li class="flex justify-between gap-4 border-t border-[#EEEBE4] px-5 py-3.5 text-[15px] first:border-t-0">
@@ -737,8 +801,11 @@
 </ul>
 </div>
 </div>
+</div>
+</div>
+</div>
 </section>
-<section aria-labelledby="faq-title" class="border-t border-border py-[72px] min-[760px]:py-[120px]">
+<section aria-labelledby="faq-title" class="border-t border-border py-12 min-[760px]:py-[120px]">
 <div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-8 min-[1000px]:grid-cols-[400px_minmax(0,1fr)] min-[1000px]:gap-16">
 <h2 id="faq-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Questions martial arts classes ask.</h2>
 <div>
@@ -779,8 +846,8 @@
 </div>
 </div>
 </section>
-<section aria-labelledby="others-title" class="bg-mk-noon py-[72px] min-[760px]:py-[120px]">
-<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-8">
+<section aria-labelledby="others-title" class="bg-mk-noon py-12 min-[760px]:py-[120px]">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-8">
 <div class="grid gap-3">
 <h2 id="others-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Same day, other trades.</h2>
 <p class="m-0 text-[16px] leading-relaxed text-mk-copy max-w-[520px]">The day runs the same way in other trades, with bookings and classes instead of orders.</p>
@@ -788,18 +855,18 @@
 <div>
 <ul aria-label="Same day, other trades." class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-2">
 <li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
-<a href="/for/home-bakers" class="grid h-full content-start gap-3 rounded-[24px] border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground">
+<a href="/for/home-bakers" class="grid h-full content-start gap-2 rounded-[24px] border border-border bg-card p-5 text-foreground no-underline shadow-mk-card hover:border-foreground min-[760px]:gap-3 min-[760px]:p-6">
 <span class="font-mono text-[14px]">9 am</span>
-<b class="font-display text-[26px] leading-tight tracking-[-0.03em]">A WhatsApp order, written in once.</b>
+<b class="font-display text-[22px] leading-tight tracking-[-0.03em] min-[760px]:text-[26px]">A WhatsApp order, written in once.</b>
 <span class="text-[14px] text-mk-copy">Rye &amp; Co., an example bakery</span>
 <span class="text-[16px] leading-normal text-mk-copy">Seven hours from the ovens at 7, with a cake ordered on the website, the Christmas menu added from Claude and a question at night.</span>
 <span class="mt-2 w-fit border-b-[1.5px] border-current text-[15px] font-semibold">Follow a day at a home bakery →</span>
 </a>
 </li>
 <li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
-<a href="/for/florists" class="grid h-full content-start gap-3 rounded-[24px] border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground">
+<a href="/for/florists" class="grid h-full content-start gap-2 rounded-[24px] border border-border bg-card p-5 text-foreground no-underline shadow-mk-card hover:border-foreground min-[760px]:gap-3 min-[760px]:p-6">
 <span class="font-mono text-[14px]">9 am</span>
-<b class="font-display text-[26px] leading-tight tracking-[-0.03em]">Twenty-four roses for tonight, card message and all.</b>
+<b class="font-display text-[22px] leading-tight tracking-[-0.03em] min-[760px]:text-[26px]">Twenty-four roses for tonight, card message and all.</b>
 <span class="text-[14px] text-mk-copy">Petal Lane, an example florist</span>
 <span class="text-[16px] leading-normal text-mk-copy">From the flower market at six to tomorrow’s rose count, with a wedding enquiry, a post and the hotel paying its week.</span>
 <span class="mt-2 w-fit border-b-[1.5px] border-current text-[15px] font-semibold">Follow a day at a florist →</span>
@@ -810,13 +877,13 @@
 </div>
 <div class="grid gap-3">
 <h3 class="m-0 text-[15px] font-semibold text-mk-copy">Also for martial arts classes</h3>
-<div class="flex flex-wrap gap-2">
+<div class="flex flex-wrap gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&amp;&gt;*]:shrink-0">
 <a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer" href="/for/gyms">Gyms</a>
 <a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer" href="/for/personal-trainers">Personal trainers</a>
 <a class="inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer" href="/for/swimming-classes">Swimming classes</a>
 </div>
 </div>
-<a class="flex flex-wrap items-center justify-between gap-3 rounded-[18px] bg-card px-6 py-5 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground" href="/for">
+<a class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[18px] bg-card px-5 py-4 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground min-[760px]:px-6 min-[760px]:py-5" href="/for">
 <b class="font-display text-[22px] tracking-[-0.02em]">All 34 trades</b>
 <span class="text-[15px] text-mk-copy">From the bakery at 7 to the tuition at 5, each at one moment of its day →</span>
 </a>

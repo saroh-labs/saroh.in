@@ -466,6 +466,8 @@ export function websiteWords({
                 : "Free to start. No card needed.",
         },
         inTheApp: {
+            /** On a phone, the steps and what follows fold behind this. */
+            phone: "See it in the app, step by step",
             everything: "Everything the website builder does",
             usedBy: "Used by",
             of: "of",

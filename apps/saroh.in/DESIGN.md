@@ -333,6 +333,28 @@ price is ever drawn into an image.
 
 ## Changes
 
+- **17 Nov 2026, phone polish (DEC-221, unit/web-polish).** Phone lengths
+  at 390px, desk unchanged. Kit: `kit/phone-fold` (`PhoneFold`: content
+  once in the HTML, behind a summary on a phone, shown from 760px;
+  `PhoneClip`: a picture cut at a height with a fade, its summary lifting
+  the cut); `kit/drawn-photo` (the boards' `.p-rye`/`.p-neel`/`.p-pulse`
+  art as `DrawnPhoto`, named per business and item in the world:
+  `WorldBusiness.photo`, `WorldItem.photo`; `SiteItem.drawn`); DayScene's
+  phone row (sun, hour, mood side by side, 48px bands); SwipeRow counts a
+  card only when 60% in view. Solutions: day hours take a two-line
+  `phoneLead` with the whole lead, the line after and the note folded
+  ("Read the whole hour"); pictures that don't crop themselves are clipped
+  by kind; the hour strip, starter list and Also items past three fold;
+  chip rows scroll on one line; the AI asks swipe; tile drawings' pills
+  and meta are 12px. Landing: drawn bakes, salon and gym photos in the hero
+  phone, the site showcase and the Share cards; tighter phone bands.
+  /features: each chapter's lead shows its first sentence, the rest folded;
+  the money's path is clipped. Orders (`components/feature-pages/orders-moments.tsx`,
+  words `content/feature-orders.ts`): where orders come from, the New order
+  sheet, ORD-1045 opened and what it moves (bun boxes 38 to 36), all from
+  the world; the hero shows Rye & Co.'s own list (`s-orders`) and the first
+  step its order (`r-order`) on both editions. Keep pages' steps and Ask
+  exchanges swipe on a phone. Reach and Ask: In the app folds on a phone.
 - **17 Nov 2026, the Reach and Ask feature pages (DEC-221, unit/web-reach).**
   Website builder (FWDesk/FWPhone2), Share and posts (FSDesk/FSPhone2, with
   `#saroh-social`), Ask AI (FADesk/FAPhone2) and AI apps (FMDesk/FMPhone2),

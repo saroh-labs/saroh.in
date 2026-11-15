@@ -147,10 +147,10 @@ export function SolutionsHub({
 
             <section
                 aria-labelledby="tell-title"
-                className="border-t border-border py-[72px] min-[760px]:py-[120px]"
+                className="border-t border-border pb-10 pt-12 min-[760px]:py-[120px]"
             >
-                <Container className="grid gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_420px] min-[1000px]:gap-16">
-                    <div className="grid content-start gap-5">
+                <Container className="grid gap-8 min-[760px]:gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_420px] min-[1000px]:gap-16">
+                    <div className="grid content-start gap-4 min-[760px]:gap-5">
                         <h2
                             id="tell-title"
                             className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
@@ -180,12 +180,12 @@ export function SolutionsHub({
                             <a
                                 key={d.href}
                                 href={d.href}
-                                className="grid gap-2 rounded-mk-card border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground"
+                                className="grid gap-1.5 rounded-mk-card border border-border bg-card p-5 text-foreground no-underline shadow-mk-card hover:border-foreground min-[760px]:gap-2 min-[760px]:p-6"
                             >
                                 <b className="font-display text-mk-kit-h3">
                                     {d.title}
                                 </b>
-                                <span className="text-[15px] leading-relaxed text-mk-copy">
+                                <span className="text-[14px] leading-snug text-mk-copy min-[760px]:text-[15px] min-[760px]:leading-relaxed">
                                     {d.body}
                                 </span>
                                 <span className="mt-1 inline-flex items-center gap-2 text-[15px] font-semibold">

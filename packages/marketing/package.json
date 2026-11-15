@@ -76,6 +76,8 @@
         "./kit/time": "./src/kit/time.ts",
         "./kit/time-stamp": "./src/kit/time-stamp.tsx",
         "./kit/chip": "./src/kit/chip.tsx",
+        "./kit/drawn-photo": "./src/kit/drawn-photo.tsx",
+        "./kit/phone-fold": "./src/kit/phone-fold.tsx",
         "./kit/cropped-card": "./src/kit/cropped-card.tsx",
         "./kit/swipe-row": "./src/kit/swipe-row.tsx",
         "./kit/moment-card": "./src/kit/moment-card.tsx",

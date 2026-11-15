@@ -43,4 +43,12 @@ export const TRADE_WORDS = {
     /** A link chip's tail under a scene. */
     seeIt: "see it",
     allTradesShort: "All trades",
+    /** On a phone, the hour's whole story folds behind this. */
+    wholeHour: "Read the whole hour",
+    /** A scene's cut pictures, when none of them names its own fold. */
+    wholePicture: "See all of it",
+    /** A trade without a written day: its sample day, cut on a phone. */
+    wholeDay: "See the whole day",
+    /** On a phone, Also in Saroh shows three; the rest fold behind this. */
+    allAlso: (n: number) => `See all ${n}`,
 } as const;

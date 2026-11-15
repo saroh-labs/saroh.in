@@ -8,6 +8,7 @@ import { cn } from "@saroh/marketing/cn";
 import { Container } from "@saroh/marketing/container";
 import { SourceChips } from "@saroh/marketing/kit/chip";
 import { Claim } from "@saroh/marketing/kit/claim";
+import { DrawnPhoto } from "@saroh/marketing/kit/drawn-photo";
 import { siteVars } from "@saroh/marketing/kit/site-drawing";
 import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
 import { TimeStamp } from "@saroh/marketing/kit/time-stamp";
@@ -214,11 +215,25 @@ function Post({
                     <b className={cn(head, "text-[22px] leading-tight")}>
                         {box?.name}
                     </b>
-                    <span className="size-14 rounded-full bg-[hsl(var(--site-accent)/0.4)]" />
+                    {box?.photo ? (
+                        <DrawnPhoto
+                            kind={box.photo}
+                            className="size-14 rounded-full"
+                        />
+                    ) : (
+                        <span className="size-14 rounded-full bg-[hsl(var(--site-accent)/0.4)]" />
+                    )}
                 </div>
             ) : (
                 <>
-                    <div className="absolute inset-0 bg-[hsl(var(--site-accent)/0.35)]" />
+                    {box?.photo ? (
+                        <DrawnPhoto
+                            kind={box.photo}
+                            className="absolute inset-0"
+                        />
+                    ) : (
+                        <div className="absolute inset-0 bg-[hsl(var(--site-accent)/0.35)]" />
+                    )}
                     {kind === "tag" ? (
                         <span className="absolute right-3 top-3 flex size-[68px] flex-col items-center justify-center rounded-full bg-[hsl(var(--site-accent))] text-center text-[hsl(var(--site-accent-fg))]">
                             <b className="text-[17px] leading-none">
@@ -442,7 +457,7 @@ export function NewInSaroh({ on }: { on: NewsSwitches }) {
         <section
             id="new"
             aria-labelledby="new-title"
-            className="scroll-mt-24 bg-foreground py-14 text-mk-lamp-fg min-[760px]:py-[72px]"
+            className="scroll-mt-24 bg-foreground py-12 text-mk-lamp-fg min-[760px]:py-[72px]"
         >
             <Container>
                 <div className="grid gap-3 min-[960px]:grid-cols-[minmax(0,1fr)_460px] min-[960px]:items-end min-[960px]:gap-12">

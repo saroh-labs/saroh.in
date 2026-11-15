@@ -21,9 +21,12 @@ import {
     SmallPicture,
     starterWords,
 } from "@saroh/search-pages";
-import type { ReactNode } from "react";
+import type { ReactElement, ReactNode } from "react";
+import { cloneElement } from "react";
 
+import { Fold } from "@/components/home/fold";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
+import { PhoneClip } from "@/components/shared/layout/phone-fold";
 import type { TradeDay } from "@/content/solutions-days";
 import { TRADE_WORDS as W } from "@/content/solutions-trade";
 
@@ -205,10 +208,57 @@ function Changes({
     const bigWords = T[pre.big] as (typeof T)[string] | undefined;
     const url = p.shape === "orders" ? "app.saroh.in" : s.site;
     const extra = newAlso(p, isOn);
+    const alsoItems: ReactElement<{ className?: string }>[] = [
+        ...s.also.map((it, i) => (
+            <li key={it.title} className="flex gap-3">
+                <span className="va-icon">
+                    <AlsoSvg
+                        icon={
+                            it.icon ??
+                            (pre.also[i] as
+                                (typeof pre.also)[number] | undefined) ??
+                            "list"
+                        }
+                    />
+                </span>
+                <span className="grid gap-1">
+                    <b className="text-[16px] font-semibold">{it.title}</b>
+                    <span className="text-[15px] leading-snug text-mk-copy">
+                        {it.line}
+                    </span>
+                </span>
+            </li>
+        )),
+        ...extra.map((it) => {
+            const f = feature(it.feature);
+            return (
+                <li key={it.feature} className="flex gap-3">
+                    <span className="va-icon">
+                        <AlsoSvg icon={it.icon} />
+                    </span>
+                    <span className="grid gap-1">
+                        {f ? (
+                            <TextLink href={f.href} tone="ink" arrow>
+                                {it.title}
+                            </TextLink>
+                        ) : (
+                            <b className="text-[16px] font-semibold">
+                                {it.title}
+                            </b>
+                        )}
+                        <span className="text-[15px] leading-snug text-mk-copy">
+                            {it.line}
+                        </span>
+                    </span>
+                </li>
+            );
+        }),
+    ];
     return (
         // The tiles' drawings are the search pages' own (`.sp` carries their colours).
-        <div className="sp grid gap-12">
-            <div className="grid gap-5 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
+        // The search pages' tile drawings draw pills and meta at 11 to 11.5px: here every informative word is at least 12px.
+        <div className="sp grid grid-cols-[minmax(0,1fr)] gap-12 [&_.vc-av]:!text-[12px] [&_.vc-k]:!text-[12px] [&_.vc-pill]:!text-[12px] [&_.vc-sm]:!text-[12px] [&_[style*='font-size:11']]:!text-[12px]">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-5 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
                 {bigWords ? (
                     <article className="grid content-start gap-4 rounded-mk-card border border-border bg-card p-5 min-[760px]:col-span-2 min-[1000px]:col-span-3">
                         <div className="max-[759px]:hidden">
@@ -271,65 +321,35 @@ function Changes({
                     {W.also}
                 </h3>
                 <ul className="m-0 grid list-none gap-x-10 gap-y-5 p-0 min-[760px]:grid-cols-2 min-[1000px]:grid-cols-3">
-                    {s.also.map((it, i) => (
-                        <li key={it.title} className="flex gap-3">
-                            <span className="va-icon">
-                                <AlsoSvg
-                                    icon={
-                                        it.icon ??
-                                        (pre.also[i] as
-                                            | (typeof pre.also)[number]
-                                            | undefined) ??
-                                        "list"
-                                    }
-                                />
-                            </span>
-                            <span className="grid gap-1">
-                                <b className="text-[16px] font-semibold">
-                                    {it.title}
-                                </b>
-                                <span className="text-[15px] leading-snug text-mk-copy">
-                                    {it.line}
-                                </span>
-                            </span>
-                        </li>
-                    ))}
-                    {extra.map((it) => {
-                        const f = feature(it.feature);
-                        return (
-                            <li key={it.feature} className="flex gap-3">
-                                <span className="va-icon">
-                                    <AlsoSvg icon={it.icon} />
-                                </span>
-                                <span className="grid gap-1">
-                                    {f ? (
-                                        <TextLink
-                                            href={f.href}
-                                            tone="ink"
-                                            arrow
-                                        >
-                                            {it.title}
-                                        </TextLink>
-                                    ) : (
-                                        <b className="text-[16px] font-semibold">
-                                            {it.title}
-                                        </b>
-                                    )}
-                                    <span className="text-[15px] leading-snug text-mk-copy">
-                                        {it.line}
-                                    </span>
-                                </span>
-                            </li>
-                        );
-                    })}
+                    {alsoItems.map((li, i) =>
+                        i < 3
+                            ? li
+                            : cloneElement(li, {
+                                  className: "flex gap-3 max-[759px]:hidden",
+                              }),
+                    )}
                 </ul>
+                {/* A phone: three, then the rest fold (PHONE.md). */}
+                {alsoItems.length > 3 ? (
+                    <Fold
+                        summary={W.allAlso(alsoItems.length)}
+                        className="-mt-2 min-[760px]:hidden"
+                    >
+                        <ul className="m-0 mt-3 grid list-none gap-y-5 p-0">
+                            {alsoItems.slice(3)}
+                        </ul>
+                    </Fold>
+                ) : null}
             </div>
             {p.ai && isOn("ai-apps") ? (
-                <AiAsks
-                    ai={p.ai}
-                    isOn={isOn}
-                    feature={(f) => feature(f)?.href}
-                />
+                // The asks swipe here (the search page's own track styles assume its layout).
+                <div className="max-[899px]:[&_.sp-ai-lines]:!mt-6 max-[899px]:[&_.sp-bento]:!mt-6 max-[899px]:[&_.sp-bento]:-mr-mk-gutter max-[899px]:[&_.sp-bento]:snap-x max-[899px]:[&_.sp-bento]:snap-mandatory max-[899px]:[&_.sp-bento]:!flex-row max-[899px]:[&_.sp-bento]:overflow-x-auto max-[899px]:[&_.sp-bento]:pr-mk-gutter max-[899px]:[&_.sp-bento]:[scrollbar-width:none] [&_.sp-card]:relative max-[899px]:[&_.sp-card]:snap-start max-[899px]:[&_.sp-card]:![flex:0_0_86%] max-[899px]:[&_.sp-sec]:!mt-0">
+                    <AiAsks
+                        ai={p.ai}
+                        isOn={isOn}
+                        feature={(f) => feature(f)?.href}
+                    />
+                </div>
             ) : null}
         </div>
     );
@@ -383,7 +403,13 @@ export function TradePage(props: TradePageProps) {
             heroLink={
                 p.demo && demo ? { href: demo, label: p.demo } : undefined
             }
-            picture={<SceneHero page={p} />}
+            picture={
+                <div className="w-full max-w-[360px]">
+                    <PhoneClip height={380} label={W.wholeDay}>
+                        <SceneHero page={p} />
+                    </PhoneClip>
+                </div>
+            }
             feature={feature}
             claimOn={props.claimOn}
             templatesOn={!off.includes("templates")}

@@ -8,6 +8,8 @@ import { ChevronDown } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { PhoneFold } from "@/components/shared/layout/phone-fold";
+
 import { Rich } from "./rich";
 
 export interface ChapterLink {
@@ -87,10 +89,13 @@ export function Chapter({
     before?: ReactNode;
 }) {
     const titleId = `${id}-title`;
+    // The lead's first sentence, and the rest a phone folds.
+    const cut = /^([^]+?[.!?])\s+([^]+)$/.exec(lead);
+    const [opening, rest] = cut ? [cut[1], cut[2]] : [lead, ""];
     return (
         <div
             id={id}
-            className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-10 min-[760px]:gap-14"
+            className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-14"
         >
             <div className="grid gap-4 min-[960px]:grid-cols-2 min-[960px]:items-end min-[960px]:gap-12">
                 <h2
@@ -102,6 +107,7 @@ export function Chapter({
                 <p
                     className={cn(
                         "m-0 text-mk-kit-lead [text-wrap:pretty]",
+                        rest && "max-[759px]:hidden",
                         onInk
                             ? "text-mk-ledger-fg/90 [&_b]:text-mk-ledger-fg"
                             : "text-mk-copy",
@@ -109,6 +115,30 @@ export function Chapter({
                 >
                     <Rich text={lead} />
                 </p>
+                {/* A phone: the lead's first sentence, the rest folded (PHONE.md). */}
+                {rest ? (
+                    <div
+                        className={cn(
+                            "grid gap-1 text-mk-kit-lead min-[760px]:hidden",
+                            onInk
+                                ? "text-mk-ledger-fg/90 [&_b]:text-mk-ledger-fg"
+                                : "text-mk-copy",
+                        )}
+                    >
+                        <p className="m-0 [text-wrap:pretty]">
+                            <Rich text={opening} />
+                        </p>
+                        <PhoneFold
+                            summary={readMore}
+                            tone={onInk ? "on-ink" : "ink"}
+                            className="text-[16px]"
+                        >
+                            <p className="m-0 mt-1 [text-wrap:pretty]">
+                                <Rich text={rest} />
+                            </p>
+                        </PhoneFold>
+                    </div>
+                ) : null}
             </div>
             {before}
             <SwipeRow

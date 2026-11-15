@@ -1,3 +1,4 @@
+import type { DrawnPhotoKind } from "@saroh/marketing/kit/drawn-photo";
 import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
 import type { World, WorldBusiness, WorldTrade } from "@saroh/marketing/world";
 
@@ -31,6 +32,7 @@ const RYE_LOOK: SiteLook = {
 /** Rye & Co., the lead: Asha's Monday is every story's home. */
 const RYE: WorldBusiness = {
     key: "rye",
+    photo: "buns",
     trade: "bakery",
     name: "Rye & Co.",
     kind: "home bakery",
@@ -66,34 +68,54 @@ const RYE: WorldBusiness = {
         },
     ],
     items: [
-        { key: "sourdough", name: "Sourdough loaf", price: "₹220" },
+        {
+            key: "sourdough",
+            photo: "loaf",
+            name: "Sourdough loaf",
+            price: "₹220",
+        },
         {
             key: "bun-box",
+            photo: "buns",
             name: "Cardamom bun box",
             price: "₹360",
             unit: "box of 6",
         },
         {
             key: "rose-pistachio",
+            photo: "brownies",
             name: "Rose pistachio cake",
             price: "₹1,450",
             unit: "1 kg",
         },
         {
             key: "black-forest",
+            photo: "brownies",
             name: "Black forest cake",
             price: "₹950",
             unit: "500 g",
         },
         {
             key: "brownie-box",
+            photo: "brownies",
             name: "Brownie box",
             price: "₹300",
             unit: "box of 6",
         },
         // The Christmas menu, added as drafts at 6:12 pm.
-        { key: "plum-cake", name: "Plum cake", price: "₹650", unit: "500 g" },
-        { key: "hamper", name: "Christmas hamper", price: "₹1,200" },
+        {
+            key: "plum-cake",
+            photo: "festive",
+            name: "Plum cake",
+            price: "₹650",
+            unit: "500 g",
+        },
+        {
+            key: "hamper",
+            photo: "festive",
+            name: "Christmas hamper",
+            price: "₹1,200",
+        },
     ],
     orders: [
         {
@@ -224,6 +246,7 @@ const RYE: WorldBusiness = {
 /** The other trades a page's switcher offers (Bakery · Salon · Gym · Florist). */
 const NEEL: WorldBusiness = {
     key: "neel",
+    photo: "salon",
     trade: "salon",
     name: "Studio Neel",
     kind: "salon",
@@ -247,12 +270,14 @@ const NEEL: WorldBusiness = {
     items: [
         {
             key: "keratin",
+            photo: "salon",
             name: "Keratin smoothing",
             price: "₹2,800",
             unit: "90 min",
         },
         {
             key: "haircut",
+            photo: "salon",
             name: "Haircut and finish",
             price: "₹900",
             unit: "45 min",
@@ -262,6 +287,7 @@ const NEEL: WorldBusiness = {
 
 const PULSE: WorldBusiness = {
     key: "pulse",
+    photo: "gym",
     trade: "gym",
     name: "Pulse Fitness",
     kind: "gym",
@@ -512,7 +538,11 @@ export interface HomeHeroScene {
     site: {
         time: string;
         hero: string;
-        items: readonly { name: string; line: string }[];
+        items: readonly {
+            name: string;
+            line: string;
+            photo?: DrawnPhotoKind;
+        }[];
         note: string;
         action: string;
     };
@@ -541,6 +571,8 @@ const itemLine = (b: WorldBusiness, key: string) => {
     const i = b.items.find((x) => x.key === key);
     return i ? `${i.price}${i.unit ? ` · ${i.unit}` : ""}` : "";
 };
+const itemPhoto = (b: WorldBusiness, key: string) =>
+    b.items.find((x) => x.key === key)?.photo;
 const itemName = (b: WorldBusiness, key: string) =>
     b.items.find((x) => x.key === key)?.name ?? key;
 const ORD_1044 = RYE.orders?.find((o) => o.id === "ORD-1044");
@@ -559,10 +591,12 @@ export const HOME_HERO_SCENES: readonly HomeHeroScene[] = [
                 {
                     name: itemName(RYE, "bun-box"),
                     line: itemLine(RYE, "bun-box"),
+                    photo: itemPhoto(RYE, "bun-box"),
                 },
                 {
                     name: itemName(RYE, "sourdough"),
                     line: itemLine(RYE, "sourdough"),
+                    photo: itemPhoto(RYE, "sourdough"),
                 },
             ],
             note: "Pick up tomorrow, 8 am",
@@ -619,10 +653,12 @@ export const HOME_HERO_SCENES: readonly HomeHeroScene[] = [
                 {
                     name: itemName(NEEL, "keratin"),
                     line: itemLine(NEEL, "keratin"),
+                    photo: itemPhoto(NEEL, "keratin"),
                 },
                 {
                     name: itemName(NEEL, "haircut"),
                     line: itemLine(NEEL, "haircut"),
+                    photo: itemPhoto(NEEL, "haircut"),
                 },
             ],
             note: "Tomorrow, 11 am with Neel",
@@ -729,7 +765,7 @@ export const HOME_SITE_SHOWCASE: readonly {
     nav: readonly string[];
     cta: string;
     hero: { title: string; line: string };
-    items: readonly { name: string; price: string }[];
+    items: readonly { name: string; price: string; drawn?: DrawnPhotoKind }[];
 }[] = [
     {
         business: RYE,
@@ -741,10 +777,15 @@ export const HOME_SITE_SHOWCASE: readonly {
             line: "Open 7 am to 8 pm. Cake orders by 8 pm for the next day.",
         },
         items: [
-            { name: itemName(RYE, "bun-box"), price: itemLine(RYE, "bun-box") },
+            {
+                name: itemName(RYE, "bun-box"),
+                price: itemLine(RYE, "bun-box"),
+                drawn: itemPhoto(RYE, "bun-box"),
+            },
             {
                 name: itemName(RYE, "sourdough"),
                 price: itemLine(RYE, "sourdough"),
+                drawn: itemPhoto(RYE, "sourdough"),
             },
         ],
     },
@@ -760,6 +801,7 @@ export const HOME_SITE_SHOWCASE: readonly {
         items: NEEL.items.map((i) => ({
             name: i.name,
             price: `${i.price} · ${i.unit ?? ""}`,
+            drawn: i.photo,
         })),
     },
     {
@@ -772,8 +814,12 @@ export const HOME_SITE_SHOWCASE: readonly {
             line: "Book a class, see the places left.",
         },
         items: [
-            { name: "HIIT · 6 am", price: "4 places left" },
-            { name: "Strength · 7 pm", price: "Full · waitlist" },
+            { name: "HIIT · 6 am", price: "4 places left", drawn: PULSE.photo },
+            {
+                name: "Strength · 7 pm",
+                price: "Full · waitlist",
+                drawn: PULSE.photo,
+            },
         ],
     },
 ];

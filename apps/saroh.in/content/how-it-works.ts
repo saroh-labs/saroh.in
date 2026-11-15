@@ -601,6 +601,8 @@ export const HOW_IT_WORKS = {
 
     /** How money moves, drawn on the ledger band. */
     money: {
+        /** On a phone, the money's path is cut; this opens it. */
+        more: "See where the money goes",
         label: "How the money moves, an example",
         /** When the example's customer pays (WORLD: ORD-1044, 4:06 pm). */
         at: "16:06",

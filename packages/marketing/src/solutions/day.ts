@@ -20,6 +20,11 @@ export interface DayHour<F extends string = string> {
     mood: Words;
     title: Words;
     lead: Words;
+    /**
+     * The phone's lead, two lines at most (SOTradePhone2): the whole `lead`
+     * folds under it, still in the HTML.
+     */
+    phoneLead?: Words;
     moments: readonly MomentData[];
     used: readonly UsedLink<F>[];
     /**

@@ -46,6 +46,7 @@ import {
 import type { IsOn } from "@/components/how-it-works/rich";
 import { gated } from "@/components/how-it-works/rich";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
+import { PhoneClip } from "@/components/shared/layout/phone-fold";
 import { featureHref, featureList, NEW_FEATURES } from "@/content/features";
 import type {
     Caption,
@@ -341,7 +342,11 @@ export default function HowItWorksPage() {
                         look={look}
                         items={["bun-box", "sourdough", "rose-pistachio"]
                             .map(item)
-                            .map((i) => ({ name: i.name, price: priced(i) }))}
+                            .map((i) => ({
+                                name: i.name,
+                                price: priced(i),
+                                photo: i.photo,
+                            }))}
                     />
                 ),
             },
@@ -655,7 +660,7 @@ export default function HowItWorksPage() {
             <Container
                 as="section"
                 aria-labelledby="how-it-works-title"
-                className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-[72px] pt-10 min-[760px]:gap-12 min-[760px]:pb-[120px] min-[760px]:pt-[88px]"
+                className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 pt-10 min-[760px]:gap-12 min-[760px]:pb-[120px] min-[760px]:pt-[88px]"
             >
                 <h1
                     id="how-it-works-title"
@@ -755,7 +760,7 @@ export default function HowItWorksPage() {
                         aria-labelledby={`${ch.id}-title`}
                         className={BAND[ch.id]}
                     >
-                        <Container className="grid grid-cols-[minmax(0,1fr)] gap-12 py-[72px] min-[760px]:gap-16 min-[760px]:py-[120px]">
+                        <Container className="grid grid-cols-[minmax(0,1fr)] gap-8 py-12 min-[760px]:gap-16 min-[760px]:py-[120px]">
                             {firstOfGroup.has(ch.id) ? (
                                 <GroupHead
                                     name={W.groups[ch.group].name}
@@ -780,48 +785,61 @@ export default function HowItWorksPage() {
                                 onInk={onInk}
                                 before={
                                     ch.id === "money" ? (
-                                        <MoneyFlow
-                                            label={W.money.label}
-                                            at={W.money.at}
-                                            from={{
-                                                title: W.money.pays(
-                                                    first(paidOrder.customer),
-                                                    paidOrder.total,
-                                                ),
-                                                line: W.money.by(
-                                                    money.method,
-                                                    paidOrder.id,
-                                                ),
-                                            }}
-                                            via={{
-                                                label: W.money.yourAccount,
-                                                title: account,
-                                                line: W.money.inName(
-                                                    rye.owner,
-                                                    money.provider,
-                                                ),
-                                            }}
-                                            to={{
-                                                label: W.money.yourBank,
-                                                title: W.money.bank(rye.owner),
-                                                line: W.money.schedule(
-                                                    money.provider,
-                                                ),
-                                            }}
-                                            saroh={{
-                                                name: W.money.saroh,
-                                                line: W.money.hears(
-                                                    paidOrder.id,
-                                                    paidOrder.invoice,
-                                                    (
-                                                        money.taxLine ??
-                                                        money.taxName
-                                                    ).replace(" + ", " and "),
-                                                    rye.owner,
-                                                ),
-                                                holds: `${W.money.holds} ${W.money.zero}`,
-                                            }}
-                                        />
+                                        <PhoneClip
+                                            height={270}
+                                            label={W.money.more}
+                                            tone="on-ink"
+                                        >
+                                            <MoneyFlow
+                                                label={W.money.label}
+                                                at={W.money.at}
+                                                from={{
+                                                    title: W.money.pays(
+                                                        first(
+                                                            paidOrder.customer,
+                                                        ),
+                                                        paidOrder.total,
+                                                    ),
+                                                    line: W.money.by(
+                                                        money.method,
+                                                        paidOrder.id,
+                                                    ),
+                                                }}
+                                                via={{
+                                                    label: W.money.yourAccount,
+                                                    title: account,
+                                                    line: W.money.inName(
+                                                        rye.owner,
+                                                        money.provider,
+                                                    ),
+                                                }}
+                                                to={{
+                                                    label: W.money.yourBank,
+                                                    title: W.money.bank(
+                                                        rye.owner,
+                                                    ),
+                                                    line: W.money.schedule(
+                                                        money.provider,
+                                                    ),
+                                                }}
+                                                saroh={{
+                                                    name: W.money.saroh,
+                                                    line: W.money.hears(
+                                                        paidOrder.id,
+                                                        paidOrder.invoice,
+                                                        (
+                                                            money.taxLine ??
+                                                            money.taxName
+                                                        ).replace(
+                                                            " + ",
+                                                            " and ",
+                                                        ),
+                                                        rye.owner,
+                                                    ),
+                                                    holds: `${W.money.holds} ${W.money.zero}`,
+                                                }}
+                                            />
+                                        </PhoneClip>
                                     ) : undefined
                                 }
                             />
@@ -835,7 +853,7 @@ export default function HowItWorksPage() {
                 as="section"
                 id={W.yours.id}
                 aria-labelledby="yours-title"
-                className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-10 py-[72px] min-[760px]:py-[120px]"
+                className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-8 py-12 min-[760px]:gap-10 min-[760px]:py-[120px]"
             >
                 <div className="grid gap-4 min-[960px]:grid-cols-[1fr_minmax(0,520px)] min-[960px]:items-end min-[960px]:gap-12">
                     <h2

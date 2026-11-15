@@ -19,12 +19,14 @@ import { ArrowRight, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { OrdersMoments } from "@/components/feature-pages/orders-moments";
 import { heroPlanLine } from "@/components/feature/feature-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { ShotImage } from "@/components/shared/media/shot-image";
 import { featureHelpLinks } from "@/content/feature-help";
 import type { KeepSlug } from "@/content/feature-keep";
 import { KEEP, KEEP_WORDS } from "@/content/feature-keep";
+import { ORDERS_MOMENTS } from "@/content/feature-orders";
 import { featureHref, featureList, features } from "@/content/features";
 import { summarise } from "@/content/help";
 import { shots } from "@/content/shots";
@@ -217,6 +219,9 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
                 </CroppedCard>
             </Container>
 
+            {/* Orders' own moments (FODesk): the order taken, then one opened. */}
+            {slug === "orders" ? <OrdersMoments data={ORDERS_MOMENTS} /> : null}
+
             {/* SLOT 2 · HOW IT WORKS: each step beside its screen, then Help. */}
             <Container
                 as="section"
@@ -231,13 +236,17 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
                 <h2 id={`${slug}-how`} className={H2}>
                     {feature.howTitle}
                 </h2>
-                <ol className="m-0 grid list-none gap-12 p-0 min-[760px]:gap-20">
+                {/* A phone: the steps swipe, one in full and the next peeking (PHONE.md). */}
+                <ol
+                    aria-label={feature.howTitle}
+                    className="m-0 grid list-none gap-12 p-0 max-[759px]:-mr-mk-gutter max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:gap-20"
+                >
                     {feature.steps.map((step, i) => {
                         const shot = shots[step.shot];
                         return (
                             <li
                                 key={step.title}
-                                className="grid gap-5 min-[960px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[960px]:items-center min-[960px]:gap-16"
+                                className="grid content-start gap-5 max-[759px]:w-[calc(100%-24px)] max-[759px]:shrink-0 max-[759px]:snap-start min-[960px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[960px]:items-center min-[960px]:gap-16"
                             >
                                 <div
                                     className={cn(
@@ -365,7 +374,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
                     as="section"
                     id="ask"
                     aria-labelledby={`${slug}-ask`}
-                    className={cn("pb-[72px] min-[760px]:pb-[120px]", scroll)}
+                    className={cn("pb-12 min-[760px]:pb-[120px]", scroll)}
                 >
                     <div className="grid gap-8 rounded-mk-card bg-foreground px-5 py-10 text-background min-[760px]:px-14 min-[760px]:py-12 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,660px)] min-[960px]:gap-12">
                         <div className="grid content-start gap-4">
@@ -386,7 +395,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
                                 {ask.link}
                             </TextLink>
                         </div>
-                        <ul className="m-0 grid list-none gap-4 p-0">
+                        <ul className="m-0 grid list-none gap-4 p-0 max-[759px]:-mr-5 max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-5 max-[759px]:[scrollbar-width:none]">
                             {ask.exchanges.map((x) => {
                                 const o = x.order
                                     ? WORLD.lead.orders?.find(
@@ -396,7 +405,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
                                 return (
                                     <li
                                         key={x.q}
-                                        className="grid gap-3 rounded-mk-card border border-mk-on-ink-line bg-mk-on-ink-hover p-5"
+                                        className="grid content-start gap-3 rounded-mk-card border border-mk-on-ink-line bg-mk-on-ink-hover p-5 max-[759px]:w-[calc(100%-24px)] max-[759px]:shrink-0 max-[759px]:snap-start"
                                     >
                                         <p className="m-0 justify-self-end rounded-xl bg-background px-3.5 py-2 text-[15px] text-foreground">
                                             {x.q}

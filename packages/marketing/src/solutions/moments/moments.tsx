@@ -123,8 +123,10 @@ function PhoneFold({
     if (!label) return <>{children}</>;
     return (
         <>
-            <div className="contents max-[759px]:hidden">{children}</div>
-            <details className="group min-[760px]:hidden">
+            <div data-pf="desk" className="contents max-[759px]:hidden">
+                {children}
+            </div>
+            <details data-pf="phone" className="group min-[760px]:hidden">
                 <summary
                     className={`inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden ${ring()}`}
                 >
@@ -467,7 +469,7 @@ export function OrderTaken({ m }: { m: OrderMoment }) {
 export function SiteOrder({ m }: { m: SiteOrderMoment }) {
     return (
         <div className="relative grid gap-5 min-[1000px]:block min-[1000px]:pb-16">
-            <div className="min-[1000px]:mr-[200px]">
+            <div className="max-[759px]:order-2 min-[1000px]:mr-[200px]">
                 <PhoneFold label={m.more}>
                     <SiteDrawing
                         label={m.label}

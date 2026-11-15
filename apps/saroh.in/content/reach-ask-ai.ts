@@ -543,6 +543,8 @@ export function askAiWords({
             ["faq", "Questions"],
         ] as const,
         inTheApp: {
+            /** On a phone, the steps and what follows fold behind this. */
+            phone: "See it in the app, step by step",
             everything: "Everything Ask AI does",
             usedBy: "Used by",
             of: "of",
