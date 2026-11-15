@@ -45,27 +45,33 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Open up and see what needs you.",
         sub: "A business dashboard that starts with what needs you. Every morning it lists what's late, who's coming in, what's owed and what failed, most urgent first. Each person sees the part that's theirs, and most things can be done right from the list.",
         hero: {
-            shot: "s-home",
+            shot: "d-home",
         },
         howTitle: "One screen before the first customer.",
         steps: [
             {
                 title: "The most urgent thing is at the top",
-                body: "Late orders first, then stock short for orders, failed renewals and overdue bills, each with the button that fixes it. A business that takes bookings also sees today's people, in order, beside it.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-needs",
+                body: "Overdue bills, notes to answer, failed renewals, late orders and stock short for orders, each with the button that fixes it.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-needs",
+            },
+            {
+                title: "Today's people, in order",
+                body: "Who's booked, at what time and with whom, and who pays at the desk. Anything the team should know is beside their name.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-today",
             },
             {
                 title: "Money that needs chasing",
-                body: "Overdue bills with a reminder ready to send, cheques not yet in the bank, and failed renewals with a new pay link.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-money",
+                body: "Overdue bills with a reminder ready to send, and failed renewals with a new pay link.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-money",
             },
             {
                 title: "Zoom out to the month",
                 body: "The calendar shows every day's orders, bookings, renewals and bills, with money in, out and due.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-calendar",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-calendar",
             },
         ],
         points: [
@@ -200,21 +206,27 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
-            shot: "s-orders",
+            shot: "k-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
-                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. Print a ticket for the kitchen. A treatment sold as several visits is fulfilled by those visits.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-order",
+                body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. A shop's order prints a ticket for the kitchen.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-order",
+            },
+            {
+                title: "Orders that take several visits",
+                body: "A treatment sold as three visits is fulfilled by those visits. Mark each one attended, or book the next.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-visits",
             },
             {
                 title: "Each one makes its invoice",
-                body: "Paid orders get a numbered invoice with the right tax, ready to send or print.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-invoice",
+                body: "Paid orders get a numbered invoice with the right tax, ready to send or print. An exempt treatment gets a bill of supply.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-invoice",
             },
         ],
         points: [
@@ -259,21 +271,33 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Know the person in front of you.",
         sub: "Customer management for a small team. Every customer's bookings, plans, bills and notes on one page, with their orders once they're linked. What they usually buy, what they've spent, and anything the team should know before they arrive.",
         hero: {
-            shot: "r-customers",
+            shot: "d-customers",
         },
         howTitle: "A page for everyone who pays.",
         steps: [
             {
                 title: "Everything about them on one page",
-                body: "What they've spent, how they usually get their order, what they buy most, down to the size, and the plan they're on.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-customer",
+                body: "What they've spent, their bookings, orders, invoices and notes, and anything the team should know at the top.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "d-customer",
+            },
+            {
+                title: "What they have left",
+                body: "A treatment of several visits shows what's attended, what's booked and what's still to book. A member's classes left on a pack show the same way.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-visits",
+            },
+            {
+                title: "Notes they send reach the team",
+                body: "What a patient writes when booking is matched to their record. Check it, label it and add it where the team will see it.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-note",
             },
             {
                 title: "Flags only for the right people",
-                body: "An allergy or access need shows on their orders, kitchen tickets, today's list and bookings. Notes they send when booking are matched to their record, and medical notes only show to those allowed to see them.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "r-flag",
+                body: "Allergies and access needs show on their orders, today's list and bookings. Medical notes marked Sensitive only show to those allowed to see them.",
+                who: "Kavi Dental (demo clinic)",
+                shot: "k-flags",
             },
         ],
         points: [
@@ -331,10 +355,10 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "g-courses",
             },
             {
-                title: "Class packs, used a visit at a time",
-                body: "Sell a pack of classes once; each visit uses one, and you see what's left. A treatment of several visits works the same way: they book the first, your team books the rest.",
+                title: "Sessions over several visits",
+                body: "A block of personal training is three sessions of an hour. Members book the first, pay a deposit or the whole amount, and your team books the rest. Class packs work the same way, a visit at a time.",
                 who: "Pulse Fitness (demo gym)",
-                shot: "g-packs",
+                shot: "g-ptblock",
             },
         ],
         points: [
@@ -383,21 +407,27 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Regulars on a plan, renewed on time.",
         sub: "Membership and subscription billing for your regulars: memberships, weekly bread, monthly boxes. Each renewal makes its invoice on the day, and plans can renew on their own by UPI Autopay where you've set it up on your Razorpay account. A failed payment is shown to you with a new pay link.",
         hero: {
-            shot: "r-subdetail",
+            shot: "g-subdetail",
         },
         howTitle: "Set up once, renewed every time.",
         steps: [
             {
+                title: "Your plans, with their price",
+                body: "Set each plan's price and how often it renews. List them on your site, and sign members up at the desk.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-plans",
+            },
+            {
                 title: "Renewals run themselves",
-                body: "Each plan renews on its day. If a payment fails, it's flagged for you with a new pay link. List your plans on your site with their price, and sign members up at the desk.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-subs",
+                body: "Each plan renews on its day. If a payment fails, it's flagged for you with a new pay link.",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-subs",
             },
             {
                 title: "Every renewal makes its invoice",
                 body: "The invoice is made on the renewal day, ready to send.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "s-billing",
+                who: "Pulse Fitness (demo gym)",
+                shot: "g-billing",
             },
         ],
         points: [
@@ -444,21 +474,21 @@ export const features: Record<FeatureSlug, Feature> = {
         steps: [
             {
                 title: "Made from the order",
-                body: "Your business's details, the customer, each line with its tax, and the total, numbered in order. Mark a service GST-exempt and its invoices are bills of supply.",
+                body: "Your business's details, the customer, each line with its tax, and the total, numbered in order.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "r-invoice",
             },
             {
-                title: "See what's overdue",
-                body: "Overdue bills are flagged, with a reminder and a pay link ready to send.",
+                title: "The right kind for your business",
+                body: "Mark a product or service GST-exempt, like bread, and a bill for it alone is a bill of supply, worded as the law asks.",
                 who: "Rye & Co. (demo bakery)",
-                shot: "r-money",
+                shot: "r-supply",
             },
             {
-                title: "Cheques until they clear",
-                body: "Paid by cheque or bank transfer? Record it, and the bill is marked paid and flagged until the money is in the bank.",
+                title: "See what's overdue",
+                body: "Overdue bills are flagged, with a reminder and a pay link ready to send. Cheques show as paid until they clear.",
                 who: "Rye & Co. (demo bakery)",
-                shot: "r-cheques",
+                shot: "r-money",
             },
         ],
         points: [

@@ -1819,23 +1819,7 @@ export const SHOTS: Shot[] = [
             "Home at Rye & Co.: nine things that need Priya, from late orders to a failed renewal",
         gap: 'The owner is "Demo", not Priya, and the list holds 18 things, not nine.',
     },
-    // Dashboard's steps: Rye's own Home, cropped to what each step says
-    // (owner, 15 Nov 2026: one business through a page).
-    {
-        key: "r-needs",
-        business: "rye",
-        role: "owner",
-        route: "/",
-        viewport: { width: 1100, height: 1500 },
-        steps: [HIDE_AI_MOMENT],
-        clip: {
-            selector: `${HOME_DESK} section:has(h2:text-is("Needs you"))`,
-            pad: 8,
-        },
-        alt: "Needs you on the Home of Rye & Co. (demo bakery): late orders first, each with its next step",
-        caption:
-            "Needs you at Rye & Co.: late orders at the top, then bills, cheques, a failed renewal and stock",
-    },
+    // Billing's overdue step: Rye's own Home, the money rows opened.
     {
         key: "r-money",
         business: "rye",
@@ -1857,34 +1841,21 @@ export const SHOTS: Shot[] = [
         caption:
             "Overdue bills with a reminder ready, cheques not yet in the bank, and a renewal to retry by pay link",
     },
+
     {
-        // Customers' step 2: Priya's allergy, where the team will see it.
-        key: "r-flag",
+        // Billing's step 2: Rye's bread is nil-rated, so a bread-only bill
+        // is a bill of supply (the same app rule as a clinic's).
+        key: "r-supply",
         business: "rye",
         role: "owner",
-        route: "/customers/seed_sc_rc_contact_priya",
-        viewport: { width: 1100, height: 1000 },
-        clip: {
-            selector: 'main nav[aria-label="Breadcrumb"]',
-            until: 'section[aria-label="Needs attention"]',
-            pad: 12,
-        },
-        alt: "Priya Raman at Rye & Co. (demo bakery): Allergy: Sesame beside her name, and the team's note to use the plain bun tray",
+        route: "/billing/invoices/seed_sc_rc_invoice_trade_13",
+        viewport: { width: 1100, height: 1300 },
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        alt: "A bill of supply from Rye & Co. (demo bakery) for nil-rated sourdough loaves, with the exempt-supply line",
         caption:
-            "A sesame allergy flagged on Priya's record, with the team's note, so it shows on her orders and tickets",
+            "Bread is exempt from GST, so a bill for bread alone is a bill of supply, worded as the law asks",
     },
-    {
-        // Billing's step 3: Rye's cheques, paid but not yet in the bank.
-        key: "r-cheques",
-        business: "rye",
-        role: "owner",
-        route: "/billing/invoices?view=cheques",
-        viewport: { width: 900, height: 1000 },
-        clip: { selector: "[data-list-table]", pad: 12 },
-        alt: "Cheques not in the bank at Rye & Co. (demo bakery): two invoices paid by cheque, waiting to clear",
-        caption:
-            "Two invoices paid by cheque, marked paid and flagged until the money is in the bank",
-    },
+
     {
         key: "s-orders",
         business: "rye",
@@ -2158,12 +2129,50 @@ export const SHOTS: Shot[] = [
             "Farah Khan's page at Pulse: a six-week course, classes left and her next booking",
         gap: "Farah Khan is a Kavi Dental patient in the seed; Asha Verma is on Pulse's four-week course, and the page shows her membership and next booking, not the course.",
     },
+    // Subscriptions follows Pulse Fitness (owner, 15 Nov 2026).
+    {
+        // Bookings' step 3: a block of personal training, one order of three visits.
+        key: "g-ptblock",
+        business: "pulse",
+        role: "owner",
+        route: "/commerce/orders/seed_sc_pulse_order_ptblock",
+        viewport: { width: 1100, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        alt: "A personal training block at Pulse Fitness (demo gym): three sessions, the first attended and the second booked",
+        caption:
+            "A block of three personal training sessions, sold once: what's attended, what's booked and what's left",
+    },
+    {
+        key: "g-subdetail",
+        business: "pulse",
+        role: "owner",
+        route: "/billing/subscriptions",
+        viewport: DESK,
+        steps: [
+            { click: 'main tr:has-text("Payment failed")' },
+            { waitFor: '[role="dialog"]:has-text("Try again or fix payment")' },
+        ],
+        alt: "A member's membership at Pulse Fitness (demo gym): a renewal not paid, with Try again or fix payment, Pause and Cancel",
+        caption:
+            "A membership whose renewal failed, with the next charge, the failed one and what to do about it",
+    },
+    {
+        key: "g-plans",
+        business: "pulse",
+        role: "owner",
+        route: "/billing/subscriptions",
+        viewport: STEP_VIEW,
+        steps: [{ click: 'main [role="tab"]:has-text("Plans")' }],
+        alt: "The membership plans at Pulse Fitness (demo gym), each with its price and how often it renews",
+        caption:
+            "Pulse's three membership plans with their prices and how often they renew",
+    },
     {
         key: "g-subs",
         business: "pulse",
         role: "owner",
         route: "/billing/subscriptions",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Memberships at Pulse Fitness (demo gym) with their next charge",
         caption: "Memberships at Pulse with their next charge",
     },
@@ -2172,7 +2181,7 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/billing/invoices",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Invoices at Pulse Fitness (demo gym), with the overdue ones flagged",
         caption: "Pulse Fitness's invoices with four overdue",
         gap: "The seed has 17 overdue, not four.",
@@ -2218,18 +2227,140 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "A root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book",
         caption:
             "Order #D301, a root canal: visit 1 attended, visit 2 today, visit 3 still to book",
         gap: "The order is #ORD-001 and visit 2 is booked for a coming day, not today.",
+    },
+    // Customers follows Kavi Dental (owner, 15 Nov 2026: the business that
+    // shows every step's feature): Rahul's root canal, note and flags.
+    // Dashboard follows Kavi Dental: its Home has today's people (15 Nov 2026).
+    {
+        key: "k-needs",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [HIDE_AI_MOMENT],
+        clip: {
+            selector: `${HOME_DESK} section:has(h2:text-is("Needs you"))`,
+            pad: 8,
+        },
+        alt: "Needs you on the Home of Kavi Dental (demo clinic): unpaid bills, an enquiry to answer and what to set up, each with its button",
+        caption:
+            "Needs you at Kavi Dental: bills to chase, a patient's note to answer and what's left to set up",
+    },
+    {
+        key: "k-today",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [HIDE_AI_MOMENT],
+        clip: {
+            selector: `${HOME_DESK} section:has(h2:text-is("Today"))`,
+            pad: 8,
+        },
+        alt: "Today on the Home of Kavi Dental (demo clinic): the day's patients in order, with their dentist, how they pay and their flags",
+        caption:
+            "Today's patients in order, each with their dentist, how they pay and anything the team should know",
+    },
+    {
+        key: "k-money",
+        business: "kavi",
+        role: "owner",
+        route: "/",
+        viewport: { width: 1100, height: 1500 },
+        steps: [
+            HIDE_AI_MOMENT,
+            {
+                click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
+            },
+        ],
+        clip: {
+            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
+            pad: 8,
+        },
+        alt: "Unpaid bills on the Home of Kavi Dental (demo clinic): the overdue ones with Remind all",
+        caption:
+            "Overdue bills at Kavi Dental, each with how late it is and a reminder ready to send",
+    },
+    {
+        key: "k-calendar",
+        business: "kavi",
+        role: "owner",
+        route: "/calendar",
+        viewport: STEP_VIEW,
+        alt: "This month on the calendar at Kavi Dental (demo clinic), with each day's bookings and money",
+        caption:
+            "The month at Kavi Dental: each day's bookings and money in, out and due",
+    },
+    // Orders follows Kavi Dental: treatments sold as orders of several visits.
+    {
+        key: "k-orders",
+        business: "kavi",
+        role: "owner",
+        route: "/commerce/orders",
+        viewport: DESK,
+        steps: [HIDE_AI_MOMENT],
+        alt: "Orders at Kavi Dental (demo clinic): treatments of several visits, each with its next visit and how it's paid",
+        caption:
+            "Kavi Dental's orders: implants, braces, root canals and cleanings, each with where it's up to",
+    },
+    {
+        key: "k-invoice",
+        business: "kavi",
+        role: "owner",
+        route: "/billing/invoices/seed_sc_kavi_invoice_o_rahul_rct",
+        viewport: { width: 1100, height: 1300 },
+        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        alt: "The bill for Rahul Verma's root canal from Kavi Dental (demo clinic): a bill of supply, as dental treatment is exempt from GST",
+        caption:
+            "The treatment's bill, made from the order: a bill of supply, as healthcare is exempt from GST",
+    },
+    {
+        key: "k-visits",
+        business: "kavi",
+        role: "owner",
+        route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
+        viewport: { width: 1100, height: 1000 },
+        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        alt: "Rahul Verma's root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book, with his latex allergy and blood thinners above",
+        caption:
+            "A three-visit root canal: what's attended, what's booked and what's left, with the patient's flags on top",
+    },
+    {
+        key: "k-note",
+        business: "kavi",
+        role: "owner",
+        route: "/customers/seed_sc_kavi_contact_rahul",
+        viewport: { width: 1100, height: 1000 },
+        clip: {
+            selector: 'section[aria-label="1 note from the booking page"]',
+            pad: 8,
+        },
+        alt: "A note Rahul Verma wrote when booking at Kavi Dental (demo clinic), ready to label Medical and add to Needs attention as sensitive",
+        caption:
+            "What a patient wrote when booking, matched to their record, to label and add where the team will see it",
+    },
+    {
+        key: "k-flags",
+        business: "kavi",
+        role: "owner",
+        route: "/customers/seed_sc_kavi_contact_rahul",
+        viewport: { width: 1100, height: 1600 },
+        clip: { selector: 'section[aria-label="Needs attention"]', pad: 8 },
+        alt: "Needs attention on Rahul Verma's record at Kavi Dental (demo clinic): a latex allergy, and blood thinners marked Sensitive",
+        caption:
+            "Allergy and medical flags on the patient's record; the medical one is Sensitive, shown only to those allowed",
     },
     {
         key: "d-customer",
         business: "kavi",
         role: "owner",
         route: "/customers/seed_sc_kavi_contact_rahul",
-        viewport: DESK,
+        viewport: STEP_VIEW,
         alt: "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
         caption:
             "Rahul Verma's page with a note from the booking page about a new blood-pressure tablet",
