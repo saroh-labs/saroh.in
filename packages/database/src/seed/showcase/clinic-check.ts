@@ -21,6 +21,8 @@ export interface KaviCounts {
     lateCancels: number;
     upcoming: number;
     paidOnline: number;
+    /** The treatments on the Orders list (E9). */
+    orders: number;
     closures: string;
     invoices: string;
     attention: string;
@@ -247,6 +249,7 @@ export async function checkKavi(
         paidOnline: await prisma.booking.count({
             where: { ...where, paidWith: "PAID" },
         }),
+        orders: await prisma.order.count({ where }),
         closures: (
             await prisma.businessClosure.findMany({
                 where: { ...where, endAt: { gt: now } },
@@ -298,6 +301,16 @@ export async function checkKavi(
                   AND (SELECT COUNT(*) FROM "Booking" b
                        WHERE b."orderId" = o.id AND b.status <> 'CANCELLED') >= 2`,
         ),
+        // A busy clinic's list: one done, one paid in part (a deposit).
+        "eight treatments on the Orders list": counts.orders >= 8,
+        "a treatment with every visit attended, and one paid in part":
+            (await has(prisma.$queryRaw<Row[]>`
+                SELECT COUNT(*) AS n FROM "Order"
+                WHERE "organizationId" = ${orgId} AND status = 'DELIVERED'`)) &&
+            (await has(prisma.$queryRaw<Row[]>`
+                SELECT COUNT(*) AS n FROM "Order"
+                WHERE "organizationId" = ${orgId}
+                  AND "paymentStatus" = 'UNPAID' AND "paidByHand" > 0`)),
         "a free-cancel window of 24 hours": await has(prisma.$queryRaw<Row[]>`
             SELECT COUNT(*) AS n FROM "BookingRules"
             WHERE "organizationId" = ${orgId} AND "freeCancelHours" = 24`),

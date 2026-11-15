@@ -784,6 +784,12 @@ export async function seedPulseShop(
         update: { ecommerceEnabled: true },
         create: { id: sid("storefeatures"), storeId, ecommerceEnabled: true },
     });
+    // The site sells from the front desk (G11), as Rye's from its Online
+    // storefront: without it Home asks which location the shop sells from.
+    await prisma.site.update({
+        where: { id: sid("site") },
+        data: { storefrontId: storeId },
+    });
 
     // --- categories and options
     const categoryId = {} as Record<CategoryKey, string>;

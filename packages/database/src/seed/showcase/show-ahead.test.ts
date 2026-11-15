@@ -9,8 +9,10 @@ import {
 } from "./appointments";
 import { planCourses } from "./billing";
 import type { ShowcaseService } from "./data";
+import { PULSE } from "./data";
 import { DK_DIARY, DK_PEOPLE } from "./desk42";
 import { DK_SERVICES } from "./desk42-data";
+import { istAt } from "./people";
 import { SA_DIARY, SA_PEOPLE } from "./shiksha";
 import { SA_COURSES, SA_SERVICES } from "./shiksha-data";
 import { rngFor } from "./vertical";
@@ -161,6 +163,51 @@ describe.each(BUSINESSES)("$name's must-show bookings ahead", (biz) => {
                     ).toBe(false);
                 }
                 byContact.set(b.contact, [...theirs, b]);
+            }
+        },
+    );
+});
+
+// Pulse's Home showed an empty Today on a Sunday (15 Nov 2026): its diary
+// tops today up (`todayAtLeast`), whatever the weekday and hour.
+describe("Pulse Fitness's Today", () => {
+    it.each(NOWS.map((now) => [now.toISOString(), now] as const))(
+        "holds four standing bookings when the seed runs at %s",
+        (_, now) => {
+            const planned = planBookings(rngFor("test-pulse", "bookings"), {
+                now,
+                services: PULSE.services,
+                target: PULSE.bookings,
+                fromDay: -60,
+                toDay: 21,
+                contacts: PULSE.contacts,
+                prospects: Array.from({ length: 30 }, (_, i) => i),
+                prospectServices: [3],
+                weekdayWeights: [0.6, 1.1, 1, 1.1, 1, 1, 0.9],
+                todayAtLeast: 4,
+            });
+            const { bookings } = bookingRows(planned, {
+                now,
+                orgId: "org",
+                services: seeded(PULSE.services),
+                contacts: contacts(PULSE.contacts),
+                staffUserIds: ["staff"],
+                bookingId: (n) => `booking-${n}`,
+                eventId: (n, kind) => `event-${n}-${kind}`,
+            });
+            const from = istAt(now, 0, 0);
+            const to = istAt(now, 1, 0);
+            const today = bookings.filter(
+                (b) =>
+                    b.status !== "CANCELLED" &&
+                    (b.startAt as Date) >= from &&
+                    (b.startAt as Date) < to,
+            );
+            expect(today.length).toBeGreaterThanOrEqual(4);
+            for (const b of planned) {
+                expect(isSlotStart(PULSE.services[b.service], b.startAt)).toBe(
+                    true,
+                );
             }
         },
     );

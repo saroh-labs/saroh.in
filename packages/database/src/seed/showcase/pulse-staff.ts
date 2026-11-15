@@ -25,7 +25,8 @@ export interface StaffFixture {
     owner?: boolean;
     /**
      * Indexes into Pulse's services: 0 personal training, 1 HIIT, 2 yoga,
-     * 3 free trial, 4 strength foundations, 5 fitness assessment.
+     * 3 free trial, 4 strength foundations, 5 fitness assessment,
+     * 6 personal training block.
      */
     services: readonly number[];
     hours: readonly Window[];
@@ -42,7 +43,7 @@ export const PULSE_STAFF: readonly StaffFixture[] = [
         name: "Karan Mehta",
         title: "Owner · Head coach",
         owner: true,
-        services: [0, 5, 3],
+        services: [0, 5, 3, 6],
         hours: [
             { days: [1, 2, 3, 4, 5], from: "06:00", to: "11:00" },
             { days: [6], from: "07:00", to: "11:00" },
@@ -52,7 +53,7 @@ export const PULSE_STAFF: readonly StaffFixture[] = [
         key: "ritu",
         name: "Ritu Kapoor",
         title: "Trainer",
-        services: [1, 0, 4],
+        services: [1, 0, 4, 6],
         hours: [
             { days: [1, 3, 5], from: "06:00", to: "10:00" },
             { days: [1, 2, 3, 4, 5], from: "17:00", to: "21:00" },
@@ -62,7 +63,7 @@ export const PULSE_STAFF: readonly StaffFixture[] = [
         key: "sameer",
         name: "Sameer Khan",
         title: "Trainer",
-        services: [1, 0, 5, 4],
+        services: [1, 0, 5, 4, 6],
         hours: [
             { days: [2, 4], from: "06:00", to: "12:00" },
             { days: [1, 3, 5], from: "16:00", to: "20:00" },

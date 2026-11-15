@@ -92,9 +92,14 @@ import { earliest, hashKey, istAt, makePeople } from "./people";
 import { MOTION } from "./physio-data";
 import { checkPixelChai, seedPixelChai } from "./pixel-chai";
 import type { PulseCounts } from "./pulse";
-import { checkPulse, planPulse, upsertPulseStaff } from "./pulse";
+import {
+    checkPulse,
+    planPulse,
+    seedPulseTrainingBlock,
+    upsertPulseStaff,
+} from "./pulse";
 import { PULSE_POSTS } from "./pulse-posts";
-import { checkPulseShop, seedPulseShop } from "./pulse-shop";
+import { checkPulseShop, PULSE_STORE_ID, seedPulseShop } from "./pulse-shop";
 import { createRng } from "./random";
 import { NOOR } from "./salon-data";
 import type { ShikshaCounts } from "./shiksha";
@@ -1419,6 +1424,8 @@ async function seedBusiness(
               ],
               reserved: courses?.reserved,
               busy: courses?.busy,
+              // A gym's Today is never empty, Sunday included.
+              todayAtLeast: key === PULSE.key ? 4 : undefined,
           })
         : [];
     const diary = bookingRows(planned, {
@@ -1797,6 +1804,14 @@ async function seedExtras(
             orgId,
             now,
             ownerUserId: ctx.demoUserId,
+        });
+        await seedPulseTrainingBlock(prisma, {
+            orgId,
+            now,
+            storeId: PULSE_STORE_ID,
+            ownerUserId: ctx.demoUserId,
+            services: biz.services,
+            id: (...parts) => sid(biz.key, ...parts),
         });
     }
     if (biz.key === CAREPOINT.key) {

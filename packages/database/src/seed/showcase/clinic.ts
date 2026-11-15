@@ -470,6 +470,10 @@ async function writeOrders(prisma: Db, orders: KaviWorld["orders"]) {
                 fulfilment: o.fulfilment,
                 paymentStatus: o.paidAt ? "PAID" : "UNPAID",
                 paidAt: o.paidAt,
+                // A deposit taken at the desk: paid in part, the rest due.
+                paidByHand: rupees(o.depositPaise),
+                // Every visit attended: fulfilled, as `settleTreatmentInTx` leaves it.
+                ...(o.done ? { status: "DELIVERED", stage: "DELIVERED" } : {}),
                 createdAt: o.placedAt,
                 items: {
                     create: {
