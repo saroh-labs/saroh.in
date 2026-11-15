@@ -423,5 +423,40 @@ registry.ts` (stubs drawing the old page until agent reach lands).
       crumbs, the 48px Ink button, the closing as ClosingCTA, plain 13px
       labels for the old small caps, nothing under 12px, and hub cards that
       swipe on a phone. Tool UIs (Operate) keep their controls as they were.
+- **17 Nov 2026, Solutions (`/for`, all 34 `/for/<trade>`; unit/web-solutions).**
+  Boards SOHubDesk/SOHubPhone2, SOTradeDesk/SOTradePhone2,
+  SLFloristDesk/SLFloristPhone2, SLLibrary.
+    - **Trade page** (`components/solution/trade-page.tsx`): a sticky trade
+      bar ("A day at a"), the page's own MDX h1 and lead, its picture (Home
+      on a phone where a day is written, else its MDX sample day), the
+      problems (each quote, its area, the hour that answers it, and "How
+      Saroh helps" folded), then the day, "What changes" (the MDX tiles,
+      with the search pages' own drawings, the quote, Also in Saroh, the AI
+      asks), the template and starter list, pricing, every question
+      (`FaqItems`), other written days, related trades, `ClosingCTA` and
+      the `StickyBar`. Every word of each MDX stays; SEO metadata and
+      JSON-LD are byte for byte as before (`live-pages` snapshots).
+    - **Written days** (`content/solutions-days.ts`): only where one is
+      written, now home bakers (Rye & Co.) and florists (Petal Lane). Each
+      hour is a `DayScene` keyed to the world's `day`; the `HourStrip`
+      reads the world's lines. On a day page the "What changes" part folds
+      into "Everything else Saroh does for …".
+    - **Moment library** (`components/solution/moments/`): home, shelf,
+      order, site-order, post, payment (`MoneyPath`), bill, ai-app, ask,
+      waiting and enquiry, each drawn from data alone (no business's
+      name), so saroh.tech or a later day builds from the same pieces. On a
+      phone a moment's second picture folds in a closed `<details>`.
+      Booking, class/pack and reminder (SLLibrary) wait for the first day
+      that uses them.
+    - **Claims in words** (`components/solution/words.ts`): a sentence's
+      part with a claim is drawn only while it's on (Hinglish at 9 pm,
+      "Ask AI on Grow and Pro", "Sharing is free", Saroh Social posting).
+    - **Hub** (`components/solution/for-hub.tsx`, `hub-finder.tsx`): "A day
+      in your trade." Each trade at one moment of its day
+      (`content/solutions-hub.ts`), grouped by what it does, search and
+      filters in the address as before; "A whole day, told in full" only on
+      trades with a written day; on a phone a swipe row per group, a closed
+      A to Z list and a sticky "Find your trade". "Tell us your trade" goes
+      to /contact until the hub has its own form.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).

@@ -1,11 +1,12 @@
-import "@saroh/search-pages/styles.css";
-
-import { ForHub } from "@saroh/search-pages";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
+import { ForHub } from "@/components/solution/for-hub";
+import { TRADE_DAYS } from "@/content/solutions-days";
+import { env } from "@/env";
+import { featuresOff } from "@/lib/feature-switches";
 import { cta } from "@/lib/links";
 import { builtSearchPages, FOR_HUB, liveSearchPages } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
@@ -18,8 +19,9 @@ const CTA_SRC = "for-hub";
 
 /**
  * `/for` (DEC-193): the trade pages this build has, with a search and filters
- * in the browser. With none (production before the first publish) it is a
- * 404, and nothing links it.
+ * in the browser, each at one moment of its day (DEC-221, `ForHub`). With
+ * none (production before the first publish) it is a 404, and nothing
+ * links it.
  */
 export function generateMetadata(): Metadata {
     return {
@@ -47,16 +49,11 @@ export default function ForHubPage() {
             <CtaClickArea src={CTA_SRC} mode={start.mode}>
                 <ForHub
                     pages={pages}
-                    links={{
-                        home: "/",
-                        startFree: start.href,
-                        startFreeLabel: start.label,
-                        src: CTA_SRC,
-                        note:
-                            start.mode === "open"
-                                ? "No card needed to start."
-                                : undefined,
-                    }}
+                    days={TRADE_DAYS.filter((d) =>
+                        pages.some((p) => p.slug === d.slug),
+                    )}
+                    src={CTA_SRC}
+                    templatesOn={!featuresOff(env).includes("templates")}
                 />
             </CtaClickArea>
         </>

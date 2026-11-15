@@ -21,501 +21,1128 @@
 
 <script type="application/ld+json">[{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://www.saroh.in/"},{"@type":"ListItem","position":2,"name":"Solutions","item":"https://www.saroh.in/for"}]}]</script>
 <div class="contents">
-<div class="sp">
-<div class="sp-fh">
-<header class="sp-fh-head">
-<nav aria-label="Breadcrumb" class="sp-crumb">
-<span class="sp-crumb-i">
-<a href="/">Home</a>
-</span>
-<span class="sp-crumb-i">
+<div class="bg-mk-dawn">
+<div class="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-8 px-mk-gutter pb-10 pt-4 min-[1000px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1000px]:gap-16 min-[1000px]:pb-14">
+<div class="grid content-start">
+<nav aria-label="Breadcrumb">
+<ol class="m-0 flex list-none flex-wrap items-center gap-2 p-0 text-[14px] text-muted-foreground">
+<li class="flex items-center gap-2">
+<a class="cursor-pointer rounded-sm transition-colors duration-fast ease-out text-muted-foreground no-underline hover:text-foreground active:text-mk-copy focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]" href="/">Home</a>
+</li>
+<li class="flex items-center gap-2">
 <span aria-hidden="true">/</span>
-<span aria-current="page">Solutions</span>
-</span>
+<span aria-current="page" class="">Solutions</span>
+</li>
+</ol>
 </nav>
-<h1 class="sp-fh-h1">Find your trade</h1>
-<p class="sp-fh-lead">See what a normal day looks like in Saroh, for a business like yours.</p>
-</header>
-<div class="sp-fh-layout">
-<aside class="sp-fh-rail">
-<div class="sp-fh-search">
-<svg aria-hidden="true" viewBox="0 0 24 24">
-<circle cx="11" cy="11" r="7">
+<h1 class="m-0 mt-4 font-display text-mk-kit-h1 font-bold [text-wrap:balance]">A day in your <span class="underline decoration-brand-500 decoration-[0.08em] underline-offset-[0.14em] [text-decoration-skip-ink:none]">trade.</span>
+</h1>
+<p class="m-0 mt-6 max-w-[560px] text-mk-kit-lead text-mk-copy">
+<span class="max-[759px]:hidden">34 kinds of small business, each shown at one ordinary moment of its day. Find yours and follow the whole day: the first booking, the order that comes in while you’re busy, the payment that lands, and what’s waiting tomorrow.</span>
+<span class="min-[760px]:hidden">34 kinds of small business, each at one ordinary moment. Find yours.</span>
+</p>
+</div>
+<div class="grid content-start gap-4 min-[1000px]:pt-14">
+<div role="search" class="flex h-[52px] items-center gap-3 rounded-[14px] border border-border bg-card px-4 shadow-mk-card focus-within:ring-2 focus-within:ring-foreground">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search size-5 shrink-0 text-mk-copy" aria-hidden="true">
+<circle cx="11" cy="11" r="8">
 </circle>
-<path d="m20 20-3.5-3.5">
+<path d="m21 21-4.3-4.3">
 </path>
 </svg>
-<label class="sp-fh-sr" for="for-hub-search">Search trades</label>
-<input id="for-hub-search" type="search" placeholder="Dentist, bakery…" value=""/>
+<label class="sr-only" for="for-hub-search">Search trades</label>
+<input id="for-hub-search" type="search" placeholder="Search your trade, like bakery, salon or tuition" class="min-w-0 font-sans text-base font-normal text-foreground placeholder:text-muted-foreground flex-1 border-none bg-transparent outline-none focus:ring-0 h-full" value=""/>
 </div>
-<div class="sp-fh-opts" role="group" aria-labelledby="for-hub-what">
-<h2 id="for-hub-what" class="sp-fh-opts-h">What you do</h2>
-<button type="button" class="sp-fh-opt" aria-pressed="true">All<span class="sp-fh-opt-n">34</span>
+<div role="group" aria-label="What you do" class="-mr-mk-gutter flex gap-2 overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:mr-0 min-[760px]:flex-wrap min-[760px]:pr-0 [&amp;::-webkit-scrollbar]:hidden">
+<button type="button" aria-pressed="true" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-foreground bg-foreground text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">All<span class="font-mono text-[13px] text-background/80">34</span>
 </button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">Shops and food<span class="sp-fh-opt-n">7</span>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Food and shops<span class="font-mono text-[13px] text-muted-foreground">7</span>
 </button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">Beauty<span class="sp-fh-opt-n">7</span>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Beauty and wellness<span class="font-mono text-[13px] text-muted-foreground">7</span>
 </button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">Fitness and classes<span class="sp-fh-opt-n">7</span>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Fitness and classes<span class="font-mono text-[13px] text-muted-foreground">7</span>
 </button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">Health<span class="sp-fh-opt-n">9</span>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Health and care<span class="font-mono text-[13px] text-muted-foreground">9</span>
 </button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">Learning<span class="sp-fh-opt-n">4</span>
-</button>
-</div>
-<button type="button" class="sp-fh-more" aria-expanded="false" aria-controls="for-hub-ways">How customers come to you</button>
-<div id="for-hub-ways" class="sp-fh-opts sp-fh-ways" data-open="false" role="group" aria-labelledby="for-hub-how">
-<h2 id="for-hub-how" class="sp-fh-opts-h">How customers come to you</h2>
-<button type="button" class="sp-fh-opt" aria-pressed="true">Any way<span class="sp-fh-opt-n">34</span>
-</button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">They book a time<span class="sp-fh-opt-n">17</span>
-</button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">They join a class or batch<span class="sp-fh-opt-n">10</span>
-</button>
-<button type="button" class="sp-fh-opt" aria-pressed="false">They place an order<span class="sp-fh-opt-n">7</span>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Learning<span class="font-mono text-[13px] text-muted-foreground">4</span>
 </button>
 </div>
-</aside>
-<div class="sp-fh-results" data-lines="false">
-<div class="sp-fh-status">
-<p aria-live="polite">All 34 trades</p>
+<div role="group" aria-label="Customers come to you by" class="-mr-mk-gutter flex items-center gap-2 overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:mr-0 min-[760px]:flex-wrap min-[760px]:pr-0 [&amp;::-webkit-scrollbar]:hidden">
+<span class="shrink-0 text-[13px] text-mk-copy">Customers come to you by</span>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Booking a time<span class="font-mono text-[13px] text-muted-foreground">17</span>
+</button>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Joining a class<span class="font-mono text-[13px] text-muted-foreground">10</span>
+</button>
+<button type="button" aria-pressed="false" class="inline-flex min-h-9 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11 border border-border-strong bg-card text-foreground hover:border-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] cursor-pointer shrink-0">Placing an order<span class="font-mono text-[13px] text-muted-foreground">7</span>
+</button>
 </div>
-<div class="sp-fh-bento">
-<a class="sp-fh-tile sp-fh-big" href="/for/salons">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Salons<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Clients book the stylist they want, at a time that&#x27;s free.</span>
-</span>
-<span class="sp-fh-day" aria-hidden="true">
-<span class="sp-fh-day-top">
-<b>Today · Sat 25 Oct</b>
-<span>6 bookings</span>
-</span>
-<span class="sp-fh-day-row">
-<span>10:00</span>
-<b>Meera Iyer</b>
-<span>Threading</span>
-</span>
-<span class="sp-fh-day-row">
-<span>11:00</span>
-<b>Riya Sharma</b>
-<span>Priya</span>
-</span>
-<span class="sp-fh-day-row">
-<span>12:30</span>
-<b>Kavya Rao</b>
-<span>D-Tan facial</span>
-</span>
-<span class="sp-fh-day-row">
-<span>14:00</span>
-<b>Sana Khan</b>
-<span>Manicure</span>
-</span>
-</span>
-</a>
-<div class="sp-fh-side">
-<a class="sp-fh-tile sp-fh-small" href="/for/gyms">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Gyms &amp; studios<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Know who&#x27;s coming, and who has paid this month.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-tile sp-fh-small" href="/for/clinics">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Clinics<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Patients book a time, and you know what to check first.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-tile sp-fh-small" href="/for/shops">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Shops<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every sale billed, every shelf counted.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
+<p class="m-0 flex min-h-11 items-center gap-4 text-[14px] text-mk-copy">
+<span aria-live="polite">All 34 trades</span>
+</p>
 </div>
 </div>
-<section class="sp-fh-group">
-<h2 class="sp-fh-group-h">Shops and food</h2>
-<div class="sp-fh-cards">
-<a class="sp-fh-card" href="/for/boutiques">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Boutiques<span aria-hidden="true" class="sp-fh-go">→</span>
+<div class="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-4 px-mk-gutter pb-10">
+<details class="group rounded-mk-card border border-border bg-card min-[760px]:hidden">
+<summary class="flex min-h-16 cursor-pointer list-none items-center justify-between gap-3 px-5 [&amp;::-webkit-details-marker]:hidden">
+<span class="grid">
+<b class="font-display text-[20px] tracking-[-0.025em]">All trades, A to Z</b>
+<span class="text-[13px] text-mk-copy">One tap to each page</span>
 </span>
-<span class="sp-fh-tile-line">A GST bill for every sale, and every size counted.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down size-5 transition-transform group-open:rotate-180" aria-hidden="true">
+<path d="m6 9 6 6 6-6">
+</path>
+</svg>
+</summary>
+<ul class="m-0 grid list-none grid-cols-2 gap-x-4 px-5 pb-5">
+<li>
+<a href="/for/art-classes" class="flex min-h-11 items-center text-[15px] text-foreground">Art classes</a>
+</li>
+<li>
+<a href="/for/ayurveda-clinics" class="flex min-h-11 items-center text-[15px] text-foreground">Ayurveda clinics</a>
+</li>
+<li>
+<a href="/for/barbers" class="flex min-h-11 items-center text-[15px] text-foreground">Barbers</a>
+</li>
+<li>
+<a href="/for/boutiques" class="flex min-h-11 items-center text-[15px] text-foreground">Boutiques</a>
+</li>
+<li>
+<a href="/for/cafes" class="flex min-h-11 items-center text-[15px] text-foreground">Cafés</a>
+</li>
+<li>
+<a href="/for/clinics" class="flex min-h-11 items-center text-[15px] text-foreground">Clinics</a>
+</li>
+<li>
+<a href="/for/cloud-kitchens" class="flex min-h-11 items-center text-[15px] text-foreground">Cloud kitchens</a>
+</li>
+<li>
+<a href="/for/coaching-centres" class="flex min-h-11 items-center text-[15px] text-foreground">Coaching centres</a>
+</li>
+<li>
+<a href="/for/counsellors" class="flex min-h-11 items-center text-[15px] text-foreground">Counsellors</a>
+</li>
+<li>
+<a href="/for/dance-classes" class="flex min-h-11 items-center text-[15px] text-foreground">Dance classes</a>
+</li>
+<li>
+<a href="/for/dental-clinics" class="flex min-h-11 items-center text-[15px] text-foreground">Dental clinics</a>
+</li>
+<li>
+<a href="/for/dermatology-clinics" class="flex min-h-11 items-center text-[15px] text-foreground">Dermatology clinics</a>
+</li>
+<li>
+<a href="/for/dieticians" class="flex min-h-11 items-center text-[15px] text-foreground">Dieticians</a>
+</li>
+<li>
+<a href="/for/florists" class="flex min-h-11 items-center text-[15px] text-foreground">Florists</a>
+</li>
+<li>
+<a href="/for/gift-shops" class="flex min-h-11 items-center text-[15px] text-foreground">Gift shops</a>
+</li>
+<li>
+<a href="/for/gyms" class="flex min-h-11 items-center text-[15px] text-foreground">Gyms &amp; studios</a>
+</li>
+<li>
+<a href="/for/home-bakers" class="flex min-h-11 items-center text-[15px] text-foreground">Home bakers</a>
+</li>
+<li>
+<a href="/for/home-tuition" class="flex min-h-11 items-center text-[15px] text-foreground">Home tuition</a>
+</li>
+<li>
+<a href="/for/homeopathy-clinics" class="flex min-h-11 items-center text-[15px] text-foreground">Homeopathy clinics</a>
+</li>
+<li>
+<a href="/for/makeup-artists" class="flex min-h-11 items-center text-[15px] text-foreground">Makeup artists</a>
+</li>
+<li>
+<a href="/for/martial-arts" class="flex min-h-11 items-center text-[15px] text-foreground">Martial arts</a>
+</li>
+<li>
+<a href="/for/mehendi-artists" class="flex min-h-11 items-center text-[15px] text-foreground">Mehendi artists</a>
+</li>
+<li>
+<a href="/for/music-classes" class="flex min-h-11 items-center text-[15px] text-foreground">Music classes</a>
+</li>
+<li>
+<a href="/for/nail-studios" class="flex min-h-11 items-center text-[15px] text-foreground">Nail studios</a>
+</li>
+<li>
+<a href="/for/pathology-labs" class="flex min-h-11 items-center text-[15px] text-foreground">Pathology labs</a>
+</li>
+<li>
+<a href="/for/personal-trainers" class="flex min-h-11 items-center text-[15px] text-foreground">Personal trainers</a>
+</li>
+<li>
+<a href="/for/physiotherapy" class="flex min-h-11 items-center text-[15px] text-foreground">Physiotherapy</a>
+</li>
+<li>
+<a href="/for/salons" class="flex min-h-11 items-center text-[15px] text-foreground">Salons</a>
+</li>
+<li>
+<a href="/for/shops" class="flex min-h-11 items-center text-[15px] text-foreground">Shops</a>
+</li>
+<li>
+<a href="/for/spas" class="flex min-h-11 items-center text-[15px] text-foreground">Spas</a>
+</li>
+<li>
+<a href="/for/swimming-classes" class="flex min-h-11 items-center text-[15px] text-foreground">Swimming classes</a>
+</li>
+<li>
+<a href="/for/tattoo-studios" class="flex min-h-11 items-center text-[15px] text-foreground">Tattoo studios</a>
+</li>
+<li>
+<a href="/for/yoga-studios" class="flex min-h-11 items-center text-[15px] text-foreground">Yoga studios</a>
+</li>
+<li>
+<a href="/for/zumba-classes" class="flex min-h-11 items-center text-[15px] text-foreground">Zumba classes</a>
+</li>
+</ul>
+</details>
+<p class="m-0 grid gap-2 border-t border-border pt-5 text-[15px] min-[760px]:flex min-[760px]:items-center min-[760px]:gap-5">
+<span class="font-mono text-[13px] text-mk-copy">7 am to 9 pm</span>
+<span class="min-w-0 flex-1">Two trades have a whole day told in full. Start with Monday at Rye &amp; Co., an example bakery.</span>
+<a class="cursor-pointer rounded-sm transition-colors duration-fast ease-out inline-flex min-h-11 items-center font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] hover:text-foreground hover:decoration-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]" href="/for/home-bakers#7am">Follow Asha’s day<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right ml-[0.25em] inline-block size-[0.9em] align-[-0.1em]" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+<path d="m12 5 7 7-7 7">
 </path>
 </svg>
 </a>
-<a class="sp-fh-card" href="/for/cafes">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Cafés<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Quick bills at the counter, right orders in the kitchen.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</p>
+</div>
+</div>
+<div class="mx-auto grid max-w-mk-page grid-cols-[minmax(0,1fr)] gap-0 px-mk-gutter">
+<section id="food" aria-labelledby="g-food" class="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-border py-12 first:border-t-0 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16">
+<div class="grid content-start gap-2">
+<h2 id="g-food" class="m-0 font-display text-[30px] font-bold leading-tight tracking-[-0.035em]">Food and shops</h2>
+<p class="m-0 font-mono text-[13px] text-mk-copy">7 trades</p>
+<p class="m-0 text-[15px] leading-snug text-mk-copy">They place an order, at the counter or on your site.</p>
+</div>
+<div>
+<ul aria-label="Food and shops" class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-3">
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/florists" class="group grid h-full content-start gap-2 rounded-mk-card p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-[1.5px] border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">6:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/cloud-kitchens">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Cloud kitchens<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every order cooked and sent out in the right order.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="10" cy="55" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Florists</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Three orders go out today, each with its card.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">3 orders · 11 am to 7 pm</span>
+</span>
+<span class="mt-1 text-[13px] font-semibold text-brand-700 [.bg-mk-lamp_&amp;]:text-mk-lamp-saff">A whole day, told in full</span>
 </a>
-<a class="sp-fh-card" href="/for/florists">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Florists<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every bouquet out on time, even on Valentine&#x27;s Day.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/home-bakers" class="group grid h-full content-start gap-2 rounded-mk-card p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-[1.5px] border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">7:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/gift-shops">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Gift shops<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Ready for the Diwali rush, with a GST bill for every sale.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="11.7" cy="42.1" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Home bakers</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Three cakes to bake today, and one still isn’t paid.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-[#FBE4E0] text-[#A02A16]">Unpaid · ₹1,450 · Send pay link</span>
+</span>
+<span class="mt-1 text-[13px] font-semibold text-brand-700 [.bg-mk-lamp_&amp;]:text-mk-lamp-saff">A whole day, told in full</span>
 </a>
-<a class="sp-fh-card" href="/for/home-bakers">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Home bakers<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every cake order in one list, not lost in WhatsApp.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/cafes" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">8:15 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="18.4" cy="27.2" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Cafés</h3>
+<span class="text-[15px] leading-snug text-mk-copy">An office order for twelve cold coffees, billed before the rush.</span>
+<span class="mt-2 flex">
+<span class="flex w-full max-w-[240px] justify-between gap-3 rounded-[10px] bg-card px-2.5 py-2 text-[12px] text-[hsl(var(--foreground))]">
+<span>Bill 212 · GST</span>
+<b class="font-mono">₹2,640</b>
+</span>
+</span>
 </a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/shops" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">9:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="24.6" cy="19.6" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Shops</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Shutter up. Two orders from last night are ready to pack.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">2 to pack · 1 collect</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/boutiques" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">11:30 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="53.5" cy="5.4" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Boutiques</h3>
+<span class="text-[15px] leading-snug text-mk-copy">A kurta in M sells at the counter, and the site knows straight away.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Size M · 3 → 2 left</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/cloud-kitchens" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">12:40 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="68.7" cy="5.8" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Cloud kitchens</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Lunch orders cooked and sent out in the order they came.</span>
+<span class="mt-2 flex">
+<span class="grid gap-1.5">
+<span aria-hidden="true" class="flex gap-1">
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+</span>
+<b class="text-[12px] font-semibold">Order 88 cooking · 89 next</b>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/gift-shops" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">4:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="103.3" cy="30" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Gift shops</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Christmas hampers are going fast. Twelve left on the shelf.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Christmas hamper</b>
+<span class="font-mono">12 of 40</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:30%">
+</span>
+</span>
+</span>
+</span>
+</a>
+</li>
+</ul>
+<p class="m-0 mt-3 text-[12px] text-muted-foreground min-[760px]:hidden">1 of 7</p>
 </div>
 </section>
-<section class="sp-fh-group">
-<h2 class="sp-fh-group-h">Beauty</h2>
-<div class="sp-fh-cards">
-<a class="sp-fh-card" href="/for/barbers">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Barbers<span aria-hidden="true" class="sp-fh-go">→</span>
+<section id="beauty" aria-labelledby="g-beauty" class="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-border py-12 first:border-t-0 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16">
+<div class="grid content-start gap-2">
+<h2 id="g-beauty" class="m-0 font-display text-[30px] font-bold leading-tight tracking-[-0.035em]">Beauty and wellness</h2>
+<p class="m-0 font-mono text-[13px] text-mk-copy">7 trades</p>
+<p class="m-0 text-[15px] leading-snug text-mk-copy">They book a time, with the person they want.</p>
+</div>
+<div>
+<ul aria-label="Beauty and wellness" class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-3">
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/barbers" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">9:30 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="29.6" cy="15.3" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
 </span>
-<span class="sp-fh-tile-line">Every chair booked, and no one waiting.</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Barbers</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Every chair booked, and nobody standing at the door.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-mk-ok-tint text-mk-ok">3 chairs · 0 waiting</span>
 </span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/salons" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">10:30 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="40.9" cy="8.8" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Salons</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Neel’s chair is booked till four. Walk-ins see who’s free.</span>
+<span class="mt-2 flex">
+<span class="grid gap-1.5">
+<span aria-hidden="true" class="flex gap-1">
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+</span>
+<b class="text-[12px] font-semibold">Neel · free from 4 pm</b>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/nail-studios" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-afternoon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">1:15 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="76.1" cy="7.7" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Nail studios</h3>
+<span class="text-[15px] leading-snug text-mk-copy">A gel set booked for the ninety minutes it really takes.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Gel set · 90 min</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/makeup-artists" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-afternoon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">2:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="85" cy="11.7" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Makeup artists</h3>
+<span class="text-[15px] leading-snug text-mk-copy">The December wedding date is held, and the advance is in.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-mk-ok-tint text-mk-ok">Advance paid · Sat 12 Dec</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/spas" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">5:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="108.3" cy="42.1" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Spas</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Two therapists, four rooms, and the phone stays quiet.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Rooms this evening</b>
+<span class="font-mono">4 of 4</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:100%">
+</span>
+</span>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/tattoo-studios" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-lamp text-mk-lamp-fg [&amp;_.text-foreground]:text-mk-lamp-fg [&amp;_.text-mk-copy]:text-mk-lamp-meta border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">7:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round" stroke-dasharray="3 5">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M66 10a10 10 0 1 0 0 16a8 8 0 1 1 0-16z" fill="hsl(var(--mk-lamp-saff))">
 </path>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Tattoo studios</h3>
+<span class="text-[15px] leading-snug text-mk-copy">The deposit is in before the stencil is drawn.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-mk-ok-tint text-mk-ok">Deposit paid · ₹2,000</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/makeup-artists">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Makeup artists<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every wedding date held, and the advance paid.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/mehendi-artists" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-lamp text-mk-lamp-fg [&amp;_.text-foreground]:text-mk-lamp-fg [&amp;_.text-mk-copy]:text-mk-lamp-meta border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">8:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round" stroke-dasharray="3 5">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M66 10a10 10 0 1 0 0 16a8 8 0 1 1 0-16z" fill="hsl(var(--mk-lamp-saff))">
 </path>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Mehendi artists</h3>
+<span class="text-[15px] leading-snug text-mk-copy">A bridal date fixed in one message, not twenty.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Bridal · Sun 13 Dec · held</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/mehendi-artists">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Mehendi artists<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every bridal date held, without the WhatsApp back and forth.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/nail-studios">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Nail studios<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every set booked for the time it really takes.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/spas">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Spas<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every therapist booked, and the phone quiet.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/tattoo-studios">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Tattoo studios<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Fewer DMs, more time at the chair.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
+</li>
+</ul>
+<p class="m-0 mt-3 text-[12px] text-muted-foreground min-[760px]:hidden">1 of 7</p>
 </div>
 </section>
-<section class="sp-fh-group">
-<h2 class="sp-fh-group-h">Fitness and classes</h2>
-<div class="sp-fh-cards">
-<a class="sp-fh-card" href="/for/dance-classes">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Dance classes<span aria-hidden="true" class="sp-fh-go">→</span>
+<section id="fitness" aria-labelledby="g-fitness" class="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-border py-12 first:border-t-0 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16">
+<div class="grid content-start gap-2">
+<h2 id="g-fitness" class="m-0 font-display text-[30px] font-bold leading-tight tracking-[-0.035em]">Fitness and classes</h2>
+<p class="m-0 font-mono text-[13px] text-mk-copy">7 trades</p>
+<p class="m-0 text-[15px] leading-snug text-mk-copy">They join a class, a batch or a pack.</p>
+</div>
+<div>
+<ul aria-label="Fitness and classes" class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-3">
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/gyms" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">6:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="10" cy="55" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
 </span>
-<span class="sp-fh-tile-line">Every batch and every fee, without the paper register.</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Gyms &amp; studios</h3>
+<span class="text-[15px] leading-snug text-mk-copy">The six o’clock batch is full, and you know who hasn’t paid this month.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">6 am strength</b>
+<span class="font-mono">18 of 18</span>
 </span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:100%">
+</span>
+</span>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/personal-trainers" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">6:45 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="11" cy="45.2" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Personal trainers</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Your clients, their sessions and their fees, all on your phone.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Client · session 7 of 10</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/yoga-studios" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">7:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="11.7" cy="42.1" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Yoga studios</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Twelve mats booked for sunrise flow.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Sunrise flow</b>
+<span class="font-mono">12 of 15</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:80%">
+</span>
+</span>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/swimming-classes" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">8:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="16.7" cy="30" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Swimming classes</h3>
+<span class="text-[15px] leading-snug text-mk-copy">The summer batch filled before the phone started ringing.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Summer batch</b>
+<span class="font-mono">20 of 20</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:100%">
+</span>
+</span>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/dance-classes" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">5:30 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="109.6" cy="48.5" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Dance classes</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Saturday batch, fees in, and no paper register.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-mk-ok-tint text-mk-ok">November fees · 22 of 24 paid</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/martial-arts" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">6:30 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="110" cy="55" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Martial arts</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Grading day on Sunday, every student’s belt on one list.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Grading · Sun · 31 students</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/zumba-classes" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-lamp text-mk-lamp-fg [&amp;_.text-foreground]:text-mk-lamp-fg [&amp;_.text-mk-copy]:text-mk-lamp-meta border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">7:30 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round" stroke-dasharray="3 5">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--mk-lamp-meta))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M66 10a10 10 0 1 0 0 16a8 8 0 1 1 0-16z" fill="hsl(var(--mk-lamp-saff))">
 </path>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Zumba classes</h3>
+<span class="text-[15px] leading-snug text-mk-copy">A full floor tonight, and the month’s fees already in.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Evening Zumba</b>
+<span class="font-mono">25 of 25</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:100%">
+</span>
+</span>
+</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/martial-arts">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Martial arts<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Batches, monthly fees and grading day, in one place.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/personal-trainers">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Personal trainers<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Your clients, sessions and fees, all on your phone.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/swimming-classes">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Swimming classes<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">The summer batch full, before the phone starts ringing.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/yoga-studios">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Yoga studios<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Know who&#x27;s coming to every class, and who has paid.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/zumba-classes">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Zumba classes<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">A full floor every evening, and the fees already in.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
-</path>
-</svg>
-</a>
+</li>
+</ul>
+<p class="m-0 mt-3 text-[12px] text-muted-foreground min-[760px]:hidden">1 of 7</p>
 </div>
 </section>
-<section class="sp-fh-group">
-<h2 class="sp-fh-group-h">Health</h2>
-<div class="sp-fh-cards">
-<a class="sp-fh-card" href="/for/ayurveda-clinics">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Ayurveda clinics<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every therapy booked, and Panchakarma days kept in order.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<section id="health" aria-labelledby="g-health" class="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-border py-12 first:border-t-0 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16">
+<div class="grid content-start gap-2">
+<h2 id="g-health" class="m-0 font-display text-[30px] font-bold leading-tight tracking-[-0.035em]">Health and care</h2>
+<p class="m-0 font-mono text-[13px] text-mk-copy">9 trades</p>
+<p class="m-0 text-[15px] leading-snug text-mk-copy">Patients and clients book a visit, then come back.</p>
+</div>
+<div>
+<ul aria-label="Health and care" class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-3">
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/pathology-labs" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">7:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/counsellors">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Counsellors<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Sessions booked and paid, without the back-and-forth.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="11.7" cy="42.1" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Pathology labs</h3>
+<span class="text-[15px] leading-snug text-mk-copy">A calmer morning queue, and a bill for every test.</span>
+<span class="mt-2 flex">
+<span class="flex w-full max-w-[240px] justify-between gap-3 rounded-[10px] bg-card px-2.5 py-2 text-[12px] text-[hsl(var(--foreground))]">
+<span>Bill 88 · 3 tests</span>
+<b class="font-mono">₹1,250</b>
+</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/dental-clinics">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Dental clinics<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Patients book their own time, and no visit gets lost.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/ayurveda-clinics" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">7:30 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/dermatology-clinics">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Dermatology clinics<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Patients book themselves, and every sitting stays on track.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="13.8" cy="35.9" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Ayurveda clinics</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Panchakarma day three: therapist and room ready.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Day 3 of 7 · Room 2</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/dieticians">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Dieticians<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every follow-up booked, and every plan billed on time.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/physiotherapy" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dawn text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">8:30 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/homeopathy-clinics">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Homeopathy clinics<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">First visits and follow-ups booked, with your notes at hand.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="20.3" cy="24.6" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Physiotherapy</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Knee rehab, visit seven, written in before the next patient.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Visit 7 of 12</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/pathology-labs">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Pathology labs<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">A calmer morning queue, and a bill for every test.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/clinics" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">9:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/physiotherapy">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Physiotherapy<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every session booked, and every visit kept track of.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="24.6" cy="19.6" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Clinics</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Patients booked their own times. You know what to check first.</span>
+<span class="mt-2 flex">
+<span class="grid gap-1.5">
+<span aria-hidden="true" class="flex gap-1">
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+<span class="h-3 w-4 rounded-[3px] bg-current/20">
+</span>
+</span>
+<b class="text-[12px] font-semibold">9 of 12 slots booked</b>
+</span>
+</span>
 </a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/dental-clinics" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">10:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="35" cy="11.7" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Dental clinics</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Root canal, sitting two of three, booked for Thursday.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Sitting 2 of 3 · Thu</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/dermatology-clinics" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">11:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="47.1" cy="6.7" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Dermatology clinics</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Laser sitting four of six, and every one on track.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Laser course</b>
+<span class="font-mono">4 of 6</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:67%">
+</span>
+</span>
+</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/dieticians" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-afternoon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">3:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="95.4" cy="19.6" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Dieticians</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Week-four follow-up booked, and the plan billed.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-mk-ok-tint text-mk-ok">Follow-up · week 4</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/homeopathy-clinics" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">4:30 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="106.2" cy="35.9" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Homeopathy clinics</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Follow-up booked, with your notes from last time at hand.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Notes · 2 visits</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/counsellors" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">6:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="110" cy="55" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Counsellors</h3>
+<span class="text-[15px] leading-snug text-mk-copy">A session booked and paid, without the back-and-forth.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-mk-ok-tint text-mk-ok">Paid · 50 min</span>
+</span>
+</a>
+</li>
+</ul>
+<p class="m-0 mt-3 text-[12px] text-muted-foreground min-[760px]:hidden">1 of 9</p>
 </div>
 </section>
-<section class="sp-fh-group">
-<h2 class="sp-fh-group-h">Learning</h2>
-<div class="sp-fh-cards">
-<a class="sp-fh-card" href="/for/coaching-centres">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Coaching centres<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Batch seats counted, and monthly fees billed on time.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<section id="learning" aria-labelledby="g-learning" class="grid grid-cols-[minmax(0,1fr)] gap-6 border-t border-border py-12 first:border-t-0 min-[1000px]:grid-cols-[260px_minmax(0,1fr)] min-[1000px]:gap-12 min-[1000px]:py-16">
+<div class="grid content-start gap-2">
+<h2 id="g-learning" class="m-0 font-display text-[30px] font-bold leading-tight tracking-[-0.035em]">Learning</h2>
+<p class="m-0 font-mono text-[13px] text-mk-copy">4 trades</p>
+<p class="m-0 text-[15px] leading-snug text-mk-copy">Students take a seat in a batch and pay by the month.</p>
+</div>
+<div>
+<ul aria-label="Learning" class="m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0 min-[760px]:grid-cols-3">
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/art-classes" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-noon text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">11:00 am</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/art-classes">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Art classes<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Kids&#x27; batches and weekend workshops, booked and paid.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="47.1" cy="6.7" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Art classes</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Saturday kids’ workshop: eight of ten seats taken.</span>
+<span class="mt-2 flex">
+<span class="grid w-full max-w-[240px] gap-1.5 rounded-[10px] bg-card p-2.5 text-[hsl(var(--foreground))]">
+<span class="flex justify-between gap-3 text-[12px]">
+<b class="font-semibold">Kids’ workshop</b>
+<span class="font-mono">8 of 10</span>
+</span>
+<span class="h-1.5 overflow-hidden rounded-full bg-[#ECE7DC]">
+<span class="block h-full bg-foreground" style="width:80%">
+</span>
+</span>
+</span>
+</span>
 </a>
-<a class="sp-fh-card" href="/for/home-tuition">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Home tuition<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Timings fixed, fees asked for, no notebook needed.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/coaching-centres" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">4:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
-</svg>
-</a>
-<a class="sp-fh-card" href="/for/music-classes">
-<span class="sp-fh-tile-copy">
-<span class="sp-fh-tile-name">Music classes<span aria-hidden="true" class="sp-fh-go">→</span>
-</span>
-<span class="sp-fh-tile-line">Every lesson booked, and every month&#x27;s fee asked for.</span>
-</span>
-<svg aria-hidden="true" class="sp-fh-chev" viewBox="0 0 24 24">
-<path d="m9 6 6 6-6 6">
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
 </path>
+<circle cx="103.3" cy="30" r="7" fill="hsl(var(--brand-500))">
+</circle>
 </svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Coaching centres</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Batch seats counted, and the month’s fees asked for.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Class 10 batch · 36 of 40</span>
+</span>
 </a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/home-tuition" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">5:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="108.3" cy="42.1" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Home tuition</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Timings fixed and fees asked for, with no notebook.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Mon · Wed · Fri · 5 pm</span>
+</span>
+</a>
+</li>
+<li class="w-[calc(100%-24px)] shrink-0 snap-start min-[760px]:w-auto">
+<a href="/for/music-classes" class="group grid h-full content-start gap-2 rounded-mk-card border p-5 no-underline transition-shadow duration-fast ease-out hover:border-foreground bg-mk-dusk text-foreground border-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid]">
+<span class="flex items-start justify-between gap-3">
+<span class="font-mono text-[13px] font-medium">6:00 pm</span>
+<svg viewBox="0 0 120 62" aria-hidden="true" class="block h-auto w-12">
+<path d="M10 55A50 50 0 0 1 110 55" fill="none" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<path d="M4 55h112" stroke="hsl(var(--border-strong))" stroke-width="1.9" stroke-linecap="round">
+</path>
+<circle cx="110" cy="55" r="7" fill="hsl(var(--brand-500))">
+</circle>
+</svg>
+</span>
+<h3 class="m-0 font-display text-mk-kit-h3 font-bold text-foreground">Music classes</h3>
+<span class="text-[15px] leading-snug text-mk-copy">Every lesson booked, and this month’s fee asked for.</span>
+<span class="mt-2 flex">
+<span class="inline-flex min-h-7 w-fit items-center rounded-full px-2.5 text-[12px] font-semibold bg-card text-[hsl(var(--foreground))] shadow-[inset_0_0_0_1px_hsl(var(--border))]">Fee link sent · 6 students</span>
+</span>
+</a>
+</li>
+</ul>
+<p class="m-0 mt-3 text-[12px] text-muted-foreground min-[760px]:hidden">1 of 4</p>
 </div>
 </section>
-<section class="sp-cta sp-cta-wide sp-fh-band">
-<div class="sp-cta-copy">
-<h2 class="sp-cta-h">Don&#x27;t see your trade?</h2>
-<p class="sp-cta-line">Saroh runs on bookings, classes and orders. If your business uses any of them, it can run on Saroh.</p>
 </div>
-<div class="sp-cta-act">
-<a class="sp-btn sp-btn-amber" href="/waitlist?src=for-hub" data-cta="for-hub">Join the waitlist</a>
+<section aria-labelledby="tell-title" class="border-t border-border py-[72px] min-[760px]:py-[120px]">
+<div class="mx-auto w-full px-mk-gutter max-w-mk-page grid gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_420px] min-[1000px]:gap-16">
+<div class="grid content-start gap-5">
+<h2 id="tell-title" class="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">Don’t see your trade? Tell us.</h2>
+<p class="m-0 max-w-[60ch] text-[16px] leading-relaxed text-mk-copy">Saroh runs on three things: bookings, classes and orders. Tell us what you do and we’ll write your trade’s day next. If your customers book a time, join a batch or place an order, you can start today.</p>
+<div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+<a class="inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] bg-foreground text-background hover:bg-mk-ink-hover hover:text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] h-12 gap-2 rounded-mk-kit-btn px-[22px] text-base disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100" href="/contact">Tell us your trade</a>
+<span id="for-hub-cta">
+<a class="inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] border text-foreground hover:bg-mk-hover hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] h-12 gap-2 rounded-mk-kit-btn px-[22px] text-base border-foreground bg-card disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100" href="/waitlist?src=for-hub">Join the waitlist</a>
+</span>
+</div>
+<p class="m-0 text-[15px] text-muted-foreground">Free to start. No card needed.</p>
+</div>
+<div class="grid content-start gap-4">
+<a href="/features" class="grid gap-2 rounded-mk-card border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground">
+<b class="font-display text-mk-kit-h3">Features</b>
+<span class="text-[15px] leading-relaxed text-mk-copy">Every moment on these pages uses a part of Saroh. See how each one works: your site, orders, bookings, payments, Ask AI and sharing.</span>
+<span class="mt-1 inline-flex items-center gap-2 text-[15px] font-semibold">All features<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right size-4" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+<path d="m12 5 7 7-7 7">
+</path>
+</svg>
+</span>
+</a>
+<a href="/" class="grid gap-2 rounded-mk-card border border-border bg-card p-6 text-foreground no-underline shadow-mk-card hover:border-foreground">
+<b class="font-display text-mk-kit-h3">New to Saroh?</b>
+<span class="text-[15px] leading-relaxed text-mk-copy">Start at the beginning: what Saroh is, what it costs to start, and the four jobs it does for you.</span>
+<span class="mt-1 inline-flex items-center gap-2 text-[15px] font-semibold">What Saroh is<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-right size-4" aria-hidden="true">
+<path d="M5 12h14">
+</path>
+<path d="m12 5 7 7-7 7">
+</path>
+</svg>
+</span>
+</a>
+</div>
 </div>
 </section>
-</div>
-</div>
-</div>
+<div class="fixed inset-x-0 bottom-0 z-40 h-16 translate-y-full border-t border-border bg-card px-5 py-2 shadow-[0_-6px_18px_-10px_rgba(40,30,15,0.25)] transition-transform duration-base ease-out data-[shown]:translate-y-0 motion-reduce:transition-none min-[760px]:hidden [&amp;&gt;*]:w-full" inert="">
+<a class="inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap font-semibold no-underline transition-[background-color,color,transform] duration-fast ease-out active:scale-[0.97] bg-foreground text-background hover:bg-mk-ink-hover hover:text-background focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 focus-visible:[outline-style:solid] h-12 gap-2 rounded-mk-kit-btn px-[22px] text-base disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100 w-full" href="#for-hub-search">
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-search size-5" aria-hidden="true">
+<circle cx="11" cy="11" r="8">
+</circle>
+<path d="m21 21-4.3-4.3">
+</path>
+</svg>Find your trade</a>
 </div>
 </div>

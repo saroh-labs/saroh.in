@@ -138,6 +138,12 @@ const RULES: Rule[] = [
                 "keep: a chapter's Read more links, folded on a phone, open from 760px",
             "components/feature-pages/keep-page.tsx":
                 "keep: the Keep template's folded points and its questions (FOPhone2), every answer in the HTML",
+            "components/solution/moments/moments.tsx":
+                "keep (DEC-221): a moment's second picture folds on a phone, kept in the HTML",
+            "components/solution/trade-page.tsx":
+                "keep (DEC-221): a problem's answer and a day trade's other parts fold, kept in the HTML",
+            "components/solution/hub-finder.tsx":
+                "keep (DEC-221): the phone's closed A to Z list of every trade",
         },
         files: SITE,
     },
