@@ -7,7 +7,7 @@
 export const PRICING = {
     eyebrow: "Pricing",
     title: "Start free. Paid plans come later.",
-    intro: "Free is the plan you can use today, with no card. Grow and Pro aren't available yet, so there's nothing to buy here.",
+    intro: "Free is the plan you can use today, with no card. Grow and Pro are coming soon, so there's nothing to buy here yet.",
     closer: "Put your business on Saroh today.",
     /** Free leads: it's the one plan with something to press. */
     plans: [
@@ -17,7 +17,7 @@ export const PRICING = {
     ],
     /** The absent mark, where a price would be. */
     noPrice: "—",
-    notYet: "Not available yet",
+    notYet: "Coming soon",
     /** "Tell me when" under a paid plan (KTD8): one email when paid plans open. */
     tellMe: {
         ask: "Tell me when",

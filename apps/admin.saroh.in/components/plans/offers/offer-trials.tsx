@@ -4,6 +4,7 @@ import { TRIAL_DAYS_MAX, TRIAL_DAYS_MIN } from "@saroh/pricing-catalog";
 import { Checkbox } from "@saroh/ui/checkbox";
 import { useId } from "react";
 
+import { planCurrencySign, planTaxed } from "@/lib/plan-money";
 import { useDraft } from "../draft-store";
 import { RupeesField, WholeField } from "./number-field";
 import { paidPlans, trialOf } from "./offers";
@@ -88,10 +89,10 @@ export function OfferTrials() {
                             onValue={(days) => set(p.id, { days })}
                         />
                         <span className="text-[12.5px] text-muted-foreground">
-                            days for ₹
+                            days for {planCurrencySign()}
                         </span>
                         <RupeesField
-                            aria-label={`${p.name} first month, before GST`}
+                            aria-label={`${p.name} first month${planTaxed() ? ", before GST" : ""}`}
                             paise={t.firstPaise ?? 0}
                             disabled={!canEdit || !t.on}
                             className="w-20"
@@ -105,7 +106,8 @@ export function OfferTrials() {
                             }
                         />
                         <span className="text-[12.5px] text-muted-foreground">
-                            + GST · {t.on ? "shown on the pricing page" : "off"}
+                            {planTaxed() ? "+ GST · " : ""}
+                            {t.on ? "shown on the pricing page" : "off"}
                         </span>
                         <ChangedDot on={changed} />
                     </div>

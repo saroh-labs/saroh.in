@@ -42,7 +42,7 @@ export default async function PricingPage() {
                 <h2 id="plans-title" className="sr-only">
                     Plans
                 </h2>
-                <Plans model={pricingModel(catalog, read?.offered)} />
+                <Plans model={pricingModel(catalog)} />
             </Container>
             {usage ? (
                 <Section
