@@ -31,18 +31,6 @@ export interface AiAppsWords {
             answer: string[];
             link: string;
         };
-        second: {
-            at: string;
-            ask: string;
-            step: {
-                did: string;
-                what: string;
-                tool: string;
-                state: string;
-            };
-            answer: string;
-        };
-        reply: string;
         cap: string;
         momentLink: string;
         phoneMore: string;

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 
 import { ButtonLink } from "../buttons/button";
-import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
 import { Mark } from "../sections/mark";
+import { SplitHero } from "../sections/split-hero";
 import type { HomeHeroScene } from "./hero-stage";
 import { HeroStage } from "./hero-stage";
 import type { HomeWords } from "./words";
@@ -48,59 +48,68 @@ export function HomeHero({
             aria-labelledby="home-title"
             className="pt-6 min-[760px]:pt-11"
         >
-            <Container className="grid justify-items-start gap-0 min-[760px]:justify-items-center min-[760px]:text-center">
-                <h1
-                    id="home-title"
-                    className="m-0 max-w-[16ch] font-display text-mk-kit-h1 font-bold [text-wrap:balance] min-[760px]:max-w-[20ch]"
-                >
-                    {home.title.before}
-                    <Mark>{home.title.mark}</Mark>
-                    {home.title.after}
-                </h1>
-                <p className="m-0 mt-4 max-w-[780px] text-mk-kit-lead text-mk-copy min-[760px]:mt-[22px]">
-                    {home.eyebrow}.{" "}
-                    <span className="max-[759px]:hidden">{home.lede}</span>
-                    <span className="min-[760px]:hidden">{home.phoneLede}</span>
-                </p>
-                <div className="mt-5 flex w-full flex-wrap items-center gap-3 min-[760px]:mt-[30px] min-[760px]:w-auto min-[760px]:justify-center">
+            <SplitHero
+                as="div"
+                id="home-title"
+                layout="center"
+                title={
+                    <>
+                        {home.title.before}
+                        <Mark>{home.title.mark}</Mark>
+                        {home.title.after}
+                    </>
+                }
+                titleClassName="min-[760px]:max-w-[20ch]"
+                lede={
+                    <>
+                        {home.eyebrow}.{" "}
+                        <span className="max-[759px]:hidden">{home.lede}</span>
+                        <span className="min-[760px]:hidden">
+                            {home.phoneLede}
+                        </span>
+                    </>
+                }
+                primary={
                     <span
                         id={HERO_CTA_ID}
                         className="max-[759px]:flex-1 [&>a]:w-full"
                     >
                         {start}
                     </span>
-                    <ButtonLink
-                        href="/features"
-                        variant="secondary"
-                        size="kit"
-                        className="max-[759px]:hidden"
-                    >
-                        {home.how.label}
-                    </ButtonLink>
-                    <TextLink
-                        href="/features"
-                        tone="ink"
-                        arrow
-                        className="text-[15px] min-[760px]:hidden"
-                    >
-                        {home.how.short}
-                    </TextLink>
-                    {extra}
-                    {tour ? (
+                }
+                secondary={
+                    <>
                         <ButtonLink
-                            href="#video"
+                            href="/features"
                             variant="secondary"
                             size="kit"
-                            play
+                            className="max-[759px]:hidden"
                         >
-                            {tour}
+                            {home.how.label}
                         </ButtonLink>
-                    ) : null}
-                </div>
-                <p className="m-0 mt-2.5 text-[14px] text-muted-foreground">
-                    {home.freeNote}
-                </p>
-            </Container>
+                        <TextLink
+                            href="/features"
+                            tone="ink"
+                            arrow
+                            className="text-[15px] min-[760px]:hidden"
+                        >
+                            {home.how.short}
+                        </TextLink>
+                        {extra}
+                        {tour ? (
+                            <ButtonLink
+                                href="#video"
+                                variant="secondary"
+                                size="kit"
+                                play
+                            >
+                                {tour}
+                            </ButtonLink>
+                        ) : null}
+                    </>
+                }
+                foot={home.freeNote}
+            />
             <HeroStage
                 scenes={scenes}
                 legend={home.trade.legend}

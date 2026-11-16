@@ -24,7 +24,6 @@ const truffle = item("truffle-cake");
 const bun = item("cinnamon-bun");
 const loaf = item("sourdough");
 const holiday = THISTLEWICK_TUESDAY.holiday;
-const cls = THISTLEWICK_TUESDAY.class;
 const owner = bakery.owner;
 
 export function aiAppsWords(): AiAppsWords {
@@ -37,7 +36,7 @@ export function aiAppsWords(): AiAppsWords {
         note: "Free to start. No card needed.",
 
         chat: {
-            label: `A chat in Claude at 4:12 pm where ${owner} adds the holiday menu to ${bakery.name} as a draft product on a new holiday page, gets a publish request, then asks about Saturday's class`,
+            label: `A chat in Claude at 4:12 pm where ${owner} adds the holiday menu to ${bakery.name} as a draft product on a new holiday page and gets a publish request`,
             app: "Claude",
             connected: `Saroh · ${bakery.name}`,
             first: {
@@ -74,18 +73,6 @@ export function aiAppsWords(): AiAppsWords {
                 ],
                 link: "Open the publish request in Saroh",
             },
-            second: {
-                at: "16:14",
-                ask: "How full is Saturday's class?",
-                step: {
-                    did: "Looked at bookings",
-                    what: cls.when.split(",")[0],
-                    tool: "list_bookings",
-                    state: "Read only",
-                },
-                answer: `${cls.name}, Saturday 21 Nov at 10 am: ${cls.booked} of ${cls.places} places booked, so ${cls.places - cls.booked} are left.`,
-            },
-            reply: "Reply to Claude",
             cap: `An example chat, for ${bakery.name} (demo bakery). ${owner}, closing up on Tuesday 17 Nov.`,
             momentLink: `See 4 pm at ${bakery.name}`,
             phoneMore: "See the rest of the chat",
