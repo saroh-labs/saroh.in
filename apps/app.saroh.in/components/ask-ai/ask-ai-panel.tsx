@@ -74,6 +74,7 @@ import type { Turn, TurnContext } from "./thread";
 import { One, TurnView } from "./thread";
 import {
     FOLLOW_UP,
+    HINGLISH,
     PAUSED,
     PLACEHOLDER,
     PRIVACY_LINE,
@@ -105,16 +106,30 @@ const CHIPS = [
 const SETTINGS_HREF = "/settings/developers/ask-ai";
 const PRIVACY_HREF = `${MARKETING_URL}/privacy`;
 
-const LANGUAGES: { value: AskAiLanguage; name: string; line?: string }[] = [
-    {
-        value: "MATCH",
-        name: "Match my question (default)",
-        line: "English in, English out. Hinglish in, Hinglish out.",
-    },
-    { value: "ENGLISH", name: "English" },
-    { value: "HINGLISH", name: "Hinglish", line: "Hindi in English letters" },
-    { value: "HINDI", name: "Hindi", line: "हिन्दी में" },
-];
+const LANGUAGES: { value: AskAiLanguage; name: string; line?: string }[] =
+    HINGLISH
+        ? [
+              {
+                  value: "MATCH",
+                  name: "Match my question (default)",
+                  line: "English in, English out. Hinglish in, Hinglish out.",
+              },
+              { value: "ENGLISH", name: "English" },
+              {
+                  value: "HINGLISH",
+                  name: "Hinglish",
+                  line: "Hindi in English letters",
+              },
+              { value: "HINDI", name: "Hindi", line: "हिन्दी में" },
+          ]
+        : [
+              {
+                  value: "MATCH",
+                  name: "Match my question (default)",
+                  line: "Answers in the language you ask in.",
+              },
+              { value: "ENGLISH", name: "English" },
+          ];
 
 let keys = 0;
 const nextKey = () => `t${++keys}`;
@@ -688,7 +703,8 @@ export function AskAiPanel({
                         className="m-0 text-sm leading-[1.5] text-neutral-700 dark:text-foreground"
                     >
                         Bookings, payments, customers and products. Add or
-                        change things by asking. English or Hinglish.
+                        change things by asking.
+                        {HINGLISH ? " English or Hinglish." : ""}
                     </p>
                 </div>
                 <div className="mt-2 flex flex-col gap-2">
