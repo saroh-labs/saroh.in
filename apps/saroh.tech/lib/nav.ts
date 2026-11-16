@@ -76,6 +76,18 @@ export const RESOURCES: NavItem[] = [
         line: "What's new in Saroh",
         href: "/changelog",
     },
+    // The website templates gallery, while templates are on (DEC-135): saroh.in
+    // lists its document templates in Resources the same way (owner, 16 Nov 2026).
+    ...(featuresOff().includes("templates")
+        ? []
+        : [
+              {
+                  group: LEARN,
+                  name: "Website templates",
+                  line: "Sites made for your kind of business",
+                  href: "/website-templates",
+              },
+          ]),
     // The API and webhooks, while their switch is on (owner, 16 Nov 2026, #13).
     ...(featuresOff().includes("developers")
         ? []

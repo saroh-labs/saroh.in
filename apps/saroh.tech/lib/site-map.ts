@@ -18,6 +18,11 @@ import { HELP } from "@/content/help";
 
 import { DEVELOPERS } from "@/content/developers";
 import { INTEGRATIONS } from "@/content/integrations";
+import {
+    galleryTemplates,
+    WEBSITE_TEMPLATES_PATH,
+    websiteTemplatesPage,
+} from "@/content/website-templates";
 import { featuresOff } from "@/lib/feature-switches";
 
 import { LEGAL_UPDATED } from "@/content/legal";
@@ -64,6 +69,8 @@ export type PageType =
     | "tool"
     | "templates"
     | "template"
+    | "website-templates"
+    | "website-template"
     | "guides"
     | "guide"
     | "not-found";
@@ -299,6 +306,38 @@ export const PAGES: SitePage[] = [
         unreviewed: true,
         updated: "2026-11-04",
     },
+    // The website templates gallery, only while templates are on (DEC-135),
+    // at /website-templates (/templates is the document templates).
+    ...(featuresOff().includes("templates")
+        ? []
+        : [
+              {
+                  ...hub(
+                      WEBSITE_TEMPLATES_PATH,
+                      "website-templates",
+                      "Website templates for small businesses | Saroh",
+                      websiteTemplatesPage.description,
+                      websiteTemplatesPage.title,
+                      websiteTemplatesPage.name,
+                  ),
+                  unreviewed: true,
+                  updated: "2026-11-16",
+              },
+              ...galleryTemplates().map((t): SitePage => ({
+                  path: t.href,
+                  type: "website-template",
+                  title: `${t.name} website template | Saroh`,
+                  description: t.description,
+                  h1: `${t.name}: ${t.idea}.`,
+                  crumb: under(
+                      websiteTemplatesPage.name,
+                      WEBSITE_TEMPLATES_PATH,
+                      t.name,
+                  ),
+                  unreviewed: true,
+                  updated: "2026-11-16",
+              })),
+          ]),
     // Only while its switch is on: the page 404s without it (#13).
     ...(featuresOff().includes("developers")
         ? []
