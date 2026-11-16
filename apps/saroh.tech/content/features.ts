@@ -772,11 +772,16 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Only what you can do",
-                body: "It acts as you. It can't cancel bookings, give refunds or touch billing, and it never sees sensitive customer details.",
+                // Teams and reviewers are paid-plan facts here (#43), not dropped.
+                body: "It acts as you. It can't cancel bookings, give refunds or touch billing, and it never sees sensitive customer details. Teams come with paid plans: there it keeps to your role and can't change who's in it.",
             },
             {
                 title: "Nothing goes live by itself",
-                body: "You publish website changes in Saroh. The app can't.",
+                body: "You publish website changes in Saroh. The app can't. Sending them to a reviewer comes with paid plans.",
+            },
+            {
+                title: "Several businesses, one connection",
+                body: "Tick the ones it may use. It names the business on every change it makes.",
             },
         ],
         apps: {

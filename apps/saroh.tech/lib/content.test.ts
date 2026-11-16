@@ -284,9 +284,10 @@ describe("saroh.tech's words", () => {
     });
 
     it("name no paid plan while Global is Free only (plan 2026-11-13-002, U16)", () => {
-        // Own domains are named as coming with paid plans (owner, 16 Nov 2026, #21).
+        // Own domains are named as coming with paid plans (owner, 16 Nov 2026,
+        // #21), and so are API keys, teams and reviewers (#41, #43).
         const domains =
-            /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans/g;
+            /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans|API keys come with paid plans|Teams come with paid plans|Sending them to a reviewer comes with paid plans/g;
         expect(
             words({ ...all, INTEGRATIONS }).replace(domains, ""),
         ).not.toMatch(

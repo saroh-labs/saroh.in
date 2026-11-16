@@ -192,11 +192,9 @@ export interface AiAppsWords {
             title: string;
             sub: string;
             items: string[];
-            tools: string[];
         }[];
         honest: string;
         all: string;
-        names: string;
     };
     cant: {
         title: string;

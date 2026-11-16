@@ -3,7 +3,7 @@
  * one Claude chat at closing time, what lands in Saroh, and how to connect.
  * Every name, price and time comes from the world (`content/world.ts`);
  * tool names are the MCP server's own (`apps/api.saroh.in/src/modules/mcp/
- * tools/`), kept small in the chat and folded in the full list.
+ * tools/`), kept small in the chat.
  *
  * Claims wait for their switch: `ai-apps-plans` (a plan named beside AI
  * apps), `ask-ai-languages` (Ask AI answering in Hinglish), `ask-ai-plans`.
@@ -325,27 +325,6 @@ export function aiAppsWords({
                         "Make a booking, or move one",
                         "See orders and move them along",
                     ],
-                    tools: [
-                        "list_bookings",
-                        "get_booking",
-                        "create_booking",
-                        "move_booking",
-                        "find_free_slots",
-                        "list_waitlist",
-                        "list_orders",
-                        "get_order",
-                        "create_order",
-                        "update_order_status",
-                        "list_customers",
-                        "get_customer",
-                        "create_customer",
-                        "update_customer",
-                        "list_enquiries",
-                        "get_enquiry",
-                        "get_class_fill",
-                        "list_class_packs",
-                        "list_staff",
-                    ],
                 },
                 {
                     title: "What you sell",
@@ -354,18 +333,6 @@ export function aiAppsWords({
                         "Add a product, as a draft",
                         "Change a price or details",
                         "Set your opening hours",
-                    ],
-                    tools: [
-                        "list_products",
-                        "get_product",
-                        "create_product",
-                        "update_product",
-                        "list_services",
-                        "create_service",
-                        "update_service",
-                        "get_hours",
-                        "set_hours",
-                        "upload_image",
                     ],
                 },
                 {
@@ -376,23 +343,6 @@ export function aiAppsWords({
                         "Write a blog post draft",
                         "Remove a section or a page from the draft",
                     ],
-                    tools: [
-                        "get_site",
-                        "get_page",
-                        "add_page",
-                        "edit_page",
-                        "update_page",
-                        "delete_page",
-                        "remove_section",
-                        "list_section_types",
-                        "update_site_settings",
-                        "draft_blog_post",
-                        "list_templates",
-                        "create_site_from_template",
-                        "preview_publish",
-                        "get_publish_request",
-                        "restore_site_draft",
-                    ],
                 },
                 {
                     title: "How it's going",
@@ -402,22 +352,10 @@ export function aiAppsWords({
                         "Who still owes you",
                         "Customers who haven't come back",
                     ],
-                    tools: [
-                        "get_business_summary",
-                        "get_needs_attention",
-                        "get_whats_selling",
-                        "list_unpaid_bills",
-                        "find_lapsed_customers",
-                        "summarise_orders",
-                        "summarise_bookings",
-                        "summarise_invoices",
-                        "summarise_stock",
-                    ],
                 },
             ],
             honest: "It can remove sections and pages from your website draft. They stay a draft until you publish, and Roll back site draft puts the draft back as it was.",
             all: "Every step it can take, on Developers",
-            names: "The step names your assistant sees",
         },
 
         cant: {
