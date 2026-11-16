@@ -31,12 +31,12 @@ import { TRADES as TEMPLATE_TRADES } from "@/content/templates";
 import type { TradePage } from "@/content/trades";
 import { HOME_WORDS, tradePage } from "@/content/trades";
 import { claimsOff, featuresOff } from "@/lib/feature-switches";
+import type { readCatalog } from "@/lib/plans";
 import {
     faqWithPlans,
-    freeCardModel,
     freePlanLine,
     paidPlansOn,
-    readCatalog,
+    pricingModel,
     readPricing,
 } from "@/lib/plans";
 import { faqSchema, pageSchema } from "@/lib/schema";
@@ -239,7 +239,6 @@ export default async function SolutionPage({ params }: Props) {
               cardOnline,
               plansOn,
           );
-
     return (
         <div data-page-type={page.type}>
             <JsonLd
@@ -291,19 +290,17 @@ export default async function SolutionPage({ params }: Props) {
                 starter={own.starter}
                 pricing={{
                     title: own.pricingTitle,
+                    // Every plan, as /pricing shows them (owner, 16 Nov).
                     children: (
-                        // One card would stretch across the page.
-                        <div className="max-w-[420px]">
-                            <Plans
-                                model={freeCardModel(catalog)}
-                                on={plansOn}
-                                src={`${src}-pricing`}
-                                compare={{
-                                    href: "/pricing",
-                                    label: home.pricingCompare,
-                                }}
-                            />
-                        </div>
+                        <Plans
+                            model={pricingModel(catalog, plansOn)}
+                            on={plansOn}
+                            src={`${src}-pricing`}
+                            compare={{
+                                href: "/pricing",
+                                label: home.pricingCompare,
+                            }}
+                        />
                     ),
                 }}
                 faq={{ title: own.questionsTitle, items: own.faq }}
