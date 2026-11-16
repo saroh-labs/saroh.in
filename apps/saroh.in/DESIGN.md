@@ -342,6 +342,13 @@ price is ever drawn into an image.
 
 ## Changes
 
+- **16 Nov 2026, one trade look per trade (owner, bugs #8, #19–#22).** Both
+  sites draw a business's site in its trade's look from
+  `@saroh/marketing/kit/trade-looks` (bakery, salon, gym): Thistlewick is
+  drawn in Rye & Co.'s cream and terracotta, never the renderer's grey
+  default. saroh.tech's shots are retaken by the same step rules, its demo
+  businesses on Grow and Pro locally (paid features show as on their way).
+
 - **16 Nov 2026, feature pages: one step layout and desk shots (owner,
   bugs #26–#30).** Every record feature page (`keep-page.tsx`, both
   editions): the hero's headline and lede both start at the top; each step's
