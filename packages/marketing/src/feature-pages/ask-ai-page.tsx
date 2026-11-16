@@ -2,7 +2,6 @@ import {
     ArrowRight,
     Check,
     ChevronDown,
-    Lock,
     Sparkles,
     Undo2,
     X,
@@ -75,7 +74,6 @@ export function AskAiView({
 }: AskAiPageProps) {
     const slug = "ask-ai";
     const stockOn = site.claimOn("ask-ai-stock");
-    const plans = site.claimOn("ask-ai-plans");
     const w = words;
     const lead = world.lead;
     const h = w.hero;
@@ -770,7 +768,7 @@ export function AskAiView({
                 </Container>
             </section>
 
-            {/* Plans: one line, the Free and limit panels folded. */}
+            {/* Plans: one line (owner, 16 Nov: no locked or limit panels). */}
             <Container
                 as="section"
                 id={w.plans.id}
@@ -783,95 +781,6 @@ export function AskAiView({
                 >
                     {w.plans.line}
                 </PlanLine>
-                <Claim on={plans}>
-                    <Fold
-                        label={w.plans.fold}
-                        className="mt-4 max-w-[62ch] [&_summary>span]:whitespace-normal"
-                    >
-                        <div className="grid gap-6 min-[760px]:grid-cols-2">
-                            <figure className="m-0 grid gap-3">
-                                <AskPanel
-                                    title="Ask AI"
-                                    label={w.plans.free.label}
-                                >
-                                    <p className="m-0 flex items-center gap-2 text-[18px] font-semibold">
-                                        <Lock
-                                            aria-hidden
-                                            className="size-[18px]"
-                                        />
-                                        {w.plans.free.lead}
-                                    </p>
-                                    <p className="m-0 text-[14.5px] text-mk-copy">
-                                        {w.plans.free.sub}
-                                    </p>
-                                    {w.plans.free.ex.map(([q, a], i) => (
-                                        <div
-                                            key={q}
-                                            className="rounded-xl bg-mk-noon px-3 py-2.5 text-[14px]"
-                                        >
-                                            <span className="block text-mk-copy">
-                                                {q}
-                                            </span>
-                                            <b className="font-semibold">
-                                                {i === 1 ? (
-                                                    <s className="mr-1.5 font-normal text-muted-foreground">
-                                                        {w.plans.free.was}
-                                                    </s>
-                                                ) : null}
-                                                {a}
-                                            </b>
-                                        </div>
-                                    ))}
-                                    <p className="m-0 text-[13px] text-muted-foreground">
-                                        {w.plans.free.examples}
-                                    </p>
-                                </AskPanel>
-                                <figcaption className="text-[14px] text-mk-copy">
-                                    <b className="text-foreground">
-                                        {w.plans.free.cap[0]}
-                                    </b>{" "}
-                                    {w.plans.free.cap[1]}
-                                </figcaption>
-                            </figure>
-                            <figure className="m-0 grid gap-3">
-                                <AskPanel
-                                    title="Ask AI"
-                                    label={w.plans.limit.label}
-                                >
-                                    <span className="w-fit rounded-full bg-mk-hover px-2.5 py-1 text-[13px] font-semibold">
-                                        {w.plans.limit.about}
-                                    </span>
-                                    <Asked>{w.plans.limit.q}</Asked>
-                                    <div className="rounded-xl border border-border bg-mk-noon p-3">
-                                        <b className="block text-[15px] font-semibold">
-                                            {w.plans.limit.title}
-                                        </b>
-                                        <p className="m-0 mt-1 text-[14px] text-mk-copy">
-                                            {w.plans.limit.sub}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center justify-between rounded-xl border border-border px-3 py-2.5 text-[14px] text-muted-foreground">
-                                        {w.plans.limit.input}
-                                    </div>
-                                    <div className="flex justify-between text-[13px]">
-                                        <span className="font-semibold text-mk-warn">
-                                            {w.plans.limit.left}
-                                        </span>
-                                        <span className="underline underline-offset-2">
-                                            {w.plans.limit.data}
-                                        </span>
-                                    </div>
-                                </AskPanel>
-                                <figcaption className="text-[14px] text-mk-copy">
-                                    <b className="text-foreground">
-                                        {w.plans.limit.cap[0]}
-                                    </b>{" "}
-                                    {w.plans.limit.cap[1]}
-                                </figcaption>
-                            </figure>
-                        </div>
-                    </Fold>
-                </Claim>
             </Container>
 
             {/* AI apps, the next step. */}

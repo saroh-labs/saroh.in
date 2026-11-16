@@ -427,48 +427,6 @@ export function askAiWords({
                 ? "Free to start. Ask AI comes with Grow and Pro."
                 : "Free to start.",
             compare: "Compare plans",
-            fold: "What the panel shows on Free, and when questions run out",
-            free: {
-                label: "Ask AI on the Free plan: locked, with three examples",
-                lead: "Ask AI comes with Grow and Pro",
-                sub: "What it does that no screen in Saroh does:",
-                ex: [
-                    [
-                        '"How did November go vs October?"',
-                        `Up 20%. The ${item("bun-box").toLowerCase().split(" ").slice(-2).join(" ")} did most of it.`,
-                    ],
-                    [
-                        `"Move ${first(kavya)}'s tasting to Tuesday 4 pm"`,
-                        `Tue 17 Nov, 4:00 pm · ${first(kavya)} gets a message`,
-                    ],
-                    [
-                        '"Regulars who haven\'t been back?"',
-                        "5 people · Call · Order again",
-                    ],
-                ] as const,
-                was: "Mon 4:00 pm",
-                examples: "Examples. On Free, you'd see this.",
-                buttons: ["See plans", "Not now"],
-                cap: [
-                    "On Free.",
-                    "Press Ask AI and you see three examples of what it does, then the plans.",
-                ],
-            },
-            limit: {
-                label: "Ask AI when the month's questions are used: paused until 1 December",
-                about: "About: Calendar · 16–22 Nov",
-                q: "Which classes still have seats?",
-                title: "This month's questions are used.",
-                sub: "They come back on 1 Dec. This didn't use a question.",
-                buttons: ["Request more", "See plans"],
-                input: "Paused until 1 Dec",
-                left: "None left · back 1 Dec",
-                data: "How your data is used",
-                cap: [
-                    "On Grow and Pro.",
-                    "Questions come with your plan each month. If they run out, it says so plainly and pauses until the 1st.",
-                ],
-            },
         },
 
         mcp: {

@@ -289,33 +289,6 @@ export interface AskAiWords {
         id: string;
         line: string;
         compare: string;
-        fold: string;
-        free: {
-            label: string;
-            lead: string;
-            sub: string;
-            ex: readonly [
-                readonly [string, string],
-                readonly [string, string],
-                readonly [string, string],
-            ];
-            was: string;
-            examples: string;
-            buttons: string[];
-            cap: string[];
-        };
-        limit: {
-            label: string;
-            about: string;
-            q: string;
-            title: string;
-            sub: string;
-            buttons: string[];
-            input: string;
-            left: string;
-            data: string;
-            cap: string[];
-        };
     };
     mcp: {
         title: string;

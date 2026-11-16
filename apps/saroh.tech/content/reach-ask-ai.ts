@@ -375,48 +375,6 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             id: "plans",
             line: "Everyone is on Free for now. Ask AI isn't part of Free.",
             compare: "Tell me when",
-            fold: "What the panel shows on Free, and when questions run out",
-            free: {
-                label: "Ask AI on the Free plan: locked, with three examples",
-                lead: "Ask AI isn't part of Free",
-                sub: "What it does that no screen in Saroh does:",
-                ex: [
-                    [
-                        '"How did November go vs October?"',
-                        "Up 9%. The cinnamon buns did most of it.",
-                    ],
-                    [
-                        `"Move ${first(maya.customer)}'s class to the 28th"`,
-                        "Sat 28 Nov, 10:00 am · moved",
-                    ],
-                    [
-                        '"Regulars who haven\'t been back?"',
-                        "5 people · Order again",
-                    ],
-                ],
-                was: "Tue 4:00 pm",
-                examples: "Examples. On Free, you'd see this.",
-                buttons: ["Tell me when", "Not now"],
-                cap: [
-                    "On Free.",
-                    "Press Ask AI and you see three examples of what it does.",
-                ],
-            },
-            limit: {
-                label: "Ask AI when the month's questions are used: paused until 1 December",
-                about: "About: Calendar · 16–22 Nov",
-                q: "Which classes still have seats?",
-                title: "This month's questions are used.",
-                sub: "They come back on 1 Dec. This didn't use a question.",
-                buttons: ["Request more", "Tell me when"],
-                input: "Paused until 1 Dec",
-                left: "None left · back 1 Dec",
-                data: "How your data is used",
-                cap: [
-                    "Once it's on your plan.",
-                    "Questions come with the plan each month. If they run out, it says so plainly and pauses until the 1st.",
-                ],
-            },
         },
 
         mcp: {
