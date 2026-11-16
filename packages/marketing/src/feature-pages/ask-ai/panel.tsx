@@ -132,31 +132,30 @@ export function Suggestion({
     t,
     h,
     act,
-    on = false,
+    onPick,
 }: {
     t: string;
     h?: string;
     act?: boolean;
-    /** Just tapped: Ink, as the steps' player shows it being picked. */
-    on?: boolean;
+    /** Makes it a real button, highlighted as the invitation (the steps' player). */
+    onPick?: () => void;
 }) {
+    const Tag = onPick ? "button" : "div";
     return (
-        <div
+        <Tag
+            {...(onPick ? { type: "button" as const, onClick: onPick } : {})}
             className={cn(
-                "flex min-h-11 items-center gap-2.5 border-t border-mk-line-row px-1 text-[14.5px] transition-colors duration-300 first:border-t-0 motion-reduce:transition-none",
+                "flex min-h-11 w-full items-center gap-2.5 border-t border-mk-line-row px-1 text-left text-[14.5px] text-foreground first:border-t-0",
                 act && "font-semibold",
-                on &&
-                    "rounded-lg border-transparent bg-foreground px-3 text-background",
+                onPick &&
+                    cn(
+                        "cursor-pointer rounded-lg border-0 bg-mk-tint px-3 shadow-[inset_0_0_0_1px_hsl(var(--brand-500)/0.45)] hover:bg-mk-hover",
+                        ring({ offset: 2 }),
+                    ),
             )}
         >
             {act ? (
-                <Sparkles
-                    aria-hidden
-                    className={cn(
-                        "size-4",
-                        on ? "text-brand-500" : "text-brand-700",
-                    )}
-                />
+                <Sparkles aria-hidden className="size-4 text-brand-700" />
             ) : null}
             <span className="min-w-0 flex-1">{t}</span>
             {h ? (
@@ -164,11 +163,17 @@ export function Suggestion({
                     {h}
                 </span>
             ) : null}
+            {onPick ? (
+                <span
+                    aria-hidden
+                    className="size-2 shrink-0 rounded-full bg-brand-500 motion-safe:animate-pulse"
+                />
+            ) : null}
             <ArrowRight
                 aria-hidden
                 className="size-4 shrink-0 text-muted-foreground"
             />
-        </div>
+        </Tag>
     );
 }
 

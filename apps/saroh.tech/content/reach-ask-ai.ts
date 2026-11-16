@@ -452,8 +452,7 @@ export function askAiWords({
             phone: "Help and setup",
             foot: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
             play: {
-                pause: "Pause",
-                play: "Play it through",
+                startOver: "Start over",
                 reading: "Reading",
                 ready: "Ready",
                 done: "Done",

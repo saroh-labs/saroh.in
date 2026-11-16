@@ -9,7 +9,7 @@ import {
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { advance } from "../../sections/steps-player";
+import { BEAT } from "../../sections/steps-player";
 import type { AskPlayWords } from "./answer";
 import { AskSteps } from "./ask-steps";
 
@@ -79,8 +79,7 @@ const words: AskPlayWords = {
     },
     hint: "Hints are counted from your business.",
     play: {
-        pause: "Pause",
-        play: "Play it through",
+        startOver: "Start over",
         reading: "Reading",
         ready: "Ready",
         done: "Done",
@@ -104,7 +103,7 @@ const how = {
 
 const ui = () => <AskSteps how={how} words={words} stockOn={false} />;
 
-/** Motion allowed (or not); no IntersectionObserver in jsdom, so it counts as on screen. */
+/** Motion allowed, or reduced. */
 function motion(reduce: boolean) {
     vi.stubGlobal("matchMedia", (q: string) => ({
         matches: reduce && q.includes("reduce"),
@@ -120,8 +119,10 @@ const pressed = () =>
         .map((b) => b.getAttribute("aria-pressed"));
 const status = (id: string) =>
     screen.getByText(id).parentElement?.lastElementChild?.textContent;
+const hint = () =>
+    screen.getByRole("button", { name: /Mark today's orders ready/ });
 
-describe("AskSteps (board overdrive)", () => {
+describe("AskSteps (board overdrive, hands-on)", () => {
     it("draws the whole conversation in the server HTML, confirmed", () => {
         const html = renderToStaticMarkup(ui());
         const box = document.createElement("div");
@@ -142,67 +143,68 @@ describe("AskSteps (board overdrive)", () => {
         expect(
             box.querySelector('[role="region"]')?.getAttribute("aria-label"),
         ).toBe(words.panel.label);
-        // No autoplay button without script.
-        expect(html).not.toContain("Play it through");
+        expect(text).not.toContain("Start over");
     });
 
-    it("keeps the finished story and runs no timer with reduced motion", () => {
-        motion(true);
-        vi.useFakeTimers();
-        render(ui());
-        expect(pressed()).toEqual(["false", "false", "false", "true"]);
-        expect(vi.getTimerCount()).toBe(0);
-        expect(status("ORD-1")).toBe("Ready");
-        expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
-    });
-
-    it("plays from step 1; picking a step stops it; confirming marks the rows Ready", async () => {
+    it("starts still at step 1 and moves only when the visitor acts", async () => {
         motion(false);
         vi.useFakeTimers();
         render(ui());
-        // Restarted on the client: step 1, the ready questions, playing.
         expect(pressed()).toEqual(["true", "false", "false", "false"]);
-        expect(screen.getByText("Mark today's orders ready…")).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Pause" })).toBeTruthy();
-        await act(async () => {
-            await vi.advanceTimersByTimeAsync(80 * 26);
-        });
-        expect(pressed()[1]).toBe("true");
-
-        fireEvent.click(screen.getByRole("button", { name: /Confirm/ }));
-        expect(pressed()).toEqual(["false", "false", "false", "true"]);
-        expect(
-            screen.getByRole("button", { name: "Play it through" }),
-        ).toBeTruthy();
+        // Nothing plays by itself.
         expect(vi.getTimerCount()).toBe(0);
         await act(async () => {
-            await vi.advanceTimersByTimeAsync(80 * 200);
+            await vi.advanceTimersByTimeAsync(10_000);
         });
-        expect(pressed()[3]).toBe("true");
+        expect(pressed()[0]).toBe("true");
+        expect(screen.queryByText("Start over")).toBeNull();
+
+        // Tapping the hint asks it: a short Reading beat, then the answer.
+        fireEvent.click(hint());
+        expect(pressed()[1]).toBe("true");
+        expect(screen.getByText("Reading")).toBeTruthy();
+        expect(screen.queryByText(words.panel.lead)).toBeNull();
+        await act(async () => {
+            await vi.advanceTimersByTimeAsync(BEAT);
+        });
+        expect(pressed()[2]).toBe("true");
+        expect(screen.getByText(words.panel.lead)).toBeTruthy();
         expect(status("ORD-1")).toBe("Paid");
 
+        // Confirming marks the card's orders Ready and ends on step 4.
         fireEvent.click(screen.getByRole("button", { name: "Mark 2 ready" }));
+        expect(pressed()[3]).toBe("true");
         expect(status("ORD-1")).toBe("Ready");
         expect(status("ORD-3")).toBe("Ready");
         expect(status("ORD-2")).toBe("Not paid");
-        expect(screen.getByText("Undo")).toBeTruthy();
-    });
-});
 
-describe("StepsPlayer's advance", () => {
-    it("runs a step, confirms the last, then goes round to step 1", () => {
-        const s = { at: 3, tick: 2, auto: true, confirmed: false };
-        expect(advance(s, [2, 2, 2, 2])).toEqual({
-            ...s,
-            confirmed: true,
-            tick: 0,
-        });
-        expect(advance({ ...s, confirmed: true }, [2, 2, 2, 2])).toEqual({
-            at: 0,
-            tick: 0,
-            auto: true,
-            confirmed: false,
-        });
-        expect(advance({ ...s, at: 1, tick: 2 }, [2, 2, 2, 2]).at).toBe(2);
+        // Start over goes back to the ready questions.
+        fireEvent.click(screen.getByRole("button", { name: "Start over" }));
+        expect(pressed()[0]).toBe("true");
+        expect(hint()).toBeTruthy();
+    });
+
+    it("jumps to a picked step", () => {
+        motion(false);
+        render(ui());
+        fireEvent.click(screen.getByRole("button", { name: /Confirm/ }));
+        expect(pressed()).toEqual(["false", "false", "false", "true"]);
+        expect(
+            screen.getByRole("button", { name: "Mark 2 ready" }),
+        ).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: /Ask body/ }));
+        expect(pressed()[1]).toBe("true");
+        expect(screen.getByText("Reading")).toBeTruthy();
+    });
+
+    it("skips the beat with reduced motion: the answer comes at once", () => {
+        motion(true);
+        vi.useFakeTimers();
+        render(ui());
+        expect(pressed()[0]).toBe("true");
+        fireEvent.click(hint());
+        expect(vi.getTimerCount()).toBe(0);
+        expect(pressed()[2]).toBe("true");
+        expect(screen.getByText(words.panel.lead)).toBeTruthy();
     });
 });

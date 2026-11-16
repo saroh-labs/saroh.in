@@ -4,7 +4,6 @@ import { Check } from "lucide-react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 
-import { Button } from "../buttons/button";
 import { cn } from "../cn";
 import { Container } from "../layout/container";
 import { ring } from "../ring";
@@ -15,53 +14,46 @@ import { StepsFoot } from "./steps-showcase";
 export interface PlayerStep {
     title: string;
     body: string;
-    /** How long its part of the story plays, in ticks of `TICK` ms. */
-    ticks: number;
 }
 
-/** Where the shared panel's story has got. */
+/** Where the shared panel's story has got, and the visitor's moves on it. */
 export interface PlayerView {
-    /** The step playing (0-based). */
+    /** The step shown (0-based). */
     step: number;
-    /** How far through that step's part, 0 to 1. */
-    progress: number;
     /** The last step's change has been confirmed. */
     confirmed: boolean;
-    /** Confirms it: the panel's button calls this, and stops autoplay. */
+    /**
+     * Moves the story to `to`; with `via`, it shows that step for a short
+     * beat first (none with reduced motion).
+     */
+    go: (to: number, via?: number) => void;
+    /** Confirms the change: the step list ends, ticked to the last. */
     confirm: () => void;
 }
 
-const TICK = 80;
+/** Reduced motion: a beat is skipped, its result shown at once. */
+const reducedMotion = () =>
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/** How long a `via` step shows before the story goes on. */
+export const BEAT = 900;
 
 interface State {
     at: number;
-    tick: number;
-    auto: boolean;
     confirmed: boolean;
-}
-
-/** One tick of autoplay: run the step, confirm on the last, then go round. */
-export function advance(s: State, ticks: readonly number[]): State {
-    const len = ticks[s.at] ?? 1;
-    if (s.tick < len) return { ...s, tick: s.tick + 1 };
-    const last = s.at === ticks.length - 1;
-    if (last && !s.confirmed) return { ...s, confirmed: true, tick: 0 };
-    return {
-        ...s,
-        at: last ? 0 : s.at + 1,
-        tick: 0,
-        confirmed: last ? false : s.confirmed,
-    };
+    /** Where the story goes after this step's beat. */
+    then?: number;
 }
 
 /**
- * "How it works" as one conversation played through (board "overdrive",
- * #49): the numbered steps left with a Saffron line filling down, and one
- * large panel right whose story every step moves on. The server draws the
- * finished story (the last step, confirmed), so the HTML holds all of it.
- * On the client, with motion allowed, it starts again from step 1 and plays
- * while the section is on screen and the tab is visible. Picking a step
- * jumps there and stops autoplay; reduced motion keeps the finished story.
+ * "How it works" as one conversation the visitor plays (board "overdrive",
+ * #49; hands-on, owner 16 Nov): the numbered steps left with a Saffron line
+ * filling down, and one large panel right whose story the visitor moves on,
+ * by acting in the panel or picking a step. Nothing plays by itself. The
+ * server draws the finished story (the last step, confirmed), so the HTML
+ * holds all of it; with script it starts still at step 1. Reduced motion
+ * skips the beats: results appear at once.
  */
 export function StepsPlayer({
     id,
@@ -83,68 +75,43 @@ export function StepsPlayer({
     panel: (view: PlayerView) => ReactNode;
     /** The panel region's accessible name. */
     panelLabel: string;
-    labels: { pause: string; play: string };
+    labels: { startOver: string };
     /** A small line under the panel: the demo business it is shown at. */
     note?: string;
     foot?: ReactNode;
     links?: readonly { href: string; label: string }[];
     className?: string;
 }) {
-    const ticks = steps.map((s) => s.ticks);
     const last = steps.length - 1;
-    const [s, setS] = useState<State>({
-        at: last,
-        tick: ticks[last] ?? 0,
-        auto: false,
-        confirmed: true,
-    });
-    const [motion, setMotion] = useState(false);
-    const [seen, setSeen] = useState(false);
-    const [awake, setAwake] = useState(true);
+    const [s, setS] = useState<State>({ at: last, confirmed: true });
+    const [live, setLive] = useState(false);
     const [minH, setMinH] = useState<number>();
-    const section = useRef<HTMLDivElement>(null);
     const box = useRef<HTMLDivElement>(null);
     const buttons = useRef<(HTMLButtonElement | null)[]>([]);
     const titleId = `${id}-title`;
 
     useEffect(() => {
-        const mq =
-            typeof window.matchMedia === "function"
-                ? window.matchMedia("(prefers-reduced-motion: reduce)")
-                : null;
-        if (!mq || mq.matches) return;
-        // shortcut: the finished story's height, held so playing never moves the page; not re-measured on resize.
+        // shortcut: the finished story's height, held so moving on never shifts the page; not re-measured on resize.
         setMinH(box.current?.offsetHeight);
-        setMotion(true);
-        setS({ at: 0, tick: 0, auto: true, confirmed: false });
-
-        const onVis = () => setAwake(!document.hidden);
-        document.addEventListener("visibilitychange", onVis);
-        const el = section.current;
-        let io: IntersectionObserver | undefined;
-        if (el && typeof IntersectionObserver !== "undefined") {
-            io = new IntersectionObserver(([e]) =>
-                setSeen(Boolean(e.isIntersecting)),
-            );
-            io.observe(el);
-        } else setSeen(true);
-        return () => {
-            document.removeEventListener("visibilitychange", onVis);
-            io?.disconnect();
-        };
+        setLive(true);
+        setS({ at: 0, confirmed: false });
     }, []);
 
-    const running = motion && s.auto && seen && awake;
-    const key = ticks.join();
+    // A beat's step shows briefly, then the story goes on; any move cancels it.
     useEffect(() => {
-        if (!running) return;
-        const lens = key.split(",").map(Number);
-        const t = setInterval(() => setS((x) => advance(x, lens)), TICK);
-        return () => clearInterval(t);
-    }, [running, key]);
+        const to = s.then;
+        if (to === undefined) return;
+        const t = setTimeout(() => setS({ at: to, confirmed: false }), BEAT);
+        return () => clearTimeout(t);
+    }, [s]);
 
-    const pick = (i: number) =>
-        setS({ at: i, tick: ticks[i] ?? 0, auto: false, confirmed: false });
+    const pick = (i: number) => setS({ at: i, confirmed: false });
+    const go = (to: number, via?: number) =>
+        setS(
+            via === undefined || reducedMotion()
+                ? { at: to, confirmed: false }
+                : { at: via, confirmed: false, then: to },
+        );
 
     const onKey = (e: KeyboardEvent, i: number) => {
         const to = nextIndex(e.key, i, steps.length);
@@ -156,9 +123,9 @@ export function StepsPlayer({
 
     const view: PlayerView = {
         step: s.at,
-        progress: Math.min(1, s.tick / (ticks[s.at] || 1)),
         confirmed: s.confirmed,
-        confirm: () => setS((x) => ({ ...x, confirmed: true, auto: false })),
+        go,
+        confirm: () => setS({ at: last, confirmed: true }),
     };
 
     return (
@@ -168,10 +135,7 @@ export function StepsPlayer({
             aria-labelledby={titleId}
             className={cn("pt-12 min-[760px]:pt-[120px]", className)}
         >
-            <div
-                ref={section}
-                className="grid gap-10 min-[1080px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[1080px]:items-start min-[1080px]:gap-16"
-            >
+            <div className="grid gap-10 min-[1080px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[1080px]:items-start min-[1080px]:gap-16">
                 <div className="grid gap-7">
                     <SectionHeading
                         id={titleId}
@@ -182,7 +146,8 @@ export function StepsPlayer({
                     <ol className="m-0 grid list-none p-0">
                         {steps.map((step, i) => {
                             const on = i === s.at;
-                            const done = i < s.at;
+                            const done =
+                                i < s.at || (s.confirmed && i === last);
                             return (
                                 <li key={step.title} className="relative">
                                     {/* From this step's circle to the next: Saffron once passed. */}
@@ -262,16 +227,17 @@ export function StepsPlayer({
                         })}
                     </ol>
                     <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2">
-                        {motion ? (
-                            <Button
-                                variant="secondary"
-                                size="kit"
-                                onClick={() =>
-                                    setS((x) => ({ ...x, auto: !x.auto }))
-                                }
+                        {live && s.at > 0 ? (
+                            <button
+                                type="button"
+                                onClick={() => pick(0)}
+                                className={cn(
+                                    "min-h-11 cursor-pointer border-none bg-transparent px-0 text-[14px] font-semibold text-foreground underline underline-offset-4",
+                                    ring({ offset: 2 }),
+                                )}
                             >
-                                {s.auto ? labels.pause : labels.play}
-                            </Button>
+                                {labels.startOver}
+                            </button>
                         ) : null}
                         <StepsFoot foot={foot} links={links} />
                     </div>

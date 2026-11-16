@@ -10,13 +10,10 @@ export const ROW =
 export function AnswerTable({
     p,
     stockOn,
-    shown = p.rows.length,
     change,
 }: {
     p: AskAiWords["hero"]["panel"];
     stockOn: boolean;
-    /** How many order rows have come in yet (the steps' player); stock follows the last. */
-    shown?: number;
     /** The card's orders: tinted while it waits, `label` (Ready) once done. */
     change?: { ids: readonly string[]; done: boolean; label: string };
 }) {
@@ -34,7 +31,7 @@ export function AnswerTable({
                     </span>
                 ))}
             </div>
-            {p.rows.slice(0, shown).map((r) => {
+            {p.rows.map((r) => {
                 const changing = change?.ids.includes(r.id);
                 const ready = changing && change?.done;
                 return (
@@ -47,8 +44,6 @@ export function AnswerTable({
                             change
                                 ? changing && !ready && "bg-mk-tint"
                                 : r.from && "bg-mk-tint",
-                            shown < p.rows.length &&
-                                "motion-safe:duration-300 motion-safe:animate-in motion-safe:fade-in",
                         )}
                     >
                         <span>{r.id}</span>
@@ -68,7 +63,7 @@ export function AnswerTable({
                     </div>
                 );
             })}
-            {stockOn && shown >= p.rows.length ? (
+            {stockOn ? (
                 <>
                     <div
                         className={cn(
@@ -125,19 +120,12 @@ export function askPlayWords(w: AskAiWords): AskPlayWords {
     };
 }
 
-/** How long each step's part of the conversation plays, in the player's ticks. */
-export function askPlayTicks(
-    p: AskAiWords["hero"]["panel"],
-): [number, number, number, number] {
-    return [24, p.q.length + 14, 46, 40];
-}
-
 /**
- * Ask AI's "How it works" (board "overdrive", #49): the hero's one question
- * played through the four steps in one panel. Step 1 taps the ready
- * question, step 2 types it, step 3 reads the parts of the business then
- * brings in the answer's rows, step 4 offers the card; confirmed, its
- * orders read Ready. At the last step, confirmed, it is the whole answer.
+ * Ask AI's "How it works" (board "overdrive", #49, hands-on): the hero's one
+ * question in one panel, moved on by the visitor. Step 1 shows Home's ready
+ * questions with the last one inviting a tap; tapping it asks (step 2, a
+ * short "Reading" beat), then the answer, its rows and the card (step 3);
+ * pressing the card's button marks its orders Ready (step 4, confirmed).
  */
 export function AskPlay({
     words,
@@ -149,30 +137,8 @@ export function AskPlay({
     stockOn: boolean;
 }) {
     const { panel: p, home, play } = words;
-    const [, typeLen, readLen] = askPlayTicks(p);
-    const { step, progress: at, confirmed } = view;
-    const typed =
-        step > 1
-            ? p.q.length
-            : step === 1
-              ? Math.min(p.q.length, Math.round(at * typeLen))
-              : 0;
-    // Step 3: the parts light up in turn, then the rows come in one by one.
-    const readTo = 18 / readLen;
-    const read = step > 2 || (step === 2 && at >= readTo);
-    const lit =
-        step === 2 && !read
-            ? Math.min(p.sources.length, Math.floor(at / (5 / readLen)) + 1)
-            : p.sources.length;
-    const rows =
-        step > 2
-            ? p.rows.length
-            : step === 2
-              ? Math.min(
-                    p.rows.length,
-                    Math.floor(((at - readTo) / (1 - readTo)) * p.rows.length),
-                )
-              : 0;
+    const { step, confirmed } = view;
+    const lastHint = home.sugs.length - 1;
     return (
         <AskPanel title={p.title} icons={3} className="text-left">
             <span className="w-fit rounded-full bg-mk-hover px-2.5 py-1 text-[13px] font-semibold">
@@ -188,7 +154,11 @@ export function AskPlay({
                             <Suggestion
                                 key={g.t}
                                 {...g}
-                                on={i === home.sugs.length - 1 && at > 0.6}
+                                onPick={
+                                    i === lastHint
+                                        ? () => view.go(2, 1)
+                                        : undefined
+                                }
                             />
                         ))}
                     </div>
@@ -197,25 +167,20 @@ export function AskPlay({
                     </p>
                 </>
             ) : (
-                <Asked>
-                    {p.q.slice(0, typed)}
-                    {typed < p.q.length ? (
-                        <span
-                            aria-hidden
-                            className="ml-0.5 inline-block h-[1.1em] w-0.5 animate-pulse bg-brand-500 align-[-0.2em]"
-                        />
-                    ) : null}
-                </Asked>
+                <>
+                    <Asked>{p.q}</Asked>
+                    <ReadFrom
+                        sources={p.sources}
+                        label={step === 1 ? play.reading : p.from}
+                        tail={step === 1 ? undefined : p.where}
+                        className={cn(
+                            step === 1 && "motion-safe:animate-pulse",
+                        )}
+                    />
+                </>
             )}
             {step >= 2 ? (
-                <ReadFrom
-                    sources={p.sources.slice(0, lit)}
-                    label={read ? p.from : play.reading}
-                    tail={read ? p.where : undefined}
-                />
-            ) : null}
-            {read ? (
-                <>
+                <div className="grid gap-3.5 motion-safe:duration-300 motion-safe:animate-in motion-safe:fade-in">
                     <div className="grid gap-1.5">
                         <p className="m-0 font-display text-[19px] font-bold leading-snug tracking-[-0.01em]">
                             {p.lead}
@@ -227,29 +192,22 @@ export function AskPlay({
                     <AnswerTable
                         p={p}
                         stockOn={stockOn}
-                        shown={rows}
-                        change={
-                            step === 3
-                                ? {
-                                      ids: p.card.orders,
-                                      done: confirmed,
-                                      label: play.ready,
-                                  }
-                                : undefined
-                        }
+                        change={{
+                            ids: p.card.orders,
+                            done: confirmed,
+                            label: play.ready,
+                        }}
                     />
-                </>
-            ) : null}
-            {step === 3 ? (
-                <ConfirmCard
-                    head={confirmed ? play.done : p.card.head}
-                    title={p.card.title}
-                    kv={p.card.kv}
-                    note={p.card.note}
-                    done={confirmed}
-                    buttons={confirmed ? [play.undo] : p.card.buttons}
-                    onConfirm={view.confirm}
-                />
+                    <ConfirmCard
+                        head={confirmed ? play.done : p.card.head}
+                        title={p.card.title}
+                        kv={p.card.kv}
+                        note={p.card.note}
+                        done={confirmed}
+                        buttons={confirmed ? [play.undo] : p.card.buttons}
+                        onConfirm={view.confirm}
+                    />
+                </div>
             ) : null}
         </AskPanel>
     );

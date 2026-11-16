@@ -344,10 +344,10 @@ export interface AskAiWords {
         phone: string;
         /** The line under the steps: how long history keeps a conversation. */
         foot: string;
-        /** The steps' one conversation, played through (board "overdrive", #49). */
+        /** The steps' one conversation, moved on by the visitor (board "overdrive", #49). */
         play: {
-            pause: string;
-            play: string;
+            /** Back to step 1, once past it. */
+            startOver: string;
             /** Before the sources' chips while it reads them. */
             reading: string;
             /** A changed order's status once the card is pressed. */
