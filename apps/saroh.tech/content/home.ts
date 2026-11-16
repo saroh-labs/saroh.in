@@ -192,7 +192,7 @@ export const home = {
         },
         api: {
             title: "API keys and webhooks",
-            body: "Make a key for your own tools. Webhooks tell your other apps the moment an order is paid.",
+            body: "Make a key for your own tools. Webhooks tell your other apps the moment an order is paid. API keys come with paid plans.",
             readOnly: "read only",
             active: "Active",
             delivered: "Delivered",

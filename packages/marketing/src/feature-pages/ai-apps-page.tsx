@@ -29,7 +29,7 @@ import type { FeatureAppList } from "../content/types";
 import type { World } from "../content/world";
 import type { AiAppsWords } from "./ai-apps/words";
 import { DraftPill, LivePill } from "./reach/app-card";
-import { CropToggle, Fold } from "./reach/fold";
+import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { InTheApp } from "./reach/in-the-app";
 import { HERO_CTA } from "./reach/page-top";
@@ -63,7 +63,7 @@ export interface AiAppsPageProps {
  * /features/ai-apps (boards FMDesk, FMPhone2): one Claude chat at closing
  * time, what lands in Saroh, Ask AI or AI apps, connecting in three moves,
  * what it can and can't do. Tool names are the MCP server's own, small in
- * the chat and folded in the full list. A plan named beside AI apps waits
+ * the chat; the full list is for developers, not on this page (#41). A plan named beside AI apps waits
  * for `ai-apps-plans`.
  */
 export function AiAppsView({
@@ -635,31 +635,6 @@ export function AiAppsView({
                         </>
                     ) : null}
                 </p>
-                <Fold
-                    label={w.can.names}
-                    meta="MCP"
-                    className="mt-4 max-w-[62ch]"
-                >
-                    <dl className="m-0 grid gap-3">
-                        {w.can.groups.map((g) => (
-                            <div key={g.title}>
-                                <dt className="font-semibold text-foreground">
-                                    {g.title}
-                                </dt>
-                                <dd className="m-0 mt-1 flex flex-wrap gap-1.5">
-                                    {g.tools.map((t) => (
-                                        <code
-                                            key={t}
-                                            className="rounded bg-mk-hover px-1.5 py-0.5 font-mono text-[12.5px]"
-                                        >
-                                            {t}
-                                        </code>
-                                    ))}
-                                </dd>
-                            </div>
-                        ))}
-                    </dl>
-                </Fold>
             </Section>
 
             {/* What it can't do. */}

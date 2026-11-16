@@ -24,7 +24,8 @@ export const DEVELOPERS = {
     name: "Developers",
     headline: "Build on a business's Saroh data.",
     sub: "The Saroh API and webhooks, for a developer or an agency working for a business on Saroh. Read and change its products, services, bookings, orders and customers from your server, show its catalogue on a website you build, and hear the moment an order is paid.",
-    note: "The business's owner makes the keys.",
+    // Built for Global, but keys come with paid plans, not on sale yet (#41).
+    note: "The business's owner makes the keys. API keys come with paid plans.",
     readDocs: { label: "Read the API docs", path: "/api" },
     hero: {
         title: "Terminal",

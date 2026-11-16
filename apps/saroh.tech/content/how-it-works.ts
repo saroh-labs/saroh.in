@@ -289,7 +289,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
                 tails: [
                     {
                         release: "developers",
-                        text: " Make **API keys and webhooks** for your own workflows. A key can never do more than you can.",
+                        text: " Make **API keys and webhooks** for your own workflows. A key can never do more than you can. API keys come with paid plans.",
                     },
                 ],
             },
@@ -541,7 +541,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
                     tails: [
                         {
                             release: "developers",
-                            text: " Or read them from your own server with an API key.",
+                            text: " Or read them from your own server with an API key. API keys come with paid plans.",
                         },
                     ],
                 },
