@@ -36,6 +36,7 @@ import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 import { Looks } from "./website/looks";
 import { lookStyle } from "./website/shop-site";
+import { BrandStep, PreviewStep, TestReleaseStep } from "./website/steps";
 import type { WebsiteWords } from "./website/words";
 
 const H3 = "m-0 font-display text-mk-kit-h3 font-bold";
@@ -60,9 +61,10 @@ export interface WebsitePageProps {
 /**
  * /features/website (boards FWDesk, FWPhone2): one responsive page. The
  * hero leads with one change (a price in Products, already on the site),
- * then the looks by trade over Rye & Co.'s own site, then what the site
- * reads, the address, draft and publish, sections, sharing and asking for
- * a change. Products and the shop wait for the `site-shop` claim.
+ * then the colourways over Rye & Co.'s own site, then what the site
+ * reads, the address, draft and publish, a test release (its claim), the
+ * device preview, the brand, sections, sharing and asking for a change.
+ * Products and the shop wait for the `site-shop` claim.
  */
 export function WebsiteView({
     site,
@@ -76,6 +78,7 @@ export function WebsiteView({
 }: WebsitePageProps) {
     const slug = "website";
     const shop = site.claimOn("site-shop");
+    const testReleases = site.claimOn("site-test-releases");
     const w = words;
     const lead = world.lead;
     const look = lead.look;
@@ -210,7 +213,7 @@ export function WebsiteView({
                 </Claim>
             </PageTop>
 
-            {/* The looks, by trade, over Rye & Co.'s own site. */}
+            {/* The colourways, over Rye & Co.'s own site (#31). */}
             <Container
                 as="section"
                 aria-labelledby="looks-title"
@@ -515,15 +518,11 @@ export function WebsiteView({
                                 ),
                                 records: false,
                             },
-                            ...(w.address.own
-                                ? [
-                                      {
-                                          ...w.address.own,
-                                          field: <>{w.address.own.domain}</>,
-                                          records: true,
-                                      },
-                                  ]
-                                : []),
+                            {
+                                ...w.address.own,
+                                field: <>{w.address.own.domain}</>,
+                                records: true,
+                            },
                         ].map((card) => (
                             <div
                                 key={card.title}
@@ -751,7 +750,7 @@ export function WebsiteView({
                         </div>
                     </div>
                 </div>
-                <div className="mt-9 hidden gap-10 border-t border-border pt-6 min-[760px]:grid min-[1080px]:grid-cols-3">
+                <div className="mt-9 hidden gap-10 border-t border-border pt-6 min-[760px]:grid min-[1080px]:grid-cols-2">
                     {w.draft.points.map((p) => (
                         <div key={p.title}>
                             <b className="block text-[17px] font-semibold">
@@ -790,6 +789,27 @@ export function WebsiteView({
                     ))}
                 </Fold>
             </Section>
+
+            {/* Try it on a test address first, then go live. */}
+            <Claim on={testReleases}>
+                <TestReleaseStep words={w.testRelease} />
+            </Claim>
+
+            {/* Every screen, before you publish. */}
+            <PreviewStep
+                words={w.preview}
+                site={w.looks.site}
+                shop={shop}
+                look={look}
+            />
+
+            {/* Your brand, on every page. */}
+            <BrandStep
+                words={w.brand}
+                site={w.looks.site}
+                shop={shop}
+                look={look}
+            />
 
             {/* Pages, built from sections. */}
             <Section

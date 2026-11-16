@@ -154,6 +154,7 @@
         "NEXT_PUBLIC_CLAIM_ASK_AI_PLANS",
         "NEXT_PUBLIC_CLAIM_AI_APPS_PLANS",
         "NEXT_PUBLIC_CLAIM_SITE_SHOP",
+        "NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES",
         "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS",
         "NEXT_PUBLIC_API_AREA",
         // Share as a post and Create post (DEC-217): the app's switch, read at
