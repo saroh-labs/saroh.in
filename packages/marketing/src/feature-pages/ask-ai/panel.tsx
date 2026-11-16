@@ -186,6 +186,7 @@ export function ConfirmCard({
     buttons,
     done = false,
     onConfirm,
+    onUndo,
 }: {
     head: ReactNode;
     title: string;
@@ -195,6 +196,8 @@ export function ConfirmCard({
     done?: boolean;
     /** Makes the first button a real one that confirms (the steps' player). */
     onConfirm?: () => void;
+    /** Once done, makes Undo a real button. */
+    onUndo?: () => void;
 }) {
     return (
         <div
@@ -238,11 +241,13 @@ export function ConfirmCard({
                                 ? "bg-foreground text-background"
                                 : "border border-border-strong bg-card",
                         );
-                        return i === 0 && onConfirm && !done ? (
+                        const act =
+                            i === 0 ? (done ? onUndo : onConfirm) : undefined;
+                        return act ? (
                             <button
                                 key={i}
                                 type="button"
-                                onClick={onConfirm}
+                                onClick={act}
                                 className={cn(
                                     look,
                                     "cursor-pointer border-none",

@@ -206,6 +206,7 @@ export function AskPlay({
                         done={confirmed}
                         buttons={confirmed ? [play.undo] : p.card.buttons}
                         onConfirm={view.confirm}
+                        onUndo={view.undo}
                     />
                 </div>
             ) : null}

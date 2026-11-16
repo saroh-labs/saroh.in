@@ -8,6 +8,7 @@ import { cn } from "../cn";
 import { Container } from "../layout/container";
 import { ring } from "../ring";
 import { nextIndex } from "../roving";
+import { useBrowserValue } from "../use-browser-value";
 import { SectionHeading } from "./section-heading";
 import { StepsFoot } from "./steps-showcase";
 
@@ -29,6 +30,8 @@ export interface PlayerView {
     go: (to: number, via?: number) => void;
     /** Confirms the change: the step list ends, ticked to the last. */
     confirm: () => void;
+    /** Takes the confirmed change back (the card's Undo). */
+    undo: () => void;
 }
 
 /** Reduced motion: a beat is skipped, its result shown at once. */
@@ -83,19 +86,14 @@ export function StepsPlayer({
     className?: string;
 }) {
     const last = steps.length - 1;
-    const [s, setS] = useState<State>({ at: last, confirmed: true });
-    const [live, setLive] = useState(false);
-    const [minH, setMinH] = useState<number>();
+    // The server (and no script) shows the finished story; once the page's
+    // script runs, the story starts at step 1 and waits for the visitor.
+    const live = useBrowserValue(() => true, false);
+    const [state, setS] = useState<State>({ at: 0, confirmed: false });
+    const s: State = live ? state : { at: last, confirmed: true };
     const box = useRef<HTMLDivElement>(null);
     const buttons = useRef<(HTMLButtonElement | null)[]>([]);
     const titleId = `${id}-title`;
-
-    useEffect(() => {
-        // shortcut: the finished story's height, held so moving on never shifts the page; not re-measured on resize.
-        setMinH(box.current?.offsetHeight);
-        setLive(true);
-        setS({ at: 0, confirmed: false });
-    }, []);
 
     // A beat's step shows briefly, then the story goes on; any move cancels it.
     useEffect(() => {
@@ -126,6 +124,7 @@ export function StepsPlayer({
         confirmed: s.confirmed,
         go,
         confirm: () => setS({ at: last, confirmed: true }),
+        undo: () => setS({ at: last, confirmed: false }),
     };
 
     return (
@@ -255,7 +254,6 @@ export function StepsPlayer({
                         data-step-panel={s.at}
                         // A grid, so the panel fills the held height.
                         className="relative grid"
-                        style={minH ? { minHeight: minH } : undefined}
                     >
                         {panel(view)}
                     </div>
