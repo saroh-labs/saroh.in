@@ -467,7 +467,7 @@ export function TradePage(props: TradePageProps) {
                 })),
             }}
             related={{
-                title: W.related(p.plural),
+                title: W.related,
                 items: p.related.map((r) => ({
                     slug: r.slug,
                     name: r.name,

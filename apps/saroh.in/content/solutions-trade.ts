@@ -33,7 +33,7 @@ export const TRADE_WORDS = {
         "The day runs the same way in other trades, with bookings and classes instead of orders.",
     followDay: (kind: string) => `Follow a day at a ${kind}`,
     exampleOf: (name: string, kind: string) => `${name}, an example ${kind}`,
-    related: (plural: string) => `Also for ${plural}`,
+    related: "Saroh for other trades",
     allTrades: (n: number) => `All ${n} trades`,
     allTradesLine:
         "From the bakery at 7 to the tuition at 5, each at one moment of its day",
