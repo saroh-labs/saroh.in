@@ -163,7 +163,7 @@ export const HOW_IT_WORKS = {
             line: "A website in your look, live today",
             chip: "Your site",
             lead: {
-                text: "A website builder that starts from **a template made for your trade**, in your colours, live at a saroh.app address from the first day or at a domain you own. Your shop and booking page are already in it, and prices and hours come from where you keep them.",
+                text: "A website builder that starts from **a template made for your trade**, in your colours, live at a saroh.app address from the first day, or at a domain you own on a paid plan. Your shop and booking page are already in it, and prices and hours come from where you keep them.",
             },
             captions: [
                 {
@@ -175,7 +175,7 @@ export const HOW_IT_WORKS = {
                 {
                     title: "Go live at your own address.",
                     body: {
-                        text: "Start on yourname.saroh.app today. Bring a domain you own whenever you like.",
+                        text: "Start on yourname.saroh.app today. Bring a domain you own on a paid plan.",
                     },
                 },
                 {
@@ -410,7 +410,7 @@ export const HOW_IT_WORKS = {
         address: {
             title: "Your web address",
             live: "Live",
-            then: "Then, when you're ready",
+            then: "Then, on a paid plan",
             connected: "Connected",
             comes: "Your shop and booking page come with it: **/shop** and **/book**.",
         },
@@ -599,7 +599,7 @@ export const HOW_IT_WORKS = {
             {
                 name: "Your address",
                 body: {
-                    text: "Live at yourname.saroh.app from the first day, or at a domain you own.",
+                    text: "Live at yourname.saroh.app from the first day, or at a domain you own on a paid plan.",
                 },
                 chip: "{domain}",
             },

@@ -6,8 +6,9 @@
  *
  * What differs from saroh.in, by what Global can do today
  * (`content/features.ts`, website is Limited):
- * - a site lives on a saroh.app address: no own domain, so the address
- *   section draws one card and no DNS records;
+ * - a site lives on a saroh.app address; a domain you own comes with paid
+ *   plans (owner, 16 Nov 2026), so the address section draws one card, says
+ *   so, and draws no DNS records;
  * - one person runs the business: no reviewer, no team;
  * - Thistlewick takes no bookings, so the slot saroh.in gives a class is
  *   its made-to-order cake, which the site reads from Products;
@@ -244,7 +245,7 @@ export function websiteWords({
 
         address: {
             title: "Your address, from the first day.",
-            lead: `Every site starts at a ${host.slice(1)} address, ready the moment you publish. A domain you already own can't be connected yet.`,
+            lead: `Every site starts at a ${host.slice(1)} address, ready the moment you publish. A domain you own comes with paid plans, which open soon.`,
             web: {
                 title: "Web address",
                 sub: `At ${host.slice(1)}.`,
@@ -400,7 +401,7 @@ export function websiteWords({
             },
             {
                 q: "Can I use my own domain?",
-                a: `Not yet. Every site lives at a ${host.slice(1)} address today.`,
+                a: `Every site lives at a ${host.slice(1)} address from the first day. A domain you own comes with paid plans, which open soon.`,
             },
             {
                 q: "Does anything go live without me?",

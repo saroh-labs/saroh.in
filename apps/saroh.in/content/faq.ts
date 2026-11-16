@@ -66,7 +66,7 @@ export const faqs = {
     },
     domain: {
         q: "Can I use my own domain?",
-        a: "Yes. Start on yourname.saroh.app and connect your own domain when you're ready.",
+        a: "Yes. Start on yourname.saroh.app and connect your own domain on a paid plan.",
     },
     "ai-apps": {
         q: "Can I run it from Claude or ChatGPT?",

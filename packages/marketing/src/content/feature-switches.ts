@@ -138,3 +138,10 @@ const COUNT_WORDS = [
 export function countWord(n: number): string {
     return COUNT_WORDS[n] ?? String(n);
 }
+
+/**
+ * The features tagged "New" on both sites while their release is fresh (the
+ * menus, the footer, /features' links): one list, so saroh.in and saroh.tech
+ * never disagree (owner, 16 Nov 2026, #23). Empty it in a later commit.
+ */
+export const NEW_FEATURES: readonly string[] = ["ai-apps", "ask-ai", "social"];

@@ -25,9 +25,9 @@ describe("the Global example world (DEC-221)", () => {
         expect(WORLD.money.provider).toBe("Stripe");
     });
 
-    it("follows ?trade=, and falls back to the bakery for a trade it has no example of", () => {
+    it("follows ?trade= for every trade, the florist drawn only (owner, 16 Nov 2026)", () => {
         expect(exampleFor(WORLD, "salon").name).toBe("Larkspur & Vane");
         expect(exampleFor(WORLD, "gym").name).toBe("Ironvale Fitness");
-        expect(exampleFor(WORLD, "florist").name).toBe("Thistlewick Bakery");
+        expect(exampleFor(WORLD, "florist").name).toBe("Bramble & Bloom");
     });
 });

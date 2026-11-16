@@ -303,7 +303,7 @@ export function HowItWorksPage({
                     <AddressPanel
                         w={P.address}
                         site={rye.site}
-                        domain={rye.domain}
+                        domain={rye.domain ?? P.address.example}
                     />
                 ),
             },

@@ -293,18 +293,7 @@ const PETAL: WorldBusiness = {
     tradePage: "/for/florists",
     orderRange: ["ORD-0514", "ORD-0530"],
     invoiceRange: ["INV-0228", "INV-0230"],
-    look: {
-        bg: "26.7 52.9% 96.7%",
-        surface: "6.7 42.9% 91.8%",
-        fg: "345 23.5% 13.3%",
-        muted: "333.6 12.8% 38.2%",
-        accent: "350.1 57.2% 39.4%",
-        accentFg: "26.7 52.9% 96.7%",
-        fontHeading: SERIF,
-        fontBody: SANS,
-        headingWeight: 600,
-        radius: 10,
-    },
+    look: TRADE_LOOKS.florist,
     customers: [
         {
             name: "Kabir Malhotra",

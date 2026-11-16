@@ -32,7 +32,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
         mark: "yours",
         after: ".",
     },
-    lede: "Your records, the things that reach your customers, and the ways you ask and connect. Each is shown in the screens you'd use, with {business} on {street} as the example.",
+    lede: "Your records, the things that reach your customers, and the ways you ask and connect. Each is shown in the screens you'd use, with {business} in Madison as the example.",
     examplesLegend: "Examples from a",
     trades: {
         bakery: "Bakery",
@@ -60,6 +60,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
             thistlewick: "Bread and pastry, baked before you wake.",
             larkspur: "Cut, colour and blow-dry, by appointment.",
             ironvale: "Small classes. Real coaching.",
+            bramble: "Flowers for every day, and the big ones.",
         },
         label: (business) => `${business}'s site and a paid order, an example`,
     },
@@ -131,7 +132,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
             line: "A website in your look, live today",
             chip: "Your site",
             lead: {
-                text: "A website builder that starts from **a template made for your trade**, in your colours, live at a saroh.app address from the first day. Your booking page is already in it, and prices and hours come from where you keep them.",
+                text: "A website builder that starts from **a template made for your trade**, in your colours, live at a saroh.app address from the first day, and at a domain you own once paid plans open. Your booking page is already in it, and prices and hours come from where you keep them.",
             },
             captions: [
                 {
@@ -143,7 +144,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
                 {
                     title: "Go live at your saroh.app address.",
                     body: {
-                        text: "Live at yourname.saroh.app from the first day.",
+                        text: "Live at yourname.saroh.app from the first day. A domain you own comes with paid plans.",
                     },
                 },
                 {
@@ -359,9 +360,11 @@ export const HOW_IT_WORKS: HowItWorksWords = {
         address: {
             title: "Your web address",
             live: "Live",
-            then: "Then, when you're ready",
-            connected: "Connected",
+            then: "Then, with paid plans",
+            connected: "Coming",
             comes: "Your booking page comes with it: **/book**.",
+            // An example domain, never a real one: Thistlewick has none yet.
+            example: "thistlewick.example",
         },
         draft: {
             changes: "**2 changes in draft.** Holiday menu, hours for Sunday.",
@@ -520,7 +523,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
             {
                 name: "Your address",
                 body: {
-                    text: "Live at yourname.saroh.app from the first day.",
+                    text: "Live at yourname.saroh.app from the first day, and at a domain you own once paid plans open.",
                 },
                 chip: "{site}",
             },

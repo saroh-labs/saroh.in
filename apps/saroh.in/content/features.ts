@@ -1,3 +1,4 @@
+import { NEW_FEATURES as SHARED_NEW } from "@saroh/marketing/feature-switches";
 /**
  * The feature pages (nine, plus AI apps, Ask AI and Share behind their
  * switches): eight from the Features template's `F` and `LINE`
@@ -934,14 +935,10 @@ export const featureList: Feature[] = shownFeatures(featuresOff()).map(
 export const featureHref = (slug: FeatureSlug) => `/features/${slug}`;
 
 /**
- * Tagged "new" in the menus, the footer and Home's grid while their release
- * is fresh (plan 2026-11-13-002, U2); empty this list in a later commit.
+ * Tagged "new" in the menus, the footer and /features while their release
+ * is fresh (plan 2026-11-13-002, U2): the shared list, saroh.tech's too.
  */
-export const NEW_FEATURES: readonly FeatureSlug[] = [
-    "ai-apps",
-    "ask-ai",
-    "social",
-];
+export const NEW_FEATURES = SHARED_NEW as readonly FeatureSlug[];
 
 /** Whether `value` names a feature page, shown or not. */
 export function isFeatureSlug(value: string): value is FeatureSlug {

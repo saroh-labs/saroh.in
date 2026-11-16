@@ -250,6 +250,40 @@ const IRONVALE: WorldBusiness = {
     ],
 };
 
+/**
+ * Bramble & Bloom, a florist: not in the Global seed. Drawn only where a
+ * page offers a trade switch (the Features hero's Florist, as saroh.in's
+ * Petal Lane is), so saroh.tech's switch has the trades its /solutions does
+ * (owner, 16 Nov 2026, #19). Its name, address and prices are made up.
+ */
+const BRAMBLE: WorldBusiness = {
+    key: "bramble",
+    trade: "florist",
+    name: "Bramble & Bloom",
+    kind: "florist",
+    owner: "Hazel",
+    place: "Sample Lane, Portland, OR",
+    site: "bramble-and-bloom.saroh.app",
+    plan: "Free",
+    look: TRADE_LOOKS.florist,
+    customers: [{ name: "Theo Grant" }, { name: "Maya Collins" }],
+    items: [
+        {
+            key: "roses-12",
+            name: "Red rose bouquet",
+            price: "$65.00",
+            unit: "12 stems",
+        },
+        {
+            key: "lilies",
+            name: "Mixed lily bouquet",
+            price: "$55.00",
+            unit: "12 stems",
+        },
+        { key: "table", name: "Table flowers", price: "$48.00" },
+    ],
+};
+
 export const WORLD: World = {
     edition: "global",
     // Thistlewick is closed on Mondays (the seed's hours), so its day is a Tuesday.
@@ -264,8 +298,9 @@ export const WORLD: World = {
         taxId: "00-0000000",
     },
     lead: THISTLEWICK,
-    // No florist in the Global seed: ?trade=florist shows the bakery.
-    others: [LARKSPUR, IRONVALE],
+    // The florist is drawn only (not in the Global seed); last, so
+    // `[salon, gym] = others` still reads the seeded two.
+    others: [LARKSPUR, IRONVALE, BRAMBLE],
 };
 
 /**
@@ -378,7 +413,7 @@ export const HOME_HERO_SCENES: readonly HomeHeroScene[] = [
         trade: "bakery",
         business: THISTLEWICK,
         caption:
-            "Example: Thistlewick Bakery, on Sample Street in Madison. The customer orders on the left and right; Clara sees her morning in the middle.",
+            "Example: Thistlewick Bakery in Madison. The customer orders on the left and right; Clara sees her morning in the middle.",
         site: {
             time: "9:41",
             hero: "Bread and pastry, baked before you wake.",

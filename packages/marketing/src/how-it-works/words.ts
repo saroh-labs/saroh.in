@@ -105,6 +105,11 @@ export interface PanelWords {
         then: string;
         connected: string;
         comes: string;
+        /**
+         * The own domain drawn where the example business has none: an
+         * example on an edition whose own domains come with paid plans.
+         */
+        example?: string;
     };
     draft: { changes: string; publish: string; versions: string };
     share: { title: string; meta: string; button: string };

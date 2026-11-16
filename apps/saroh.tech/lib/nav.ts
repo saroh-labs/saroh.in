@@ -1,4 +1,5 @@
 import { featuresOff } from "@/lib/feature-switches";
+import { NEW_FEATURES } from "@saroh/marketing/feature-switches";
 import type { MenuLink, NavItem } from "@saroh/marketing/nav-types";
 
 import { featureHref, featureList } from "@/content/features";
@@ -22,6 +23,8 @@ export const FEATURES: NavItem[] = featureList.map((f) => ({
     name: f.name,
     line: f.navLine,
     href: featureHref(f.slug),
+    // The same "New" tags as saroh.in's (#23).
+    isNew: NEW_FEATURES.includes(f.slug),
 }));
 
 /**

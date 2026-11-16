@@ -81,7 +81,7 @@ export const faqs = {
     },
     domain: {
         q: "Can I use my own domain?",
-        a: "Not yet. Your site lives at yourname.saroh.app.",
+        a: "Your site lives at yourname.saroh.app from the first day. A domain you own comes with paid plans, which open soon.",
     },
     "ai-apps": {
         q: "Can I run it from Claude or ChatGPT?",

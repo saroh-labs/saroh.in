@@ -1,4 +1,5 @@
 import type { ClaimSwitch } from "@saroh/marketing/feature-switches";
+import { NEW_FEATURES } from "@saroh/marketing/feature-switches";
 import { HowItWorksPage } from "@saroh/marketing/how-it-works/how-it-works-page";
 import type { Gate } from "@saroh/marketing/how-it-works/words";
 
@@ -41,7 +42,7 @@ export default function Page() {
                     (!g.claim || claimOn(g.claim))
                 }
                 pageShown={(href) => Boolean(pageAt(href.split("#")[0]))}
-                isNew={() => false}
+                isNew={(slug) => NEW_FEATURES.includes(slug)}
                 dayOn={false}
                 className={SITE_FONTS}
             />

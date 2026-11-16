@@ -284,7 +284,12 @@ describe("saroh.tech's words", () => {
     });
 
     it("name no paid plan while Global is Free only (plan 2026-11-13-002, U16)", () => {
-        expect(words({ ...all, INTEGRATIONS })).not.toMatch(
+        // Own domains are named as coming with paid plans (owner, 16 Nov 2026, #21).
+        const domains =
+            /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans/g;
+        expect(
+            words({ ...all, INTEGRATIONS }).replace(domains, ""),
+        ).not.toMatch(
             /\bpaid plans?\b|\bupgrade\b|\b(Grow|Pro)( and Pro)? plans?\b|comes with (Grow|Pro)/i,
         );
     });

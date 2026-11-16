@@ -50,7 +50,10 @@ describe("saroh.tech's Reach and Ask words", () => {
     });
 
     it("name no paid plan and count no packs while Global is Free only", () => {
-        expect(text).not.toMatch(
+        // Own domains are named as coming with paid plans (owner, 16 Nov 2026, #21).
+        const domains =
+            /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans/g;
+        expect(text.replace(domains, "")).not.toMatch(
             /\bpaid plans?\b|\bupgrade\b|\bGrow\b|\bPro\b|\bpack(s|ages?)?\b/i,
         );
     });
