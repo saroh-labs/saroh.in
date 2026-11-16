@@ -48,9 +48,11 @@ function Screen({ shot }: { shot: ShotView | undefined }) {
 export function claimed<F extends Feature>(all: F, hide?: RegExp): F {
     const strip = (text: string) =>
         hide
-            ? (text.match(/[^.!?]+[.!?]+/g) ?? [text])
+            ? text
+                  // Split after each sentence's end (linear; no backtracking).
+                  .split(/(?<=[.!?])\s+/)
                   .filter((sentence) => !hide.test(sentence))
-                  .join("")
+                  .join(" ")
                   .trim()
             : text;
     return {

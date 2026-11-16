@@ -88,8 +88,9 @@ export function Chapter({
 }) {
     const titleId = `${id}-title`;
     // The lead's first sentence, and the rest a phone folds.
-    const cut = /^([^]+?[.!?])\s+([^]+)$/.exec(lead);
-    const [opening, rest] = cut ? [cut[1], cut[2]] : [lead, ""];
+    const end = /[.!?]\s/.exec(lead);
+    const rest = end ? lead.slice(end.index + 1).trimStart() : "";
+    const opening = rest && end ? lead.slice(0, end.index + 1) : lead;
     return (
         <div
             id={id}

@@ -349,7 +349,7 @@ function anchorLabel(anchor: string): string {
     return `${m[1] ? "Tue " : ""}${m[2]} ${m[3]}`;
 }
 function anchorAt(anchor: string): string {
-    const m = /(\d+)(am|pm)$/.exec(anchor);
+    const m = /^(?:tue)?(\d+)(am|pm)$/.exec(anchor);
     if (!m) return "12:00";
     const h = (Number(m[1]) % 12) + (m[2] === "pm" ? 12 : 0);
     return `${String(h).padStart(2, "0")}:00`;

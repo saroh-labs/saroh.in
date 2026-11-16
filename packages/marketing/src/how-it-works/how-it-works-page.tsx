@@ -131,10 +131,11 @@ export function HowItWorksPage({
     const { money } = WORLD;
     const account = W.hero.account(rye.name, money.provider);
     const street = rye.place.split(",")[0] ?? rye.place;
-    const shortDay = WORLD.today.replace(
-        /^(\w{3})\w*day (\d+ \w+).*$/,
-        "$1 $2",
-    );
+    // "Monday 16 November …" → "Mon 16 November".
+    const [weekday = "", date = "", month = ""] = WORLD.today.split(" ");
+    const shortDay = weekday.endsWith("day")
+        ? `${weekday.slice(0, 3)} ${date} ${month}`
+        : WORLD.today;
 
     // ── The hero's drawing, for each trade ──
     const examples = WORLD_TRADES.flatMap((trade) => {
