@@ -342,6 +342,19 @@ price is ever drawn into an image.
 
 ## Changes
 
+- **16 Nov 2026, feature pages: one step layout and desk shots (owner,
+  bugs #26–#30).** Every record feature page (`keep-page.tsx`, both
+  editions): the hero's headline and lede both start at the top; each step's
+  words start level with its shot, its title is 26px on desk (22px on a
+  phone) so it reads as a heading over the 16px body, and the demo line is
+  quiet sans, not mono; the shot keeps the wide column on whichever side it
+  sits, in one 16:10 frame. Step shots are the desk app at 1280 × 800 with
+  its full sidebar (`STEP_VIEW`), never a crop of one panel: a step that is
+  about one part scrolls it into view (`focus`); Insights' steps open their
+  own tabs. The signed-in name is the business's owner (Asha Rao at Rye &
+  Co., Karan Mehta at Pulse), set on the shots database before its shots
+  (`SHOTS_DATABASE_URL`), never "Demo Owner".
+
 - **16 Nov 2026, phone polish two (DEC-221, unit/web-polish2).** Phone
   lengths at 390px; desk heights unchanged. Kit: the footer on a phone is
   the wordmark with Saroh's accounts beside it, one line, the groups

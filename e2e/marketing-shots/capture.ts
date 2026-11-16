@@ -34,6 +34,7 @@
  * The seed moves with the calendar, so re-seed before a run for "today" to
  * look like today.
  */
+import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -213,7 +214,37 @@ async function loaded(page: Page) {
 
 /** Open the shot's business: the workspace's own cookie, in this context. */
 async function open(page: Page, business: Business) {
+    nameOwner(business);
     await page.goto(`${urls.APP_URL}/open/${BUSINESSES[business].id}`);
+}
+
+/**
+ * The demo account owns every showcase business, so before a business's
+ * shots it takes that business's owner's name (Asha at Rye & Co., not "Demo
+ * Owner"; owner, 16 Nov 2026). Only on the shots database
+ * (`SHOTS_DATABASE_URL`, a local throwaway such as saroh-shots).
+ */
+let named: string | undefined;
+function nameOwner(business: Business) {
+    const name: string | undefined = (
+        BUSINESSES[business] as { owner?: string }
+    ).owner;
+    const db = process.env.SHOTS_DATABASE_URL;
+    if (!name || name === named) return;
+    if (!db) {
+        console.warn(
+            `SHOTS_DATABASE_URL unset: shots keep the seed's owner name`,
+        );
+        return;
+    }
+    if (!/@localhost[:/]/.test(db))
+        throw new Error("SHOTS_DATABASE_URL must be a local database");
+    execFileSync("psql", [
+        db,
+        "-qc",
+        `update "User" set name = '${name.replace(/'/g, "''")}' where email = '${ROLES.owner}'`,
+    ]);
+    named = name;
 }
 
 /** The marked control's box within the area `clip` (CSS px), as fractions. */
@@ -262,6 +293,19 @@ async function capture(
         } else {
             await page.locator(step.waitFor).first().waitFor();
         }
+    }
+    if (shot.focus) {
+        await page
+            .locator(shot.focus)
+            .last()
+            .evaluate((el) => {
+                el.scrollIntoView({ block: "start" });
+                // A little room above it, so its heading isn't on the edge.
+                let box = el.parentElement;
+                while (box && box.scrollHeight <= box.clientHeight)
+                    box = box.parentElement;
+                (box ?? document.scrollingElement)?.scrollBy(0, -24);
+            });
     }
     await loaded(page);
     if (!shot.clip) {

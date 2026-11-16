@@ -29,23 +29,36 @@
 
 /** A demo business in the showcase seed (`db:seed:showcase`). */
 export const BUSINESSES = {
-    rye: { id: "seed_sc_rc_org", name: "Rye & Co.", site: "rye-and-co" },
+    rye: {
+        id: "seed_sc_rc_org",
+        name: "Rye & Co.",
+        site: "rye-and-co",
+        owner: "Asha Rao",
+    },
     pulse: {
         id: "seed_sc_pulse_org",
         name: "Pulse Fitness",
         site: "pulse-fitness",
+        owner: "Karan Mehta",
     },
-    kavi: { id: "seed_sc_kavi_org", name: "Kavi Dental", site: "kavi-dental" },
+    kavi: {
+        id: "seed_sc_kavi_org",
+        name: "Kavi Dental",
+        site: "kavi-dental",
+        owner: "Meera Iyer",
+    },
     /** The demo salon (`salon-data.ts`, NOOR): Share and, later, Ask AI. */
     gulmohar: {
         id: "seed_sc_ns_org",
         name: "Gulmohar Salon & Bridal",
         site: "gulmohar-salon",
+        owner: "Zoya Khan",
     },
     northwind: {
         id: "seed_org",
         name: "Northwind Supply",
         site: "northwind",
+        owner: "Rahul Nair",
     },
     /** Asha's first business, with nothing turned on yet (`founder.ts`). */
     asha: {
@@ -151,6 +164,11 @@ export interface Shot {
     viewport: Viewport;
     steps?: Step[];
     clip?: Clip;
+    /**
+     * Instead of a clip: the whole viewport, scrolled so this is in view.
+     * A feature step shows the full desk app around what it's about (owner, 16 Nov 2026).
+     */
+    focus?: string;
     /** Alt text: what the image shows, the business named as a demo. */
     alt: string;
     /** The design's caption or who-line for the shot, for the claims ledger. */
@@ -1800,10 +1818,10 @@ const HIDE_AI_MOMENT: Step = { hide: '[data-moment="new-ai-apps"]' };
 const HOME_DESK = '[data-home-layout="desk"]';
 
 /**
- * A step's shot: drawn in half the page, so it's taken at 900 wide and the
- * screen's words read at near full size (owner, 14-15 Nov 2026).
+ * A step's shot: the desk app with its full sidebar, 16:10 like the frame a
+ * step draws it in, so nothing is cut (owner, 16 Nov 2026; was 900 × 1000).
  */
-const STEP_VIEW: Viewport = { width: 900, height: 1000 };
+const STEP_VIEW: Viewport = { width: 1280, height: 800 };
 
 export const SHOTS: Shot[] = [
     // ── Rye & Co. ──────────────────────────────────────────────────────
@@ -1825,18 +1843,14 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/",
-        viewport: { width: 1100, height: 1500 },
+        viewport: STEP_VIEW,
         steps: [
             HIDE_AI_MOMENT,
             {
                 click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
             },
         ],
-        clip: {
-            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
-            until: `${HOME_DESK} [data-need-group]:has-text("go through")`,
-            pad: 8,
-        },
+        focus: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
         alt: "Money to chase on the Home of Rye & Co. (demo bakery): overdue bills with Remind all, cheques waiting to clear and a failed renewal",
         caption:
             "Overdue bills with a reminder ready, cheques not yet in the bank, and a renewal to retry by pay link",
@@ -1849,8 +1863,8 @@ export const SHOTS: Shot[] = [
         business: "rye",
         role: "owner",
         route: "/billing/invoices/seed_sc_rc_invoice_trade_13",
-        viewport: { width: 1100, height: 1300 },
-        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        viewport: STEP_VIEW,
+        focus: '[aria-label$="as it prints"]',
         alt: "A bill of supply from Rye & Co. (demo bakery) for nil-rated sourdough loaves, with the exempt-supply line",
         caption:
             "Bread is exempt from GST, so a bill for bread alone is a bill of supply, worded as the law asks",
@@ -1885,9 +1899,9 @@ export const SHOTS: Shot[] = [
         role: "owner",
         // RC/26-27/0087, written by hand to Kiln & Co. Café.
         route: "/billing/invoices/seed_sc_rc_invoice_trade_3",
-        viewport: { width: 1100, height: 1300 },
+        viewport: STEP_VIEW,
         // The invoice as it prints, without the page around it.
-        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        focus: '[aria-label$="as it prints"]',
         alt: "A GST tax invoice from Rye & Co. (demo bakery) to a café, with the business's details and tax",
         caption:
             "A GST invoice made from an order, with the business's details and tax / A GST tax invoice from Rye & Co. to Third Wave Café",
@@ -2027,11 +2041,8 @@ export const SHOTS: Shot[] = [
         business: "northwind",
         role: "owner",
         route: "/analytics",
-        viewport: { width: 1100, height: 1500 },
-        clip: {
-            selector: '[data-testid="insights-suggestion"]',
-            pad: 8,
-        },
+        viewport: STEP_VIEW,
+        focus: '[data-testid="insights-suggestion"]',
         alt: "Insights at Northwind Supply (demo business): what to do next, a product selling less, with a button to open it",
         caption:
             "What to do next: one suggestion from the business's own sales, with the button that acts on it",
@@ -2040,12 +2051,8 @@ export const SHOTS: Shot[] = [
         key: "i-weeks",
         business: "northwind",
         role: "owner",
-        route: "/analytics",
-        viewport: { width: 1100, height: 1500 },
-        clip: {
-            selector: '[data-testid="answer-money"]',
-            pad: 8,
-        },
+        route: "/analytics?tab=money",
+        viewport: STEP_VIEW,
         alt: "Am I making more money? at Northwind Supply (demo business): the last 4 weeks against the 4 before, week by week",
         caption:
             "Am I making more money? Yes, with the weeks side by side against the 4 before",
@@ -2054,12 +2061,8 @@ export const SHOTS: Shot[] = [
         key: "i-store",
         business: "northwind",
         role: "owner",
-        route: "/analytics",
-        viewport: { width: 1100, height: 1500 },
-        clip: {
-            selector: '[data-testid="answer-sells"]',
-            pad: 8,
-        },
+        route: "/analytics?tab=sells",
+        viewport: STEP_VIEW,
         alt: "What sells at Northwind Supply (demo business): the three best sellers with units and money",
         caption: "What sells most, with units sold and money taken",
     },
@@ -2136,8 +2139,8 @@ export const SHOTS: Shot[] = [
         business: "pulse",
         role: "owner",
         route: "/commerce/orders/seed_sc_pulse_order_ptblock",
-        viewport: { width: 1100, height: 1000 },
-        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        viewport: STEP_VIEW,
+        focus: 'section[aria-labelledby="od-visits"]',
         alt: "A personal training block at Pulse Fitness (demo gym): three sessions, the first attended and the second booked",
         caption:
             "A block of three personal training sessions, sold once: what's attended, what's booked and what's left",
@@ -2241,12 +2244,9 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/",
-        viewport: { width: 1100, height: 1500 },
+        viewport: STEP_VIEW,
         steps: [HIDE_AI_MOMENT],
-        clip: {
-            selector: `${HOME_DESK} section:has(h2:text-is("Needs you"))`,
-            pad: 8,
-        },
+        focus: `${HOME_DESK} section:has(h2:text-is("Needs you"))`,
         alt: "Needs you on the Home of Kavi Dental (demo clinic): unpaid bills, an enquiry to answer and what to set up, each with its button",
         caption:
             "Needs you at Kavi Dental: bills to chase, a patient's note to answer and what's left to set up",
@@ -2256,12 +2256,9 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/",
-        viewport: { width: 1100, height: 1500 },
+        viewport: STEP_VIEW,
         steps: [HIDE_AI_MOMENT],
-        clip: {
-            selector: `${HOME_DESK} section:has(h2:text-is("Today"))`,
-            pad: 8,
-        },
+        focus: `${HOME_DESK} section:has(h2:text-is("Today"))`,
         alt: "Today on the Home of Kavi Dental (demo clinic): the day's patients in order, with their dentist, how they pay and their flags",
         caption:
             "Today's patients in order, each with their dentist, how they pay and anything the team should know",
@@ -2271,17 +2268,14 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/",
-        viewport: { width: 1100, height: 1500 },
+        viewport: STEP_VIEW,
         steps: [
             HIDE_AI_MOMENT,
             {
                 click: `${HOME_DESK} [data-need-group]:has-text("unpaid on") button[aria-label="Show the rows"]`,
             },
         ],
-        clip: {
-            selector: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
-            pad: 8,
-        },
+        focus: `${HOME_DESK} [data-need-group]:has-text("unpaid on")`,
         alt: "Unpaid bills on the Home of Kavi Dental (demo clinic): the overdue ones with Remind all",
         caption:
             "Overdue bills at Kavi Dental, each with how late it is and a reminder ready to send",
@@ -2313,8 +2307,8 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/billing/invoices/seed_sc_kavi_invoice_o_rahul_rct",
-        viewport: { width: 1100, height: 1300 },
-        clip: { selector: '[aria-label$="as it prints"]', pad: 8 },
+        viewport: STEP_VIEW,
+        focus: '[aria-label$="as it prints"]',
         alt: "The bill for Rahul Verma's root canal from Kavi Dental (demo clinic): a bill of supply, as dental treatment is exempt from GST",
         caption:
             "The treatment's bill, made from the order: a bill of supply, as healthcare is exempt from GST",
@@ -2324,8 +2318,8 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/commerce/orders/seed_sc_kavi_order_rahul_rct",
-        viewport: { width: 1100, height: 1000 },
-        clip: { selector: 'section[aria-labelledby="od-visits"]', pad: 8 },
+        viewport: STEP_VIEW,
+        focus: 'section[aria-labelledby="od-visits"]',
         alt: "Rahul Verma's root canal at Kavi Dental (demo clinic): visit 1 attended, visit 2 booked, visit 3 still to book, with his latex allergy and blood thinners above",
         caption:
             "A three-visit root canal: what's attended, what's booked and what's left, with the patient's flags on top",
@@ -2335,11 +2329,8 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/customers/seed_sc_kavi_contact_rahul",
-        viewport: { width: 1100, height: 1000 },
-        clip: {
-            selector: 'section[aria-label="1 note from the booking page"]',
-            pad: 8,
-        },
+        viewport: STEP_VIEW,
+        focus: 'section[aria-label="1 note from the booking page"]',
         alt: "A note Rahul Verma wrote when booking at Kavi Dental (demo clinic), ready to label Medical and add to Needs attention as sensitive",
         caption:
             "What a patient wrote when booking, matched to their record, to label and add where the team will see it",
@@ -2349,8 +2340,8 @@ export const SHOTS: Shot[] = [
         business: "kavi",
         role: "owner",
         route: "/customers/seed_sc_kavi_contact_rahul",
-        viewport: { width: 1100, height: 1600 },
-        clip: { selector: 'section[aria-label="Needs attention"]', pad: 8 },
+        viewport: STEP_VIEW,
+        focus: 'section[aria-label="Needs attention"]',
         alt: "Needs attention on Rahul Verma's record at Kavi Dental (demo clinic): a latex allergy, and blood thinners marked Sensitive",
         caption:
             "Allergy and medical flags on the patient's record; the medical one is Sensitive, shown only to those allowed",

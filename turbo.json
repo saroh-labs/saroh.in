@@ -61,6 +61,9 @@
     ],
     "globalPassThroughEnv": [
         "PORT",
+        // Marketing shots only: the local throwaway database whose demo owner
+        // takes each business's owner's name (e2e/marketing-shots/capture.ts).
+        "SHOTS_DATABASE_URL",
         // PostHog on the servers (DEC-125): the api's and the merchant
         // sites' own, read per request, never compiled into a browser bundle.
         "POSTHOG_KEY",

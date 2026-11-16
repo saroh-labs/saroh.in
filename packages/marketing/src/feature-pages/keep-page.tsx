@@ -196,7 +196,7 @@ export function KeepPage({
                     current="plain"
                     className="[&_[aria-current]]:font-semibold [&_[aria-current]]:text-foreground"
                 />
-                <div className="grid gap-6 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,440px)] min-[960px]:items-end min-[960px]:gap-16">
+                <div className="grid gap-6 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,440px)] min-[960px]:items-start min-[960px]:gap-16">
                     <h1
                         id={`${slug}-title`}
                         className="m-0 max-w-[16ch] font-display text-mk-kit-h1 font-bold [text-wrap:balance]"
@@ -286,15 +286,22 @@ export function KeepPage({
                         return (
                             <li
                                 key={step.title}
-                                className="grid content-start gap-5 max-[759px]:w-[calc(100%-24px)] max-[759px]:shrink-0 max-[759px]:snap-start min-[960px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[960px]:items-center min-[960px]:gap-16"
+                                className={cn(
+                                    "grid content-start gap-5 max-[759px]:w-[calc(100%-24px)] max-[759px]:shrink-0 max-[759px]:snap-start min-[960px]:items-start min-[960px]:gap-16",
+                                    // The shot keeps the wide column on either side.
+                                    i % 2
+                                        ? "min-[960px]:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]"
+                                        : "min-[960px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]",
+                                )}
                             >
                                 <div
                                     className={cn(
-                                        "grid content-start gap-2",
+                                        "grid content-start gap-3 min-[960px]:pt-4",
                                         i % 2 && "min-[960px]:order-2",
                                     )}
                                 >
-                                    <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                                    {/* Bigger than the kit's h3 so a step reads as a heading over its body (owner, 16 Nov 2026). */}
+                                    <h3 className="m-0 font-display text-mk-card-lg font-bold [text-wrap:balance] min-[960px]:text-mk-h2-article">
                                         {step.title}
                                         {notYet ? (
                                             <NotYet label={notYet} />
@@ -303,18 +310,20 @@ export function KeepPage({
                                     <p className="m-0 text-[16px] leading-relaxed text-mk-copy">
                                         {step.body}
                                     </p>
-                                    <p className="m-0 font-mono text-[13px] text-muted-foreground">
+                                    <p className="m-0 text-mk-note text-muted-foreground">
                                         {step.who}
                                     </p>
                                 </div>
                                 <div
                                     data-shot={shot.id}
-                                    className="overflow-hidden rounded-mk-crop border border-border bg-card shadow-mk-panel"
+                                    className="aspect-[16/10] overflow-hidden rounded-mk-crop border border-border bg-card shadow-mk-panel"
                                 >
+                                    {/* One frame for every step (owner, 16 Nov 2026); a capture is 16:10 too, so nothing is cut. */}
                                     <ShotImage
                                         shot={shot.image}
                                         alt={shot.alt ?? shot.image.alt}
                                         sizes="(min-width: 960px) 700px, 100vw"
+                                        className="h-full object-cover object-left-top"
                                     />
                                 </div>
                             </li>
