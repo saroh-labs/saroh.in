@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+import { hostsFor, urlOf } from "@saroh/edition";
 import type { NextFunction, Request, Response } from "express";
 
 /**
@@ -15,7 +16,10 @@ import type { NextFunction, Request, Response } from "express";
  * plans (saroh.tech's build reads them, with no cookie) stay open.
  */
 export const GLOBAL_ACCESS_COOKIE = "saroh-dev-access";
-const AWAY = "https://saroh.in/";
+/** India's site, where a visitor without the key goes. */
+const AWAY = `${urlOf(hostsFor("INDIA", "production").site)}/`;
+/** Global's own domain: its site, and every address under it. */
+const GLOBAL_ROOT = hostsFor("GLOBAL", "production").site;
 
 const OPEN = [
     { method: "GET", path: /^\/health(\/.*)?$/ },
@@ -24,7 +28,7 @@ const OPEN = [
 
 export const isGlobalHost = (host: string | undefined) => {
     const name = (host ?? "").trim().toLowerCase().split(":")[0] ?? "";
-    return name === "saroh.tech" || name.endsWith(".saroh.tech");
+    return name === GLOBAL_ROOT || name.endsWith(`.${GLOBAL_ROOT}`);
 };
 
 const sha256Hex = (value: string) =>

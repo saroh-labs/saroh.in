@@ -82,7 +82,7 @@ describe("globalAccessGate (Global behind the key, 16 Nov 2026)", () => {
             path: "/organizations",
         });
         expect(get.res.statusCode).toBe(302);
-        expect(get.res.location).toBe("https://saroh.in/");
+        expect(get.res.location).toBe("https://www.saroh.in/");
         expect(get.res.headers["X-Robots-Tag"]).toContain("noindex");
     });
 
