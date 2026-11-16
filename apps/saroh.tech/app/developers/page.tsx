@@ -1,4 +1,5 @@
 import { DevelopersPage } from "@saroh/marketing/feature-pages/developers-page";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/shared/json-ld";
@@ -9,9 +10,12 @@ import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
 
-const entry = pageOf("/developers");
+const off = () => featuresOff().includes("developers");
 
-export const metadata = pageMetadata(entry);
+/** Off, the page isn't in the site map: no entry to read, and the route is a 404. */
+export function generateMetadata(): Metadata {
+    return off() ? {} : pageMetadata(pageOf("/developers"));
+}
 
 /**
  * /developers on saroh.tech (owner, 16 Nov 2026, #13): saroh.in's page, the
@@ -19,11 +23,11 @@ export const metadata = pageMetadata(entry);
  * and unlinked too (`lib/nav.ts`); its docs links follow `NEXT_PUBLIC_DOCS`.
  */
 export default function DevelopersRoute() {
-    const off = featuresOff();
-    if (off.includes("developers")) notFound();
+    if (off()) notFound();
+    const switches = featuresOff();
     return (
         <>
-            <JsonLd data={pageSchema(entry)} />
+            <JsonLd data={pageSchema(pageOf("/developers"))} />
             <DevelopersPage
                 words={DEVELOPERS}
                 docsHref={docsHref}
@@ -31,8 +35,8 @@ export default function DevelopersRoute() {
                 start={(src, variant) => (
                     <StartLink src={src} variant={variant} />
                 )}
-                docsOn={!off.includes("docs")}
-                aiAppsOn={!off.includes("ai-apps")}
+                docsOn={!switches.includes("docs")}
+                aiAppsOn={!switches.includes("ai-apps")}
             />
         </>
     );
