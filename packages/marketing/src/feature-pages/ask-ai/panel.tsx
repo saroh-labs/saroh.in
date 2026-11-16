@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { cn } from "../../cn";
 import { SourceChips } from "../../kit/chip";
+import { ring } from "../../ring";
 
 /** Each part of the business keeps one dot colour wherever Ask AI names it. */
 const DOT: Record<string, string> = {
@@ -131,16 +132,26 @@ export function Suggestion({
     t,
     h,
     act,
+    onPick,
 }: {
     t: string;
     h?: string;
     act?: boolean;
+    /** Makes it a real button, highlighted as the invitation (the steps' player). */
+    onPick?: () => void;
 }) {
+    const Tag = onPick ? "button" : "div";
     return (
-        <div
+        <Tag
+            {...(onPick ? { type: "button" as const, onClick: onPick } : {})}
             className={cn(
-                "flex min-h-11 items-center gap-2.5 border-t border-mk-line-row px-1 text-[14.5px] first:border-t-0",
+                "flex min-h-11 w-full items-center gap-2.5 border-t border-mk-line-row px-1 text-left text-[14.5px] text-foreground first:border-t-0",
                 act && "font-semibold",
+                onPick &&
+                    cn(
+                        "cursor-pointer rounded-lg border-0 bg-mk-tint px-3 shadow-[inset_0_0_0_1px_hsl(var(--brand-500)/0.45)] hover:bg-mk-hover",
+                        ring({ offset: 2 }),
+                    ),
             )}
         >
             {act ? (
@@ -152,11 +163,17 @@ export function Suggestion({
                     {h}
                 </span>
             ) : null}
+            {onPick ? (
+                <span
+                    aria-hidden
+                    className="size-2 shrink-0 rounded-full bg-brand-500 motion-safe:animate-pulse"
+                />
+            ) : null}
             <ArrowRight
                 aria-hidden
                 className="size-4 shrink-0 text-muted-foreground"
             />
-        </div>
+        </Tag>
     );
 }
 
@@ -168,6 +185,7 @@ export function ConfirmCard({
     note,
     buttons,
     done = false,
+    onConfirm,
 }: {
     head: ReactNode;
     title: string;
@@ -175,6 +193,8 @@ export function ConfirmCard({
     note?: string;
     buttons: readonly ReactNode[];
     done?: boolean;
+    /** Makes the first button a real one that confirms (the steps' player). */
+    onConfirm?: () => void;
 }) {
     return (
         <div
@@ -210,19 +230,33 @@ export function ConfirmCard({
                     </p>
                 ) : null}
                 <div className="flex flex-wrap gap-2">
-                    {buttons.map((b, i) => (
-                        <span
-                            key={i}
-                            className={cn(
-                                "inline-flex h-10 items-center gap-1.5 rounded-[9px] px-3.5 text-[14px] font-semibold",
-                                i === 0 && !done
-                                    ? "bg-foreground text-background"
-                                    : "border border-border-strong bg-card",
-                            )}
-                        >
-                            {b}
-                        </span>
-                    ))}
+                    {buttons.map((b, i) => {
+                        const look = cn(
+                            "inline-flex items-center gap-1.5 rounded-[9px] px-3.5 text-[14px] font-semibold",
+                            onConfirm ? "min-h-11" : "h-10",
+                            i === 0 && !done
+                                ? "bg-foreground text-background"
+                                : "border border-border-strong bg-card",
+                        );
+                        return i === 0 && onConfirm && !done ? (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={onConfirm}
+                                className={cn(
+                                    look,
+                                    "cursor-pointer border-none",
+                                    ring({ offset: 2 }),
+                                )}
+                            >
+                                {b}
+                            </button>
+                        ) : (
+                            <span key={i} className={look}>
+                                {b}
+                            </span>
+                        );
+                    })}
                 </div>
             </div>
         </div>

@@ -29,10 +29,25 @@ export function PanelShot({ shot }: { shot: ShotView }) {
     );
 }
 
+/** A Reach page's "How it works" words: the feature's steps less any sentence whose claim is off. */
+export function reachSteps(data: InTheAppData, foot?: string) {
+    const feature = claimed(data.feature, data.hide);
+    const under = [data.feature.worksToday, foot].filter(Boolean).join(" ");
+    return {
+        id: "in-the-app",
+        title: feature.howTitle,
+        lede: feature.sub,
+        steps: feature.steps,
+        foot: under || undefined,
+        links: data.help,
+    };
+}
+
 /**
  * A Reach page's "How it works" (board "Steps A"): the feature's own steps
  * and lead from `content/features.ts`, less any sentence whose claim is off,
- * each with the picture the page draws for it, and its Help links.
+ * each with the picture the page draws for it, and its Help links. Ask AI
+ * plays one panel through its steps instead (`AskSteps`, board "overdrive").
  */
 export function ReachSteps({
     data,
@@ -44,21 +59,16 @@ export function ReachSteps({
     foot?: string;
     picture: (step: FeatureStep, i: number) => ReactNode;
 }) {
-    const feature = claimed(data.feature, data.hide);
-    const under = [data.feature.worksToday, foot].filter(Boolean).join(" ");
+    const { steps, ...how } = reachSteps(data, foot);
     return (
         <StepsShowcase
-            id="in-the-app"
-            title={feature.howTitle}
-            lede={feature.sub}
-            steps={feature.steps.map((step, i) => ({
+            {...how}
+            steps={steps.map((step, i) => ({
                 title: step.title,
                 body: step.body,
                 note: step.who,
                 picture: picture(step, i),
             }))}
-            foot={under || undefined}
-            links={data.help}
         />
     );
 }

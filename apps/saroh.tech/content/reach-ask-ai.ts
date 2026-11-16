@@ -163,6 +163,7 @@ export function askAiWords({
                 where: `· today, ${where}`,
                 card: {
                     head: "Change 2 orders",
+                    orders: [maya.id, ben.id],
                     title: "Mark as ready for pick-up",
                     kv: [
                         ["Orders", `${maya.id}, ${ben.id}`],
@@ -450,6 +451,13 @@ export function askAiWords({
             /** On a phone, the steps and what follows fold behind this. */
             phone: "Help and setup",
             foot: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
+            play: {
+                startOver: "Start over",
+                reading: "Reading",
+                ready: "Ready",
+                done: "Done",
+                undo: "Undo",
+            },
         },
     };
 }

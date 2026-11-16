@@ -1,12 +1,6 @@
 import { cn } from "../../cn";
-import {
-    Asked,
-    AskPanel,
-    Checked,
-    ConfirmCard,
-    ReadFrom,
-    Suggestion,
-} from "./panel";
+import type { PlayerView } from "../../sections/steps-player";
+import { Asked, AskPanel, ConfirmCard, ReadFrom, Suggestion } from "./panel";
 import type { AskAiWords } from "./words";
 
 export const ROW =
@@ -16,9 +10,12 @@ export const ROW =
 export function AnswerTable({
     p,
     stockOn,
+    change,
 }: {
     p: AskAiWords["hero"]["panel"];
     stockOn: boolean;
+    /** The card's orders: tinted while it waits, `label` (Ready) once done. */
+    change?: { ids: readonly string[]; done: boolean; label: string };
 }) {
     return (
         <div className="overflow-hidden rounded-xl border border-border text-[14px]">
@@ -34,29 +31,38 @@ export function AnswerTable({
                     </span>
                 ))}
             </div>
-            {p.rows.map((r) => (
-                <div
-                    key={r.id}
-                    data-wire={r.from ? "p-ord" : undefined}
-                    className={cn(
-                        ROW,
-                        "min-h-10 grid-cols-[70px_1fr_64px_70px]",
-                        r.from && "bg-mk-tint",
-                    )}
-                >
-                    <span>{r.id}</span>
-                    <span className="truncate">{r.customer}</span>
-                    <span className="text-right">{r.total}</span>
-                    <span
+            {p.rows.map((r) => {
+                const changing = change?.ids.includes(r.id);
+                const ready = changing && change?.done;
+                return (
+                    <div
+                        key={r.id}
+                        data-wire={r.from ? "p-ord" : undefined}
                         className={cn(
-                            "text-right",
-                            r.paid !== "Paid" && "font-semibold text-mk-warn",
+                            ROW,
+                            "min-h-10 grid-cols-[70px_1fr_64px_70px] transition-colors duration-300 motion-reduce:transition-none",
+                            change
+                                ? changing && !ready && "bg-mk-tint"
+                                : r.from && "bg-mk-tint",
                         )}
                     >
-                        {r.paid}
-                    </span>
-                </div>
-            ))}
+                        <span>{r.id}</span>
+                        <span className="truncate">{r.customer}</span>
+                        <span className="text-right">{r.total}</span>
+                        <span
+                            className={cn(
+                                "text-right",
+                                ready
+                                    ? "font-semibold text-mk-ok"
+                                    : r.paid !== "Paid" &&
+                                          "font-semibold text-mk-warn",
+                            )}
+                        >
+                            {ready ? change.label : r.paid}
+                        </span>
+                    </div>
+                );
+            })}
             {stockOn ? (
                 <>
                     <div
@@ -91,69 +97,118 @@ export function AnswerTable({
     );
 }
 
+/** The words the steps' player draws: plain data, handed from the server page. */
+export interface AskPlayWords {
+    panel: AskAiWords["hero"]["panel"];
+    /** Home's ready questions and their lead. */
+    home: {
+        lead: string;
+        sugs: readonly { t: string; h?: string; act?: boolean }[];
+    };
+    hint: string;
+    play: AskAiWords["inTheApp"]["play"];
+}
+
+/** The player's words from the page's: Home's screen is the one with a lead. */
+export function askPlayWords(w: AskAiWords): AskPlayWords {
+    const home = w.where.screens.find((sc) => sc.lead !== undefined);
+    return {
+        panel: w.hero.panel,
+        home: { lead: home?.lead ?? "", sugs: home?.sugs ?? [] },
+        hint: w.where.hintHome,
+        play: w.inTheApp.play,
+    };
+}
+
 /**
- * Ask AI's "How it works" steps, drawn (board "Steps A"): the captures are
- * phone-narrow and unreadable at the panel's size, and saroh.tech has none.
- * Each follows the hero's one question, keyed by the step's shot.
+ * Ask AI's "How it works" (board "overdrive", #49, hands-on): the hero's one
+ * question in one panel, moved on by the visitor. Step 1 shows Home's ready
+ * questions with the last one inviting a tap; tapping it asks (step 2, a
+ * short "Reading" beat), then the answer, its rows and the card (step 3);
+ * pressing the card's button marks its orders Ready (step 4, confirmed).
  */
-export function AskStep({
-    w,
-    shot,
+export function AskPlay({
+    words,
+    view,
     stockOn,
 }: {
-    w: AskAiWords;
-    shot: string;
+    words: AskPlayWords;
+    view: PlayerView;
     stockOn: boolean;
 }) {
-    const p = w.hero.panel;
-    const home = w.where.screens.find((sc) => sc.lead !== undefined);
+    const { panel: p, home, play } = words;
+    const { step, confirmed } = view;
+    const lastHint = home.sugs.length - 1;
     return (
-        <AskPanel
-            title={p.title}
-            icons={3}
-            className="mx-auto max-w-[560px] text-left"
-        >
-            {shot === "ask-start" && home?.lead ? (
+        <AskPanel title={p.title} icons={3} className="text-left">
+            <span className="w-fit rounded-full bg-mk-hover px-2.5 py-1 text-[13px] font-semibold">
+                {p.about}
+            </span>
+            {step === 0 ? (
                 <>
-                    <p className="m-0 text-[16px] font-semibold">{home.lead}</p>
+                    <p className="m-0 font-display text-[22px] font-bold tracking-[-0.02em]">
+                        {home.lead}
+                    </p>
                     <div>
-                        {home.sugs.map((g) => (
-                            <Suggestion key={g.t} {...g} />
+                        {home.sugs.map((g, i) => (
+                            <Suggestion
+                                key={g.t}
+                                {...g}
+                                onPick={
+                                    i === lastHint
+                                        ? () => view.go(2, 1)
+                                        : undefined
+                                }
+                            />
                         ))}
                     </div>
                     <p className="m-0 text-[13px] leading-snug text-muted-foreground">
-                        {w.where.hintHome}
+                        {words.hint}
                     </p>
                 </>
             ) : (
                 <>
-                    <span className="w-fit rounded-full bg-mk-hover px-2.5 py-1 text-[13px] font-semibold">
-                        {p.about}
-                    </span>
                     <Asked>{p.q}</Asked>
-                    <Checked>{p.checked}</Checked>
-                    {shot === "ask-answer" ? (
-                        <>
-                            <p className="m-0 text-[17px] font-semibold leading-snug">
-                                {p.lead}
-                            </p>
-                            <AnswerTable p={p} stockOn={stockOn} />
-                            <ReadFrom
-                                sources={p.sources}
-                                label={p.from}
-                                tail={p.where}
-                            />
-                        </>
-                    ) : shot === "ask-confirm" ? (
-                        <>
-                            <p className="m-0 text-[15px] leading-normal text-mk-copy">
-                                {p.lead}
-                            </p>
-                            <ConfirmCard {...p.card} />
-                        </>
-                    ) : null}
+                    <ReadFrom
+                        sources={p.sources}
+                        label={step === 1 ? play.reading : p.from}
+                        tail={step === 1 ? undefined : p.where}
+                        className={cn(
+                            step === 1 && "motion-safe:animate-pulse",
+                        )}
+                    />
                 </>
             )}
+            {step >= 2 ? (
+                <div className="grid gap-3.5 motion-safe:duration-300 motion-safe:animate-in motion-safe:fade-in">
+                    <div className="grid gap-1.5">
+                        <p className="m-0 font-display text-[19px] font-bold leading-snug tracking-[-0.01em]">
+                            {p.lead}
+                        </p>
+                        <p className="m-0 text-[15px] leading-normal text-mk-copy">
+                            {p.why}
+                        </p>
+                    </div>
+                    <AnswerTable
+                        p={p}
+                        stockOn={stockOn}
+                        change={{
+                            ids: p.card.orders,
+                            done: confirmed,
+                            label: play.ready,
+                        }}
+                    />
+                    <ConfirmCard
+                        head={confirmed ? play.done : p.card.head}
+                        title={p.card.title}
+                        kv={p.card.kv}
+                        note={p.card.note}
+                        done={confirmed}
+                        buttons={confirmed ? [play.undo] : p.card.buttons}
+                        onConfirm={view.confirm}
+                    />
+                </div>
+            ) : null}
         </AskPanel>
     );
 }

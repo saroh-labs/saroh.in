@@ -154,30 +154,7 @@ export function StepsShowcase({
                             );
                         })}
                     </ol>
-                    {foot || links.length ? (
-                        <div className="grid gap-1 text-[14px] text-muted-foreground">
-                            {foot ? (
-                                <p className="m-0 max-w-[62ch] [text-wrap:pretty]">
-                                    {foot}
-                                </p>
-                            ) : null}
-                            {links.length ? (
-                                <div className="flex flex-wrap gap-x-6">
-                                    {links.map((link) => (
-                                        <TextLink
-                                            key={link.href}
-                                            href={link.href}
-                                            tone="ink"
-                                            arrow
-                                            className="text-[14px]"
-                                        >
-                                            {link.label}
-                                        </TextLink>
-                                    ))}
-                                </div>
-                            ) : null}
-                        </div>
-                    ) : null}
+                    <StepsFoot foot={foot} links={links} />
                 </div>
                 {/* Holds the panel's place in the grid on a desk. */}
                 <div
@@ -186,5 +163,38 @@ export function StepsShowcase({
                 />
             </div>
         </Container>
+    );
+}
+
+/** The small line and Help links under a steps list (Showcase and Player). */
+export function StepsFoot({
+    foot,
+    links = [],
+}: {
+    foot?: ReactNode;
+    links?: readonly { href: string; label: string }[];
+}) {
+    if (!foot && !links.length) return null;
+    return (
+        <div className="grid gap-1 text-[14px] text-muted-foreground">
+            {foot ? (
+                <p className="m-0 max-w-[62ch] [text-wrap:pretty]">{foot}</p>
+            ) : null}
+            {links.length ? (
+                <div className="flex flex-wrap gap-x-6">
+                    {links.map((link) => (
+                        <TextLink
+                            key={link.href}
+                            href={link.href}
+                            tone="ink"
+                            arrow
+                            className="text-[14px]"
+                        >
+                            {link.label}
+                        </TextLink>
+                    ))}
+                </div>
+            ) : null}
+        </div>
     );
 }

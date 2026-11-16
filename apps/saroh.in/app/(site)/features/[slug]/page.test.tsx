@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { shownFeatures } from "@saroh/marketing/feature-switches";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { featureList, features } from "@/content/features";
@@ -190,34 +191,54 @@ describe("/features/[slug]", () => {
         });
     });
 
-    it("/features/social and /features/ask-ai draw every step's picture in the HTML (Steps A)", async () => {
-        for (const slug of ["social", "ask-ai"] as const) {
-            const { unmount } = render(await FeaturePage(params(slug)));
-            const how = found(
-                screen
-                    .getByRole("heading", { name: features[slug].howTitle })
-                    .closest("section"),
-            );
-            // Four steps, no heading-only card, each picture under its step.
-            expect(how.querySelector("ol")?.children).toHaveLength(4);
-            const pictures = how.querySelectorAll("[data-step-picture]");
-            expect(pictures).toHaveLength(4);
-            for (const p of Array.from(pictures))
-                expect(
-                    p.textContent.trim() || p.querySelector("img"),
-                ).toBeTruthy();
-            // Share's are its captured shots; Ask AI's are drawn, readable large.
-            expect(
-                Array.from(how.querySelectorAll("[data-shot]")).map((el) =>
-                    el.getAttribute("data-shot"),
-                ),
-            ).toEqual(
-                slug === "social"
-                    ? features[slug].steps.map((st) => st.shot)
-                    : [],
-            );
-            unmount();
-        }
+    it("/features/social draws every step's picture in the HTML (Steps A)", async () => {
+        render(await FeaturePage(params("social")));
+        const how = found(
+            screen
+                .getByRole("heading", { name: features.social.howTitle })
+                .closest("section"),
+        );
+        // Four steps, no heading-only card, each picture under its step.
+        expect(how.querySelector("ol")?.children).toHaveLength(4);
+        const pictures = how.querySelectorAll("[data-step-picture]");
+        expect(pictures).toHaveLength(4);
+        for (const p of Array.from(pictures))
+            expect(p.textContent.trim() || p.querySelector("img")).toBeTruthy();
+        // Share's are its captured shots.
+        expect(
+            Array.from(how.querySelectorAll("[data-shot]")).map((el) =>
+                el.getAttribute("data-shot"),
+            ),
+        ).toEqual(features.social.steps.map((st) => st.shot));
+    });
+
+    it("/features/ask-ai's steps hold the whole conversation in the server HTML, then start at step 1 (overdrive, #49)", async () => {
+        // The server HTML: every step's words, one panel, the finished story.
+        const box = document.createElement("div");
+        box.innerHTML = renderToStaticMarkup(
+            await FeaturePage(params("ask-ai")),
+        );
+        const html = found(box.querySelector("#in-the-app"));
+        expect(html.querySelector("ol")?.children).toHaveLength(4);
+        for (const st of features["ask-ai"].steps)
+            expect(html.textContent).toContain(st.title);
+        expect(html.querySelectorAll("[data-step-picture]")).toHaveLength(0);
+        expect(html.querySelectorAll("[data-shot]")).toHaveLength(0);
+        const panel = found(html.querySelector("[data-step-panel]"));
+        expect(panel.getAttribute("role")).toBe("region");
+        // The answer's rows, two of them Ready (and the card's "Then"), the card done.
+        expect(panel.textContent).toContain("ORD-1046");
+        expect(panel.textContent).toContain("Mark as ready for pick-up");
+        expect(panel.textContent.match(/Ready/g)?.length).toBe(3);
+        expect(panel.textContent).toContain("Undo");
+
+        // With script it starts still, at the ready questions.
+        render(await FeaturePage(params("ask-ai")));
+        const live = found(document.querySelector("[data-step-panel]"));
+        expect(live.getAttribute("data-step-panel")).toBe("0");
+        expect(
+            screen.getByRole("button", { name: /Mark today's orders ready/ }),
+        ).toBeTruthy();
     });
 
     describe("/features/ai-apps (board VFAiApps)", () => {

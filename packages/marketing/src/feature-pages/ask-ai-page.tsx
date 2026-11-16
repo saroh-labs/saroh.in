@@ -21,7 +21,8 @@ import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 
 import type { World } from "../content/world";
-import { AnswerTable, AskStep, ROW } from "./ask-ai/answer";
+import { AnswerTable, askPlayWords, ROW } from "./ask-ai/answer";
+import { AskSteps } from "./ask-ai/ask-steps";
 import {
     Asked,
     AskPanel,
@@ -37,7 +38,7 @@ import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Questions } from "./reach/questions";
-import { ReachSteps } from "./reach/reach-steps";
+import { reachSteps } from "./reach/reach-steps";
 import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
@@ -744,12 +745,10 @@ export function AskAiView({
                 </Container>
             ) : null}
 
-            <ReachSteps
-                data={inTheApp}
-                foot={w.inTheApp.foot}
-                picture={(step) => (
-                    <AskStep w={w} shot={step.shot} stockOn={stockOn} />
-                )}
+            <AskSteps
+                how={reachSteps(inTheApp, w.inTheApp.foot)}
+                words={askPlayWords(w)}
+                stockOn={stockOn}
             />
 
             <Questions items={w.faq} ask={w.askUs} />
