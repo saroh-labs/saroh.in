@@ -66,8 +66,11 @@ test("the real files: Claude's screens are supplied in both editions, reasons re
         const supplied = suppliedKeys(read(site.config));
         for (const key of ["ai-hero", "ai-ask", "ai-connect"])
             assert.ok(supplied.has(key), `${site.config}: ${key}`);
-        assert.ok(!supplied.has("ai-consent"));
     }
+    // Saroh's own AI-app screens, kept by hand: the release stack has no MCP sign-in.
+    const india = suppliedKeys(read(SITES["saroh.in"].config));
+    for (const key of ["ai-consent", "ai-activity"])
+        assert.ok(india.has(key), key);
     const pending = pendingShots(read(SITES["saroh.tech"].pending));
     assert.ok(pending.size > 0);
     for (const [key, why] of pending) assert.match(why, / /, key);

@@ -1786,6 +1786,10 @@ const AI_APPS_SHOTS: Shot[] = [
         ],
         // The consent column alone: full page it was a small card in white.
         clip: { selector: "h1 >> xpath=..", pad: 32 },
+        // Kept, not retaken each release: the release stack's API has no
+        // MCP sign-in (no api. host), so the run can't reach this page.
+        supplied:
+            "Taken by hand on the local stack (portless api.saroh.localhost); retake when the page changes",
         alt: "Saroh's sign-in for an AI app at Rye & Co. (demo bakery): the businesses it may use, and what it may and may not do",
         caption:
             "An AI app wants to use Saroh as you: two of three businesses ticked, what it may do and what it can't, and Allow",
@@ -1803,6 +1807,10 @@ const AI_APPS_SHOTS: Shot[] = [
         ],
         // The connection's sheet alone; the page behind it is dimmed.
         clip: { selector: '[role="dialog"]' },
+        // Kept, not retaken each release: it needs Claude connected through
+        // the MCP sign-in, which the release stack doesn't have.
+        supplied:
+            "Taken by hand after shots:connect-claude on the local stack; retake when the sheet changes",
         alt: "AI assistants in Settings at Rye & Co. (demo bakery): a connected AI app and the changes it made",
         caption:
             "Settings › API and AI apps › AI assistants: Claude connected to two businesses, its last three changes, and Roll back site draft and Disconnect",
