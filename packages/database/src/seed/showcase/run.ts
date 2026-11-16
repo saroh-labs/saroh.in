@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { seedRyeAskAi } from "./rye-ask-ai";
 
 import { holdOpenLines } from "../../backfill/held-stock";
 import {
@@ -231,6 +232,8 @@ export async function seedShowcase(
             }),
         }),
     );
+    // Its Ask AI conversations, already asked, for saroh.in's shots.
+    await seedRyeAskAi(prisma, now, ctx.demoUserId);
     // The dental clinic the round-2 bookings screens are verified and filmed
     // in (E29). Divya Kamath works its desk as a Member.
     businesses.push(

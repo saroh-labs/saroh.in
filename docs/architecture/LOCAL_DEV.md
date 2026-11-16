@@ -543,6 +543,12 @@ them and read money their way. Their zone is one where it's mid-morning when
 seeded (`morning-zone.ts`), so a capture at any hour shows a working day. Keep
 them on their own database.
 
+Both this seed and the showcase write the Ask AI conversations the shots open
+(Thistlewick's in `seed/global/ask-ai.ts`, Rye & Co.'s in
+`seed/showcase/rye-ask-ai.ts`), sealed with `AI_TEXT_ENC_KEY`: run the seed
+with the API's key in the environment (it is in `apps/api.saroh.in/.env.local`,
+which the seed doesn't read), or none are written. No model key is needed.
+
 For Free's real rows, import dev's catalogue (above), then seed again so they
 sit on it. Set `SAROH_RAZORPAY_KEY_ID`, `SAROH_RAZORPAY_KEY_SECRET` and
 `SAROH_RAZORPAY_WEBHOOK_SECRET` empty on the import and on the API: with the

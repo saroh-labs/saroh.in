@@ -20,6 +20,7 @@ import type { Rng } from "../showcase/random";
 import { createRng } from "../showcase/random";
 import { writeTraffic } from "../showcase/traffic";
 import { writesStandIns } from "../stand-in-providers";
+import { seedThistlewickAskAi } from "./ask-ai";
 import { planBilling } from "./billing";
 import type {
     GlobalBusiness,
@@ -161,6 +162,8 @@ export async function seedGlobal(clock: Date = new Date()): Promise<void> {
         const biz = { ...fixture, zone: morningZone(now) };
         await seedOne(prisma, biz, now, demo.id);
     }
+    // Thistlewick's Ask AI conversations, already asked, for saroh.tech's shots.
+    await seedThistlewickAskAi(prisma, now, morningZone(now), demo.id);
     const ids = GLOBAL_BUSINESSES.map((b) => `${PREFIX}${b.key}_org`);
     await syncStorefrontFulfilmentTypes(prisma, ids);
     for (const orgId of ids) {
