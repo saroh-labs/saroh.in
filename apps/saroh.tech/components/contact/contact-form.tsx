@@ -2,7 +2,7 @@
 
 import { Button } from "@saroh/marketing/button";
 import { ChoiceChip } from "@saroh/marketing/choice-chip";
-import { ContactFormFrame, ContactSent } from "@saroh/marketing/contact-parts";
+import { ContactFormFrame, ContactSent } from "@saroh/marketing/form-parts";
 import { nextIndex } from "@saroh/marketing/roving";
 import { Field as FieldFrame } from "@saroh/ui/field";
 import type { FormEvent, KeyboardEvent } from "react";

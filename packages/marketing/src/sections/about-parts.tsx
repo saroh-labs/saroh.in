@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { PropsWithChildren } from "react";
 
 import { Container } from "../layout/container";
 
@@ -137,10 +137,7 @@ export function AboutValues({
 export function CompanyFact({
     label,
     children,
-}: {
-    label: string;
-    children: ReactNode;
-}) {
+}: PropsWithChildren<{ label: string }>) {
     return (
         // `content-start`: a cell beside a taller one (a three-line address)
         // keeps its words right under its label, not spread down the cell.

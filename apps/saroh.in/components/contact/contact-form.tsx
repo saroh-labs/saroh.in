@@ -7,7 +7,7 @@ import { CONTACT_LIMITS, firstName } from "@/lib/contact-message";
 
 import { Button } from "@saroh/marketing/button";
 import { ChoiceChip } from "@saroh/marketing/choice-chip";
-import { ContactFormFrame, ContactSent } from "@saroh/marketing/contact-parts";
+import { ContactFormFrame, ContactSent } from "@saroh/marketing/form-parts";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import { fieldClasses } from "../shared/fields/field-classes";
 import { useContactForm } from "./use-contact-form";

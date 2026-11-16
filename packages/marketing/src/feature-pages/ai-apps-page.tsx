@@ -11,7 +11,6 @@ import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
 import { ConnectSteps } from "../sections/connect-steps";
-import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 import { SplitHero } from "../sections/split-hero";
 
@@ -22,7 +21,7 @@ import { DraftPill, LivePill } from "./reach/app-card";
 import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { claimed } from "./reach/in-the-app";
-import { HERO_CTA } from "./reach/page-top";
+import { HERO_CTA, PageTitleWords, SecondaryButton } from "./reach/page-top";
 import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
 import { Tail } from "./reach/tail";
@@ -82,12 +81,7 @@ export function AiAppsView({
                 crumbs={[crumb, { name: w.name }]}
                 crumbsClassName="pt-6"
                 layout="beside"
-                title={
-                    <>
-                        {w.title.before}
-                        <Mark>{w.title.mark}</Mark>
-                    </>
-                }
+                title={<PageTitleWords title={w.title} />}
                 titleClassName="max-w-[14ch]"
                 lede={w.lede}
                 note={
@@ -99,14 +93,9 @@ export function AiAppsView({
                     <span id={HERO_CTA}>{site.start(`feature-${slug}`)}</span>
                 }
                 secondary={
-                    <ButtonLink
-                        href={`#${w.connect.id}`}
-                        variant="secondary"
-                        size="kit"
-                        className="max-[759px]:hidden"
-                    >
+                    <SecondaryButton href={`#${w.connect.id}`}>
                         {w.secondary}
-                    </ButtonLink>
+                    </SecondaryButton>
                 }
                 foot={w.note}
                 gridClassName="gap-10 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1080px]:gap-16"

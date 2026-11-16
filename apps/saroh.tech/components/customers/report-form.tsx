@@ -1,6 +1,6 @@
 "use client";
 
-import { ReportDone, ReportFormFrame } from "@saroh/marketing/report-parts";
+import { ReportDone, ReportFormFrame } from "@saroh/marketing/form-parts";
 import type { FormEvent } from "react";
 import { useRef, useState, useSyncExternalStore } from "react";
 
