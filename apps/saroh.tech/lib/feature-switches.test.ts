@@ -37,7 +37,9 @@ async function builtWith(on: readonly string[]) {
     };
 }
 
-describe("saroh.tech's feature switches", () => {
+// Each test re-imports the feature modules cold (resetModules); the first
+// import outlasts 5s on a loaded gate, so the file gets 30s a test.
+describe("saroh.tech's feature switches", { timeout: 30_000 }, () => {
     afterEach(() => {
         vi.unstubAllEnvs();
         vi.resetModules();
