@@ -63,7 +63,7 @@ export interface SocialPageProps {
  */
 export function SocialView({
     site,
-    words: w,
+    words,
     world,
     crumb,
     inTheApp,
@@ -73,6 +73,7 @@ export function SocialView({
     const everyPlan = site.claimOn("share-every-plan");
     const posting = site.claimOn("social-posting");
     const insights = site.claimOn("share-insights");
+    const w = words;
     const lead = world.lead;
     const leadLook = w.looks.lead;
     const otherLook = w.looks.other;
@@ -83,7 +84,6 @@ export function SocialView({
     return (
         <div className={fonts}>
             <PageTop
-                stacked
                 crumb={crumb}
                 words={w}
                 start={site.start(`feature-${slug}`)}
@@ -99,6 +99,7 @@ export function SocialView({
                         </p>
                     </Claim>
                 }
+                stacked
             >
                 <CropToggle label={w.stage.more} height={330}>
                     <div

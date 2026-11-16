@@ -33,28 +33,14 @@ const DESK_PANEL =
  * (`aria-pressed`); the arrow keys move along them and pick.
  */
 export function StepsShowcase({
-    id,
-    title,
-    lede,
     steps,
     foot,
     links = [],
-    className,
-}: {
-    id: string;
-    title: ReactNode;
-    lede?: ReactNode;
-    steps: readonly ShowcaseStep[];
-    /** One small line under the list, e.g. how long history is kept. */
-    foot?: ReactNode;
-    /** "How to …" links to Help. */
-    links?: readonly { href: string; label: string }[];
-    className?: string;
-}) {
+    ...head
+}: StepsSectionProps & { steps: readonly ShowcaseStep[] }) {
     const [at, setAt] = useState(0);
     const buttons = useRef<(HTMLButtonElement | null)[]>([]);
     const base = useId();
-    const titleId = `${id}-title`;
 
     const onKey = (e: KeyboardEvent, i: number) => {
         const to = nextIndex(e.key, i, steps.length);
@@ -65,14 +51,138 @@ export function StepsShowcase({
     };
 
     return (
+        <StepsSection
+            {...head}
+            // The panel's pictures are placed against this box on a desk.
+            relative
+            aside={
+                // Holds the panel's place in the grid on a desk.
+                <div
+                    aria-hidden
+                    className="hidden h-[640px] min-[1080px]:block"
+                />
+            }
+        >
+            <ol className="m-0 list-none border-t border-border p-0">
+                {steps.map((step, i) => {
+                    const on = i === at;
+                    const pic = `${base}-${i}`;
+                    return (
+                        <li key={step.title} className="border-b border-border">
+                            <button
+                                ref={(el) => {
+                                    buttons.current[i] = el;
+                                }}
+                                type="button"
+                                aria-pressed={on}
+                                aria-controls={pic}
+                                tabIndex={on ? 0 : -1}
+                                onClick={() => setAt(i)}
+                                onKeyDown={(e) => onKey(e, i)}
+                                className={cn(
+                                    "flex w-full cursor-pointer items-start gap-4 border-none bg-transparent px-1 py-[18px] text-left text-foreground transition-opacity duration-fast ease-out motion-reduce:transition-none",
+                                    !on &&
+                                        "min-[1080px]:opacity-60 min-[1080px]:hover:opacity-90",
+                                    ring({ offset: 2 }),
+                                )}
+                            >
+                                <span
+                                    aria-hidden
+                                    className={cn(
+                                        "grid size-[30px] shrink-0 place-items-center rounded-full font-mono text-[14px] font-semibold",
+                                        on
+                                            ? "bg-foreground text-background"
+                                            : "bg-mk-hover text-mk-copy",
+                                    )}
+                                >
+                                    {i + 1}
+                                </span>
+                                <span className="grid gap-1">
+                                    <span className="font-display text-[19px] font-bold leading-tight tracking-[-0.02em]">
+                                        <span className="sr-only">
+                                            Step {i + 1}:{" "}
+                                        </span>
+                                        {step.title}
+                                    </span>
+                                    <span className="text-[15px] leading-normal text-mk-copy [text-wrap:pretty]">
+                                        {step.body}
+                                    </span>
+                                </span>
+                            </button>
+                            {/* Under its step on a phone; in the panel, when picked, on a desk. */}
+                            <div
+                                id={pic}
+                                data-step-picture={i}
+                                className={cn(
+                                    "justify-[safe_center] mb-6 flex flex-col items-center gap-3 overflow-hidden rounded-mk-card border border-border bg-mk-noon p-3.5 shadow-[0_24px_48px_-24px_rgba(40,30,15,0.25)] min-[1080px]:mb-0 min-[1080px]:p-6",
+                                    DESK_PANEL,
+                                    !on && "min-[1080px]:hidden",
+                                    on &&
+                                        "motion-reduce:animate-none min-[1080px]:duration-200 min-[1080px]:animate-in min-[1080px]:fade-in",
+                                )}
+                            >
+                                <div className="w-full min-w-0">
+                                    {step.picture}
+                                </div>
+                                {step.note ? (
+                                    <p className="m-0 self-start text-[13px] text-muted-foreground">
+                                        {step.note}
+                                    </p>
+                                ) : null}
+                            </div>
+                        </li>
+                    );
+                })}
+            </ol>
+            <StepsFoot foot={foot} links={links} />
+        </StepsSection>
+    );
+}
+
+/** What every steps section takes besides its steps (Showcase and Player). */
+export interface StepsSectionProps {
+    id: string;
+    title: ReactNode;
+    lede?: ReactNode;
+    /** One small line under the list, e.g. how long history is kept. */
+    foot?: ReactNode;
+    /** "How to …" links to Help. */
+    links?: readonly { href: string; label: string }[];
+    className?: string;
+}
+
+/**
+ * A steps section's frame (Showcase and Player): the heading and the list
+ * (`children`) in the left 5 of 12 on a desk, `aside` in the right 7.
+ */
+export function StepsSection({
+    id,
+    title,
+    lede,
+    className,
+    relative = false,
+    aside,
+    children,
+}: Pick<StepsSectionProps, "id" | "title" | "lede" | "className"> & {
+    /** The grid is what the panel's pictures are placed against. */
+    relative?: boolean;
+    aside: ReactNode;
+    children: ReactNode;
+}) {
+    const titleId = `${id}-title`;
+    return (
         <Container
             as="section"
             id={id}
             aria-labelledby={titleId}
             className={cn("pt-12 min-[760px]:pt-[120px]", className)}
         >
-            {/* The panel's pictures are placed against this box on a desk. */}
-            <div className="relative grid gap-10 min-[1080px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[1080px]:items-start min-[1080px]:gap-16">
+            <div
+                className={cn(
+                    relative && "relative",
+                    "grid gap-10 min-[1080px]:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] min-[1080px]:items-start min-[1080px]:gap-16",
+                )}
+            >
                 <div className="grid gap-7">
                     <SectionHeading
                         id={titleId}
@@ -80,87 +190,9 @@ export function StepsShowcase({
                         lead={lede}
                         size="kit-h2"
                     />
-                    <ol className="m-0 list-none border-t border-border p-0">
-                        {steps.map((step, i) => {
-                            const on = i === at;
-                            const pic = `${base}-${i}`;
-                            return (
-                                <li
-                                    key={step.title}
-                                    className="border-b border-border"
-                                >
-                                    <button
-                                        ref={(el) => {
-                                            buttons.current[i] = el;
-                                        }}
-                                        type="button"
-                                        aria-pressed={on}
-                                        aria-controls={pic}
-                                        tabIndex={on ? 0 : -1}
-                                        onClick={() => setAt(i)}
-                                        onKeyDown={(e) => onKey(e, i)}
-                                        className={cn(
-                                            "flex w-full cursor-pointer items-start gap-4 border-none bg-transparent px-1 py-[18px] text-left text-foreground transition-opacity duration-fast ease-out motion-reduce:transition-none",
-                                            !on &&
-                                                "min-[1080px]:opacity-60 min-[1080px]:hover:opacity-90",
-                                            ring({ offset: 2 }),
-                                        )}
-                                    >
-                                        <span
-                                            aria-hidden
-                                            className={cn(
-                                                "grid size-[30px] shrink-0 place-items-center rounded-full font-mono text-[14px] font-semibold",
-                                                on
-                                                    ? "bg-foreground text-background"
-                                                    : "bg-mk-hover text-mk-copy",
-                                            )}
-                                        >
-                                            {i + 1}
-                                        </span>
-                                        <span className="grid gap-1">
-                                            <span className="font-display text-[19px] font-bold leading-tight tracking-[-0.02em]">
-                                                <span className="sr-only">
-                                                    Step {i + 1}:{" "}
-                                                </span>
-                                                {step.title}
-                                            </span>
-                                            <span className="text-[15px] leading-normal text-mk-copy [text-wrap:pretty]">
-                                                {step.body}
-                                            </span>
-                                        </span>
-                                    </button>
-                                    {/* Under its step on a phone; in the panel, when picked, on a desk. */}
-                                    <div
-                                        id={pic}
-                                        data-step-picture={i}
-                                        className={cn(
-                                            "justify-[safe_center] mb-6 flex flex-col items-center gap-3 overflow-hidden rounded-mk-card border border-border bg-mk-noon p-3.5 shadow-[0_24px_48px_-24px_rgba(40,30,15,0.25)] min-[1080px]:mb-0 min-[1080px]:p-6",
-                                            DESK_PANEL,
-                                            !on && "min-[1080px]:hidden",
-                                            on &&
-                                                "motion-reduce:animate-none min-[1080px]:duration-200 min-[1080px]:animate-in min-[1080px]:fade-in",
-                                        )}
-                                    >
-                                        <div className="w-full min-w-0">
-                                            {step.picture}
-                                        </div>
-                                        {step.note ? (
-                                            <p className="m-0 self-start text-[13px] text-muted-foreground">
-                                                {step.note}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                </li>
-                            );
-                        })}
-                    </ol>
-                    <StepsFoot foot={foot} links={links} />
+                    {children}
                 </div>
-                {/* Holds the panel's place in the grid on a desk. */}
-                <div
-                    aria-hidden
-                    className="hidden h-[640px] min-[1080px]:block"
-                />
+                {aside}
             </div>
         </Container>
     );

@@ -2,7 +2,7 @@ import { ChevronDown } from "lucide-react";
 import type { DetailsHTMLAttributes, ReactNode } from "react";
 
 import { cn } from "../cn";
-import { ring } from "../ring";
+import { foldSummaryClasses } from "../kit/phone-fold";
 
 /**
  * The landing's one fold (PHONE.md, DEC-221): a TextLink-styled summary,
@@ -25,15 +25,7 @@ export function Fold({
 }) {
     return (
         <details className={cn("group", className)} {...props}>
-            <summary
-                className={cn(
-                    "inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden",
-                    tone === "ink"
-                        ? "text-foreground decoration-border-strong"
-                        : "text-mk-lamp-fg decoration-mk-on-ink-line",
-                    ring(),
-                )}
-            >
+            <summary className={foldSummaryClasses(tone)}>
                 {summary}
                 {chevron ? (
                     <ChevronDown

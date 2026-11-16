@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import type { ReactNode } from "react";
 import { cn } from "../../cn";
+import { CARD_FRAME } from "../../templates/browser-frame";
 
 /**
  * A crop of a Saroh screen (the boards' `.ac`): the business's initial and
@@ -21,12 +22,7 @@ export function AppCard({
     className?: string;
 }) {
     return (
-        <div
-            className={cn(
-                "min-w-0 overflow-hidden rounded-[14px] border border-border bg-card",
-                className,
-            )}
-        >
+        <div className={cn(CARD_FRAME, className)}>
             <div className="flex h-[46px] items-center gap-2.5 border-b border-mk-line-row bg-mk-noon px-4 text-[14px]">
                 <span className="inline-flex items-center gap-[7px] font-semibold">
                     <i

@@ -1,4 +1,4 @@
-import type { SiteLook } from "../../kit/site-drawing";
+import type { SiteFace, SiteLook } from "../../kit/site-drawing";
 
 /**
  * The moment library (board SLLibrary): one data shape per kind of moment a
@@ -104,17 +104,11 @@ export interface OrderMoment {
 }
 
 /** An order on the business's own site, landing in Saroh (`site-order`). */
-export interface SiteOrderMoment {
+export interface SiteOrderMoment extends SiteFace {
     kind: "site-order";
     label: string;
     /** On a phone, the second picture folds behind this ("See the whole …"). */
     more?: string;
-    look: SiteLook;
-    address: string;
-    name: string;
-    nav: readonly string[];
-    cta: string;
-    hero: { title: string; line: string };
     items: readonly { name: string; price: string }[];
     card: {
         title: string;
