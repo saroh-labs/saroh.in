@@ -5,7 +5,7 @@ import { WORLD } from "@/content/world";
 import { claimOn } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
 
-import { featureName, inTheAppData, REACH_CRUMB } from "./reach/data";
+import { inTheAppData, REACH_CRUMB } from "./reach/data";
 import { SITE_FONTS } from "./reach/site-fonts";
 
 /** /features/social (FSDesk, FSPhone2): the shared page with saroh.in's words and world. */
@@ -23,7 +23,6 @@ export function SocialPage() {
             })}
             world={WORLD}
             crumb={REACH_CRUMB}
-            featureName={featureName}
             inTheApp={inTheAppData("social")}
             fonts={SITE_FONTS}
         />,

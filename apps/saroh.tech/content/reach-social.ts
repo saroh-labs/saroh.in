@@ -401,13 +401,8 @@ export function socialWords({
         },
 
         tail: {
-            momentAt: "13:00",
-            momentLead: "Seen in a day:",
-            moment: `the lunch rush is over, and ${bakery.owner} turns the cinnamon buns into a post before the afternoon bake.`,
-            momentLink: `See 1 pm at ${bakery.name}`,
             plan: "Everyone is on Free for now.",
             compare: "Tell me when",
-            works: "Works with",
         },
 
         faq: [
@@ -427,6 +422,10 @@ export function socialWords({
                 q: "What sizes do I get?",
                 a: "Post, square and story. Stories keep words clear of the top and bottom, so Instagram and WhatsApp never cover the name or price.",
             },
+            {
+                q: "Where does a post link to?",
+                a: "To the item's live page on your site, where people can book or buy.",
+            },
         ],
         askUs: {
             lead: "Something else?",
@@ -439,11 +438,9 @@ export function socialWords({
             note: "Free to start. No card needed.",
         },
         inTheApp: {
-            everything: "Everything Share does",
-            usedBy: "Used by",
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
+            phone: "Help and setup",
         },
         insights,
     };

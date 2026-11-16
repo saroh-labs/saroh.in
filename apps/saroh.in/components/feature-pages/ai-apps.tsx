@@ -8,7 +8,7 @@ import { claimOn } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
 import { resourcesContext } from "@/lib/resources-context";
 
-import { featureName, inTheAppData, REACH_CRUMB } from "./reach/data";
+import { inTheAppData, REACH_CRUMB } from "./reach/data";
 
 /** /features/ai-apps (FMDesk, FMPhone2): the shared page with saroh.in's words and world. */
 export function AiAppsPage() {
@@ -23,7 +23,6 @@ export function AiAppsPage() {
             })}
             world={WORLD}
             crumb={REACH_CRUMB}
-            featureName={featureName}
             inTheApp={inTheAppData("ai-apps")}
             apps={
                 apps

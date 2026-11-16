@@ -305,13 +305,8 @@ export interface WebsiteWords {
         draftUrl: string;
     };
     tail: {
-        moment: string;
-        momentLead: string;
-        momentAt: string;
-        momentLink: string;
         plan: string;
         compare: string;
-        works: string;
     };
     faq: {
         q: string;
@@ -328,8 +323,6 @@ export interface WebsiteWords {
         note: string;
     };
     inTheApp: {
-        everything: string;
-        usedBy: string;
         of: string;
         /** On a phone, the steps and what follows fold behind this. */
         phone: string;

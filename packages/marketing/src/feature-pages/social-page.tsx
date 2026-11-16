@@ -16,7 +16,6 @@ import {
 import { Fragment } from "react";
 import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
-import { dayLink } from "../content/world";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
 import { PhoneClip } from "../kit/phone-fold";
@@ -32,7 +31,6 @@ import { LivePill } from "./reach/app-card";
 import { CropToggle, Fold } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { InTheApp } from "./reach/in-the-app";
-import { shownChips } from "./reach/links";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Photo } from "./reach/photo";
 import { Questions } from "./reach/questions";
@@ -53,8 +51,6 @@ export interface SocialPageProps {
     world: World;
     /** The level above: "Features", at /features. */
     crumb: { name: string; href: string };
-    /** A feature's name, for a "Works with" chip. */
-    featureName: (slug: string) => string;
     inTheApp: InTheAppData;
     /** The merchant fonts' class (`--font-site-*`), for the post drawings. */
     fonts: string;
@@ -71,7 +67,6 @@ export function SocialView({
     words,
     world,
     crumb,
-    featureName,
     inTheApp,
     fonts,
 }: SocialPageProps) {
@@ -84,7 +79,6 @@ export function SocialView({
     const leadLook = w.looks.lead;
     const otherLook = w.looks.other;
     const card = w.cards.lead;
-    const oneMoment = lead.day?.find((h) => h.at === "13:00");
     const s = w.story;
     const k = w.social;
 
@@ -1073,42 +1067,10 @@ export function SocialView({
 
             <InTheApp {...inTheApp} site={site} words={w.inTheApp} />
 
-            <Container as="section" aria-label={w.tail.works} className={SCENE}>
-                <Tail
-                    moment={
-                        oneMoment
-                            ? {
-                                  at: w.tail.momentAt,
-                                  line: (
-                                      <>
-                                          <b className="font-semibold text-foreground">
-                                              {w.tail.momentLead}
-                                          </b>{" "}
-                                          {w.tail.moment}
-                                      </>
-                                  ),
-                                  link: {
-                                      label: w.tail.momentLink,
-                                      href: dayLink(lead, oneMoment),
-                                  },
-                              }
-                            : undefined
-                    }
-                    plan={{
-                        line: w.tail.plan,
-                        compare: { label: w.tail.compare, href: "/pricing" },
-                    }}
-                    works={{
-                        label: w.tail.works,
-                        items: shownChips(site, featureName, [
-                            "products",
-                            "bookings",
-                            ["website", "Website builder"],
-                            "ask-ai",
-                        ]),
-                    }}
-                />
-            </Container>
+            <Tail
+                line={w.tail.plan}
+                compare={{ label: w.tail.compare, href: "/pricing" }}
+            />
 
             <Questions items={w.faq} ask={w.askUs} />
 

@@ -384,14 +384,8 @@ export function websiteWords({
         },
 
         tail: {
-            // Thistlewick's day isn't written yet: no moment.
-            moment: "",
-            momentLead: "Seen in a day:",
-            momentAt: "10:00",
-            momentLink: `See 10 am at ${bakery.name}`,
             plan: "Everyone is on Free for now.",
             compare: "Tell me when",
-            works: "Works with",
         },
 
         faq: [
@@ -419,6 +413,22 @@ export function websiteWords({
                 q: "Is it in other languages?",
                 a: 'Not yet. Your site is in English today, with a "Made with Saroh" credit.',
             },
+            {
+                q: "How does my site look when someone shares a link?",
+                a: "You set the title, description and share image under Search and sharing. Saroh tells you when the picture is too small for Facebook and LinkedIn, or too heavy for WhatsApp.",
+            },
+            {
+                q: "Can Google find my site?",
+                a: "Yes. Each site has its own sitemap, and you can add your Google Search Console or Bing Webmaster Tools code in Settings.",
+            },
+            {
+                q: "Where do enquiries from my site go?",
+                a: "A form on your site adds the person to your contacts as a lead.",
+            },
+            {
+                q: "Can I have a blog?",
+                a: "Yes. Write posts and list them on a page of your site.",
+            },
         ],
         ask_us: {
             lead: "Something else?",
@@ -432,11 +442,9 @@ export function websiteWords({
             note: "Free to start. No card needed.",
         },
         inTheApp: {
-            everything: "Everything the website builder does",
-            usedBy: "Used by",
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
+            phone: "Help and setup",
         },
     };
 }

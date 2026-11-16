@@ -10,9 +10,8 @@ import { featureHelpLinks } from "@/content/feature-help";
 import type { KeepSlug } from "@/content/feature-keep";
 import { KEEP, KEEP_WORDS } from "@/content/feature-keep";
 import { ORDERS_MOMENTS } from "@/content/feature-orders";
-import { featureHref, featureList, features } from "@/content/features";
+import { featureHref, features } from "@/content/features";
 import { summarise } from "@/content/help";
-import { solutions } from "@/content/solutions";
 import { WORLD } from "@/content/world";
 import { claimOn, featuresOff } from "@/lib/feature-switches";
 import { helpArticles } from "@/lib/help-docs";
@@ -20,9 +19,9 @@ import { LAUNCH_MODE } from "@/lib/links";
 import { pageSite } from "@/lib/page-site";
 import { readLivePricing } from "@/lib/pricing";
 import { resourcesContext } from "@/lib/resources-context";
-import { isPublished, solutionLink } from "@/lib/search-pages";
+import { isPublished } from "@/lib/search-pages";
 
-/** The page's one moment: its own words, else the world's hour for the feature. */
+/** The hero's day button: the page's own hour, else the world's hour for the feature. */
 function momentOf(
     slug: KeepSlug,
 ): { business: WorldBusiness; hour: WorldHour } | null {
@@ -50,8 +49,6 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
     const context = resourcesContext();
     const help = featureHelpLinks(slug, helpArticles().map(summarise), context);
     const off = featuresOff();
-    const shown = new Set(featureList.map((f) => f.slug));
-    const around = feature.worksWith.filter((s) => shown.has(s));
 
     const moment = momentOf(slug);
     const day =
@@ -104,13 +101,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
             scene={words.scene}
             hero={shotView(feature.hero.shot, feature.hero.alt)}
             day={day}
-            moment={moment && day ? moment.hour : null}
             help={help}
-            around={around.map((s) => ({
-                href: featureHref(s),
-                name: features[s].name,
-                line: features[s].cardLine,
-            }))}
             ask={
                 ask
                     ? {
@@ -140,10 +131,6 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
             }
             planLine={heroPlanLine(feature, catalog)}
             compareHref="/pricing"
-            usedBy={feature.usedBy.map((s) => ({
-                href: solutionLink(s),
-                name: solutions[s].longName,
-            }))}
             faq={words.faq}
             moments={
                 slug === "orders" ? (

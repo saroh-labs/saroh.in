@@ -87,7 +87,8 @@ describe("/features/[slug]", () => {
             const hrefs = Array.from(container.querySelectorAll("a"))
                 .map((a) => a.getAttribute("href") ?? "")
                 .filter((h) => /^\/(features|solutions)\//.test(h));
-            expect(hrefs.length).toBeGreaterThan(0);
+            // No "Used by" or "Works with" chips any more (BUGS #37-#39): a page
+            // may link no other feature or trade, but never a missing one.
             for (const h of hrefs) expect(known).toContain(h);
             expect(hrefs).not.toContain(`/features/${slug}`);
             unmount();

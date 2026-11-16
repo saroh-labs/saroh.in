@@ -1,49 +1,36 @@
 import type { ReactNode } from "react";
-import { Chip } from "../../kit/chip";
-import { MomentCard } from "../../kit/moment-card";
+import { cn } from "../../cn";
 import { PlanLine } from "../../kit/plan-line";
+import { Container } from "../../layout/container";
 
 /**
- * A feature page's tail (FIX.md, feature-page tails): ONE moment from the
- * trade's day, the PlanLine, and "Works with" as a chip row. Each part is
- * optional; a page passes only what it has.
+ * Every feature page's ending, on both sites (BUGS #37–#39, #50, #52; owner,
+ * 16 Nov): the plan line and Compare plans, nothing else. The "Everything …
+ * does" fold, "Used by", the day's moment and "Works with" are gone: the
+ * steps, FAQ, Features menu and Solutions menu already say them. The "How
+ * to …" links stay beside each page's steps.
  */
 export function Tail({
-    moment,
-    plan,
-    works,
+    line,
+    compare,
+    id,
+    className,
 }: {
-    moment?: {
-        at: string;
-        line: ReactNode;
-        link: { label: string; href: string };
-    };
-    plan?: { line: ReactNode; compare: { label: string; href: string } };
-    works?: { label: string; items: readonly { name: string; href: string }[] };
+    line: ReactNode;
+    compare: { label: string; href: string };
+    id?: string;
+    className?: string;
 }) {
     return (
-        <div className="grid gap-5">
-            {moment ? <MomentCard {...moment} /> : null}
-            {plan ? (
-                <PlanLine compare={plan.compare} className="px-1 text-[17px]">
-                    {plan.line}
-                </PlanLine>
-            ) : null}
-            {works?.items.length ? (
-                <nav
-                    aria-label={works.label}
-                    className="flex flex-wrap items-center gap-2.5"
-                >
-                    <span className="mr-1.5 text-[15px] text-muted-foreground">
-                        {works.label}
-                    </span>
-                    {works.items.map((w) => (
-                        <Chip key={w.href} href={w.href}>
-                            {w.name}
-                        </Chip>
-                    ))}
-                </nav>
-            ) : null}
-        </div>
+        <Container
+            as="section"
+            id={id}
+            aria-label={compare.label}
+            className={cn("pt-12 min-[760px]:pt-[120px]", className)}
+        >
+            <PlanLine compare={compare} className="text-[18px]">
+                {line}
+            </PlanLine>
+        </Container>
     );
 }
