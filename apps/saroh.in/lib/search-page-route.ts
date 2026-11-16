@@ -56,7 +56,11 @@ export function docHubLinks(
     return (["guides", "gst", "downloads"] as const)
         .filter((id) => liveDocPages(id, list).length > 0)
         .map((id) => ({
-            name: docKind(id).hubLabel,
+            // Downloads are the document templates: the name saroh.tech gives its own (owner, 16 Nov 2026).
+            name:
+                id === "downloads"
+                    ? "Document templates"
+                    : docKind(id).hubLabel,
             line: HUB_LINES[id],
             href: docKind(id).hub,
             isNew: true,
