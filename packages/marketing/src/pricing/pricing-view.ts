@@ -129,6 +129,7 @@ function footnote(
  * wait on Developers, Ask AI's on Ask AI.
  */
 export const ROW_SWITCH: Readonly<Partial<Record<string, string>>> = {
+    "api-mcp": "ai-apps",
     "ask-ai": "ask-ai",
     "ask-ai-questions": "ask-ai",
     "api-keys": "developers",
