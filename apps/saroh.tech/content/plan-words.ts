@@ -55,6 +55,11 @@ export const PLAN_WORDS = {
         on: "No. Ask AI comes with a paid plan. AI apps is on Free, if you'd like to ask Claude or ChatGPT instead.",
         off: "Not yet. Everyone is on Free for now, and Ask AI isn't part of it. AI apps is, if you'd like to ask Claude or ChatGPT instead.",
     },
+    /** Website's Approved stage: reviewers are team seats (#33). */
+    reviewers: {
+        on: "Reviewers come with paid plans.",
+        off: "Reviewers come with paid plans.",
+    },
     /** A domain you own, as a sentence after "…from the first day." */
     domain: {
         on: "A domain you own comes with a paid plan.",

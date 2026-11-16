@@ -8,10 +8,11 @@ import { SectionHeading } from "./section-heading";
  * A section's band (the redesign, KIT.md): the colour it fills edge to edge.
  * The hour tints (`dawn` to `lamp`) are for Solutions only; `lamp` is the
  * night's dark band, its words light. `white` is a lighter band between
- * Paper ones.
+ * Paper ones. `ink` is the closing band's Ink, for a section drawn dark
+ * (Website's overdrive sections), its words on-Ink.
  */
 export type SectionTone =
-    "paper" | "white" | "dawn" | "noon" | "afternoon" | "dusk" | "lamp";
+    "paper" | "white" | "dawn" | "noon" | "afternoon" | "dusk" | "lamp" | "ink";
 
 export const TONE_BAND: Record<SectionTone, string> = {
     paper: "bg-background text-foreground",
@@ -22,6 +23,7 @@ export const TONE_BAND: Record<SectionTone, string> = {
     dusk: "bg-mk-dusk text-foreground",
     // Its headings and copy turn light with it (`[&_h2]`, `.text-mk-copy`).
     lamp: "bg-mk-lamp text-mk-lamp-fg [&_.text-foreground]:text-mk-lamp-fg [&_.text-mk-copy]:text-mk-lamp-meta",
+    ink: "bg-foreground text-background [&_.text-foreground]:text-background [&_.text-mk-copy]:text-mk-on-ink",
 };
 
 /**

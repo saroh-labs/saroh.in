@@ -21,12 +21,27 @@ import type { WorldBusiness } from "../../content/world";
  *   are said only once it is open, as a point's `openNote` is (DEC-136).
  */
 
-/** A step of the page: its heading and lead, the drawing's name, and its points. */
-export interface StepWords {
+/** One stage of "Nothing goes live until it's right." (`Journey`). */
+export interface JourneyStage {
+    /** On the track: "Draft", and the line under it. */
     title: string;
-    lead: string;
-    label: string;
-    points: { title: string; body: string }[];
+    sub: string;
+    /** Beside the frame while this stage is on. */
+    heading: string;
+    body: string;
+    /** A plan line under the body, where the page may name one. */
+    plan?: string;
+    /** The frame's address bar, and its badge. */
+    host: string;
+    badge: string;
+    /** The badge's colour: grey draft, Saffron link-only, or green. */
+    tone: "draft" | "test" | "ok";
+    /** A stamp over the page ("DRAFT · ONLY YOU"). */
+    stamp?: string;
+    /** A reviewer's chip over the page ("Ravi approved · prices checked"). */
+    chip?: string;
+    /** The buttons that move it on; each one's result shows once live. */
+    actions?: readonly { label: string; result: string }[];
 }
 
 /** A colourway in the switcher: whose look it borrows, its name, and the line under it. */
@@ -216,71 +231,41 @@ export interface WebsiteWords {
         ];
         found: string;
     };
-    draft: {
+    /**
+     * "Nothing goes live until it's right." (#33): draft, test address,
+     * approved, live. `release` (the test address and the approval) is
+     * drawn only under the `site-test-releases` claim; without it the
+     * draft's action is `publish.action` and the last stage `publish.live`.
+     */
+    journey: {
         title: string;
         lead: string;
+        /** The frame's accessible name. */
         label: string;
-        page: string;
-        state: string;
-        preview: string;
-        publish: string;
-        sectionsTitle: string;
-        sections: string[];
-        addSection: string;
-        selected: string;
-        hero: {
-            title: string;
-            line: string;
-            cta: string;
+        track: string;
+        startOver: string;
+        draft: JourneyStage;
+        release: readonly JourneyStage[];
+        live: JourneyStage;
+        publish: {
+            action: { label: string; result: string };
+            live: JourneyStage;
         };
-        history: string;
-        versions: (
-            | {
-                  when: string;
-                  live: string;
-              }
-            | {
-                  when: string;
-                  live?: undefined;
-              }
-        )[];
-        published: string;
-        putBack: string;
-        previewTitle: string;
-        previewNote: string;
-        points: {
-            title: string;
-            body: string;
-        }[];
-        phoneMore: string;
-        phoneMoreMeta: string;
     };
-    /** Test releases, reviewers and approval (the `site-test-releases` claim). */
-    testRelease: StepWords & {
-        panel: string;
-        name: string;
-        number: string;
-        address: string;
-        only: string;
-        reviewer: string;
-        approved: string;
-        now: string;
-        later: string;
-    };
-    /** The editor's device switch: desktop, tablet and phone, zoom and Fit. */
-    preview: StepWords & {
-        devices: readonly string[];
-        zoom: string;
-    };
-    /** The look panel: theme, colours, typefaces and logo. */
-    brand: StepWords & {
-        panel: string;
-        theme: string;
-        themeValue: string;
+    /**
+     * "Your brand, every screen." (#35, #36): the colour sets
+     * (`looks.options`) and the editor's Desktop, Tablet and Phone over the
+     * example site.
+     */
+    studio: {
+        title: string;
+        lead: string;
+        /** The frame's accessible name, before the set and the screen. */
+        label: string;
         colours: string;
-        typefaces: string;
-        typefacesValue: string;
-        logo: string;
+        screen: string;
+        devices: readonly [string, string, string];
+        note: string;
     };
     sections: {
         /** On a phone, what the sections read and what you fill fold behind this. */

@@ -281,117 +281,89 @@ export function websiteWords({
             found: "Found",
         },
 
-        draft: {
-            title: "Change it on the page. Publish when it's right.",
-            lead: "Your changes stay a draft until you publish. Send a preview link first when someone should see it before it goes live, and every publish is kept.",
-            label: "The site editor with the Home page's top section selected and two unpublished changes",
-            page: "Home",
-            state: "Draft · 2 changes",
-            preview: "Preview link",
-            publish: "Publish",
-            sectionsTitle: "Sections on Home",
-            sections: [
-                "Top of page",
-                "Products",
-                "What we bake",
-                "Hours",
-                "Visit us",
-            ],
-            addSection: "Add a section",
-            selected: "Top of page",
-            hero: {
-                title: "The holiday boxes are in",
-                line: `The ${box.name.toLowerCase()}, ${box.price}, packed to give. Order two days ahead.`,
-                cta: "See the holiday menu",
+        journey: {
+            title: "Nothing goes live until it's right.",
+            lead: "Your changes stay a draft until you publish, and every publish is kept. Send a preview link first when someone should see it before it goes live.",
+            label: `${bakery.name}'s holiday menu page, from draft to live`,
+            track: "From draft to live",
+            startOver: "Start over",
+            draft: {
+                title: "Draft",
+                sub: "Only you see it",
+                heading: "Every change starts as a draft.",
+                body: "Add the holiday menu, move a section, change a photo. Customers see none of it until you publish. Every publish is kept in Version history, so you can put an earlier one back.",
+                host: `editor · ${slug}`,
+                badge: "Draft",
+                tone: "draft",
+                stamp: "DRAFT · ONLY YOU",
+                actions: [{ label: "Make a test release", result: "Live now" }],
             },
-            history: "Version history",
-            versions: [
-                { when: `Sun 15 Nov, 1:12 pm · ${owner}`, live: "On the site" },
-                { when: `Fri 6 Nov, 9:40 am · ${owner}` },
-                { when: `Tue 3 Nov, 4:05 pm · ${owner}` },
-            ],
-            published: "Published",
-            putBack: "Put back",
-            previewTitle: "Preview link, for someone to check first",
-            previewNote: "Link copied · works until you publish",
-            points: [
+            release: [
                 {
-                    title: "Draft, then publish",
-                    body: "Nothing changes for customers until you press Publish.",
+                    title: "Test address",
+                    sub: "Link only",
+                    heading: "Try it where only your people can.",
+                    body: "A test release freezes the site as it stands on a test address of its own. Only people you send the link to can open it, and nothing there takes a real order or payment.",
+                    host: `test--${bakery.site}`,
+                    badge: "Link only",
+                    tone: "test",
+                    actions: [
+                        {
+                            label: "Your reviewer opens the link and approves",
+                            result: "Live now",
+                        },
+                    ],
                 },
                 {
-                    title: "Every version kept",
-                    body: "Each publish is kept in Version history, and you can put an earlier one back.",
+                    title: "Approved",
+                    sub: "Your reviewer",
+                    heading: "A reviewer signs it off.",
+                    body: "With Publishing needs approval on, changes wait for a reviewer. Yours opened the link, checked the prices and approved.",
+                    plan: plan.reviewers,
+                    host: `test--${bakery.site}`,
+                    badge: "Approved",
+                    tone: "ok",
+                    chip: "Approved · prices checked",
+                    actions: [
+                        { label: "Go live now", result: "Live now" },
+                        {
+                            label: "Sat, 9:00 am",
+                            result: "Goes live Sat, 9:00 am",
+                        },
+                    ],
                 },
             ],
-            phoneMore: "See version history",
-            phoneMoreMeta: "Put back",
+            live: {
+                title: "Live",
+                sub: "Now, or Sat 9:00 am",
+                heading: "Live now, or while you bake.",
+                body: "Put it live at once, or set Saturday 9 am and let it happen on its own.",
+                host: bakery.site,
+                badge: "Live",
+                tone: "ok",
+            },
+            publish: {
+                action: { label: "Publish", result: "Live now" },
+                live: {
+                    title: "Live",
+                    sub: "When you press Publish",
+                    heading: "Live when you press Publish.",
+                    body: "Customers see the new page the moment you publish. If it's not right, put an earlier version back.",
+                    host: bakery.site,
+                    badge: "Live",
+                    tone: "ok",
+                },
+            },
         },
 
-        testRelease: {
-            title: "Try it on a test address first.",
-            lead: "Make a test release: your site as it stands, frozen on a test address of its own. Send the link to the people who should check it, and only they can open it. When it's right, put it live now or at a time you set.",
-            label: `A test release of ${bakery.name}'s site on its own test address, approved by a reviewer, with Go live now and Go live at a set time`,
-            panel: "Test releases",
-            name: "Holiday menu",
-            number: "Test release 3",
-            address: `test--${bakery.site}`,
-            only: "Link only",
-            reviewer: "Your reviewer",
-            approved: "Approved",
-            now: "Go live now",
-            later: "Go live at a set time",
-            points: [
-                {
-                    title: "Only people with the link",
-                    body: "Without the link, every page on the test address asks to be opened from it. Nothing there takes a real order or payment.",
-                },
-                {
-                    title: "Approval before it goes live",
-                    body: "Turn on Publishing needs approval, and changes wait for a reviewer to approve them. Reviewers come with paid plans.",
-                },
-            ],
-        },
-
-        preview: {
-            title: "See every screen before you publish.",
-            lead: "The editor shows your site on a computer, a tablet and a phone. Switch between them as you edit, zoom in, or fit the whole page in view.",
-            label: `The editor's device switch set to Phone, showing ${bakery.name}'s home page at phone width`,
-            devices: ["Desktop", "Tablet", "Phone"],
-            zoom: "Fit",
-            points: [
-                {
-                    title: "Desktop, tablet and phone",
-                    body: "Each redraws the page at that width, so you see what a customer's screen shows, not a squeezed copy.",
-                },
-                {
-                    title: "Zoom, or Fit",
-                    body: "Look at the page at 50, 75 or 100%, or fit the whole frame in the window.",
-                },
-            ],
-        },
-
-        brand: {
-            title: "Your brand, on every page.",
-            lead: "Pick a theme, then set your colours, typefaces and logo. Every page follows, the shop included.",
-            label: `The look panel with ${bakery.name}'s theme, colours, typefaces and logo, beside its site`,
-            panel: "Look",
-            theme: "Theme",
-            themeValue: "Folio",
+        studio: {
+            title: "Your brand, every screen.",
+            lead: "Pick a theme, then your colours, typefaces and logo. Every page follows, the shop included.",
+            label: `${bakery.name}'s website`,
             colours: "Colours",
-            typefaces: "Typefaces",
-            typefacesValue: "Fraunces and Inter Tight",
-            logo: "Logo",
-            points: [
-                {
-                    title: "Colours and typefaces that go together",
-                    body: "Choose a colourway, a pair of typefaces and the spacing from ones made to sit well together, and every page follows.",
-                },
-                {
-                    title: "A blog when you want one",
-                    body: "Write posts and list them on a page of your site, in the same look.",
-                },
-            ],
+            screen: "Screen",
+            devices: ["Desktop", "Tablet", "Phone"],
+            note: "Typefaces come with each colour set, made to sit together. In the editor, each screen redraws the page at its width, not a squeezed copy: zoom to 50, 75 or 100%, or Fit the whole page in view.",
         },
 
         sections: {
@@ -506,7 +478,7 @@ export function websiteWords({
             },
             {
                 q: "Can I have a blog?",
-                a: "Yes. Write posts and list them on a page of your site.",
+                a: "Yes. Write posts and list them on a page of your site, in the same look.",
             },
         ],
         ask_us: {

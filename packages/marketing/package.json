@@ -18,6 +18,7 @@
         "./cn": "./src/cn.ts",
         "./ring": "./src/ring.ts",
         "./roving": "./src/roving.ts",
+        "./use-browser-value": "./src/use-browser-value.ts",
         "./button": "./src/buttons/button.tsx",
         "./arrow": "./src/links/arrow.tsx",
         "./card-link": "./src/links/card-link.tsx",

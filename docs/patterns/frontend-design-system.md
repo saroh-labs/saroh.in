@@ -343,6 +343,15 @@
       panel (`view.go`, `view.confirm`) or a picked step moves it on. The
       server draws the finished story; with script it starts at step 1;
       reduced motion skips the beats.
+    - A story that plays by itself on an Ink band (Website, board
+      R2WebsiteOverdrive "V1 overdrive, dark", owner 16 Nov: the one
+      exception to "nothing autoplays"): `Journey` (draft to live) and
+      `BrandStudio` (colour sets over Desktop, Tablet, Phone) in
+      `feature-pages/website/`, on `Section tone="ink"`, timed by
+      `useAutoplay` (`website/autoplay.ts`): plays while 40% in view and
+      the tab is shown, the visitor's first pick stops it for good, reduced
+      motion never plays. The server draws the finished state with every
+      stage's words in the HTML.
     - "Paste one address" (AI apps, R2Apps2 variant I, owner 16 Nov): the
       MCP address large in mono between Ink rules with Copy, Saffron
       numbered steps, "Step-by-step for" guide pills with the apps' marks

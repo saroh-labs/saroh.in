@@ -1,10 +1,4 @@
-import {
-    AlertTriangle,
-    FileText,
-    LayoutTemplate,
-    Plus,
-    Wallet,
-} from "lucide-react";
+import { AlertTriangle, FileText, Plus, Wallet } from "lucide-react";
 import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
 import { Claim } from "../kit/claim";
@@ -34,9 +28,10 @@ import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
 import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
+import { BrandStudio } from "./website/brand-studio";
+import { Journey } from "./website/journey";
 import { Looks } from "./website/looks";
 import { lookStyle } from "./website/shop-site";
-import { BrandStep, PreviewStep, TestReleaseStep } from "./website/steps";
 import type { WebsiteWords } from "./website/words";
 
 const H3 = "m-0 font-display text-mk-kit-h3 font-bold";
@@ -62,8 +57,9 @@ export interface WebsitePageProps {
  * /features/website (boards FWDesk, FWPhone2): one responsive page. The
  * hero leads with one change (a price in Products, already on the site),
  * then the colourways over Rye & Co.'s own site, then what the site
- * reads, the address, draft and publish, a test release (its claim), the
- * device preview, the brand, sections, sharing and asking for a change.
+ * reads, the address, then two Ink sections (board R2WebsiteOverdrive):
+ * draft to live, with a test release and approval under their claim, and
+ * the brand on every screen; then sections, sharing and asking for a change.
  * Products and the shop wait for the `site-shop` claim.
  */
 export function WebsiteView({
@@ -85,6 +81,19 @@ export function WebsiteView({
     const tpl = templates;
     const aiApps = site.featureHref("ai-apps");
     const s = w.signature;
+    const lookOptions = w.looks.options.flatMap((o) =>
+        o.business.look
+            ? [
+                  {
+                      label: o.label,
+                      line: o.line,
+                      look: o.business.look,
+                      band: o.band,
+                      caps: o.business.trade === "gym",
+                  },
+              ]
+            : [],
+    );
 
     return (
         <div className={fonts}>
@@ -234,19 +243,7 @@ export function WebsiteView({
                     example={w.looks.example}
                     words={w.looks.site}
                     shop={shop}
-                    options={w.looks.options.flatMap((o) =>
-                        o.business.look
-                            ? [
-                                  {
-                                      label: o.label,
-                                      line: o.line,
-                                      look: o.business.look,
-                                      band: o.band,
-                                      caps: o.business.trade === "gym",
-                                  },
-                              ]
-                            : [],
-                    )}
+                    options={lookOptions}
                 />
                 {tpl ? (
                     <>
@@ -612,203 +609,35 @@ export function WebsiteView({
                 </Container>
             </section>
 
-            {/* Draft, then publish. */}
-            <Section
-                titleId="draft-title"
-                title={w.draft.title}
-                lead={w.draft.lead}
-                size="kit-h2"
-                className={SCENE}
-            >
-                <div className="mt-10 grid items-start gap-7 min-[760px]:mt-[52px] min-[1080px]:grid-cols-[1fr_360px]">
-                    <div
-                        role="img"
-                        aria-label={w.draft.label}
-                        className="relative max-h-[320px] overflow-hidden rounded-mk-card border border-border bg-card shadow-[0_24px_50px_-28px_rgba(40,30,15,0.3)] min-[760px]:max-h-none"
-                    >
-                        <div className="flex h-[58px] items-center gap-3 border-b border-mk-line-row px-4">
-                            <span className="text-[15px] font-semibold">
-                                {w.draft.page}
-                            </span>
-                            <span className="rounded-full bg-mk-tint px-2.5 py-1 text-[12.5px] font-semibold text-brand-700">
-                                {w.draft.state}
-                            </span>
-                            <span className="ml-auto hidden h-10 items-center rounded-[9px] border border-border-strong bg-card px-3.5 text-[14px] font-semibold min-[760px]:inline-flex">
-                                {w.draft.preview}
-                            </span>
-                            <span className="ml-auto inline-flex h-10 items-center rounded-[9px] bg-foreground px-3.5 text-[14px] font-semibold text-background min-[760px]:ml-0">
-                                {w.draft.publish}
-                            </span>
-                        </div>
-                        <div className="grid min-[760px]:grid-cols-[200px_1fr]">
-                            <div className="hidden border-r border-mk-line-row bg-mk-noon py-3 min-[760px]:block">
-                                <div className="px-4 pb-2 pt-1 text-[12.5px] font-semibold text-muted-foreground">
-                                    {w.draft.sectionsTitle}
-                                </div>
-                                {w.draft.sections.map((sec, i) => (
-                                    <div
-                                        key={sec}
-                                        className={cn(
-                                            "flex h-[42px] items-center gap-2.5 px-4 text-[14px] text-mk-copy",
-                                            i === 0 &&
-                                                "bg-card font-semibold text-foreground shadow-[inset_3px_0_0_hsl(var(--foreground))]",
-                                        )}
-                                    >
-                                        <LayoutTemplate
-                                            aria-hidden
-                                            className="size-4 text-muted-foreground"
-                                        />
-                                        {sec}
-                                    </div>
-                                ))}
-                                <div className="mx-4 mt-2.5 flex h-10 items-center justify-center gap-1.5 rounded-[9px] border border-dashed border-border-strong text-[13.5px] font-semibold">
-                                    <Plus aria-hidden className="size-4" />
-                                    {w.draft.addSection}
-                                </div>
-                            </div>
-                            <div className="bg-mk-hover p-3 min-[760px]:p-5">
-                                <div
-                                    style={look ? lookStyle(look) : undefined}
-                                    className="overflow-hidden rounded-md bg-[hsl(var(--site-bg))] font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))]"
-                                >
-                                    <div className="hidden items-center gap-4 border-b border-[hsl(var(--site-fg)/0.12)] px-[22px] py-3 min-[760px]:flex">
-                                        <span className="font-[family-name:var(--site-font-heading)] text-[20px] font-semibold">
-                                            {lead.name}
-                                        </span>
-                                        <span className="flex gap-4 text-[13.5px] text-[hsl(var(--site-muted))]">
-                                            {w.looks.site.nav
-                                                .slice(0, 3)
-                                                .map((n) => (
-                                                    <span key={n}>{n}</span>
-                                                ))}
-                                        </span>
-                                        <span className="ml-auto inline-flex h-[34px] items-center rounded-[var(--site-radius)] bg-[hsl(var(--site-accent))] px-3.5 text-[13.5px] font-bold text-[hsl(var(--site-accent-fg))]">
-                                            {w.looks.site.order}
-                                        </span>
-                                    </div>
-                                    <div className="relative outline outline-2 -outline-offset-2 outline-foreground">
-                                        <span className="absolute left-0 top-0 z-[1] rounded-br-md bg-foreground px-[9px] py-1 text-[12px] font-semibold text-background">
-                                            {w.draft.selected}
-                                        </span>
-                                        <div className="grid items-center gap-5 px-[22px] pb-6 pt-9 min-[760px]:grid-cols-[1fr_1fr] min-[760px]:pt-[30px]">
-                                            <Photo
-                                                kind="festive"
-                                                className="h-[140px] rounded-[var(--site-radius)] min-[760px]:order-2 min-[760px]:h-[180px]"
-                                            />
-                                            <div>
-                                                <h3 className="m-0 font-[family-name:var(--site-font-heading)] text-[28px] font-semibold leading-[1.05] min-[760px]:text-[36px]">
-                                                    {w.draft.hero.title}
-                                                </h3>
-                                                <p className="m-0 mt-2.5 text-[14.5px] text-[hsl(var(--site-muted))]">
-                                                    {w.draft.hero.line}
-                                                </p>
-                                                <span className="mt-3.5 inline-flex h-[38px] items-center rounded-[var(--site-radius)] bg-[hsl(var(--site-accent))] px-4 text-[13.5px] font-bold text-[hsl(var(--site-accent-fg))]">
-                                                    {w.draft.hero.cta}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div
-                            aria-hidden
-                            className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-card min-[760px]:hidden"
-                        />
-                    </div>
-                    <div className="hidden min-[760px]:block">
-                        <div className="overflow-hidden rounded-mk-card border border-border bg-card">
-                            <h3 className="m-0 border-b border-mk-line-row px-[18px] py-4 text-[16px] font-semibold">
-                                {w.draft.history}
-                            </h3>
-                            {w.draft.versions.map((v) => (
-                                <div
-                                    key={v.when}
-                                    className="flex items-center gap-3 border-t border-mk-line-row px-[18px] py-3 text-[14px] first-of-type:border-t-0"
-                                >
-                                    <span className="flex-1">
-                                        {w.draft.published}
-                                        <small className="block text-[13px] text-muted-foreground">
-                                            {v.when}
-                                        </small>
-                                    </span>
-                                    {v.live ? (
-                                        <LivePill>{v.live}</LivePill>
-                                    ) : (
-                                        <span className="font-semibold underline underline-offset-[3px]">
-                                            {w.draft.putBack}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="mt-4 rounded-[14px] border border-border bg-card px-[18px] py-3.5 text-[14px] text-mk-copy">
-                            {w.draft.previewTitle}
-                            <span className="mt-1.5 block rounded-lg bg-mk-noon px-2.5 py-2 font-mono text-[13px] text-foreground">
-                                {w.draft.previewNote}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-                <div className="mt-9 hidden gap-10 border-t border-border pt-6 min-[760px]:grid min-[1080px]:grid-cols-2">
-                    {w.draft.points.map((p) => (
-                        <div key={p.title}>
-                            <b className="block text-[17px] font-semibold">
-                                {p.title}
-                            </b>
-                            <p className="m-0 mt-1.5 text-[15.5px] leading-normal text-mk-copy">
-                                {p.body}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-                <Fold
-                    phone
-                    label={w.draft.phoneMore}
-                    meta={w.draft.phoneMoreMeta}
-                    className="mt-3"
-                >
-                    <ul>
-                        {w.draft.versions.map((v) => (
-                            <li key={v.when}>
-                                {w.draft.published} {v.when} ·{" "}
-                                {v.live ?? w.draft.putBack}
-                            </li>
-                        ))}
-                    </ul>
-                    <p className="m-0 mt-2.5">
-                        {w.draft.previewTitle}: {w.draft.previewNote}.
-                    </p>
-                    {w.draft.points.map((p) => (
-                        <p key={p.title} className="m-0 mt-2.5">
-                            <b className="font-semibold text-foreground">
-                                {p.title}.
-                            </b>{" "}
-                            {p.body}
-                        </p>
-                    ))}
-                </Fold>
-            </Section>
-
-            {/* Try it on a test address first, then go live. */}
-            <Claim on={testReleases}>
-                <TestReleaseStep words={w.testRelease} />
-            </Claim>
-
-            {/* Every screen, before you publish. */}
-            <PreviewStep
-                words={w.preview}
+            {/* Nothing goes live until it's right (#33): draft, test address, approved, live. */}
+            <Journey
+                words={w.journey}
+                stages={
+                    testReleases
+                        ? [
+                              w.journey.draft,
+                              ...w.journey.release,
+                              w.journey.live,
+                          ]
+                        : [
+                              {
+                                  ...w.journey.draft,
+                                  actions: [w.journey.publish.action],
+                              },
+                              w.journey.publish.live,
+                          ]
+                }
                 site={w.looks.site}
                 shop={shop}
                 look={look}
             />
 
-            {/* Your brand, on every page. */}
-            <BrandStep
-                words={w.brand}
+            {/* Your brand, every screen (#35, #36). */}
+            <BrandStudio
+                words={w.studio}
+                options={lookOptions}
                 site={w.looks.site}
                 shop={shop}
-                look={look}
             />
 
             {/* Pages, built from sections. */}
