@@ -272,6 +272,10 @@ for (const root of SEARCH_ROOTS) {
     for await (const file of walk(join(ROOT, root))) {
         const rel = relative(ROOT, file);
         if (rel.startsWith("packages/site-blocks/")) continue;
+        // The marketing sites' drawings of an example business's site, in its
+        // palette (owner, 16 Nov 2026): illustrations on saroh.in/saroh.tech,
+        // never a merchant's page, so not a second renderer of the blocks.
+        if (rel.startsWith("packages/marketing/src/")) continue;
         if (SITE_LAYER_ALLOWED.has(rel) || PENDING_REMOVAL.has(rel)) continue;
         // The Tailwind configs must name the namespace; that is what makes the
         // classes exist. Declaring is not drawing.
