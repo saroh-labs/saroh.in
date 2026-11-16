@@ -392,7 +392,7 @@ export function aiAppsWords({
         },
         plan: {
             line: plans
-                ? "Free to start. AI apps comes with Grow and Pro. Your assistant's app may need a paid plan of its own."
+                ? "AI apps is on every plan, Free included. Your assistant's app may need a paid plan of its own."
                 : "Free to start. Your assistant's app may need a paid plan of its own.",
             compare: "Compare plans",
         },
