@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 
 import { HowItWorksPage as HowItWorks } from "@saroh/marketing/how-it-works/how-it-works-page";
 import type { Gate } from "@saroh/marketing/how-it-works/words";
 
+import { SITE_FONTS } from "@/components/feature-pages/reach/site-fonts";
 import { NEW_FEATURES } from "@/content/features";
 import { HOW_IT_WORKS as W } from "@/content/how-it-works";
 import { linkShown } from "@/content/resources";
@@ -29,18 +29,6 @@ export const metadata: Metadata = pageMetadata({
     path: W.href,
 });
 
-// The example merchants' own fonts, for their drawings (never Saroh's).
-const siteSerif = localFont({
-    src: "../../../../../packages/site-blocks/fonts/fraunces/Fraunces-wght-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-serif",
-});
-const siteSans = localFont({
-    src: "../../../../../packages/site-blocks/fonts/figtree/Figtree-400-700-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-sans",
-});
-
 export default function HowItWorksPage() {
     const off = featuresOff();
     const ctx = resourcesContext();
@@ -58,7 +46,7 @@ export default function HowItWorksPage() {
             pageShown={(href) => linkShown(href, ctx)}
             isNew={(slug) => NEW_FEATURES.includes(slug as FeatureSlug)}
             dayOn={dayPage ? isPublished(dayPage) : false}
-            className={`${siteSerif.variable} ${siteSans.variable}`}
+            className={SITE_FONTS}
         />
     );
 }

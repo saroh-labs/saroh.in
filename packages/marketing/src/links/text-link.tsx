@@ -79,3 +79,30 @@ export function TextLink({
         </Link>
     );
 }
+
+/** A row of Ink links, each with its arrow: "Read the guides →  Contact us →". */
+export function LinkRow({
+    links,
+    className,
+    linkClassName,
+}: {
+    links: readonly { href: string; label: string }[];
+    className?: string;
+    linkClassName?: string;
+}) {
+    return (
+        <div className={cn("flex flex-wrap gap-x-6", className)}>
+            {links.map((link) => (
+                <TextLink
+                    key={link.href}
+                    href={link.href}
+                    tone="ink"
+                    arrow
+                    className={linkClassName}
+                >
+                    {link.label}
+                </TextLink>
+            ))}
+        </div>
+    );
+}

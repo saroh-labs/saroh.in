@@ -9,16 +9,17 @@ import type { PublishContext } from "@/content/resources";
 import { linkShown } from "@/content/resources";
 import type { LaunchMode } from "@/lib/links";
 
+import {
+    AboutName,
+    AboutValues,
+    CompanyFact,
+} from "@saroh/marketing/about-parts";
 import { Container } from "@saroh/marketing/container";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
-import { Section } from "@saroh/marketing/section";
-import { TextLink } from "@saroh/marketing/text-link";
+import { LinkRow, TextLink } from "@saroh/marketing/text-link";
 
 import { PageHero } from "@saroh/marketing/page-hero";
 import { CtaLink } from "../shared/buttons/cta-link";
-
-/** Noto Sans Devanagari, loaded by the route (`app/(site)/about/page.tsx`). */
-const HINDI = "font-[family-name:var(--font-devanagari)]";
 
 /**
  * /about (design "About", DEC-137): the opening, what the name means on an
@@ -57,76 +58,18 @@ export function AboutPage({
                     .join("")}
             />
 
-            <Container as="section" aria-labelledby="about-name">
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-10 rounded-mk-card bg-foreground p-[clamp(32px,6vw,72px)] text-background">
-                    <div className="grid gap-[14px]">
-                        <h2
-                            id="about-name"
-                            className="m-0 font-display text-mk-kit-h3 font-bold text-mk-on-ink"
-                        >
-                            {meaning.eyebrow}
-                        </h2>
-                        <div className="flex items-end gap-2.5">
-                            <span
-                                lang="hi"
-                                // The design's clamp(72px, 10vw, 120px); under about
-                                // 343px wide it eases down so the word and its
-                                // dot stay inside the band.
-                                className={`${HINDI} text-[min(clamp(72px,10vw,120px),21vw)] font-bold leading-[1.15]`}
-                            >
-                                {meaning.word}
-                            </span>
-                            <span
-                                aria-hidden
-                                className="mb-[clamp(26px,3.6vw,40px)] size-4 flex-none rounded-full bg-mk-saffron"
-                            />
-                        </div>
-                    </div>
-                    <div className="grid gap-[18px] text-mk-band-body text-mk-on-ink">
-                        <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-[18px] gap-y-1.5">
-                            {meaning.parts.map((part) => (
-                                <NameLine key={part.roman} part={part} />
-                            ))}
-                        </div>
-                        <p className="m-0 border-t border-mk-ink-hover pt-[18px] [text-wrap:pretty]">
-                            {meaning.together.before}
-                            <strong className="font-semibold text-background">
-                                {meaning.together.strong}
-                            </strong>
-                            {meaning.together.after}
-                        </p>
-                        <span className="font-display text-[22px] font-semibold text-mk-saffron">
-                            {meaning.line}
-                        </span>
-                    </div>
-                </div>
-            </Container>
+            <AboutName meaning={meaning} />
 
-            <Section
-                titleId="about-values"
+            <AboutValues
                 title={values.title}
-                size="kit-h2"
-                space="kit"
-                className="grid gap-10 pb-0 min-[760px]:pb-0"
-            >
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-4">
-                    {drawnIn(values.cards, mode).map((card) => (
-                        <div
-                            key={card.title}
-                            className="grid content-start gap-2.5 rounded-mk-card border border-border bg-card p-6"
-                        >
-                            <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
-                                {card.title}
-                            </h3>
-                            <p className="m-0 text-[16px] leading-[1.6] text-mk-copy">
-                                {mode === "open" && card.openBody
-                                    ? card.openBody
-                                    : card.body}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            </Section>
+                cards={drawnIn(values.cards, mode).map((card) => ({
+                    title: card.title,
+                    body:
+                        mode === "open" && card.openBody
+                            ? card.openBody
+                            : card.body,
+                }))}
+            />
 
             <Container
                 as="section"
@@ -144,18 +87,7 @@ export function AboutPage({
                         {where.opens[mode]} {where.rest}
                     </p>
                     {links.length > 0 ? (
-                        <div className="flex flex-wrap gap-x-6 text-[16px]">
-                            {links.map((link) => (
-                                <TextLink
-                                    key={link.href}
-                                    href={link.href}
-                                    tone="ink"
-                                    arrow
-                                >
-                                    {link.label}
-                                </TextLink>
-                            ))}
-                        </div>
+                        <LinkRow links={links} className="text-[16px]" />
                     ) : null}
                 </div>
                 {founder ? (
@@ -225,46 +157,5 @@ export function AboutPage({
                 note={band.note[mode]}
             />
         </>
-    );
-}
-
-/** "स  **sa**, with. As in सपरिवार, with the family." */
-function NameLine({ part }: { part: (typeof ABOUT.meaning.parts)[number] }) {
-    return (
-        <>
-            <span
-                lang="hi"
-                className={`${HINDI} text-[28px] font-bold text-background`}
-            >
-                {part.hi}
-            </span>
-            <span>
-                <strong className="font-semibold text-background">
-                    {part.roman}
-                </strong>
-                {part.means}
-                <span lang="hi" className={HINDI}>
-                    {part.example}
-                </span>
-                {part.gloss}
-            </span>
-        </>
-    );
-}
-
-function CompanyFact({
-    label,
-    children,
-}: {
-    label: string;
-    children: React.ReactNode;
-}) {
-    return (
-        // `content-start`: a cell beside a taller one (a three-line address)
-        // keeps its words right under its label, not spread down the cell.
-        <div className="grid content-start gap-1">
-            <dt className="font-semibold text-foreground">{label}</dt>
-            <dd className="m-0">{children}</dd>
-        </div>
     );
 }

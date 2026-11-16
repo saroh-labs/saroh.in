@@ -1,8 +1,11 @@
 import { ComingList } from "@saroh/marketing/coming-list";
 import { Container } from "@saroh/marketing/container";
+import {
+    IntegrationCardHead,
+    PlannedSection,
+} from "@saroh/marketing/integration-parts";
 import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
 import { PageHero } from "@saroh/marketing/page-hero";
-import { Pill } from "@saroh/marketing/pill";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
@@ -42,19 +45,11 @@ export default function IntegrationsPage() {
                             key={item.name}
                             className="grid h-full content-start gap-3.5 rounded-mk-card border border-border bg-card p-[22px] text-foreground"
                         >
-                            <span className="flex items-start gap-3">
-                                <span className="grid">
-                                    <span className="font-display text-mk-kit-h3 font-bold">
-                                        {item.name}
-                                    </span>
-                                    <span className="text-[13px] text-muted-foreground">
-                                        {item.category}
-                                    </span>
-                                </span>
-                                <Pill tone="ok" className="ml-auto">
-                                    {page.available}
-                                </Pill>
-                            </span>
+                            <IntegrationCardHead
+                                name={item.name}
+                                kind={item.category}
+                                available={page.available}
+                            />
                             <span className="text-[15px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
                                 {item.line}
                             </span>
@@ -66,27 +61,17 @@ export default function IntegrationsPage() {
                 </SwipeRow>
             </Container>
 
-            <Container
-                as="section"
-                aria-labelledby="planned"
+            <PlannedSection
                 id="planned-list"
-                className="grid gap-5 pt-[72px] min-[760px]:pt-[120px]"
+                title={page.plannedTitle}
+                intro={page.plannedIntro}
             >
-                <h2
-                    id="planned"
-                    className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
-                >
-                    {page.plannedTitle}
-                </h2>
-                <p className="m-0 mb-3 max-w-[70ch] text-[16px] leading-[1.6] text-mk-copy">
-                    {page.plannedIntro}
-                </p>
                 <ComingList
                     groups={page.planned}
                     idPrefix="planned"
                     mark={page.notYet}
                 />
-            </Container>
+            </PlannedSection>
 
             <Container className="pb-[72px] pt-14 min-[760px]:pb-[120px]">
                 <p className="m-0 border-t border-border pt-6 text-[16px] leading-[1.6] text-mk-copy">

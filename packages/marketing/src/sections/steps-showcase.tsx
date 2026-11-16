@@ -5,7 +5,7 @@ import { useId, useRef, useState } from "react";
 
 import { cn } from "../cn";
 import { Container } from "../layout/container";
-import { TextLink } from "../links/text-link";
+import { LinkRow } from "../links/text-link";
 import { ring } from "../ring";
 import { nextIndex } from "../roving";
 import { SectionHeading } from "./section-heading";
@@ -181,19 +181,7 @@ export function StepsFoot({
                 <p className="m-0 max-w-[62ch] [text-wrap:pretty]">{foot}</p>
             ) : null}
             {links.length ? (
-                <div className="flex flex-wrap gap-x-6">
-                    {links.map((link) => (
-                        <TextLink
-                            key={link.href}
-                            href={link.href}
-                            tone="ink"
-                            arrow
-                            className="text-[14px]"
-                        >
-                            {link.label}
-                        </TextLink>
-                    ))}
-                </div>
+                <LinkRow links={links} linkClassName="text-[14px]" />
             ) : null}
         </div>
     );

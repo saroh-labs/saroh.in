@@ -1,11 +1,14 @@
+import {
+    AboutName,
+    AboutValues,
+    CompanyFact,
+} from "@saroh/marketing/about-parts";
 import { Arrow } from "@saroh/marketing/arrow";
 import { Container } from "@saroh/marketing/container";
 import { PageHero } from "@saroh/marketing/page-hero";
-import { Section } from "@saroh/marketing/section";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import localFont from "next/font/local";
 import Link from "next/link";
-import type { ReactNode } from "react";
 
 import { Closing } from "@/components/shared/closing";
 import { JsonLd } from "@/components/shared/json-ld";
@@ -27,7 +30,6 @@ const devanagari = localFont({
     display: "swap",
     variable: "--font-devanagari",
 });
-const HINDI = "font-[family-name:var(--font-devanagari)]";
 
 export default function Page() {
     const { meaning, values, where, company, band } = ABOUT;
@@ -41,71 +43,9 @@ export default function Page() {
                 lead={ABOUT.lead}
             />
 
-            <Container as="section" aria-labelledby="about-name">
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] items-center gap-10 rounded-mk-card bg-foreground p-[clamp(32px,6vw,72px)] text-background">
-                    <div className="grid gap-[14px]">
-                        <h2
-                            id="about-name"
-                            className="m-0 font-display text-mk-kit-h3 font-bold text-mk-on-ink"
-                        >
-                            {meaning.eyebrow}
-                        </h2>
-                        <div className="flex items-end gap-2.5">
-                            <span
-                                lang="hi"
-                                className={`${HINDI} text-[min(clamp(72px,10vw,120px),21vw)] font-bold leading-[1.15]`}
-                            >
-                                {meaning.word}
-                            </span>
-                            <span
-                                aria-hidden
-                                className="mb-[clamp(26px,3.6vw,40px)] size-4 flex-none rounded-full bg-mk-saffron"
-                            />
-                        </div>
-                    </div>
-                    <div className="grid gap-[18px] text-mk-band-body text-mk-on-ink">
-                        <div className="grid grid-cols-[auto_1fr] items-baseline gap-x-[18px] gap-y-1.5">
-                            {meaning.parts.map((part) => (
-                                <NameLine key={part.roman} part={part} />
-                            ))}
-                        </div>
-                        <p className="m-0 border-t border-mk-ink-hover pt-[18px] [text-wrap:pretty]">
-                            {meaning.together.before}
-                            <strong className="font-semibold text-background">
-                                {meaning.together.strong}
-                            </strong>
-                            {meaning.together.after}
-                        </p>
-                        <span className="font-display text-[22px] font-semibold text-mk-saffron">
-                            {meaning.line}
-                        </span>
-                    </div>
-                </div>
-            </Container>
+            <AboutName meaning={meaning} />
 
-            <Section
-                titleId="about-values"
-                title={values.title}
-                size="kit-h2"
-                space="kit"
-                className="grid gap-10 pb-0 min-[760px]:pb-0"
-            >
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,250px),1fr))] gap-4">
-                    {values.cards.map((card) => (
-                        <div
-                            key={card.title}
-                            className="grid content-start gap-2.5 rounded-mk-card border border-border bg-card p-6"
-                        >
-                            <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
-                                {card.title}
-                            </h3>
-                            <p className="m-0 text-[16px] leading-[1.6] text-mk-copy">
-                                {card.body}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            </Section>
+            <AboutValues title={values.title} cards={values.cards} />
 
             <Container
                 as="section"
@@ -164,45 +104,6 @@ export default function Page() {
                 href={signupHref(page.type)}
                 note={band.note}
             />
-        </div>
-    );
-}
-
-/** "स  **sa**, with. As in सपरिवार, with the family." */
-function NameLine({ part }: { part: (typeof ABOUT.meaning.parts)[number] }) {
-    return (
-        <>
-            <span
-                lang="hi"
-                className={`${HINDI} text-[28px] font-bold text-background`}
-            >
-                {part.hi}
-            </span>
-            <span>
-                <strong className="font-semibold text-background">
-                    {part.roman}
-                </strong>
-                {part.means}
-                <span lang="hi" className={HINDI}>
-                    {part.example}
-                </span>
-                {part.gloss}
-            </span>
-        </>
-    );
-}
-
-function CompanyFact({
-    label,
-    children,
-}: {
-    label: string;
-    children: ReactNode;
-}) {
-    return (
-        <div className="grid content-start gap-1">
-            <dt className="font-semibold text-foreground">{label}</dt>
-            <dd className="m-0">{children}</dd>
         </div>
     );
 }
