@@ -251,7 +251,7 @@ export const HOW_IT_WORKS = {
             line: "How it moves, into your own account",
             chip: "Your money",
             lead: {
-                text: "Customers pay by UPI or card, and it lands in **your own Razorpay or Cashfree account**, or Stripe outside India, under your name. Saroh never holds your money, so there's no waiting on us for a payout. Every paid order makes its own GST invoice.",
+                text: "Customers pay by UPI or card, and it lands in **your own Razorpay or Cashfree account**, under your name. Saroh never holds your money, so there's no waiting on us for a payout. Every paid order makes its own GST invoice.",
             },
             captions: [
                 {
@@ -448,10 +448,7 @@ export const HOW_IT_WORKS = {
             connected: "Connected",
             connect: "Connect",
             /** The other providers a business in India may connect. */
-            others: [
-                { name: "Cashfree", line: "If you already use it" },
-                { name: "Stripe", line: "For businesses outside India" },
-            ],
+            others: [{ name: "Cashfree", line: "If you already use it" }],
         },
         paying: {
             label: "Paying",
@@ -595,7 +592,7 @@ export const HOW_IT_WORKS = {
             {
                 name: "Your money",
                 body: {
-                    text: "Paid into your own Razorpay, Cashfree or Stripe account, in your name. Saroh never holds it.",
+                    text: "Paid into your own Razorpay or Cashfree account, in your name. Saroh never holds it.",
                 },
                 chip: "Saroh holds nothing",
             },
@@ -728,7 +725,7 @@ export const HOW_IT_WORKS = {
                 {
                     href: "/integrations",
                     name: "Payments",
-                    line: "Razorpay, Cashfree or Stripe, in your name",
+                    line: "Razorpay or Cashfree, in your name",
                 },
                 {
                     feature: "social",

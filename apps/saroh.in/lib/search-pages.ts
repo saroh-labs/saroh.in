@@ -121,6 +121,14 @@ export function tradesHubLinks(list: PublishList = publishList()) {
         : [];
 }
 
+/**
+ * Where "Solutions" in a trail goes: the /for hub once a trade page is
+ * live, else home (its "#solutions" door went, owner, 16 Nov 2026).
+ */
+export function solutionsHub(list: PublishList = publishList()): string {
+    return liveSearchPages(list).length > 0 ? FOR_HUB.path : "/";
+}
+
 /** The /tools hub: the menus' "Free tools" and every tool's breadcrumb. */
 export const TOOLS_HUB = { name: "Free tools", path: "/tools" } as const;
 

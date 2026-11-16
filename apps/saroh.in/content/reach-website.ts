@@ -45,7 +45,7 @@ const slug = rye.site.split(".")[0];
 const host = rye.site.slice(slug.length);
 const area = rye.place.split(",")[0];
 const cap = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
-/** The second provider the world names: "Cashfree, or Stripe abroad" → "Cashfree". */
+/** The second provider the world names: "Cashfree". */
 const otherProvider = WORLD.money.otherProviders?.split(",")[0];
 
 export function websiteWords({

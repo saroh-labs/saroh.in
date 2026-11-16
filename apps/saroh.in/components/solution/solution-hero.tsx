@@ -3,6 +3,7 @@ import { ProductHero } from "@saroh/marketing/product-hero";
 import type { Solution } from "@/content/types";
 import { demoHref, demoTrade } from "@/lib/demos";
 
+import { solutionsHub } from "@/lib/search-pages";
 import { HeroActions } from "../shared/buttons/hero-actions";
 import { shotView } from "../shared/media/shot-view";
 
@@ -23,7 +24,7 @@ export function SolutionHero({
     const trade = demoTrade(solution.slug);
     return (
         <ProductHero
-            section={{ name: "Solutions", href: "/#solutions" }}
+            section={{ name: "Solutions", href: solutionsHub() }}
             name={solution.name}
             headline={solution.headline}
             sub={solution.sub}

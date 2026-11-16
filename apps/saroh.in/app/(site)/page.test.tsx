@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { HOME_FAQ } from "@/content/faq";
 import { featureList } from "@/content/features";
-import { SOLUTION_SLUGS } from "@/content/types";
 import { freePlanLine } from "@/lib/plan-teasers";
 import { fakeCatalog } from "@/lib/pricing.fixture";
 
@@ -102,39 +101,28 @@ describe("/ (Home)", () => {
             }),
         ).toBeTruthy();
         for (const id of [
-            "features",
-            "solutions",
             "pricing",
             "faq",
             "online",
             "orders",
             "money",
-            "day",
+            "tools",
         ]) {
             expect(container.querySelector(`#${id}`)).not.toBeNull();
         }
         expect(metadata.alternates?.canonical).toBe("/");
     });
 
-    it("lists the shown features, Dashboard first, and the four solutions", async () => {
+    it("links every feature from the stays-yours line, and lists six free tools (owner, 16 Nov 2026)", async () => {
         const { container } = render(await HomePage());
-        const features = container.querySelector("#features");
-        const hrefs = Array.from(features?.querySelectorAll("a") ?? []).map(
-            (a) => a.getAttribute("href"),
-        );
-        expect(hrefs).toEqual(featureList.map((f) => `/features/${f.slug}`));
-        expect(hrefs[0]).toBe("/features/dashboard");
-        // The "Works for" chips, and each trade's card folded under them.
-        const solutions = container.querySelector("#solutions");
-        expect(
-            new Set(
-                Array.from(solutions?.querySelectorAll("a") ?? []).map((a) =>
-                    a.getAttribute("href"),
-                ),
-            ),
-        ).toEqual(new Set(SOLUTION_SLUGS.map((s) => `/solutions/${s}`)));
-        const worksFor = screen.getByRole("navigation", { name: "Works for" });
-        expect(within(worksFor).getAllByRole("link")).toHaveLength(4);
+        expect(container.querySelector('a[href="/features"]')).not.toBeNull();
+        expect(container.querySelector("#features")).toBeNull();
+        expect(container.querySelector("#day")).toBeNull();
+        const tools = section(container, "tools");
+        const cards = Array.from(tools.querySelectorAll('a[href^="/tools/"]'));
+        expect(cards.length).toBeGreaterThan(0);
+        expect(cards.length).toBeLessThanOrEqual(6);
+        expect(tools.querySelector('a[href="/tools"]')).not.toBeNull();
     });
 
     it("no tour video: no 'See it in action' and no #video", async () => {

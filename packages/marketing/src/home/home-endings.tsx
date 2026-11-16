@@ -6,73 +6,49 @@ import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
 import { FaqItems } from "../sections/faq";
 import { Fold } from "./fold";
-import { Tag } from "./tag";
 import type { HomeWords } from "./words";
 
 /** How many questions a phone shows before "All questions". */
 const PHONE_FIRST = 3;
 
 /**
- * "Stays yours" in one line (its story is /features' `#yours`), and under
- * it every part of Saroh (`#features`, folded): the links the old grid had,
- * Dashboard first.
+ * "Stays yours" in one line, with its story (/features' `#yours`) and every
+ * feature (/features) a link away.
  */
 export function YoursLine({
     words: home,
-    features,
 }: {
-    words: Pick<
-        HomeWords,
-        "yours" | "featuresEyebrow" | "featuresTitle" | "newTag"
-    >;
-    features: readonly {
-        href: string;
-        name: string;
-        body: string;
-        isNew: boolean;
-    }[];
+    words: Pick<HomeWords, "yours" | "featuresEyebrow"> & {
+        /** "All features", the nav's word for /features. */
+        allFeatures: string;
+    };
 }) {
+    // The 12-feature list that was folded here is the Features menu and
+    // /features already: a hidden copy on the landing (owner, 16 Nov 2026, #14).
     return (
         <Container as="section" aria-label={home.featuresEyebrow}>
             <div className="border-b border-border py-8 min-[760px]:py-12">
-                <p className="m-0 flex flex-wrap items-center gap-x-4 text-[17px] leading-normal text-foreground min-[760px]:text-[20px]">
+                <p className="m-0 flex flex-wrap items-center gap-x-6 gap-y-2 text-[17px] leading-normal text-foreground min-[760px]:text-[20px]">
                     {home.yours.line}
-                    <TextLink
-                        href="/features#yours"
-                        tone="ink"
-                        arrow
-                        className="text-[16px] min-[760px]:text-[18px]"
-                    >
-                        {home.yours.link}
-                    </TextLink>
+                    <span className="flex flex-wrap gap-x-6 gap-y-1">
+                        <TextLink
+                            href="/features#yours"
+                            tone="ink"
+                            arrow
+                            className="text-[16px] min-[760px]:text-[18px]"
+                        >
+                            {home.yours.link}
+                        </TextLink>
+                        <TextLink
+                            href="/features"
+                            tone="ink"
+                            arrow
+                            className="text-[16px] min-[760px]:text-[18px]"
+                        >
+                            {home.allFeatures}
+                        </TextLink>
+                    </span>
                 </p>
-                <Fold
-                    id="features"
-                    summary={home.featuresEyebrow}
-                    chevron
-                    className="mt-4 scroll-mt-24"
-                >
-                    <p className="m-0 mt-2 font-display text-mk-kit-h3 font-bold">
-                        {home.featuresTitle}
-                    </p>
-                    <ul className="m-0 mt-3 grid list-none gap-x-8 gap-y-1 p-0 min-[760px]:grid-cols-2 min-[1100px]:grid-cols-3">
-                        {features.map((f) => (
-                            <li key={f.href} className="py-1.5">
-                                <TextLink href={f.href} tone="ink" arrow>
-                                    {f.name}
-                                </TextLink>
-                                {f.isNew ? (
-                                    <Tag tone="ok" className="ml-2">
-                                        {home.newTag}
-                                    </Tag>
-                                ) : null}
-                                <span className="block text-[15px] leading-snug text-mk-copy">
-                                    {f.body}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </Fold>
             </div>
         </Container>
     );

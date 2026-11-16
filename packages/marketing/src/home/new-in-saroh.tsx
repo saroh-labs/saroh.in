@@ -491,7 +491,7 @@ export function NewInSaroh({
             className="scroll-mt-24 bg-foreground py-12 text-mk-lamp-fg min-[760px]:py-[72px]"
         >
             <Container>
-                <div className="grid gap-3 min-[960px]:grid-cols-[minmax(0,1fr)_460px] min-[960px]:items-end min-[960px]:gap-12">
+                <div className="grid gap-3 min-[960px]:grid-cols-[minmax(0,1fr)_460px] min-[960px]:items-start min-[960px]:gap-12">
                     <h2
                         id="new-title"
                         className="m-0 font-display text-mk-kit-h2 font-bold"

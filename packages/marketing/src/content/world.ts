@@ -71,7 +71,7 @@ export interface WorldHour {
 export interface WorldMoney {
     /** "Razorpay", "Stripe". */
     provider: string;
-    /** The other providers it could be: "Cashfree, or Stripe abroad". */
+    /** The other providers it could be, in this edition: "Cashfree". */
     otherProviders?: string;
     /** How the customer pays: "UPI", "card". */
     method: string;

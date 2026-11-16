@@ -443,7 +443,8 @@ export const WORLD: World = {
     hours: "Open 7 am to 8 pm. Cake orders by 8 pm for the next day.",
     money: {
         provider: "Razorpay",
-        otherProviders: "Cashfree, or Stripe abroad",
+        // Only India's providers on saroh.in (owner, 16 Nov 2026, #11).
+        otherProviders: "Cashfree",
         method: "UPI",
         taxName: "GST",
         taxLine: "CGST + SGST",

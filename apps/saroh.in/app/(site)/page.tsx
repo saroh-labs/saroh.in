@@ -4,11 +4,12 @@ import localFont from "next/font/local";
 import { HomeHero } from "@/components/home/home-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
+import { menusList } from "@/components/shared/layout/site-chrome";
 import { HOME_FAQ } from "@/content/faq";
-import { featureHref, featureList, NEW_FEATURES } from "@/content/features";
+import { featureList } from "@/content/features";
 import { home, TOUR_VIDEO } from "@/content/home";
+import { NAV_WORDS } from "@/content/nav";
 import { shownResources } from "@/content/resources";
-import { solutionList, solutions } from "@/content/solutions";
 import { HOME_SITE_SHOWCASE, RYE_MONDAY, WORLD } from "@/content/world";
 import { claimOn } from "@/lib/feature-switches";
 import { LAUNCH_MODE } from "@/lib/links";
@@ -16,7 +17,12 @@ import { HOME_OG_ALT } from "@/lib/og-card";
 import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { resourcesContext } from "@/lib/resources-context";
-import { isPublished, solutionLink } from "@/lib/search-pages";
+import {
+    footerToolLinks,
+    publishList,
+    shownToolLinks,
+    TOOLS_HUB,
+} from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import {
     faqPageLd,
@@ -26,14 +32,12 @@ import {
 } from "@/lib/structured-data";
 import { ButtonLink } from "@saroh/marketing/button";
 import { Container } from "@saroh/marketing/container";
-import type { DoorOption } from "@saroh/marketing/home/day-door";
-import { DayDoor } from "@saroh/marketing/home/day-door";
-import { Fold } from "@saroh/marketing/home/fold";
 import {
     PlansAndQuestions,
     YoursLine,
 } from "@saroh/marketing/home/home-endings";
 import { HERO_CTA_ID } from "@saroh/marketing/home/home-hero";
+import { HomeTools } from "@saroh/marketing/home/home-tools";
 import { MoneyBand } from "@saroh/marketing/home/money-band";
 import { NewInSaroh } from "@saroh/marketing/home/new-in-saroh";
 import { OrdersChapter } from "@saroh/marketing/home/orders-chapter";
@@ -43,14 +47,13 @@ import { Chip } from "@saroh/marketing/kit/chip";
 import { Claim } from "@saroh/marketing/kit/claim";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
-import { TextLink } from "@saroh/marketing/text-link";
-import { dayLink } from "@saroh/marketing/world";
 
 /**
  * `/`, the landing (DEC-221; boards LAHomeDesk and LAHomePhone2, one
  * responsive page): the hero with its three phones and trade switcher, the
- * website and orders chapters, the money band, the door to a whole day,
- * New in Saroh, the "stays yours" line, plans and questions, and the close.
+ * website and orders chapters, the money band, New in Saroh, the "stays
+ * yours" line, the free tools, plans and questions, and the close (the
+ * door to a day and the folded feature grid went, owner, 16 Nov 2026).
  *
  * Moved, not cut (rule 15): the feature grid is folded under "Everything in
  * Saroh" (`#features`); the Solutions cards under the door (`#solutions`);
@@ -82,36 +85,15 @@ export const metadata: Metadata = pageMetadata({
     image: { url: "/opengraph-image", alt: HOME_OG_ALT },
 });
 
-/** The door's picker: a trade's written day where it is live, else its page. */
-function doorOptions(): DoorOption[] {
-    const days = [WORLD.lead, ...WORLD.others].flatMap((b) => {
-        const first = b.day?.[0];
-        return b.tradePage && first && isPublished(b.tradePage)
-            ? [
-                  {
-                      trade: b.trade,
-                      link: `${home.day.spend} ${b.name}`,
-                      href: dayLink(b, first),
-                  },
-              ]
-            : [];
-    });
-    const dayOf = (trade: string) => days.find((d) => d.trade === trade);
-    const page = (slug: "shops" | "salons" | "gyms") => ({
-        link: solutions[slug].card.link,
-        href: solutionLink(slug),
-    });
-    const florist = dayOf("florist");
-    return [
-        {
-            id: "bakery",
-            label: "Bakery",
-            ...(dayOf("bakery") ?? page("shops")),
-        },
-        { id: "salon", label: "Salon", ...page("salons") },
-        { id: "gym", label: "Gym", ...page("gyms") },
-        ...(florist ? [{ id: "florist", label: "Florist", ...florist }] : []),
-    ];
+/**
+ * The landing's six free tools: the footer's five most asked-for, then the
+ * next, of the tools this build shows (every one on a local preview).
+ */
+function homeTools() {
+    const ctx = resourcesContext();
+    const shown = shownToolLinks(ctx, menusList(publishList(), ctx.preview));
+    const first = footerToolLinks(shown);
+    return [...first, ...shown.filter((t) => !first.includes(t))].slice(0, 6);
 }
 
 export default async function HomePage() {
@@ -193,68 +175,6 @@ export default async function HomePage() {
                 amount={paidTotal}
             />
 
-            <Container
-                as="section"
-                id="day"
-                className="scroll-mt-24 pt-10 min-[760px]:pt-16"
-            >
-                <DayDoor
-                    title={home.day.title}
-                    line={home.day.line}
-                    legend={home.day.legend}
-                    options={doorOptions()}
-                >
-                    <div
-                        id="solutions"
-                        className="mt-5 grid scroll-mt-24 gap-1 border-t border-border pt-4"
-                    >
-                        <nav
-                            aria-label={home.worksFor}
-                            // A phone: one row of chips that scrolls (PHONE.md).
-                            className="flex flex-wrap items-center gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&>*]:shrink-0"
-                        >
-                            <span className="mr-1 text-[14px] text-muted-foreground">
-                                {home.worksFor}
-                            </span>
-                            {solutionList.map((s) => (
-                                <Chip
-                                    key={s.slug}
-                                    variant="filter"
-                                    href={solutionLink(s.slug)}
-                                >
-                                    {s.card.name}
-                                </Chip>
-                            ))}
-                        </nav>
-                        <Fold summary={home.solutionsMore}>
-                            <ul className="m-0 mt-2 grid list-none gap-5 p-0 min-[760px]:grid-cols-2">
-                                {solutionList.map((s) => (
-                                    <li key={s.slug} className="grid gap-1">
-                                        <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
-                                            {s.card.name}
-                                        </h3>
-                                        <p className="m-0 text-[15px] leading-normal text-mk-copy">
-                                            {s.card.body}
-                                        </p>
-                                        <p className="m-0 text-[13px] text-muted-foreground">
-                                            {s.card.uses}
-                                        </p>
-                                        <TextLink
-                                            href={solutionLink(s.slug)}
-                                            tone="ink"
-                                            arrow
-                                            className="text-[15px]"
-                                        >
-                                            {s.card.link}
-                                        </TextLink>
-                                    </li>
-                                ))}
-                            </ul>
-                        </Fold>
-                    </div>
-                </DayDoor>
-            </Container>
-
             <div className="mt-16 min-[760px]:mt-20">
                 <NewInSaroh
                     on={news}
@@ -265,13 +185,19 @@ export default async function HomePage() {
             </div>
 
             <YoursLine
-                words={home}
-                features={featureList.map((f) => ({
-                    href: featureHref(f.slug),
-                    name: f.name,
-                    body: f.homeBody,
-                    isNew: NEW_FEATURES.includes(f.slug),
+                words={{ ...home, allFeatures: NAV_WORDS.howItWorksAll }}
+            />
+
+            <HomeTools
+                title={home.toolsTitle}
+                lead={home.toolsLead}
+                tools={homeTools().map((t, i) => ({
+                    title: t.name,
+                    line: t.line,
+                    href: t.href,
+                    desk: i >= 4,
                 }))}
+                all={{ name: "See all free tools", href: TOOLS_HUB.path }}
             />
 
             <PlansAndQuestions
@@ -299,24 +225,11 @@ export default async function HomePage() {
             <ClosingCTA
                 title={home.closer}
                 primary={<CtaLink src="home-band" size="kit" />}
+                // The same second step as saroh.tech's (owner, 16 Nov 2026, #16).
                 secondary={
-                    templates ? (
-                        <ButtonLink
-                            href="/templates"
-                            variant="secondary"
-                            size="kit"
-                        >
-                            {home.templates}
-                        </ButtonLink>
-                    ) : (
-                        <ButtonLink
-                            href="/features"
-                            variant="secondary"
-                            size="kit"
-                        >
-                            {home.how.label}
-                        </ButtonLink>
-                    )
+                    <ButtonLink href="/features" variant="secondary" size="kit">
+                        {home.how.label}
+                    </ButtonLink>
                 }
             />
             <StickyBar watch={HERO_CTA_ID}>

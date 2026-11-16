@@ -95,7 +95,7 @@ export function Chapter({
             id={id}
             className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-5 min-[760px]:gap-14"
         >
-            <div className="grid gap-4 min-[960px]:grid-cols-2 min-[960px]:items-end min-[960px]:gap-12">
+            <div className="grid gap-4 min-[960px]:grid-cols-2 min-[960px]:items-start min-[960px]:gap-12">
                 <h2
                     id={titleId}
                     className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"

@@ -13,10 +13,13 @@ import { signupHref } from "@/site.config";
 export function StartLink({
     src,
     className,
+    variant,
 }: {
     /** Where the sign-up came from, e.g. `feature-orders-band`. */
     src: string;
     className?: string;
+    /** Secondary beside a page's own first step (/developers' docs). */
+    variant?: "primary" | "secondary";
 }) {
     return (
         <Link
@@ -25,7 +28,7 @@ export function StartLink({
             data-cta={
                 src.endsWith("-band") ? "start-free-band" : "start-free-page"
             }
-            className={cn(buttonClasses({ size: "kit" }), className)}
+            className={cn(buttonClasses({ size: "kit", variant }), className)}
         >
             Start free
         </Link>

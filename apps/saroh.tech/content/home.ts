@@ -100,20 +100,21 @@ export const home = {
     },
     money: {
         title: "Get paid into your own account. Saroh never holds the money.",
-        lede: "Customers pay you at the counter, or by card online straight into your own payment account. The invoice is marked paid by itself.",
+        // Stripe named, as saroh.in names Razorpay and Cashfree and as /features does (owner, 16 Nov 2026, #11).
+        lede: "Customers pay you at the counter, or by card online straight into your own Stripe account. The invoice is marked paid by itself.",
         link: "How payments work",
-        label: "How a payment moves: customer, your payment account, your bank. Saroh only records it.",
+        label: "How a payment moves: customer, your Stripe account, your bank. Saroh only records it.",
         customer: {
             title: "Your customer",
             line: "Pays {amount} by card, online or at the counter",
         },
         account: {
-            title: "Your own payment account",
-            line: "In your name, with its own fees",
+            title: "Your own Stripe account",
+            line: "In your name. Stripe's own fees apply",
         },
         bank: {
             title: "Your bank account",
-            line: "Paid out on your payment provider's usual schedule",
+            line: "Paid out on Stripe's usual schedule",
         },
         saroh: {
             title: "Saroh",
@@ -134,7 +135,7 @@ export const home = {
     solutionsMore: "What Saroh does for each trade",
     news: {
         title: "New in Saroh",
-        lede: "Ask your business a question, post in your own look, and run it from your own AI assistant.",
+        lede: "Ask your business a question, post in your own look, run it from your own AI assistant, and connect your own tools.",
         row: "New in Saroh",
         askAi: {
             title: "Ask AI",
@@ -221,7 +222,8 @@ export const home = {
     allQuestions: "All questions",
     askUs: { lead: "Something else?", link: "Ask us" },
     /** The closing title. */
-    closer: "Every morning, know what needs you.",
+    // The same close as saroh.in's (owner, 16 Nov 2026, #16).
+    closer: "Open tomorrow knowing what needs you.",
     templates: "Browse templates",
     toolsTitle: "Free tools. No sign-up.",
     toolsLead:

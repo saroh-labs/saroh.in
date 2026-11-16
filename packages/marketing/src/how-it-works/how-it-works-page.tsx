@@ -846,7 +846,7 @@ export function HowItWorksPage({
                 aria-labelledby="yours-title"
                 className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-8 py-12 min-[760px]:gap-10 min-[760px]:py-[120px]"
             >
-                <div className="grid gap-4 min-[960px]:grid-cols-[1fr_minmax(0,520px)] min-[960px]:items-end min-[960px]:gap-12">
+                <div className="grid gap-4 min-[960px]:grid-cols-[1fr_minmax(0,520px)] min-[960px]:items-start min-[960px]:gap-12">
                     <h2
                         id="yours-title"
                         className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"

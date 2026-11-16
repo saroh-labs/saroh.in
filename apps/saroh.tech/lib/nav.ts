@@ -1,3 +1,4 @@
+import { featuresOff } from "@/lib/feature-switches";
 import type { MenuLink, NavItem } from "@saroh/marketing/nav-types";
 
 import { featureHref, featureList } from "@/content/features";
@@ -72,6 +73,17 @@ export const RESOURCES: NavItem[] = [
         line: "What's new in Saroh",
         href: "/changelog",
     },
+    // The API and webhooks, while their switch is on (owner, 16 Nov 2026, #13).
+    ...(featuresOff().includes("developers")
+        ? []
+        : [
+              {
+                  group: LEARN,
+                  name: "Developers",
+                  line: "The Saroh API and webhooks",
+                  href: "/developers",
+              },
+          ]),
     {
         group: SAROH,
         name: "Integrations",
@@ -232,14 +244,20 @@ const PRODUCT_ORDER = [
 const shownSlugs = new Set<string>(featureList.map((f) => f.slug));
 const claimsHidden = claimsOff();
 
-export const PRODUCT: MenuLink[] = PRODUCT_ORDER.filter(
-    (p) =>
-        shownSlugs.has(p.slug) &&
-        !("claim" in p && claimsHidden.includes(p.claim)),
-).map((p) => ({
-    name: p.name,
-    href: `${featureHref(p.slug)}${"claim" in p ? "#saroh-social" : ""}`,
-}));
+export const PRODUCT: MenuLink[] = [
+    ...PRODUCT_ORDER.filter(
+        (p) =>
+            shownSlugs.has(p.slug) &&
+            !("claim" in p && claimsHidden.includes(p.claim)),
+    ).map((p) => ({
+        name: p.name,
+        href: `${featureHref(p.slug)}${"claim" in p ? "#saroh-social" : ""}`,
+    })),
+    // Last in the LOCKED order, as on saroh.in: API and webhooks.
+    ...(featuresOff().includes("developers")
+        ? []
+        : [{ name: "API and webhooks", href: "/developers" }]),
+];
 
 /**
  * The footer's groups: Product first, then everything else this site links

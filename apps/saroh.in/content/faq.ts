@@ -62,7 +62,7 @@ export const faqs = {
     },
     money: {
         q: "Where does my customers' money go?",
-        a: "Into your own Razorpay or Cashfree account, or Stripe outside India. Saroh never holds it.",
+        a: "Into your own Razorpay or Cashfree account. Saroh never holds it.",
     },
     domain: {
         q: "Can I use my own domain?",

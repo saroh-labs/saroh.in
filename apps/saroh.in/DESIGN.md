@@ -342,6 +342,19 @@ price is ever drawn into an image.
 
 ## Changes
 
+- **16 Nov 2026, landing and nav (owner, bugs #1–#4, #6, #9–#17).** Both
+  landings: a section's heading starts level with its paragraph (two-column
+  heads top-aligned, landing and /features); the door to a day and the
+  folded "Everything in Saroh" are gone (the stays-yours line links "All
+  features"); the free tools are one shared section (`home/home-tools`);
+  the close is the same heading and "See how it works" on both; providers
+  are only the site's own (saroh.in Razorpay and Cashfree, saroh.tech
+  Stripe); example-site cards share one height. /developers is one shared
+  page (`feature-pages/developers-page`), saroh.tech's behind its switch.
+  Nav: a menu opens under its button; Website templates (saroh.in) and
+  Document templates (saroh.tech); Developers inside Resources. Footers:
+  one structure on both sites.
+
 - **16 Nov 2026, one trade look per trade (owner, bugs #8, #19–#22).** Both
   sites draw a business's site in its trade's look from
   `@saroh/marketing/kit/trade-looks` (bakery, salon, gym): Thistlewick is

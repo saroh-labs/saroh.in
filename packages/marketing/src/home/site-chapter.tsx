@@ -43,7 +43,7 @@ export function SiteChapter({
             aria-labelledby="online-title"
             className="scroll-mt-24 pt-12 min-[760px]:pt-20"
         >
-            <div className="grid gap-4 min-[960px]:grid-cols-[minmax(0,1fr)_470px] min-[960px]:items-end min-[960px]:gap-12">
+            <div className="grid gap-4 min-[960px]:grid-cols-[minmax(0,1fr)_470px] min-[960px]:items-start min-[960px]:gap-12">
                 <h2
                     id="online-title"
                     className="m-0 max-w-[700px] font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
@@ -76,9 +76,14 @@ export function SiteChapter({
                     const b = x.business;
                     const caption = s.captions[b.key];
                     return (
-                        <div key={b.key} className="grid gap-3">
+                        // One height for the row's cards, each filled in its own site colour (#10).
+                        <div
+                            key={b.key}
+                            className="grid h-full grid-rows-[1fr_auto] gap-3"
+                        >
                             {b.look ? (
                                 <SiteDrawing
+                                    className="h-full [&>*]:h-full [&>*]:bg-[hsl(var(--site-bg))]"
                                     phone
                                     look={b.look}
                                     address={x.address}

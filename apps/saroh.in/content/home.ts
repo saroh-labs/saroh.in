@@ -95,7 +95,7 @@ export const home = {
     },
     money: {
         title: "Get paid into your own account. Saroh never holds the money.",
-        lede: "Customers pay by UPI or card straight into your own Razorpay or Cashfree account, or Stripe outside India. The GST invoice goes out by itself.",
+        lede: "Customers pay by UPI or card straight into your own Razorpay or Cashfree account. The GST invoice goes out by itself.",
         link: "How payments work",
         label: "How a payment moves: customer, your payment account, your bank. Saroh only records it.",
         customer: {
@@ -104,7 +104,7 @@ export const home = {
         },
         account: {
             title: "Your Razorpay or Cashfree",
-            line: "Your own account, in your name. Stripe outside India.",
+            line: "Your own account, in your name.",
         },
         bank: {
             title: "Your bank account",
@@ -219,6 +219,10 @@ export const home = {
     askUs: { lead: "Something else?", link: "Ask us" },
     closer: "Open tomorrow knowing what needs you.",
     templates: "Browse templates",
+    // The same section as saroh.tech's (owner, 16 Nov 2026, #15).
+    toolsTitle: "Free tools. No sign-up.",
+    toolsLead:
+        "GST, invoices, QR codes and WhatsApp links. Use them as long as you like.",
 } as const;
 
 /**

@@ -16,7 +16,9 @@ import {
 
 import { HELP } from "@/content/help";
 
+import { DEVELOPERS } from "@/content/developers";
 import { INTEGRATIONS } from "@/content/integrations";
+import { featuresOff } from "@/lib/feature-switches";
 
 import { LEGAL_UPDATED } from "@/content/legal";
 
@@ -54,6 +56,7 @@ export type PageType =
     | "about"
     | "contact"
     | "integrations"
+    | "developers"
     | "referral"
     | "help"
     | "legal"
@@ -202,7 +205,7 @@ export const PAGES: SitePage[] = [
         title: `${f.seoTitle} | Saroh`,
         description: f.seoDescription,
         h1: f.headline,
-        crumb: [{ name: "Features", path: "/#features" }, { name: f.name }],
+        crumb: [{ name: "Features", path: "/features" }, { name: f.name }],
         unreviewed: true,
         updated: FEATURES_UPDATED,
     })),
@@ -296,6 +299,23 @@ export const PAGES: SitePage[] = [
         unreviewed: true,
         updated: "2026-11-04",
     },
+    // Only while its switch is on: the page 404s without it (#13).
+    ...(featuresOff().includes("developers")
+        ? []
+        : [
+              {
+                  ...hub(
+                      "/developers",
+                      "developers",
+                      "Saroh API and webhooks for developers | Saroh",
+                      "The Saroh API and webhooks: read and change a business's products, bookings, orders and customers, show its catalogue on your site, and hear when an order is paid.",
+                      DEVELOPERS.headline,
+                      DEVELOPERS.name,
+                  ),
+                  unreviewed: true,
+                  updated: "2026-11-16",
+              },
+          ]),
     {
         ...hub(
             "/integrations",

@@ -195,8 +195,9 @@ describe("saroh.tech's words", () => {
         const banned =
             /\b(GST|GSTIN|UPI|HSN|SAC|Razorpay|Cashfree|bills? of supply|Stripe|PayPal|SMS|pay link|deposits?|autopay|custom domain|your own domain|quotes?|estimates?|client pages?|approvals?|acceptance|any currency|see when|reminders?)\b|₹/i;
         // Home names its two free tools; help has the free reminder writer, and
-        // `currencies` says who uses saroh.in. Nothing else may.
-        const { tools: _tools, ...homeWords } = home;
+        // `currencies` says who uses saroh.in. Home's money band names Stripe,
+        // as saroh.in's names Razorpay (owner, 16 Nov 2026, #11). Nothing else may.
+        const { tools: _tools, money: _money, ...homeWords } = home;
         const { HELP: _help, ...rest } = { ...all, home: homeWords };
         // Features alone says card payments go through your own Stripe (KTD9).
         const stripe = /through your own Stripe/g;
