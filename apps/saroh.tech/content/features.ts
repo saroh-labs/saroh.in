@@ -702,8 +702,9 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
         headline: "Use Saroh from your AI assistant.",
         sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up an order or move it along. It can do only what you can do in Saroh, and nothing on your website goes live until you publish it.",
-        // The hero and step 3 happen in another company's app: drawn, never
-        // captured (`ChatExchange`). `ai-hero` stays the share card's key.
+        // The hero happens in another company's app: drawn, never captured
+        // (`ChatExchange`). `ai-hero` stays the share card's key. The page
+        // draws the steps as words under Saroh's address (variant I, 16 Nov).
         hero: { shot: "ai-hero" },
         heroChat: {
             caption:
@@ -720,40 +721,22 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         howTitle: "Connected in a minute. In charge after.",
         steps: [
             {
-                title: "Add Saroh to your AI app",
-                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector: https://mcp.saroh.tech/mcp. Each app's help article shows where.",
+                title: "Add a connector",
+                body: "In Claude, ChatGPT, Gemini CLI, Copilot Studio, Windsurf, Notion or another app that connects to MCP servers, add Saroh's address as a connector.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-connect",
             },
             {
-                title: "Sign in and allow it",
-                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick the businesses it may use, and allow it. One connection covers them all.",
+                title: "Sign in and allow",
+                body: "Saroh shows what the app may and may not do. Tick the businesses it may use: one connection covers them all.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-consent",
             },
             {
-                title: "Ask in your own words",
-                body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in AI activity in Settings, kept for 90 days. Website changes stay a draft until you publish them in Saroh.",
+                title: "Ask",
+                body: "“Add the holiday menu.” It drafts, you publish.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-ask",
-                chat: {
-                    caption:
-                        "Drawing of a chat in an AI assistant: the owner of Thistlewick Bakery (demo bakery) marks a customer's order ready for pick-up, and it changes at once",
-                    ask: "Mark Maya Thompson's order ready for pick-up.",
-                    tools: "Saroh · Thistlewick Bakery · list_orders, update_order_status",
-                    reply: "Done. Maya Thompson's order is now Ready, waiting for her to pick it up.",
-                    outcome: "at_once",
-                    result: {
-                        title: "Order for Maya Thompson",
-                        line: "Ready · changed just now",
-                    },
-                },
-            },
-            {
-                title: "See everything it did",
-                body: "Settings lists each AI app you connected and every change it made. Put the website draft back as it was before the app's changes, or disconnect it at any time.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "ai-activity",
             },
         ],
         points: [
@@ -783,11 +766,6 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 body: "Tick the ones it may use. It names the business on every change it makes.",
             },
         ],
-        apps: {
-            title: "Apps you can use",
-            lead: "Saroh connects through MCP, the open standard AI apps use to reach other tools. Each app has a short guide.",
-            also: "Also works with Gemini CLI, Microsoft Copilot Studio, Windsurf and Notion, and other apps that connect to MCP servers with a sign-in. Some apps add connectors only on an account of their own that allows it.",
-        },
         worksLead:
             "Your AI assistant works on the same records as the rest of Saroh, so a change it makes is a change everywhere.",
         worksWith: ["website", "products", "bookings", "orders"],

@@ -1,5 +1,5 @@
 import { Check, ChevronRight, ExternalLink, Eye, Info, X } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
 import { dayLink } from "../content/world";
@@ -10,29 +10,30 @@ import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
-import { AppList } from "../sections/app-list";
-import { ChatExchange } from "../sections/chat-exchange";
+import { ConnectSteps } from "../sections/connect-steps";
 import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 import { SplitHero } from "../sections/split-hero";
 
-import type { FeatureAppList } from "../content/types";
 import type { World } from "../content/world";
 import { MovePanel, PANEL, RecordPanel } from "./ai-apps/drawn";
 import type { AiAppsWords } from "./ai-apps/words";
 import { DraftPill, LivePill } from "./reach/app-card";
 import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
+import { claimed } from "./reach/in-the-app";
 import { HERO_CTA } from "./reach/page-top";
 import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
-import { PanelShot, ReachSteps } from "./reach/reach-steps";
 import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
 const SCENE = "pt-12 min-[760px]:pt-[120px]";
-/** A drawn screen in the steps' panel: centred, at a width that reads. */
-const STEP_PANEL = "mx-auto max-w-[480px] shadow-mk-shot";
+/** The apps' marks, in each site's `public/logos/` (svgl.app; SOURCES.txt there). */
+const GUIDE_ICON = {
+    claude: "/logos/claude.svg",
+    chatgpt: "/logos/openai.svg",
+};
 
 /** What the site resolves for this page (its `content/` and `lib/`). */
 export interface AiAppsPageProps {
@@ -41,12 +42,8 @@ export interface AiAppsPageProps {
     world: World;
     /** The level above: "Features", at /features. */
     crumb: { name: string; href: string };
+    /** The feature's steps and its Help guides. */
     inTheApp: InTheAppData;
-    /** "Apps you can use": the words and the site's AI app cards. */
-    apps?: {
-        words: FeatureAppList;
-        list: ComponentProps<typeof AppList>["apps"];
-    } | null;
     /** The site's page for developers; null where it has none (links none). */
     developersHref?: string | null;
 }
@@ -64,7 +61,6 @@ export function AiAppsView({
     world,
     crumb,
     inTheApp,
-    apps,
     developersHref = "/developers",
 }: AiAppsPageProps) {
     const slug = "ai-apps";
@@ -76,6 +72,7 @@ export function AiAppsView({
     const help = inTheApp.help;
     const chatgptHelp = help.find((h) => /chatgpt/i.test(h.href));
     const c = w.chat;
+    const feature = claimed(inTheApp.feature, inTheApp.hide);
 
     return (
         <div>
@@ -590,33 +587,27 @@ export function AiAppsView({
                 </Container>
             ) : null}
 
-            <ReachSteps
-                data={inTheApp}
-                picture={(step) => {
-                    const shot = site.shot(step.shot, step.alt);
-                    const captured = shot?.image.src ? shot : null;
-                    // Claude's own screens are drawn, Saroh's are captured where they read large.
-                    if (step.chat)
-                        return (
-                            <ChatExchange
-                                words={step.chat}
-                                className="mx-auto max-w-[560px]"
-                            />
-                        );
-                    if (step.shot === "ai-connect")
-                        return <MovePanel w={w} i={0} className={STEP_PANEL} />;
-                    if (step.shot === "ai-consent")
-                        return captured ? (
-                            <PanelShot shot={captured} />
-                        ) : (
-                            <MovePanel w={w} i={2} className={STEP_PANEL} />
-                        );
-                    if (step.shot === "ai-activity")
-                        return <RecordPanel w={w} className={STEP_PANEL} />;
-                    return captured ? <PanelShot shot={captured} /> : null;
-                }}
+            {/* How it works (variant I): the address, three steps, each app's guide. */}
+            <ConnectSteps
+                id="in-the-app"
+                title={feature.howTitle}
+                lede={w.paste.lede}
+                address={w.connect.address}
+                steps={feature.steps}
+                guides={help.map((h) => {
+                    const app = /claude/i.test(h.href)
+                        ? "claude"
+                        : /chatgpt/i.test(h.href)
+                          ? "chatgpt"
+                          : null;
+                    return {
+                        href: h.href,
+                        label: app ? w.paste[app] : w.paste.other,
+                        icon: app ? GUIDE_ICON[app] : undefined,
+                    };
+                })}
+                words={w.paste}
             />
-            {apps ? <AppList words={apps.words} apps={apps.list} /> : null}
 
             <Tail
                 line={w.plan.line}

@@ -47,7 +47,7 @@
         "./cta-band": "./src/sections/cta-band.tsx",
         "./code-sample": "./src/sections/code-sample.tsx",
         "./chat-exchange": "./src/sections/chat-exchange.tsx",
-        "./app-list": "./src/sections/app-list.tsx",
+        "./connect-steps": "./src/sections/connect-steps.tsx",
         "./product-hero": "./src/sections/product-hero.tsx",
         "./coming-list": "./src/sections/coming-list.tsx",
         "./home-hero": "./src/sections/home-hero.tsx",

@@ -227,64 +227,35 @@ describe("/features/[slug]", () => {
             });
         });
 
-        it("draws every step, Claude's real chat captured, its connector form drawn", async () => {
+        it("How it works is one section: Saroh's address with Copy, the steps and each app's guide (variant I)", async () => {
             env.NEXT_PUBLIC_AI_APPS = "on";
-            const { container } = render(await FeaturePage(params("ai-apps")));
-            // Real chats in Claude now, not drawings (owner, 15 Nov 2026).
-            expect(
-                container.querySelectorAll("figure[data-chat]"),
-            ).toHaveLength(0);
+            render(await FeaturePage(params("ai-apps")));
             const how = found(
                 screen
                     .getByRole("heading", {
+                        level: 2,
                         name: features["ai-apps"].howTitle,
                     })
                     .closest("section"),
             );
-            // Saroh's consent and Claude's real chat are captured; Claude's
-            // connector form and Saroh's record are drawn (Steps A).
+            // Shown without https://, copied whole.
+            expect(how.querySelector("code")?.textContent).toBe(
+                "mcp.saroh.in/mcp",
+            );
             expect(
-                Array.from(how.querySelectorAll("[data-shot]")).map((el) =>
-                    el.getAttribute("data-shot"),
+                within(how).getByRole("button", { name: "Copy" }),
+            ).toBeTruthy();
+            expect(
+                Array.from(how.querySelectorAll("ol > li h3")).map(
+                    (h) => h.textContent,
                 ),
-            ).toEqual(["ai-consent", "ai-ask"]);
-            expect(how.querySelectorAll("[data-step-picture]")).toHaveLength(4);
-        });
-
-        it("lists only the live AI apps under Apps you can use", async () => {
-            env.NEXT_PUBLIC_AI_APPS = "on";
-            const { liveIntegrations, shownIntegrations } =
-                await import("@/content/integrations");
-            render(await FeaturePage(params("ai-apps")));
-            const s = found(
-                screen
-                    .getByRole("heading", {
-                        level: 2,
-                        name: "Apps you can use",
-                    })
-                    .closest("section"),
-            );
-            const live = shownIntegrations([]).filter(
-                (c) => c.category === "AI apps",
-            );
-            const hrefs = Array.from(s.querySelectorAll("li a")).map((a) =>
-                a.getAttribute("href"),
-            );
-            expect(hrefs).toEqual(live.map((c) => c.href));
-            // A card not walked on dev is never listed.
-            for (const c of liveIntegrations.filter(
-                (x) => x.category === "AI apps" && !x.liveOnDev,
-            )) {
-                expect(hrefs).not.toContain(c.href);
-            }
-            expect(s.textContent).toContain("Gemini CLI");
-        });
-
-        it("other feature pages have no app list", async () => {
-            render(await FeaturePage(params("bookings")));
+            ).toEqual(features["ai-apps"].steps.map((st) => st.title));
+            // No pictures in it now, and no separate app list after it.
+            expect(how.querySelectorAll("[data-step-picture]")).toHaveLength(0);
             expect(
                 screen.queryByRole("heading", { name: "Apps you can use" }),
             ).toBeNull();
+            expect(how.textContent).toContain("Gemini CLI");
         });
     });
 

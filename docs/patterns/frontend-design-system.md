@@ -332,9 +332,14 @@
       bottom-aligned heading grid.
     - A plain page head (about, help, legal, tools): `PageHero`.
     - "How it works" as numbered steps beside one large picture (Ask AI,
-      AI apps, Share; board "Steps A", #42/#49/#51): `StepsShowcase`
+      Share; board "Steps A", #42/#51): `StepsShowcase`
       (`/steps-showcase`), through `ReachSteps` on a Reach page. Every
       step's picture is in the HTML; a phone shows each under its step.
+    - "Paste one address" (AI apps, R2Apps2 variant I, owner 16 Nov): the
+      MCP address large in mono between Ink rules with Copy, Saffron
+      numbered steps, "Step-by-step for" guide pills with the apps' marks
+      (`public/logos/`): `ConnectSteps` (`/connect-steps`). It replaced
+      AI apps' Steps A and its "Apps you can use" cards.
     - A section's heading, eyebrow and lead: `SectionHeading` / `Section`.
     - The closing band: `ClosingCTA` (`kit/closing-cta`).
     - The plan line under a feature: `PlanLine` (`kit/plan-line`).

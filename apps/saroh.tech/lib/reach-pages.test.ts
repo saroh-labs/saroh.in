@@ -25,16 +25,29 @@ describe("saroh.tech's Reach and Ask pages", () => {
         });
     }
 
-    // Steps A (#42, #49, #51): Global has no Ask AI or AI apps captures, so
-    // those steps are drawn; none is an empty pending frame.
-    for (const slug of ["ask-ai", "ai-apps", "social"] as const) {
+    // Steps A (#42, #51): Global has no Ask AI captures, so those steps are
+    // drawn; none is an empty pending frame.
+    for (const slug of ["ask-ai", "social"] as const) {
         it(`/features/${slug} draws four How it works pictures, none empty`, async () => {
             const html = renderToStaticMarkup(await BESPOKE[slug]());
-            const start = html.indexOf('id="in-the-app"');
-            const how = html.slice(start, html.indexOf("</section>", start));
-            expect(how.split("data-step-picture=")).toHaveLength(5);
+            expect(how(html).split("data-step-picture=")).toHaveLength(5);
             // A pending key's neutral frame (`ShotImage` with no src).
-            expect(how).not.toContain("place-items-center bg-muted");
+            expect(how(html)).not.toContain("place-items-center bg-muted");
         });
     }
+
+    // AI apps' How it works is words under Global's address (variant I,
+    // 16 Nov): no picture at all, so never a pending frame either.
+    it("/features/ai-apps draws Global's address and no empty frame", async () => {
+        const section = how(renderToStaticMarkup(await BESPOKE["ai-apps"]()));
+        expect(section).toContain(">mcp.saroh.tech/mcp</code>");
+        expect(section).not.toContain("data-step-picture=");
+        expect(section).not.toContain("place-items-center bg-muted");
+    });
 });
+
+/** The How it works section's markup. */
+function how(html: string) {
+    const start = html.indexOf('id="in-the-app"');
+    return html.slice(start, html.indexOf("</section>", start));
+}
