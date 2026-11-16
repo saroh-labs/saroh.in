@@ -22,7 +22,6 @@ const hamper = item("hamper");
 const bun = item("bun-box");
 const rose = item("rose-pistachio");
 const xmas = RYE_MONDAY.christmas;
-const cls = RYE_MONDAY.class;
 const owner = rye.owner;
 const place = rye.place.split(",")[0];
 
@@ -44,7 +43,7 @@ export function aiAppsWords({
         note: "Free to start. No card needed.",
 
         chat: {
-            label: `A chat in Claude at 6:12 pm where ${owner} adds the Christmas menu to ${rye.name} as two drafts on a new Christmas page, gets a publish request, then asks about Saturday's class`,
+            label: `A chat in Claude at 6:12 pm where ${owner} adds the Christmas menu to ${rye.name} as two drafts on a new Christmas page and gets a publish request`,
             app: "Claude",
             connected: `Saroh · ${rye.name}`,
             first: {
@@ -87,18 +86,6 @@ export function aiAppsWords({
                 ],
                 link: "Open the publish request in Saroh",
             },
-            second: {
-                at: "18:14",
-                ask: "How full is Saturday's class?",
-                step: {
-                    did: "Looked at bookings",
-                    what: cls.when.split(",")[0],
-                    tool: "list_bookings",
-                    state: "Read only",
-                },
-                answer: `${cls.name}, Saturday 21 Nov at 10 am: ${cls.booked} of ${cls.places} places booked, so ${cls.places - cls.booked} are left.`,
-            },
-            reply: "Reply to Claude",
             cap: `An example chat, for ${rye.name} (demo bakery). ${owner}, closing up on Monday 16 Nov.`,
             momentLink: `See 6 pm at ${rye.name}`,
             phoneMore: "See the rest of the chat",

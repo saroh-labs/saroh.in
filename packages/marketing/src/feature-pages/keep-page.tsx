@@ -12,9 +12,9 @@ import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
 import type { ShotView } from "../media/shot";
 import { ShotImage } from "../media/shot-image";
-import { Breadcrumbs } from "../nav/breadcrumbs";
 import { ring } from "../ring";
 import { Mark } from "../sections/mark";
+import { SplitHero } from "../sections/split-hero";
 import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
@@ -165,50 +165,34 @@ export function KeepPage({
             </StickyBar>
 
             {/* SLOT 1 · HERO: the promise, a moment, then the real screen cropped. */}
-            <Container
-                as="section"
-                aria-labelledby={`${slug}-title`}
+            <SplitHero
+                id={`${slug}-title`}
+                crumbs={[
+                    { name: KEEP.crumb, href: featuresHref },
+                    { name: feature.name },
+                ]}
+                crumbsClassName="[&_[aria-current]]:font-semibold [&_[aria-current]]:text-foreground"
+                title={marked(feature.headline, mark)}
+                lede={feature.sub}
+                primary={
+                    <span id={ctaId}>{site.start(`feature-${slug}`)}</span>
+                }
+                secondary={
+                    day ? (
+                        <ButtonLink
+                            href={day.href}
+                            variant="secondary"
+                            size="kit"
+                            className="bg-card"
+                        >
+                            {day.label}
+                        </ButtonLink>
+                    ) : null
+                }
+                foot={note ?? KEEP.heroNote}
                 className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 pt-8 min-[760px]:gap-12 min-[760px]:pb-[120px] min-[760px]:pt-12"
+                gridClassName="pt-0 min-[760px]:pt-0 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,440px)] min-[960px]:gap-16"
             >
-                <Breadcrumbs
-                    crumbs={[
-                        { name: KEEP.crumb, href: featuresHref },
-                        { name: feature.name },
-                    ]}
-                    current="plain"
-                    className="[&_[aria-current]]:font-semibold [&_[aria-current]]:text-foreground"
-                />
-                <div className="grid gap-6 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,440px)] min-[960px]:items-start min-[960px]:gap-16">
-                    <h1
-                        id={`${slug}-title`}
-                        className="m-0 max-w-[16ch] font-display text-mk-kit-h1 font-bold [text-wrap:balance]"
-                    >
-                        {marked(feature.headline, mark)}
-                    </h1>
-                    <div className="grid gap-6">
-                        <p className="m-0 text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
-                            {feature.sub}
-                        </p>
-                        <div className="flex flex-wrap gap-3">
-                            <span id={ctaId}>
-                                {site.start(`feature-${slug}`)}
-                            </span>
-                            {day ? (
-                                <ButtonLink
-                                    href={day.href}
-                                    variant="secondary"
-                                    size="kit"
-                                    className="bg-card"
-                                >
-                                    {day.label}
-                                </ButtonLink>
-                            ) : null}
-                        </div>
-                        <p className="m-0 text-[14px] text-muted-foreground">
-                            {note ?? KEEP.heroNote}
-                        </p>
-                    </div>
-                </div>
                 <nav
                     aria-label={KEEP.chapters}
                     className="-mr-mk-gutter flex gap-2 overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:hidden [&::-webkit-scrollbar]:hidden"
@@ -239,7 +223,7 @@ export function KeepPage({
                         />
                     </div>
                 </CroppedCard>
-            </Container>
+            </SplitHero>
 
             {/* Orders' own moments (FODesk): the order taken, then one opened. */}
             {moments}

@@ -318,6 +318,25 @@
     | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)               | `navigator.clipboard`, `URL.createObjectURL`                                  |
     | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                                 | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
 
+    **Which component for which pattern** (`@saroh/marketing`, the redesign).
+    Before writing a section, look here and in `packages/marketing/package.json`'s
+    exports for the one that exists and pass it values; a page that needs it
+    different adds a prop there. Fix a pattern in the shared component, then
+    grep the pattern everywhere (a two-column head was fixed one copy at a time
+    and came back three times, #47; DEV_LEARNINGS 16 Nov).
+
+    - A page's opening (crumbs, h1 with one `Mark`, lede, plan note, Start
+      free + second button, foot note, picture below or beside, centred
+      Home): `SplitHero` (`/split-hero`; `layout` split, stacked, beside,
+      center). Top-aligned (`items-start`); `split-hero.test.tsx` fails on a
+      bottom-aligned heading grid.
+    - A plain page head (about, help, legal, tools): `PageHero`.
+    - A section's heading, eyebrow and lead: `SectionHeading` / `Section`.
+    - The closing band: `ClosingCTA` (`kit/closing-cta`).
+    - The plan line under a feature: `PlanLine` (`kit/plan-line`).
+    - A phone's sticky start bar: `StickyBar`, watching the hero CTA's id.
+    - Questions: `Faq` / `FaqItems`; chapter chips: `Chip variant="chapter"`.
+
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,
   service or discount code is one of six words, the same whatever the thing:

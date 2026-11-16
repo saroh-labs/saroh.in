@@ -31,6 +31,7 @@
         "./eyebrow": "./src/sections/eyebrow.tsx",
         "./page-title": "./src/sections/page-title.tsx",
         "./page-hero": "./src/sections/page-hero.tsx",
+        "./split-hero": "./src/sections/split-hero.tsx",
         "./faq": "./src/sections/faq.tsx",
         "./point-grid": "./src/sections/point-grid.tsx",
         "./column-heading": "./src/nav/column-heading.tsx",

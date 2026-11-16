@@ -1,5 +1,4 @@
 import {
-    ArrowUp,
     Check,
     ChevronRight,
     ExternalLink,
@@ -19,10 +18,10 @@ import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
-import { Breadcrumbs } from "../nav/breadcrumbs";
 import { AppList } from "../sections/app-list";
 import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
+import { SplitHero } from "../sections/split-hero";
 
 import type { FeatureAppList } from "../content/types";
 import type { World } from "../content/world";
@@ -86,43 +85,40 @@ export function AiAppsView({
     return (
         <div>
             {/* Hero: the words beside the chat. */}
-            <Container as="section" aria-labelledby="page-title">
-                <Breadcrumbs
-                    className="pt-6"
-                    crumbs={[crumb, { name: w.name }]}
-                />
-                <div className="grid items-start gap-10 pt-5 min-[1080px]:grid-cols-[1fr_minmax(0,560px)] min-[1080px]:gap-16 min-[1080px]:pt-7">
-                    <div className="min-[1080px]:pt-9">
-                        <h1
-                            id="page-title"
-                            className="m-0 max-w-[14ch] font-display text-mk-kit-h1 font-bold [text-wrap:balance]"
-                        >
-                            {w.title.before}
-                            <Mark>{w.title.mark}</Mark>
-                        </h1>
-                        <p className="m-0 mt-7 text-mk-kit-lead text-mk-copy">
-                            {w.lede}
-                        </p>
-                        <p className="m-0 mt-4 text-[15px] text-mk-copy">
-                            {w.apps}
-                        </p>
-                        <div className="mt-7 flex flex-wrap gap-3">
-                            <span id={HERO_CTA}>
-                                {site.start(`feature-${slug}`)}
-                            </span>
-                            <ButtonLink
-                                href={`#${w.connect.id}`}
-                                variant="secondary"
-                                size="kit"
-                                className="max-[759px]:hidden"
-                            >
-                                {w.secondary}
-                            </ButtonLink>
-                        </div>
-                        <p className="m-0 mt-5 text-[15px] text-muted-foreground">
-                            {w.note}
-                        </p>
-                    </div>
+            <SplitHero
+                id="page-title"
+                crumbs={[crumb, { name: w.name }]}
+                crumbsClassName="pt-6"
+                layout="beside"
+                title={
+                    <>
+                        {w.title.before}
+                        <Mark>{w.title.mark}</Mark>
+                    </>
+                }
+                titleClassName="max-w-[14ch]"
+                lede={w.lede}
+                note={
+                    <p className="m-0 mt-4 text-[15px] text-mk-copy">
+                        {w.apps}
+                    </p>
+                }
+                primary={
+                    <span id={HERO_CTA}>{site.start(`feature-${slug}`)}</span>
+                }
+                secondary={
+                    <ButtonLink
+                        href={`#${w.connect.id}`}
+                        variant="secondary"
+                        size="kit"
+                        className="max-[759px]:hidden"
+                    >
+                        {w.secondary}
+                    </ButtonLink>
+                }
+                foot={w.note}
+                gridClassName="gap-10 min-[1080px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[1080px]:gap-16"
+                picture={
                     <div className="min-w-0">
                         <CropToggle label={c.phoneMore} height={300}>
                             <Chat w={w} />
@@ -141,8 +137,8 @@ export function AiAppsView({
                             ) : null}
                         </p>
                     </div>
-                </div>
-            </Container>
+                }
+            />
 
             {/* Which should you use? */}
             <Container className="pt-12 min-[760px]:pt-16">
@@ -767,7 +763,7 @@ export function AiAppsView({
     );
 }
 
-/** The Claude chat (FM's hero): two messages, each step it took, small tool names. */
+/** The Claude chat (FM's hero): one ask, each step it took, small tool names, sized to the words beside it (#40). */
 function Chat({ w }: { w: AiAppsWords }) {
     const c = w.chat;
     const step = (s: {
@@ -839,23 +835,6 @@ function Chat({ w }: { w: AiAppsWords }) {
                 <span className="inline-flex w-fit items-center gap-2 rounded-[10px] border border-border-strong px-3 py-2 text-[14px] font-semibold">
                     <ExternalLink aria-hidden className="size-4" />
                     {c.first.link}
-                </span>
-                <Time at={c.second.at} />
-                <Bubble>{c.second.ask}</Bubble>
-                <div className="rounded-xl border border-border px-3">
-                    {step(c.second.step)}
-                </div>
-                <p className="m-0 font-serif text-[15.5px] leading-normal">
-                    {c.second.answer}
-                </p>
-            </div>
-            <div className="m-4 mt-0 flex h-12 items-center justify-between rounded-xl border border-border px-3.5 text-[14px] text-muted-foreground">
-                {c.reply}
-                <span
-                    aria-hidden
-                    className="inline-flex size-8 items-center justify-center rounded-lg bg-foreground text-background"
-                >
-                    <ArrowUp className="size-4" />
                 </span>
             </div>
         </div>

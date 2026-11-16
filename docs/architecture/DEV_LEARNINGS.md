@@ -6768,3 +6768,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a page already dated today passes (`scripts/check-content-dates.mjs`, `CONTENT_DATES_TODAY` for its test); a test covers it.
 - **Rule:** a freshness check accepts "already today" as fresh.
 - **Category:** tooling · content
+
+## A page's heading sat low beside its words, again (16 Nov 2026)
+
+- **Symptom:** on Ask AI, Website and Share (desk), the h1 sat at the bottom of its column while the lede and buttons sat at the top (bug #47), after the same thing had been fixed on Keep pages, Home's chapters and Features (#9, #26).
+- **Cause:** the "h1 left, words and buttons right" opening was written by hand in seven files, and each fix changed one copy (`items-end` to top). The shared Reach top (`feature-pages/reach/page-top.tsx`) was missed. Under it, `cn()` didn't know the kit sizes (`text-mk-kit-h1`, `-h2`, `-h3`, `-lead`), so a later colour class silently dropped them (and vice versa), the same trap as `text-mk-note`.
+- **Fix:** one `SplitHero` (`@saroh/marketing/split-hero`), top-aligned once, used by Keep pages, the Reach top (Website, Share, Ask AI), AI apps, trade pages, the Solutions hub and Home. `split-hero.test.tsx` scans the package and fails on a `grid … items-end` whose children hold an h1/h2. The kit sizes are in `cn.ts`'s font-size group.
+- **Rule:** fix a pattern in its shared component, then grep the pattern everywhere; before writing a section, find the component and pass values (`frontend-design-system.md` → shared pieces).
+- **Category:** frontend · marketing

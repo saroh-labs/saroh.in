@@ -11,7 +11,13 @@ describe("cn", () => {
         expect(cn("text-mk-body text-mk-copy")).toBe(
             "text-mk-body text-mk-copy",
         );
-        for (const size of ["mk-price-lg", "mk-pricing-hero", "mk-h2-xs"]) {
+        for (const size of [
+            "mk-price-lg",
+            "mk-pricing-hero",
+            "mk-h2-xs",
+            "mk-kit-h1",
+            "mk-kit-lead",
+        ]) {
             expect(cn(`text-${size} text-foreground`)).toBe(
                 `text-${size} text-foreground`,
             );

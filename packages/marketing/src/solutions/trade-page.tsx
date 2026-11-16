@@ -16,9 +16,9 @@ import { hourAnchor, hourLabel, hourTint } from "../kit/time";
 import { TradeSwitcher } from "../kit/trade-switcher";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
-import { Breadcrumbs } from "../nav/breadcrumbs";
 import { ring } from "../ring";
 import { FaqItems } from "../sections/faq";
+import { SplitHero } from "../sections/split-hero";
 import type { DayHour, TradeDay, UsedLink } from "./day";
 import { HomePhone, Moment } from "./moments/moments";
 import type { MomentData } from "./moments/types";
@@ -590,18 +590,16 @@ export function TradePageLayout(props: TradePageLayoutProps) {
 
             {/* The hero: the page's own h1 and lead, then the day's picture. */}
             <section className="bg-mk-dawn pb-10 pt-4 min-[760px]:pb-[72px]">
-                <Container className="grid grid-cols-[minmax(0,1fr)] gap-10 min-[1000px]:grid-cols-[minmax(0,1fr)_400px] min-[1000px]:gap-[72px]">
-                    <div className="grid min-w-0 content-start">
-                        <Breadcrumbs
-                            crumbs={[
-                                { name: W.crumb, href: props.hubHref },
-                                { name: props.name },
-                            ]}
-                        />
-                        <h1 className="m-0 mt-4 max-w-[16ch] font-display text-mk-kit-h1 font-bold [text-wrap:balance]">
-                            {props.h1}
-                        </h1>
-                        <p className="m-0 mt-6 max-w-[620px] text-mk-kit-lead text-mk-copy">
+                <SplitHero
+                    as="div"
+                    crumbs={[
+                        { name: W.crumb, href: props.hubHref },
+                        { name: props.name },
+                    ]}
+                    layout="beside"
+                    title={props.h1}
+                    lede={
+                        <>
                             <span className="max-[759px]:hidden">
                                 {props.lead}
                                 {day ? ` ${day.intro}` : ""}
@@ -610,39 +608,50 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                 {props.phoneLead ?? props.lead}
                                 {day ? ` ${day.phoneIntro}` : ""}
                             </span>
-                        </p>
-                        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-                            <span id={heroCta}>{cta("hero")}</span>
-                            {day ? (
-                                <TextLink
-                                    href={`#${day.start.anchor}`}
-                                    tone="ink"
-                                >
-                                    {day.follow} ↓
-                                </TextLink>
-                            ) : props.heroLink ? (
-                                <TextLink
-                                    href={props.heroLink.href}
-                                    tone="ink"
-                                    arrow
-                                >
-                                    {props.heroLink.label}
-                                </TextLink>
-                            ) : null}
-                        </div>
-                        <p className="m-0 mt-3 text-[15px] text-muted-foreground">
+                        </>
+                    }
+                    ledeClassName="max-w-[620px]"
+                    primary={<span id={heroCta}>{cta("hero")}</span>}
+                    secondary={
+                        day ? (
+                            <TextLink
+                                href={`#${day.start.anchor}`}
+                                tone="ink"
+                                className="ml-3"
+                            >
+                                {day.follow} ↓
+                            </TextLink>
+                        ) : props.heroLink ? (
+                            <TextLink
+                                href={props.heroLink.href}
+                                tone="ink"
+                                arrow
+                                className="ml-3"
+                            >
+                                {props.heroLink.label}
+                            </TextLink>
+                        ) : null
+                    }
+                    foot={
+                        <>
                             {W.noCard}
                             {freeLine ? <> {freeLine}</> : null}
-                        </p>
-                        {day?.exampleNote ? (
+                        </>
+                    }
+                    more={
+                        day?.exampleNote ? (
                             <p className="m-0 mt-4 max-w-[560px] text-[13px] text-mk-copy">
                                 {day.exampleNote}
                             </p>
-                        ) : null}
-                    </div>
-                    <div className="flex justify-center min-[1000px]:col-start-2 min-[1000px]:row-span-2 min-[1000px]:row-start-1 min-[1000px]:block">
-                        {day ? <HomePhone m={day.hero} /> : props.picture}
-                    </div>
+                        ) : null
+                    }
+                    gridClassName="gap-10 pt-4 min-[760px]:pt-4 min-[1000px]:grid-cols-[minmax(0,1fr)_400px] min-[1000px]:gap-[72px]"
+                    picture={
+                        <div className="flex justify-center min-[1000px]:col-start-2 min-[1000px]:row-span-2 min-[1000px]:row-start-1 min-[1000px]:block">
+                            {day ? <HomePhone m={day.hero} /> : props.picture}
+                        </div>
+                    }
+                >
                     {day ? (
                         <div
                             id={day.start.anchor}
@@ -678,7 +687,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                             </div>
                         </div>
                     ) : null}
-                </Container>
+                </SplitHero>
                 {day ? (
                     <Container className="mt-6 min-[760px]:mt-[72px]">
                         {/* A phone: the day's index folds under its title (PHONE.md), once in the HTML. */}
@@ -757,7 +766,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                         />
                                     </summary>
                                     <div className="grid gap-6 px-5 pb-8">
-                                        <h2 className={cn(H2, "text-[28px]")}>
+                                        <h2 className={`${H2} text-[28px]`}>
                                             {changes.title}
                                         </h2>
                                         {changes.children}

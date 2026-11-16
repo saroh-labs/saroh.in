@@ -5,8 +5,8 @@ import { ButtonLink } from "../buttons/button";
 import { StickyBar } from "../kit/sticky-bar";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
-import { Breadcrumbs } from "../nav/breadcrumbs";
 import { Mark } from "../sections/mark";
+import { SplitHero } from "../sections/split-hero";
 import type { HubFinderWords, HubGroupView, HubTile } from "./hub-finder";
 import { HubFinder } from "./hub-finder";
 
@@ -91,25 +91,33 @@ export function SolutionsHub({
         <>
             <HubFinder
                 intro={
-                    <>
-                        <Breadcrumbs
-                            crumbs={[
-                                { name: "Home", href: "/" },
-                                { name: W.crumb },
-                            ]}
-                        />
-                        <h1 className="m-0 mt-4 font-display text-mk-kit-h1 font-bold [text-wrap:balance]">
-                            {W.h1Before} <Mark>{W.h1Mark}</Mark>
-                        </h1>
-                        <p className="m-0 mt-6 max-w-[560px] text-mk-kit-lead text-mk-copy">
-                            <span className="max-[759px]:hidden">
-                                {W.lead(n)}
-                            </span>
-                            <span className="min-[760px]:hidden">
-                                {W.phoneLead(n)}
-                            </span>
-                        </p>
-                    </>
+                    <SplitHero
+                        as="div"
+                        contained={false}
+                        crumbs={[
+                            { name: "Home", href: "/" },
+                            { name: W.crumb },
+                        ]}
+                        layout="beside"
+                        title={
+                            <>
+                                {W.h1Before} <Mark>{W.h1Mark}</Mark>
+                            </>
+                        }
+                        titleClassName="max-w-none"
+                        lede={
+                            <>
+                                <span className="max-[759px]:hidden">
+                                    {W.lead(n)}
+                                </span>
+                                <span className="min-[760px]:hidden">
+                                    {W.phoneLead(n)}
+                                </span>
+                            </>
+                        }
+                        ledeClassName="max-w-[560px]"
+                        gridClassName="pt-4 min-[760px]:pt-4"
+                    />
                 }
                 door={
                     days ? (
