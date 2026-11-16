@@ -390,7 +390,7 @@ export function askAiWords({
 
         mcp: {
             title: "Prefer your own assistant? Connect Claude or ChatGPT.",
-            body: "AI apps connects the assistant you already use to Saroh, on Free. It works on the same records as Ask AI, so a change it makes is a change everywhere.",
+            body: "AI apps connects the assistant you already use to Saroh. It works on the same records as Ask AI, so a change it makes is a change everywhere.",
             link: "How AI apps work",
             more: "See an answer from your assistant",
             rule: {

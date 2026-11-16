@@ -40,10 +40,10 @@ export const PLAN_WORDS = {
         on: "The site and the booking page come with every plan, Free included. A domain you own comes with a paid plan.",
         off: "Everyone is on Free for now.",
     },
-    /** AI apps is on every plan, Free included (bug #41). */
+    /** AI apps (MCP) is for paid plans only (owner, 16 Nov 2026, #55). No plan is named beside it (DEC-221). */
     aiAppsLine: {
-        on: "AI apps is on every plan, Free included. Your assistant's app may need a subscription of its own.",
-        off: "Everyone is on Free for now, AI apps included. Your assistant's app may need a subscription of its own.",
+        on: "Free to start. AI apps comes with a paid plan. Your assistant's app may need a subscription of its own.",
+        off: "Everyone is on Free for now. AI apps isn't part of Free.",
     },
     /** Ask AI isn't on Free. No plan is named beside it (DEC-221's `ask-ai-plans` claim). */
     askAiHero: { on: "Comes with a paid plan.", off: "Not part of Free yet." },
@@ -52,8 +52,8 @@ export const PLAN_WORDS = {
         off: "Everyone is on Free for now. Ask AI isn't part of Free.",
     },
     askAiFaq: {
-        on: "No. Ask AI comes with a paid plan. AI apps is on Free, if you'd like to ask Claude or ChatGPT instead.",
-        off: "Not yet. Everyone is on Free for now, and Ask AI isn't part of it. AI apps is, if you'd like to ask Claude or ChatGPT instead.",
+        on: "No. Ask AI comes with a paid plan, and so does AI apps.",
+        off: "Not yet. Everyone is on Free for now, and neither Ask AI nor AI apps is part of it.",
     },
     /** A domain you own, as a sentence after "…from the first day." */
     domain: {
