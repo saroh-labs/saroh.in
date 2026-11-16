@@ -359,6 +359,42 @@ export const CAPTURED: Record<
         width: 2560,
         height: 1600,
     },
+    "ask-hero": {
+        src: "/shots/v2/ask-hero.webp",
+        alt: "Ask AI at Thistlewick Bakery (demo bakery) answering how the last seven days went, with its best sellers as cards",
+        width: 2880,
+        height: 2400,
+    },
+    "ask-hero-phone": {
+        src: "/shots/v2/ask-hero-phone.webp",
+        alt: "Ask AI on a phone at Thistlewick Bakery (demo bakery), answering how the last seven days went",
+        width: 780,
+        height: 1688,
+    },
+    "ask-start": {
+        src: "/shots/v2/ask-start.webp",
+        alt: "Ask AI at Thistlewick Bakery (demo bakery) before a question, with ready questions",
+        width: 880,
+        height: 1678,
+    },
+    "ask-answer": {
+        src: "/shots/v2/ask-answer.webp",
+        alt: "Ask AI at Thistlewick Bakery (demo bakery) answering which products sold best this month, with the best sellers as cards",
+        width: 1408,
+        height: 1878,
+    },
+    "ask-confirm": {
+        src: "/shots/v2/ask-confirm.webp",
+        alt: "Ask AI at Thistlewick Bakery (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+        width: 1408,
+        height: 1158,
+    },
+    "ask-history": {
+        src: "/shots/v2/ask-history.webp",
+        alt: "Ask AI's history at Thistlewick Bakery (demo bakery)",
+        width: 662,
+        height: 658,
+    },
     "sh-sheet": {
         src: "/shots/v2/sh-sheet.webp",
         alt: "The Share sheet for the Sourdough loaf at Thistlewick Bakery (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
