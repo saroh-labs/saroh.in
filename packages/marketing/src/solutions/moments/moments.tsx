@@ -139,7 +139,8 @@ function PhoneFold({
 }
 
 /** A white card on a scene: 16px corners, one soft shadow. */
-const CARD = "rounded-mk-card bg-card text-foreground shadow-mk-card";
+/** A white card; `mk-paper` keeps its words dark on the night band (Section). */
+const CARD = "mk-paper rounded-mk-card bg-card text-foreground shadow-mk-card";
 const ROW = "border-t border-[#EEEBE4] first:border-t-0";
 const META = "text-[13px] leading-snug text-mk-copy";
 
