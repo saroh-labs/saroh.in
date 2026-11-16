@@ -177,8 +177,8 @@ const SOLUTION_FAMILY: Record<SolutionSlug, string> = {
 /**
  * The desk Solutions menu: once a /for/ page is live, every trade under its
  * family, the solutions first, names only (a trade's name says what it is).
- * Before that, the solutions alone with their lines. The footer and the phone
- * sheet keep the short list (`solutionItems`).
+ * Before that, the solutions alone with their lines. The phone sheet shows
+ * it too; the footer keeps the short list (`solutionItems`).
  */
 export function solutionMenuItems(list: PublishList = publishList()) {
     const trades = liveSearchPages(list);

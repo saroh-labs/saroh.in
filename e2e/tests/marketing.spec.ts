@@ -335,9 +335,14 @@ test.describe("nav menus by keyboard", () => {
             await page.keyboard.press("Enter");
             const back = sheet.getByRole("button", { name: "Back" });
             await expect(back).toBeFocused();
-            await expect(
-                sheet.locator(`#nav-sheet-${label.toLowerCase()} a`),
-            ).toHaveCount(count);
+            const links = sheet.locator(`#nav-sheet-${label.toLowerCase()} a`);
+            // Solutions lists every live trade once /for/ pages are live (the
+            // redesign's phone sheet), so it holds at least the solutions.
+            if (label === "Solutions")
+                await expect
+                    .poll(() => links.count())
+                    .toBeGreaterThanOrEqual(count);
+            else await expect(links).toHaveCount(count);
             await page.keyboard.press("Enter");
             await expect(row).toBeFocused();
         }

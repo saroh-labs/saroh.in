@@ -54,7 +54,9 @@ export function SwipeRow({
 
     return (
         <div className={className}>
+            {/* Scrolls sideways on purpose: the e2e hidden-sideways check allows it. */}
             <ul
+                data-scroll-x=""
                 ref={row}
                 aria-label={label}
                 className={cn(
