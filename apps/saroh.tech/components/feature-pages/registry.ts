@@ -1,3 +1,4 @@
+import type { BespokeSlug } from "@saroh/marketing/content-types";
 import type { ReactElement } from "react";
 
 import { AiAppsPage } from "./ai-apps";
@@ -10,10 +11,7 @@ import { WebsitePage } from "./website";
  * `registry.ts`): Website, Share, Ask AI and AI apps each draw the shared
  * page from `@saroh/marketing/feature-pages` with Global's words and world.
  */
-export const BESPOKE: Record<
-    "website" | "social" | "ask-ai" | "ai-apps",
-    () => Promise<ReactElement>
-> = {
+export const BESPOKE: Record<BespokeSlug, () => Promise<ReactElement>> = {
     website: WebsitePage,
     social: SocialPage,
     "ask-ai": AskAiPage,

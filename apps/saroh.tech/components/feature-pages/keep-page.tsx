@@ -1,5 +1,8 @@
 import type { ShotKey } from "@saroh/marketing/content-types";
-import { KeepPage as Keep } from "@saroh/marketing/feature-pages/keep-page";
+import {
+    KeepPage as Keep,
+    keepAsk,
+} from "@saroh/marketing/feature-pages/keep-page";
 import { OrdersMoments } from "@saroh/marketing/feature-pages/orders-moments";
 
 import type { KeepSlug } from "@/content/feature-keep";
@@ -44,27 +47,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
     const live = new Set(HELP.map((a) => a.slug));
     const ask =
         words.ask && !featuresOff().includes("ask-ai")
-            ? {
-                  ...words.ask,
-                  href: featureHref("ask-ai"),
-                  exchanges: words.ask.exchanges.map((x) => {
-                      const o = WORLD.lead.orders?.find(
-                          (r) => r.id === x.order?.id,
-                      );
-                      return {
-                          ...x,
-                          order:
-                              o && x.order
-                                  ? {
-                                        id: o.id,
-                                        customer: o.customer,
-                                        total: o.total,
-                                        note: x.order.note,
-                                    }
-                                  : undefined,
-                      };
-                  }),
-              }
+            ? keepAsk(words.ask, featureHref("ask-ai"), WORLD.lead.orders)
             : null;
     return (
         <Keep

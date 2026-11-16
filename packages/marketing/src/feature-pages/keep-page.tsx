@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
+import type { WorldOrder } from "../content/world";
 import { Chip, SourceChips } from "../kit/chip";
 import { ClosingCTA } from "../kit/closing-cta";
 import { CroppedCard } from "../kit/cropped-card";
@@ -55,6 +56,44 @@ export interface KeepAsk {
         order?: { id: string; customer: string; total: string; note: string };
         sources: readonly string[];
     }[];
+}
+
+/**
+ * The Ask band from an edition's words: its link, and each answer's order
+ * looked up in the world for its customer and total (with the words' note).
+ */
+export function keepAsk<
+    A extends {
+        exchanges: readonly (Omit<KeepAsk["exchanges"][number], "order"> & {
+            order?: { id: string; note: string };
+        })[];
+    },
+>(
+    ask: A,
+    href: string,
+    orders: readonly WorldOrder[] | undefined,
+): Omit<A, "exchanges"> & Pick<KeepAsk, "href" | "exchanges"> {
+    return {
+        ...ask,
+        href,
+        exchanges: ask.exchanges.map((x) => {
+            const o = x.order
+                ? orders?.find((r) => r.id === x.order?.id)
+                : undefined;
+            return {
+                ...x,
+                order:
+                    o && x.order
+                        ? {
+                              id: o.id,
+                              customer: o.customer,
+                              total: o.total,
+                              note: x.order.note,
+                          }
+                        : undefined,
+            };
+        }),
+    };
 }
 
 export interface KeepPageProps {

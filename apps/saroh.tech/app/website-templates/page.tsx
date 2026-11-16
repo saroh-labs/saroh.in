@@ -30,14 +30,9 @@ export default function WebsiteTemplatesPage() {
             <JsonLd data={pageSchema(entry)} />
             <TemplatesIndex
                 crumbs={[{ name: "Home", href: "/" }, { name: page.name }]}
-                title={page.title}
-                lead={page.intro(templates)}
+                words={page}
                 templates={templates}
-                allLabel={page.allChip}
-                previewLabel={page.preview}
-                sampleNote={page.sampleNote}
                 bandTitle={page.band.title}
-                bandNote={page.band.body}
                 start={<StartLink src="website-templates-band" />}
             />
         </>

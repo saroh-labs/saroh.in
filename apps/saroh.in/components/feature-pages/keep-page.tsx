@@ -1,4 +1,7 @@
-import { KeepPage as Keep } from "@saroh/marketing/feature-pages/keep-page";
+import {
+    KeepPage as Keep,
+    keepAsk,
+} from "@saroh/marketing/feature-pages/keep-page";
 import { OrdersMoments } from "@saroh/marketing/feature-pages/orders-moments";
 import { hourLabel } from "@saroh/marketing/kit/time";
 import type { WorldBusiness, WorldHour } from "@saroh/marketing/world";
@@ -104,29 +107,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
             help={help}
             ask={
                 ask
-                    ? {
-                          ...ask,
-                          href: featureHref("ask-ai"),
-                          exchanges: ask.exchanges.map((x) => {
-                              const o = x.order
-                                  ? WORLD.lead.orders?.find(
-                                        (r) => r.id === x.order?.id,
-                                    )
-                                  : undefined;
-                              return {
-                                  ...x,
-                                  order:
-                                      o && x.order
-                                          ? {
-                                                id: o.id,
-                                                customer: o.customer,
-                                                total: o.total,
-                                                note: x.order.note,
-                                            }
-                                          : undefined,
-                              };
-                          }),
-                      }
+                    ? keepAsk(ask, featureHref("ask-ai"), WORLD.lead.orders)
                     : null
             }
             planLine={heroPlanLine(feature, catalog)}

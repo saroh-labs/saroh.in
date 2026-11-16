@@ -40,14 +40,9 @@ export default function TemplatesPage() {
     return (
         <>
             <TemplatesIndex
-                title={page.title}
-                lead={page.intro(templates)}
+                words={page}
                 templates={templates}
-                allLabel={page.allChip}
-                previewLabel={page.preview}
-                sampleNote={page.sampleNote}
                 bandTitle={open ? page.band.after : page.band.before}
-                bandNote={page.band.body}
                 start={<CtaLink src="templates-band" size="kit" />}
             />
         </>

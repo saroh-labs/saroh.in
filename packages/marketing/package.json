@@ -73,6 +73,8 @@
         "./pricing-hero": "./src/pricing/pricing-hero.tsx",
         "./plan-cards": "./src/pricing/plan-cards.tsx",
         "./choice-chip": "./src/fields/choice-chip.tsx",
+        "./contact-parts": "./src/fields/contact-parts.tsx",
+        "./report-parts": "./src/fields/report-parts.tsx",
         "./drawn-panel": "./src/help/drawn-panel.tsx",
         "./feature-pages/developers-page": "./src/feature-pages/developers-page.tsx",
         "./feature-pages/site": "./src/feature-pages/site.ts",

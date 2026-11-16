@@ -16,44 +16,42 @@ import { TemplatesGallery } from "./templates-gallery";
  */
 export function TemplatesIndex({
     crumbs,
-    title,
-    lead,
+    words,
     templates,
-    allLabel,
-    previewLabel,
-    sampleNote,
     bandTitle,
-    bandNote,
     start,
 }: {
     crumbs?: ComponentProps<typeof PageHero>["crumbs"];
-    title: string;
-    lead: string;
+    /** The edition's gallery words (`content/`). */
+    words: {
+        title: string;
+        intro: (templates: readonly GalleryTemplate[]) => string;
+        allChip: string;
+        preview: string;
+        sampleNote: string;
+        band: { body: string };
+    };
     templates: GalleryTemplate[];
-    allLabel: string;
-    previewLabel: string;
-    sampleNote: string;
     bandTitle: string;
-    bandNote: string;
     start: ReactNode;
 }) {
     return (
         <>
             <PageHero
                 crumbs={crumbs}
-                title={title}
-                lead={lead}
+                title={words.title}
+                lead={words.intro(templates)}
                 className="pb-8 min-[760px]:pb-10"
             />
             <Container>
                 <TemplatesGallery
                     templates={templates}
                     chips={galleryChips(templates)}
-                    allLabel={allLabel}
-                    previewLabel={previewLabel}
+                    allLabel={words.allChip}
+                    previewLabel={words.preview}
                 />
                 <p className="m-0 pt-8 text-[13px] text-muted-foreground">
-                    {sampleNote}
+                    {words.sampleNote}
                 </p>
             </Container>
             <ClosingCTA
@@ -62,7 +60,7 @@ export function TemplatesIndex({
                 className="mt-[72px] min-[760px]:mt-[120px]"
                 title={bandTitle}
                 primary={start}
-                note={bandNote}
+                note={words.band.body}
             />
         </>
     );

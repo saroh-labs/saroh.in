@@ -8,27 +8,18 @@
  * line's link follows the paid-plans switch (`plan-words.ts`). Each page's
  * Help links are Global's own articles (`content/help.ts`).
  */
-import type { FeatureSlug } from "@saroh/marketing/content-types";
+import type { KeepSlug } from "@saroh/marketing/content-types";
 import type { KeepTemplateWords } from "@saroh/marketing/feature-pages/keep-page";
 
 /** The day these words last changed. */
 export const UPDATED = "2026-11-15";
 
 /** The Keep pages: every record feature. Website, Share, Ask AI and AI apps have their own. */
-export const KEEP_SLUGS = [
-    "dashboard",
-    "products",
-    "orders",
-    "customers",
-    "bookings",
-    "subscriptions",
-    "billing",
-    "insights",
-] as const satisfies readonly FeatureSlug[];
-export type KeepSlug = (typeof KEEP_SLUGS)[number];
-
-export const isKeep = (slug: string): slug is KeepSlug =>
-    (KEEP_SLUGS as readonly string[]).includes(slug);
+export {
+    isKeep,
+    KEEP_SLUGS,
+    type KeepSlug,
+} from "@saroh/marketing/content-types";
 
 export interface KeepWords {
     /** The word of the headline the Saffron mark sits under. */
