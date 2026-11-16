@@ -9,10 +9,14 @@ import { SiteNav } from "@/components/shared/nav/site-nav";
 import { WhatsAppChat } from "@/components/shared/whatsapp/whatsapp-chat";
 import { shownLegal, shownResources } from "@/content/resources";
 import { env } from "@/env";
+import { docPages } from "@/lib/docs-pages";
 import { asksConsent } from "@/lib/ga";
 import { resourcesContext } from "@/lib/resources-context";
 import { docHubLinks } from "@/lib/search-page-route";
+import type { PublishList } from "@/lib/search-pages";
 import {
+    builtSearchPages,
+    builtTools,
     footerToolLinks,
     liveTools,
     publishList,
@@ -60,7 +64,7 @@ export function SiteChrome({
     }
     const ctx = resourcesContext();
     // A solution goes to its /for/ page once that is live (DEC-193).
-    const published = publishList();
+    const published = menusList(publishList(), ctx.preview);
     // Then the GST, guides and downloads hubs, each once a page is live.
     const resources = [
         ...resourceItems(shownResources(ctx)),
@@ -144,4 +148,24 @@ function Shell({
             {after}
         </div>
     );
+}
+
+/**
+ * What the menus and footer count as live. On a preview with
+ * `RESOURCES_PREVIEW` on (never production, `previewOn`), every page this
+ * build has, so local review reaches every trade, tool, guide, GST page and
+ * download from the nav (owner, 16 Nov 2026); otherwise the publish list.
+ */
+export function menusList(list: PublishList, preview: boolean): PublishList {
+    if (!preview || !list.preview) return list;
+    return {
+        ...list,
+        live: [
+            ...builtSearchPages(list).map((p) => p.path),
+            ...builtTools(list).map((p) => p.path),
+            ...(["guides", "gst", "downloads"] as const).flatMap((id) =>
+                docPages.list(id).map((p) => p.path),
+            ),
+        ],
+    };
 }
