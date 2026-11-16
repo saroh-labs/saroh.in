@@ -25,16 +25,28 @@ describe("saroh.tech's Reach and Ask pages", () => {
         });
     }
 
-    // Steps A (#42, #51): Global has no Ask AI captures, so those steps are
-    // drawn; none is an empty pending frame.
-    for (const slug of ["ask-ai", "social"] as const) {
-        it(`/features/${slug} draws four How it works pictures, none empty`, async () => {
-            const html = renderToStaticMarkup(await BESPOKE[slug]());
-            expect(how(html).split("data-step-picture=")).toHaveLength(5);
-            // A pending key's neutral frame (`ShotImage` with no src).
-            expect(how(html)).not.toContain("place-items-center bg-muted");
-        });
-    }
+    // Steps A (#42, #51): Share's four pictures, none an empty pending frame.
+    it("/features/social draws four How it works pictures, none empty", async () => {
+        const html = renderToStaticMarkup(await BESPOKE.social());
+        expect(how(html).split("data-step-picture=")).toHaveLength(5);
+        // A pending key's neutral frame (`ShotImage` with no src).
+        expect(how(html)).not.toContain("place-items-center bg-muted");
+    });
+
+    // Ask AI's steps play one drawn panel (board "overdrive", #49): its whole
+    // conversation is in the HTML, in Global's English and currency, and
+    // never a pending frame.
+    it("/features/ask-ai plays one drawn panel, none empty", async () => {
+        const section = how(renderToStaticMarkup(await BESPOKE["ask-ai"]()));
+        expect(section.split("data-step-panel=")).toHaveLength(2);
+        expect(section).not.toContain("data-step-picture=");
+        expect(section).not.toContain("place-items-center bg-muted");
+        const text = visibleText(section);
+        expect(text).toContain("Is everything ready for today's orders?");
+        expect(text).toContain("Mark as ready for pick-up");
+        expect(text.match(/\bReady\b/g)?.length).toBeGreaterThanOrEqual(2);
+        expect(text).not.toMatch(/₹|Hinglish|\bRye\b/);
+    });
 
     // AI apps' How it works is words under Global's address (variant I,
     // 16 Nov): no picture at all, so never a pending frame either.

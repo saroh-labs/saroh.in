@@ -1,12 +1,6 @@
 import { cn } from "../../cn";
-import {
-    Asked,
-    AskPanel,
-    Checked,
-    ConfirmCard,
-    ReadFrom,
-    Suggestion,
-} from "./panel";
+import type { PlayerView } from "../../sections/steps-player";
+import { Asked, AskPanel, ConfirmCard, ReadFrom, Suggestion } from "./panel";
 import type { AskAiWords } from "./words";
 
 export const ROW =
@@ -16,9 +10,15 @@ export const ROW =
 export function AnswerTable({
     p,
     stockOn,
+    shown = p.rows.length,
+    change,
 }: {
     p: AskAiWords["hero"]["panel"];
     stockOn: boolean;
+    /** How many order rows have come in yet (the steps' player); stock follows the last. */
+    shown?: number;
+    /** The card's orders: tinted while it waits, `label` (Ready) once done. */
+    change?: { ids: readonly string[]; done: boolean; label: string };
 }) {
     return (
         <div className="overflow-hidden rounded-xl border border-border text-[14px]">
@@ -34,30 +34,41 @@ export function AnswerTable({
                     </span>
                 ))}
             </div>
-            {p.rows.map((r) => (
-                <div
-                    key={r.id}
-                    data-wire={r.from ? "p-ord" : undefined}
-                    className={cn(
-                        ROW,
-                        "min-h-10 grid-cols-[70px_1fr_64px_70px]",
-                        r.from && "bg-mk-tint",
-                    )}
-                >
-                    <span>{r.id}</span>
-                    <span className="truncate">{r.customer}</span>
-                    <span className="text-right">{r.total}</span>
-                    <span
+            {p.rows.slice(0, shown).map((r) => {
+                const changing = change?.ids.includes(r.id);
+                const ready = changing && change?.done;
+                return (
+                    <div
+                        key={r.id}
+                        data-wire={r.from ? "p-ord" : undefined}
                         className={cn(
-                            "text-right",
-                            r.paid !== "Paid" && "font-semibold text-mk-warn",
+                            ROW,
+                            "min-h-10 grid-cols-[70px_1fr_64px_70px] transition-colors duration-300 motion-reduce:transition-none",
+                            change
+                                ? changing && !ready && "bg-mk-tint"
+                                : r.from && "bg-mk-tint",
+                            shown < p.rows.length &&
+                                "motion-safe:duration-300 motion-safe:animate-in motion-safe:fade-in",
                         )}
                     >
-                        {r.paid}
-                    </span>
-                </div>
-            ))}
-            {stockOn ? (
+                        <span>{r.id}</span>
+                        <span className="truncate">{r.customer}</span>
+                        <span className="text-right">{r.total}</span>
+                        <span
+                            className={cn(
+                                "text-right",
+                                ready
+                                    ? "font-semibold text-mk-ok"
+                                    : r.paid !== "Paid" &&
+                                          "font-semibold text-mk-warn",
+                            )}
+                        >
+                            {ready ? change.label : r.paid}
+                        </span>
+                    </div>
+                );
+            })}
+            {stockOn && shown >= p.rows.length ? (
                 <>
                     <div
                         className={cn(
@@ -91,69 +102,155 @@ export function AnswerTable({
     );
 }
 
+/** The words the steps' player draws: plain data, handed from the server page. */
+export interface AskPlayWords {
+    panel: AskAiWords["hero"]["panel"];
+    /** Home's ready questions and their lead. */
+    home: {
+        lead: string;
+        sugs: readonly { t: string; h?: string; act?: boolean }[];
+    };
+    hint: string;
+    play: AskAiWords["inTheApp"]["play"];
+}
+
+/** The player's words from the page's: Home's screen is the one with a lead. */
+export function askPlayWords(w: AskAiWords): AskPlayWords {
+    const home = w.where.screens.find((sc) => sc.lead !== undefined);
+    return {
+        panel: w.hero.panel,
+        home: { lead: home?.lead ?? "", sugs: home?.sugs ?? [] },
+        hint: w.where.hintHome,
+        play: w.inTheApp.play,
+    };
+}
+
+/** How long each step's part of the conversation plays, in the player's ticks. */
+export function askPlayTicks(
+    p: AskAiWords["hero"]["panel"],
+): [number, number, number, number] {
+    return [24, p.q.length + 14, 46, 40];
+}
+
 /**
- * Ask AI's "How it works" steps, drawn (board "Steps A"): the captures are
- * phone-narrow and unreadable at the panel's size, and saroh.tech has none.
- * Each follows the hero's one question, keyed by the step's shot.
+ * Ask AI's "How it works" (board "overdrive", #49): the hero's one question
+ * played through the four steps in one panel. Step 1 taps the ready
+ * question, step 2 types it, step 3 reads the parts of the business then
+ * brings in the answer's rows, step 4 offers the card; confirmed, its
+ * orders read Ready. At the last step, confirmed, it is the whole answer.
  */
-export function AskStep({
-    w,
-    shot,
+export function AskPlay({
+    words,
+    view,
     stockOn,
 }: {
-    w: AskAiWords;
-    shot: string;
+    words: AskPlayWords;
+    view: PlayerView;
     stockOn: boolean;
 }) {
-    const p = w.hero.panel;
-    const home = w.where.screens.find((sc) => sc.lead !== undefined);
+    const { panel: p, home, play } = words;
+    const [, typeLen, readLen] = askPlayTicks(p);
+    const { step, progress: at, confirmed } = view;
+    const typed =
+        step > 1
+            ? p.q.length
+            : step === 1
+              ? Math.min(p.q.length, Math.round(at * typeLen))
+              : 0;
+    // Step 3: the parts light up in turn, then the rows come in one by one.
+    const readTo = 18 / readLen;
+    const read = step > 2 || (step === 2 && at >= readTo);
+    const lit =
+        step === 2 && !read
+            ? Math.min(p.sources.length, Math.floor(at / (5 / readLen)) + 1)
+            : p.sources.length;
+    const rows =
+        step > 2
+            ? p.rows.length
+            : step === 2
+              ? Math.min(
+                    p.rows.length,
+                    Math.floor(((at - readTo) / (1 - readTo)) * p.rows.length),
+                )
+              : 0;
     return (
-        <AskPanel
-            title={p.title}
-            icons={3}
-            className="mx-auto max-w-[560px] text-left"
-        >
-            {shot === "ask-start" && home?.lead ? (
+        <AskPanel title={p.title} icons={3} className="text-left">
+            <span className="w-fit rounded-full bg-mk-hover px-2.5 py-1 text-[13px] font-semibold">
+                {p.about}
+            </span>
+            {step === 0 ? (
                 <>
-                    <p className="m-0 text-[16px] font-semibold">{home.lead}</p>
+                    <p className="m-0 font-display text-[22px] font-bold tracking-[-0.02em]">
+                        {home.lead}
+                    </p>
                     <div>
-                        {home.sugs.map((g) => (
-                            <Suggestion key={g.t} {...g} />
+                        {home.sugs.map((g, i) => (
+                            <Suggestion
+                                key={g.t}
+                                {...g}
+                                on={i === home.sugs.length - 1 && at > 0.6}
+                            />
                         ))}
                     </div>
                     <p className="m-0 text-[13px] leading-snug text-muted-foreground">
-                        {w.where.hintHome}
+                        {words.hint}
                     </p>
                 </>
             ) : (
-                <>
-                    <span className="w-fit rounded-full bg-mk-hover px-2.5 py-1 text-[13px] font-semibold">
-                        {p.about}
-                    </span>
-                    <Asked>{p.q}</Asked>
-                    <Checked>{p.checked}</Checked>
-                    {shot === "ask-answer" ? (
-                        <>
-                            <p className="m-0 text-[17px] font-semibold leading-snug">
-                                {p.lead}
-                            </p>
-                            <AnswerTable p={p} stockOn={stockOn} />
-                            <ReadFrom
-                                sources={p.sources}
-                                label={p.from}
-                                tail={p.where}
-                            />
-                        </>
-                    ) : shot === "ask-confirm" ? (
-                        <>
-                            <p className="m-0 text-[15px] leading-normal text-mk-copy">
-                                {p.lead}
-                            </p>
-                            <ConfirmCard {...p.card} />
-                        </>
+                <Asked>
+                    {p.q.slice(0, typed)}
+                    {typed < p.q.length ? (
+                        <span
+                            aria-hidden
+                            className="ml-0.5 inline-block h-[1.1em] w-0.5 animate-pulse bg-brand-500 align-[-0.2em]"
+                        />
                     ) : null}
-                </>
+                </Asked>
             )}
+            {step >= 2 ? (
+                <ReadFrom
+                    sources={p.sources.slice(0, lit)}
+                    label={read ? p.from : play.reading}
+                    tail={read ? p.where : undefined}
+                />
+            ) : null}
+            {read ? (
+                <>
+                    <div className="grid gap-1.5">
+                        <p className="m-0 font-display text-[19px] font-bold leading-snug tracking-[-0.01em]">
+                            {p.lead}
+                        </p>
+                        <p className="m-0 text-[15px] leading-normal text-mk-copy">
+                            {p.why}
+                        </p>
+                    </div>
+                    <AnswerTable
+                        p={p}
+                        stockOn={stockOn}
+                        shown={rows}
+                        change={
+                            step === 3
+                                ? {
+                                      ids: p.card.orders,
+                                      done: confirmed,
+                                      label: play.ready,
+                                  }
+                                : undefined
+                        }
+                    />
+                </>
+            ) : null}
+            {step === 3 ? (
+                <ConfirmCard
+                    head={confirmed ? play.done : p.card.head}
+                    title={p.card.title}
+                    kv={p.card.kv}
+                    note={p.card.note}
+                    done={confirmed}
+                    buttons={confirmed ? [play.undo] : p.card.buttons}
+                    onConfirm={view.confirm}
+                />
+            ) : null}
         </AskPanel>
     );
 }

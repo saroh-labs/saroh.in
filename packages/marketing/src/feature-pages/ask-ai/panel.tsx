@@ -11,6 +11,7 @@ import {
 import type { ReactNode } from "react";
 import { cn } from "../../cn";
 import { SourceChips } from "../../kit/chip";
+import { ring } from "../../ring";
 
 /** Each part of the business keeps one dot colour wherever Ask AI names it. */
 const DOT: Record<string, string> = {
@@ -131,20 +132,31 @@ export function Suggestion({
     t,
     h,
     act,
+    on = false,
 }: {
     t: string;
     h?: string;
     act?: boolean;
+    /** Just tapped: Ink, as the steps' player shows it being picked. */
+    on?: boolean;
 }) {
     return (
         <div
             className={cn(
-                "flex min-h-11 items-center gap-2.5 border-t border-mk-line-row px-1 text-[14.5px] first:border-t-0",
+                "flex min-h-11 items-center gap-2.5 border-t border-mk-line-row px-1 text-[14.5px] transition-colors duration-300 first:border-t-0 motion-reduce:transition-none",
                 act && "font-semibold",
+                on &&
+                    "rounded-lg border-transparent bg-foreground px-3 text-background",
             )}
         >
             {act ? (
-                <Sparkles aria-hidden className="size-4 text-brand-700" />
+                <Sparkles
+                    aria-hidden
+                    className={cn(
+                        "size-4",
+                        on ? "text-brand-500" : "text-brand-700",
+                    )}
+                />
             ) : null}
             <span className="min-w-0 flex-1">{t}</span>
             {h ? (
@@ -168,6 +180,7 @@ export function ConfirmCard({
     note,
     buttons,
     done = false,
+    onConfirm,
 }: {
     head: ReactNode;
     title: string;
@@ -175,6 +188,8 @@ export function ConfirmCard({
     note?: string;
     buttons: readonly ReactNode[];
     done?: boolean;
+    /** Makes the first button a real one that confirms (the steps' player). */
+    onConfirm?: () => void;
 }) {
     return (
         <div
@@ -210,19 +225,33 @@ export function ConfirmCard({
                     </p>
                 ) : null}
                 <div className="flex flex-wrap gap-2">
-                    {buttons.map((b, i) => (
-                        <span
-                            key={i}
-                            className={cn(
-                                "inline-flex h-10 items-center gap-1.5 rounded-[9px] px-3.5 text-[14px] font-semibold",
-                                i === 0 && !done
-                                    ? "bg-foreground text-background"
-                                    : "border border-border-strong bg-card",
-                            )}
-                        >
-                            {b}
-                        </span>
-                    ))}
+                    {buttons.map((b, i) => {
+                        const look = cn(
+                            "inline-flex items-center gap-1.5 rounded-[9px] px-3.5 text-[14px] font-semibold",
+                            onConfirm ? "min-h-11" : "h-10",
+                            i === 0 && !done
+                                ? "bg-foreground text-background"
+                                : "border border-border-strong bg-card",
+                        );
+                        return i === 0 && onConfirm && !done ? (
+                            <button
+                                key={i}
+                                type="button"
+                                onClick={onConfirm}
+                                className={cn(
+                                    look,
+                                    "cursor-pointer border-none",
+                                    ring({ offset: 2 }),
+                                )}
+                            >
+                                {b}
+                            </button>
+                        ) : (
+                            <span key={i} className={look}>
+                                {b}
+                            </span>
+                        );
+                    })}
                 </div>
             </div>
         </div>

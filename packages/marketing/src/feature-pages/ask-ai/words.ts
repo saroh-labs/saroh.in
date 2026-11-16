@@ -115,6 +115,8 @@ export interface AskAiWords {
                     readonly [string, string],
                     readonly [string, string],
                 ];
+                /** The orders the card changes: they read Ready once it is pressed. */
+                orders: string[];
                 note: string;
                 buttons: string[];
             };
@@ -342,5 +344,17 @@ export interface AskAiWords {
         phone: string;
         /** The line under the steps: how long history keeps a conversation. */
         foot: string;
+        /** The steps' one conversation, played through (board "overdrive", #49). */
+        play: {
+            pause: string;
+            play: string;
+            /** Before the sources' chips while it reads them. */
+            reading: string;
+            /** A changed order's status once the card is pressed. */
+            ready: string;
+            /** The card's head once pressed, and its one button. */
+            done: string;
+            undo: string;
+        };
     };
 }

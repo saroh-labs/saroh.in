@@ -331,10 +331,16 @@
       center). Top-aligned (`items-start`); `split-hero.test.tsx` fails on a
       bottom-aligned heading grid.
     - A plain page head (about, help, legal, tools): `PageHero`.
-    - "How it works" as numbered steps beside one large picture (Ask AI,
-      Share; board "Steps A", #42/#51): `StepsShowcase`
+    - "How it works" as numbered steps beside one large picture (Share;
+      board "Steps A", #42/#51): `StepsShowcase`
       (`/steps-showcase`), through `ReachSteps` on a Reach page. Every
       step's picture is in the HTML; a phone shows each under its step.
+    - "How it works" as one story the steps play through one panel (Ask
+      AI, board "overdrive", #49): `StepsPlayer`
+      (`sections/steps-player.tsx`), each step's `ticks` and a `panel(view)`
+      drawn from a client piece (`AskSteps`, its words from `reachSteps()`).
+      The server draws the finished story; motion plays it from step 1 in
+      view; reduced motion keeps it finished.
     - "Paste one address" (AI apps, R2Apps2 variant I, owner 16 Nov): the
       MCP address large in mono between Ink rules with Copy, Saffron
       numbered steps, "Step-by-step for" guide pills with the apps' marks
