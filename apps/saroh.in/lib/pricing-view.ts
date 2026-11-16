@@ -21,6 +21,7 @@ import {
     PRICE_NOTE,
     PRICE_PLACEHOLDER,
 } from "@/content/types";
+import { featuresOff } from "./feature-switches";
 
 export { viewKey } from "@saroh/marketing/pricing-model";
 export type {
@@ -50,8 +51,11 @@ export const PRICING_SITE: PricingSite = {
 };
 
 /** The pricing page for a catalogue, in this site's money and words. */
-export function pricingPageModel(catalog: Catalog): PricingPageModel {
-    return pageModel(catalog, PRICING_SITE);
+export function pricingPageModel(
+    catalog: Catalog,
+    off: readonly string[] = featuresOff(),
+): PricingPageModel {
+    return pageModel(catalog, PRICING_SITE, off);
 }
 
 /**

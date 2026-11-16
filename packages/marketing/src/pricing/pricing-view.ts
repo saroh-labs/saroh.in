@@ -122,11 +122,42 @@ function footnote(
     return tax ? `${billed} ${tax}` : billed;
 }
 
+/**
+ * The release switch a catalogue row waits on: while it is off the row is
+ * in no card, no comparison and no usage table, so a plan never names a
+ * feature the site hasn't launched (owner, 16 Nov 2026). The API's rows
+ * wait on Developers, Ask AI's on Ask AI.
+ */
+export const ROW_SWITCH: Readonly<Partial<Record<string, string>>> = {
+    "ask-ai": "ask-ai",
+    "ask-ai-questions": "ask-ai",
+    "api-keys": "developers",
+    "api-secret": "developers",
+    "api-storefront": "developers",
+    webhooks: "developers",
+    "api-requests": "developers",
+};
+
+/** The catalogue without the rows whose release switch is off. */
+export function withoutSwitchedOff(
+    catalog: Catalog,
+    off: readonly string[],
+): Catalog {
+    const hide = (id: string) => {
+        const s = ROW_SWITCH[id];
+        return s !== undefined && off.includes(s);
+    };
+    return { ...catalog, modules: catalog.modules.filter((m) => !hide(m.id)) };
+}
+
 /** The pricing page for a catalogue: the design's every state, worked out. */
 export function pricingPageModel(
-    catalog: Catalog,
+    whole: Catalog,
     site: PricingSite,
+    /** The release switches that are off: their rows aren't drawn. */
+    off: readonly string[] = [],
 ): PricingPageModel {
+    const catalog = withoutSwitchedOff(whole, off);
     const yearlyOn = catalog.yearly.on;
     const views = {} as Record<ViewKey, PricingView>;
     for (const yearly of [false, true]) {

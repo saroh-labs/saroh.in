@@ -24,6 +24,7 @@ import type { FaqId } from "@/content/faq";
 import { faqItems, PAY_CARD_ONLINE } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { PRICING } from "@/content/pricing";
+import { featuresOff } from "@/lib/feature-switches";
 
 /** Words of India's catalogue that mean nothing on this edition (`indiaOnlyWord`). */
 const indiaOnly = (text: string) => indiaOnlyWord(text) !== null;
@@ -227,11 +228,16 @@ export function pricingModel(
         money?.tax === "none" &&
         catalog.plans.some((p) => p.pricePaise > 0)
     ) {
-        return pricingPageModel(withoutIndiaWords(catalog), {
-            money: (minor) => formatMinor(minor, money.currency),
-            count: (n) => n.toLocaleString("en-US"),
-            tax: null,
-        });
+        return pricingPageModel(
+            withoutIndiaWords(catalog),
+            {
+                money: (minor) => formatMinor(minor, money.currency),
+                count: (n) => n.toLocaleString("en-US"),
+                tax: null,
+            },
+            // A feature's rows wait on its release switch, as on saroh.in.
+            featuresOff(),
+        );
     }
     const limits = catalog && freeLimitLines(catalog);
     const model = placeholderPricingModel({
