@@ -37,8 +37,6 @@ export interface TradePageProps {
     draft?: boolean;
     /** The written day, where there is one. */
     day?: TradeDay;
-    /** The other written days, for "Same day, other trades". */
-    otherDays: readonly TradeDay[];
     /** The `src` of this page's start buttons ("for-home-bakers"). */
     src: string;
     demo?: string;
@@ -384,7 +382,6 @@ export function TradePage(props: TradePageProps) {
             tradeHref={(s) => `/for/${s}`}
             draft={props.draft}
             day={day}
-            otherDays={props.otherDays}
             cta={(place) =>
                 place === "hero" ? (
                     <CtaLink src={src} size="kit" template={tpl} />

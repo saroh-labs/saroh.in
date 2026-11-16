@@ -257,7 +257,6 @@ export default async function SolutionPage({ params }: Props) {
                 words={W}
                 hubHref={HUB_PATH}
                 tradeHref={(t) => `/solutions/${t}`}
-                otherDays={[]}
                 cta={(place) =>
                     place === "hero" ? (
                         <StartFree src={`${src}-hero`} from="start-free-page" />

@@ -11,7 +11,7 @@ import { JsonLd } from "@/components/shared/layout/json-ld";
 import { TradePage } from "@/components/solution/trade-page";
 import { featureHref, featureList, features } from "@/content/features";
 import { FREE_PLAN_LINE } from "@/content/home";
-import { TRADE_DAYS, tradeDay } from "@/content/solutions-days";
+import { tradeDay } from "@/content/solutions-days";
 import { galleryTemplate, templateHref } from "@/content/templates";
 import type { FeatureSlug } from "@/content/types";
 import { env } from "@/env";
@@ -125,9 +125,6 @@ export default async function ForPage({ params }: Props) {
                         page={demo ? p : { ...p, demo: undefined }}
                         draft={!isPublished(p.path)}
                         day={day}
-                        otherDays={TRADE_DAYS.filter(
-                            (d) => d.slug !== slug && built.has(d.slug),
-                        )}
                         src={`for-${slug}`}
                         demo={demo ?? undefined}
                         pageHref={(s) =>
