@@ -6776,3 +6776,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** one `SplitHero` (`@saroh/marketing/split-hero`), top-aligned once, used by Keep pages, the Reach top (Website, Share, Ask AI), AI apps, trade pages, the Solutions hub and Home. `split-hero.test.tsx` scans the package and fails on a `grid … items-end` whose children hold an h1/h2. The kit sizes are in `cn.ts`'s font-size group.
 - **Rule:** fix a pattern in its shared component, then grep the pattern everywhere; before writing a section, find the component and pass values (`frontend-design-system.md` → shared pieces).
 - **Category:** frontend · marketing
+
+## 16 Nov 2026: Paper text on Saffron and white inside an Ink section
+
+- **Symptom:** on the Website page's dark sections the "Make a test release" button, the current stage's number and the approval chip had Paper text on Saffron or white (owner saw it).
+- **Cause:** `Section`'s `ink` tone rewrote every `.text-foreground` descendant to Paper, including buttons and light chips.
+- **Fix:** the rewrite now skips `a` and `button`; dark text on a light surface inside Ink uses `text-[hsl(var(--foreground))]`.
+- **Rule:** when a section flips colours for its descendants, check every light surface and every button inside it in the browser before calling it done.
