@@ -272,7 +272,8 @@ describe("storefront reads (publishable key)", () => {
             days.body.days as { open: boolean; starts: unknown[] }[]
         ).filter((d) => d.open);
         expect(open.length).toBeGreaterThan(0);
-        expect(open[0].starts.length).toBeGreaterThan(0);
+        // Today can be open with no starts left by the hour the run happens.
+        expect(open.some((d) => d.starts.length > 0)).toBe(true);
 
         for (const path of ["staff", "days"]) {
             const theirs = await read(
