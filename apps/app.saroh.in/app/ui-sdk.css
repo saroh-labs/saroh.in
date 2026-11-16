@@ -1,0 +1,10 @@
+/*
+ * ui-sdk (@ui-sdk/react) on Tailwind 3. Its docs assume Tailwind 4, whose base
+ * styles sit in a layer; here Tailwind's styles are unlayered, and unlayered
+ * styles beat every layer. So: the CSS ui-sdk injects goes in its `ui-sdk`
+ * layer, its default look in `ui-sdk-defaults`, and Saroh's own classes and
+ * tokens (unlayered) always win over both.
+ */
+@layer ui-sdk, ui-sdk-defaults;
+
+@import "@ui-sdk/core/web.css" layer(ui-sdk-defaults);
