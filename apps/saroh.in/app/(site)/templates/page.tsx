@@ -62,6 +62,7 @@ export default function TemplatesPage() {
             </Container>
 
             <ClosingCTA
+                visual={null}
                 id="templates-start"
                 className="mt-[72px] min-[760px]:mt-[120px]"
                 title={open ? page.band.after : page.band.before}

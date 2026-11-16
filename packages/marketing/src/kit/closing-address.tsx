@@ -43,11 +43,7 @@ const HOLD = 18;
  * still, with no caret. The typing is hidden from screen readers; they read
  * the current address once, with no live region.
  */
-export function ClosingAddress({
-    note = "The address types each name in turn.",
-}: {
-    note?: ReactNode;
-}) {
+export function ClosingAddress({ note = "On Saroh:" }: { note?: ReactNode }) {
     const names = useContext(Names);
     const [k, setK] = useState(0);
     const [len, setLen] = useState(names.length ? names[0].slug.length : 0);
@@ -114,32 +110,48 @@ export function ClosingAddress({
                     </span>
                 </span>
             </p>
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span className="mr-1 text-sm text-mk-on-ink-muted">
+                    {note}
+                </span>
                 {names.map((n, i) => (
+                    // A quiet pill, not a button look: the real actions are below.
                     <button
                         key={n.slug}
                         type="button"
                         aria-pressed={i === k}
                         onClick={() => pick(i)}
-                        style={{
-                            background: `hsl(${n.look.bg})`,
-                            color: `hsl(${n.look.fg})`,
-                            fontFamily: n.look.fontHeading,
-                            fontWeight: n.look.headingWeight,
-                            borderRadius: n.look.radius,
-                        }}
                         className={cn(
-                            "min-h-11 cursor-pointer border-0 px-4 py-2.5 text-base",
+                            "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border-0 bg-transparent px-3 text-sm font-medium",
                             i === k
-                                ? "ring-2 ring-brand-500"
-                                : "ring-1 ring-background/15",
+                                ? "text-background"
+                                : "text-mk-on-ink-muted hover:text-mk-on-ink",
                             ring({ offset: 3, color: "paper" }),
                         )}
                     >
-                        {n.name}
+                        <span
+                            aria-hidden
+                            style={{
+                                background: `hsl(${n.look.bg})`,
+                                borderColor: `hsl(${n.look.fg} / 0.25)`,
+                            }}
+                            className={cn(
+                                "size-3.5 rounded-full border",
+                                i === k &&
+                                    "outline outline-2 outline-offset-2 outline-brand-500",
+                            )}
+                        />
+                        <span
+                            className={cn(
+                                "underline-offset-4",
+                                i === k &&
+                                    "underline decoration-brand-500 decoration-2",
+                            )}
+                        >
+                            {n.name}
+                        </span>
                     </button>
                 ))}
-                <span className="text-sm text-mk-on-ink-muted">{note}</span>
             </div>
         </div>
     );

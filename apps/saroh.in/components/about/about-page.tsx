@@ -217,6 +217,7 @@ export function AboutPage({
             </Container>
 
             <ClosingCTA
+                visual={null}
                 id="about-start"
                 className="mt-[72px] min-[760px]:mt-[120px]"
                 title={band.title[mode]}

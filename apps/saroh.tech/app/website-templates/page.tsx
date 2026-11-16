@@ -50,6 +50,7 @@ export default function WebsiteTemplatesPage() {
                 </p>
             </Container>
             <ClosingCTA
+                visual={null}
                 id="templates-start"
                 className="mt-[72px] min-[760px]:mt-[120px]"
                 title={page.band.title}

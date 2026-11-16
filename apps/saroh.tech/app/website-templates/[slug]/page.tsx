@@ -168,6 +168,7 @@ export default async function WebsiteTemplatePage({ params }: Props) {
             ) : null}
 
             <ClosingCTA
+                visual={null}
                 id="template-start"
                 className="mt-[72px] min-[760px]:mt-[120px]"
                 title={detail.band(t.name)}
