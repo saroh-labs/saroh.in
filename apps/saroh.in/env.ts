@@ -130,6 +130,7 @@ export const env = createEnv({
         NEXT_PUBLIC_CLAIM_ASK_AI_PLANS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_CLAIM_AI_APPS_PLANS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_CLAIM_SITE_SHOP: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_CHAT: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_NUMBER: z
@@ -244,6 +245,8 @@ export const env = createEnv({
         NEXT_PUBLIC_CLAIM_AI_APPS_PLANS:
             process.env.NEXT_PUBLIC_CLAIM_AI_APPS_PLANS,
         NEXT_PUBLIC_CLAIM_SITE_SHOP: process.env.NEXT_PUBLIC_CLAIM_SITE_SHOP,
+        NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES:
+            process.env.NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES,
         NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS:
             process.env.NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS,
         NEXT_PUBLIC_WHATSAPP_CHAT: process.env.NEXT_PUBLIC_WHATSAPP_CHAT,

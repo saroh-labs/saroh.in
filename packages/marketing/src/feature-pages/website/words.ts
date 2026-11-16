@@ -21,7 +21,15 @@ import type { WorldBusiness } from "../../content/world";
  *   are said only once it is open, as a point's `openNote` is (DEC-136).
  */
 
-/** A look in the switcher: whose look, and the line under it. */
+/** A step of the page: its heading and lead, the drawing's name, and its points. */
+export interface StepWords {
+    title: string;
+    lead: string;
+    label: string;
+    points: { title: string; body: string }[];
+}
+
+/** A colourway in the switcher: whose look it borrows, its name, and the line under it. */
 export interface LookWords {
     business: WorldBusiness;
     label: string;
@@ -192,8 +200,7 @@ export interface WebsiteWords {
             host: string;
             foot: string;
         };
-        /** Your own domain: left out where an edition can't connect one yet. */
-        own?: {
+        own: {
             title: string;
             sub: string;
             domain: string;
@@ -247,6 +254,33 @@ export interface WebsiteWords {
         }[];
         phoneMore: string;
         phoneMoreMeta: string;
+    };
+    /** Test releases, reviewers and approval (the `site-test-releases` claim). */
+    testRelease: StepWords & {
+        panel: string;
+        name: string;
+        number: string;
+        address: string;
+        only: string;
+        reviewer: string;
+        approved: string;
+        now: string;
+        later: string;
+    };
+    /** The editor's device switch: desktop, tablet and phone, zoom and Fit. */
+    preview: StepWords & {
+        devices: readonly string[];
+        zoom: string;
+    };
+    /** The look panel: theme, colours, typefaces and logo. */
+    brand: StepWords & {
+        panel: string;
+        theme: string;
+        themeValue: string;
+        colours: string;
+        typefaces: string;
+        typefacesValue: string;
+        logo: string;
     };
     sections: {
         /** On a phone, what the sections read and what you fill fold behind this. */

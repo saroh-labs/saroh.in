@@ -39,8 +39,16 @@ const strings = (v: unknown): string[] =>
 const text = JSON.stringify(all, (key, value: unknown) =>
     key === "business" ? undefined : value,
 );
+/**
+ * Website's paid-plan facts, named as coming with paid plans (owner, 16 Nov
+ * 2026): the own-domain card (#32) and approval by a reviewer (#33).
+ */
+const paidFacts =
+    /Your own domain( comes with a paid plan\.)?|Comes with a paid plan\. Paid plans open soon\.|Approval before it goes live|Publishing needs approval|Reviewers come with paid plans\./g;
 // Features alone names the provider, as "through your own Stripe" (KTD9).
-const said = text.replace(/through your own Stripe/g, "");
+const said = text
+    .replace(/through your own Stripe/g, "")
+    .replace(paidFacts, "");
 
 describe("saroh.tech's Reach and Ask words", () => {
     it("stay out of what isn't true outside India", () => {
@@ -53,7 +61,7 @@ describe("saroh.tech's Reach and Ask words", () => {
         // Own domains are named as coming with paid plans (owner, 16 Nov 2026, #21).
         const domains =
             /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans/g;
-        expect(text.replace(domains, "")).not.toMatch(
+        expect(text.replace(domains, "").replace(paidFacts, "")).not.toMatch(
             /\bpaid plans?\b|\bupgrade\b|\bGrow\b|\bPro\b|\bpack(s|ages?)?\b/i,
         );
     });

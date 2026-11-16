@@ -383,14 +383,15 @@ export const THISTLEWICK_TUESDAY = {
 } as const satisfies WorldStory & Record<string, unknown>;
 
 /**
- * The trade looks the Reach pages switch between (Website's "pick the look
- * for your trade", Share's salon cards): a salon's and a gym's template
+ * The trade looks the Reach pages switch between (Website's "pick its
+ * colours", Share's salon cards): a salon's, a gym's and a florist's template
  * colours, the same drawings saroh.in uses for those trades. The Global
  * seed sets no theme, so these are template looks, never a business's own.
  */
-export const TEMPLATE_LOOKS: Record<"salon" | "gym", SiteLook> = {
+export const TEMPLATE_LOOKS: Record<"salon" | "gym" | "florist", SiteLook> = {
     salon: TRADE_LOOKS.salon,
     gym: TRADE_LOOKS.gym,
+    florist: TRADE_LOOKS.florist,
 };
 
 const priced = (b: WorldBusiness, key: string) => {

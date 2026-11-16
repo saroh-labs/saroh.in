@@ -311,18 +311,19 @@ edition's world file, typed by `@saroh/marketing/world`:
 rule: on only when it says `on`, unset is on only under `next dev`, and a
 claim is off whenever its feature's release switch is off.
 
-| Claim                                                       | Variable                             | Under     |
-| ----------------------------------------------------------- | ------------------------------------ | --------- |
-| `social-posting` (Saroh Social posts and schedules for you) | `NEXT_PUBLIC_CLAIM_SOCIAL_POSTING`   | `social`  |
-| `share-every-plan` (Share free on every plan)               | `NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN` | `social`  |
-| `ask-ai-stock` (Ask AI reads Stock)                         | `NEXT_PUBLIC_CLAIM_ASK_AI_STOCK`     | `ask-ai`  |
-| `ask-ai-website` (Ask AI reads and changes the Website)     | `NEXT_PUBLIC_CLAIM_ASK_AI_WEBSITE`   | `ask-ai`  |
-| `ask-ai-social` (Ask AI reads posts)                        | `NEXT_PUBLIC_CLAIM_ASK_AI_SOCIAL`    | `ask-ai`  |
-| `ask-ai-languages` (Hinglish or Hindi)                      | `NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES` | `ask-ai`  |
-| `ask-ai-plans` (a plan named beside Ask AI)                 | `NEXT_PUBLIC_CLAIM_ASK_AI_PLANS`     | `ask-ai`  |
-| `ai-apps-plans` (a plan named beside AI apps)               | `NEXT_PUBLIC_CLAIM_AI_APPS_PLANS`    | `ai-apps` |
-| `site-shop` (products and the shop on a merchant's site)    | `NEXT_PUBLIC_CLAIM_SITE_SHOP`        | none      |
-| `share-insights` (worth-posting ideas, visits per post)     | `NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS`   | `social`  |
+| Claim                                                       | Variable                               | Under     |
+| ----------------------------------------------------------- | -------------------------------------- | --------- |
+| `social-posting` (Saroh Social posts and schedules for you) | `NEXT_PUBLIC_CLAIM_SOCIAL_POSTING`     | `social`  |
+| `share-every-plan` (Share free on every plan)               | `NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN`   | `social`  |
+| `ask-ai-stock` (Ask AI reads Stock)                         | `NEXT_PUBLIC_CLAIM_ASK_AI_STOCK`       | `ask-ai`  |
+| `ask-ai-website` (Ask AI reads and changes the Website)     | `NEXT_PUBLIC_CLAIM_ASK_AI_WEBSITE`     | `ask-ai`  |
+| `ask-ai-social` (Ask AI reads posts)                        | `NEXT_PUBLIC_CLAIM_ASK_AI_SOCIAL`      | `ask-ai`  |
+| `ask-ai-languages` (Hinglish or Hindi)                      | `NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES`   | `ask-ai`  |
+| `ask-ai-plans` (a plan named beside Ask AI)                 | `NEXT_PUBLIC_CLAIM_ASK_AI_PLANS`       | `ask-ai`  |
+| `ai-apps-plans` (a plan named beside AI apps)               | `NEXT_PUBLIC_CLAIM_AI_APPS_PLANS`      | `ai-apps` |
+| `site-shop` (products and the shop on a merchant's site)    | `NEXT_PUBLIC_CLAIM_SITE_SHOP`          | none      |
+| `site-test-releases` (test releases and approval)           | `NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES` | none      |
+| `share-insights` (worth-posting ideas, visits per post)     | `NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS`     | `social`  |
 
 Wrap the claim in `<Claim on={claimOn("…")}>`. A new unlive claim gets a
 switch here first, with its test.

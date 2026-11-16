@@ -7,9 +7,10 @@
  * What differs from saroh.in, by what Global can do today
  * (`content/features.ts`, website is Limited):
  * - a site lives on a saroh.app address; a domain you own comes with paid
- *   plans (owner, 16 Nov 2026), so the address section draws one card, says
- *   so, and draws no DNS records;
- * - one person runs the business: no reviewer, no team;
+ *   plans (owner, 16 Nov 2026), so the address section draws saroh.in's two
+ *   cards with an example domain and says the own domain is a paid plan's
+ *   (#32);
+ * - reviewers and approval are team seats, so they come with paid plans;
  * - Thistlewick takes no bookings, so the slot saroh.in gives a class is
  *   its made-to-order cake, which the site reads from Products;
  * - no plan on sale (DEC-211): no plan terms, whatever `open` says.
@@ -24,7 +25,7 @@ import type {
 import { TEMPLATE_LOOKS, THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
-const [salon, gym] = WORLD.others;
+const [salon, gym, florist] = WORLD.others;
 const item = (key: string) => {
     const found = bakery.items.find((i) => i.key === key);
     if (!found) throw new Error(`world: no item ${key}`);
@@ -113,27 +114,32 @@ export function websiteWords({
 
         looks: {
             id: "looks",
-            title: "Then pick the look for your trade.",
-            label: "Then pick its look",
-            group: "Look",
-            note: "Same products, prices and hours in every look.",
+            title: "Then pick its colours.",
+            label: "Then pick its colours",
+            group: "Colours",
+            note: "Same products, prices and hours in every colourway.",
             frame: `${bakery.name}'s website at ${bakery.site}, with its shop and cakes to order`,
             example: "Example",
             options: [
                 {
                     business: bakery,
-                    label: "Bakery look",
-                    line: "Thistlewick's own site, as it is today.",
+                    label: "Cream and terracotta",
+                    line: "Warm cream, terracotta buttons and a serif for the headings.",
                 },
                 {
                     business: { ...salon, look: TEMPLATE_LOOKS.salon },
-                    label: "Salon look",
-                    line: "Your words and prices, a salon's colours and type.",
+                    label: "Plum and gold",
+                    line: "Deep plum, gold buttons and a heavy sans.",
                 },
                 {
                     business: { ...gym, look: TEMPLATE_LOOKS.gym },
-                    label: "Gym look",
-                    line: "Same shop, same cakes, a gym's bolder type.",
+                    label: "Black and lime",
+                    line: "Near-black, a lime accent and the name in capitals.",
+                },
+                {
+                    business: { ...florist, look: TEMPLATE_LOOKS.florist },
+                    label: "Blush and wine",
+                    line: "Soft blush, wine-red buttons and a serif, gently rounded.",
                 },
             ] satisfies LookWords[],
             site: {
@@ -245,13 +251,19 @@ export function websiteWords({
 
         address: {
             title: "Your address, from the first day.",
-            lead: `Every site starts at a ${host.slice(1)} address, ready the moment you publish. A domain you own comes with paid plans, which open soon.`,
+            lead: `Every site starts at a free ${host.slice(1)} address. Connect a domain you own with two records at your registrar, and the screen tells you when it's live. Your own domain comes with a paid plan.`,
             web: {
                 title: "Web address",
-                sub: `At ${host.slice(1)}.`,
+                sub: "Free, on every plan.",
                 slug,
                 host,
                 foot: "This is where your shop and every page you publish live, from the moment you start.",
+            },
+            own: {
+                title: "Your own domain",
+                sub: "Connected through www. Comes with a paid plan. Paid plans open soon.",
+                domain: "www.thistlewick.example",
+                foot: "Add both at the place you bought the domain. Example domain. Yours will differ.",
             },
             live: "Live",
             records: "See the two records to add",
@@ -306,13 +318,75 @@ export function websiteWords({
                     title: "Every version kept",
                     body: "Each publish is kept in Version history, and you can put an earlier one back.",
                 },
-                {
-                    title: "Your look, everywhere",
-                    body: "Choose a colourway, a pair of typefaces and the spacing, and every page follows.",
-                },
             ],
             phoneMore: "See version history",
             phoneMoreMeta: "Put back",
+        },
+
+        testRelease: {
+            title: "Try it on a test address first.",
+            lead: "Make a test release: your site as it stands, frozen on a test address of its own. Send the link to the people who should check it, and only they can open it. When it's right, put it live now or at a time you set.",
+            label: `A test release of ${bakery.name}'s site on its own test address, approved by a reviewer, with Go live now and Go live at a set time`,
+            panel: "Test releases",
+            name: "Holiday menu",
+            number: "Test release 3",
+            address: `test--${bakery.site}`,
+            only: "Link only",
+            reviewer: "Your reviewer",
+            approved: "Approved",
+            now: "Go live now",
+            later: "Go live at a set time",
+            points: [
+                {
+                    title: "Only people with the link",
+                    body: "Without the link, every page on the test address asks to be opened from it. Nothing there takes a real order or payment.",
+                },
+                {
+                    title: "Approval before it goes live",
+                    body: "Turn on Publishing needs approval, and changes wait for a reviewer to approve them. Reviewers come with paid plans.",
+                },
+            ],
+        },
+
+        preview: {
+            title: "See every screen before you publish.",
+            lead: "The editor shows your site on a computer, a tablet and a phone. Switch between them as you edit, zoom in, or fit the whole page in view.",
+            label: `The editor's device switch set to Phone, showing ${bakery.name}'s home page at phone width`,
+            devices: ["Desktop", "Tablet", "Phone"],
+            zoom: "Fit",
+            points: [
+                {
+                    title: "Desktop, tablet and phone",
+                    body: "Each redraws the page at that width, so you see what a customer's screen shows, not a squeezed copy.",
+                },
+                {
+                    title: "Zoom, or Fit",
+                    body: "Look at the page at 50, 75 or 100%, or fit the whole frame in the window.",
+                },
+            ],
+        },
+
+        brand: {
+            title: "Your brand, on every page.",
+            lead: "Pick a theme, then set your colours, typefaces and logo. Every page follows, the shop included.",
+            label: `The look panel with ${bakery.name}'s theme, colours, typefaces and logo, beside its site`,
+            panel: "Look",
+            theme: "Theme",
+            themeValue: "Folio",
+            colours: "Colours",
+            typefaces: "Typefaces",
+            typefacesValue: "Fraunces and Inter Tight",
+            logo: "Logo",
+            points: [
+                {
+                    title: "Colours and typefaces that go together",
+                    body: "Choose a colourway, a pair of typefaces and the spacing from ones made to sit well together, and every page follows.",
+                },
+                {
+                    title: "A blog when you want one",
+                    body: "Write posts and list them on a page of your site, in the same look.",
+                },
+            ],
         },
 
         sections: {

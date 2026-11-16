@@ -118,33 +118,33 @@ export function websiteWords({
 
         looks: {
             id: "looks",
-            title: "Then pick the look for your trade.",
-            label: "Then pick its look",
-            group: "Look",
-            note: "Same products, prices and times in every look.",
+            title: "Then pick its colours.",
+            label: "Then pick its colours",
+            group: "Colours",
+            note: "Same products, prices and times in every colourway.",
             frame: `${rye.name}'s website at ${rye.site}, with its shop and class booking`,
             example: "Example",
             options: [
                 {
                     business: rye,
-                    label: "Bakery look",
-                    line: "Your own bakery's warm cream and terracotta.",
+                    label: "Cream and terracotta",
+                    line: "Warm cream, terracotta buttons and a serif for the headings.",
                     band: LOOK_BANDS.rye,
                 },
                 {
                     business: WORLD.others[0],
-                    label: "Salon look",
-                    line: "Your words and prices, a salon's colours and type.",
+                    label: "Plum and gold",
+                    line: "Deep plum, gold buttons and a heavy sans.",
                 },
                 {
                     business: WORLD.others[1],
-                    label: "Gym look",
-                    line: "Same shop, same class, a gym's bolder type.",
+                    label: "Black and lime",
+                    line: "Near-black, a lime accent and the name in capitals.",
                 },
                 {
                     business: WORLD.others[2],
-                    label: "Florist look",
-                    line: "Same shop in a florist's garnet and blush, soft and rounded.",
+                    label: "Blush and wine",
+                    line: "Soft blush, wine-red buttons and a serif, gently rounded.",
                 },
             ] satisfies LookWords[],
             site: {
@@ -330,13 +330,77 @@ export function websiteWords({
                     title: "Every version kept",
                     body: "Each publish is kept in Version history, and you can put an earlier one back.",
                 },
-                {
-                    title: "Your look, everywhere",
-                    body: "Choose a colourway, a pair of typefaces and the spacing, and every page follows.",
-                },
             ],
             phoneMore: "See version history",
             phoneMoreMeta: "Put back",
+        },
+
+        testRelease: {
+            title: "Try it on a test address first.",
+            lead: "Make a test release: your site as it stands, frozen on a test address of its own. Send the link to the people who should check it, and only they can open it. Once it's approved, put it live now or at a time you set.",
+            label: `A test release of ${rye.name}'s site on its own test address, approved by a reviewer, with Go live now and Go live at a set time`,
+            panel: "Test releases",
+            name: "Christmas menu",
+            number: "Test release 3",
+            address: `test--${rye.site}`,
+            only: "Link only",
+            reviewer: `${rye.staff?.[0]?.name ?? "Your reviewer"}, Reviewer`,
+            approved: "Approved",
+            now: "Go live now",
+            later: "Go live at a set time",
+            points: [
+                {
+                    title: "Only people with the link",
+                    body: "Without the link, every page on the test address asks to be opened from it. Nothing there takes a real order, booking or payment.",
+                },
+                {
+                    title: "Approval before it goes live",
+                    body: open
+                        ? "Turn on Publishing needs approval, and changes wait for someone with the Reviewer role to approve them. It's a setting on Pro."
+                        : "Turn on Publishing needs approval, and changes wait for someone with the Reviewer role to approve them.",
+                },
+            ],
+        },
+
+        preview: {
+            title: "See every screen before you publish.",
+            lead: "The editor shows your site on a computer, a tablet and a phone. Switch between them as you edit, zoom in, or fit the whole page in view.",
+            label: `The editor's device switch set to Phone, showing ${rye.name}'s home page at phone width`,
+            devices: ["Desktop", "Tablet", "Phone"],
+            zoom: "Fit",
+            points: [
+                {
+                    title: "Desktop, tablet and phone",
+                    body: "Each redraws the page at that width, so you see what a customer's screen shows, not a squeezed copy.",
+                },
+                {
+                    title: "Zoom, or Fit",
+                    body: "Look at the page at 50, 75 or 100%, or fit the whole frame in the window.",
+                },
+            ],
+        },
+
+        brand: {
+            title: "Your brand, on every page.",
+            lead: "Pick a theme, then set your colours, typefaces and logo. Every page follows, the shop and booking page included.",
+            label: `The look panel with ${rye.name}'s theme, colours, typefaces and logo, beside its site`,
+            panel: "Look",
+            theme: "Theme",
+            themeValue: "Folio",
+            colours: "Colours",
+            typefaces: "Typefaces",
+            typefacesValue: "Fraunces and Inter Tight",
+            logo: "Logo",
+            points: [
+                {
+                    title: "Colours and typefaces that go together",
+                    body: "Choose a colourway, a pair of typefaces and the spacing from ones made to sit well together, and every page follows.",
+                },
+                {
+                    title: "A blog when you want one",
+                    body: "Write posts and list them on a page of your site, in the same look.",
+                },
+            ],
         },
 
         sections: {

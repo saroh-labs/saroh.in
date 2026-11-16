@@ -70,6 +70,8 @@ export const CLAIM_SWITCHES = {
     "ai-apps-plans": "NEXT_PUBLIC_CLAIM_AI_APPS_PLANS",
     /** Products and the online shop on the merchant's site (`SITE_SHOP`, claims ledger H12). */
     "site-shop": "NEXT_PUBLIC_CLAIM_SITE_SHOP",
+    /** Test releases on their own address, and approval before publishing (`SITE_TEST_RELEASES`). */
+    "site-test-releases": "NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES",
     /** Share's "Worth posting today" ideas and the visits a post's link brought. */
     "share-insights": "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS",
 } as const;

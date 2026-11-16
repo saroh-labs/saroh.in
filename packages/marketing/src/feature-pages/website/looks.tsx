@@ -58,9 +58,10 @@ function Address({
 }
 
 /**
- * "Then pick its look" (FW's stage): the trade looks as a segmented switch
- * over Rye & Co.'s site, the words and prices staying put while the look
- * changes. On desk the other three looks sit beside it, small; a press on
+ * "Then pick its colours" (FW's stage, #31): colourways named by colour
+ * (each borrows a trade's look) as a segmented switch over the lead
+ * business's site, the words and prices staying put while the colours
+ * change. On desk the other three looks sit beside it, small; a press on
  * one picks it. On a phone the switch alone changes the one site.
  */
 export function Looks({
@@ -120,7 +121,7 @@ export function Looks({
             </div>
             <div className="mt-4 grid items-start gap-7 min-[1080px]:grid-cols-[1fr_290px]">
                 <figure
-                    aria-label={`${frameLabel}, in the ${current.label.toLowerCase()}`}
+                    aria-label={`${frameLabel}, in ${current.label.toLowerCase()}`}
                     className="relative m-0 min-w-0 overflow-hidden rounded-mk-card bg-card shadow-[0_1px_2px_rgba(40,30,15,0.06),0_28px_60px_-24px_rgba(40,30,15,0.32)] max-[759px]:max-h-[440px]"
                 >
                     <Address address={words.address} example={example} />
