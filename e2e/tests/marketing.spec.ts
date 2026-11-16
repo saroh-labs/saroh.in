@@ -81,6 +81,8 @@ const OPEN = process.env.NEXT_PUBLIC_LAUNCH_MODE === "open";
 const INDEXED = [
     "/",
     ...(OPEN ? ["/pricing"] : []),
+    // How it works, the features' hub (the redesign, Nov 2026).
+    "/features",
     ...FEATURES.map((s) => `/features/${s}`),
     ...SOLUTIONS.map((s) => `/solutions/${s}`),
     // Once the launch switch is open the waitlist's address moves to
@@ -260,8 +262,11 @@ test.describe("nav menus by keyboard", () => {
         const nav = page.getByRole("navigation", { name: "Main" });
 
         for (const [label, count] of [
-            ["Features", FEATURES.length],
-            ["Solutions", SOLUTIONS.length],
+            // Each feature, then "All features" to the hub at /features.
+            ["Features", FEATURES.length + 1],
+            // The trades' pages by group (/for/…, as many as are published),
+            // then "All trades": at least one per solution.
+            ["Solutions", null],
         ] as const) {
             const button = nav.getByRole("button", { name: label });
             await button.focus();
@@ -269,7 +274,11 @@ test.describe("nav menus by keyboard", () => {
             await expect(button).toHaveAttribute("aria-expanded", "true");
             const menu = nav.getByRole("menu", { name: label });
             const items = menu.getByRole("menuitem");
-            await expect(items).toHaveCount(count);
+            if (count === null)
+                await expect
+                    .poll(() => items.count())
+                    .toBeGreaterThanOrEqual(SOLUTIONS.length);
+            else await expect(items).toHaveCount(count);
             // Opening puts focus on the first item; the arrows move and wrap.
             await expect(items.first()).toBeFocused();
             await page.keyboard.press("ArrowDown");
@@ -293,14 +302,14 @@ test.describe("nav menus by keyboard", () => {
         // Enter on an item goes there, and the menu is closed on arrival.
         await nav.getByRole("button", { name: "Solutions" }).focus();
         await page.keyboard.press("Enter");
-        await expect(
-            nav
-                .getByRole("menu", { name: "Solutions" })
-                .getByRole("menuitem")
-                .first(),
-        ).toBeFocused();
+        const first = nav
+            .getByRole("menu", { name: "Solutions" })
+            .getByRole("menuitem")
+            .first();
+        await expect(first).toBeFocused();
+        const href = await first.getAttribute("href");
         await page.keyboard.press("Enter");
-        await expect(page).toHaveURL(`${WEB}/solutions/${SOLUTIONS[0]}`);
+        await expect(page).toHaveURL(`${WEB}${href}`);
         await expect(nav.getByRole("menu")).toHaveCount(0);
     });
 

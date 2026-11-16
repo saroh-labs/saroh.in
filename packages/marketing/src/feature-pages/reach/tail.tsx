@@ -17,15 +17,16 @@ export function Tail({
     className,
 }: {
     line: ReactNode;
-    compare: { label: string; href: string };
+    /** Null while the site has no Pricing to show: the line alone, not a region. */
+    compare: { label: string; href: string } | null;
     id?: string;
     className?: string;
 }) {
     return (
         <Container
-            as="section"
+            as={compare ? "section" : "div"}
             id={id}
-            aria-label={compare.label}
+            aria-label={compare?.label}
             className={cn("pt-12 min-[760px]:pt-[120px]", className)}
         >
             <PlanLine compare={compare} className="text-[18px]">

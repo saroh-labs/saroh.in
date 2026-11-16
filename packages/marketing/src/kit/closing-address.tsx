@@ -102,7 +102,7 @@ export function ClosingAddress({ note = "On Saroh:" }: { note?: ReactNode }) {
                         </span>
                         {moving ? <Caret /> : null}
                     </span>
-                    <span className="block text-mk-on-ink-line min-[1280px]:inline">
+                    <span className="block text-mk-on-ink-muted min-[1280px]:inline">
                         .saroh.app
                     </span>
                 </span>

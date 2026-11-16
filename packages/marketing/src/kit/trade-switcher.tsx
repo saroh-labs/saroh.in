@@ -49,7 +49,11 @@ export function TradeSwitcher({
             <span className="shrink-0 text-[14px] text-muted-foreground">
                 {legend}
             </span>
-            <div className="flex min-w-0 overflow-x-auto rounded-full border border-border bg-card/60 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+                // Scrolls sideways on purpose when the trades outrun a phone.
+                data-scroll-x=""
+                className="flex min-w-0 overflow-x-auto rounded-full border border-border bg-card/60 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
                 {options.map((o) => {
                     const on = o.id === value;
                     return onSelect !== undefined || !o.href ? (

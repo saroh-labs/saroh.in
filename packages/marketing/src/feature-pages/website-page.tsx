@@ -523,14 +523,22 @@ export function WebsiteView({
                                         className="mx-5 mt-3"
                                     >
                                         <div className="overflow-x-auto rounded-[10px] border border-border">
-                                            <table className="w-full min-w-[420px] border-collapse text-left text-[14px]">
+                                            <table className="w-full border-collapse text-left text-[14px]">
                                                 <thead className="bg-mk-noon text-[12.5px] font-semibold text-muted-foreground">
                                                     <tr>
                                                         {w.address.head.map(
                                                             (h) => (
                                                                 <th
                                                                     key={h}
-                                                                    className="px-3 py-2.5 font-semibold"
+                                                                    className={cn(
+                                                                        "px-2 py-2.5 font-semibold min-[400px]:px-3",
+                                                                        // Under 400px Status rides in the Value cell.
+                                                                        h ===
+                                                                            w
+                                                                                .address
+                                                                                .head[3] &&
+                                                                            "max-[399px]:hidden",
+                                                                    )}
                                                                 >
                                                                     {h}
                                                                 </th>
@@ -549,16 +557,27 @@ export function WebsiteView({
                                                                 key={type}
                                                                 className="border-t border-mk-line-row"
                                                             >
-                                                                <td className="px-3 py-2.5 font-mono text-[13.5px]">
+                                                                <td className="px-2 py-2.5 font-mono text-[13.5px] min-[400px]:px-3">
                                                                     {type}
                                                                 </td>
-                                                                <td className="px-3 py-2.5 font-mono text-[13.5px]">
+                                                                <td className="px-2 py-2.5 font-mono text-[13.5px] min-[400px]:px-3">
                                                                     {name}
                                                                 </td>
-                                                                <td className="px-3 py-2.5 text-muted-foreground">
+                                                                <td className="px-2 py-2.5 text-muted-foreground [overflow-wrap:anywhere] min-[400px]:px-3">
                                                                     {value}
+                                                                    {/* Status, here under 400px: four columns don't fit a 320 phone. */}
+                                                                    <LivePill
+                                                                        dot
+                                                                        className="mt-1.5 flex w-fit min-[400px]:hidden"
+                                                                    >
+                                                                        {
+                                                                            w
+                                                                                .address
+                                                                                .found
+                                                                        }
+                                                                    </LivePill>
                                                                 </td>
-                                                                <td className="px-3 py-2.5">
+                                                                <td className="px-2 py-2.5 max-[399px]:hidden min-[400px]:px-3">
                                                                     <LivePill
                                                                         dot
                                                                     >
@@ -857,7 +876,11 @@ export function WebsiteView({
 
             <Tail
                 line={w.tail.plan}
-                compare={{ label: w.tail.compare, href: "/pricing" }}
+                compare={
+                    site.open
+                        ? { label: w.tail.compare, href: "/pricing" }
+                        : null
+                }
             />
 
             <Questions items={w.faq} ask={w.ask_us} />

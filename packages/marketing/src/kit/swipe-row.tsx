@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Children, useEffect, useRef, useState } from "react";
 
 import { cn } from "../cn";
+import { ring } from "../ring";
 
 /**
  * Three or more of a kind on a phone (PHONE.md): one card in full, the next
@@ -18,6 +19,7 @@ export function SwipeRow({
     label,
     columns = 3,
     of = "of",
+    bleed = true,
     className,
 }: {
     children: ReactNode;
@@ -27,6 +29,8 @@ export function SwipeRow({
     columns?: 1 | 2 | 3 | 4;
     /** The word in "1 of 4". */
     of?: string;
+    /** Runs to the window's edge on a phone; false inside a padded card, whose edge would clip it. */
+    bleed?: boolean;
     className?: string;
 }) {
     const items = Children.toArray(children);
@@ -54,15 +58,19 @@ export function SwipeRow({
 
     return (
         <div className={className}>
-            {/* Scrolls sideways on purpose: the e2e hidden-sideways check allows it. */}
+            {/* Scrolls sideways on purpose: the e2e hidden-sideways check allows
+                it, and a keyboard reaches it to scroll (a card may hold no link). */}
             <ul
                 data-scroll-x=""
+                tabIndex={0}
                 ref={row}
                 aria-label={label}
                 className={cn(
                     // The row runs to the window's edge on a phone, so the
                     // next card peeks 24px past the gutter.
-                    "m-0 -mr-mk-gutter flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                    "m-0 flex snap-x snap-mandatory list-none gap-3 overflow-x-auto p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                    bleed && "-mr-mk-gutter pr-mk-gutter",
+                    ring(),
                     "min-[760px]:mr-0 min-[760px]:grid min-[760px]:gap-6 min-[760px]:overflow-visible min-[760px]:pr-0",
                     columns === 1 && "min-[760px]:grid-cols-1",
                     columns === 2 && "min-[760px]:grid-cols-2",

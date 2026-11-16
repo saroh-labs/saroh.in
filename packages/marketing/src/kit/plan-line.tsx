@@ -15,7 +15,8 @@ export function PlanLine({
     className,
 }: {
     children: ReactNode;
-    compare: { label: string; href: string };
+    /** Absent while the site has no Pricing to show (the launch switch shut). */
+    compare?: { label: string; href: string } | null;
     className?: string;
 }) {
     return (
@@ -26,9 +27,11 @@ export function PlanLine({
             )}
         >
             <span>{children}</span>
-            <TextLink href={compare.href} tone="ink" arrow>
-                {compare.label}
-            </TextLink>
+            {compare ? (
+                <TextLink href={compare.href} tone="ink" arrow>
+                    {compare.label}
+                </TextLink>
+            ) : null}
         </p>
     );
 }

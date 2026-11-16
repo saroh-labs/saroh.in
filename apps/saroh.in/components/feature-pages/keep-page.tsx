@@ -111,7 +111,8 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
                     : null
             }
             planLine={heroPlanLine(feature, catalog)}
-            compareHref="/pricing"
+            // `/pricing` waits at the waitlist (302) until the launch switch opens.
+            compareHref={LAUNCH_MODE === "open" ? "/pricing" : null}
             faq={words.faq}
             moments={
                 slug === "orders" ? (

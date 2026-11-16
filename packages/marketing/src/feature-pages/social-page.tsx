@@ -147,6 +147,7 @@ export function SocialView({
                             label={w.stage.label}
                             columns={4}
                             of={w.stage.of}
+                            bleed={false}
                             className="mt-7"
                         >
                             {KINDS.map((kind) => (
@@ -1053,7 +1054,11 @@ export function SocialView({
 
             <Tail
                 line={w.tail.plan}
-                compare={{ label: w.tail.compare, href: "/pricing" }}
+                compare={
+                    site.open
+                        ? { label: w.tail.compare, href: "/pricing" }
+                        : null
+                }
             />
 
             <Questions items={w.faq} ask={w.askUs} />

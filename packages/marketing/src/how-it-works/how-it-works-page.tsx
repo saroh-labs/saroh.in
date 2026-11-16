@@ -664,6 +664,7 @@ export function HowItWorksPage({
                         >
                             <nav
                                 aria-label={W.chaptersLabel}
+                                data-scroll-x=""
                                 className="-mr-mk-gutter flex gap-2 overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:hidden [&::-webkit-scrollbar]:hidden"
                             >
                                 {chapters.map(({ ch }) => (

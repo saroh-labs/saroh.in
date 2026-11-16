@@ -46,7 +46,10 @@ export function HomeChapters({
                 aria-label={home.chapters.label}
                 className="pt-5 min-[760px]:hidden"
             >
-                <ul className="m-0 -mr-mk-gutter flex list-none gap-2 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <ul
+                    data-scroll-x=""
+                    className="m-0 -mr-mk-gutter flex list-none gap-2 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
                     {home.chapters.items
                         .filter((c) => c.href !== "#new" || anyNews)
                         .map((c) => (

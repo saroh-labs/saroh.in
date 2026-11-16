@@ -129,7 +129,8 @@ export interface KeepPageProps {
     ask: KeepAsk | null;
     /** The plan sentence, from the site's catalogue or plan rule. */
     planLine: ReactNode;
-    compareHref: string;
+    /** Null while the site has no Pricing to show: the plan line alone. */
+    compareHref: string | null;
     /** "Tell me when" where no plan is on sale; else the words' "Compare plans". */
     compareLabel?: string;
     faq?: readonly { q: string; a: string }[];
@@ -234,6 +235,7 @@ export function KeepPage({
             >
                 <nav
                     aria-label={KEEP.chapters}
+                    data-scroll-x=""
                     className="-mr-mk-gutter flex gap-2 overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:hidden [&::-webkit-scrollbar]:hidden"
                 >
                     {chapters.map((c) => (
@@ -284,7 +286,13 @@ export function KeepPage({
                 {/* A phone: the steps swipe, one in full and the next peeking (PHONE.md). */}
                 <ol
                     aria-label={feature.howTitle}
-                    className="m-0 grid list-none gap-12 p-0 max-[759px]:-mr-mk-gutter max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:gap-20"
+                    // Swipes on purpose; a keyboard reaches it to scroll.
+                    data-scroll-x=""
+                    tabIndex={0}
+                    className={cn(
+                        ring(),
+                        "m-0 grid list-none gap-12 p-0 max-[759px]:-mr-mk-gutter max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:gap-20",
+                    )}
                 >
                     {feature.steps.map((step, i) => {
                         const shot = step.shot;
@@ -441,10 +449,14 @@ export function KeepPage({
             {/* THE ENDING: plans in a line (the shared feature-page ending). */}
             <Tail
                 line={planLine}
-                compare={{
-                    label: compareLabel ?? KEEP.compare,
-                    href: compareHref,
-                }}
+                compare={
+                    compareHref
+                        ? {
+                              label: compareLabel ?? KEEP.compare,
+                              href: compareHref,
+                          }
+                        : null
+                }
                 className="pb-12 pt-0 min-[760px]:pb-[96px] min-[760px]:pt-0"
             />
 

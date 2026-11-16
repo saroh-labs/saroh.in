@@ -36,7 +36,8 @@ export function PageTop({
     words: PageTopWords;
     /** The edition's start button. */
     start: ReactNode;
-    secondaryHref: string;
+    /** Null: no second button (Pricing while the launch switch is shut). */
+    secondaryHref: string | null;
     /** Anything between the lede and the buttons (a plan line, a pill). */
     aside?: ReactNode;
     /** The h1 across the page, the lede and buttons in a row under it (FS). */
@@ -47,6 +48,9 @@ export function PageTop({
     return (
         <SplitHero
             id="page-title"
+            // Not a landmark: the h1 names the page already, and a closing
+            // band that repeats the title would make two regions of one name.
+            as="div"
             crumbs={[crumb, { name: w.name }]}
             crumbsClassName="pt-6"
             layout={stacked ? "stacked" : "split"}
@@ -56,9 +60,11 @@ export function PageTop({
             secondary={
                 <>
                     <span id={HERO_CTA}>{start}</span>
-                    <SecondaryButton href={secondaryHref}>
-                        {w.secondary}
-                    </SecondaryButton>
+                    {secondaryHref ? (
+                        <SecondaryButton href={secondaryHref}>
+                            {w.secondary}
+                        </SecondaryButton>
+                    ) : null}
                 </>
             }
             foot={w.note}

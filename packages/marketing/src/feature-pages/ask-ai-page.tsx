@@ -17,6 +17,7 @@ import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
+import { ring } from "../ring";
 import { Section } from "../sections/section";
 
 import type { World } from "../content/world";
@@ -104,7 +105,7 @@ export function AskAiView({
                 crumb={crumb}
                 words={w}
                 start={site.start(`feature-${slug}`)}
-                secondaryHref={"/pricing"}
+                secondaryHref={site.open ? "/pricing" : null}
                 aside={
                     w.plan ? (
                         <p className="m-0 mt-5 text-[15px] text-mk-copy">
@@ -327,6 +328,7 @@ export function AskAiView({
                 <p className="m-0 mt-6 text-[14px] text-mk-copy">{h.example}</p>
                 <nav
                     aria-label="On this page"
+                    data-scroll-x=""
                     className="-mr-mk-gutter mt-6 flex gap-2 overflow-x-auto pr-mk-gutter [scrollbar-width:none] min-[760px]:hidden"
                 >
                     {w.chapters.map(([id, label]) => (
@@ -348,7 +350,16 @@ export function AskAiView({
             >
                 {/* A phone swipes through the screens, each cut at 420px; none is
                     behind a click (owner, 16 Nov). */}
-                <div className="mt-10 grid gap-x-7 gap-y-10 max-[759px]:-mr-mk-gutter max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:mt-12 min-[1080px]:grid-cols-2">
+                <div
+                    role="group"
+                    aria-label={w.where.title}
+                    data-scroll-x=""
+                    tabIndex={0}
+                    className={cn(
+                        ring(),
+                        "mt-10 grid gap-x-7 gap-y-10 max-[759px]:-mr-mk-gutter max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:mt-12 min-[1080px]:grid-cols-2",
+                    )}
+                >
                     {w.where.screens.map((sc) => (
                         <div
                             key={sc.name}
@@ -377,9 +388,9 @@ export function AskAiView({
                                             </span>
                                         ) : null}
                                     </div>
-                                    <h4 className="m-0 font-display text-[20px] font-bold">
+                                    <p className="m-0 font-display text-[20px] font-bold">
                                         {sc.h}
-                                    </h4>
+                                    </p>
                                     <small className="text-[13px] text-muted-foreground">
                                         {sc.small}
                                     </small>
@@ -662,7 +673,11 @@ export function AskAiView({
             <Tail
                 id={w.plans.id}
                 line={w.plans.line}
-                compare={{ label: w.plans.compare, href: "/pricing" }}
+                compare={
+                    site.open
+                        ? { label: w.plans.compare, href: "/pricing" }
+                        : null
+                }
                 className="scroll-mt-24"
             />
 
@@ -735,9 +750,15 @@ export function AskAiView({
                 visual={<AskTypes words={w.close.ask} />}
                 primary={site.start(`feature-${slug}-close`)}
                 secondary={
-                    <ButtonLink href="/pricing" variant="secondary" size="kit">
-                        {w.plans.compare}
-                    </ButtonLink>
+                    site.open ? (
+                        <ButtonLink
+                            href="/pricing"
+                            variant="secondary"
+                            size="kit"
+                        >
+                            {w.plans.compare}
+                        </ButtonLink>
+                    ) : undefined
                 }
                 note={w.close.note}
                 className="mt-[72px] min-[760px]:mt-[120px]"

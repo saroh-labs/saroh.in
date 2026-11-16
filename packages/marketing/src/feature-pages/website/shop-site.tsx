@@ -307,14 +307,15 @@ export function MiniSite({
                 kind="buns"
                 className="h-[62px] shrink-0 rounded-[var(--site-radius)]"
             />
-            <h5
+            {/* A drawing's words, not an outline heading: it sits in a figure or a button. */}
+            <p
                 className={cn(
                     HEAD,
                     "m-0 text-[22px] leading-[1.05] tracking-[-0.02em]",
                 )}
             >
                 {words.headline}
-            </h5>
+            </p>
             {shop ? (
                 <div className="flex items-center justify-between rounded-[var(--site-radius)] bg-[hsl(var(--site-surface))] px-2.5 py-2 text-[13px]">
                     <span>

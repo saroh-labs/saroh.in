@@ -163,9 +163,9 @@ export function AiAppsView({
                         >
                             <Crumb parts={w.land.products.crumb} />
                             <div className="flex items-baseline gap-3 px-4 pt-3">
-                                <h4 className="m-0 font-display text-[22px] font-bold">
+                                <p className="m-0 font-display text-[22px] font-bold">
                                     {w.land.products.title}
-                                </h4>
+                                </p>
                                 <span className="text-[13.5px] text-muted-foreground">
                                     {w.land.products.count}
                                 </span>
@@ -233,9 +233,9 @@ export function AiAppsView({
                             className={PANEL}
                         >
                             <Crumb parts={w.land.request.crumb} />
-                            <h4 className="m-0 px-4 pt-3 font-display text-[22px] font-bold">
+                            <p className="m-0 px-4 pt-3 font-display text-[22px] font-bold">
                                 {w.land.request.title}
-                            </h4>
+                            </p>
                             <dl className="m-0 grid grid-cols-[90px_1fr] gap-x-3 gap-y-2 px-4 pt-3 text-[14px]">
                                 {w.land.request.rows.map(([k, v, when]) => (
                                     <div key={k} className="contents">
@@ -600,7 +600,11 @@ export function AiAppsView({
 
             <Tail
                 line={w.plan.line}
-                compare={{ label: w.plan.compare, href: "/pricing" }}
+                compare={
+                    site.open
+                        ? { label: w.plan.compare, href: "/pricing" }
+                        : null
+                }
             />
 
             <Questions items={w.faq} ask={w.askUs} />

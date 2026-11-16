@@ -96,6 +96,7 @@ export function Looks({
                 <div
                     role="group"
                     aria-label={group}
+                    data-scroll-x=""
                     className="-mx-mk-gutter flex max-w-[100vw] gap-1 overflow-x-auto rounded-xl bg-mk-hover p-1 px-mk-gutter [scrollbar-width:none] min-[760px]:mx-0 min-[760px]:px-1"
                 >
                     {options.map((o, i) => (

@@ -68,9 +68,9 @@ export function MovePanel({
                             Saroh
                             <i className="ml-0.5 inline-block size-1.5 rounded-full bg-brand-500" />
                         </span>
-                        <h5 className="m-0 text-[17px] font-semibold">
+                        <p className="m-0 text-[17px] font-semibold">
                             {w.connect.signIn.title}
-                        </h5>
+                        </p>
                         <Field label={w.connect.signIn.email[0]}>
                             {w.connect.signIn.email[1]}
                         </Field>
@@ -81,9 +81,9 @@ export function MovePanel({
                     </>
                 ) : (
                     <>
-                        <h5 className="m-0 text-[16px] font-semibold leading-snug">
+                        <p className="m-0 text-[16px] font-semibold leading-snug">
                             {w.connect.consent.title}
-                        </h5>
+                        </p>
                         <div className="grid gap-1.5 text-[14px]">
                             <span className="flex items-center gap-2.5">
                                 <span className="size-[18px] rounded border border-border-strong" />
@@ -128,9 +128,9 @@ export function RecordPanel({
             aria-label={w.cant.panel.label}
             className={cn(PANEL, "p-4", className)}
         >
-            <h5 className="m-0 text-[16px] font-semibold">
+            <p className="m-0 text-[16px] font-semibold">
                 {w.cant.panel.title}
-            </h5>
+            </p>
             <div className="text-[13px] text-muted-foreground">
                 {w.cant.panel.sub}
             </div>

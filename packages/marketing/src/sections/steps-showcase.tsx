@@ -82,7 +82,7 @@ export function StepsShowcase({
                                 className={cn(
                                     "flex w-full cursor-pointer items-start gap-4 border-none bg-transparent px-1 py-[18px] text-left text-foreground transition-opacity duration-fast ease-out motion-reduce:transition-none",
                                     !on &&
-                                        "min-[1080px]:opacity-60 min-[1080px]:hover:opacity-90",
+                                        "min-[1080px]:opacity-75 min-[1080px]:hover:opacity-90",
                                     ring({ offset: 2 }),
                                 )}
                             >
