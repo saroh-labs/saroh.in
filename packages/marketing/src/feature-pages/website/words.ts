@@ -5,6 +5,7 @@
  * saroh.tech's Global words fill the same shape.
  */
 import type { WorldBusiness } from "../../content/world";
+import type { AskUsWords, QuestionWords } from "../reach/questions";
 
 /**
  * /features/website, the Reach page built around its signature (boards
@@ -332,16 +333,8 @@ export interface WebsiteWords {
         plan: string;
         compare: string;
     };
-    faq: {
-        q: string;
-        a: string;
-    }[];
-    ask_us: {
-        lead: string;
-        label: string;
-        href: string;
-        more: string;
-    };
+    faq: QuestionWords[];
+    ask_us: AskUsWords;
     close: {
         title: string;
         note: string;

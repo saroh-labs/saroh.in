@@ -30,9 +30,9 @@ import {
     WORLD_TRADES,
 } from "@saroh/marketing/world";
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import type { ReactNode } from "react";
 
+import { SITE_FONTS } from "@/components/feature-pages/reach/site-fonts";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { RYE_MONDAY, WORLD } from "@/content/world";
 import { claimOn } from "@/lib/feature-switches";
@@ -47,18 +47,6 @@ export const metadata: Metadata = {
     title: "Kit · Saroh",
     robots: { index: false, follow: false },
 };
-
-// A merchant's own fonts, for the site drawings (never Saroh's).
-const siteSerif = localFont({
-    src: "../../../../../../packages/site-blocks/fonts/fraunces/Fraunces-wght-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-serif",
-});
-const siteSans = localFont({
-    src: "../../../../../../packages/site-blocks/fonts/figtree/Figtree-400-700-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-sans",
-});
 
 const rye = WORLD.lead;
 const order = (id: string) => rye.orders?.find((o) => o.id === id);
@@ -126,7 +114,7 @@ export default async function KitSheet({
     ];
 
     return (
-        <div className={`${siteSerif.variable} ${siteSans.variable}`}>
+        <div className={SITE_FONTS}>
             <Container className="grid gap-10 py-[72px]">
                 <Breadcrumbs
                     crumbs={[

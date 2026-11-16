@@ -34,3 +34,21 @@ export function HubHead({
         </>
     );
 }
+
+/** A hub page's column: the page's width and gutter, its sections 48px apart (72px from 760px). */
+export function HubPage({
+    page,
+    children,
+}: {
+    page: SitePage;
+    children: ReactNode;
+}) {
+    return (
+        <div
+            data-page-type={page.type}
+            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter min-[760px]:gap-[72px]"
+        >
+            {children}
+        </div>
+    );
+}

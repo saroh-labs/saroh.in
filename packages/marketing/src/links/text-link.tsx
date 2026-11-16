@@ -80,10 +80,13 @@ export function TextLink({
     );
 }
 
-/** A row of Ink links, each with its arrow: "Read the guides →  Contact us →". */
+/**
+ * A row of Ink links, each with its arrow: "Read the guides →  Contact us →".
+ * `className` replaces the row's own layout (a column, a size).
+ */
 export function LinkRow({
     links,
-    className,
+    className = "flex flex-wrap gap-x-6",
     linkClassName,
 }: {
     links: readonly { href: string; label: string }[];
@@ -91,7 +94,7 @@ export function LinkRow({
     linkClassName?: string;
 }) {
     return (
-        <div className={cn("flex flex-wrap gap-x-6", className)}>
+        <div className={className}>
             {links.map((link) => (
                 <TextLink
                     key={link.href}

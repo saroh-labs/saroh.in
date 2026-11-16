@@ -12,6 +12,7 @@
 import type { AskAiWords } from "@saroh/marketing/feature-pages/ask-ai/words";
 
 import { planWords } from "./plan-words";
+import { ASK_US } from "./reach-ask-us";
 import { THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -429,12 +430,7 @@ export function askAiWords({
                 a: "Ask AI is built into Saroh. AI apps lets you connect the assistant you already use. Both work on the same records.",
             },
         ],
-        askUs: {
-            lead: "Something else?",
-            label: "Ask us",
-            href: "/contact",
-            more: "All questions",
-        },
+        askUs: ASK_US,
         close: {
             title: "Ask across your whole business.",
             note: "Nothing changes until you confirm.",

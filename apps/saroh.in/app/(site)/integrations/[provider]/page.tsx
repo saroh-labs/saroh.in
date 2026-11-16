@@ -23,7 +23,7 @@ import { Article, Container } from "@saroh/marketing/container";
 import { Faq } from "@saroh/marketing/faq";
 import { markTitle } from "@saroh/marketing/page-hero";
 import { SectionHeading } from "@saroh/marketing/section-heading";
-import { TextLink } from "@saroh/marketing/text-link";
+import { LinkRow, TextLink } from "@saroh/marketing/text-link";
 
 /**
  * One integration's page (Resources plan U3, design "Saroh Resources -
@@ -182,20 +182,7 @@ export default async function IntegrationPage({ params }: Props) {
                     // Inside the article's column: its width and gutter.
                     className="max-w-none px-0 pt-0"
                 />
-                {links.length > 0 ? (
-                    <div className="flex flex-wrap gap-x-6">
-                        {links.map((l) => (
-                            <TextLink
-                                key={l.href}
-                                href={l.href}
-                                tone="ink"
-                                arrow
-                            >
-                                {l.label}
-                            </TextLink>
-                        ))}
-                    </div>
-                ) : null}
+                {links.length > 0 ? <LinkRow links={links} /> : null}
             </Container>
         </>
     );

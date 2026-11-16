@@ -16,6 +16,7 @@ import type {
     CardWordsSet,
     SocialWords,
 } from "@saroh/marketing/feature-pages/social/words";
+import { ASK_US } from "./reach-ask-us";
 import { LOOK_BANDS } from "./reach-looks";
 import { RYE_MONDAY, WORLD } from "./world";
 
@@ -442,12 +443,7 @@ export function socialWords({
                 a: "To the item's live page on your site, where people can book or buy.",
             },
         ],
-        askUs: {
-            lead: "Something else?",
-            label: "Ask us",
-            href: "/contact",
-            more: "All questions",
-        },
+        askUs: ASK_US,
         close: {
             title: "Start managing your online presence with Saroh today.",
             note: everyPlan

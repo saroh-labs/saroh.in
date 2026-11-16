@@ -87,7 +87,10 @@ export function AboutPage({
                         {where.opens[mode]} {where.rest}
                     </p>
                     {links.length > 0 ? (
-                        <LinkRow links={links} className="text-[16px]" />
+                        <LinkRow
+                            links={links}
+                            className="flex flex-wrap gap-x-6 text-[16px]"
+                        />
                     ) : null}
                 </div>
                 {founder ? (

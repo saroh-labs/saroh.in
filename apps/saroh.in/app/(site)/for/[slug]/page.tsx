@@ -2,9 +2,9 @@ import "@saroh/search-pages/styles.css";
 
 import type { SearchPageData } from "@saroh/search-pages";
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 
+import { SITE_FONTS } from "@/components/feature-pages/reach/site-fonts";
 import { PricingCards } from "@/components/pricing/pricing-cards";
 import { CtaClickArea } from "@/components/shared/buttons/cta-click-area";
 import { JsonLd } from "@/components/shared/layout/json-ld";
@@ -40,18 +40,6 @@ import { breadcrumbLd } from "@/lib/structured-data";
  * and `noindex` (`lib/search-pages.ts`). Any other slug is a 404. (The admin
  * preview still draws the package's own `<SearchPage>`.)
  */
-
-// A merchant's own fonts, for the drawings of its site and posts (never Saroh's).
-const siteSerif = localFont({
-    src: "../../../../../../packages/site-blocks/fonts/fraunces/Fraunces-wght-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-serif",
-});
-const siteSans = localFont({
-    src: "../../../../../../packages/site-blocks/fonts/figtree/Figtree-400-700-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-sans",
-});
 
 /** The trade bar's trades: the lead four, as the boards name them. */
 const BAR = [
@@ -131,7 +119,7 @@ export default async function ForPage({ params }: Props) {
                 ]}
             />
             <CtaClickArea src={`for-${slug}`} mode={start.mode}>
-                <div className={`${siteSerif.variable} ${siteSans.variable}`}>
+                <div className={SITE_FONTS}>
                     <TradePage
                         // No link for a demo that isn't on: the words go too.
                         page={demo ? p : { ...p, demo: undefined }}

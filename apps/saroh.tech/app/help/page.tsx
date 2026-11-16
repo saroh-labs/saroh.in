@@ -2,6 +2,7 @@ import { ContactCard } from "@/components/legal/contact-card";
 import { LinkCard } from "@/components/shared/card";
 import { CtaBand } from "@/components/shared/cta-band";
 import { FaqList } from "@/components/shared/faq-list";
+import { HubPage } from "@/components/shared/hub-head";
 import { JsonLd } from "@/components/shared/json-ld";
 import { H2 } from "@/components/tools/tool-page";
 import { HELP, HELP_FAQS, HELP_GROUPS } from "@/content/help";
@@ -18,10 +19,7 @@ export const metadata = pageMetadata(page);
 
 export default function Page() {
     return (
-        <div
-            data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter min-[760px]:gap-[72px]"
-        >
+        <HubPage page={page}>
             <JsonLd data={[...pageSchema(page), faqSchema(HELP_FAQS)]} />
             <PageHero
                 crumbs={page.crumb?.map((c) => ({
@@ -69,6 +67,6 @@ export default function Page() {
                 href={signupHref("help")}
                 from="start-free-band"
             />
-        </div>
+        </HubPage>
     );
 }

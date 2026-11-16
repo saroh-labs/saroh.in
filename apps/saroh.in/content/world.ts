@@ -1,5 +1,5 @@
 import type { HomeHeroScene } from "@saroh/marketing/home/hero-stage";
-import type { DrawnPhotoKind } from "@saroh/marketing/kit/drawn-photo";
+import type { SiteShowcase } from "@saroh/marketing/home/site-chapter";
 import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
 import { TRADE_LOOKS } from "@saroh/marketing/kit/trade-looks";
 import type { World, WorldBusiness } from "@saroh/marketing/world";
@@ -692,15 +692,7 @@ export const HOME_HERO_SCENES: readonly HomeHeroScene[] = [
  * The landing's example sites (round 4, LAHomeDesk "A website that looks
  * like your shop"): each business's own site as its owner wrote it.
  */
-export const HOME_SITE_SHOWCASE: readonly {
-    business: WorldBusiness;
-    /** The address the frame shows: the own domain where there is one. */
-    address: string;
-    nav: readonly string[];
-    cta: string;
-    hero: { title: string; line: string };
-    items: readonly { name: string; price: string; drawn?: DrawnPhotoKind }[];
-}[] = [
+export const HOME_SITE_SHOWCASE: readonly SiteShowcase[] = [
     {
         business: RYE,
         address: RYE.domain ?? RYE.site,

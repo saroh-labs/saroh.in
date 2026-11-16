@@ -3,7 +3,7 @@ import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
 import { ButtonLink } from "@/components/shared/button";
 import { LinkCard } from "@/components/shared/card";
 import { CtaBand } from "@/components/shared/cta-band";
-import { HubHead } from "@/components/shared/hub-head";
+import { HubHead, HubPage } from "@/components/shared/hub-head";
 import { GUIDE_CONTENT, GUIDE_GROUPS } from "@/content/guides";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -15,10 +15,7 @@ export const metadata = pageMetadata(page);
 
 export default function Page() {
     return (
-        <div
-            data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter min-[760px]:gap-[72px]"
-        >
+        <HubPage page={page}>
             <HubHead
                 page={page}
                 action={
@@ -64,6 +61,6 @@ export default function Page() {
                 href={signupHref("guides")}
                 from="start-free-band"
             />
-        </div>
+        </HubPage>
     );
 }

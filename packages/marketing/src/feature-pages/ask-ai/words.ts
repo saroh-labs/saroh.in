@@ -5,6 +5,7 @@
  * saroh.tech's Global words fill the same shape.
  */
 import type { AskTypesWords } from "../../kit/ask-types";
+import type { AskUsWords, QuestionWords } from "../reach/questions";
 
 export interface AskAiWords {
     name: string;
@@ -318,16 +319,8 @@ export interface AskAiWords {
     moment: {
         link: string;
     };
-    faq: {
-        q: string;
-        a: string;
-    }[];
-    askUs: {
-        lead: string;
-        label: string;
-        href: string;
-        more: string;
-    };
+    faq: QuestionWords[];
+    askUs: AskUsWords;
     close: {
         title: string;
         note: string;
