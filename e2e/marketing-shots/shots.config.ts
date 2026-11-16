@@ -2151,13 +2151,18 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions",
         viewport: DESK,
+        // The page's promise is "renewed on time": the active members, each
+        // with their next renewal, not one failed payment (owner, 16 Nov 2026).
         steps: [
-            { click: 'main tr:has-text("Payment failed")' },
-            { waitFor: '[role="dialog"]:has-text("Try again or fix payment")' },
+            { click: 'main button:has-text("Need you")' },
+            { click: '[role="option"]:has-text("Active")' },
+            { waitFor: 'main tr:has-text("Active")' },
+            // Off the menu: no focus ring or hover left on the shot.
+            { click: "main h1" },
         ],
-        alt: "A member's membership at Pulse Fitness (demo gym): a renewal not paid, with Try again or fix payment, Pause and Cancel",
+        alt: "Active memberships at Pulse Fitness (demo gym), each with its next renewal and what it pays",
         caption:
-            "A membership whose renewal failed, with the next charge, the failed one and what to do about it",
+            "Active memberships at Pulse, each renewing on its day, with what it pays",
     },
     {
         key: "g-plans",
@@ -2176,6 +2181,12 @@ export const SHOTS: Shot[] = [
         role: "owner",
         route: "/billing/subscriptions",
         viewport: STEP_VIEW,
+        steps: [
+            { click: 'main button:has-text("Need you")' },
+            { click: '[role="option"]:has-text("All subscriptions")' },
+            // Off the menu: no focus ring or hover left on the shot.
+            { click: "main h1" },
+        ],
         alt: "Memberships at Pulse Fitness (demo gym) with their next charge",
         caption: "Memberships at Pulse with their next charge",
     },

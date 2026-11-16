@@ -187,7 +187,7 @@ export const CAPTURED: Record<
     },
     "g-subdetail": {
         src: "/shots/v2/g-subdetail.webp",
-        alt: "A member's membership at Pulse Fitness (demo gym): a renewal not paid, with Try again or fix payment, Pause and Cancel",
+        alt: "Active memberships at Pulse Fitness (demo gym), each with its next renewal and what it pays",
         width: 2880,
         height: 1800,
     },
