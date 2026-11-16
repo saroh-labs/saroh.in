@@ -171,7 +171,7 @@ export function AiAppsView({
                                 </span>
                             </div>
                             <div className="mt-3 text-[14px]">
-                                <div className="grid grid-cols-[1fr_70px_70px] gap-2 border-y border-mk-line-row bg-mk-noon px-4 py-2 text-[12px] font-semibold tracking-[0.04em] text-muted-foreground">
+                                <div className="grid grid-cols-[minmax(0,1fr)_56px_60px] gap-2 border-y border-mk-line-row bg-mk-noon px-3 py-2 text-[12px] font-semibold tracking-[0.04em] text-muted-foreground min-[400px]:grid-cols-[1fr_70px_70px] min-[400px]:px-4">
                                     {w.land.products.head.map((x, i) => (
                                         <span
                                             key={x}
@@ -187,20 +187,20 @@ export function AiAppsView({
                                     <div
                                         key={r.key}
                                         className={cn(
-                                            "grid grid-cols-[1fr_70px_70px] items-center gap-2 border-t border-mk-line-row px-4 py-2.5 first-of-type:border-t-0",
+                                            "grid grid-cols-[minmax(0,1fr)_56px_60px] items-center gap-2 border-t border-mk-line-row px-3 py-2.5 first-of-type:border-t-0 min-[400px]:grid-cols-[1fr_70px_70px] min-[400px]:px-4",
                                             r.isNew && "bg-mk-tint",
                                         )}
                                     >
                                         <span className="flex min-w-0 items-center gap-2.5">
                                             <Photo
                                                 kind={photoFor(r.key)}
-                                                className="size-9 shrink-0 rounded-md"
+                                                className="size-9 shrink-0 rounded-md max-[399px]:hidden"
                                             />
                                             <span className="min-w-0">
                                                 <span className="block truncate">
                                                     {r.name}
                                                 </span>
-                                                <small className="block text-[12.5px] text-muted-foreground">
+                                                <small className="block truncate text-[12.5px] text-muted-foreground">
                                                     {w.land.products.where}
                                                 </small>
                                             </span>

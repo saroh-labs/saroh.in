@@ -119,10 +119,10 @@ export function AskAiView({
                         ["s-ord", "p-ord"],
                         ...(stockOn ? ([["s-stk", "p-stk"]] as const) : []),
                     ]}
-                    className="grid items-start gap-5 min-[1080px]:grid-cols-[390px_1fr_minmax(0,560px)] min-[1080px]:gap-0"
+                    className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 min-[1080px]:grid-cols-[390px_1fr_minmax(0,560px)] min-[1080px]:gap-0"
                 >
                     {/* Left: the moment and the rows it read. */}
-                    <div className="grid gap-4 min-[1080px]:gap-6">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4 min-[1080px]:gap-6">
                         <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[15px] text-mk-copy min-[1080px]:block min-[1080px]:border-t-2 min-[1080px]:border-foreground min-[1080px]:pt-4">
                             <TimeChip>
                                 <TimeStamp at={h.at} />
@@ -141,7 +141,7 @@ export function AskAiView({
                         <div
                             role="img"
                             aria-label={p.label}
-                            className="grid gap-2 min-[1080px]:hidden"
+                            className="grid grid-cols-[minmax(0,1fr)] gap-2 min-[1080px]:hidden"
                         >
                             {[
                                 { src: "Orders", ...s.orders.feed, warn: true },

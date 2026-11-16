@@ -129,14 +129,14 @@ export function WebsiteView({
                                         thumb={
                                             <Photo
                                                 kind={photoFor(r.key)}
-                                                className="size-11 shrink-0 rounded-[7px]"
+                                                className="size-11 shrink-0 rounded-[7px] max-[399px]:hidden"
                                             />
                                         }
                                         name={r.name}
                                         note={r.note}
                                         end={
                                             "to" in r ? (
-                                                <span className="flex items-center gap-2.5 font-mono text-[16px]">
+                                                <span className="flex items-center gap-1.5 font-mono text-[14px] min-[400px]:gap-2.5 min-[400px]:text-[16px]">
                                                     <s className="text-muted-foreground">
                                                         {r.from}
                                                     </s>
@@ -158,10 +158,10 @@ export function WebsiteView({
                                 style={look ? lookStyle(look) : undefined}
                                 className="overflow-hidden rounded-xl shadow-[0_1px_2px_rgba(40,30,15,0.06),0_14px_30px_-16px_rgba(40,30,15,0.3)]"
                             >
-                                <div className="grid grid-cols-[110px_1fr] items-center gap-[18px] bg-[hsl(var(--site-bg))] p-[18px] font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))] min-[760px]:grid-cols-[150px_1fr]">
+                                <div className="grid grid-cols-[72px_1fr] items-center gap-3 bg-[hsl(var(--site-bg))] p-3.5 font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))] min-[400px]:grid-cols-[110px_1fr] min-[400px]:gap-[18px] min-[400px]:p-[18px] min-[760px]:grid-cols-[150px_1fr]">
                                     <Photo
                                         kind="buns"
-                                        className="h-[110px] rounded-[var(--site-radius)] min-[760px]:h-[150px]"
+                                        className="h-[72px] rounded-[var(--site-radius)] min-[400px]:h-[110px] min-[760px]:h-[150px]"
                                     />
                                     <div className="min-w-0">
                                         <span className="mb-2.5 block truncate font-mono text-[12px] text-[hsl(var(--site-muted))]">
@@ -173,7 +173,7 @@ export function WebsiteView({
                                         <span className="text-[14px] text-[hsl(var(--site-muted))]">
                                             {s.shopItem.unit}
                                         </span>
-                                        <em className="mt-3 flex items-center gap-2.5 text-[22px] font-bold not-italic">
+                                        <em className="mt-3 flex flex-wrap items-center gap-2.5 text-[22px] font-bold not-italic">
                                             {s.shopItem.price}
                                             <i className="rounded-[3px] bg-[hsl(var(--site-accent))] px-2 py-[3px] text-[12px] font-bold not-italic text-[hsl(var(--site-accent-fg))]">
                                                 {s.shopItem.badge}

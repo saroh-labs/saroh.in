@@ -145,7 +145,7 @@ export function Suggestion({
         <Tag
             {...(onPick ? { type: "button" as const, onClick: onPick } : {})}
             className={cn(
-                "flex min-h-11 w-full items-center gap-2.5 border-t border-mk-line-row px-1 text-left text-[14.5px] text-foreground first:border-t-0",
+                "flex min-h-11 w-full items-center gap-2 border-t border-mk-line-row px-1 text-left text-[14.5px] text-foreground first:border-t-0",
                 act && "font-semibold",
                 onPick &&
                     cn(
@@ -171,7 +171,7 @@ export function Suggestion({
             ) : null}
             <ArrowRight
                 aria-hidden
-                className="size-4 shrink-0 text-muted-foreground"
+                className="size-4 shrink-0 text-muted-foreground max-[399px]:hidden"
             />
         </Tag>
     );

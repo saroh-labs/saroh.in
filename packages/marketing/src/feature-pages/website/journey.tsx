@@ -113,7 +113,7 @@ export function Journey({
                                 aria-pressed={i === at}
                                 onClick={() => pick(i)}
                                 className={cn(
-                                    "grid min-h-11 w-full cursor-pointer justify-items-start gap-3 border-none bg-transparent p-0 pr-3 text-left text-background",
+                                    "grid min-h-11 w-full cursor-pointer justify-items-start gap-3 border-none bg-transparent p-0 pr-1 text-left text-background min-[400px]:pr-3",
                                     ring({ color: "paper", offset: 2 }),
                                 )}
                             >
@@ -136,7 +136,7 @@ export function Journey({
                                 </span>
                                 <b
                                     className={cn(
-                                        "font-display text-[16px] font-bold leading-tight tracking-[-0.02em] min-[760px]:text-[22px]",
+                                        "font-display text-[13px] font-bold leading-tight tracking-[-0.02em] min-[400px]:text-[16px] min-[760px]:text-[22px]",
                                         i > at && "text-mk-on-ink-muted",
                                     )}
                                 >

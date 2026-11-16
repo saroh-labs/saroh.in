@@ -651,7 +651,7 @@ export function HowItWorksPage({
                     {W.title.after}
                 </h1>
                 <div className="grid gap-10 min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,560px)] min-[960px]:gap-20">
-                    <div className="grid min-w-0 content-start gap-8">
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-8">
                         <p className="m-0 max-w-[48ch] text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
                             {W.lede
                                 .replace("{business}", rye.name)

@@ -21,7 +21,7 @@ export function ExampleSwitch({
 }) {
     const [value, setValue] = useState(options[0]?.id ?? "");
     return (
-        <div className="grid gap-6">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
             <TradeSwitcher
                 legend={legend}
                 options={options.map(({ id, label }) => ({ id, label }))}

@@ -108,7 +108,7 @@ export function ClosingAddress({ note = "On Saroh:" }: { note?: ReactNode }) {
                 </span>
             </p>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                <span className="mr-1 text-sm text-mk-on-ink-muted">
+                <span className="mr-1 text-sm text-mk-on-ink-muted max-[559px]:basis-full">
                     {note}
                 </span>
                 {names.map((n, i) => (

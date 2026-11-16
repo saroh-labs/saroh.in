@@ -180,7 +180,7 @@ export function FooterBrand({
             </div>
             <ul
                 aria-label="Follow Saroh"
-                className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0 max-[759px]:col-start-2 max-[759px]:row-start-1 max-[759px]:-mr-2 max-[759px]:ml-0 max-[759px]:justify-end max-[759px]:gap-0"
+                className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0 max-[759px]:col-start-2 max-[759px]:row-start-1 max-[759px]:-mr-2 max-[759px]:ml-0 max-[759px]:justify-end max-[759px]:gap-0 max-[399px]:col-span-2 max-[399px]:col-start-1 max-[399px]:row-start-3 max-[399px]:-ml-3 max-[399px]:justify-start"
             >
                 {socials.map((link) => (
                     <li key={link.href}>

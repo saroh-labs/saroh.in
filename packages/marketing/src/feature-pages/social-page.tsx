@@ -385,7 +385,7 @@ export function SocialView({
                                             <p className="m-0 mb-3 mt-1 text-[13.5px] leading-snug text-mk-copy">
                                                 {idea.line}
                                             </p>
-                                            <span className="inline-flex h-[38px] items-center rounded-[9px] bg-foreground px-3.5 text-[13.5px] font-semibold text-background">
+                                            <span className="inline-flex h-[38px] items-center whitespace-nowrap rounded-[9px] bg-foreground px-3.5 text-[13.5px] font-semibold text-background">
                                                 {w.worth.make}
                                             </span>
                                         </div>

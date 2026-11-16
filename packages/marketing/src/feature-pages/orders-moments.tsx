@@ -110,7 +110,7 @@ function Sheet({ s }: { s: OrdersMomentsData["take"]["sheet"] }) {
             aria-label={s.label}
             className={cn(
                 CARD,
-                "grid gap-4 p-5 shadow-mk-card min-[760px]:p-6",
+                "grid grid-cols-[minmax(0,1fr)] gap-4 p-5 shadow-mk-card min-[760px]:p-6",
             )}
         >
             <p className="m-0 grid gap-0.5">
@@ -155,7 +155,7 @@ function Record({ r }: { r: OrdersMomentsData["open"]["record"] }) {
             aria-label={r.label}
             className={cn(
                 CARD,
-                "grid gap-4 p-5 shadow-mk-card min-[760px]:p-6",
+                "grid grid-cols-[minmax(0,1fr)] gap-4 p-5 shadow-mk-card min-[760px]:p-6",
             )}
         >
             <div className="flex flex-wrap items-center gap-3">
@@ -180,7 +180,7 @@ function Record({ r }: { r: OrdersMomentsData["open"]["record"] }) {
                 </b>
                 {r.placed}
             </p>
-            <ol className="m-0 flex list-none items-center gap-2 p-0 text-[13px]">
+            <ol className="m-0 flex list-none flex-wrap items-center gap-2 p-0 text-[13px]">
                 {r.steps.map((st, i) => (
                     <li
                         key={st}

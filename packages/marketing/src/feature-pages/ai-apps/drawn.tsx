@@ -43,7 +43,7 @@ export function MovePanel({
                     </>
                 )}
             </div>
-            <div className="grid gap-3 p-4">
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-3 p-4">
                 {i === 0 ? (
                     <>
                         <div className="text-[15px] font-semibold">
@@ -53,10 +53,10 @@ export function MovePanel({
                             {w.connect.form.name[1]}
                         </Field>
                         <Field label={w.connect.form.addr}>
-                            <span className="truncate font-mono text-[13px]">
+                            <span className="min-w-0 truncate font-mono text-[13px]">
                                 {w.connect.address}
                             </span>
-                            <em className="ml-auto text-[12.5px] font-semibold not-italic">
+                            <em className="ml-auto shrink-0 text-[12.5px] font-semibold not-italic">
                                 {w.connect.form.copy}
                             </em>
                         </Field>

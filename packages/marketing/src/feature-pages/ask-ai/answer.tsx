@@ -22,11 +22,17 @@ export function AnswerTable({
             <div
                 className={cn(
                     ROW,
-                    "min-h-8 grid-cols-[70px_1fr_64px_70px] bg-mk-noon text-[12.5px] font-semibold text-muted-foreground",
+                    "min-h-8 grid-cols-[minmax(0,1fr)_64px_70px] bg-mk-noon text-[12.5px] font-semibold text-muted-foreground min-[400px]:grid-cols-[70px_1fr_64px_70px]",
                 )}
             >
                 {p.head.map((x, i) => (
-                    <span key={x} className={cn(i > 1 && "text-right")}>
+                    <span
+                        key={x}
+                        className={cn(
+                            i > 1 && "text-right",
+                            i === 0 && "max-[399px]:hidden",
+                        )}
+                    >
                         {x}
                     </span>
                 ))}
@@ -40,13 +46,13 @@ export function AnswerTable({
                         data-wire={r.from ? "p-ord" : undefined}
                         className={cn(
                             ROW,
-                            "min-h-10 grid-cols-[70px_1fr_64px_70px] transition-colors duration-300 motion-reduce:transition-none",
+                            "min-h-10 grid-cols-[minmax(0,1fr)_64px_70px] transition-colors duration-300 motion-reduce:transition-none min-[400px]:grid-cols-[70px_1fr_64px_70px]",
                             change
                                 ? changing && !ready && "bg-mk-tint"
                                 : r.from && "bg-mk-tint",
                         )}
                     >
-                        <span>{r.id}</span>
+                        <span className="max-[399px]:hidden">{r.id}</span>
                         <span className="truncate">{r.customer}</span>
                         <span className="text-right">{r.total}</span>
                         <span
