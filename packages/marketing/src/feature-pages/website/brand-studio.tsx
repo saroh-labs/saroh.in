@@ -3,8 +3,8 @@
 import { useRef, useState } from "react";
 
 import { cn } from "../../cn";
+import { Container } from "../../layout/container";
 import { ring } from "../../ring";
-import { Section } from "../../sections/section";
 import { useAutoplay } from "./autoplay";
 import type { LookOption } from "./looks";
 import type { ShopSiteWords } from "./shop-site";
@@ -16,9 +16,9 @@ export const LOOK_MS = 2600;
 
 /** Desktop, Tablet, Phone: the frame's width and corners. */
 const SCREEN = [
-    "max-w-[740px] rounded-[14px]",
-    "max-w-[480px] rounded-[24px]",
-    "max-w-[290px] rounded-[36px]",
+    "max-w-[740px] h-[360px] min-[760px]:h-[460px] rounded-[14px]",
+    "max-w-[440px] h-[420px] min-[760px]:h-[580px] rounded-[24px]",
+    "max-w-[290px] h-[420px] min-[760px]:h-[580px] rounded-[36px]",
 ] as const;
 
 const LABEL =
@@ -62,108 +62,121 @@ export function BrandStudio({
     const device = w.devices[dev];
 
     return (
-        <Section
-            titleId="studio-title"
-            title={w.title}
-            lead={w.lead}
-            size="kit-h2"
-            tone="ink"
-            space="kit"
-            className="border-t border-mk-on-ink-line pt-14 min-[760px]:pt-20"
+        <section
+            aria-labelledby="studio-title"
+            className="border-t border-mk-on-ink-line bg-foreground py-14 text-background min-[760px]:py-20"
         >
-            <div
-                ref={box}
-                className="mt-10 grid items-start gap-10 min-[760px]:mt-14 min-[1080px]:grid-cols-[400px_minmax(0,1fr)] min-[1080px]:gap-14"
-            >
-                <div className="grid gap-7">
-                    <div className="grid gap-3">
-                        <span id="studio-colours" className={LABEL}>
-                            {w.colours}
-                        </span>
-                        <div
-                            role="group"
-                            aria-labelledby="studio-colours"
-                            className="grid grid-cols-2 gap-2.5"
-                        >
-                            {options.map((x, i) => (
-                                <button
-                                    key={x.label}
-                                    type="button"
-                                    aria-pressed={i === pal}
-                                    onClick={() => {
-                                        stop();
-                                        setOn((v) => ({ ...v, pal: i }));
-                                    }}
-                                    className={cn(
-                                        "flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-3 text-left text-[14px] font-semibold text-background",
-                                        i === pal
-                                            ? "border-2 border-brand-500 bg-transparent"
-                                            : "m-px border border-mk-on-ink-line bg-transparent",
-                                        ring({ color: "paper", offset: 2 }),
-                                    )}
-                                >
-                                    <span
-                                        aria-hidden
-                                        className="size-[34px] shrink-0 rounded-lg"
-                                        style={{
-                                            background: `linear-gradient(135deg, hsl(${x.look.bg}) 55%, hsl(${x.look.accent}) 55%)`,
+            <Container>
+                <div
+                    ref={box}
+                    className="grid items-center gap-10 min-[1080px]:grid-cols-[420px_minmax(0,1fr)] min-[1080px]:gap-16"
+                >
+                    <div className="grid gap-7">
+                        <div className="grid gap-4">
+                            <h2
+                                id="studio-title"
+                                className="m-0 font-display text-mk-kit-h2 font-bold text-background"
+                            >
+                                {w.title}
+                            </h2>
+                            <p className="m-0 text-[16px] leading-normal text-mk-on-ink">
+                                {w.lead}
+                            </p>
+                        </div>
+                        <div className="grid gap-3">
+                            <span id="studio-colours" className={LABEL}>
+                                {w.colours}
+                            </span>
+                            <div
+                                role="group"
+                                aria-labelledby="studio-colours"
+                                className="grid grid-cols-2 gap-2.5"
+                            >
+                                {options.map((x, i) => (
+                                    <button
+                                        key={x.label}
+                                        type="button"
+                                        aria-pressed={i === pal}
+                                        onClick={() => {
+                                            stop();
+                                            setOn((v) => ({ ...v, pal: i }));
                                         }}
-                                    />
-                                    {x.label}
-                                </button>
-                            ))}
+                                        className={cn(
+                                            "flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl bg-transparent py-1.5 pl-1.5 pr-3 text-left text-[14px] font-semibold text-background",
+                                            i === pal
+                                                ? "border-2 border-brand-500"
+                                                : "m-px border border-mk-on-ink-line",
+                                            ring({ color: "paper", offset: 2 }),
+                                        )}
+                                    >
+                                        <span
+                                            aria-hidden
+                                            className="size-[34px] shrink-0 rounded-lg"
+                                            style={{
+                                                background: `linear-gradient(135deg, hsl(${x.look.bg}) 55%, hsl(${x.look.accent}) 55%)`,
+                                            }}
+                                        />
+                                        {x.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
+                        <div className="grid gap-3">
+                            <span id="studio-screen" className={LABEL}>
+                                {w.screen}
+                            </span>
+                            <div
+                                role="group"
+                                aria-labelledby="studio-screen"
+                                className="flex gap-1 rounded-xl border border-mk-on-ink-line p-1"
+                            >
+                                {w.devices.map((d, i) => (
+                                    <button
+                                        key={d}
+                                        type="button"
+                                        aria-pressed={i === dev}
+                                        onClick={() => {
+                                            stop();
+                                            setOn((v) => ({ ...v, dev: i }));
+                                        }}
+                                        className={cn(
+                                            "min-h-11 flex-1 cursor-pointer rounded-[9px] border-none text-[15px] font-semibold",
+                                            i === dev
+                                                ? "bg-background text-[hsl(var(--foreground))]"
+                                                : "bg-transparent text-mk-on-ink-muted",
+                                            ring({ color: "paper", offset: 2 }),
+                                        )}
+                                    >
+                                        {d}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <p className="m-0 text-[14px] leading-normal text-mk-on-ink-muted">
+                            {w.note}
+                        </p>
                     </div>
-                    <div className="grid gap-3">
-                        <span id="studio-screen" className={LABEL}>
-                            {w.screen}
-                        </span>
-                        <div
-                            role="group"
-                            aria-labelledby="studio-screen"
-                            className="flex gap-1 rounded-xl border border-mk-on-ink-line p-1"
+                    <div className="flex min-h-[420px] items-center justify-center min-[760px]:min-h-[640px]">
+                        <figure
+                            aria-label={`${w.label}, in ${o.label.toLowerCase()}, on ${device.toLowerCase()}`}
+                            data-look={o.label}
+                            data-screen={device}
+                            className={cn(
+                                "m-0 w-full overflow-hidden border-[10px] border-[hsl(var(--foreground))] bg-[hsl(var(--site-bg))] shadow-mk-zoom ring-1 ring-mk-on-ink-line transition-[max-width,height,border-radius] duration-500 ease-out motion-reduce:transition-none",
+                                SCREEN[dev],
+                            )}
+                            style={lookStyle(o.look, o.band)}
                         >
-                            {w.devices.map((d, i) => (
-                                <button
-                                    key={d}
-                                    type="button"
-                                    aria-pressed={i === dev}
-                                    onClick={() => {
-                                        stop();
-                                        setOn((v) => ({ ...v, dev: i }));
-                                    }}
-                                    className={cn(
-                                        "min-h-11 flex-1 cursor-pointer rounded-[9px] border-none text-[15px] font-semibold",
-                                        i === dev
-                                            ? "bg-background text-[hsl(var(--foreground))]"
-                                            : "bg-transparent text-mk-on-ink-muted",
-                                        ring({ color: "paper", offset: 2 }),
-                                    )}
-                                >
-                                    {d}
-                                </button>
-                            ))}
-                        </div>
+                            <MiniSite
+                                words={site}
+                                shop={shop}
+                                caps={o.caps}
+                                fit
+                            />
+                        </figure>
                     </div>
-                    <p className="m-0 text-[14px] leading-normal text-mk-on-ink-muted">
-                        {w.note}
-                    </p>
                 </div>
-                <div className="flex justify-center rounded-[20px] px-3 min-[760px]:px-8">
-                    <figure
-                        aria-label={`${w.label}, in ${o.label.toLowerCase()}, on ${device.toLowerCase()}`}
-                        data-look={o.label}
-                        data-screen={device}
-                        className={cn(
-                            "m-0 w-full overflow-hidden border border-mk-on-ink-line shadow-mk-zoom transition-[max-width,border-radius] duration-500 ease-out motion-reduce:transition-none",
-                            SCREEN[dev],
-                        )}
-                        style={lookStyle(o.look, o.band)}
-                    >
-                        <MiniSite words={site} shop={shop} caps={o.caps} fit />
-                    </figure>
-                </div>
-            </div>
-        </Section>
+            </Container>
+        </section>
     );
 }
