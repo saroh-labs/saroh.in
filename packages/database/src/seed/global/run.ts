@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { backfillInvoicePayments } from "../../backfill/invoice-payments";
 import { assertDatabaseTarget } from "../../database-target";
 import { alignOrderNumberSequence } from "../../order-number";
+import { liveCataloguePlanRow } from "../../pricing-catalogue";
 import { OWNER_EMAIL } from "../data";
 import type { Db } from "../helpers";
 import {
@@ -251,13 +252,17 @@ async function seedOne(
             enabled: true,
         },
     });
-    // Free: the only plan a Global business can be on today.
+    // Its paid plan where the live catalogue has one (dev's, imported), else
+    // Free, the only plan production offers Global today (DEC-211).
+    const paid = await liveCataloguePlanRow(prisma, "GLOBAL", biz.plan);
     await prisma.subscription.create({
         data: {
             id: sid("subscription"),
             organizationId: orgId,
             // The wall clock: `now` is rounded down, to before a catalogue just imported.
-            planId: await seedPlanId(prisma, new Date(), "free", "GLOBAL"),
+            planId: paid?.active
+                ? paid.id
+                : await seedPlanId(prisma, new Date(), "free", "GLOBAL"),
             status: "ACTIVE",
             currentPeriodEnd: at(30, 540),
         },
@@ -1575,6 +1580,9 @@ function planDiary(
             : a.people[rng.skewed(a.people.length, 1.5)];
     };
     let n = 0;
+    // The first two visits already past due stay unpaid, so Home's "unpaid"
+    // row is there whatever the roll (k-money's shot, 16 Nov 2026).
+    let leftUnpaid = 0;
     const billVisit = (
         id: string,
         person: Person,
@@ -1583,7 +1591,10 @@ function planDiary(
     ) => {
         if (!s.price) return;
         const roll = rng.next();
-        const overdue = roll > 0.93;
+        const pastDue = startAt.getTime() + 14 * DAY < now.getTime();
+        const forced = pastDue && leftUnpaid < 2;
+        if (forced) leftUnpaid++;
+        const overdue = roll > 0.93 || forced;
         a.docs.push({
             id: sid("invoice", "booking", id),
             status: overdue ? "ISSUED" : "PAID",

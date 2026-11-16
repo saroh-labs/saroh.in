@@ -71,24 +71,28 @@ export const BUSINESSES = {
         id: "seed_gl_shop_org",
         name: "Thistlewick Bakery",
         site: "thistlewick-bakery",
+        owner: "Clara Pike",
         locale: "en-US",
     },
     larkspur: {
         id: "seed_gl_salon_org",
         name: "Larkspur & Vane",
         site: "larkspur-and-vane",
+        owner: "Imogen Vane",
         locale: "en-GB",
     },
     ironvale: {
         id: "seed_gl_gym_org",
         name: "Ironvale Fitness",
         site: "ironvale-fitness",
+        owner: "Jordan Reyes",
         locale: "en-US",
     },
     wrenfield: {
         id: "seed_gl_clinic_org",
         name: "Wrenfield Dental",
         site: "wrenfield-dental",
+        owner: "Elena Ward",
         locale: "en-US",
     },
 } as const;

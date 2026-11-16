@@ -37,7 +37,6 @@ export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
         "Class packs are a paid module, and Global's businesses are on Free.",
     "r-supply":
         "A bill of supply is India's GST rule; Global's invoices have no exempt-supply wording.",
-    "p-site": NOT_TAKEN,
     "ai-hero": SUPPLIED,
     "ai-connect": SUPPLIED,
     "ai-ask": SUPPLIED,

@@ -158,6 +158,12 @@ export interface GlobalBusiness {
     taxRate: number | null;
     taxId: string | null;
     modules: readonly string[];
+    /**
+     * The paid plan it's on where the live Global catalogue offers one (a
+     * local copy of dev's, `catalogue:import`), else Free: the demo shows
+     * what a paying business gets (owner, 16 Nov 2026).
+     */
+    plan: "grow" | "pro";
     /** With Payments off an enrolment issues no invoice, so none is written. */
     courses?: readonly GlobalCourse[];
     invoiceStyle?: string;
@@ -252,6 +258,7 @@ export const THISTLEWICK: GlobalBusiness = {
     taxRate: 5.5,
     taxId: "00-0000000",
     modules: ["COMMERCE", "CRM", "WEBSITE", "INSIGHTS"],
+    plan: "pro",
     invoiceStyle: "CLASSIC",
     stores: [
         { key: "main", name: "Downtown" },
@@ -553,6 +560,7 @@ export const LARKSPUR: GlobalBusiness = {
     taxRate: 20,
     taxId: "GB000000000",
     modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COMMERCE"],
+    plan: "grow",
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Larkspur & Vane" }],
     hours: hoursFrom({
@@ -826,6 +834,7 @@ export const IRONVALE: GlobalBusiness = {
     taxRate: null,
     taxId: null,
     modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COURSES"],
+    plan: "pro",
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Front desk" }],
     hours: hoursFrom({
@@ -1098,6 +1107,7 @@ export const WRENFIELD: GlobalBusiness = {
     taxRate: null,
     taxId: null,
     modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COMMERCE"],
+    plan: "grow",
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Wrenfield Dental" }],
     hours: hoursFrom({

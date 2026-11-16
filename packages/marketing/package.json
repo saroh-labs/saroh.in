@@ -99,6 +99,7 @@
         "./marketing-nav": "./src/nav/marketing-nav.tsx",
         "./marketing-footer": "./src/nav/marketing-footer.tsx",
         "./kit/time": "./src/kit/time.ts",
+        "./kit/trade-looks": "./src/kit/trade-looks.ts",
         "./kit/time-stamp": "./src/kit/time-stamp.tsx",
         "./kit/chip": "./src/kit/chip.tsx",
         "./kit/drawn-photo": "./src/kit/drawn-photo.tsx",

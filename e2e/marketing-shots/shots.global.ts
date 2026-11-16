@@ -199,7 +199,7 @@ const AI_APPS_SHOTS: Shot[] = [
     }),
 ];
 
-export const GLOBAL_SHOTS: Shot[] = [
+const LISTED: Shot[] = [
     // ── Thistlewick Bakery ─────────────────────────────────────────────
     shop(
         "s-home",
@@ -594,3 +594,29 @@ export const GLOBAL_SHOTS: Shot[] = [
     ...SHARE_SHOTS,
     ...AI_APPS_SHOTS,
 ];
+
+/**
+ * A key saroh.in takes as a feature step (the desk app at 1280 × 800, never
+ * a one-panel crop) is taken the same way here: its viewport, its `focus`
+ * and an Insights tab, with this edition's business and route (owner,
+ * 16 Nov 2026, bugs #26–#30).
+ */
+function asIndiaStep(shot: Shot): Shot {
+    const india = SHOTS.find((s) => s.key === shot.key);
+    if (india?.viewport.width !== 1280 || india.viewport.height !== 800)
+        return shot;
+    const tab = /\?tab=\w+$/.exec(india.route)?.[0] ?? "";
+    return {
+        ...shot,
+        viewport: india.viewport,
+        clip: undefined,
+        // Its own crop's target first: the same key can show another screen here.
+        // An Insights tab is the whole step: nothing to scroll to.
+        focus: tab
+            ? undefined
+            : (shot.focus ?? shot.clip?.selector ?? india.focus),
+        route: tab && !shot.route.includes("?") ? shot.route + tab : shot.route,
+    };
+}
+
+export const GLOBAL_SHOTS: Shot[] = LISTED.map(asIndiaStep);

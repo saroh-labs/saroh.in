@@ -1,6 +1,7 @@
 import type { HomeHeroScene } from "@saroh/marketing/home/hero-stage";
 import type { SiteShowcase } from "@saroh/marketing/home/site-chapter";
 import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
+import { TRADE_LOOKS } from "@saroh/marketing/kit/trade-looks";
 import type { World, WorldBusiness, WorldStory } from "@saroh/marketing/world";
 
 /**
@@ -11,30 +12,13 @@ import type { World, WorldBusiness, WorldStory } from "@saroh/marketing/world";
  * a drawing needs a fact the seed doesn't hold, it is marked "not in the
  * seed" and kept in this file only.
  *
+ * Each business draws its trade's look (`kit/trade-looks`), as saroh.in's
+ * do: the same bakery, salon and gym colours on both sites (owner, 16 Nov 2026).
+ *
  * Global launches on Free (DEC-211): no GST, UPI, Razorpay or Hinglish; the
  * money path names Stripe, and a plan line says "Free until paid plans
  * open" with "Tell me when", never Grow or Pro.
  */
-
-const SANS = "var(--font-site-sans), ui-sans-serif, system-ui, sans-serif";
-
-/**
- * The seed sets no theme, so Thistlewick's site wears the site renderer's
- * default look (`@saroh/site-blocks` site theme), with its body colour for
- * the muted words so they read.
- */
-const DEFAULT_LOOK: SiteLook = {
-    bg: "0 0% 100%",
-    surface: "30 14% 95%",
-    fg: "24 10% 10%",
-    muted: "24 6% 34%",
-    accent: "24 10% 10%",
-    accentFg: "0 0% 100%",
-    fontHeading: SANS,
-    fontBody: SANS,
-    headingWeight: 600,
-    radius: 2,
-};
 
 /** Thistlewick Bakery (Madison, WI): the lead, a bakery as Rye & Co. is in India. */
 const THISTLEWICK: WorldBusiness = {
@@ -51,7 +35,7 @@ const THISTLEWICK: WorldBusiness = {
     site: "thistlewick-bakery.saroh.app",
     plan: "Free",
     tradePage: "/solutions/shops",
-    look: DEFAULT_LOOK,
+    look: TRADE_LOOKS.bakery,
     orderRange: ["ORD-001", "ORD-048"],
     invoiceRange: ["INV-0001", "INV-0005"],
     customers: [
@@ -197,7 +181,7 @@ const LARKSPUR: WorldBusiness = {
     place: "14 Sample Yard, Bristol",
     site: "larkspur-and-vane.saroh.app",
     plan: "Free",
-    look: DEFAULT_LOOK,
+    look: TRADE_LOOKS.salon,
     customers: [
         {
             name: "Hannah Clarke",
@@ -232,7 +216,7 @@ const IRONVALE: WorldBusiness = {
     place: "2400 Sample Avenue, Denver, CO",
     site: "ironvale-fitness.saroh.app",
     plan: "Free",
-    look: DEFAULT_LOOK,
+    look: TRADE_LOOKS.gym,
     customers: [
         {
             name: "Alex Romero",
@@ -370,30 +354,8 @@ export const THISTLEWICK_TUESDAY = {
  * seed sets no theme, so these are template looks, never a business's own.
  */
 export const TEMPLATE_LOOKS: Record<"salon" | "gym", SiteLook> = {
-    salon: {
-        bg: "286.7 39.1% 13.5%",
-        surface: "289.7 37.6% 18.2%",
-        fg: "33.9 48.9% 90.8%",
-        muted: "316.7 18.7% 81.2%",
-        accent: "41.6 54% 53.9%",
-        accentFg: "286.7 39.1% 13.5%",
-        fontHeading: SANS,
-        fontBody: SANS,
-        headingWeight: 800,
-        radius: 14,
-    },
-    gym: {
-        bg: "150 10.5% 7.5%",
-        surface: "140 9.7% 12.2%",
-        fg: "85.7 20% 93.1%",
-        muted: "100 8.2% 71.4%",
-        accent: "74.5 84.7% 61.6%",
-        accentFg: "150 10.5% 7.5%",
-        fontHeading: SANS,
-        fontBody: SANS,
-        headingWeight: 700,
-        radius: 8,
-    },
+    salon: TRADE_LOOKS.salon,
+    gym: TRADE_LOOKS.gym,
 };
 
 const priced = (b: WorldBusiness, key: string) => {
