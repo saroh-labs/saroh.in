@@ -890,24 +890,47 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                 </div>
                             </PhoneFold>
                         ) : null}
+                        {otherDays.length === 0 ? (
+                            // Without day cards the other trades are one quiet line (owner, 16 Nov, #57).
+                            <nav
+                                aria-label={props.related.title}
+                                className="mt-8 flex flex-wrap items-baseline gap-x-3 gap-y-2 text-[15px] text-mk-copy"
+                            >
+                                <span>{props.related.title}:</span>
+                                {props.related.items.map((r) =>
+                                    r.href ? (
+                                        <TextLink
+                                            key={r.slug}
+                                            href={r.href}
+                                            tone="ink"
+                                        >
+                                            {r.name}
+                                        </TextLink>
+                                    ) : null,
+                                )}
+                                <TextLink href={props.hubHref} tone="ink" arrow>
+                                    {props.allTrades.label}
+                                </TextLink>
+                            </nav>
+                        ) : null}
                     </div>
                 </Container>
             </section>
 
-            <section
-                aria-labelledby="others-title"
-                className={cn("bg-mk-noon", SECTION)}
-            >
-                <Container className="grid grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-8">
-                    <div className="grid gap-3">
-                        <h2 id="others-title" className={H2}>
-                            {W.others}
-                        </h2>
-                        <p className={cn(BODY, "max-w-[520px]")}>
-                            {W.othersLine}
-                        </p>
-                    </div>
-                    {otherDays.length > 0 ? (
+            {otherDays.length > 0 ? (
+                <section
+                    aria-labelledby="others-title"
+                    className={cn("bg-mk-noon", SECTION)}
+                >
+                    <Container className="grid grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-8">
+                        <div className="grid gap-3">
+                            <h2 id="others-title" className={H2}>
+                                {W.others}
+                            </h2>
+                            <p className={cn(BODY, "max-w-[520px]")}>
+                                {W.othersLine}
+                            </p>
+                        </div>
                         <SwipeRow label={W.others} columns={2}>
                             {otherDays.map((d) => {
                                 const first = d.hours[0] as DayHour | undefined;
@@ -940,42 +963,42 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                 );
                             })}
                         </SwipeRow>
-                    ) : null}
-                    <div className="grid gap-3">
-                        <h3 className="m-0 text-[15px] font-semibold text-mk-copy">
-                            {props.related.title}
-                        </h3>
-                        <div className="flex flex-wrap gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&>*]:shrink-0">
-                            {props.related.items.map((r) =>
-                                r.href ? (
-                                    <Chip
-                                        key={r.slug}
-                                        variant="chapter"
-                                        href={r.href}
-                                    >
-                                        {r.name}
-                                    </Chip>
-                                ) : (
-                                    <Chip key={r.slug} variant="chapter">
-                                        {r.name}
-                                    </Chip>
-                                ),
-                            )}
+                        <div className="grid gap-3">
+                            <h3 className="m-0 text-[15px] font-semibold text-mk-copy">
+                                {props.related.title}
+                            </h3>
+                            <div className="flex flex-wrap gap-2 max-[759px]:-mr-mk-gutter max-[759px]:flex-nowrap max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] [&>*]:shrink-0">
+                                {props.related.items.map((r) =>
+                                    r.href ? (
+                                        <Chip
+                                            key={r.slug}
+                                            variant="chapter"
+                                            href={r.href}
+                                        >
+                                            {r.name}
+                                        </Chip>
+                                    ) : (
+                                        <Chip key={r.slug} variant="chapter">
+                                            {r.name}
+                                        </Chip>
+                                    ),
+                                )}
+                            </div>
                         </div>
-                    </div>
-                    <Link
-                        href={props.hubHref}
-                        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[18px] bg-card px-5 py-4 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground min-[760px]:px-6 min-[760px]:py-5"
-                    >
-                        <b className="font-display text-[22px] tracking-[-0.02em]">
-                            {props.allTrades.label}
-                        </b>
-                        <span className="text-[15px] text-mk-copy">
-                            {props.allTrades.line} →
-                        </span>
-                    </Link>
-                </Container>
-            </section>
+                        <Link
+                            href={props.hubHref}
+                            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-[18px] bg-card px-5 py-4 text-foreground no-underline shadow-mk-card hover:ring-1 hover:ring-foreground min-[760px]:px-6 min-[760px]:py-5"
+                        >
+                            <b className="font-display text-[22px] tracking-[-0.02em]">
+                                {props.allTrades.label}
+                            </b>
+                            <span className="text-[15px] text-mk-copy">
+                                {props.allTrades.line} →
+                            </span>
+                        </Link>
+                    </Container>
+                </section>
+            ) : null}
 
             <ClosingCTA
                 title={props.closing.title}
