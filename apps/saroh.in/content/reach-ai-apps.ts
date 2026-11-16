@@ -235,6 +235,17 @@ export function aiAppsWords({
             ] as const,
         },
 
+        paste: {
+            lede: "Paste one address into your AI app.",
+            copy: "Copy",
+            copied: "Copied",
+            failed: "Couldn't copy. The address is selected: copy it by hand.",
+            guides: "Step-by-step for",
+            claude: "Claude",
+            chatgpt: "ChatGPT",
+            other: "Another AI app",
+        },
+
         connect: {
             id: "connect",
             title: "Connected in three moves.",

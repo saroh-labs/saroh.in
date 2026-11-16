@@ -2,7 +2,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AppList } from "./app-list";
 import { ChatExchange, OUTCOME_PILL } from "./chat-exchange";
 
 afterEach(cleanup);
@@ -52,46 +51,5 @@ describe("ChatExchange", () => {
             />,
         );
         expect(screen.getByText("Draft to publish")).toBeTruthy();
-    });
-});
-
-describe("AppList", () => {
-    const words = {
-        title: "Apps you can use",
-        lead: "A lead",
-        also: "Also works with Notion.",
-    };
-
-    it("draws a card per app given, then the one line", () => {
-        render(
-            <AppList
-                words={words}
-                apps={[
-                    {
-                        href: "/integrations/claude",
-                        name: "Claude",
-                        kind: "AI assistant",
-                        line: "Ask Claude.",
-                        cta: "See Claude",
-                    },
-                ]}
-            />,
-        );
-        const section = screen
-            .getByRole("heading", { level: 2, name: "Apps you can use" })
-            .closest("section");
-        expect(section?.querySelectorAll("li")).toHaveLength(1);
-        expect(
-            screen
-                .getByRole("link", { name: /See Claude/ })
-                .getAttribute("href"),
-        ).toBe("/integrations/claude");
-        expect(screen.getByText("Also works with Notion.")).toBeTruthy();
-    });
-
-    it("with no live app, keeps the line and draws no empty list", () => {
-        const { container } = render(<AppList words={words} apps={[]} />);
-        expect(container.querySelector("ul")).toBeNull();
-        expect(screen.getByText("Also works with Notion.")).toBeTruthy();
     });
 });

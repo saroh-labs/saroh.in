@@ -114,6 +114,17 @@ export interface AiAppsWords {
             ...(readonly [string, string, string])[],
         ];
     };
+    /** "How it works" (variant I): the line under its heading, Copy, and the guide pills. */
+    paste: {
+        lede: string;
+        copy: string;
+        copied: string;
+        failed: string;
+        guides: string;
+        claude: string;
+        chatgpt: string;
+        other: string;
+    };
     connect: {
         id: string;
         title: string;

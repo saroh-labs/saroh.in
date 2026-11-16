@@ -151,6 +151,12 @@ export function marketingTheme(shared: Record<string, unknown>) {
             ],
             // A scene's lead: 20px on desk, 17px on a phone.
             "mk-kit-lead": ["clamp(17px, 1.4vw, 20px)", { lineHeight: "1.55" }],
+            // An address set as the hero (AI apps' MCP address, variant I):
+            // 76px on desk, down to 24px so a 320px phone never scrolls.
+            "mk-address": [
+                "clamp(24px, 7.4vw, 76px)",
+                { lineHeight: "1", letterSpacing: "-0.04em" },
+            ],
         } satisfies Record<
             string,
             string | [string, { lineHeight?: string; letterSpacing?: string }]
