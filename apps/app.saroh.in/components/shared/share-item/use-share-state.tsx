@@ -16,15 +16,21 @@ import {
     cardFileName,
     cardImageUrl,
     cardsFor,
+    firstStyle,
     HEADLINE_MAX,
-    taggedLink,
     withLink,
 } from "@/lib/share-item/share";
 import type { CaptionKind } from "@/lib/share-item/words";
-import { captionFor, captionKinds, SHARE_WORDS } from "@/lib/share-item/words";
+import {
+    CAPTION_NAMES,
+    captionFor,
+    captionKinds,
+    SHARE_WORDS,
+} from "@/lib/share-item/words";
 
 import { CaptionBox } from "./caption-box";
 import type { PickerCard } from "./card-picker";
+import { CardRow, SizeSwitch } from "./card-picker";
 import { ColourRow } from "./colour-row";
 import type { ShareParts } from "./share-actions";
 import { useCardImage } from "./use-card-image";
@@ -41,18 +47,14 @@ export function useShareState(
     narrow: boolean,
 ) {
     const cards = cardsFor(item);
-    const [style, setStyle] = useState<CardStyle>(
-        cards.includes("price") && item.price !== null
-            ? "price"
-            : (cards[0] ?? "photo"),
-    );
+    const [style, setStyle] = useState<CardStyle>(firstStyle(item));
     const [size, setSize] = useState<CardSize>("post");
     // The booking page's headline, typed here and never stored.
     const [headline, setHeadline] = useState(BOOK_HEADLINE);
     const [bg, setBg] = useState<string | null>(null);
     // Each picture is a render: wait for typing or a colour drag to settle.
     const look = useSettled({ bg, headline }, 500);
-    const link = taggedLink(item.url);
+    const link = item.url;
     const named =
         item.kind === "book"
             ? { ...item, name: headline.trim() || BOOK_HEADLINE }
@@ -61,7 +63,7 @@ export function useShareState(
     const [kind, setKind] = useState<CaptionKind>(
         kinds.includes("price") ? "price" : "short",
     );
-    const [text, setText] = useState(() => captionFor(kind, named, link));
+    const [text, setText] = useState(() => captionFor(kind, named));
 
     const src = (s: CardStyle, w?: number) =>
         cardImageUrl(setup, item, s, size, { ...look, w });
@@ -74,7 +76,7 @@ export function useShareState(
     };
     const pickKind = (k: CaptionKind) => {
         setKind(k);
-        setText(captionFor(k, named, link));
+        setText(captionFor(k, named));
     };
     // Thumbnails at twice the size they show: a small render, not a full one.
     const picker: PickerCard[] = cards.map((s) => ({
@@ -135,13 +137,17 @@ export function ShareExtras({
     );
 }
 
-/** The caption with its chips. */
+/** The caption with its chips and its link. */
 export function ShareCaption({
     share,
-    showLabel,
+    onDone,
+    phone,
+    className,
 }: {
     share: ShareState;
-    showLabel: boolean;
+    onDone?: () => void;
+    phone?: boolean;
+    className?: string;
 }) {
     return (
         <CaptionBox
@@ -150,10 +156,58 @@ export function ShareCaption({
             onKind={share.pickKind}
             text={share.text}
             onText={share.setText}
-            showLabel={showLabel}
+            link={share.parts.link}
+            onDone={onDone}
+            phone={phone}
+            className={className}
         />
     );
 }
+
+/**
+ * "Try another look" (BPostDesk, SBShareDesk): the size, the ready cards
+ * small, and the colours (and the booking page's headline), all at once.
+ */
+export function LookPicker({
+    item,
+    setup,
+    share,
+    className,
+}: {
+    item: ShareItem;
+    setup: ShareSetup;
+    share: ShareState;
+    className?: string;
+}) {
+    return (
+        <section
+            aria-label={SHARE_WORDS.tryLook}
+            data-look-picker=""
+            className={className}
+        >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-[14px] font-semibold">
+                    {SHARE_WORDS.tryLook}
+                </h3>
+                <SizeSwitch size={share.size} onSize={share.setSize} />
+            </div>
+            <CardRow
+                cards={share.picker}
+                style={share.style}
+                onStyle={share.setStyle}
+                size={share.size}
+                failed={share.image.state === "failed"}
+            />
+            <div className="mt-4 grid grid-cols-[minmax(0,1fr)] gap-3">
+                <ShareExtras item={item} setup={setup} share={share} />
+            </div>
+        </section>
+    );
+}
+
+/** The caption's start, named: "Caption · With price". */
+export const captionTitle = (share: ShareState) =>
+    `${SHARE_WORDS.caption} · ${CAPTION_NAMES[share.kind]}`;
 
 /** `value`, once it has stayed the same for `ms`. */
 export function useSettled<T>(value: T, ms: number): T {

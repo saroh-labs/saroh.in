@@ -98,6 +98,9 @@ export interface PickSources {
 /** The one reason a draft can't be picked (SGPick*). */
 export const DRAFT_WHY = "Publish it first. A draft has no public page.";
 
+/** A published product whose shop isn't open yet (not a draft). */
+export const SHOP_NOT_LIVE = "your shop isn't live";
+
 const shortDay = (iso: string) => formatDay(iso.slice(0, 10));
 
 const trimSlash = (url: string) => url.replace(/\/+$/, "");
@@ -110,12 +113,18 @@ export function pickRows(src: PickSources): PickRow[] {
     for (const p of src.products) {
         if (p.status === "ARCHIVED") continue;
         const price = formatMoneyMajor(p.price, p.currency);
-        const live = p.status === "PUBLISHED" && !!p.slug && !!shop;
+        const published = p.status === "PUBLISHED" && !!p.slug;
+        const live = published && !!shop;
         rows.push({
             key: `product:${p.id}`,
             kind: "product",
             name: p.name,
-            line: live ? `Product · ${price}` : "Product · not published",
+            // A published product isn't a draft: its shop is what's not live.
+            line: live
+                ? `Product · ${price}`
+                : published
+                  ? `Product · ${SHOP_NOT_LIVE}`
+                  : "Product · not published",
             image: p.image,
             at: p.updatedAt,
             item:
@@ -127,6 +136,7 @@ export function pickRows(src: PickSources): PickRow[] {
                           price,
                           url: `${trimSlash(shop)}/${encodeURIComponent(p.slug)}`,
                           offerId: null,
+                          hasPhoto: !!p.image,
                       }
                     : null,
         });

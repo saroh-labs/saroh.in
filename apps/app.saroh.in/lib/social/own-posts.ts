@@ -1,5 +1,5 @@
 import type { CrmResult } from "@/lib/api/http";
-import { mutate } from "@/lib/api/http";
+import { destroy, getJson, mutate, orgBase } from "@/lib/api/http";
 import type { CardSize, CardStyle } from "@/lib/share-item/share";
 
 /**
@@ -51,5 +51,26 @@ export function updateOwnPost(
         "PATCH",
         input,
         "Couldn't save your post.",
+    );
+}
+
+/** The business's own posts, newest first (Social's Your posts). */
+export async function listOwnPosts(): Promise<OwnPost[]> {
+    const base = await orgBase();
+    if (!base) return [];
+    return (await getJson<OwnPost[]>(`${base}/share-posts`)) ?? [];
+}
+
+/** One own post, to reopen it; null when it isn't this business's. */
+export async function getOwnPost(id: string): Promise<OwnPost | null> {
+    const base = await orgBase();
+    if (!base) return null;
+    return getJson<OwnPost>(`${base}/share-posts/${encodeURIComponent(id)}`);
+}
+
+export function deleteOwnPost(id: string): Promise<CrmResult<unknown>> {
+    return destroy(
+        `/share-posts/${encodeURIComponent(id)}`,
+        "Couldn't delete your post.",
     );
 }

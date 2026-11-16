@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 /**
- * Share as a post (#1375 U2, boards SFBDesk, SFBPhone, SFNoImage*,
- * SFCopiedPhone, SFLock*): the card picker asks the API for the chosen
- * style and size; Offer only with a live offer; the desk's four actions
- * carry the caption as edited and the tagged link; the phone copies the
- * caption first, then shares one PNG with the caption and link; a picture
- * that can't be made leaves the caption and link working with one
- * message; Schedule is locked, Free to the plans and Grow to the add-on.
+ * Share as a post (#1375 U2; boards SBShare*, SPayoff*, 16 Nov): the
+ * post first, the card picker asks the API for the chosen style and size;
+ * Offer only with a live offer; Ready to share carries the caption as
+ * edited and its plain link; Download saves and copies, then Ready for
+ * Instagram; the phone copies the caption first, then shares one PNG with
+ * the caption and link; a picture that can't be made leaves the caption
+ * and link working with one message; Saroh Social is a locked line, Free
+ * to the plans and Grow to the add-on.
  */
 import type { AnchorHTMLAttributes } from "react";
 import { act } from "react";
@@ -41,9 +42,10 @@ vi.mock("@/lib/edition", async (actual) => {
         },
     };
 });
-const toast = { showError: vi.fn() };
+const toast = { showError: vi.fn(), showUndo: vi.fn() };
 vi.mock("@saroh/ui/toast", () => ({
     showError: (...a: unknown[]) => toast.showError(...a) as unknown,
+    showUndo: (...a: unknown[]) => toast.showUndo(...a) as unknown,
 }));
 
 const BUNS: ShareItem = {
@@ -53,9 +55,10 @@ const BUNS: ShareItem = {
     price: "₹360",
     url: "https://rye.example.com/shop/cardamom-bun-box",
     offerId: null,
+    hasPhoto: true,
 };
-const LINK =
-    "https://rye.example.com/shop/cardamom-bun-box?utm_source=saroh-share&utm_medium=social";
+// The item's own page, plain: no tracking words in what a customer reads.
+const LINK = "https://rye.example.com/shop/cardamom-bun-box";
 const FREE: ShareSetup = {
     apiOrigin: "https://api.example.com",
     siteId: "site_1",
@@ -87,6 +90,7 @@ beforeEach(() => {
     document.body.appendChild(host);
     root = createRoot(host);
     toast.showError.mockReset();
+    toast.showUndo.mockReset();
     fetched = [];
     fetchOk = true;
     clipboard.length = 0;
@@ -169,6 +173,11 @@ const caption = () => {
     if (!box) throw new Error("No caption");
     return box;
 };
+const action = (what: "download" | "copy") => {
+    const el = sheet().querySelector<HTMLButtonElement>(`[data-share-${what}]`);
+    if (!el) throw new Error(`No ${what}`);
+    return el;
+};
 const last = () =>
     new URL(fetched[fetched.length - 1] ?? "", "https://app.example.com");
 
@@ -178,6 +187,11 @@ async function press(el: HTMLElement) {
         await Promise.resolve();
     });
     await flush();
+}
+
+/** The caption opens with Edit: folded until then (BPost*, SBShare*). */
+async function editCaption(name = "Edit the caption") {
+    await press(button(name));
 }
 
 function type(value: string) {
@@ -243,33 +257,63 @@ describe("at a desk", () => {
         expect(last().searchParams.get("style")).toBe("simple");
     });
 
-    it("sends the caption as edited, with its tagged link, by every action", async () => {
+    it("sends the caption as edited, with its plain link, by every action", async () => {
         await openSheet();
-        expect(caption().value).toBe(
-            `Cardamom bun box, for ₹360. Order here: ${LINK}`,
+        // The post first, its caption under the picture.
+        expect(sheet().querySelector("[data-insta-frame]")).not.toBeNull();
+        await editCaption();
+        expect(caption().value).toBe("Cardamom bun box, for ₹360. Order here:");
+        // The link is a fixed chip, never words to type over.
+        expect(sheet().querySelector("[data-caption-link]")?.textContent).toBe(
+            "rye.example.com/shop/cardamom-bun-box",
         );
         type("Fresh cardamom buns, baked every morning.");
         const shared = `Fresh cardamom buns, baked every morning. ${LINK}`;
 
-        await press(button("Copy caption"));
+        await press(action("copy"));
         expect(clipboard).toEqual([shared]);
-        expect(sheet().textContent).toContain("Copied");
+        expect(action("copy").textContent).toContain("Copied");
 
-        expect(link("Send on WhatsApp").href).toBe(
+        expect(link("WhatsApp").href).toBe(
             `https://wa.me/?text=${encodeURIComponent(shared)}`,
         );
-        expect(link("Share on Facebook").href).toBe(
+        expect(link("Facebook").href).toBe(
             `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(LINK)}`,
         );
-        expect(button("Download image").disabled).toBe(false);
+        expect(action("download").disabled).toBe(false);
     });
 
-    it("starts again from a chip: Hinglish is a fixed template", async () => {
+    it("starts again from a chip: Hinglish is a fixed template, and can be undone", async () => {
         await openSheet();
+        await editCaption();
         await press(button("Hinglish"));
         expect(caption().value).toBe(
-            `Cardamom bun box ab available hai sirf ₹360 mein. Order karne ke liye yahan dekhein: ${LINK}`,
+            "Cardamom bun box ab available hai sirf ₹360 mein. Order karne ke liye yahan dekhein:",
         );
+        expect(toast.showUndo).toHaveBeenCalledWith(
+            "Changed to Hinglish",
+            expect.any(Function),
+        );
+    });
+
+    it("Download saves and copies, then says it is ready for Instagram", async () => {
+        const click = vi
+            .spyOn(HTMLAnchorElement.prototype, "click")
+            .mockImplementation(() => undefined);
+        await openSheet();
+        await press(action("download"));
+        expect(click).toHaveBeenCalled();
+        expect(clipboard).toEqual([
+            `Cardamom bun box, for ₹360. Order here: ${LINK}`,
+        ]);
+        const payoff = sheet().querySelector("[data-share-payoff]");
+        expect(payoff?.textContent).toContain("Ready for Instagram");
+        expect(payoff?.textContent).toContain("Image saved to your Downloads");
+        expect(payoff?.textContent).toContain("Caption copied, with your link");
+        expect(link("Open Instagram").href).toBe("https://www.instagram.com/");
+        await press(button("Try another look"));
+        expect(sheet().querySelector("[data-share-payoff]")).toBeNull();
+        click.mockRestore();
     });
 
     it("a picture that can't be made: one message, Download off, the caption still goes", async () => {
@@ -279,11 +323,11 @@ describe("at a desk", () => {
             1,
         );
         expect(sheet().textContent).toContain("The picture couldn't be made");
-        expect(button("Download image").disabled).toBe(true);
+        expect(action("download").disabled).toBe(true);
         expect(toast.showError).not.toHaveBeenCalled();
-        await press(button("Copy caption"));
+        await press(action("copy"));
         expect(clipboard).toHaveLength(1);
-        expect(link("Send on WhatsApp").href).toContain("wa.me");
+        expect(link("WhatsApp").href).toContain("wa.me");
 
         fetchOk = true;
         const before = fetched.length;
@@ -292,19 +336,13 @@ describe("at a desk", () => {
         expect(sheet().querySelector("[data-picture-failed]")).toBeNull();
     });
 
-    it("Free: Schedule is locked, pointing at the plans", async () => {
+    it("Free: Saroh Social is one locked line, pointing at the plans", async () => {
         await openSheet();
         expect(sheet().textContent).toContain(
-            "Schedule to Instagram, Facebook and Threads with Saroh Social.",
+            "Post straight to Instagram, Facebook and Threads, now or later, with Saroh Social.",
         );
         expect(link("See plans").getAttribute("href")).toBe(
             "/settings/billing/plans",
-        );
-        await press(button("Schedule, locked"));
-        const offer = document.querySelector('[data-social-offer="free"]');
-        expect(offer?.textContent).toContain("Schedule with Saroh Social");
-        expect(offer?.textContent).toContain(
-            "Share now stays free on every plan.",
         );
     });
 
@@ -352,7 +390,10 @@ describe("on a phone", () => {
     it("copies the caption first, then shares one PNG with the caption and link", async () => {
         const share = phoneShare();
         await openSheet();
-        expect(sheet().textContent).toContain("Price tag · 2 of 4");
+        expect(sheet().textContent).toContain(
+            "Price tag · swipe for another look",
+        );
+        await editCaption("Edit caption");
         type("Fresh cardamom buns.");
         await press(button("Share now"));
 
@@ -364,18 +405,20 @@ describe("on a phone", () => {
         expect(data.files?.[0]?.name).toBe("cardamom-bun-box-price-post.png");
         expect(data.text).toBe("Fresh cardamom buns.");
         expect(data.url).toBe(LINK);
+        expect(sheet().textContent).toContain("Ready for Instagram");
         expect(sheet().textContent).toContain(
-            "Caption copied. Paste it in Instagram.",
+            "Caption copied. Paste it there.",
         );
     });
 
-    it("a cancelled share says nothing", async () => {
+    it("a cancelled share says nothing and stays on the post", async () => {
         const abort = new Error("cancelled");
         abort.name = "AbortError";
         phoneShare(() => Promise.reject(abort));
         await openSheet();
         await press(button("Share now"));
         expect(toast.showError).not.toHaveBeenCalled();
+        expect(sheet().querySelector("[data-share-payoff]")).toBeNull();
     });
 
     it("without a picture, shares the caption and link", async () => {
@@ -390,17 +433,23 @@ describe("on a phone", () => {
         expect(clipboard).toHaveLength(1);
     });
 
-    it("Schedule opens the offer under the caption", async () => {
+    it("Schedule is one line with the way to the add-on; nothing opens over the sheet", async () => {
         phoneShare();
         await openSheet(BUNS, {
             ...FREE,
             schedule: { tier: "grow", price: null },
         });
-        await press(button("Schedule, locked"));
-        const offer = sheet().querySelector('[data-social-offer="grow"]');
-        expect(offer?.textContent).toContain("Add Saroh Social to Grow");
-        await press(button("Not now"));
-        expect(sheet().querySelector("[data-social-offer]")).toBeNull();
+        expect(sheet().textContent).toContain("Schedule with Saroh Social.");
+        expect(link("Add Saroh Social").getAttribute("href")).toBe(
+            "/settings/billing#add-ons",
+        );
+    });
+
+    it("keeps size and colours a tap away", async () => {
+        phoneShare();
+        await openSheet(BUNS, { ...FREE, swatches: ["#3e5a45"] });
+        await press(button("Size and colours"));
+        expect(sheet().querySelector("[data-colour-row]")).not.toBeNull();
     });
 });
 
@@ -435,7 +484,7 @@ describe("cards, colours and kinds (owner, 12 Nov 2026)", () => {
 
     it("draws every card on a picked colour, and back on the site's", async () => {
         await openSheet(BUNS, { ...FREE, swatches: ["#3e5a45", "#b5532a"] });
-        await press(button("Colour #3e5a45"));
+        await press(button("Deep green"));
         await settle();
         expect(last().searchParams.get("bg")).toBe("#3e5a45");
         const thumbs = Array.from(
@@ -471,6 +520,7 @@ describe("cards, colours and kinds (owner, 12 Nov 2026)", () => {
         expect(last().searchParams.get("headline")).toBe(
             "Cake consults open this Saturday",
         );
+        await editCaption();
         expect(caption().value).toContain("Book your slot. Book here:");
     });
 
@@ -490,6 +540,7 @@ describe("cards, colours and kinds (owner, 12 Nov 2026)", () => {
                 c.getAttribute("data-card"),
             );
         expect(cards()).toEqual(["colour", "simple"]);
+        await editCaption();
         expect(sheet().textContent).toContain("With summary");
         expect(sheet().querySelector("[data-share-headline]")).toBeNull();
         act(() => root.unmount());
@@ -502,6 +553,7 @@ describe("cards, colours and kinds (owner, 12 Nov 2026)", () => {
 
     it("offers Hinglish only where the edition's profile does", async () => {
         await openSheet();
+        await editCaption();
         expect(sheet().textContent).toContain("Hinglish");
         act(() => root.unmount());
         document.body.innerHTML = "";
@@ -510,6 +562,7 @@ describe("cards, colours and kinds (owner, 12 Nov 2026)", () => {
         root = createRoot(host);
         edition.name = "GLOBAL";
         await openSheet();
+        await editCaption();
         expect(sheet().textContent).not.toContain("Hinglish");
     });
 });

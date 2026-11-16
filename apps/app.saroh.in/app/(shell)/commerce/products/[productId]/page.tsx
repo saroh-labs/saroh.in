@@ -245,6 +245,8 @@ export default async function ProductPage({
                       ),
                       url: shopUrl,
                       offerId: offer?.id ?? null,
+                      // Photo and Price tag need its own photo (cardsFor).
+                      hasPhoto: overview.product.images.length > 0,
                   },
               }
             : null;

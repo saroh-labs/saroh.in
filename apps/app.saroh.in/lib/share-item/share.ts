@@ -4,8 +4,8 @@
  *
  * The pictures are the API's (`GET public/share/:siteId/:kind/:ref/image`,
  * public, open CORS): five styles in three sizes, in the business's own
- * look, or on a colour picked in the sheet. The link is the item's live page, tagged so a visit from a post is
- * counted.
+ * look, or on a colour picked in the sheet. The link is the item's live
+ * page, plain: no tracking words in what a customer reads.
  */
 
 export const CARD_STYLES = [
@@ -58,6 +58,8 @@ export interface ShareSetup {
     schedule: ScheduleLock;
     /** Colours from the site's own look, `#rrggbb`, for the colour row; may be empty. */
     swatches?: readonly string[];
+    /** The site's name, as the post's preview shows its account. */
+    business?: string;
 }
 
 /** What the sheet changes about every card at once. */
@@ -93,11 +95,12 @@ export const ADD_ONS_HREF = "/settings/billing#add-ons";
 export function cardsFor(item: ShareItem): CardStyle[] {
     const photo: CardStyle[] = item.hasPhoto ? ["photo"] : [];
     switch (item.kind) {
+        // Photo and Price tag draw the item's own photo to the edges:
+        // without one the API draws a letter tile, so neither is offered.
         case "product":
         case "service":
             return [
-                "photo",
-                "price",
+                ...(item.hasPhoto ? (["photo", "price"] as const) : []),
                 ...(item.offerId !== null ? (["offer"] as const) : []),
                 "simple",
                 "colour",
@@ -105,12 +108,20 @@ export function cardsFor(item: ShareItem): CardStyle[] {
         case "post":
             return [...photo, "colour", "simple"];
         case "book":
-            return ["colour", "photo", "simple"];
+            return ["colour", "simple", ...photo];
         case "offer":
             return ["offer", "simple", "colour"];
         case "own":
             return ["colour", "simple", ...photo];
     }
+}
+
+/** The card a thing opens on: Price tag where it has a price, else its first. */
+export function firstStyle(item: ShareItem): CardStyle {
+    const cards = cardsFor(item);
+    return cards.includes("price") && item.price !== null
+        ? "price"
+        : (cards[0] ?? "simple");
 }
 
 /** The picture for one card at one size. */
@@ -143,19 +154,33 @@ export function cardImageUrl(
 
 /**
  * The colour row's swatches: the site's own colours, then lighter and
- * deeper tints of them, six to eight in all (fewer when the site has
- * fewer to offer), each `#rrggbb` once.
+ * deeper tints of them, at most four (one row beside Site colours and your own, in the share sheet), none
+ * that reads the same as one already there, each `#rrggbb` once.
  */
-export function shareSwatches(site: readonly string[], max = 8): string[] {
+export function shareSwatches(site: readonly string[], max = 4): string[] {
     const out: string[] = [];
     const add = (hex: string | null) => {
-        if (hex && out.length < max && !out.includes(hex)) out.push(hex);
+        if (!hex || out.length >= max) return;
+        // Two that read as the same colour are one choice.
+        if (out.some((o) => colourGap(o, hex) < NEAR)) return;
+        out.push(hex);
     };
     for (const hex of site) add(normalHex(hex));
     for (const amount of [0.55, -0.35]) {
         for (const hex of site) add(tint(normalHex(hex), amount));
     }
     return out;
+}
+
+/** Below this, two colours read as one in a 36px swatch. */
+const NEAR = 48;
+
+/** Straight-line distance between two `#rrggbb` colours, 0 to 441. */
+function colourGap(a: string, b: string): number {
+    const ch = (h: string) =>
+        [1, 3, 5].map((i) => Number.parseInt(h.slice(i, i + 2), 16));
+    const [x, y] = [ch(a), ch(b)];
+    return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
 }
 
 const normalHex = (value: string): string | null =>
@@ -177,19 +202,96 @@ function tint(hex: string | null, amount: number): string | null {
 }
 
 /**
- * The item's page, tagged so Saroh can count visits from a post (R5); a
- * saved own post adds its own campaign, `post-<id>`.
+ * The link as the caption's chip shows it: no scheme, no query. What is
+ * shared is the whole address; the chip is its name.
+ * shortcut: the item's own address stands in for a short tagged link
+ * (`/s/<code>`, board BCaption*); switch once the API mints short links.
  */
-export function taggedLink(url: string, postId?: string): string {
+export function shownLink(url: string): string {
     try {
         const u = new URL(url);
-        u.searchParams.set("utm_source", "saroh-share");
-        u.searchParams.set("utm_medium", "social");
-        if (postId) u.searchParams.set("utm_campaign", `post-${postId}`);
-        return u.toString();
+        return `${u.host}${u.pathname === "/" ? "" : u.pathname}`;
     } catch {
-        return url;
+        return url.replace(/^https?:\/\//, "");
     }
+}
+
+/**
+ * The site colour a post's mark (its account's dot, an own post's tile)
+ * is drawn in: the first that light text reads on, else none (the caller
+ * falls back to ink). A site's white or cream is never a mark.
+ */
+export function markColour(
+    swatches: readonly string[] | undefined,
+): string | null {
+    for (const hex of swatches ?? []) {
+        const h = normalHex(hex);
+        if (!h) continue;
+        const [r, g, b] = [1, 3, 5].map((i) => {
+            const c = Number.parseInt(h.slice(i, i + 2), 16) / 255;
+            return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+        });
+        const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        if (lum < 0.3) return h;
+    }
+    return null;
+}
+
+/**
+ * A colour's name for the colour row, from its hue and lightness: "Deep
+ * green", "Light orange", "Charcoal". Swatches are read by name, never by hex.
+ */
+export function colourName(hex: string): string {
+    const h6 = normalHex(hex);
+    if (!h6) return "Colour";
+    const [r, g, b] = [1, 3, 5].map(
+        (i) => Number.parseInt(h6.slice(i, i + 2), 16) / 255,
+    );
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    const l = (max + min) / 2;
+    const d = max - min;
+    const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+    if (s < 0.12 || d < 0.06) {
+        return l < 0.18
+            ? "Black"
+            : l < 0.4
+              ? "Charcoal"
+              : l < 0.75
+                ? "Grey"
+                : l < 0.93
+                  ? "Stone"
+                  : "White";
+    }
+    let h =
+        max === r
+            ? ((g - b) / d) % 6
+            : max === g
+              ? (b - r) / d + 2
+              : (r - g) / d + 4;
+    h = (h * 60 + 360) % 360;
+    if (l > 0.9) return h < 65 || h >= 345 ? "Cream" : "White";
+    const hue =
+        h < 15 || h >= 345
+            ? "red"
+            : h < 40
+              ? l < 0.35
+                  ? "brown"
+                  : "orange"
+              : h < 65
+                ? "yellow"
+                : h < 170
+                  ? "green"
+                  : h < 200
+                    ? "teal"
+                    : h < 255
+                      ? "blue"
+                      : h < 290
+                        ? "purple"
+                        : "pink";
+    const shade = l < 0.32 ? "Deep " : l > 0.72 ? "Light " : "";
+    const name = `${shade}${hue}`;
+    return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 /** The caption as shared: the link stays at its end, whatever was typed. */

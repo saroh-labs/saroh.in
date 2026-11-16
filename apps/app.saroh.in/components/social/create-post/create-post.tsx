@@ -8,27 +8,27 @@ import Link from "next/link";
 import { useState } from "react";
 
 import type { ShareSetup } from "@/lib/share-item/share";
-import { cardImageUrl, cardsFor } from "@/lib/share-item/share";
 import type { LinkChoice } from "@/lib/social/links";
+import type { OwnPost } from "@/lib/social/own-posts";
 import type { PickRow } from "@/lib/social/pick";
-import { CONTINUE_WITH } from "@/lib/social/pick";
 import { POST_WORDS } from "@/lib/social/words";
 
-import { ComposerFoot } from "./composer-foot";
 import { ItemComposer } from "./item-composer";
 import { OwnComposer } from "./own-composer";
 import { PickStep } from "./pick-step";
 
-type Step =
+export type Step =
     | { at: "pick" }
     | { at: "item"; key: string }
-    | { at: "own"; mode: "photo" | "text" };
+    | { at: "own"; photo: boolean; post: OwnPost | null };
 
 /**
- * Create post (#1378, plan 2026-11-12-003 U7): pick something live from the
- * business, or make your own post, then its cards and caption, shared now
- * on any plan. Saroh Social adds channels and scheduling to this same page
- * later: until then both are drawn locked (SFCLocked*).
+ * Create post (#1378; boards BPick*, BPost*, BCaption*, BOwn*, BDone*,
+ * 16 Nov): pick something live from the business, or write your own post,
+ * and it opens finished: the post as Instagram shows it, Ready to share
+ * beside it. Shared now on any plan; Saroh Social's channels are drawn
+ * locked. `start` opens it on a thing (Social's Make this post) or on a
+ * saved own post (Your posts).
  */
 export function CreatePost({
     rows,
@@ -39,6 +39,8 @@ export function CreatePost({
     canPost,
     business,
     failed,
+    ownCount,
+    start = { at: "pick" },
 }: {
     rows: PickRow[];
     setup: ShareSetup;
@@ -49,23 +51,57 @@ export function CreatePost({
     canPost: boolean;
     business: string;
     failed: string[];
+    ownCount: number;
+    start?: Step;
 }) {
     const narrow = useNarrow();
-    const [step, setStep] = useState<Step>({ at: "pick" });
-    const [picked, setPicked] = useState<string | null>(null);
-    const row = rows.find((r) => r.key === picked) ?? null;
-    const pickedItem = row?.item ? row : null;
-    const toPick = () => setStep({ at: "pick" });
+    const [step, setStep] = useState<Step>(start);
+    const [done, setDone] = useState(false);
+    const toPick = () => {
+        setDone(false);
+        setStep({ at: "pick" });
+    };
+    const shown = setup.business ?? business;
 
+    const row =
+        step.at === "item"
+            ? rows.find((r) => r.key === step.key && r.item !== null)
+            : undefined;
     const own = step.at === "own";
+    const picking = step.at === "pick" || (step.at === "item" && !row);
+
     const header = (
         <PageHeader
             className="mb-5"
             holdsData={false}
-            breadcrumb={[POST_WORDS.social, POST_WORDS.title]}
+            compactOnPhone
+            breadcrumb={[
+                <Link key="social" href="/social">
+                    {POST_WORDS.social}
+                </Link>,
+                POST_WORDS.title,
+            ]}
             title={own ? POST_WORDS.ownTitle : POST_WORDS.title}
             description={
-                own ? POST_WORDS.ownDescription : POST_WORDS.description
+                done || narrow
+                    ? undefined
+                    : picking
+                      ? POST_WORDS.pickDescription
+                      : own
+                        ? POST_WORDS.ownDescription
+                        : POST_WORDS.readyDescription
+            }
+            actions={
+                narrow && row && !done ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="bg-card"
+                        onClick={toPick}
+                    >
+                        {POST_WORDS.change}
+                    </Button>
+                ) : undefined
             }
         />
     );
@@ -75,144 +111,56 @@ export function CreatePost({
             <div>
                 {header}
                 <OwnComposer
-                    mode={step.mode}
+                    initial={step.post}
+                    startWithPhoto={step.photo}
                     setup={setup}
                     origin={origin}
                     fixedLinks={fixedLinks}
                     pageLinks={pageLinks}
+                    business={shown}
+                    ownCount={ownCount}
                     narrow={narrow}
-                    onPickInstead={toPick}
-                    renderFoot={(parts, note) => (
-                        <ComposerFoot
-                            parts={parts}
-                            lock={setup.schedule}
-                            narrow={narrow}
-                            note={note}
-                        />
-                    )}
+                    onAnother={toPick}
+                    onDone={setDone}
                 />
             </div>
         );
     }
 
-    if (step.at === "item") {
-        const chosen = rows.find((r) => r.key === step.key);
-        if (chosen?.item) {
-            return (
-                <div>
-                    {header}
-                    <ItemComposer
-                        key={chosen.key}
-                        row={{ ...chosen, item: chosen.item }}
-                        setup={setup}
-                        business={business}
-                        narrow={narrow}
-                        onChange={toPick}
-                    />
-                </div>
-            );
-        }
+    if (row?.item) {
+        return (
+            <div>
+                {header}
+                <ItemComposer
+                    key={row.key}
+                    row={{ ...row, item: row.item }}
+                    setup={setup}
+                    business={shown}
+                    narrow={narrow}
+                    onChange={toPick}
+                    onAnother={toPick}
+                    onDone={setDone}
+                />
+            </div>
+        );
     }
 
-    const go = () => {
-        if (pickedItem) setStep({ at: "item", key: pickedItem.key });
-    };
     return (
         <div>
             {header}
             {failed.length > 0 ? (
                 <PartialRead className="mb-4" things={failed.join(", ")} />
             ) : null}
-            <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,640px)_minmax(0,1fr)]">
-                <PickStep
-                    rows={rows}
-                    picked={picked}
-                    onPick={setPicked}
-                    canPost={canPost}
-                    onOwn={(mode) => setStep({ at: "own", mode })}
-                />
-                {pickedItem?.item && !narrow ? (
-                    <ItsPosts
-                        key={pickedItem.key}
-                        setup={setup}
-                        row={{ ...pickedItem, item: pickedItem.item }}
-                    />
-                ) : null}
-            </div>
-            <div className="sticky bottom-0 z-10 -mx-4 mt-6 flex items-center justify-end gap-3 border-t border-border bg-background px-4 py-3 sm:-mx-[26px] sm:px-[26px]">
-                {narrow ? (
-                    <Button
-                        type="button"
-                        size="lg"
-                        className="h-11 w-full"
-                        disabled={!pickedItem}
-                        onClick={go}
-                        data-continue=""
-                        data-ph-unmask=""
-                    >
-                        {pickedItem
-                            ? CONTINUE_WITH[pickedItem.kind]
-                            : POST_WORDS.continue}
-                    </Button>
-                ) : (
-                    <>
-                        {pickedItem ? null : (
-                            <p className="mr-auto text-[12.5px] text-muted-foreground">
-                                {POST_WORDS.pickOne}
-                            </p>
-                        )}
-                        <Button asChild variant="outline">
-                            <Link href="/">{POST_WORDS.cancel}</Link>
-                        </Button>
-                        <Button
-                            type="button"
-                            disabled={!pickedItem}
-                            onClick={go}
-                            data-continue=""
-                        >
-                            {POST_WORDS.continue}
-                        </Button>
-                    </>
-                )}
-            </div>
+            <PickStep
+                rows={rows}
+                setup={setup}
+                canPost={canPost}
+                narrow={narrow}
+                onOpen={(key) => setStep({ at: "item", key })}
+                onOwn={(mode) =>
+                    setStep({ at: "own", photo: mode === "photo", post: null })
+                }
+            />
         </div>
-    );
-}
-
-/** The picked thing's cards, small (SGPickDesk's "Its posts"). */
-function ItsPosts({
-    setup,
-    row,
-}: {
-    setup: ShareSetup;
-    row: PickRow & { item: NonNullable<PickRow["item"]> };
-}) {
-    const cards = cardsFor(row.item);
-    return (
-        <section aria-label={POST_WORDS.itsPosts} className="grid gap-3">
-            <h2 className="text-[15px] font-semibold">{POST_WORDS.itsPosts}</h2>
-            <div className="flex flex-wrap gap-3">
-                {cards.map((style) => (
-                    <Thumb
-                        key={style}
-                        src={cardImageUrl(setup, row.item, style, "post", {
-                            w: 240,
-                        })}
-                    />
-                ))}
-            </div>
-            <p className="text-[13px] text-muted-foreground">
-                {POST_WORDS.itsPostsNext}
-            </p>
-        </section>
-    );
-}
-
-function Thumb({ src }: { src: string }) {
-    return (
-        <span className="block aspect-[4/5] w-[150px] overflow-hidden rounded-[6px] bg-muted shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element -- a PNG the API draws */}
-            <img src={src} alt="" className="size-full object-cover" />
-        </span>
     );
 }

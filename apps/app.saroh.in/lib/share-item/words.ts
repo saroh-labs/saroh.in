@@ -50,53 +50,50 @@ export function captionKinds(
     );
 }
 
-/** The caption a chip starts from, its tagged link at the end. */
-export function captionFor(
-    kind: CaptionKind,
-    item: ShareItem,
-    link: string,
-): string {
+/**
+ * The words a chip starts from. The link is never in them: it is the
+ * caption's fixed chip, added at the end as it is shared (`withLink`).
+ */
+export function captionFor(kind: CaptionKind, item: ShareItem): string {
     if (item.kind === "post") {
         if (kind === "hinglish") {
-            return `Naya post: ${item.name}. Padhne ke liye yahan dekhein: ${link}`;
+            return `Naya post: ${item.name}. Padhne ke liye yahan dekhein:`;
         }
         if (kind === "summary" && item.summary?.trim()) {
-            return `${item.name}: ${item.summary.trim()} Read it here: ${link}`;
+            return `${item.name}: ${item.summary.trim()} Read it here:`;
         }
-        return `${item.name}. Read it here: ${link}`;
+        return `${item.name}. Read it here:`;
     }
     if (item.kind === "offer") {
         return kind === "hinglish"
-            ? `${item.name}. Offer dekhne ke liye yahan dekhein: ${link}`
-            : `${item.name}. See it here: ${link}`;
+            ? `${item.name}. Offer dekhne ke liye yahan dekhein:`
+            : `${item.name}. See it here:`;
     }
-    if (item.kind === "own") {
-        return `${item.name} ${link}`;
-    }
+    if (item.kind === "own") return item.name;
     if (item.kind === "book") {
         return kind === "hinglish"
-            ? `${item.name}. Booking ke liye yahan dekhein: ${link}`
-            : `${item.name}. Book here: ${link}`;
+            ? `${item.name}. Booking ke liye yahan dekhein:`
+            : `${item.name}. Book here:`;
     }
     const product = item.kind === "product";
     const go = product ? "Order here:" : "Book here:";
     if (kind === "price" && item.price) {
         return product
-            ? `${item.name}, for ${item.price}. ${go} ${link}`
-            : `${item.name}, ${item.price}. ${go} ${link}`;
+            ? `${item.name}, for ${item.price}. ${go}`
+            : `${item.name}, ${item.price}. ${go}`;
     }
     if (kind === "hinglish") {
         const price = item.price ? ` sirf ${item.price} mein` : "";
         return product
-            ? `${item.name} ab available hai${price}. Order karne ke liye yahan dekhein: ${link}`
-            : `${item.name} ab book karein${price}. Booking ke liye yahan dekhein: ${link}`;
+            ? `${item.name} ab available hai${price}. Order karne ke liye yahan dekhein:`
+            : `${item.name} ab book karein${price}. Booking ke liye yahan dekhein:`;
     }
-    return `${item.name}. ${product ? "See it here:" : go} ${link}`;
+    return `${item.name}. ${product ? "See it here:" : go}`;
 }
 
 export const SHARE_WORDS = {
     subtitle: (item: ShareItem) =>
-        `A post in your website's look · live on your ${item.kind === "product" || item.kind === "offer" ? "shop" : item.kind === "post" ? "blog" : item.kind === "own" ? "website" : "booking page"}`,
+        `A post in your website's look. Live on your ${item.kind === "product" || item.kind === "offer" ? "shop" : item.kind === "post" ? "blog" : item.kind === "own" ? "website" : "booking page"}.`,
     headline: "Headline on the card",
     colours: "Colours",
     siteColours: "Site colours",
@@ -137,7 +134,54 @@ export const SHARE_WORDS = {
     growBilled: "Billed with your Grow plan. Remove it any time.",
     ownerCanAdd: "Your business owner can add Saroh Social.",
     stillFree: "Share now stays free on every plan.",
+    // Boards SBShare*, SPayoff*, BPost*, BCaption*, BDone* (16 Nov).
+    ready: "Ready to share",
+    downloadWhy: "Then post it from Instagram",
+    copyWhy: "With the link at the end",
+    whatsappShort: "WhatsApp",
+    facebookShort: "Facebook",
+    tryLook: "Try another look",
+    editCaption: "Edit the caption",
+    editCaptionShort: "Edit caption",
+    captionDone: "Done",
+    previewNote: "How it looks on Instagram. Each app crops a little.",
+    previewTyping: "The preview follows your caption as you type.",
+    swipe: "swipe for another look",
+    copiesFirst: "Copies the caption first, for Instagram.",
+    linkInBio: "Link in bio",
+    readyFor: "Ready for Instagram",
+    imageSaved: "Image saved to your Downloads",
+    captionCopied: "Caption copied, with your link",
+    pasteThere: "Caption copied. Paste it there.",
+    payoffHow: "Open Instagram, pick the image and paste the caption.",
+    openInstagram: "Open Instagram",
+    alsoWhatsapp: "Also send on WhatsApp",
+    whatsappToo: "WhatsApp too",
+    skipCopy: "Skip the copy and paste next time.",
+    skipCopyWhat:
+        "Saroh Social posts to Instagram, Facebook and Threads for you, at a time you pick, and shows what each post brought in.",
+    postStraight:
+        "Post straight to Instagram, Facebook and Threads, now or later, with Saroh Social.",
+    postsItForYou: "Saroh Social posts it for you.",
+    scheduleWith: "Schedule with Saroh Social.",
+    postTo: "Post to",
+    sizeAndColours: "Size and colours",
+    look: "Look",
+    linkBecomes: "The link becomes “Link in bio” there.",
 } as const;
+
+/** Instagram shows this much of a caption before "… more". */
+export const CAPTION_FOLD = 125;
+
+/** The note under the caption: whether it fits before "… more". */
+export const captionFits = (length: number) =>
+    length <= CAPTION_FOLD
+        ? `Instagram shows the first ${CAPTION_FOLD} characters before “… more”. Yours fits.`
+        : `Instagram shows the first ${CAPTION_FOLD} characters before “… more”. Yours runs on: put the best part first.`;
+
+/** "Changed to Hinglish", with Undo. */
+export const changedTo = (kind: CaptionKind) =>
+    `Changed to ${CAPTION_NAMES[kind]}`;
 
 /** "Add Saroh Social · ₹X a month", or just the name with no price known. */
 export const addSocialLabel = (price: string | null) =>

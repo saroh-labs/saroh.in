@@ -39,6 +39,7 @@ export const readShareSetup = cache(
         const detail = await getSite(site.id).catch(() => null);
         return {
             swatches: shareSwatches(siteColours(detail)),
+            business: site.name,
             apiOrigin:
                 env.NEXT_PUBLIC_API_URL ??
                 env.NEXT_PUBLIC_BETTER_AUTH_URL ??

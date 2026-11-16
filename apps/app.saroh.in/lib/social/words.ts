@@ -1,4 +1,7 @@
 import { formatNumber } from "@/lib/format/money";
+import type { ShareItemKind } from "@/lib/share-item/share";
+
+import type { PickFilter } from "./pick";
 
 /**
  * Every word Create post says (boards SGPick*, SGOwn*, SFCLocked*). The
@@ -11,14 +14,14 @@ export const POST_WORDS = {
     social: "Social",
     description:
         "Make a post from anything you sell and share it. Scheduling to your channels comes with Saroh Social.",
-    ownDescription:
-        "A headline or your own photo, drawn in your website's look. Share it now on any plan.",
+    ownDescription: "Type a line. Saroh draws it in your website's look.",
     whatToPost: "1. What to post",
     whatToPostPhone: "What to post",
     own: "Your own post",
-    ownWhat: "Your photo or just a headline, in your website's look.",
+    ownWhat:
+        "Say something in a line: open late, closed for Diwali, we're hiring. Add a photo if you like.",
     ownExamples: "Closed for a day, new timings, we're hiring.",
-    usePhoto: "Use a photo",
+    usePhoto: "Use your photo",
     textOnly: "Text only",
     yourPhoto: "Your photo",
     noOwnPosts:
@@ -69,7 +72,87 @@ export const POST_WORDS = {
     linkInBio: "Link in bio",
     notLive: "Your website needs to be live to share posts.",
     publishSite: "Publish your website",
+    // Boards BPick*, BPost*, BOwn*, BDone*, BSocial* (16 Nov).
+    yourPosts: "Your posts",
+    pickDescription:
+        "Pick what to post. Saroh makes it in your website's look, ready to share.",
+    readyDescription: "Your post is ready. Share it, or try another look.",
+    ownShort: "A line, or your photo",
+    ownThumb: "Your line",
+    writeHeadline: "Write a headline",
+    orSell: "Or something you sell",
+    searchShort: "Search",
+    showThem: "Show them",
+    hideThem: "Hide them",
+    edit: "Edit",
+    captionRowLine: "Edit, or try another start",
+    lookRowLine: "Post, Square or Story, and colours",
+    makeAnother: "Make another post",
+    anotherPost: "Another post",
+    whatToSay: "What do you want to say?",
+    headlinePlaceholder: "Open late on Saturday",
+    headlineShort: "Short reads best on a phone.",
+    addPhoto: "Add your photo",
+    changePhoto: "Change photo",
+    removePhoto: "Remove",
+    linkTo: "Link to",
+    captionAndLink: "Caption and link",
+    noCaptionYet: "No caption yet. The link goes on its own.",
+    drawsAsYouType: "Draws as you type.",
+    draftSaved: "Draft saved",
+    savesAsYouGo: "Saves as you type",
+    deleteDraft: "Delete this draft",
+    deleteTitle: "Delete this post?",
+    deleteWhat:
+        "It goes from Your posts. Anything already shared stays where it was posted.",
+    deleteConfirm: "Delete post",
+    keepIt: "Keep it",
+    socialDescription:
+        "Posts in your website's look, ready for Instagram, WhatsApp and Facebook.",
+    newPost: "New post",
+    worthToday: "Worth posting today",
+    worthFrom: "From your shop, your offers and your blog",
+    makeThis: "Make this post",
+    notToday: "Not today",
+    socialSeeMore:
+        "Post straight to Instagram and see what each post brings, with Saroh Social.",
+    ownSaved: (when: string) => `Your own post · saved ${when}`,
+    deleted: "Post deleted.",
+    firstReady: "Your first post is ready",
+    firstWhy:
+        "Saroh has already drawn these from your business, in your website's look. Pick one and share it in a minute: free, on any plan.",
+    firstWhyPhone:
+        "Drawn from your business, in your website's look. Free on any plan.",
+    ownLine: "A line in your colours",
+    useThis: "Use this post",
+    pickElse: "Pick something else",
+    pickElseDesk: "Or pick something else you sell",
+    yourPostsCount: (n: number) => `Your posts (${formatNumber(n)})`,
+    liveWhere: (kind: ShareItemKind) =>
+        kind === "product" || kind === "offer"
+            ? "live on your shop"
+            : kind === "post"
+              ? "live on your blog"
+              : kind === "own"
+                ? "on your website"
+                : "live on your booking page",
 } as const;
+
+/** The pick step's chips, short enough for a row (BPick*). */
+export const PICK_CHIP_NAMES: Record<PickFilter, string> = {
+    all: "All",
+    product: "Products",
+    service: "Services",
+    post: "Blog posts",
+    offer: "Offers",
+    book: "Booking page",
+};
+
+/** "2 drafts aren't shown: publish them first." */
+export const draftsHidden = (n: number, shown: boolean) =>
+    shown
+        ? `Each one shows the post it makes. ${n === 1 ? "1 draft is" : `${formatNumber(n)} drafts are`} greyed: publish ${n === 1 ? "it" : "them"} first.`
+        : `Each one shows the post it makes. ${n === 1 ? "1 draft isn't" : `${formatNumber(n)} drafts aren't`} shown: publish ${n === 1 ? "it" : "them"} first.`;
 
 /** "28 / 90", "126 / 2,200". */
 export const counted = (n: number, max: number) =>

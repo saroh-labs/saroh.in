@@ -3,7 +3,6 @@
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Segmented } from "@saroh/ui/segmented";
-import { Skeleton } from "@saroh/ui/skeleton";
 import { ImageIcon, RotateCw } from "lucide-react";
 import type { KeyboardEvent } from "react";
 import { useEffect, useRef } from "react";
@@ -12,6 +11,7 @@ import type { CardSize, CardStyle } from "@/lib/share-item/share";
 import { CARD_SIZES } from "@/lib/share-item/share";
 import { CARD_NAMES, SHARE_WORDS, SIZE_NAMES } from "@/lib/share-item/words";
 
+import { ASPECT } from "./insta-frame";
 import type { CardImage } from "./use-card-image";
 
 /** One card in the picker: its style and its picture at the chosen size. */
@@ -19,12 +19,6 @@ export interface PickerCard {
     style: CardStyle;
     src: string;
 }
-
-const ASPECT: Record<CardSize, string> = {
-    post: "aspect-[4/5]",
-    square: "aspect-square",
-    story: "aspect-[9/16]",
-};
 
 const FOCUS =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
@@ -44,7 +38,9 @@ export function SizeSwitch({
             label="Size"
             options={CARD_SIZES.map((s) => ({
                 value: s,
-                label: SIZE_NAMES[s],
+                // "Post", the ratio left to the picture (boards BPost*).
+                label: SIZE_NAMES[s].replace(/ \d+:\d+$/, ""),
+                name: SIZE_NAMES[s],
             }))}
             value={size}
             onValueChange={onSize}
@@ -110,7 +106,7 @@ export function CardRow({
             role="radiogroup"
             aria-label={SHARE_WORDS.pick}
             onKeyDown={keys.onKeyDown}
-            className="flex flex-wrap items-start gap-4"
+            className="flex flex-wrap items-start gap-2.5"
         >
             {cards.map((c) => {
                 const on = c.style === style;
@@ -127,17 +123,16 @@ export function CardRow({
                         onClick={() => onStyle(c.style)}
                         className={cn(
                             FOCUS,
-                            "flex w-[110px] flex-col items-center gap-2 rounded-[10px] text-[13px] font-medium disabled:text-muted-foreground",
-                            on && !failed && "font-semibold",
+                            "flex w-[72px] flex-col items-center gap-1.5 rounded-[10px] p-1 text-[12.5px] font-medium text-muted-foreground disabled:text-muted-foreground",
+                            on &&
+                                !failed &&
+                                "font-semibold text-foreground ring-2 ring-foreground",
                         )}
                     >
                         <span
                             className={cn(
-                                "block w-full overflow-hidden rounded-[8px] bg-muted",
+                                "block w-16 overflow-hidden rounded-[4px] bg-muted shadow-sm",
                                 ASPECT[size],
-                                on && !failed
-                                    ? "ring-2 ring-foreground ring-offset-2 ring-offset-background"
-                                    : "shadow-sm",
                             )}
                         >
                             {failed ? (
@@ -198,50 +193,12 @@ export function PictureFailed({
     );
 }
 
-/** The chosen card, large, at the desk. */
-export function CardPreview({
-    image,
-    size,
-    name,
-    onRetry,
-}: {
-    image: CardImage;
-    size: CardSize;
-    /** What the picture shows, for a screen reader. */
-    name: string;
-    onRetry: () => void;
-}) {
-    if (image.state === "failed") return <PictureFailed onRetry={onRetry} />;
-    return (
-        <div className="rounded-xl bg-muted p-3.5">
-            <div
-                className={cn(
-                    "mx-auto w-full max-w-[250px] overflow-hidden rounded-[6px]",
-                    ASPECT[size],
-                )}
-            >
-                {image.state === "ready" ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- the fetched PNG, as a blob
-                    <img
-                        src={image.src}
-                        alt={name}
-                        data-preview=""
-                        className="size-full object-cover"
-                    />
-                ) : (
-                    <Skeleton className="size-full" />
-                )}
-            </div>
-        </div>
-    );
-}
-
 /**
- * The phone's big swipeable card (SFBPhone): the chosen one in the middle,
- * its neighbours peeking, dots and "Price tag · 2 of 4" under it. A swipe
- * that settles on a card chooses it; a tap on a neighbour does too.
+ * The phone's swipe through the looks (BPostPhone, SBSharePhone), drawn
+ * where the post's picture is: one card at a time, full width. A swipe
+ * that settles on a card chooses it. Under the post, `LookDots` names it.
  */
-export function CardCarousel({
+export function SwipeTrack({
     cards,
     style,
     onStyle,
@@ -263,14 +220,13 @@ export function CardCarousel({
         cards.findIndex((c) => c.style === style),
     );
 
-    // The chosen card comes to the middle, from a tap, a key or a size.
+    // The chosen card comes into view, from a key or a size.
     useEffect(() => {
-        const el = track.current?.children[at] as HTMLElement | undefined;
-        el?.scrollIntoView({
-            inline: "center",
-            block: "nearest",
-            behavior: "smooth",
-        });
+        const box = track.current;
+        const el = box?.children[at] as HTMLElement | undefined;
+        if (box && el && Math.abs(box.scrollLeft - el.offsetLeft) > 2) {
+            box.scrollTo({ left: el.offsetLeft, behavior: "smooth" });
+        }
     }, [at, size]);
 
     // `scrollend` isn't on every iPhone yet: settle 120ms after the last scroll.
@@ -281,81 +237,82 @@ export function CardCarousel({
         },
         [],
     );
+    const settled = () => {
+        const box = track.current;
+        if (!box || box.clientWidth === 0) return;
+        const best = Math.round(box.scrollLeft / box.clientWidth);
+        const to = cards.at(Math.min(cards.length - 1, Math.max(0, best)));
+        if (to && to.style !== style) onStyle(to.style);
+    };
     const onScroll = () => {
         if (settle.current) clearTimeout(settle.current);
         settle.current = setTimeout(settled, 120);
     };
-    const settled = () => {
-        const box = track.current;
-        if (!box) return;
-        const middle = box.scrollLeft + box.clientWidth / 2;
-        let best = at;
-        let gap = Infinity;
-        Array.from(box.children).forEach((child, i) => {
-            const c = child as HTMLElement;
-            const d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - middle);
-            if (d < gap) {
-                gap = d;
-                best = i;
-            }
-        });
-        if (cards.length > 0 && cards[best].style !== style) {
-            onStyle(cards[best].style);
-        }
-    };
 
     return (
-        <div className="grid gap-2">
-            <div
-                ref={track}
-                role="radiogroup"
-                aria-label={SHARE_WORDS.pick}
-                onKeyDown={keys.onKeyDown}
-                onScroll={onScroll}
-                className="-mx-4 flex snap-x snap-mandatory items-center gap-3 overflow-x-auto px-[calc(50%-113px)] py-1 [scrollbar-width:none]"
-            >
-                {cards.map((c) => {
-                    const on = c.style === style;
-                    return (
-                        <button
-                            key={c.style}
-                            ref={keys.ref(c.style)}
-                            type="button"
-                            role="radio"
-                            aria-checked={on}
-                            aria-label={CARD_NAMES[c.style]}
-                            tabIndex={on ? 0 : -1}
-                            data-card={c.style}
-                            onClick={() => onStyle(c.style)}
-                            className={cn(
-                                FOCUS,
-                                "w-[226px] shrink-0 snap-center overflow-hidden rounded-[6px] bg-muted shadow-md transition-opacity",
-                                ASPECT[size],
-                                !on && "opacity-60",
-                            )}
-                        >
-                            {/* eslint-disable-next-line @next/next/no-img-element -- a PNG the API draws */}
-                            <img
-                                src={
-                                    on && image.state === "ready"
-                                        ? image.src
-                                        : c.src
-                                }
-                                alt={on ? name : ""}
-                                className="size-full object-cover"
-                            />
-                        </button>
-                    );
-                })}
-            </div>
-            <p
-                className="text-center text-[14px] font-semibold"
-                aria-live="polite"
-            >
-                {CARD_NAMES[cards[at]?.style ?? "photo"]} · {at + 1} of{" "}
-                {cards.length}
+        <div
+            ref={track}
+            role="radiogroup"
+            aria-label={SHARE_WORDS.pick}
+            onKeyDown={keys.onKeyDown}
+            onScroll={onScroll}
+            data-swipe-track=""
+            className="flex snap-x snap-mandatory overflow-x-auto [scrollbar-width:none]"
+        >
+            {cards.map((c) => {
+                const on = c.style === style;
+                return (
+                    <button
+                        key={c.style}
+                        ref={keys.ref(c.style)}
+                        type="button"
+                        role="radio"
+                        aria-checked={on}
+                        aria-label={CARD_NAMES[c.style]}
+                        tabIndex={on ? 0 : -1}
+                        data-card={c.style}
+                        onClick={() => onStyle(c.style)}
+                        className={cn(
+                            FOCUS,
+                            "w-full shrink-0 snap-center bg-muted",
+                            ASPECT[size],
+                        )}
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- a PNG the API draws */}
+                        <img
+                            src={
+                                on && image.state === "ready"
+                                    ? image.src
+                                    : c.src
+                            }
+                            alt={on ? name : ""}
+                            className="size-full object-cover"
+                        />
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+/** "Price tag · swipe for another look", and a dot per look. */
+export function LookDots({
+    cards,
+    style,
+}: {
+    cards: readonly PickerCard[];
+    style: CardStyle;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3">
+            <p className="text-[13.5px]" aria-live="polite">
+                <b className="font-semibold">{CARD_NAMES[style]}</b>
+                <span className="text-muted-foreground">
+                    {" "}
+                    · {SHARE_WORDS.swipe}
+                </span>
             </p>
-            <div aria-hidden className="flex justify-center gap-1.5">
+            <div aria-hidden className="flex gap-[5px]">
                 {cards.map((c) => (
                     <span
                         key={c.style}

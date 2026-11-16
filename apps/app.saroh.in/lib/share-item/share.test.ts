@@ -5,9 +5,11 @@ import {
     cardFileName,
     cardImageUrl,
     cardsFor,
+    colourName,
     facebookHref,
+    firstStyle,
     shareSwatches,
-    taggedLink,
+    shownLink,
     whatsappHref,
     withLink,
 } from "./share";
@@ -31,8 +33,11 @@ describe("share as a post (#1375 U2)", () => {
     });
 
     it("draws the Offer card only with a live offer, from the offer itself, for this product", () => {
-        expect(cardsFor(BUNS)).toEqual(["photo", "price", "simple", "colour"]);
-        const onOffer = { ...BUNS, offerId: "disc_1" };
+        // No photo of its own, no Photo or Price tag: the API would draw a letter.
+        expect(cardsFor(BUNS)).toEqual(["simple", "colour"]);
+        expect(firstStyle(BUNS)).toBe("simple");
+        expect(firstStyle({ ...BUNS, hasPhoto: true })).toBe("price");
+        const onOffer = { ...BUNS, offerId: "disc_1", hasPhoto: true };
         expect(cardsFor(onOffer)).toEqual([
             "photo",
             "price",
@@ -51,17 +56,28 @@ describe("share as a post (#1375 U2)", () => {
         );
     });
 
-    it("tags the link so a visit from a post is counted, keeping its own query", () => {
-        expect(taggedLink(BUNS.url)).toBe(
-            "https://rye.example.com/shop/cardamom-bun-box?utm_source=saroh-share&utm_medium=social",
+    it("names the link without its scheme or query, for the caption's chip", () => {
+        expect(shownLink(BUNS.url)).toBe(
+            "rye.example.com/shop/cardamom-bun-box",
         );
-        expect(taggedLink("https://rye.example.com/book?service=sv_1")).toBe(
-            "https://rye.example.com/book?service=sv_1&utm_source=saroh-share&utm_medium=social",
+        expect(shownLink("https://rye.example.com/book?service=sv_1")).toBe(
+            "rye.example.com/book",
         );
+        expect(shownLink("https://rye.example.com/")).toBe("rye.example.com");
+    });
+
+    it("names swatches by colour, never by hex", () => {
+        expect(colourName("#3e5a45")).toBe("Deep green");
+        expect(colourName("#b5532a")).toBe("Orange");
+        expect(colourName("#f4ebdd")).toBe("Cream");
+        expect(colourName("#d9d6cc")).toBe("Stone");
+        expect(colourName("#1c1c1a")).toBe("Black");
+        expect(colourName("#f2b896")).toBe("Light orange");
+        expect(colourName("nope")).toBe("Colour");
     });
 
     it("keeps the link at the caption's end, whatever was typed", () => {
-        const link = taggedLink(BUNS.url);
+        const link = BUNS.url;
         expect(withLink("Fresh buns.", link)).toBe(`Fresh buns. ${link}`);
         expect(withLink(`Fresh buns. ${link}`, link)).toBe(
             `Fresh buns. ${link}`,
@@ -82,22 +98,19 @@ describe("share as a post (#1375 U2)", () => {
         );
     });
 
-    it("starts captions from the name, price and link; no price, no With price", () => {
-        const link = "https://l.example/x";
-        expect(captionFor("price", BUNS, link)).toBe(
-            `Cardamom bun box, for ₹360. Order here: ${link}`,
+    it("starts captions from the name and price, never the link; no price, no With price", () => {
+        expect(captionFor("price", BUNS)).toBe(
+            `Cardamom bun box, for ₹360. Order here:`,
         );
-        expect(captionFor("short", BUNS, link)).toBe(
-            `Cardamom bun box. See it here: ${link}`,
+        expect(captionFor("short", BUNS)).toBe(
+            `Cardamom bun box. See it here:`,
         );
-        expect(captionFor("hinglish", BUNS, link)).toBe(
-            `Cardamom bun box ab available hai sirf ₹360 mein. Order karne ke liye yahan dekhein: ${link}`,
+        expect(captionFor("hinglish", BUNS)).toBe(
+            `Cardamom bun box ab available hai sirf ₹360 mein. Order karne ke liye yahan dekhein:`,
         );
         const free = { ...BUNS, kind: "service" as const, price: null };
         expect(captionKinds(free, true)).toEqual(["short", "hinglish"]);
-        expect(captionFor("short", free, link)).toBe(
-            `Cardamom bun box. Book here: ${link}`,
-        );
+        expect(captionFor("short", free)).toBe(`Cardamom bun box. Book here:`);
     });
 
     it("offers each kind its own cards (owner, 12 Nov 2026)", () => {
@@ -116,7 +129,13 @@ describe("share as a post (#1375 U2)", () => {
             "simple",
         ]);
         const book = { ...post, kind: "book" as const, ref: "page" };
-        expect(cardsFor(book)).toEqual(["colour", "photo", "simple"]);
+        expect(cardsFor(book)).toEqual(["colour", "simple"]);
+        // The site's own share image, when it has one; else no letter tile.
+        expect(cardsFor({ ...book, hasPhoto: true })).toEqual([
+            "colour",
+            "simple",
+            "photo",
+        ]);
         const own = { ...post, kind: "own" as const, ref: "sp_1" };
         expect(cardsFor(own)).toEqual(["colour", "simple"]);
         expect(cardsFor({ ...own, hasPhoto: true })).toEqual([
@@ -157,21 +176,29 @@ describe("share as a post (#1375 U2)", () => {
         expect(bun.searchParams.has("bg")).toBe(false);
     });
 
-    it("draws the colour row's swatches from the site's own colours and their tints", () => {
+    it("draws the colour row's swatches: one row of four, no two that look alike", () => {
         const swatches = shareSwatches(["#3E5A45", "#b5532a", "nope"]);
         expect(swatches.slice(0, 2)).toEqual(["#3e5a45", "#b5532a"]);
-        expect(swatches).toHaveLength(6);
-        expect(new Set(swatches).size).toBe(6);
+        expect(swatches.length).toBeLessThanOrEqual(4);
+        expect(new Set(swatches).size).toBe(swatches.length);
         for (const hex of swatches) expect(hex).toMatch(/^#[0-9a-f]{6}$/);
-        expect(
-            shareSwatches([
-                "#111111",
-                "#222222",
-                "#333333",
-                "#444444",
-                "#555555",
-            ]),
-        ).toHaveLength(8);
+        // Greys a step apart are one choice; the row never passes four.
+        const greys = shareSwatches([
+            "#999999",
+            "#9c9c9c",
+            "#a3a3a3",
+            "#1c1c1a",
+            "#000000",
+            "#ffffff",
+            "#b5532a",
+            "#c25a2d",
+        ]);
+        expect(greys).toEqual(
+            ["#999999", "#1c1c1a", "#ffffff", "#b5532a"].concat(greys.slice(4)),
+        );
+        expect(greys).not.toContain("#9c9c9c");
+        expect(greys).not.toContain("#000000");
+        expect(greys).not.toContain("#c25a2d");
         expect(shareSwatches([])).toEqual([]);
     });
 
@@ -196,16 +223,14 @@ describe("share as a post (#1375 U2)", () => {
             "short",
         ]);
         expect(captionKinds(BUNS, false)).toEqual(["short", "price"]);
-        expect(captionFor("summary", post, link)).toBe(
-            `How we shape a bun: Four folds and a long rest. Read it here: ${link}`,
+        expect(captionFor("summary", post)).toBe(
+            `How we shape a bun: Four folds and a long rest. Read it here:`,
         );
-        expect(captionFor("short", post, link)).toBe(
-            `How we shape a bun. Read it here: ${link}`,
+        expect(captionFor("short", post)).toBe(
+            `How we shape a bun. Read it here:`,
         );
         const book = { ...post, kind: "book" as const, name: "Book your slot" };
-        expect(captionFor("short", book, link)).toBe(
-            `Book your slot. Book here: ${link}`,
-        );
+        expect(captionFor("short", book)).toBe(`Book your slot. Book here:`);
     });
 
     it("names the file after the item, card and size", () => {

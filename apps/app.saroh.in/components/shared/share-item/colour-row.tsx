@@ -3,8 +3,10 @@
 import { ChoiceGroup, Eyebrow, pillClass } from "@saroh/ui/choice-group";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { Plus } from "lucide-react";
 import { useId } from "react";
 
+import { colourName } from "@/lib/share-item/share";
 import { SHARE_WORDS } from "@/lib/share-item/words";
 
 const SITE = "site";
@@ -29,9 +31,17 @@ export function ColourRow({
     const shown =
         value && !swatches.includes(value) ? [...swatches, value] : swatches;
     return (
-        <div className="flex flex-col gap-2" data-colour-row="">
-            <Eyebrow id={`${id}-colours`}>{SHARE_WORDS.colours}</Eyebrow>
-            <div className="flex flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-col gap-2" data-colour-row="">
+            <Eyebrow id={`${id}-colours`}>
+                {SHARE_WORDS.colours}
+                <span className="font-normal normal-case tracking-normal">
+                    {" "}
+                    · {value ? colourName(value) : SHARE_WORDS.siteColours}
+                </span>
+            </Eyebrow>
+            {/* One row, as the boards draw it. Below 360px Site colours takes
+                its own line above the swatches, so nothing is cut or scrolled. */}
+            <div className="-mx-1 flex min-w-0 items-center gap-2 px-1 py-1 coarse:gap-1.5 max-[359px]:items-end">
                 <ChoiceGroup
                     labelledBy={`${id}-colours`}
                     choices={[
@@ -42,32 +52,45 @@ export function ColourRow({
                         ...shown.map((hex) => ({
                             value: hex,
                             label: null,
-                            ariaLabel: `Colour ${hex}`,
+                            ariaLabel: colourName(hex),
+                            tip: colourName(hex),
                             style: { background: hex },
                         })),
                     ]}
                     value={value ?? SITE}
                     onChange={(v) => onChange(v === SITE ? null : v)}
-                    className="flex flex-wrap items-center gap-2"
+                    className="flex shrink-0 items-center gap-2 coarse:gap-1.5 max-[359px]:grid max-[359px]:grid-cols-[repeat(5,auto)]"
                     itemClassName={(on, choice) =>
                         choice.value === SITE
-                            ? pillClass(on)
+                            ? cn(
+                                  pillClass(on),
+                                  "max-[359px]:col-span-full max-[359px]:justify-self-start",
+                              )
                             : cn(
-                                  "size-7 rounded-full border-[3px] border-card ring-[1.5px] coarse:size-10",
+                                  "size-9 rounded-full border-[3px] border-card ring-[1.5px] coarse:size-10",
                                   on
                                       ? "ring-foreground"
                                       : "ring-border hover:ring-border-strong",
                               )
                     }
                 />
-                <Input
-                    type="color"
-                    aria-label={SHARE_WORDS.ownColour}
-                    title={SHARE_WORDS.ownColour}
-                    value={value ?? "#000000"}
-                    onChange={(e) => onChange(e.target.value.toLowerCase())}
-                    className="size-7 cursor-pointer rounded-full border-0 p-0 ring-[1.5px] ring-border coarse:size-10 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0"
-                />
+                <span className="relative shrink-0">
+                    <Input
+                        type="color"
+                        aria-label={SHARE_WORDS.ownColour}
+                        title={SHARE_WORDS.ownColour}
+                        // Unpicked, a blank swatch with a plus: never a stray black.
+                        value={value ?? "#ffffff"}
+                        onChange={(e) => onChange(e.target.value.toLowerCase())}
+                        className="size-9 cursor-pointer rounded-full border-0 p-0 ring-[1.5px] ring-border coarse:size-10 [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-full [&::-webkit-color-swatch]:border-0"
+                    />
+                    {value ? null : (
+                        <Plus
+                            aria-hidden
+                            className="pointer-events-none absolute inset-0 m-auto size-4 text-muted-foreground"
+                        />
+                    )}
+                </span>
             </div>
         </div>
     );
