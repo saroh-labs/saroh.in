@@ -16,9 +16,13 @@ import hreflang from "@saroh/edition/hreflang";
  */
 interface Env {
     ASSETS: { fetch: (request: Request) => Promise<Response> };
-    /** Set on a development deploy: nobody without it gets in. */
+    /** Set on a development deploy, or production while Global is behind the key: nobody without it gets in. */
     DEV_ACCESS_KEY?: string;
     DEV_ACCESS_COOKIE_DOMAIN?: string;
+    /** Where a visitor without the key goes (302), else a 404. */
+    DEV_REDIRECT_ORIGIN?: string;
+    /** The page there; unset keeps the path. */
+    DEV_REDIRECT_PATH?: string;
 }
 
 const CANONICAL_HOST = "saroh.tech";
@@ -122,20 +126,45 @@ async function devGate(request: Request, env: Env): Promise<Response | null> {
         .split(";")
         .map((c) => c.trim())
         .includes(`saroh-dev-access=${expected}`);
-    return pass
-        ? null
-        : new Response("Not found", {
-              status: 404,
-              headers: {
-                  "Cache-Control": "no-store",
-                  "X-Robots-Tag": "noindex, nofollow",
-              },
-          });
+    if (pass) return null;
+    const away = env.DEV_REDIRECT_ORIGIN?.trim();
+    const isRead = request.method === "GET" || request.method === "HEAD";
+    if (away && isRead) {
+        const path =
+            env.DEV_REDIRECT_PATH?.trim() || `${url.pathname}${url.search}`;
+        // Temporary: saroh.tech hasn't moved, it isn't open yet.
+        return new Response(null, {
+            status: 302,
+            headers: {
+                Location: new URL(path, away).toString(),
+                "Cache-Control": "no-store",
+                "X-Robots-Tag": "noindex, nofollow",
+            },
+        });
+    }
+    return new Response("Not found", {
+        status: 404,
+        headers: {
+            "Cache-Control": "no-store",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    });
 }
 
 export async function handle(request: Request, env: Env): Promise<Response> {
     const shut = await devGate(request, env);
     if (shut) return shut;
+    // Behind the key, nothing is indexed, even on saroh.tech itself.
+    if (env.DEV_ACCESS_KEY?.trim()) {
+        const out = await serve(request, env);
+        const indexed = new Response(out.body, out);
+        indexed.headers.set("X-Robots-Tag", "noindex, nofollow");
+        return indexed;
+    }
+    return serve(request, env);
+}
+
+async function serve(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     const secure = url.protocol === "https:";
 

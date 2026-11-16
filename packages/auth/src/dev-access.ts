@@ -150,10 +150,12 @@ export function withDevAccess(
         if (fixed) target = fixed;
         // Permanent, so search engines move what they found on saroh.io to
         // production; no-store, so a browser that later gets the key isn't
-        // stuck on a remembered redirect.
+        // stuck on a remembered redirect. DEV_REDIRECT_STATUS=302 makes it
+        // temporary: a production site behind the key (Global, owner 15 Nov
+        // 2026) mustn't tell search engines it has moved for good.
         const response = NextResponse.redirect(
             new URL(target, production),
-            301,
+            process.env.DEV_REDIRECT_STATUS?.trim() === "302" ? 302 : 301,
         );
         response.headers.set("Cache-Control", "no-store");
         return noIndex(response);

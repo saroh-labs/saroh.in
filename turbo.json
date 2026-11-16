@@ -117,6 +117,7 @@
         "DEV_ACCESS_COOKIE_DOMAIN",
         "DEV_REDIRECT_ORIGIN",
         "DEV_REDIRECT_PATH",
+        "DEV_REDIRECT_STATUS",
         "VERCEL_GIT_COMMIT_REF",
         "NEXT_PUBLIC_GA_MEASUREMENT_ID",
         // Ad conversions (DEC-127): saroh.in's public ad ids and labels, and
@@ -219,7 +220,14 @@
                 "!**/vitest.config.*",
                 "!**/jest.config.*"
             ],
-            "outputs": ["dist/**", ".next/**", "!.next/cache/**", "public/downloads/**", "public/templates/**", "out/**"]
+            "outputs": [
+                "dist/**",
+                ".next/**",
+                "!.next/cache/**",
+                "public/downloads/**",
+                "public/templates/**",
+                "out/**"
+            ]
         },
         // The Global edition's copy of the merchant app and accounts, for the
         // browser stack only (CI's shards, `pnpm prepush --e2e`): built

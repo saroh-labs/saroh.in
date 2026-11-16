@@ -25,6 +25,7 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { corsDelegate } from "./common/cors";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { globalAccessGate } from "./common/global-access";
 import { OriginGuard } from "./common/guards/origin.guard";
 import { TestHostWriteGuard } from "./common/guards/test-host.guard";
 import { OrgRlsInterceptor } from "./common/interceptors/org-rls.interceptor";
@@ -112,6 +113,10 @@ async function bootstrap() {
     // Runs first so every request (incl. the mounted Better Auth handler) gets
     // a correlation id and its logs/error envelope can be traced.
     app.use(correlationIdMiddleware);
+
+    // Global's addresses only for the saroh.tech sites' key holders until it
+    // opens (GLOBAL_API_ACCESS_KEY, owner 16 Nov 2026).
+    app.use(globalAccessGate(env.GLOBAL_API_ACCESS_KEY));
 
     // Merchant sites' address serves its own short list of routes (DEC-204).
     app.use(merchantApiOnly);

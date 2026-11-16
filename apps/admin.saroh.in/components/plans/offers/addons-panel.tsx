@@ -13,6 +13,7 @@ import {
 import type { ReactNode } from "react";
 import { useId } from "react";
 
+import { planCurrencySign } from "@/lib/plan-money";
 import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
@@ -223,7 +224,7 @@ function AddonRow({ addon }: { addon: Addon }) {
                     </>
                 )}
                 <label className="grid w-[110px] gap-1">
-                    <span className={SMALL}>₹ a month</span>
+                    <span className={SMALL}>{planCurrencySign()} a month</span>
                     <RupeesField
                         paise={addon.pricePaise}
                         disabled={!canEdit}

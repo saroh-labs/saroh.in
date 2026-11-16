@@ -298,7 +298,7 @@ describe("Free's limits beyond /pricing", () => {
     });
 });
 
-describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
+describe("Global's paid plans, at their prices (owner, 15 Nov 2026: shown before they're sold)", () => {
     const usd = () =>
         parseCatalog({
             ...fakeInput(),
@@ -308,7 +308,7 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
         });
 
     it("shows Plan B and Plan C at their dollar prices, with no tax", () => {
-        const model = pricingModel(usd(), true);
+        const model = pricingModel(usd());
         const all = JSON.stringify(model.views["month-excl"]);
         expect(model.placeholder).toBe(false);
         expect(all).toContain("$111");
@@ -348,7 +348,7 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
             tax: "none",
             yearly: { on: false, paid: 10 },
         });
-        const model = pricingModel(catalog, true);
+        const model = pricingModel(catalog);
         const all = JSON.stringify([model.views["month-excl"], model.rows]);
         expect(all).not.toMatch(/\bUPI\b|\bPIN\b|\bGST\b/);
         expect(all).toContain("Delivery");
@@ -356,13 +356,37 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
         expect(all).toContain("Products");
     });
 
-    it("keeps today's Free-only page while it isn't offered", () => {
-        const view = pricingModel(usd(), false).views["month-excl"];
-        expect(JSON.stringify(view)).not.toMatch(/\$|111|222/);
+    it("leaves out renewing memberships while Global can't do them (15 Nov 2026)", () => {
+        const input = fakeInput();
+        input.modules.push({
+            id: "subscriptions",
+            name: "Memberships that renew",
+            group: "one",
+            cells: {
+                grow: { inc: true, text: "Included", card: "Renewing members" },
+                pro: { inc: true, text: "Included", card: "Renewing members" },
+            },
+        });
+        const catalog = parseCatalog({
+            ...input,
+            currency: "USD",
+            tax: "none",
+            yearly: { on: false, paid: 10 },
+        });
+        const model = pricingModel(catalog);
+        const all = JSON.stringify([model.views["month-excl"], model.rows]);
+        expect(all).not.toMatch(/Memberships that renew|Renewing members/);
+        expect(all).toContain("Products");
+    });
+
+    it("shows the prices before Saroh sells them: the paid cards say Coming soon", () => {
+        const view = pricingModel(usd()).views["month-excl"];
+        expect(JSON.stringify(view)).toMatch(/\$111/);
+        expect(planWords(false).paidCard).toBe("Coming soon");
     });
 
     it("never draws an India catalogue's prices", () => {
-        const view = pricingModel(parseCatalog(fakeInput()), true).views[
+        const view = pricingModel(parseCatalog(fakeInput())).views[
             "month-excl"
         ];
         expect(JSON.stringify(view)).not.toMatch(/₹|111|222/);

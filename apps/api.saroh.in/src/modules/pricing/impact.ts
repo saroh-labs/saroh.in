@@ -3,7 +3,7 @@ import {
     addonOfferedOn,
     cellOf,
     formatCount,
-    formatInr,
+    formatMinor,
     monthlyEquivalentPaise,
     planPricePaise,
 } from "@saroh/pricing-catalog";
@@ -119,7 +119,7 @@ export function catalogueImpact(input: ImpactInput): Impact {
         if (!o) {
             add(
                 "info",
-                `New plan: ${p.name} at ${formatInr(p.pricePaise)}`,
+                `New plan: ${p.name} at ${formatMinor(p.pricePaise, next.currency)}`,
                 "Shown on the pricing page once published.",
             );
             continue;
@@ -130,7 +130,7 @@ export function catalogueImpact(input: ImpactInput): Impact {
             const up = p.pricePaise > o.pricePaise;
             add(
                 up ? "warn" : "ok",
-                `${p.name}: ${formatInr(o.pricePaise)} → ${formatInr(p.pricePaise)} a month`,
+                `${p.name}: ${formatMinor(o.pricePaise, next.currency)} → ${formatMinor(p.pricePaise, next.currency)} a month`,
                 `${plural(pay.length, "business pays", "businesses pay")} ${up ? "more" : "less"}` +
                     (own.length
                         ? `. ${own.length} have their own price and don't change.`

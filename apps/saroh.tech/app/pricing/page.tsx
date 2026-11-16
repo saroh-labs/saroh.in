@@ -37,7 +37,7 @@ export default async function PricingPage() {
                 className="pb-8 min-[760px]:pb-10"
             />
             {/* The cards, then every plan's details, as saroh.in (owner, 16 Nov 2026). */}
-            <PricingTables model={pricingModel(catalog, on)} on={on} />
+            <PricingTables model={pricingModel(catalog)} on={on} />
             <Container className="pt-6">
                 <ul className="m-0 grid list-disc gap-1.5 pl-5 text-mk-note text-muted-foreground">
                     {[...PRICING.usageNotes, words.pricingUsage].map((note) => (

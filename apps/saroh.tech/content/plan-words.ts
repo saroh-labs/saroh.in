@@ -79,14 +79,14 @@ export const PLAN_WORDS = {
     },
     pricingIntro: {
         on: "Free is the plan you can start on today, with no card. Grow and Pro are there when your business needs more.",
-        off: "Free is the plan you can use today, with no card. Grow and Pro aren't available yet, so there's nothing to buy here.",
+        off: "Free is the plan you can use today, with no card. Grow and Pro are coming soon, so there's nothing to buy here yet.",
     },
     pricingUsage: {
         on: "Need more than Free includes? Move up to Grow or Pro.",
         off: "You can't buy more yet: paid plans aren't on sale.",
     },
     /** A paid plan's card: its button while on sale, a mark while not. */
-    paidCard: { on: "Start on", off: "Not available yet" },
+    paidCard: { on: "Start on", off: "Coming soon" },
     /** Terms and Billing, "Paying for Saroh". */
     legal: {
         on: "There's a free plan, and it needs no card. Grow and Pro are paid plans, and the pricing page shows what each one includes.",

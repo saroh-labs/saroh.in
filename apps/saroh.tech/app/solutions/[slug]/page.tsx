@@ -292,7 +292,7 @@ export default async function SolutionPage({ params }: Props) {
                     // Every plan, as /pricing shows them (owner, 16 Nov).
                     children: (
                         <Plans
-                            model={pricingModel(catalog, plansOn)}
+                            model={pricingModel(catalog)}
                             on={plansOn}
                             src={`${src}-pricing`}
                             compare={{
