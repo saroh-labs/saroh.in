@@ -33,7 +33,7 @@ import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Photo } from "./reach/photo";
 import { Questions } from "./reach/questions";
 import { PanelShot, ReachSteps } from "./reach/reach-steps";
-import { Tail } from "./reach/tail";
+import { pricingCompare, Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 import { Feed, ItemCard, Seg, StateChip, StoryTime } from "./social/pieces";
 import { PostCard } from "./social/post-card";
@@ -1054,11 +1054,7 @@ export function SocialView({
 
             <Tail
                 line={w.tail.plan}
-                compare={
-                    site.open
-                        ? { label: w.tail.compare, href: "/pricing" }
-                        : null
-                }
+                compare={pricingCompare(site.open, w.tail.compare)}
             />
 
             <Questions items={w.faq} ask={w.askUs} />

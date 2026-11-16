@@ -2,11 +2,11 @@ import { ArrowDown, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
 import { countWord } from "../content/feature-switches";
 import type { World, WorldBusiness, WorldStory } from "../content/world";
 import { WORLD_TRADES } from "../content/world";
+import { PricingButton } from "../feature-pages/reach/tail";
 import type { PageSite } from "../feature-pages/site";
 import { Chip } from "../kit/chip";
 import { ClosingCTA } from "../kit/closing-cta";
@@ -986,15 +986,9 @@ export function HowItWorksPage({
                 title={W.close.title}
                 primary={site.start("features-close")}
                 secondary={
-                    site.open ? (
-                        <ButtonLink
-                            href="/pricing"
-                            variant="secondary"
-                            size="kit"
-                        >
-                            {W.close.pricing}
-                        </ButtonLink>
-                    ) : undefined
+                    <PricingButton open={site.open}>
+                        {W.close.pricing}
+                    </PricingButton>
                 }
                 note={W.close.note}
                 className="pt-0 min-[760px]:pt-0"

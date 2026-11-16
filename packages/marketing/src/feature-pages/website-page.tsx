@@ -24,7 +24,7 @@ import { InTheApp } from "./reach/in-the-app";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
-import { Tail } from "./reach/tail";
+import { pricingCompare, Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 import { BrandStudio } from "./website/brand-studio";
 import { Journey } from "./website/journey";
@@ -876,11 +876,7 @@ export function WebsiteView({
 
             <Tail
                 line={w.tail.plan}
-                compare={
-                    site.open
-                        ? { label: w.tail.compare, href: "/pricing" }
-                        : null
-                }
+                compare={pricingCompare(site.open, w.tail.compare)}
             />
 
             <Questions items={w.faq} ask={w.ask_us} />

@@ -39,7 +39,7 @@ import type { InTheAppData } from "./reach/in-the-app";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Questions } from "./reach/questions";
 import { reachSteps } from "./reach/reach-steps";
-import { Tail } from "./reach/tail";
+import { PricingButton, Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
 const SCENE = "pt-12 min-[760px]:pt-[120px]";
@@ -750,15 +750,9 @@ export function AskAiView({
                 visual={<AskTypes words={w.close.ask} />}
                 primary={site.start(`feature-${slug}-close`)}
                 secondary={
-                    site.open ? (
-                        <ButtonLink
-                            href="/pricing"
-                            variant="secondary"
-                            size="kit"
-                        >
-                            {w.plans.compare}
-                        </ButtonLink>
-                    ) : undefined
+                    <PricingButton open={site.open}>
+                        {w.plans.compare}
+                    </PricingButton>
                 }
                 note={w.close.note}
                 className="mt-[72px] min-[760px]:mt-[120px]"

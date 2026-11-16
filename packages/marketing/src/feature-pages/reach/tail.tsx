@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ButtonLink } from "../../buttons/button";
 import { cn } from "../../cn";
 import { PlanLine } from "../../kit/plan-line";
 import { Container } from "../../layout/container";
@@ -34,4 +35,23 @@ export function Tail({
             </PlanLine>
         </Container>
     );
+}
+
+/** Compare plans links to /pricing only while it's open; before launch it redirects to the waitlist. */
+export const pricingCompare = (open: boolean, label: string) =>
+    open ? { label, href: "/pricing" } : null;
+
+/** A closing band's Compare plans button, only while /pricing is open. */
+export function PricingButton({
+    open,
+    children,
+}: {
+    open: boolean;
+    children: ReactNode;
+}) {
+    return open ? (
+        <ButtonLink href="/pricing" variant="secondary" size="kit">
+            {children}
+        </ButtonLink>
+    ) : undefined;
 }
