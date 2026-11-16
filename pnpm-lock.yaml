@@ -1688,6 +1688,9 @@ importers:
       '@saroh/pricing-catalog':
         specifier: workspace:*
         version: link:../pricing-catalog
+      '@saroh/search-pages':
+        specifier: workspace:*
+        version: link:../search-pages
       '@saroh/templates':
         specifier: workspace:*
         version: link:../templates

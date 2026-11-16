@@ -1,5 +1,9 @@
 "use client";
 
+import {
+    setAddressParams,
+    subscribeAddress,
+} from "@saroh/search-pages/address-filters";
 import { ChevronDown, Search } from "lucide-react";
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
@@ -61,17 +65,6 @@ export interface HubFinderWords {
     none: string;
 }
 
-const CHANGED = "saroh:for-hub-filters";
-
-const subscribe = (onChange: () => void) => {
-    window.addEventListener("popstate", onChange);
-    window.addEventListener(CHANGED, onChange);
-    return () => {
-        window.removeEventListener("popstate", onChange);
-        window.removeEventListener(CHANGED, onChange);
-    };
-};
-
 interface Filters {
     family: string | null;
     way: HubWay | null;
@@ -82,19 +75,10 @@ const WAYS: HubWay[] = ["appointments", "classes", "orders"];
 
 /** The filters live in the address, so a link keeps them and Back undoes them. */
 function setAddress(next: Filters, how: "pushState" | "replaceState") {
-    const params = new URLSearchParams();
-    if (next.family) params.set("family", next.family);
-    if (next.way) params.set("how", next.way);
-    if (next.query) params.set("q", next.query);
-    const search = params.toString();
-    window.history[how](
-        null,
-        "",
-        search
-            ? `${window.location.pathname}?${search}`
-            : window.location.pathname,
+    setAddressParams(
+        { family: next.family, how: next.way, q: next.query },
+        how,
     );
-    window.dispatchEvent(new Event(CHANGED));
 }
 
 function readFilters(search: string, groups: HubGroupView[]): Filters {
@@ -245,7 +229,7 @@ export function HubFinder({
 }) {
     // The server draws no filters: every trade is in the page's HTML.
     const search = useSyncExternalStore(
-        subscribe,
+        subscribeAddress,
         () => window.location.search,
         () => "",
     );

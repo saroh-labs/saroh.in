@@ -3,51 +3,6 @@
     "minLines": 6,
     "groups": [
         {
-            "lines": 41,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
-                "3340361d62a7",
-                "e5db278c6e8e",
-                "818aa1c6edad",
-                "599e24bc383e",
-                "02e74496504d",
-                "21cd054b06d3",
-                "eb7c779d1dad",
-                "cd99b8622282",
-                "fce2ad93ca3c",
-                "82121ba80790",
-                "7340cb7f3658",
-                "8717b445fc28",
-                "1cc4ea6f9705",
-                "b825ac98d0a0",
-                "0789eb68249e",
-                "6bf483d9714f",
-                "64e4ca6f5a13",
-                "e6daae08b7c3",
-                "9be8ba2b949e",
-                "0a382c274caf",
-                "cf86d5a9707f",
-                "2077403c46ca",
-                "7b013e2454f3",
-                "c3d894457240",
-                "2187d184e9de",
-                "db47a4b835d7",
-                "6d1d9f346cbf",
-                "b68823d9fcb8",
-                "5c2ffbc76245",
-                "ad429795d3c4",
-                "f75980bb382e",
-                "e43aa0b6c4f0",
-                "734383251d30",
-                "12314de11178",
-                "360072d0a775",
-                "9d2dca84f66e"
-            ]
-        },
-        {
             "lines": 39,
             "files": [
                 "apps/accounts.saroh.in/lib/gst-states.ts",
@@ -113,63 +68,6 @@
                 "508931421cd0",
                 "c707a9ce8a58",
                 "bc92fb03a1c4"
-            ]
-        },
-        {
-            "lines": 19,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
-                "5d8dfd86cd8e",
-                "a80d5e55e8f5",
-                "c8ae15a98b05",
-                "6a0a81cd272f",
-                "04b620e16253",
-                "00584931555a",
-                "543fd755d2c1",
-                "714180ea6bc7",
-                "18151026324b",
-                "6b5cc96f0908",
-                "501695463474",
-                "8c4834e655d8",
-                "336cd81947c7",
-                "554f532227af"
-            ]
-        },
-        {
-            "lines": 13,
-            "files": [
-                "apps/saroh.in/components/contact/contact-form.tsx",
-                "apps/saroh.tech/components/contact/contact-form.tsx"
-            ],
-            "windows": [
-                "86cccbf8e005",
-                "dfd51ac8ddc5",
-                "98860d00064e",
-                "31749aef460d",
-                "68453fe318d5",
-                "e111eeaf54aa",
-                "a8bec9b497df",
-                "e3bd7f858bc1"
-            ]
-        },
-        {
-            "lines": 13,
-            "files": [
-                "apps/saroh.in/components/customers/report-form.tsx",
-                "apps/saroh.tech/components/customers/report-form.tsx"
-            ],
-            "windows": [
-                "0b197c35b8b4",
-                "f91bf1336041",
-                "00ee9019e217",
-                "81864fea89f9",
-                "e78368365f06",
-                "d38bbc1dc76e",
-                "5175df9b8355",
-                "11ce8bb546c4"
             ]
         },
         {
@@ -292,19 +190,6 @@
         {
             "lines": 9,
             "files": [
-                "apps/saroh.in/components/customers/report-form.tsx",
-                "apps/saroh.tech/components/customers/report-form.tsx"
-            ],
-            "windows": [
-                "f7ad32ad230d",
-                "9c2c93b3c619",
-                "c018fec38576",
-                "c7a08a129f3f"
-            ]
-        },
-        {
-            "lines": 9,
-            "files": [
                 "apps/saroh.in/components/tools/link-preview/link-input.tsx",
                 "apps/saroh.in/components/tools/qr-code-maker/qr-code-maker.tsx"
             ],
@@ -391,42 +276,6 @@
                 "44bbe61846cf",
                 "425f1d545025",
                 "bf27310421b3"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
-                "f5e5db9c7aa9",
-                "32004da850c3",
-                "11010a0fe103"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "apps/saroh.in/components/contact/contact-form.tsx",
-                "apps/saroh.tech/components/contact/contact-form.tsx"
-            ],
-            "windows": [
-                "36992dcdd64a",
-                "2747864fc04b",
-                "3c8b1e10c86a"
-            ]
-        },
-        {
-            "lines": 8,
-            "files": [
-                "apps/saroh.in/components/contact/contact-page.tsx",
-                "apps/saroh.tech/app/contact/page.tsx"
-            ],
-            "windows": [
-                "5a25a1016317",
-                "3ad0735121c2",
-                "9130f45ffe86"
             ]
         },
         {
@@ -569,17 +418,6 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/app/(site)/solutions/[slug]/page.tsx",
-                "apps/saroh.tech/app/solutions/[slug]/page.tsx"
-            ],
-            "windows": [
-                "1f3b572695a3",
-                "df9e7b156d3f"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
                 "apps/saroh.in/app/(site)/tools/link-preview/page.tsx",
                 "apps/saroh.in/app/(site)/tools/qr-code-maker/page.tsx"
             ],
@@ -614,67 +452,12 @@
         {
             "lines": 7,
             "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.in/components/contact/contact-page.tsx"
-            ],
-            "windows": [
-                "a94505d6473d",
-                "9428981335e3"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
-                "68d033ae10af",
-                "bba5b834bdb9"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.in/components/about/about-page.tsx",
-                "apps/saroh.tech/app/about/page.tsx"
-            ],
-            "windows": [
-                "ef40d67ebe4a",
-                "5208b87e3f1a"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.in/components/contact/contact-form.tsx",
-                "apps/saroh.tech/components/contact/contact-form.tsx"
-            ],
-            "windows": [
-                "0967254f4641",
-                "72319a2f8478"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.tech/app/about/page.tsx",
+                "packages/marketing/src/sections/about-parts.tsx",
                 "packages/search-pages/src/tools/parts.tsx"
             ],
             "windows": [
                 "d242070f255c",
                 "35ee0c8e2450"
-            ]
-        },
-        {
-            "lines": 7,
-            "files": [
-                "apps/saroh.tech/app/page.tsx",
-                "apps/saroh.tech/app/solutions/[slug]/page.tsx"
-            ],
-            "windows": [
-                "d07c696cf8af",
-                "04c626ecd619"
             ]
         },
         {
@@ -766,26 +549,6 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/app/(site)/integrations/page.tsx",
-                "apps/saroh.tech/app/integrations/page.tsx"
-            ],
-            "windows": [
-                "29ea624d66cd"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
-                "apps/saroh.in/app/(site)/integrations/page.tsx",
-                "apps/saroh.tech/app/integrations/page.tsx"
-            ],
-            "windows": [
-                "11487d103ec7"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
                 "apps/saroh.in/app/layout.tsx",
                 "apps/saroh.tech/app/layout.tsx"
             ],
@@ -826,18 +589,9 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/components/feature/feature-hero.tsx",
-                "apps/saroh.tech/app/features/[slug]/page.tsx"
-            ],
-            "windows": [
-                "8d19562410ee"
-            ]
-        },
-        {
-            "lines": 6,
-            "files": [
                 "apps/saroh.in/components/resources/resource-shell.tsx",
-                "apps/saroh.in/components/templates/browser-frame.tsx"
+                "packages/marketing/src/feature-pages/social/pieces.tsx",
+                "packages/marketing/src/how-it-works/panels.tsx"
             ],
             "windows": [
                 "aa3aee2be7e0"
@@ -901,6 +655,46 @@
             ],
             "windows": [
                 "d9acfbf54aea"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/marketing/src/feature-pages/social-page.tsx",
+                "packages/marketing/src/feature-pages/website-page.tsx"
+            ],
+            "windows": [
+                "621f7813c3ce"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/marketing/src/feature-pages/social-page.tsx",
+                "packages/marketing/src/feature-pages/website-page.tsx"
+            ],
+            "windows": [
+                "285a9dfaa480"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/marketing/src/feature-pages/website/shop-site.tsx",
+                "packages/marketing/src/solutions/moments/moments.tsx"
+            ],
+            "windows": [
+                "c3e0c600c24b"
+            ]
+        },
+        {
+            "lines": 6,
+            "files": [
+                "packages/marketing/src/solutions/moments/moments.tsx",
+                "packages/search-pages/src/tools/td-parts.tsx"
+            ],
+            "windows": [
+                "f1337029c466"
             ]
         },
         {
