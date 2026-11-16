@@ -69,7 +69,7 @@ export function BrandStudio({
             size="kit-h2"
             tone="ink"
             space="kit"
-            className="border-t border-mk-on-ink-line"
+            className="border-t border-mk-on-ink-line pt-14 min-[760px]:pt-20"
         >
             <div
                 ref={box}
@@ -149,7 +149,7 @@ export function BrandStudio({
                         {w.note}
                     </p>
                 </div>
-                <div className="flex justify-center rounded-[20px] px-3 py-8 min-[760px]:px-8 min-[760px]:py-12">
+                <div className="flex justify-center rounded-[20px] px-3 min-[760px]:px-8">
                     <figure
                         aria-label={`${w.label}, in ${o.label.toLowerCase()}, on ${device.toLowerCase()}`}
                         data-look={o.label}
@@ -160,7 +160,7 @@ export function BrandStudio({
                         )}
                         style={lookStyle(o.look, o.band)}
                     >
-                        <MiniSite words={site} shop={shop} caps={o.caps} />
+                        <MiniSite words={site} shop={shop} caps={o.caps} fit />
                     </figure>
                 </div>
             </div>

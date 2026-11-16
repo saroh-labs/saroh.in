@@ -272,15 +272,20 @@ export function MiniSite({
     words,
     shop,
     caps = false,
+    fit = false,
 }: {
     words: ShopSiteWords;
     shop: boolean;
     /** The gym look sets its name in capitals. */
     caps?: boolean;
+    /** As tall as its content, not the switcher's fixed frame. */
+    fit?: boolean;
 }) {
     const [first] = words.products;
     return (
-        <div className="flex h-[286px] flex-col gap-[9px] overflow-hidden bg-[hsl(var(--site-bg))] px-4 pb-4 pt-3.5 font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))]">
+        <div
+            className={`flex ${fit ? "" : "h-[286px]"}flex-col gap-[9px] overflow-hidden bg-[hsl(var(--site-bg))] px-4 pb-4 pt-3.5 font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))]`}
+        >
             <div className="flex items-center justify-between text-[12px]">
                 <span
                     className={cn(

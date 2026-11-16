@@ -86,6 +86,7 @@ export function Journey({
             size="kit-h2"
             tone="ink"
             space="kit"
+            className="pb-14 min-[760px]:pb-20"
         >
             <div ref={box} className="mt-10 grid gap-10 min-[760px]:mt-14">
                 <ol
