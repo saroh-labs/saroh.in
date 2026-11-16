@@ -13,12 +13,13 @@ import {
     syncStorefrontFulfilmentTypes,
     writeSite,
 } from "../helpers";
-import { seedPlanId } from "../pricing";
+import { ensureSampleGlobalPaidPlans, seedPlanId } from "../pricing";
 import { deleteSeeded } from "../run";
 import { upsertPipeline } from "../showcase/crm";
 import type { Rng } from "../showcase/random";
 import { createRng } from "../showcase/random";
 import { writeTraffic } from "../showcase/traffic";
+import { writesStandIns } from "../stand-in-providers";
 import type {
     GlobalBusiness,
     GlobalManualInvoice,
@@ -254,6 +255,9 @@ async function seedOne(
     });
     // Its paid plan where the live catalogue has one (dev's, imported), else
     // Free, the only plan production offers Global today (DEC-211).
+    // A throwaway database gets sample paid plans when it has none, so CI's
+    // and the release's shots match a local one with dev's catalogue.
+    if (writesStandIns()) await ensureSampleGlobalPaidPlans(prisma);
     const paid = await liveCataloguePlanRow(prisma, "GLOBAL", biz.plan);
     await prisma.subscription.create({
         data: {

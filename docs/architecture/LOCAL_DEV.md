@@ -526,8 +526,12 @@ pnpm --filter @saroh/database db:seed:global   # base seed, then four Global bus
 
 Thistlewick Bakery, Larkspur & Vane (pounds, VAT), Ironvale Fitness and
 Wrenfield Dental (`seed/global/`), owned by `demo@saroh.dev`: `edition: GLOBAL`,
-on Free, no payment provider, sample data only, rewritten whole each run. Each
-is what a Free business can have: setup's modules, plus the Insights (the
+no payment provider, sample data only, rewritten whole each run. They sit on
+paid plans (Thistlewick and Ironvale on Pro, the salon and clinic on Grow) so
+the shots show what a paying business gets (owner, 16 Nov 2026): the live
+Global catalogue's, a local copy of dev's when imported, else on a throwaway
+database the sample's paid plans in dollars (`ensureSampleGlobalPaidPlans`).
+The data is still what a small business has after setup: setup's modules, plus the Insights (the
 bakery), Courses (the gym) and Sell (the salon and clinic, for a treatment over
 several visits) switches Free offers, no Payments or class packs, one person
 (a diary person with no login would take a seat), a quiet diary
