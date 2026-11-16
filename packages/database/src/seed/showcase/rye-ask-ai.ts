@@ -46,6 +46,12 @@ async function bestSellers(prisma: Db, from: Date, to: Date) {
             items: BEST.map(([n, price, sold, amount, stock]) => {
                 const p = byId.get(ryeId("product", n));
                 if (!p) throw new Error(`[ask-ai] Rye has no product ${n}`);
+                // The app shows a card photo only from Saroh's media host; a
+                // card without one would be an empty box in the release shots.
+                if (!p.image?.startsWith("https://media.saroh."))
+                    throw new Error(
+                        `[ask-ai] Rye's ${p.name} has no photo on media.saroh.*`,
+                    );
                 return {
                     id: p.id,
                     name: p.name,

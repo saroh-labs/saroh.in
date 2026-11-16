@@ -69,6 +69,12 @@ export async function seedThistlewickAskAi(
                 const p = names.get(product(n));
                 if (!p)
                     throw new Error(`[ask-ai] Thistlewick has no product ${n}`);
+                // The app shows a card photo only from Saroh's media host; a
+                // card without one would be an empty box in the release shots.
+                if (!p.image?.startsWith("https://media.saroh."))
+                    throw new Error(
+                        `[ask-ai] Thistlewick's ${p.name} has no photo on media.saroh.*`,
+                    );
                 return {
                     id: p.id,
                     name: p.name,
