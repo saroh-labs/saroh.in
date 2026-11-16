@@ -405,10 +405,6 @@ export function socialWords({
         },
 
         tail: {
-            momentAt: "13:00",
-            momentLead: "Seen in a day:",
-            moment: `the lunch rush is over, and ${rye.owner} turns the ${said(bun.name)} into a post before the next batch.`,
-            momentLink: `See 1 pm at ${rye.name}`,
             plan: [
                 everyPlan ? "Share is free on every plan." : "Free to start.",
                 posting
@@ -418,7 +414,6 @@ export function socialWords({
                 .filter(Boolean)
                 .join(" "),
             compare: "Compare plans",
-            works: "Works with",
         },
 
         faq: [
@@ -442,6 +437,10 @@ export function socialWords({
                 q: "What sizes do I get?",
                 a: "Post, square and story. Stories keep words clear of the top and bottom, so Instagram and WhatsApp never cover the name or price.",
             },
+            {
+                q: "Where does a post link to?",
+                a: "To the item's live page on your site, where people can book or buy.",
+            },
         ],
         askUs: {
             lead: "Something else?",
@@ -455,9 +454,7 @@ export function socialWords({
         },
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
-            everything: "Everything Share does",
-            usedBy: "Used by",
+            phone: "Help and setup",
             of: "of",
         },
         insights,

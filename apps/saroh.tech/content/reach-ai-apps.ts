@@ -446,6 +446,14 @@ export function aiAppsWords(): AiAppsWords {
                 a: "Only what you can see in the businesses you ticked, and never sensitive customer details. What it reads is sent to the company behind your assistant, under its own terms.",
             },
             {
+                q: "What can't it do?",
+                a: "It acts as you. It can't cancel bookings, give refunds or touch billing.",
+            },
+            {
+                q: "Can one connection cover several businesses?",
+                a: "Yes. Tick the ones it may use, and it names the business on every change it makes.",
+            },
+            {
                 q: "How do I disconnect it?",
                 a: "Open Settings › API and AI apps › AI assistants, choose the connection and press Disconnect from this business. A connection also ends after 90 days without use.",
             },
@@ -466,11 +474,9 @@ export function aiAppsWords(): AiAppsWords {
         },
         close: { title: "Do your Saroh work by asking." },
         inTheApp: {
-            everything: "Everything AI apps does",
-            usedBy: "Used by",
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
+            phone: "Help and setup",
         },
     };
 }

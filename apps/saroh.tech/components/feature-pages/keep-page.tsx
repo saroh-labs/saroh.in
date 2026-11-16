@@ -1,19 +1,13 @@
-import type { FeatureSlug, ShotKey } from "@saroh/marketing/content-types";
+import type { ShotKey } from "@saroh/marketing/content-types";
 import { KeepPage as Keep } from "@saroh/marketing/feature-pages/keep-page";
 import { OrdersMoments } from "@saroh/marketing/feature-pages/orders-moments";
 
 import type { KeepSlug } from "@/content/feature-keep";
 import { KEEP, KEEP_WORDS } from "@/content/feature-keep";
 import { ORDERS_MOMENTS } from "@/content/feature-orders";
-import {
-    featureHref,
-    featureList,
-    features,
-    NOT_AVAILABLE_YET,
-} from "@/content/features";
+import { featureHref, features, NOT_AVAILABLE_YET } from "@/content/features";
 import { HELP } from "@/content/help";
 import { shotView } from "@/content/shots";
-import { solutionHref, solutions } from "@/content/solutions";
 import { WORLD } from "@/content/world";
 import { featuresOff } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
@@ -34,14 +28,13 @@ const shot = (key: ShotKey, alt?: string) =>
  * the same shot keys as saroh.in in the same slots. A Limited page says
  * what works today in place of the hero note; a Coming soon page marks
  * every step and point "Not available yet". There is no written Global day,
- * so no day button or moment. No plan is on sale: the plan line is the
+ * so no day button. No plan is on sale: the plan line is the
  * free plan's, with "Tell me when".
  */
 export async function KeepPage({ slug }: { slug: KeepSlug }) {
     const feature = features[slug];
     const words = KEEP_WORDS[slug];
     const catalog = await readCatalog();
-    const shown = new Set<string>(featureList.map((f) => f.slug));
     const live = new Set(HELP.map((a) => a.slug));
     const ask =
         words.ask && !featuresOff().includes("ask-ai")
@@ -89,24 +82,12 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
             scene={words.scene}
             hero={shot(feature.hero.shot, feature.hero.alt)}
             day={null}
-            moment={null}
             help={words.help
                 .filter((h) => live.has(h.slug))
                 .map((h) => ({ href: `/help/${h.slug}`, label: h.label }))}
-            around={feature.worksWith
-                .filter((s: FeatureSlug) => shown.has(s))
-                .map((s) => ({
-                    href: featureHref(s),
-                    name: features[s].name,
-                    line: features[s].cardLine,
-                }))}
             ask={ask}
             planLine={freePlanLine(catalog)}
             compareHref="/pricing"
-            usedBy={feature.usedBy.map((s) => ({
-                href: solutionHref(s),
-                name: solutions[s].longName,
-            }))}
             faq={words.faq}
             note={feature.state === "full" ? undefined : feature.worksToday}
             notYet={

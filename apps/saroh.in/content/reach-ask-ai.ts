@@ -23,7 +23,6 @@ const stock = (key: string) =>
     RYE_MONDAY.stock.find((s) => s.item === key)?.left ?? 0;
 const first = (name: string) => name.split(" ")[0];
 const at = RYE_MONDAY.askAt945;
-const top = RYE_MONDAY.topSeller;
 const cls = RYE_MONDAY.class;
 const meera = order("ORD-1041");
 const anjali = order("ORD-1044");
@@ -448,15 +447,8 @@ export function askAiWords({
         },
 
         moment: {
-            at: "21:00",
-            before: languages
-                ? `After closing, ${rye.owner} asks in Hinglish, `
-                : `After closing, ${rye.owner} asks what sold most this week.`,
-            q: languages ? "Is hafte sabse zyada kya bika?" : "",
-            after: ` The ${item(top.item).split(" ").slice(-2).join(" ").toLowerCase()}: ${top.sold} sold. It read Orders and Products.`,
             link: `See 9 pm at ${rye.name}`,
         },
-        works: "Works with",
 
         faq: [
             {
@@ -481,7 +473,7 @@ export function askAiWords({
             },
             {
                 q: "Can my staff use it?",
-                a: "Owners and admins can to start. Give it to anyone else in Roles. They only get answers from what their role can see.",
+                a: "Owners and admins can to start. Give it to anyone else in Roles, or turn it off for the business. Each person only gets answers from what their role can see, so someone without access to money gets no takings.",
             },
             {
                 q: "Is it the same as using Saroh from Claude or ChatGPT?",
@@ -507,9 +499,7 @@ export function askAiWords({
         ] as const,
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
-            everything: "Everything Ask AI does",
-            usedBy: "Used by",
+            phone: "Help and setup",
             of: "of",
         },
     };

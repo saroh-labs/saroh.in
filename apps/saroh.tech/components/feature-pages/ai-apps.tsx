@@ -6,7 +6,7 @@ import { aiAppsWords } from "@/content/reach-ai-apps";
 import { WORLD } from "@/content/world";
 import { pageSite } from "@/lib/page-site";
 
-import { featureName, inTheAppData, REACH_CRUMB } from "./data";
+import { inTheAppData, REACH_CRUMB } from "./data";
 
 /** /features/ai-apps: saroh.in's Connect page with Global's words and world. */
 export function AiAppsPage() {
@@ -17,7 +17,6 @@ export function AiAppsPage() {
             words={aiAppsWords()}
             world={WORLD}
             crumb={REACH_CRUMB}
-            featureName={featureName}
             inTheApp={inTheAppData("ai-apps")}
             apps={apps ? { words: apps, list: AI_APP_CARDS } : null}
             // No Developers page on Global yet: the page links none.

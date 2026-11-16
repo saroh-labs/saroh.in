@@ -21,8 +21,6 @@ import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 
 import type { World } from "../content/world";
-import { MomentCard } from "../kit/moment-card";
-import { PlanLine } from "../kit/plan-line";
 import {
     Asked,
     AskPanel,
@@ -37,9 +35,9 @@ import { TimeChip } from "./reach/app-card";
 import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { InTheApp } from "./reach/in-the-app";
-import { shownChips } from "./reach/links";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Questions } from "./reach/questions";
+import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
 const SCENE = "pt-12 min-[760px]:pt-[120px]";
@@ -53,8 +51,6 @@ export interface AskAiPageProps {
     world: World;
     /** The level above: "Features", at /features. */
     crumb: { name: string; href: string };
-    /** A feature's name, for a "Works with" chip. */
-    featureName: (slug: string) => string;
     inTheApp: InTheAppData;
 }
 
@@ -70,7 +66,6 @@ export function AskAiView({
     words,
     world,
     crumb,
-    featureName,
     inTheApp,
 }: AskAiPageProps) {
     const slug = "ask-ai";
@@ -776,19 +771,12 @@ export function AskAiView({
             </section>
 
             {/* Plans: one line (owner, 16 Nov: no locked or limit panels). */}
-            <Container
-                as="section"
+            <Tail
                 id={w.plans.id}
-                aria-label={w.plans.compare}
-                className={cn(SCENE, "scroll-mt-24")}
-            >
-                <PlanLine
-                    compare={{ label: w.plans.compare, href: "/pricing" }}
-                    className="text-[18px]"
-                >
-                    {w.plans.line}
-                </PlanLine>
-            </Container>
+                line={w.plans.line}
+                compare={{ label: w.plans.compare, href: "/pricing" }}
+                className="scroll-mt-24"
+            />
 
             {/* AI apps, the next step. */}
             {aiApps ? (
@@ -847,51 +835,6 @@ export function AskAiView({
             ) : null}
 
             <InTheApp {...inTheApp} site={site} words={w.inTheApp} />
-
-            <Container
-                as="section"
-                aria-label={w.works}
-                className={cn(SCENE, "grid gap-5")}
-            >
-                {ninePm ? (
-                    <MomentCard
-                        at={w.moment.at}
-                        line={
-                            <>
-                                {w.moment.before}
-                                {w.moment.q ? (
-                                    <span className="rounded-md bg-foreground px-1.5 py-0.5 text-background">
-                                        {w.moment.q}
-                                    </span>
-                                ) : null}
-                                {w.moment.after}
-                            </>
-                        }
-                        link={{
-                            label: w.moment.link,
-                            href: dayLink(lead, ninePm),
-                        }}
-                    />
-                ) : null}
-                <nav
-                    aria-label={w.works}
-                    className="flex flex-wrap items-center gap-2.5"
-                >
-                    <span className="mr-1.5 text-[15px] text-muted-foreground">
-                        {w.works}
-                    </span>
-                    {shownChips(site, featureName, [
-                        ["dashboard", "Home"],
-                        "insights",
-                        "bookings",
-                        "ai-apps",
-                    ]).map((c) => (
-                        <Chip key={c.href} href={c.href}>
-                            {c.name}
-                        </Chip>
-                    ))}
-                </nav>
-            </Container>
 
             <Questions items={w.faq} ask={w.askUs} />
 

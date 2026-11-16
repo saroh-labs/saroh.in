@@ -5,7 +5,7 @@ import { WORLD } from "@/content/world";
 import { claimOn } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
 
-import { featureName, inTheAppData, REACH_CRUMB } from "./reach/data";
+import { inTheAppData, REACH_CRUMB } from "./reach/data";
 
 /** /features/ask-ai (FADesk, FAPhone2): the shared page with saroh.in's words and world. */
 export function AskAiPage() {
@@ -20,7 +20,6 @@ export function AskAiPage() {
             })}
             world={WORLD}
             crumb={REACH_CRUMB}
-            featureName={featureName}
             // Hinglish and Hindi wait for their claim.
             inTheApp={inTheAppData(
                 "ask-ai",

@@ -244,8 +244,6 @@ export interface AiAppsWords {
         title: string;
     };
     inTheApp: {
-        everything: string;
-        usedBy: string;
         of: string;
         /** On a phone, the steps and what follows fold behind this. */
         phone: string;

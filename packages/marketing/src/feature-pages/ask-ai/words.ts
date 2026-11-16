@@ -311,14 +311,10 @@ export interface AskAiWords {
         q: string;
         a: string;
     };
+    /** The closing band's day link ("See 9 pm at …"). */
     moment: {
-        at: string;
-        before: string;
-        q: string;
-        after: string;
         link: string;
     };
-    works: string;
     faq: {
         q: string;
         a: string;
@@ -341,8 +337,6 @@ export interface AskAiWords {
         readonly [string, string],
     ];
     inTheApp: {
-        everything: string;
-        usedBy: string;
         of: string;
         /** On a phone, the steps and what follows fold behind this. */
         phone: string;

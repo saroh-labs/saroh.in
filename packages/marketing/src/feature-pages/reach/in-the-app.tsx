@@ -1,4 +1,3 @@
-import { Chip } from "../../kit/chip";
 import { PhoneFold } from "../../kit/phone-fold";
 import { SwipeRow } from "../../kit/swipe-row";
 import { TextLink } from "../../links/text-link";
@@ -8,14 +7,12 @@ import { Section } from "../../sections/section";
 import type { Feature } from "../../content/types";
 import type { ShotView } from "../../media/shot";
 import type { PageSite } from "../site";
-import { Fold } from "./fold";
 
 /**
  * The feature's real screens, step by step (rule 15: the redesign keeps
  * every word the page had). The boards draw the story; this section keeps
- * the captured shots, each step's words and who it is shown at, the
- * "How to …" links to Help, every point in a closed fold, and the trades
- * that use it. Its words are the feature's own, from `content/features.ts`;
+ * the captured shots, each step's words and who it is shown at, and the
+ * "How to …" links to Help. Its words are the feature's own, from `content/features.ts`;
  * its shot keys are the same in both editions.
  */
 /** Every shot at one shape, cropped from the top, so the row reads as one. */
@@ -24,14 +21,13 @@ const CROP =
 
 /**
  * What the site resolves for a feature's "In the app" (its own `content/`
- * and `lib/`): the feature's words, its Help links and the trades using it.
+ * and `lib/`): the feature's words and its Help links.
  * `worksToday` is what a Limited feature can do today (an edition's
  * `StatedFeature`), said under the lead.
  */
 export interface InTheAppData {
     feature: Feature & { worksToday?: string };
     help: readonly { href: string; label: string }[];
-    usedBy: readonly { name: string; href: string }[];
     /** Words a claim switch has off this build: a sentence that matches is left out. */
     hide?: RegExp;
 }
@@ -51,21 +47,18 @@ function Screen({ shot }: { shot: ShotView | undefined }) {
 export function InTheApp({
     feature: all,
     help,
-    usedBy,
     site,
     words,
     hide,
 }: InTheAppData & {
     site: PageSite;
     words: {
-        everything: string;
-        usedBy: string;
         of: string;
         /** The phone's fold over the steps. */
         phone: string;
     };
 }) {
-    // A sentence whose claim is off goes; a point named for it goes whole.
+    // A sentence whose claim is off goes.
     const strip = (text: string) =>
         hide
             ? (text.match(/[^.!?]+[.!?]+/g) ?? [text])
@@ -77,9 +70,6 @@ export function InTheApp({
         ...all,
         sub: strip(all.sub),
         steps: all.steps.map((st) => ({ ...st, body: strip(st.body) })),
-        points: all.points
-            .filter((pt) => !hide?.test(pt.title))
-            .map((pt) => ({ ...pt, body: strip(pt.body) })),
     };
     return (
         <Section
@@ -138,60 +128,33 @@ export function InTheApp({
                     </figure>
                 ))}
             </SwipeRow>
-            <PhoneFold summary={words.phone} className="mt-4 min-[760px]:mt-0">
-                {all.worksToday ? (
-                    <p className="m-0 mt-8 max-w-[62ch] text-[16px] leading-normal text-mk-copy">
-                        {all.worksToday}
-                    </p>
-                ) : null}
-                {help.length ? (
-                    <div className="mt-8 flex flex-wrap gap-x-8 gap-y-1">
-                        {help.map((link) => (
-                            <TextLink
-                                key={link.href}
-                                href={link.href}
-                                tone="ink"
-                                arrow
-                                className="text-[15px]"
-                            >
-                                {link.label}
-                            </TextLink>
-                        ))}
-                    </div>
-                ) : null}
-                <Fold
-                    label={words.everything}
-                    meta={`${feature.points.length}`}
-                    className="mt-6 max-w-[62ch]"
+            {all.worksToday || help.length ? (
+                <PhoneFold
+                    summary={words.phone}
+                    className="mt-4 min-[760px]:mt-0"
                 >
-                    <ul className="list-none !pl-0">
-                        {feature.points.map((p) => (
-                            <li key={p.title}>
-                                <b className="font-semibold text-foreground">
-                                    {p.title}.
-                                </b>{" "}
-                                {p.body}
-                                {site.open && p.openNote
-                                    ? ` ${p.openNote}`
-                                    : ""}
-                            </li>
-                        ))}
-                    </ul>
-                </Fold>
-                <nav
-                    aria-label={words.usedBy}
-                    className="mt-6 flex flex-wrap items-center gap-2.5"
-                >
-                    <span className="mr-1.5 text-[15px] text-muted-foreground">
-                        {words.usedBy}
-                    </span>
-                    {usedBy.map((u) => (
-                        <Chip key={u.href} href={u.href}>
-                            {u.name}
-                        </Chip>
-                    ))}
-                </nav>
-            </PhoneFold>
+                    {all.worksToday ? (
+                        <p className="m-0 mt-8 max-w-[62ch] text-[16px] leading-normal text-mk-copy">
+                            {all.worksToday}
+                        </p>
+                    ) : null}
+                    {help.length ? (
+                        <div className="mt-8 flex flex-wrap gap-x-8 gap-y-1">
+                            {help.map((link) => (
+                                <TextLink
+                                    key={link.href}
+                                    href={link.href}
+                                    tone="ink"
+                                    arrow
+                                    className="text-[15px]"
+                                >
+                                    {link.label}
+                                </TextLink>
+                            ))}
+                        </div>
+                    ) : null}
+                </PhoneFold>
+            ) : null}
         </Section>
     );
 }

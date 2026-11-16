@@ -24,7 +24,6 @@ const item = (key: string) =>
 const stock = (key: string) =>
     THISTLEWICK_TUESDAY.stock.find((s) => s.item === key)?.left ?? 0;
 const first = (name: string) => name.split(" ")[0];
-const top = THISTLEWICK_TUESDAY.topSeller;
 const cls = THISTLEWICK_TUESDAY.class;
 const left = cls.places - cls.booked;
 const maya = order("ORD-041");
@@ -396,13 +395,8 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
         },
 
         moment: {
-            at: "21:00",
-            before: `After closing, ${bakery.owner} asks what sold most this week.`,
-            q: "",
-            after: ` The cinnamon buns: ${top.sold} sold. It read Orders and Products.`,
             link: `See 9 pm at ${bakery.name}`,
         },
-        works: "Works with",
 
         faq: [
             {
@@ -444,11 +438,9 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             ["faq", "Questions"],
         ],
         inTheApp: {
-            everything: "Everything Ask AI does",
-            usedBy: "Used by",
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
+            phone: "Help and setup",
         },
     };
 }

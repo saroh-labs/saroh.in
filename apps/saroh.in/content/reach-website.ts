@@ -39,7 +39,6 @@ const plum = item("plum-cake");
 const hamper = item("hamper");
 const cls = RYE_MONDAY.class;
 const left = cls.places - cls.booked;
-const kavya = rye.orders?.find((o) => o.id === "ORD-1048");
 const owner = rye.owner;
 const slug = rye.site.split(".")[0];
 const host = rye.site.slice(slug.length);
@@ -408,17 +407,10 @@ export function websiteWords({
         },
 
         tail: {
-            moment: kavya
-                ? `${kavya.customer} orders a birthday cake for Saturday on ${owner}'s own website, and it's in Orders before ${owner} looks up.`
-                : "",
-            momentLead: "Seen in a day:",
-            momentAt: "10:00",
-            momentLink: `See 10 am at ${rye.name}`,
             plan: open
                 ? "The site, the shop and the booking page come with every plan, Free included. Your own domain comes with a paid plan."
                 : "Free to start.",
             compare: "Compare plans",
-            works: "Works with",
         },
 
         faq: [
@@ -448,6 +440,22 @@ export function websiteWords({
                 q: "Do my customers need a password?",
                 a: "No. They sign in with a code. Their account is with your business on your site, not with Saroh.",
             },
+            {
+                q: "How does my site look when someone shares a link?",
+                a: "You set the title, description and share image under Search and sharing. Saroh tells you when the picture is too small for Facebook and LinkedIn, or too heavy for WhatsApp.",
+            },
+            {
+                q: "Can Google find my site?",
+                a: "Yes. Each site has its own sitemap, and you can add your Google Search Console or Bing Webmaster Tools code in Settings.",
+            },
+            {
+                q: "Where do enquiries from my site go?",
+                a: "A form on your site adds the person to your contacts as a lead and tells the owners and admins.",
+            },
+            {
+                q: "Can I have a blog?",
+                a: "Yes. Write posts and list them on a page of your site.",
+            },
         ],
         ask_us: {
             lead: "Something else?",
@@ -464,9 +472,7 @@ export function websiteWords({
         },
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "Help, every point and who uses it",
-            everything: "Everything the website builder does",
-            usedBy: "Used by",
+            phone: "Help and setup",
             of: "of",
         },
     };

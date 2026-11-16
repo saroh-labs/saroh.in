@@ -14,7 +14,6 @@ import { cn } from "../cn";
 import { dayLink } from "../content/world";
 import { ClosingCTA } from "../kit/closing-cta";
 import { PhoneClip, PhoneFold } from "../kit/phone-fold";
-import { PlanLine } from "../kit/plan-line";
 import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
@@ -35,6 +34,7 @@ import { InTheApp } from "./reach/in-the-app";
 import { HERO_CTA } from "./reach/page-top";
 import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
+import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
 const SCENE = "pt-12 min-[760px]:pt-[120px]";
@@ -47,8 +47,6 @@ export interface AiAppsPageProps {
     world: World;
     /** The level above: "Features", at /features. */
     crumb: { name: string; href: string };
-    /** A feature's name, for a "Works with" chip. */
-    featureName: (slug: string) => string;
     inTheApp: InTheAppData;
     /** "Apps you can use": the words and the site's AI app cards. */
     apps?: {
@@ -764,18 +762,10 @@ export function AiAppsView({
             <InTheApp {...inTheApp} site={site} words={w.inTheApp} />
             {apps ? <AppList words={apps.words} apps={apps.list} /> : null}
 
-            <Container
-                as="section"
-                aria-label={w.plan.compare}
-                className={SCENE}
-            >
-                <PlanLine
-                    compare={{ label: w.plan.compare, href: "/pricing" }}
-                    className="text-[18px]"
-                >
-                    {w.plan.line}
-                </PlanLine>
-            </Container>
+            <Tail
+                line={w.plan.line}
+                compare={{ label: w.plan.compare, href: "/pricing" }}
+            />
 
             <Questions items={w.faq} ask={w.askUs} />
 

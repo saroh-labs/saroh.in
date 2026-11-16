@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
-import { dayLink } from "../content/world";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
 import { PhoneClip, PhoneFold } from "../kit/phone-fold";
@@ -30,7 +29,6 @@ import {
 import { Fold } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { InTheApp } from "./reach/in-the-app";
-import { shownChips } from "./reach/links";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Photo, photoFor } from "./reach/photo";
 import { Questions } from "./reach/questions";
@@ -50,8 +48,6 @@ export interface WebsitePageProps {
     world: World;
     /** The level above: "Features", at /features. */
     crumb: { name: string; href: string };
-    /** A feature's name, for a "Works with" chip. */
-    featureName: (slug: string) => string;
     inTheApp: InTheAppData;
     /** The merchant fonts' class (`--font-site-*`), for the site drawings. */
     fonts: string;
@@ -73,7 +69,6 @@ export function WebsiteView({
     words,
     world,
     crumb,
-    featureName,
     inTheApp,
     fonts,
     templates,
@@ -86,7 +81,6 @@ export function WebsiteView({
     const look = lead.look;
     const tpl = templates;
     const aiApps = site.featureHref("ai-apps");
-    const tenAm = lead.day?.find((h) => h.at === "10:00");
     const s = w.signature;
 
     return (
@@ -1035,43 +1029,10 @@ export function WebsiteView({
 
             <InTheApp {...inTheApp} site={site} words={w.inTheApp} />
 
-            <Container as="section" aria-label={w.tail.works} className={SCENE}>
-                <Tail
-                    moment={
-                        tenAm && w.tail.moment
-                            ? {
-                                  at: w.tail.momentAt,
-                                  line: (
-                                      <>
-                                          <b className="font-semibold text-foreground">
-                                              {w.tail.momentLead}
-                                          </b>{" "}
-                                          {w.tail.moment}
-                                      </>
-                                  ),
-                                  link: {
-                                      label: w.tail.momentLink,
-                                      href: dayLink(lead, tenAm),
-                                  },
-                              }
-                            : undefined
-                    }
-                    plan={{
-                        line: w.tail.plan,
-                        compare: { label: w.tail.compare, href: "/pricing" },
-                    }}
-                    works={{
-                        label: w.tail.works,
-                        items: shownChips(site, featureName, [
-                            "products",
-                            "bookings",
-                            ["billing", "Payments"],
-                            ["social", "Share"],
-                            "insights",
-                        ]),
-                    }}
-                />
-            </Container>
+            <Tail
+                line={w.tail.plan}
+                compare={{ label: w.tail.compare, href: "/pricing" }}
+            />
 
             <Questions items={w.faq} ask={w.ask_us} />
 

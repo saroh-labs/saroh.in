@@ -1,5 +1,4 @@
-import { ArrowRight, ChevronDown } from "lucide-react";
-import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ButtonLink } from "../buttons/button";
@@ -7,8 +6,6 @@ import { cn } from "../cn";
 import { Chip, SourceChips } from "../kit/chip";
 import { ClosingCTA } from "../kit/closing-cta";
 import { CroppedCard } from "../kit/cropped-card";
-import { MomentCard } from "../kit/moment-card";
-import { PlanLine } from "../kit/plan-line";
 import { StickyBar } from "../kit/sticky-bar";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
@@ -18,26 +15,24 @@ import { ShotImage } from "../media/shot-image";
 import { Breadcrumbs } from "../nav/breadcrumbs";
 import { ring } from "../ring";
 import { Mark } from "../sections/mark";
+import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
 /** Words every Keep page shares (each edition's `content/feature-keep.ts`). */
 export interface KeepTemplateWords {
     crumb: string;
-    /** "See 9 am at Rye & Co.": the day button and the moment's link. */
+    /** "See 9 am at Rye & Co.": the hero's day button. */
     secondary: (hour: string, business: string) => string;
     heroNote: string;
     chapters: string;
     chapterNames: {
         how: string;
         points: string;
-        around: string;
         ask: string;
         faq: string;
     };
     pointsTitle: string;
     morePoints: (n: number) => string;
-    aroundTitle: string;
-    usedBy: string;
     compare: string;
     faqTitle: string;
     faqAsk: { lead: string; label: string; href: string };
@@ -72,7 +67,6 @@ export interface KeepPageProps {
         headline: string;
         sub: string;
         howTitle: string;
-        worksLead: string;
         cardLine: string;
         closer: string;
         steps: readonly {
@@ -89,20 +83,16 @@ export interface KeepPageProps {
     /** The time-stamped scene above the hero shot. */
     scene?: { at: string; line: string };
     hero: ShotView;
-    /** The day button and the one moment, where the day's page is live. */
+    /** The hero's day button, where the day's page is live. */
     day: { href: string; label: string } | null;
-    moment: { at: string; line: string } | null;
     /** The "How to …" links to Help. */
     help: readonly { href: string; label: string }[];
-    /** The records it moves, each a shown feature page. */
-    around: readonly { href: string; name: string; line: string }[];
     ask: KeepAsk | null;
     /** The plan sentence, from the site's catalogue or plan rule. */
     planLine: ReactNode;
     compareHref: string;
     /** "Tell me when" where no plan is on sale; else the words' "Compare plans". */
     compareLabel?: string;
-    usedBy: readonly { href: string; name: string }[];
     faq?: readonly { q: string; a: string }[];
     /** In place of the hero note: what works today, on a Limited page. */
     note?: string;
@@ -134,10 +124,8 @@ function marked(headline: string, word: string): ReactNode {
 /**
  * A record feature's page (DEC-221 "Keep"; boards FODesk and FOPhone2): the
  * promise and a moment, the real screen cropped to what matters; how it
- * works, step by step with its Help links; what it does; what happens
- * around it (the features it moves); the extender bands it has (Ask); one
- * moment from the day; plans in a line; who uses it; questions; and the
- * close. Every word and fact comes in as props: each edition's site works
+ * works, step by step with its Help links; what it does; the extender
+ * bands it has (Ask); plans in a line; questions; and the close. Every word and fact comes in as props: each edition's site works
  * out its switches, shots, links and world, and this draws them.
  */
 export function KeepPage({
@@ -149,14 +137,11 @@ export function KeepPage({
     scene,
     hero,
     day,
-    moment,
     help,
-    around,
     ask,
     planLine,
     compareHref,
     compareLabel,
-    usedBy,
     faq,
     note,
     notYet,
@@ -167,9 +152,6 @@ export function KeepPage({
     const chapters = [
         { id: "how", name: KEEP.chapterNames.how },
         { id: "points", name: KEEP.chapterNames.points },
-        ...(around.length
-            ? [{ id: "around", name: KEEP.chapterNames.around }]
-            : []),
         ...(ask ? [{ id: "ask", name: KEEP.chapterNames.ask }] : []),
         ...(faq?.length ? [{ id: "faq", name: KEEP.chapterNames.faq }] : []),
     ];
@@ -368,62 +350,6 @@ export function KeepPage({
                 </div>
             </Container>
 
-            {/* SLOT 4 · AROUND IT: the records it moves, each its own page. */}
-            {around.length ? (
-                <Container
-                    as="section"
-                    id="around"
-                    aria-labelledby={`${slug}-around`}
-                    className={cn("grid gap-10 pt-0", PAD, scroll)}
-                >
-                    <div className="grid gap-4">
-                        <h2 id={`${slug}-around`} className={H2}>
-                            {KEEP.aroundTitle}
-                        </h2>
-                        <p className="m-0 max-w-[60ch] text-mk-kit-lead text-mk-copy">
-                            {feature.worksLead}
-                        </p>
-                    </div>
-                    <div className="grid gap-6 min-[960px]:grid-cols-[260px_1fr] min-[960px]:items-center min-[960px]:gap-16">
-                        <div className="grid gap-1 rounded-mk-card bg-foreground px-6 py-5 text-background">
-                            <b className="font-display text-[24px] font-bold">
-                                {feature.name}
-                            </b>
-                            <span className="text-[14px] text-mk-on-ink">
-                                {feature.cardLine}
-                            </span>
-                        </div>
-                        <ul className="m-0 list-none border-t border-border p-0">
-                            {around.map((s) => (
-                                <li
-                                    key={s.href}
-                                    className="border-b border-border"
-                                >
-                                    <Link
-                                        href={s.href}
-                                        className={cn(
-                                            "grid min-h-16 grid-cols-[1fr_auto] items-center gap-x-6 gap-y-1 py-5 no-underline hover:text-foreground min-[760px]:grid-cols-[240px_1fr_auto] [&:hover_h3]:underline",
-                                            ring(),
-                                        )}
-                                    >
-                                        <h3 className="m-0 font-display text-mk-kit-h3 font-bold underline-offset-4">
-                                            {s.name}
-                                        </h3>
-                                        <span className="col-start-1 text-[16px] text-mk-copy min-[760px]:col-start-2 min-[760px]:row-start-1">
-                                            {s.line}
-                                        </span>
-                                        <ArrowRight
-                                            aria-hidden
-                                            className="col-start-2 row-span-2 row-start-1 size-5 min-[760px]:col-start-3 min-[760px]:row-span-1"
-                                        />
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </Container>
-            ) : null}
-
             {/* SLOT 5 · EXTENDER: Ask, on Ink. */}
             {ask ? (
                 <Container
@@ -489,32 +415,15 @@ export function KeepPage({
                 </Container>
             ) : null}
 
-            {/* THE ENDING: one moment, plans in a line, who uses it. */}
-            <Container className="grid gap-8 pb-12 min-[760px]:pb-[96px]">
-                {moment && day ? (
-                    <MomentCard at={moment.at} line={moment.line} link={day} />
-                ) : null}
-                <PlanLine
-                    compare={{
-                        label: compareLabel ?? KEEP.compare,
-                        href: compareHref,
-                    }}
-                >
-                    {planLine}
-                </PlanLine>
-                {usedBy.length ? (
-                    <div className="flex flex-wrap items-center gap-3">
-                        <span className="text-[14px] text-muted-foreground">
-                            {KEEP.usedBy}
-                        </span>
-                        {usedBy.map((s) => (
-                            <Chip key={s.href} variant="filter" href={s.href}>
-                                {s.name}
-                            </Chip>
-                        ))}
-                    </div>
-                ) : null}
-            </Container>
+            {/* THE ENDING: plans in a line (the shared feature-page ending). */}
+            <Tail
+                line={planLine}
+                compare={{
+                    label: compareLabel ?? KEEP.compare,
+                    href: compareHref,
+                }}
+                className="pb-12 pt-0 min-[760px]:pb-[96px] min-[760px]:pt-0"
+            />
 
             {/* QUESTIONS: every answer in the HTML; three, then the rest folded on a phone. */}
             {faq?.length ? (
