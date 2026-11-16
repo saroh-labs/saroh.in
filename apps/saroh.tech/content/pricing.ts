@@ -50,9 +50,12 @@ export const PRICING = {
     freeAlways: ["One page per customer", "Numbered invoices in your currency"],
     paidLead: "We'll say what it includes when it's on sale.",
     footnote: "Free has limits on how much you can use.",
-    /** saroh.in's "Usage beyond your plan", for the one plan you can use. */
-    usageTitle: "What happens at Free's limits",
-    usageLead: "What Free includes, and what happens when you reach it.",
+    /** Each plan's usage, as saroh.in's "Usage beyond your plan" table. */
+    usageTitle: "What each plan includes",
+    usageLead:
+        "How much each plan includes, and what happens when you reach it.",
+    /** What a screen reader hears in a table cell with no catalogue. */
+    priceNote: "Prices aren't available right now",
     usageNotes: [
         "Saroh warns you as you near a limit, and it never deletes what you already have.",
         "A limit counted by the month starts again on the 1st, in your business's time zone.",

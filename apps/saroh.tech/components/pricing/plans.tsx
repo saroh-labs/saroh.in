@@ -4,6 +4,7 @@ import { ButtonLink } from "@saroh/marketing/button";
 import { Pill } from "@saroh/marketing/pill";
 import { PricingCards } from "@saroh/marketing/pricing-cards";
 import type { PricingPageModel } from "@saroh/marketing/pricing-model";
+import { PricingPlans } from "@saroh/marketing/pricing-plans";
 import { usePricingSwitches } from "@saroh/marketing/use-pricing-switches";
 
 import { TellMeWhen } from "@/components/pricing/tell-me-when";
@@ -49,6 +50,24 @@ export function Plans({
                     </ButtonLink>
                 )
             }
+        />
+    );
+}
+
+/**
+ * The plan cards, then every plan's details as saroh.in shows them: the
+ * comparison table and each plan's usage (owner, 16 Nov 2026). No add-ons.
+ */
+export function PricingTables({ model }: { model: PricingPageModel }) {
+    const switches = usePricingSwitches(model);
+    return (
+        <PricingPlans
+            model={model}
+            switches={switches}
+            cards={<Plans model={model} />}
+            usageTitle={PRICING.usageTitle}
+            usageLead={PRICING.usageLead}
+            placeholderNote={PRICING.priceNote}
         />
     );
 }
