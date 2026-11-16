@@ -281,7 +281,7 @@ const LISTED: Shot[] = [
     shop(
         "t-invoice",
         `/billing/invoices/${SHOP}_invoice_order_0`,
-        "An invoice made from an order at Thistlewick Bakery (demo bakery), in dollars, with its sales tax line",
+        "An invoice made from an order at Thistlewick Bakery (demo bakery), in dollars, paid in full by card",
         invoicePaper,
     ),
     shop(

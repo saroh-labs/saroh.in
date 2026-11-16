@@ -216,7 +216,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Make its invoice",
-                body: "Each order makes a numbered invoice with your tax line, ready to send or print.",
+                body: "Each order makes a numbered invoice, ready to send or print. Add your tax line on an invoice you write.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "k-invoice",
             },
@@ -478,7 +478,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Add your tax line",
-                body: "Set your sales tax once and every invoice made from an order carries it.",
+                body: "Set your sales tax once and every invoice you write carries it.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "t-invoice",
             },

@@ -155,6 +155,7 @@
         "NEXT_PUBLIC_CLAIM_AI_APPS_PLANS",
         "NEXT_PUBLIC_CLAIM_SITE_SHOP",
         "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS",
+        "NEXT_PUBLIC_CLAIM_CARD_ONLINE",
         "NEXT_PUBLIC_API_AREA",
         // Share as a post and Create post (DEC-217): the app's switch, read at
         // build, and the api's, which answers 404 while it is off.

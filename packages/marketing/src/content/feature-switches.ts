@@ -72,6 +72,11 @@ export const CLAIM_SWITCHES = {
     "site-shop": "NEXT_PUBLIC_CLAIM_SITE_SHOP",
     /** Share's "Worth posting today" ideas and the visits a post's link brought. */
     "share-insights": "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS",
+    /**
+     * saroh.tech: customers pay by card online into the business's own
+     * Stripe, which the API's `STRIPE_PAYMENTS` rollout flag opens (#7).
+     */
+    "card-online": "NEXT_PUBLIC_CLAIM_CARD_ONLINE",
 } as const;
 export type ClaimSwitch = keyof typeof CLAIM_SWITCHES;
 

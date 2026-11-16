@@ -91,7 +91,7 @@ export const CAPTURED: Record<
     },
     "t-invoice": {
         src: "/shots/v2/t-invoice.webp",
-        alt: "An invoice made from an order at Thistlewick Bakery (demo bakery), in dollars, with its sales tax line",
+        alt: "An invoice made from an order at Thistlewick Bakery (demo bakery), in dollars, paid in full by card",
         width: 1424,
         height: 888,
     },
