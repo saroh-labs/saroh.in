@@ -152,7 +152,7 @@ export function marketingTheme(shared: Record<string, unknown>) {
             // The closing band's typing address (#46): 128px on desk, down
             // to 26px so a 17-letter name fits 320px.
             "mk-kit-address": [
-                "clamp(26px, 8.5vw, 128px)",
+                "clamp(26px, 8.5vw, 80px)",
                 { lineHeight: "1", letterSpacing: "-0.055em" },
             ],
             // A scene's lead: 20px on desk, 17px on a phone.

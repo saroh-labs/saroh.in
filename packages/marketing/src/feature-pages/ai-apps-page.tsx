@@ -630,7 +630,7 @@ export function AiAppsView({
                         </ButtonLink>
                     ) : null
                 }
-                className="pt-[96px] min-[760px]:pt-[150px]"
+                className="mt-[72px] min-[760px]:mt-[120px]"
             />
             <StickyBar watch={HERO_CTA}>
                 {site.start(`feature-${slug}-sticky`, "w-full")}

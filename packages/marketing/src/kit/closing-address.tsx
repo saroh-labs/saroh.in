@@ -101,7 +101,7 @@ export function ClosingAddress({
                     {current.slug}.saroh.app, one of the businesses on Saroh
                 </span>
                 <span aria-hidden data-address="">
-                    <span className="block whitespace-nowrap">
+                    <span className="block whitespace-nowrap min-[1280px]:inline">
                         <span className="text-background">
                             {current.slug.slice(0, len)}
                         </span>
@@ -109,7 +109,7 @@ export function ClosingAddress({
                             <span className="ml-[0.04em] inline-block h-[0.8em] w-[0.05em] animate-[mk-caret_1s_steps(1)_infinite] bg-brand-500 align-[-0.05em]" />
                         ) : null}
                     </span>
-                    <span className="block text-mk-on-ink-line">
+                    <span className="block text-mk-on-ink-line min-[1280px]:inline">
                         .saroh.app
                     </span>
                 </span>
