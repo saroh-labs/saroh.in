@@ -21,9 +21,8 @@ const menuLinks = [
     ...MENUS.solutions,
     ...MENUS.resources,
     ...MENUS.tools,
-    ...MENUS.templates,
     MENUS.allTools,
-    MENUS.allTemplates,
+    ...(MENUS.websiteTemplates ? [MENUS.websiteTemplates] : []),
 ];
 const allLinks = [
     ...menuLinks,
@@ -62,7 +61,8 @@ describe("the nav", () => {
             "Also in Saroh",
             "Solutions",
             "Tools",
-            "Document templates",
+            // The website templates column, while templates are on (DEC-135).
+            ...(MENUS.websiteTemplates ? ["Templates"] : []),
             "Resources",
             "Saroh",
         ]);
@@ -109,7 +109,9 @@ describe("the nav", () => {
     it("marks the section a page is in", () => {
         expect(sectionOf("/features/billing")).toBe("features");
         expect(sectionOf("/solutions/gyms")).toBe("solutions");
-        expect(sectionOf("/templates/invoice/uk")).toBe("templates");
+        // "Templates" is the website templates; document templates are Resources (owner, 16 Nov 2026).
+        expect(sectionOf("/website-templates/gym")).toBe("templates");
+        expect(sectionOf("/templates/invoice/uk")).toBe("resources");
         expect(sectionOf("/tools/vat-calculator")).toBe("tools");
         expect(sectionOf("/help/some-task")).toBe("resources");
         expect(sectionOf("/pricing")).toBe("pricing");

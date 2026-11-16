@@ -58,7 +58,7 @@ function numberWord(n: number, capital = false): string {
 }
 
 export const websiteTemplatesPage = {
-    name: "Website templates",
+    name: "Templates",
     title: "Pick a site that looks like your business.",
     description:
         "Website templates for a bakery, a salon, a gym, a clinic, a shop, a dietitian, a writer, a studio and a developer, each with its own type and colours, built on your products, bookings and posts in Saroh.",
@@ -79,7 +79,7 @@ export const websiteTemplatesPage = {
 } as const;
 
 export const websiteTemplateDetail = {
-    crumb: "Website templates",
+    crumb: "Templates",
     saveNote: (name: string) =>
         `Start free, and pick ${name} when you set up your website.`,
     switcher: "Pages",

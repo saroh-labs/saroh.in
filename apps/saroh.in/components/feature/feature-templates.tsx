@@ -23,7 +23,7 @@ export function FeatureTemplates({ words }: { words: Words }) {
     return (
         <Section
             titleId="templates"
-            eyebrow="Website templates"
+            eyebrow="Templates"
             title={words.title}
             lead={<span className="block max-w-[72ch]">{words.lead}</span>}
             className="grid gap-9 pt-[120px]"

@@ -263,14 +263,14 @@ describe("SiteNav: Resources (plan U1)", () => {
             <Nav
                 resources={[
                     ...RESOURCES,
-                    { name: "Website templates", line: "", href: "/templates" },
+                    { name: "Templates", line: "", href: "/templates" },
                     { name: "Developers", line: "", href: "/developers" },
                 ]}
             />,
         );
         const nav = desktop();
         const templates = within(nav).getAllByRole("link", {
-            name: "Website templates",
+            name: "Templates",
         })[0];
         expect(templates.className).toContain("decoration-brand-500");
         expect(within(nav).queryByRole("link", { name: "Developers" })).toBe(

@@ -9,10 +9,11 @@ export function sectionOf(pathname: string): NavSection {
     if (within(pathname, "/solutions")) return "solutions";
     if (within(pathname, "/pricing")) return "pricing";
     if (within(pathname, "/tools")) return "tools";
-    if (within(pathname, "/templates")) return "templates";
+    if (within(pathname, "/website-templates")) return "templates";
     if (
         within(
             pathname,
+            "/templates",
             "/guides",
             "/help",
             "/changelog",

@@ -13,9 +13,9 @@ export interface NavMenus {
     solutions: NavItem[];
     resources: NavItem[];
     tools: NavItem[];
-    templates: NavItem[];
     allTools: MenuLink;
-    allTemplates: MenuLink;
+    /** The top-level Website templates link, while templates are on (DEC-135). */
+    websiteTemplates?: MenuLink;
 }
 
 /** saroh.in's nine and four, in its order, in this site's words. */
@@ -76,18 +76,14 @@ export const RESOURCES: NavItem[] = [
         line: "What's new in Saroh",
         href: "/changelog",
     },
-    // The website templates gallery, while templates are on (DEC-135): saroh.in
-    // lists its document templates in Resources the same way (owner, 16 Nov 2026).
-    ...(featuresOff().includes("templates")
-        ? []
-        : [
-              {
-                  group: LEARN,
-                  name: "Website templates",
-                  line: "Sites made for your kind of business",
-                  href: "/website-templates",
-              },
-          ]),
+    // Document templates sit in Resources on both sites; Website templates is
+    // the top-level entry (owner, 16 Nov 2026).
+    {
+        group: LEARN,
+        name: "Document templates",
+        line: "Invoices, quotes and receipts, free",
+        href: "/templates",
+    },
     // The API and webhooks, while their switch is on (owner, 16 Nov 2026, #13).
     ...(featuresOff().includes("developers")
         ? []
@@ -209,14 +205,20 @@ export const ALL_TEMPLATES: MenuLink = {
     href: "/templates",
 };
 
+/** The website templates gallery, while templates are on (DEC-135). */
+const WEBSITE_TEMPLATES: MenuLink | undefined = featuresOff().includes(
+    "templates",
+)
+    ? undefined
+    : { name: "Templates", href: "/website-templates" };
+
 export const MENUS: NavMenus = {
     features: FEATURES,
     solutions: SOLUTIONS,
     resources: RESOURCES,
     tools: TOOLS,
-    templates: TEMPLATES,
     allTools: ALL_TOOLS,
-    allTemplates: ALL_TEMPLATES,
+    ...(WEBSITE_TEMPLATES ? { websiteTemplates: WEBSITE_TEMPLATES } : {}),
 };
 
 /** The nav's own words (the redesign, DEC-221). */
@@ -226,8 +228,9 @@ export const NAV_WORDS = {
     allTrades: "See all trades",
     /** The nav entry for /features (owner, 17 Nov 2026: "Features"). */
     howItWorks: "Features",
-    // "Document templates": saroh.in's are website templates (owner, 16 Nov 2026, #1).
-    templates: "Document templates",
+    // "Templates" is the website templates, on top; Document templates are in
+    // Resources, on both sites (owner, 16 Nov 2026).
+    templates: "Templates",
     pricing: "Pricing",
     resources: "Resources",
     tools: "Tools",
@@ -287,13 +290,21 @@ export const FOOTER_COLUMNS: { title: string; links: MenuLink[] }[] = [
     },
     SOLUTIONS_COLUMN,
     { title: "Tools", links: [...TOOLS.slice(0, 5), ALL_TOOLS] },
-    {
-        title: NAV_WORDS.templates,
-        links: [
-            ...TEMPLATES.filter((t) => t.group === "Documents").slice(0, 4),
-            ALL_TEMPLATES,
-        ],
-    },
+    // As saroh.in's footer: the gallery's first four, then all of them.
+    ...(WEBSITE_TEMPLATES
+        ? [
+              {
+                  title: NAV_WORDS.templates,
+                  links: [
+                      { name: "Bakery", href: "/website-templates/bakery" },
+                      { name: "Salon", href: "/website-templates/salon" },
+                      { name: "Gym", href: "/website-templates/gym" },
+                      { name: "Clinic", href: "/website-templates/clinic" },
+                      { name: "All templates", href: "/website-templates" },
+                  ],
+              },
+          ]
+        : []),
     {
         title: "Resources",
         links: RESOURCES.filter((r) => r.group === LEARN),

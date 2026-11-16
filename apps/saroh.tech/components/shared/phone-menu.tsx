@@ -91,8 +91,7 @@ export function PhoneMenu({
                     resources={menus.resources}
                     tools={menus.tools}
                     allTools={menus.allTools}
-                    templates={menus.templates}
-                    allTemplates={menus.allTemplates}
+                    templatesPage={menus.websiteTemplates}
                     aboutLinks={[]}
                     pricing
                     featuresLabel={NAV_WORDS.howItWorks}

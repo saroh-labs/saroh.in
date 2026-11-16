@@ -24,8 +24,8 @@ export const FOOTER_WORDS = {
     more: "Also in Saroh",
     // The same column names on both sites (owner, 16 Nov 2026, #17).
     trades: "Solutions",
-    templates: "Website templates",
-    allTemplates: "All website templates",
+    templates: "Templates",
+    allTemplates: "All templates",
     resources: "Resources",
     tools: "Tools",
     saroh: "Saroh",

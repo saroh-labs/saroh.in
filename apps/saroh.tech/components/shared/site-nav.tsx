@@ -15,8 +15,9 @@ import { PhoneMenu } from "./phone-menu";
 
 /**
  * saroh.tech's nav, on the redesign's shared `MarketingNav` (DEC-221), as
- * saroh.in's: Solutions, How it works (every feature and "How Saroh works"
- * to /features), Templates (its gallery menu), Pricing, Resources and Tools
+ * saroh.in's: Solutions, Features (every feature and "All features" to
+ * /features), Website templates, Pricing, Resources (Document templates
+ * among them) and Tools
  * (their own menus, owner 17 Nov 2026), then Sign in and Start free.
  * No Developers: Global has no API page yet. Below 1240px, the start button
  * and `PhoneMenu`, whose sheet keeps Resources and Tools as levels.
@@ -54,15 +55,17 @@ export function SiteNav({
                 seeAll: HOW_IT_WORKS_ALL,
             },
         },
-        {
-            id: "templates",
-            label: NAV_WORDS.templates,
-            menu: {
-                items: menus.templates,
-                columns: 3,
-                seeAll: menus.allTemplates,
-            },
-        },
+        // Website templates on top while templates are on, as on saroh.in;
+        // Document templates are in Resources (owner, 16 Nov 2026).
+        ...(menus.websiteTemplates
+            ? [
+                  {
+                      id: "templates",
+                      label: menus.websiteTemplates.name,
+                      href: menus.websiteTemplates.href,
+                  },
+              ]
+            : []),
         { id: "pricing", label: NAV_WORDS.pricing, href: "/pricing" },
         // Resources and Tools keep their own desk menus (owner, 17 Nov 2026):
         // the free tools are how people find saroh.tech.
