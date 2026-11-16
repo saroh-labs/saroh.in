@@ -114,4 +114,11 @@ export function solutionFaq(own: SolutionFaqId): FaqId[] {
     return ["start-free", own, "tax", "pay", "team"];
 }
 
+/**
+ * The general questions on a page in `trades/`, after its own. No "pay":
+ * card payments online wait on a release switch (STRIPE_PAYMENTS) the code
+ * can't show is on.
+ */
+export const TRADE_FAQ: FaqId[] = ["tax", "team"];
+
 export const faqItems = (ids: FaqId[]): FaqItem[] => ids.map((id) => faqs[id]);

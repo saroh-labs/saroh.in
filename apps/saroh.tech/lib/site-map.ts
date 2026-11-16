@@ -35,6 +35,7 @@ import {
 } from "@/content/solutions";
 
 import { HUB_PATH, HUB_WORDS } from "@/content/solutions-hub";
+import { TRADE_PAGES, UPDATED as TRADES_UPDATED } from "@/content/trades";
 
 /**
  * Every page, as the site map and page-spec boards list them. Title,
@@ -210,8 +211,8 @@ export const PAGES: SitePage[] = [
         ...hub(
             HUB_PATH,
             "solutions",
-            "Software for your trade: shops, salons, gyms, clinics | Saroh",
-            "Software for shops, salons, gyms and clinics: pick your trade to see what Saroh does for a business like yours.",
+            "Software for your trade, from bakeries to plumbers | Saroh",
+            "Software for shops, salons, studios, clinics and trades: pick yours to see what Saroh does for a business like yours.",
             `${HUB_WORDS.h1Before} ${HUB_WORDS.h1Mark}`,
             HUB_WORDS.crumb,
         ),
@@ -227,6 +228,17 @@ export const PAGES: SitePage[] = [
         crumb: [{ name: "Solutions", path: HUB_PATH }, { name: s.name }],
         unreviewed: true,
         updated: SOLUTIONS_UPDATED,
+    })),
+    // The other trades (owner, 16 Nov 2026), held until the owner reads them.
+    ...TRADE_PAGES.map((t): SitePage => ({
+        path: `/solutions/${t.slug}`,
+        type: "solution",
+        title: `${t.seoTitle} | Saroh`,
+        description: t.seoDescription,
+        h1: t.headline,
+        crumb: [{ name: "Solutions", path: HUB_PATH }, { name: t.name }],
+        unreviewed: true,
+        updated: TRADES_UPDATED,
     })),
     {
         ...hub(

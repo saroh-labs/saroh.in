@@ -1,7 +1,14 @@
 import { ButtonLink } from "@saroh/marketing/button";
-import type { FeatureSlug, SolutionSlug } from "@saroh/marketing/content-types";
+import type {
+    FaqItem,
+    FeatureSlug,
+    Solution,
+    SolutionSlug,
+} from "@saroh/marketing/content-types";
 import { SOLUTION_SLUGS } from "@saroh/marketing/content-types";
 import { ScreenshotFrame } from "@saroh/marketing/screenshot-frame";
+import { HomePhone } from "@saroh/marketing/solutions/moments";
+import type { TradePageLayoutProps } from "@saroh/marketing/solutions/trade-page";
 import { TradePageLayout } from "@saroh/marketing/solutions/trade-page";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -9,16 +16,20 @@ import { notFound } from "next/navigation";
 import { Plans } from "@/components/pricing/plans";
 import { JsonLd } from "@/components/shared/json-ld";
 import { StartFree } from "@/components/solution/start-free";
-import { solutionFaq } from "@/content/faq";
+import { solutionFaq, TRADE_FAQ } from "@/content/faq";
 import { featureHref, featureList, features } from "@/content/features";
 import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
 import { shotView } from "@/content/shots";
 import { solutionHref, solutionList, solutions } from "@/content/solutions";
 import {
+    ALL_TRADES,
     BAR_LABELS,
     HUB_PATH,
     TRADE_WORDS as W,
 } from "@/content/solutions-hub";
+import { TRADES as TEMPLATE_TRADES } from "@/content/templates";
+import type { TradePage } from "@/content/trades";
+import { HOME_WORDS, tradePage } from "@/content/trades";
 import { claimsOff, featuresOff } from "@/lib/feature-switches";
 import {
     faqWithPlans,
@@ -33,7 +44,7 @@ import { pageAt } from "@/lib/site-map";
 export const dynamicParams = false;
 
 export function generateStaticParams() {
-    return SOLUTION_SLUGS.map((slug) => ({ slug }));
+    return ALL_TRADES.map((t) => ({ slug: t.slug }));
 }
 
 interface Props {
@@ -46,25 +57,166 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return page ? pageMetadata(page) : {};
 }
 
+type Catalog = Awaited<ReturnType<typeof readCatalog>>;
+
+/** What a page gives the layout of its own; the rest every trade page shares. */
+type OwnProps = Pick<
+    TradePageLayoutProps,
+    "name" | "h1" | "lead" | "picture" | "problems" | "starter"
+> & {
+    faq: FaqItem[];
+    pricingTitle: string;
+    questionsTitle: string;
+    related: TradePageLayoutProps["related"]["items"];
+    closer: string;
+};
+
+const isLead = (slug: string): slug is SolutionSlug =>
+    (SOLUTION_SLUGS as readonly string[]).includes(slug);
+
+/** A lead trade's page: every word of `solutions.ts`, with its screens. */
+function leadPage(s: Solution, catalog: Catalog): OwnProps {
+    const hero = s.hero && shotView(s.hero.shot, s.hero.alt);
+    return {
+        name: s.name,
+        h1: s.headline,
+        lead: s.sub,
+        picture: hero ? (
+            <figure className="m-0 grid w-full gap-3">
+                <ScreenshotFrame shot={hero} priority />
+                <figcaption className="text-[13px] text-mk-copy">
+                    {s.heroNote}
+                </figcaption>
+            </figure>
+        ) : null,
+        problems: {
+            line: s.changeTitle,
+            items: s.segments.map((seg) => {
+                const name = features[seg.feature].name;
+                const shot = shotView(seg.shot, seg.alt);
+                return {
+                    quote: seg.pain,
+                    area: seg.label ?? name,
+                    title: seg.title,
+                    body: seg.body,
+                    feature: seg.feature,
+                    link: `See ${name}`,
+                    picture: shot ? <ScreenshotFrame shot={shot} /> : undefined,
+                };
+            }),
+        },
+        faq: faqWithPlans(catalog, solutionFaq(s.faq)),
+        pricingTitle: s.pricing.title,
+        questionsTitle: W.questions(s.longName),
+        related: solutionList
+            .filter((o) => o.slug !== s.slug)
+            .map((o) => ({
+                slug: o.slug,
+                name: o.longName,
+                href: solutionHref(o.slug),
+            })),
+        closer: s.closer,
+    };
+}
+
+/**
+ * One of the other trades' pages (`content/trades/`): its own words and
+ * questions, and its Home drawn on an ordinary morning, as no Global screen
+ * of the trade is captured yet. Its problems are words alone.
+ */
+function otherPage(t: TradePage, catalog: Catalog): OwnProps {
+    const [start, ...general] = faqWithPlans(catalog, [
+        "start-free",
+        ...TRADE_FAQ,
+    ]);
+    // The invoice templates gallery is always built, as the nav's Templates
+    // menu links it; `templatesOn` is the website templates' switch.
+    const template = TEMPLATE_TRADES.find((x) => x.slug === t.templates);
+    const plural = t.name.toLowerCase();
+    return {
+        name: t.name,
+        h1: t.headline,
+        lead: t.sub,
+        picture: (
+            <figure className="m-0 grid w-full justify-items-center gap-3 min-[1000px]:justify-items-start">
+                <HomePhone
+                    m={{
+                        kind: "home",
+                        ...t.home,
+                        greeting: HOME_WORDS.greeting,
+                        needsTitle: HOME_WORDS.needsTitle,
+                        todayTitle: HOME_WORDS.todayTitle,
+                        todayDay: HOME_WORDS.todayDay,
+                        more: HOME_WORDS.more,
+                    }}
+                />
+                <figcaption className="text-[13px] text-mk-copy">
+                    {HOME_WORDS.note}
+                </figcaption>
+            </figure>
+        ),
+        problems: {
+            line: t.changeTitle,
+            items: t.problems.map((p) => {
+                const name = features[p.feature].name;
+                return {
+                    quote: p.pain,
+                    area: p.label ?? name,
+                    title: p.title,
+                    body: p.body,
+                    feature: p.feature,
+                    link: `See ${name}`,
+                };
+            }),
+        },
+        starter: {
+            ...W.starter[t.starter.kind],
+            rows: t.starter.rows,
+            template: template
+                ? {
+                      title: W.template(plural),
+                      description: W.templateLine(plural),
+                      links: [
+                          {
+                              href: `/templates/for/${template.slug}`,
+                              label: W.seeTemplates(plural),
+                          },
+                      ],
+                  }
+                : undefined,
+        },
+        faq: [start, ...t.faq, ...general],
+        pricingTitle: W.pricing(t.longName),
+        questionsTitle: W.questions(t.longName),
+        related: t.related.flatMap((slug) => {
+            const o = ALL_TRADES.find((x) => x.slug === slug);
+            return o ? [{ slug: o.slug, name: o.longName, href: o.href }] : [];
+        }),
+        closer: t.closer,
+    };
+}
+
 /**
  * A solution page in saroh.in's trade-page layout (DEC-221,
  * `TradePageLayout`), over saroh.tech's own words: each problem with its
- * answer and screen folded under it, Free's card, the questions and the
- * other trades. No Global trade has a written day yet, so none is told.
- * No live demo: saroh.in's demos are India's.
+ * answer (and its screen, where one is captured), Free's card, the
+ * questions and the other trades. No Global trade has a written day yet, so
+ * none is told. No live demo: saroh.in's demos are India's.
  */
 export default async function SolutionPage({ params }: Props) {
     const { slug } = await params;
     const page = pageAt(`/solutions/${slug}`);
-    if (!page) notFound();
-    const s = solutions[slug as SolutionSlug];
+    const other = tradePage(slug);
+    if (!page || (!isLead(slug) && !other)) notFound();
     const catalog = await readCatalog();
-    const faq = faqWithPlans(catalog, solutionFaq(s.faq));
     const shown = new Set<string>(featureList.map((f) => f.slug));
     const off = claimsOff();
+    const templatesOn = !featuresOff().includes("templates");
     const src = `solutions-${slug}`;
     const free = freePlanLine(catalog);
-    const hero = s.hero && shotView(s.hero.shot, s.hero.alt);
+    const own = other
+        ? otherPage(other, catalog)
+        : leadPage(solutions[slug as SolutionSlug], catalog);
 
     return (
         <div data-page-type={page.type}>
@@ -72,18 +224,18 @@ export default async function SolutionPage({ params }: Props) {
                 data={[
                     ...pageSchema(page),
                     faqSchema(
-                        faq.map(({ q, a }) => ({ question: q, answer: a })),
+                        own.faq.map(({ q, a }) => ({ question: q, answer: a })),
                     ),
                 ]}
             />
             <TradePageLayout
-                slug={s.slug}
-                name={s.name}
-                h1={s.headline}
-                lead={s.sub}
+                slug={slug}
+                name={own.name}
+                h1={own.h1}
+                lead={own.lead}
                 words={W}
                 hubHref={HUB_PATH}
-                tradeHref={(t) => solutionHref(t as SolutionSlug)}
+                tradeHref={(t) => `/solutions/${t}`}
                 otherDays={[]}
                 cta={(place) =>
                     place === "hero" ? (
@@ -100,16 +252,7 @@ export default async function SolutionPage({ params }: Props) {
                         />
                     )
                 }
-                picture={
-                    hero ? (
-                        <figure className="m-0 grid w-full gap-3">
-                            <ScreenshotFrame shot={hero} priority />
-                            <figcaption className="text-[13px] text-mk-copy">
-                                {s.heroNote}
-                            </figcaption>
-                        </figure>
-                    ) : null
-                }
+                picture={own.picture}
                 feature={(f) =>
                     shown.has(f)
                         ? {
@@ -119,29 +262,13 @@ export default async function SolutionPage({ params }: Props) {
                         : undefined
                 }
                 claimOn={(c) => !off.includes(c)}
-                templatesOn={!featuresOff().includes("templates")}
+                templatesOn={templatesOn}
                 // As saroh.in: the fallback only repeats "No card needed".
                 freeLine={free !== FREE_PLAN_LINE.fallback ? free : undefined}
-                problems={{
-                    line: s.changeTitle,
-                    items: s.segments.map((seg) => {
-                        const name = features[seg.feature].name;
-                        const shot = shotView(seg.shot, seg.alt);
-                        return {
-                            quote: seg.pain,
-                            area: seg.label ?? name,
-                            title: seg.title,
-                            body: seg.body,
-                            feature: seg.feature,
-                            link: `See ${name}`,
-                            picture: shot ? (
-                                <ScreenshotFrame shot={shot} />
-                            ) : undefined,
-                        };
-                    }),
-                }}
+                problems={own.problems}
+                starter={own.starter}
                 pricing={{
-                    title: s.pricing.title,
+                    title: own.pricingTitle,
                     children: (
                         // One card would stretch across the page.
                         <div className="max-w-[420px]">
@@ -156,23 +283,14 @@ export default async function SolutionPage({ params }: Props) {
                         </div>
                     ),
                 }}
-                faq={{ title: W.questions(s.longName), items: faq }}
-                related={{
-                    title: W.related,
-                    items: solutionList
-                        .filter((o) => o.slug !== s.slug)
-                        .map((o) => ({
-                            slug: o.slug,
-                            name: o.longName,
-                            href: solutionHref(o.slug),
-                        })),
-                }}
+                faq={{ title: own.questionsTitle, items: own.faq }}
+                related={{ title: W.related, items: own.related }}
                 allTrades={{
-                    label: W.allTrades(solutionList.length),
+                    label: W.allTrades(ALL_TRADES.length),
                     line: W.allTradesLine,
                 }}
                 closing={{
-                    title: s.closer,
+                    title: own.closer,
                     secondary: (
                         <ButtonLink
                             href="/features"

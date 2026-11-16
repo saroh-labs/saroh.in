@@ -81,3 +81,19 @@ lists only where Global differs (DEC-221).
   band's words. The crumbs now name `/solutions`. No Global trade has a
   written day yet, so no page tells one; a day written for one later drops
   in through `TradePageLayout`'s `day`. Same shot keys as before.
+- **16 Nov 2026, every trade (owner; unit/web-techtrades).** Solutions
+  lists 37 trades: the four lead pages as they were, and 33 more in
+  `content/trades/` (the Global template trades and the saroh.in trades that
+  make sense outside India; India-only trades left out). Each new page has
+  its own words, problems and questions, its Home drawn on an ordinary
+  morning (`HomePhone`, "An example morning, drawn for this page"; no
+  rupee bill icon), what to add first, and a link to its invoice templates
+  where the gallery has the trade. No Global screen of these trades is
+  captured, so their problems are words alone. The hub, the Solutions menu
+  and the footer list every trade in six groups (`HUB_GROUPS`); "See all
+  trades" still leads to `/solutions`. Every new page is noindex
+  (`unreviewed`) until the owner reads it, and has no hreflang pair: its
+  India page, where there is one, is published one by one under /for/.
+  Claims are only what Global's Free plan does today: no online ordering
+  from the site, no card payments online, no reminders, memberships or
+  bundles of classes, one person (`content.test.ts`).

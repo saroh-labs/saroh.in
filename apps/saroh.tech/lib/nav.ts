@@ -1,7 +1,7 @@
 import type { MenuLink, NavItem } from "@saroh/marketing/nav-types";
 
 import { featureHref, featureList } from "@/content/features";
-import { solutionHref, solutionList } from "@/content/solutions";
+import { ALL_TRADES, HUB_GROUPS, HUB_PATH } from "@/content/solutions-hub";
 import { COUNTRIES, DOCUMENTS, TRADES } from "@/content/templates";
 import { claimsOff } from "@/lib/feature-switches";
 
@@ -23,10 +23,26 @@ export const FEATURES: NavItem[] = featureList.map((f) => ({
     href: featureHref(f.slug),
 }));
 
-export const SOLUTIONS: NavItem[] = solutionList.map((s) => ({
-    name: s.name,
-    line: s.navLine,
-    href: solutionHref(s.slug),
+/**
+ * Every trade, in a column per hub group (owner, 16 Nov 2026). No line under
+ * a name: with every trade listed, the name says it all.
+ */
+export const SOLUTIONS: NavItem[] = ALL_TRADES.map((t) => ({
+    group: HUB_GROUPS.find((g) => g.id === t.group)?.title,
+    name: t.name,
+    line: "",
+    href: t.href,
+}));
+
+/** The footer's trades: a group per hub group, the last ending on the hub. */
+const TRADE_COLUMNS = HUB_GROUPS.map((g, i) => ({
+    title: g.title,
+    links: [
+        ...SOLUTIONS.filter((s) => s.group === g.title),
+        ...(i === HUB_GROUPS.length - 1
+            ? [{ name: "All trades", href: HUB_PATH }]
+            : []),
+    ],
 }));
 
 const LEARN = "Learn";
@@ -218,8 +234,8 @@ export const PRODUCT: MenuLink[] = PRODUCT_ORDER.filter(
 
 /**
  * The footer's groups: Product first, then everything else this site links
- * (the features Product doesn't name, trades, tools, templates, resources
- * and Saroh's own pages), folded on a phone.
+ * (the features Product doesn't name, the trades by group, tools,
+ * templates, resources and Saroh's own pages), folded on a phone.
  */
 export const FOOTER_COLUMNS: { title: string; links: MenuLink[] }[] = [
     { title: "Product", links: PRODUCT },
@@ -227,7 +243,7 @@ export const FOOTER_COLUMNS: { title: string; links: MenuLink[] }[] = [
         title: "Also in Saroh",
         links: FEATURES.filter((f) => !PRODUCT.some((p) => p.href === f.href)),
     },
-    { title: "For your trade", links: SOLUTIONS },
+    ...TRADE_COLUMNS,
     { title: "Tools", links: [...TOOLS.slice(0, 5), ALL_TOOLS] },
     {
         title: "Templates",

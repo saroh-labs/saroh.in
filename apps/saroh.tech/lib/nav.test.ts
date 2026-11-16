@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ALL_TRADES, HUB_GROUPS } from "@/content/solutions-hub";
 import {
     FEATURES,
     FOOTER_COLUMNS,
@@ -8,6 +9,7 @@ import {
     SOLUTIONS,
     TEMPLATES,
 } from "./nav";
+
 import { sectionOf } from "./nav-section";
 import { PAGES } from "./site-map";
 
@@ -42,11 +44,24 @@ describe("the nav", () => {
             "website",
             "insights",
         ]);
-        expect(SOLUTIONS.map((s) => s.href.split("/").pop())).toEqual([
-            "shops",
-            "salons",
-            "gyms",
-            "clinics",
+        expect(SOLUTIONS.map((s) => s.href)).toEqual(
+            ALL_TRADES.map((t) => t.href),
+        );
+        for (const lead of ["shops", "salons", "gyms", "clinics"]) {
+            expect(SOLUTIONS.map((s) => s.href)).toContain(
+                `/solutions/${lead}`,
+            );
+        }
+    });
+
+    it("lists every trade in a column per group, menu and footer, and ends on the hub", () => {
+        const groups = HUB_GROUPS.map((g) => g.title);
+        expect(new Set(SOLUTIONS.map((s) => s.group))).toEqual(new Set(groups));
+        const footer = FOOTER_COLUMNS.filter((c) => groups.includes(c.title));
+        expect(footer.map((c) => c.title)).toEqual(groups);
+        expect(footer.flatMap((c) => c.links).map((l) => l.href)).toEqual([
+            ...ALL_TRADES.map((t) => t.href),
+            "/solutions",
         ]);
     });
 

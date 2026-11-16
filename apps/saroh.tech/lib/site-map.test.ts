@@ -8,6 +8,7 @@ import { featureHref, featureList } from "@/content/features";
 import { home } from "@/content/home";
 import { GLOBAL_SHOTS } from "@/content/shots";
 import { solutionHref, solutionList } from "@/content/solutions";
+import { TRADE_PAGES } from "@/content/trades";
 
 import { pageSchema } from "./schema";
 import { canonicalOf, pageMetadata } from "./seo";
@@ -66,6 +67,13 @@ describe("the site map", () => {
         expect(product.map((p) => p.path)).toEqual([
             ...featureList.map((f) => featureHref(f.slug)),
             ...solutionList.map((s) => solutionHref(s.slug)),
+            ...TRADE_PAGES.map((t) => `/solutions/${t.slug}`),
+        ]);
+        // Only the lead four have a saroh.in twin at the same address; the
+        // other trades' India pages are published one by one (/for/).
+        const paired = new Set([
+            ...featureList.map((f) => featureHref(f.slug)),
+            ...solutionList.map((s) => solutionHref(s.slug)),
         ]);
         for (const p of product) {
             expect(p.title.length, p.path).toBeLessThan(60);
@@ -78,7 +86,7 @@ describe("the site map", () => {
             expect(
                 hreflang.pairs.some((pair) => pair.tech === p.path),
                 p.path,
-            ).toBe(true);
+            ).toBe(paired.has(p.path));
         }
     });
 
