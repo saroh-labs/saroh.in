@@ -37,6 +37,18 @@ const VARIANT: Record<ButtonVariant, string> = {
     "secondary-on-ink": `border border-mk-on-ink-line text-background hover:bg-mk-on-ink-hover hover:text-background ${ring({ color: "paper" })}`,
 };
 
+/**
+ * Inside an Ink band (`data-on-ink`, the `ClosingCTA`), the Paper buttons a
+ * site hands in take their on-Ink look: primary as `saffron`, secondary as
+ * `secondary-on-ink`. A CSS context, so a server-built button needs no prop.
+ */
+const ON_INK: Partial<Record<ButtonVariant, string>> = {
+    primary:
+        "[[data-on-ink]_&]:bg-mk-saffron [[data-on-ink]_&]:text-foreground [[data-on-ink]_&]:hover:bg-mk-saffron-hover [[data-on-ink]_&]:hover:text-foreground [[data-on-ink]_&]:focus-visible:outline-background",
+    secondary:
+        "[[data-on-ink]_&]:border-mk-on-ink-line [[data-on-ink]_&]:bg-transparent [[data-on-ink]_&]:text-background [[data-on-ink]_&]:hover:bg-mk-on-ink-hover [[data-on-ink]_&]:hover:text-background [[data-on-ink]_&]:focus-visible:outline-background",
+};
+
 const SIZE: Record<ButtonSize, string> = {
     lg: "h-[52px] gap-2.5 rounded-mk-btn px-6 text-base",
     md: "h-[46px] w-full gap-2 rounded-[11px] px-4 text-[15px]",
@@ -79,6 +91,7 @@ export function buttonClasses({
                     : null),
         // A button that is busy says so and can't be pressed twice.
         "disabled:cursor-progress disabled:opacity-80 disabled:active:scale-100",
+        ON_INK[variant],
         className,
     );
 }

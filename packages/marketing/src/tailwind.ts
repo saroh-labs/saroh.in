@@ -149,6 +149,12 @@ export function marketingTheme(shared: Record<string, unknown>) {
                 "20px",
                 { lineHeight: "1.2", letterSpacing: "-0.02em" },
             ],
+            // The closing band's typing address (#46): 128px on desk, down
+            // to 26px so a 17-letter name fits 320px.
+            "mk-kit-address": [
+                "clamp(26px, 8.5vw, 128px)",
+                { lineHeight: "1", letterSpacing: "-0.055em" },
+            ],
             // A scene's lead: 20px on desk, 17px on a phone.
             "mk-kit-lead": ["clamp(17px, 1.4vw, 20px)", { lineHeight: "1.55" }],
             // An address set as the hero (AI apps' MCP address, variant I):

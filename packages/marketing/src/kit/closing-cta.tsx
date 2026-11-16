@@ -1,22 +1,30 @@
 import type { ReactNode } from "react";
 
 import { cn } from "../cn";
+import type { World } from "../content/world";
 import { Container } from "../layout/container";
+import type { ClosingName } from "./closing-address";
+import { ClosingAddress } from "./closing-address";
 
 /**
- * A page's last word (KIT.md): one heading, the primary "Start free" and a
- * secondary by page type (a feature page links its trade-day moment, a trade
- * page its template). Both buttons come from the site (`cta()`), so the
- * launch switch moves them. `note` is "Free to start. No card needed." only
- * where the hero hasn't said it. On a phone the band is tighter, and the
- * sticky bar hides while it is in view, so its Start free shows once.
+ * A page's last word (KIT.md), the Ink band "K" (owner, 16 Nov 2026, #46):
+ * the page's own heading, then its `visual` (by default the address typing
+ * each demo business, `ClosingAddress`, whose names each site sets in its
+ * layout), the primary "Start free" and a secondary by page type (a feature
+ * page links its trade-day moment, a trade page its template). Both buttons
+ * come from the site (`cta()`), so the launch switch moves them; inside the
+ * band (`data-on-ink`) they take their on-Ink look. `note` defaults to "Live
+ * the moment you publish. Free to start, no card." On a phone the band is
+ * tighter, and the sticky bar hides while it is in view, so its Start free
+ * shows once.
  */
 export function ClosingCTA({
     id = "start",
     title,
     primary,
     secondary,
-    note,
+    note = "Live the moment you publish. Free to start, no card.",
+    visual,
     className,
 }: {
     id?: string;
@@ -24,32 +32,52 @@ export function ClosingCTA({
     primary: ReactNode;
     secondary?: ReactNode;
     note?: ReactNode;
+    /** Replaces the typing address and name chips (a page's own picture). */
+    visual?: ReactNode;
     className?: string;
 }) {
     return (
-        <Container
-            as="section"
+        <section
             aria-labelledby={`${id}-title`}
             // The sticky bar steps aside while this is on screen (`StickyBar`).
             data-closing=""
-            className={cn(
-                "grid justify-items-center gap-5 py-10 text-center min-[760px]:gap-7 min-[760px]:py-[96px]",
-                className,
-            )}
+            // Paper buttons inside take their on-Ink look (`buttonClasses`).
+            data-on-ink=""
+            className={cn("bg-foreground text-background", className)}
         >
-            <h2
-                id={`${id}-title`}
-                className="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
-            >
-                {title}
-            </h2>
-            <div className="flex flex-wrap justify-center gap-3">
-                {primary}
-                {secondary}
-            </div>
-            {note ? (
-                <p className="m-0 text-[15px] text-muted-foreground">{note}</p>
-            ) : null}
-        </Container>
+            <Container className="grid justify-items-start gap-5 py-12 min-[760px]:gap-7 min-[760px]:py-[96px]">
+                <h2
+                    id={`${id}-title`}
+                    className="m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold text-background [text-wrap:balance]"
+                >
+                    {title}
+                </h2>
+                {visual ?? <ClosingAddress />}
+                <div className="flex flex-wrap gap-3">
+                    {primary}
+                    {secondary}
+                </div>
+                {note ? (
+                    <p className="m-0 text-[15px] text-mk-on-ink-muted">
+                        {note}
+                    </p>
+                ) : null}
+            </Container>
+        </section>
+    );
+}
+
+/** A world's businesses as the band's names: the lead, then the others. */
+export function closingNames(world: World): ClosingName[] {
+    return [world.lead, ...world.others].flatMap((b) =>
+        b.look
+            ? [
+                  {
+                      name: b.name,
+                      slug: b.site.replace(/\.saroh\.app$/, ""),
+                      look: b.look,
+                  },
+              ]
+            : [],
     );
 }

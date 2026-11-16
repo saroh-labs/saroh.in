@@ -1,3 +1,6 @@
+import { ClosingNamesProvider } from "@saroh/marketing/kit/closing-address";
+import { closingNames } from "@saroh/marketing/kit/closing-cta";
+
 import {
     FEATURE_ITEMS,
     resourceItems,
@@ -8,6 +11,7 @@ import { SiteFooter } from "@/components/shared/nav/site-footer";
 import { SiteNav } from "@/components/shared/nav/site-nav";
 import { WhatsAppChat } from "@/components/shared/whatsapp/whatsapp-chat";
 import { shownLegal, shownResources } from "@/content/resources";
+import { WORLD } from "@/content/world";
 import { env } from "@/env";
 import { docPages } from "@/lib/docs-pages";
 import { asksConsent } from "@/lib/ga";
@@ -143,7 +147,10 @@ function Shell({
         <div className="min-h-screen bg-background text-foreground [line-height:normal]">
             <div className="overflow-x-clip bg-background">
                 {banner}
-                {children}
+                {/* The closing band's names: this site's demo businesses. */}
+                <ClosingNamesProvider names={closingNames(WORLD)}>
+                    {children}
+                </ClosingNamesProvider>
             </div>
             {after}
         </div>

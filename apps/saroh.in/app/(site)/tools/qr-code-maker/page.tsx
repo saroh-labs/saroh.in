@@ -61,7 +61,7 @@ export default function QrCodeMakerPage() {
             </Container>
             <ClosingCTA
                 id="qr-start"
-                className="mt-[72px] border-t border-border min-[760px]:mt-[96px]"
+                className="mt-[72px] min-[760px]:mt-[96px]"
                 title={copy.band.title}
                 primary={<CtaLink src="qr-code-maker" size="kit" />}
                 note={copy.band.body}

@@ -147,3 +147,15 @@
         -webkit-text-fill-color: transparent;
     }
 }
+
+/* The closing band's caret (`ClosingAddress`): on, then off, each second. */
+@keyframes mk-caret {
+    0%,
+    49% {
+        opacity: 1;
+    }
+    50%,
+    100% {
+        opacity: 0;
+    }
+}

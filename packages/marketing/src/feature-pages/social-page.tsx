@@ -1084,7 +1084,7 @@ export function SocialView({
                 title={w.close.title}
                 primary={site.start(`feature-${slug}-close`)}
                 note={w.close.note}
-                className="pt-[96px] min-[760px]:pt-[150px]"
+                className="mt-[72px] min-[760px]:mt-[120px]"
             />
             <StickyBar watch={HERO_CTA}>
                 {site.start(`feature-${slug}-sticky`, "w-full")}

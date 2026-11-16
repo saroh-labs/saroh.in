@@ -35,7 +35,7 @@ export function Closing({
         <ClosingCTA
             id={id}
             className={cn(
-                inset ? "max-w-none px-0" : "mt-[72px] min-[760px]:mt-[120px]",
+                inset ? "rounded-mk-band" : "mt-[72px] min-[760px]:mt-[120px]",
             )}
             title={title}
             primary={
