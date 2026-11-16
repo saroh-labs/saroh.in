@@ -111,6 +111,7 @@ export function aiAppsWords({
         },
 
         land: {
+            arriveMore: "What waits for you, and what changes at once",
             title: "And there it is, in Saroh.",
             lead: "Your assistant works on the same records as the rest of Saroh. New products wait as drafts. Website changes wait for you to publish.",
             products: {
@@ -196,6 +197,7 @@ export function aiAppsWords({
         },
 
         compare: {
+            more: "See the whole comparison",
             title: "Ask AI, or AI apps?",
             lead: "Both work on the same records, with your role's limits. AI apps asks less before it acts, so here is the difference, plainly.",
             cols: [
@@ -311,6 +313,7 @@ export function aiAppsWords({
         },
 
         can: {
+            more: "See what else it can do",
             title: "What your assistant can do.",
             lead: "Ask in plain words. A few examples from each part of the business.",
             groups: [
@@ -433,6 +436,7 @@ export function aiAppsWords({
                 body: "Each change is listed under its connection in Settings › API and AI apps, kept for 90 days. Put the website draft back as it was, or disconnect it any time.",
             },
             panel: {
+                more: "See its record",
                 label: "Saroh's connection panel for Claude: what it changed, Roll back site draft and Disconnect",
                 title: "Claude",
                 sub: `Your connection · Connected by ${owner} (you)`,
@@ -492,7 +496,7 @@ export function aiAppsWords({
         close: { title: "Do your Saroh work by asking." },
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "See it in the app, step by step",
+            phone: "Help, every point and who uses it",
             everything: "Everything AI apps does",
             usedBy: "Used by",
             of: "of",

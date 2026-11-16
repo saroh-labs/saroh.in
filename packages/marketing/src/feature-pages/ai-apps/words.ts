@@ -53,6 +53,8 @@ export interface AiAppsWords {
         link: string;
     };
     land: {
+        /** On a phone, the three ways a change arrives fold behind this. */
+        arriveMore: string;
         title: string;
         lead: string;
         products: {
@@ -107,6 +109,8 @@ export interface AiAppsWords {
         }[];
     };
     compare: {
+        /** On a phone, the table is cut and this opens it. */
+        more: string;
         title: string;
         lead: string;
         cols: {
@@ -180,6 +184,8 @@ export interface AiAppsWords {
         of: string;
     };
     can: {
+        /** On a phone, the groups past the first fold behind this. */
+        more: string;
         title: string;
         lead: string;
         groups: {
@@ -202,6 +208,8 @@ export interface AiAppsWords {
             body: string;
         };
         panel: {
+            /** On a phone, the activity panel folds behind this. */
+            more: string;
             label: string;
             title: string;
             sub: string;

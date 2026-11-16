@@ -9,7 +9,8 @@ import { ring } from "../ring";
  * TextLink, "See the whole order", with no arrow: it opens the rest here.
  *
  * Google reads the phone page, so what is folded stays in the HTML: `more`
- * sits in a closed `<details>` right after the card, never loaded on tap.
+ * sits in a closed `<details>` right after the card, never loaded on tap;
+ * opened, it lifts the cut as well.
  * The card's own words come from the page, as do `more`'s label and body.
  */
 export function CroppedCard({
@@ -30,7 +31,13 @@ export function CroppedCard({
     className?: string;
 }) {
     return (
-        <div className={cn("grid gap-2", className)}>
+        // Open, the cut lifts too (the rows it hid are part of "the whole").
+        <div
+            className={cn(
+                "grid gap-2 [&:has(>details[open])>div:first-child]:!max-h-none",
+                className,
+            )}
+        >
             <div
                 className={cn(
                     "relative overflow-hidden rounded-mk-card border border-border",
@@ -48,7 +55,8 @@ export function CroppedCard({
                 />
             </div>
             {more ? (
-                <details className="group">
+                // `data-pc`: a scene can show more of itself while this is open.
+                <details data-pc="toggle" className="group">
                     <summary
                         className={`inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] hover:decoration-foreground [&::-webkit-details-marker]:hidden ${ring()}`}
                     >

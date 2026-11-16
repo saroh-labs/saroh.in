@@ -17,6 +17,7 @@ import { TradeSwitcher } from "../kit/trade-switcher";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
 import { Breadcrumbs } from "../nav/breadcrumbs";
+import { ring } from "../ring";
 import { FaqItems } from "../sections/faq";
 import type { DayHour, TradeDay, UsedLink } from "./day";
 import { HomePhone, Moment } from "./moments/moments";
@@ -51,6 +52,8 @@ export interface TradePageWords {
     wholeHour: string;
     /** A scene's cut pictures, when none of them names its own fold. */
     wholePicture: string;
+    /** On a phone, the questions past three fold behind this. */
+    allQuestions: string;
 }
 
 /** A problem the trade knows, and its folded answer. */
@@ -124,7 +127,7 @@ export interface TradePageLayoutProps {
     bar: readonly { slug: string; label: string }[];
 }
 
-const SECTION = "py-12 min-[760px]:py-[120px]";
+const SECTION = "py-10 min-[760px]:py-[120px]";
 const H2 = "m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]";
 const BODY = "m-0 text-[16px] leading-relaxed text-mk-copy";
 
@@ -357,15 +360,22 @@ function anchorAt(anchor: string): string {
 /* ------------------------------------------------------------------ the day */
 
 /** Where a scene's pictures are cut on a phone, by its first moment's kind. */
+/** On a phone, while the hour's toggle is open (its `<section>` is the DayScene). */
+const OPENED = {
+    inline: "max-[759px]:[section:has([data-pc=toggle][open])_&]:inline",
+    block: "max-[759px]:[section:has([data-pc=toggle][open])_&]:block",
+    gone: "max-[759px]:[section:has([data-pc=toggle][open])_&]:hidden",
+};
+
 const CLIP: Partial<Record<MomentData["kind"], number>> = {
-    "site-order": 260,
-    post: 240,
-    payment: 300,
-    bill: 260,
-    "ai-app": 250,
-    ask: 280,
-    enquiry: 260,
-    shelf: 220,
+    "site-order": 210,
+    post: 200,
+    payment: 240,
+    bill: 210,
+    "ai-app": 210,
+    ask: 230,
+    enquiry: 210,
+    shelf: 190,
 };
 
 function Hour({
@@ -403,6 +413,19 @@ function Hour({
         </p>
     ) : null;
     const drawn = moments.map((m, i) => <Moment key={i} m={m} />);
+    // A phone shows the short lead and the picture; the whole lead, the line
+    // after and the note are each in the HTML once, drawn when the scene's
+    // toggle opens (`data-pc`, the cut picture's summary or "Read the whole
+    // hour"). A desk shows them all.
+    const opened = OPENED;
+    const folds =
+        short !== "" ||
+        hour.note !== undefined ||
+        (after !== "" && !hour.claimed);
+    // A cropped order or Home opens with its own "See the whole …": one link.
+    const selfFolds = moments.some(
+        (m) => m.kind === "order" || (m.kind === "home" && Boolean(m.more)),
+    );
     // Pictures that don't crop themselves are cut on a phone (PHONE.md).
     const clip = moments.some((m) => m.kind === "order" || m.kind === "home")
         ? undefined
@@ -416,8 +439,14 @@ function Hour({
             lead={
                 short ? (
                     <>
-                        <span className="max-[759px]:hidden">{lead}</span>
-                        <span className="min-[760px]:hidden">{short}</span>
+                        <span
+                            className={cn("max-[759px]:hidden", opened.inline)}
+                        >
+                            {lead}
+                        </span>
+                        <span className={cn("min-[760px]:hidden", opened.gone)}>
+                            {short}
+                        </span>
                     </>
                 ) : (
                     lead
@@ -433,28 +462,27 @@ function Hour({
             }
         >
             <div className="grid grid-cols-[minmax(0,1fr)] gap-4 min-[760px]:gap-8">
-                {/* A phone: the whole lead, the line after and the note fold here, once in the HTML. */}
-                {short || note || (after && !hour.claimed) ? (
-                    <PhoneFold
-                        summary={words.wholeHour}
-                        tone={onInk ? "on-ink" : "ink"}
-                        className="-mt-4 min-[760px]:hidden"
+                {folds && !clip && !selfFolds ? (
+                    <details
+                        data-pc="toggle"
+                        className="group -mt-4 min-[760px]:hidden"
                     >
-                        <div className="grid gap-4 pt-2">
-                            {short ? (
-                                <p className="m-0 text-[16px] leading-relaxed text-mk-copy">
-                                    {lead}
-                                </p>
-                            ) : null}
-                            {/* A claim's caveat (9 pm's plans) stays in sight. */}
-                            {after && !hour.claimed ? (
-                                <p className="m-0 text-[15px] leading-relaxed text-mk-copy">
-                                    {after}
-                                </p>
-                            ) : null}
-                            {note}
-                        </div>
-                    </PhoneFold>
+                        <summary
+                            className={cn(
+                                "inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden",
+                                onInk
+                                    ? "text-mk-lamp-fg decoration-mk-on-ink-line"
+                                    : "text-foreground decoration-border-strong",
+                                ring(),
+                            )}
+                        >
+                            {words.wholeHour}
+                            <ChevronDown
+                                aria-hidden
+                                className="size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                            />
+                        </summary>
+                    </details>
                 ) : null}
                 {clip ? (
                     <PhoneClip
@@ -478,13 +506,21 @@ function Hour({
                     <p
                         className={cn(
                             "m-0 max-w-[62ch] text-[15px] leading-relaxed text-mk-copy",
-                            !hour.claimed && "max-[759px]:hidden",
+                            // A claim's caveat (9 pm's plans) stays in sight.
+                            !hour.claimed && [
+                                "max-[759px]:hidden",
+                                opened.block,
+                            ],
                         )}
                     >
                         {after}
                     </p>
                 ) : null}
-                {note ? <div className="max-[759px]:hidden">{note}</div> : null}
+                {note ? (
+                    <div className={cn("max-[759px]:hidden", opened.block)}>
+                        {note}
+                    </div>
+                ) : null}
             </div>
         </DayScene>
     );
@@ -838,7 +874,21 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                         {props.faq.title}
                     </h2>
                     <div>
-                        <FaqItems items={props.faq.items} />
+                        {/* A phone: three questions, the rest folded (PHONE.md), all in the HTML. */}
+                        <FaqItems items={props.faq.items.slice(0, 3)} />
+                        {props.faq.items.length > 3 ? (
+                            <PhoneFold
+                                summary={W.allQuestions}
+                                className="max-[759px]:mt-3"
+                            >
+                                {/* Desk: one list, no second top rule. */}
+                                <div className="min-[760px]:[&>div]:border-t-0">
+                                    <FaqItems
+                                        items={props.faq.items.slice(3)}
+                                    />
+                                </div>
+                            </PhoneFold>
+                        ) : null}
                     </div>
                 </Container>
             </section>

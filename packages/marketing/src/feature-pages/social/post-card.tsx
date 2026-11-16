@@ -84,6 +84,7 @@ export function PostCard({
             style={lookStyle(look, band)}
         >
             <div
+                data-post=""
                 className={cn(
                     "relative flex flex-col overflow-hidden font-[family-name:var(--site-font-body)]",
                     ASPECT[size],
@@ -99,6 +100,7 @@ export function PostCard({
                         <Photo kind={photo} className="min-h-0 flex-1" />
                         <div className="flex flex-none flex-col gap-[0.18em] px-[0.95em] pb-[0.8em] pt-[0.7em]">
                             <span
+                                data-tiny="s"
                                 className={cn(
                                     LAB,
                                     "text-[hsl(var(--site-accent))]",
@@ -107,6 +109,7 @@ export function PostCard({
                                 {words.label}
                             </span>
                             <b
+                                data-tiny="n"
                                 className={cn(
                                     HEAD,
                                     "text-[1.35em] leading-[1.08] tracking-[-0.01em]",
@@ -115,11 +118,17 @@ export function PostCard({
                                 {words.name}
                             </b>
                             {words.line ? (
-                                <span className="text-[0.8em] text-[hsl(var(--site-muted))]">
+                                <span
+                                    data-tiny="m"
+                                    className="text-[0.8em] text-[hsl(var(--site-muted))]"
+                                >
                                     {words.line}
                                 </span>
                             ) : null}
-                            <span className="text-[0.55em] tracking-[0.02em] text-[hsl(var(--site-muted))]">
+                            <span
+                                data-tiny="s"
+                                className="text-[0.55em] tracking-[0.02em] text-[hsl(var(--site-muted))]"
+                            >
                                 {words.web}
                             </span>
                         </div>
@@ -129,6 +138,7 @@ export function PostCard({
                         <Photo kind={photo} className="absolute inset-0" />
                         {words.tag ? (
                             <span
+                                data-tiny="p"
                                 className={cn(
                                     HEAD,
                                     "absolute right-[0.8em] z-[2] flex size-[3.7em] -rotate-[8deg] flex-col items-center justify-center rounded-full bg-[hsl(var(--site-accent))] text-[1em] leading-none text-[hsl(var(--site-accent-fg))]",
@@ -137,7 +147,10 @@ export function PostCard({
                             >
                                 {words.tag.price}
                                 {words.tag.unit ? (
-                                    <small className="mt-[0.25em] font-[family-name:var(--site-font-body)] text-[0.45em] font-medium">
+                                    <small
+                                        data-tiny="s"
+                                        className="mt-[0.25em] font-[family-name:var(--site-font-body)] text-[0.45em] font-medium"
+                                    >
                                         {words.tag.unit}
                                     </small>
                                 ) : null}
@@ -150,6 +163,7 @@ export function PostCard({
                             )}
                         >
                             <span
+                                data-tiny="s"
                                 className={cn(
                                     LAB,
                                     "text-[color-mix(in_srgb,hsl(var(--site-accent))_55%,white)]",
@@ -158,6 +172,7 @@ export function PostCard({
                                 {words.label.split(" · ")[0]}
                             </span>
                             <b
+                                data-tiny="n"
                                 className={cn(
                                     HEAD,
                                     "text-[1.35em] leading-[1.08] tracking-[-0.01em]",
@@ -165,7 +180,10 @@ export function PostCard({
                             >
                                 {words.name}
                             </b>
-                            <span className="text-[0.55em] tracking-[0.02em] opacity-85">
+                            <span
+                                data-tiny="s"
+                                className="text-[0.55em] tracking-[0.02em] opacity-85"
+                            >
                                 {words.web}
                             </span>
                         </div>
@@ -173,11 +191,15 @@ export function PostCard({
                 ) : (
                     <div className="flex flex-1 flex-col items-center justify-center gap-[0.45em] p-[0.9em] text-center">
                         {kind === "simple" && words.mark ? (
-                            <span className="inline-flex size-[3.2em] flex-none items-center justify-center rounded-full bg-[hsl(var(--site-accent))] text-[0.6em] font-bold text-[hsl(var(--site-accent-fg))]">
+                            <span
+                                data-tiny="c"
+                                className="inline-flex size-[3.2em] flex-none items-center justify-center rounded-full bg-[hsl(var(--site-accent))] text-[0.6em] font-bold text-[hsl(var(--site-accent-fg))]"
+                            >
                                 {words.mark}
                             </span>
                         ) : null}
                         <span
+                            data-tiny="s"
                             className={cn(
                                 LAB,
                                 kind === "simple"
@@ -218,14 +240,17 @@ export function PostCard({
                             {words.name}
                         </b>
                         {kind === "offer" && words.offer ? (
-                            <span className="text-[0.8em]">
+                            <span data-tiny="m" className="text-[0.8em]">
                                 <span className="mr-[0.35em] line-through opacity-75">
                                     {words.offer.was}
                                 </span>
                                 {words.offer.now}
                             </span>
                         ) : words.line ? (
-                            <span className={cn("text-[0.8em]", muted)}>
+                            <span
+                                data-tiny="m"
+                                className={cn("text-[0.8em]", muted)}
+                            >
                                 {words.line}
                             </span>
                         ) : null}
@@ -236,6 +261,7 @@ export function PostCard({
                             />
                         ) : null}
                         <span
+                            data-tiny="s"
                             className={cn(
                                 "text-[0.55em] tracking-[0.02em]",
                                 muted,

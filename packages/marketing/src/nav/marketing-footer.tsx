@@ -79,8 +79,9 @@ export function MarketingFooter({
     return (
         <footer className="border-t border-border">
             <div className="mx-auto max-w-mk-page px-mk-gutter">
-                <div className="grid gap-x-12 gap-y-8 pb-10 pt-14 min-[760px]:grid-cols-[minmax(0,1.4fr)_minmax(0,3fr)] min-[760px]:pb-12">
-                    <div className="grid content-start gap-4">
+                <div className="grid gap-x-12 gap-y-4 pb-3 pt-6 min-[760px]:grid-cols-[minmax(0,1.4fr)_minmax(0,3fr)] min-[760px]:gap-y-8 min-[760px]:pb-12 min-[760px]:pt-14">
+                    {/* On a phone: the wordmark with the accounts beside it, then the line. */}
+                    <div className="grid content-start items-center gap-3 max-[759px]:grid-cols-[auto_minmax(0,1fr)] max-[759px]:gap-x-0 min-[760px]:gap-4">
                         <Link
                             href="/"
                             prefetch={prefetch}
@@ -89,12 +90,13 @@ export function MarketingFooter({
                         >
                             <Wordmark aria-hidden style={{ fontSize: 24 }} />
                         </Link>
-                        <p className="m-0 max-w-[36ch] text-[15px] leading-normal text-mk-copy">
+                        <p className="m-0 max-w-[36ch] text-[15px] leading-normal text-mk-copy max-[759px]:col-span-2">
                             {line}
                         </p>
                         {brand}
                     </div>
-                    <div className="grid min-[760px]:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] min-[760px]:gap-x-8 min-[760px]:gap-y-10">
+                    {/* Two folded groups a row on a phone; open, a group's links stay in its column. */}
+                    <div className="grid grid-cols-2 items-start gap-x-5 min-[760px]:grid-cols-[repeat(auto-fit,minmax(150px,1fr))] min-[760px]:gap-x-8 min-[760px]:gap-y-10">
                         {shown.map((group) => (
                             <details
                                 key={group.title}
@@ -126,10 +128,10 @@ export function MarketingFooter({
                         ))}
                     </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 border-t border-border pb-8 pt-3 text-[14px] text-muted-foreground">
-                    <span className="py-3">{note}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-6 border-t border-border pb-4 pt-1 text-[13px] text-muted-foreground min-[760px]:gap-y-1 min-[760px]:pb-8 min-[760px]:pt-3 min-[760px]:text-[14px]">
+                    <span className="py-2 min-[760px]:py-3">{note}</span>
                     {legal ? (
-                        <div className="flex flex-wrap items-center gap-x-5 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_button]:min-h-11">
+                        <div className="flex flex-wrap items-center gap-x-4 min-[760px]:gap-x-5 [&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_button]:min-h-11">
                             {legal}
                         </div>
                     ) : null}
@@ -165,7 +167,8 @@ export function FooterBrand({
 }) {
     return (
         <>
-            <div className="grid gap-1.5">
+            {/* The name's meaning stands in the desk footer; on a phone it is in the HTML, not drawn. */}
+            <div className="grid gap-1.5 max-[759px]:hidden">
                 <p className="m-0 text-[19px] font-semibold leading-snug tracking-[-0.01em] text-foreground">
                     {motto}
                 </p>
@@ -177,7 +180,7 @@ export function FooterBrand({
             </div>
             <ul
                 aria-label="Follow Saroh"
-                className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0"
+                className="m-0 -ml-2 flex list-none flex-wrap gap-1 p-0 max-[759px]:col-start-2 max-[759px]:row-start-1 max-[759px]:-mr-2 max-[759px]:ml-0 max-[759px]:justify-end max-[759px]:gap-0"
             >
                 {socials.map((link) => (
                     <li key={link.href}>

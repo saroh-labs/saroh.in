@@ -342,6 +342,31 @@ price is ever drawn into an image.
 
 ## Changes
 
+- **16 Nov 2026, phone polish two (DEC-221, unit/web-polish2).** Phone
+  lengths at 390px; desk heights unchanged. Kit: the footer on a phone is
+  the wordmark with Saroh's accounts beside it, one line, the groups
+  folded two a row and a tighter legal row (816px to 442px; the name's
+  meaning stays in the HTML, drawn on desk only). `ClosingCTA` is tighter
+  on a phone and carries `data-closing`; `StickyBar` steps aside while it
+  is in view, so Start free shows once. `PhoneClip` and `CroppedCard`
+  mark their toggle `data-pc="toggle"` (a scene can show more of itself
+  while it is open) and `CroppedCard` lifts its cut when opened.
+  Duplicated phone copies became one element: a trade-day hour's whole
+  lead, line after and note (shown while the hour's toggle is open), the
+  How it works chapter leads (first sentence, the rest while Read more is
+  open), Share's Your posts list, Ask AI's other screens (a swipe on a
+  phone, no second list). Trade pages: three questions then All
+  questions; the cut picture's own link opens the whole hour; shorter
+  cuts and bands. Reach and Ask: extra words fold (how a change arrives,
+  what it can do past the first part, what it can and can't change, the
+  second and third private points, what sections read); drawn answers,
+  panels and feeds are cut with "See the …", never folded whole; In the
+  app's screens stay in sight as a swipe row, its words folded ("Help,
+  every point and who uses it"). Share cards drawn small turn words that
+  would fall under 12px into bars, and a 64px thumbnail draws none
+  (container queries in `tokens.css`, `data-tiny` in `PostCard`). Keep
+  pages' phone bands are 48px.
+
 - **17 Nov 2026, phone polish (DEC-221, unit/web-polish).** Phone lengths
   at 390px, desk unchanged. Kit: `kit/phone-fold` (`PhoneFold`: content
   once in the HTML, behind a summary on a phone, shown from 760px;

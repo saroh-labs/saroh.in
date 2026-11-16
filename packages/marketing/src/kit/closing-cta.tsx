@@ -8,7 +8,8 @@ import { Container } from "../layout/container";
  * secondary by page type (a feature page links its trade-day moment, a trade
  * page its template). Both buttons come from the site (`cta()`), so the
  * launch switch moves them. `note` is "Free to start. No card needed." only
- * where the hero hasn't said it.
+ * where the hero hasn't said it. On a phone the band is tighter, and the
+ * sticky bar hides while it is in view, so its Start free shows once.
  */
 export function ClosingCTA({
     id = "start",
@@ -29,8 +30,10 @@ export function ClosingCTA({
         <Container
             as="section"
             aria-labelledby={`${id}-title`}
+            // The sticky bar steps aside while this is on screen (`StickyBar`).
+            data-closing=""
             className={cn(
-                "grid justify-items-center gap-7 py-[72px] text-center min-[760px]:py-[96px]",
+                "grid justify-items-center gap-5 py-10 text-center min-[760px]:gap-7 min-[760px]:py-[96px]",
                 className,
             )}
         >

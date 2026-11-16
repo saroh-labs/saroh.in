@@ -90,54 +90,55 @@ export function InTheApp({
             size="kit-h2"
             className="pt-12 min-[760px]:pt-[120px]"
         >
-            {/* A phone: the title and lead, then the rest folds (PHONE.md). */}
-            <PhoneFold summary={words.phone} className="mt-6 min-[760px]:mt-0">
-                <SwipeRow
-                    label={feature.howTitle}
-                    columns={feature.steps.length >= 3 ? 4 : 3}
-                    of={words.of}
-                    className="mt-10"
-                >
-                    {feature.heroChat ? null : (
-                        <figure className="m-0 grid h-full content-start gap-3">
-                            <Screen
-                                shot={site.shot(
-                                    feature.hero.shot,
-                                    feature.hero.alt,
-                                    feature.hero.phone,
-                                )}
-                            />
-                            <figcaption>
-                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
-                                    {feature.cardLine}
-                                </h3>
-                            </figcaption>
-                        </figure>
-                    )}
-                    {feature.steps.map((step) => (
-                        <figure
-                            key={step.title}
-                            className="m-0 grid h-full content-start gap-3"
-                        >
-                            {step.chat ? null : (
-                                <Screen shot={site.shot(step.shot, step.alt)} />
+            {/* The screens stay in sight on a phone, as a swipe row (owner, 16 Nov:
+                a screen is never behind a click); the words after them fold. */}
+            <SwipeRow
+                label={feature.howTitle}
+                columns={feature.steps.length >= 3 ? 4 : 3}
+                of={words.of}
+                className="mt-8 min-[760px]:mt-10"
+            >
+                {feature.heroChat ? null : (
+                    <figure className="m-0 grid h-full content-start gap-3">
+                        <Screen
+                            shot={site.shot(
+                                feature.hero.shot,
+                                feature.hero.alt,
+                                feature.hero.phone,
                             )}
-                            <figcaption className="grid gap-1.5">
-                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
-                                    {step.title}
-                                </h3>
-                                <p className="m-0 text-[15.5px] leading-normal text-mk-copy [text-wrap:pretty]">
-                                    {step.body}
-                                </p>
-                                {step.who ? (
-                                    <span className="text-[13px] text-muted-foreground">
-                                        {step.who}
-                                    </span>
-                                ) : null}
-                            </figcaption>
-                        </figure>
-                    ))}
-                </SwipeRow>
+                        />
+                        <figcaption>
+                            <h3 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
+                                {feature.cardLine}
+                            </h3>
+                        </figcaption>
+                    </figure>
+                )}
+                {feature.steps.map((step) => (
+                    <figure
+                        key={step.title}
+                        className="m-0 grid h-full content-start gap-3"
+                    >
+                        {step.chat ? null : (
+                            <Screen shot={site.shot(step.shot, step.alt)} />
+                        )}
+                        <figcaption className="grid gap-1.5">
+                            <h3 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
+                                {step.title}
+                            </h3>
+                            <p className="m-0 text-[15.5px] leading-normal text-mk-copy [text-wrap:pretty]">
+                                {step.body}
+                            </p>
+                            {step.who ? (
+                                <span className="text-[13px] text-muted-foreground">
+                                    {step.who}
+                                </span>
+                            ) : null}
+                        </figcaption>
+                    </figure>
+                ))}
+            </SwipeRow>
+            <PhoneFold summary={words.phone} className="mt-4 min-[760px]:mt-0">
                 {all.worksToday ? (
                     <p className="m-0 mt-8 max-w-[62ch] text-[16px] leading-normal text-mk-copy">
                         {all.worksToday}

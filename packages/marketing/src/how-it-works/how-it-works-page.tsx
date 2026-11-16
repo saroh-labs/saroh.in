@@ -751,7 +751,7 @@ export function HowItWorksPage({
                         aria-labelledby={`${ch.id}-title`}
                         className={BAND[ch.id]}
                     >
-                        <Container className="grid grid-cols-[minmax(0,1fr)] gap-8 py-12 min-[760px]:gap-16 min-[760px]:py-[120px]">
+                        <Container className="grid grid-cols-[minmax(0,1fr)] gap-6 py-10 min-[760px]:gap-16 min-[760px]:py-[120px]">
                             {firstOfGroup.has(ch.id) ? (
                                 <GroupHead
                                     name={W.groups[ch.group].name}
@@ -777,7 +777,7 @@ export function HowItWorksPage({
                                 before={
                                     ch.id === "money" ? (
                                         <PhoneClip
-                                            height={270}
+                                            height={220}
                                             label={W.money.more}
                                             tone="on-ink"
                                         >

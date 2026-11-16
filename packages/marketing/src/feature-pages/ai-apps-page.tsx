@@ -13,6 +13,7 @@ import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
 import { dayLink } from "../content/world";
 import { ClosingCTA } from "../kit/closing-cta";
+import { PhoneClip, PhoneFold } from "../kit/phone-fold";
 import { PlanLine } from "../kit/plan-line";
 import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
@@ -125,7 +126,7 @@ export function AiAppsView({
                         </p>
                     </div>
                     <div className="min-w-0">
-                        <CropToggle label={c.phoneMore} height={400}>
+                        <CropToggle label={c.phoneMore} height={300}>
                             <Chat w={w} />
                         </CropToggle>
                         <p className="m-0 mt-3 text-[13.5px] text-muted-foreground">
@@ -305,25 +306,30 @@ export function AiAppsView({
                         </div>
                     </Landed>
                 </SwipeRow>
-                <div className="mt-10 grid gap-8 border-t border-border pt-7 min-[760px]:grid-cols-3">
-                    {w.land.arrive.map((a) => (
-                        <div key={a.title}>
-                            <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
-                                {a.title}
-                            </h3>
-                            <span className="mt-2 inline-block">
-                                {a.draft ? (
-                                    <DraftPill>{a.how}</DraftPill>
-                                ) : (
-                                    <LivePill>{a.how}</LivePill>
-                                )}
-                            </span>
-                            <p className="m-0 mt-2 text-[15.5px] leading-normal text-mk-copy">
-                                {a.body}
-                            </p>
-                        </div>
-                    ))}
-                </div>
+                <PhoneFold
+                    summary={w.land.arriveMore}
+                    className="mt-6 min-[760px]:mt-10"
+                >
+                    <div className="grid gap-8 border-t border-border pt-7 min-[760px]:grid-cols-3">
+                        {w.land.arrive.map((a) => (
+                            <div key={a.title}>
+                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                                    {a.title}
+                                </h3>
+                                <span className="mt-2 inline-block">
+                                    {a.draft ? (
+                                        <DraftPill>{a.how}</DraftPill>
+                                    ) : (
+                                        <LivePill>{a.how}</LivePill>
+                                    )}
+                                </span>
+                                <p className="m-0 mt-2 text-[15.5px] leading-normal text-mk-copy">
+                                    {a.body}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </PhoneFold>
             </Section>
 
             {/* Ask AI, or AI apps? */}
@@ -334,43 +340,47 @@ export function AiAppsView({
                 size="kit-h2"
                 className={SCENE}
             >
-                <div className="mt-10 overflow-hidden rounded-mk-card border border-border bg-card min-[760px]:mt-12">
-                    <div className="hidden grid-cols-[180px_1fr_1fr] border-b border-border bg-mk-noon min-[760px]:grid">
-                        <span />
-                        {w.compare.cols.map((col) => (
-                            <span
-                                key={col.name}
-                                className="px-5 py-4 font-display text-mk-kit-h3 font-bold"
-                            >
-                                {col.name}
-                                <small className="block font-sans text-[13px] font-normal text-muted-foreground">
-                                    {col.sub}
-                                </small>
-                            </span>
-                        ))}
-                    </div>
-                    {w.compare.rows.map(([k, a, b]) => (
-                        <div
-                            key={k}
-                            className="grid border-t border-mk-line-row text-[15px] first:border-t-0 min-[760px]:grid-cols-[180px_1fr_1fr]"
-                        >
-                            <span className="px-5 pt-3.5 text-[13.5px] font-semibold text-muted-foreground min-[760px]:py-3.5">
-                                {k}
-                            </span>
-                            <span className="px-5 py-1.5 min-[760px]:py-3.5">
-                                <b className="mr-1.5 font-semibold min-[760px]:hidden">
-                                    {w.compare.cols[0].name}:
-                                </b>
-                                {a}
-                            </span>
-                            <span className="px-5 pb-3.5 pt-1.5 leading-normal min-[760px]:py-3.5">
-                                <b className="mr-1.5 font-semibold min-[760px]:hidden">
-                                    {w.compare.cols[1].name}:
-                                </b>
-                                {b}
-                            </span>
+                <div className="mt-10 min-[760px]:mt-12">
+                    <CropToggle label={w.compare.more} height={330}>
+                        <div className="overflow-hidden rounded-mk-card border border-border bg-card">
+                            <div className="hidden grid-cols-[180px_1fr_1fr] border-b border-border bg-mk-noon min-[760px]:grid">
+                                <span />
+                                {w.compare.cols.map((col) => (
+                                    <span
+                                        key={col.name}
+                                        className="px-5 py-4 font-display text-mk-kit-h3 font-bold"
+                                    >
+                                        {col.name}
+                                        <small className="block font-sans text-[13px] font-normal text-muted-foreground">
+                                            {col.sub}
+                                        </small>
+                                    </span>
+                                ))}
+                            </div>
+                            {w.compare.rows.map(([k, a, b]) => (
+                                <div
+                                    key={k}
+                                    className="grid border-t border-mk-line-row text-[15px] first:border-t-0 min-[760px]:grid-cols-[180px_1fr_1fr]"
+                                >
+                                    <span className="px-5 pt-3.5 text-[13.5px] font-semibold text-muted-foreground min-[760px]:py-3.5">
+                                        {k}
+                                    </span>
+                                    <span className="px-5 py-1.5 min-[760px]:py-3.5">
+                                        <b className="mr-1.5 font-semibold min-[760px]:hidden">
+                                            {w.compare.cols[0].name}:
+                                        </b>
+                                        {a}
+                                    </span>
+                                    <span className="px-5 pb-3.5 pt-1.5 leading-normal min-[760px]:py-3.5">
+                                        <b className="mr-1.5 font-semibold min-[760px]:hidden">
+                                            {w.compare.cols[1].name}:
+                                        </b>
+                                        {b}
+                                    </span>
+                                </div>
+                            ))}
                         </div>
-                    ))}
+                    </CropToggle>
                 </div>
             </Section>
 
@@ -563,24 +573,51 @@ export function AiAppsView({
                 className={SCENE}
             >
                 <div className="mt-10 border-t border-border">
-                    {w.can.groups.map((g) => (
-                        <div
-                            key={g.title}
-                            className="grid gap-3 border-b border-border py-6 min-[1080px]:grid-cols-[320px_1fr]"
-                        >
-                            <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
-                                {g.title}
-                                <small className="mt-1 block font-sans text-[14px] font-normal text-muted-foreground">
-                                    {g.sub}
-                                </small>
-                            </h3>
-                            <ul className="m-0 grid list-none gap-x-8 gap-y-2 p-0 text-[15.5px] min-[760px]:grid-cols-2">
-                                {g.items.map((x) => (
-                                    <li key={x}>{x}</li>
-                                ))}
-                            </ul>
-                        </div>
-                    ))}
+                    {w.can.groups.map((g, i) => {
+                        const group = (
+                            <div
+                                key={g.title}
+                                className="grid gap-3 border-b border-border py-6 min-[1080px]:grid-cols-[320px_1fr]"
+                            >
+                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                                    {g.title}
+                                    <small className="mt-1 block font-sans text-[14px] font-normal text-muted-foreground">
+                                        {g.sub}
+                                    </small>
+                                </h3>
+                                <ul className="m-0 grid list-none gap-x-8 gap-y-2 p-0 text-[15.5px] min-[760px]:grid-cols-2">
+                                    {g.items.map((x) => (
+                                        <li key={x}>{x}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        );
+                        return i === 0 ? group : null;
+                    })}
+                    {/* A phone: the first part shown, the others folded, all in the HTML. */}
+                    <PhoneFold
+                        summary={w.can.more}
+                        className="max-[759px]:mt-2"
+                    >
+                        {w.can.groups.slice(1).map((g) => (
+                            <div
+                                key={g.title}
+                                className="grid gap-3 border-b border-border py-6 min-[1080px]:grid-cols-[320px_1fr]"
+                            >
+                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                                    {g.title}
+                                    <small className="mt-1 block font-sans text-[14px] font-normal text-muted-foreground">
+                                        {g.sub}
+                                    </small>
+                                </h3>
+                                <ul className="m-0 grid list-none gap-x-8 gap-y-2 p-0 text-[15.5px] min-[760px]:grid-cols-2">
+                                    {g.items.map((x) => (
+                                        <li key={x}>{x}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        ))}
+                    </PhoneFold>
                 </div>
                 <p className="m-0 mt-6 max-w-[62ch] text-[15.5px] leading-normal text-mk-copy">
                     {w.can.honest}
@@ -630,7 +667,7 @@ export function AiAppsView({
                 aria-labelledby="cant-title"
                 className="mt-12 bg-mk-hover min-[760px]:mt-[140px]"
             >
-                <Container className="py-[72px] min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
+                <Container className="py-12 min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
                     <h2
                         id="cant-title"
                         className="m-0 font-display text-mk-kit-h2 font-bold"
@@ -667,37 +704,39 @@ export function AiAppsView({
                             <p className="m-0 mt-2 text-[16px] leading-normal text-mk-copy">
                                 {w.cant.record.body}
                             </p>
-                            <div
-                                role="img"
-                                aria-label={w.cant.panel.label}
-                                className={cn(PANEL, "mt-5 p-4")}
-                            >
-                                <h5 className="m-0 text-[16px] font-semibold">
-                                    {w.cant.panel.title}
-                                </h5>
-                                <div className="text-[13px] text-muted-foreground">
-                                    {w.cant.panel.sub}
-                                </div>
-                                {w.cant.panel.rows.map(([x, t]) => (
-                                    <div
-                                        key={x}
-                                        className="mt-2 flex justify-between gap-3 border-t border-mk-line-row pt-2 text-[14px]"
-                                    >
-                                        {x}
-                                        <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
-                                            {t}
+                            <PhoneClip height={150} label={w.cant.panel.more}>
+                                <div
+                                    role="img"
+                                    aria-label={w.cant.panel.label}
+                                    className={cn(PANEL, "mt-5 p-4")}
+                                >
+                                    <h5 className="m-0 text-[16px] font-semibold">
+                                        {w.cant.panel.title}
+                                    </h5>
+                                    <div className="text-[13px] text-muted-foreground">
+                                        {w.cant.panel.sub}
+                                    </div>
+                                    {w.cant.panel.rows.map(([x, t]) => (
+                                        <div
+                                            key={x}
+                                            className="mt-2 flex justify-between gap-3 border-t border-mk-line-row pt-2 text-[14px]"
+                                        >
+                                            {x}
+                                            <span className="shrink-0 font-mono text-[13px] text-muted-foreground">
+                                                {t}
+                                            </span>
+                                        </div>
+                                    ))}
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <span className="inline-flex h-10 items-center rounded-[9px] border border-border-strong px-3.5 text-[14px] font-semibold">
+                                            {w.cant.panel.buttons[0]}
+                                        </span>
+                                        <span className="ml-auto inline-flex h-10 items-center rounded-[9px] border border-border-strong px-3.5 text-[14px] font-semibold text-mk-warn">
+                                            {w.cant.panel.buttons[1]}
                                         </span>
                                     </div>
-                                ))}
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    <span className="inline-flex h-10 items-center rounded-[9px] border border-border-strong px-3.5 text-[14px] font-semibold">
-                                        {w.cant.panel.buttons[0]}
-                                    </span>
-                                    <span className="ml-auto inline-flex h-10 items-center rounded-[9px] border border-border-strong px-3.5 text-[14px] font-semibold text-mk-warn">
-                                        {w.cant.panel.buttons[1]}
-                                    </span>
                                 </div>
-                            </div>
+                            </PhoneClip>
                         </div>
                     </div>
                     <p className="m-0 mt-9 max-w-[62ch] text-[15.5px] leading-normal text-mk-copy">

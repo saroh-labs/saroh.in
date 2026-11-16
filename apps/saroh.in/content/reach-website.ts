@@ -340,6 +340,7 @@ export function websiteWords({
         },
 
         sections: {
+            more: "What sections read, and what you fill",
             title: "Pages, built from sections.",
             lead: "Add a page, then stack the sections it needs. The shop, the booking page and your hours are sections like any other, already joined to your records.",
             pages: [
@@ -361,6 +362,7 @@ export function websiteWords({
         },
 
         shared: {
+            more: "See the whole preview",
             title: "Looks right when it's shared.",
             lead: "Set the title, description and share picture once. Saroh tells you when the picture is too small for Facebook and LinkedIn, or too heavy for WhatsApp. Each site has its own sitemap for search.",
             chatLabel: `${rye.name}'s link shared in a WhatsApp chat, with its picture, title and description`,
@@ -391,6 +393,7 @@ export function websiteWords({
         },
 
         ask: {
+            more: "See the answer",
             title: "Or ask for the change.",
             at: RYE_MONDAY.christmas.at,
             body: `, closing up, ${owner} asks Claude to put the Christmas menu on a Christmas page. Connect Claude or ChatGPT to Saroh and ask for a change in your words. It saves a draft and sends you a publish request. Only you, or your reviewer, can publish it.`,
@@ -461,7 +464,7 @@ export function websiteWords({
         },
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "See it in the app, step by step",
+            phone: "Help, every point and who uses it",
             everything: "Everything the website builder does",
             usedBy: "Used by",
             of: "of",

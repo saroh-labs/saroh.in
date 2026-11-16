@@ -133,6 +133,7 @@ export const TRADE_WORDS: TradePageWords & {
     tradeBar: "A day at a",
     allTradesShort: "All trades",
     wholeHour: "Read the whole hour",
+    allQuestions: "All questions",
     wholePicture: "See all of it",
     questions: (longName) => `Questions ${longName.toLowerCase()} ask.`,
     related: "Saroh for other trades",

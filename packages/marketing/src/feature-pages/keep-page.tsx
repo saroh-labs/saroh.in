@@ -116,7 +116,7 @@ export interface KeepPageProps {
 
 const H2 =
     "m-0 max-w-[22ch] font-display text-mk-kit-h2 font-bold [text-wrap:balance]";
-const PAD = "py-[72px] min-[760px]:py-[120px]";
+const PAD = "py-12 min-[760px]:py-[120px]";
 
 /** The headline with the Saffron mark under its one word. */
 function marked(headline: string, word: string): ReactNode {
@@ -186,7 +186,7 @@ export function KeepPage({
             <Container
                 as="section"
                 aria-labelledby={`${slug}-title`}
-                className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-[72px] pt-8 min-[760px]:gap-12 min-[760px]:pb-[120px] min-[760px]:pt-12"
+                className="grid grid-cols-[minmax(0,1fr)] gap-8 pb-12 pt-8 min-[760px]:gap-12 min-[760px]:pb-[120px] min-[760px]:pt-12"
             >
                 <Breadcrumbs
                     crumbs={[
@@ -481,7 +481,7 @@ export function KeepPage({
             ) : null}
 
             {/* THE ENDING: one moment, plans in a line, who uses it. */}
-            <Container className="grid gap-8 pb-[72px] min-[760px]:pb-[96px]">
+            <Container className="grid gap-8 pb-12 min-[760px]:pb-[96px]">
                 {moment && day ? (
                     <MomentCard at={moment.at} line={moment.line} link={day} />
                 ) : null}
@@ -514,7 +514,7 @@ export function KeepPage({
                     id="faq"
                     aria-labelledby={`${slug}-faq`}
                     className={cn(
-                        "grid gap-8 pb-[72px] min-[760px]:pb-[96px] min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,720px)] min-[960px]:gap-16",
+                        "grid gap-8 pb-12 min-[760px]:pb-[96px] min-[960px]:grid-cols-[minmax(0,1fr)_minmax(0,720px)] min-[960px]:gap-16",
                         scroll,
                     )}
                 >

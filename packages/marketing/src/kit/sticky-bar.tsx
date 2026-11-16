@@ -9,7 +9,8 @@ export const STICKY_CTA_ATTR = "data-sticky-cta";
 /**
  * The phone's one sticky action (PHONE.md, KIT.md): a 64px white bar with a
  * hairline on top, holding the page's start button, that slides up once the
- * hero's own button (`watch`, its id) has scrolled away. While it shows,
+ * hero's own button (`watch`, its id) has scrolled away, and steps aside
+ * while the page's `ClosingCTA` (`data-closing`) is in view. While it shows,
  * `<html>` carries `data-sticky-cta`, and the header hides its Start free
  * (`STICKY_HIDES`), so there is only ever one. Phones only; from 760px wide
  * it never draws. The button comes from the site (`cta()`), never this file.
@@ -28,11 +29,21 @@ export function StickyBar({
         const target = document.getElementById(watch);
         // No observer (an old browser, a test's DOM): the bar never shows.
         if (!target || typeof IntersectionObserver === "undefined") return;
-        const seen = new IntersectionObserver(([e]) => {
-            // Shown once the hero's button is above the window, not below it.
-            setShown(!e.isIntersecting && e.boundingClientRect.top < 0);
+        const closing = document.querySelector("[data-closing]");
+        let past = false;
+        let atClose = false;
+        const seen = new IntersectionObserver((entries) => {
+            for (const e of entries) {
+                // Past once the hero's button is above the window, not below it.
+                if (e.target === target)
+                    past = !e.isIntersecting && e.boundingClientRect.top < 0;
+                // The closing band has its own start button: one on screen.
+                else atClose = e.isIntersecting;
+            }
+            setShown(past && !atClose);
         });
         seen.observe(target);
+        if (closing) seen.observe(closing);
         return () => seen.disconnect();
     }, [watch]);
 

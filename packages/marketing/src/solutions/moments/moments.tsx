@@ -451,7 +451,7 @@ export function OrderTaken({ m }: { m: OrderMoment }) {
             <div className="grid gap-4 min-[760px]:hidden">
                 <Message m={m.message} />
                 <CroppedCard
-                    height={230}
+                    height={130}
                     more={{
                         label: m.more,
                         content: <OrderRows rows={m.rows} />,

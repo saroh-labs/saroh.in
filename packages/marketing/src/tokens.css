@@ -100,3 +100,50 @@
         cursor: default;
     }
 }
+
+/*
+ * A Share card drawn small (`PostCard`, a picture with its own label): its
+ * words scale with the card, so under these widths a label, an address or
+ * a line would fall below 12px. Those become shapes, a bar the length of
+ * the words, instead of tiny text (DESIGN.md: nothing under 12px).
+ */
+@container (max-width: 460px) {
+    [data-tiny="s"] {
+        -webkit-text-fill-color: transparent;
+        background: color-mix(in srgb, currentColor 32%, transparent);
+        border-radius: 2px;
+        width: fit-content;
+        line-height: 1;
+    }
+    [data-tiny="c"] {
+        -webkit-text-fill-color: transparent;
+    }
+}
+@container (max-width: 260px) {
+    [data-tiny="m"] {
+        -webkit-text-fill-color: transparent;
+        background: color-mix(in srgb, currentColor 32%, transparent);
+        border-radius: 2px;
+        width: fit-content;
+        line-height: 1;
+    }
+}
+@container (max-width: 210px) {
+    [data-tiny="p"] {
+        -webkit-text-fill-color: transparent;
+    }
+}
+@container (max-width: 155px) {
+    [data-tiny="n"] {
+        -webkit-text-fill-color: transparent;
+        background: color-mix(in srgb, currentColor 32%, transparent);
+        border-radius: 2px;
+        width: fit-content;
+    }
+}
+/* A thumbnail (a list's 64px card): no word is legible, so none is drawn. */
+@container (max-width: 120px) {
+    [data-post] * {
+        -webkit-text-fill-color: transparent;
+    }
+}

@@ -12,6 +12,7 @@ import { dayLink } from "../content/world";
 import { Chip } from "../kit/chip";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
+import { PhoneClip, PhoneFold } from "../kit/phone-fold";
 import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
@@ -33,7 +34,7 @@ import {
 import { Wires } from "./ask-ai/wires";
 import type { AskAiWords } from "./ask-ai/words";
 import { TimeChip } from "./reach/app-card";
-import { CropToggle, Fold } from "./reach/fold";
+import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
 import { InTheApp } from "./reach/in-the-app";
 import { shownChips } from "./reach/links";
@@ -462,11 +463,13 @@ export function AskAiView({
                 size="kit-h2"
                 className={cn(SCENE, "scroll-mt-24")}
             >
-                <div className="mt-10 grid gap-x-7 gap-y-10 min-[760px]:mt-12 min-[1080px]:grid-cols-2">
-                    {w.where.screens.map((sc, i) => (
+                {/* A phone swipes through the screens, each cut at 420px; none is
+                    behind a click (owner, 16 Nov). */}
+                <div className="mt-10 grid gap-x-7 gap-y-10 max-[759px]:-mr-mk-gutter max-[759px]:flex max-[759px]:snap-x max-[759px]:snap-mandatory max-[759px]:gap-3 max-[759px]:overflow-x-auto max-[759px]:pr-mk-gutter max-[759px]:[scrollbar-width:none] min-[760px]:mt-12 min-[1080px]:grid-cols-2">
+                    {w.where.screens.map((sc) => (
                         <div
                             key={sc.name}
-                            className={cn(i > 0 && "max-[759px]:hidden")}
+                            className="max-[759px]:w-[calc(100%-24px)] max-[759px]:shrink-0 max-[759px]:snap-start"
                         >
                             <div className="mb-2.5 flex items-baseline gap-2.5 text-[15px]">
                                 <b className="font-semibold">{sc.name}</b>
@@ -546,40 +549,32 @@ export function AskAiView({
                         </div>
                     ))}
                 </div>
-                <Fold phone label={w.where.phoneMore} className="mt-3">
-                    <ul>
-                        {w.where.screens.slice(1).map((sc) => (
-                            <li key={sc.name}>
-                                <b className="font-semibold text-foreground">
-                                    {sc.name}
-                                </b>{" "}
-                                ({sc.sub}):{" "}
-                                {sc.sugs.map((g) => g.t).join(" · ")}
-                            </li>
-                        ))}
-                    </ul>
-                </Fold>
-                <div className="mt-12 rounded-mk-card border border-border bg-card p-5 min-[760px]:p-6">
-                    <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
-                        {w.where.asked}
-                    </h3>
-                    <ul className="m-0 mt-4 grid list-none gap-3 p-0 min-[1080px]:grid-cols-2">
-                        {w.where.questions.map((q) => (
-                            <li
-                                key={q.q}
-                                className="grid gap-2 border-t border-mk-line-row pt-3 min-[760px]:flex min-[760px]:items-center min-[760px]:justify-between"
-                            >
-                                <span className="w-fit rounded-[14px_14px_4px_14px] bg-foreground px-[13px] py-2 text-[14.5px] text-background">
-                                    {q.q}
-                                </span>
-                                <ReadFrom sources={q.from} label="Read from" />
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-                <p className="m-0 mt-6 max-w-[62ch] text-[15px] leading-normal text-mk-copy">
-                    {w.where.history}
-                </p>
+                <PhoneClip height={240} label={w.where.askedMore}>
+                    <div className="rounded-mk-card border border-border bg-card p-5 min-[760px]:mt-12 min-[760px]:p-6">
+                        <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
+                            {w.where.asked}
+                        </h3>
+                        <ul className="m-0 mt-4 grid list-none gap-3 p-0 min-[1080px]:grid-cols-2">
+                            {w.where.questions.map((q) => (
+                                <li
+                                    key={q.q}
+                                    className="grid gap-2 border-t border-mk-line-row pt-3 min-[760px]:flex min-[760px]:items-center min-[760px]:justify-between"
+                                >
+                                    <span className="w-fit rounded-[14px_14px_4px_14px] bg-foreground px-[13px] py-2 text-[14.5px] text-background">
+                                        {q.q}
+                                    </span>
+                                    <ReadFrom
+                                        sources={q.from}
+                                        label="Read from"
+                                    />
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <p className="m-0 mt-6 max-w-[62ch] text-[15px] leading-normal text-mk-copy">
+                        {w.where.history}
+                    </p>
+                </PhoneClip>
             </Section>
 
             {/* It acts, after you confirm. */}
@@ -694,33 +689,38 @@ export function AskAiView({
                         );
                     })}
                 </SwipeRow>
-                <ul className="m-0 mt-10 grid list-none gap-x-10 p-0 min-[760px]:grid-cols-2">
-                    {[
-                        ...w.acts.can.map((c) => ({ c, no: false })),
-                        { c: w.acts.never, no: true },
-                    ].map(({ c, no }) => (
-                        <li
-                            key={c[0]}
-                            className="flex items-center gap-3 border-t border-border py-3.5 text-[15.5px]"
-                        >
-                            {no ? (
-                                <X
-                                    aria-hidden
-                                    className="size-[18px] text-mk-warn"
-                                />
-                            ) : (
-                                <Check
-                                    aria-hidden
-                                    className="size-[18px] text-mk-ok"
-                                />
-                            )}
-                            <span className="flex-1">{c[0]}</span>
-                            <span className="text-right text-[13.5px] text-muted-foreground">
-                                {c[1]}
-                            </span>
-                        </li>
-                    ))}
-                </ul>
+                <PhoneFold
+                    summary={w.acts.listMore}
+                    className="mt-6 min-[760px]:mt-10"
+                >
+                    <ul className="m-0 grid list-none gap-x-10 p-0 min-[760px]:grid-cols-2">
+                        {[
+                            ...w.acts.can.map((c) => ({ c, no: false })),
+                            { c: w.acts.never, no: true },
+                        ].map(({ c, no }) => (
+                            <li
+                                key={c[0]}
+                                className="flex items-center gap-3 border-t border-border py-3.5 text-[15.5px]"
+                            >
+                                {no ? (
+                                    <X
+                                        aria-hidden
+                                        className="size-[18px] text-mk-warn"
+                                    />
+                                ) : (
+                                    <Check
+                                        aria-hidden
+                                        className="size-[18px] text-mk-ok"
+                                    />
+                                )}
+                                <span className="flex-1">{c[0]}</span>
+                                <span className="text-right text-[13.5px] text-muted-foreground">
+                                    {c[1]}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                </PhoneFold>
             </Section>
 
             {/* What stays private. */}
@@ -729,7 +729,7 @@ export function AskAiView({
                 aria-labelledby="private-title"
                 className="mt-12 scroll-mt-24 bg-mk-hover min-[760px]:mt-[140px]"
             >
-                <Container className="py-[72px] min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
+                <Container className="py-12 min-[760px]:pb-[110px] min-[760px]:pt-[120px]">
                     <h2
                         id="private-title"
                         className="m-0 font-display text-mk-kit-h2 font-bold"
@@ -754,16 +754,23 @@ export function AskAiView({
                                 </p>
                             </div>
                         </div>
-                        {[w.private.yours, w.private.who].map((x) => (
-                            <div key={x.title}>
-                                <b className="block text-[19px] font-semibold">
-                                    {x.title}
-                                </b>
-                                <p className="m-0 mt-2 text-[16px] leading-normal text-mk-copy">
-                                    {x.body}
-                                </p>
+                        <PhoneFold
+                            summary={w.private.more}
+                            className="max-[759px]:-mt-3 min-[760px]:contents"
+                        >
+                            <div className="grid gap-8 max-[759px]:pt-3">
+                                {[w.private.yours, w.private.who].map((x) => (
+                                    <div key={x.title}>
+                                        <b className="block text-[19px] font-semibold">
+                                            {x.title}
+                                        </b>
+                                        <p className="m-0 mt-2 text-[16px] leading-normal text-mk-copy">
+                                            {x.body}
+                                        </p>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </PhoneFold>
                     </div>
                 </Container>
             </section>
@@ -816,23 +823,25 @@ export function AskAiView({
                                 {w.mcp.rule.text}
                             </p>
                         </div>
-                        <div
-                            role="img"
-                            aria-label={w.mcp.label}
-                            className="grid min-w-0 gap-3 rounded-mk-card border border-border bg-mk-noon p-[18px]"
-                        >
-                            <div className="flex items-center gap-2 text-[13.5px] text-muted-foreground">
-                                <i
-                                    aria-hidden
-                                    className="block size-2 rounded-full bg-mk-ok"
-                                />
-                                {w.mcp.who}
+                        <PhoneClip height={200} label={w.mcp.more}>
+                            <div
+                                role="img"
+                                aria-label={w.mcp.label}
+                                className="grid min-w-0 gap-3 rounded-mk-card border border-border bg-mk-noon p-[18px]"
+                            >
+                                <div className="flex items-center gap-2 text-[13.5px] text-muted-foreground">
+                                    <i
+                                        aria-hidden
+                                        className="block size-2 rounded-full bg-mk-ok"
+                                    />
+                                    {w.mcp.who}
+                                </div>
+                                <Asked>{w.mcp.q}</Asked>
+                                <p className="m-0 font-serif text-[15px] leading-normal">
+                                    {w.mcp.a}
+                                </p>
                             </div>
-                            <Asked>{w.mcp.q}</Asked>
-                            <p className="m-0 font-serif text-[15px] leading-normal">
-                                {w.mcp.a}
-                            </p>
-                        </div>
+                        </PhoneClip>
                     </div>
                 </Container>
             ) : null}

@@ -49,7 +49,7 @@ export function DayScene({
         >
             <Container
                 className={cn(
-                    "grid grid-cols-[minmax(0,1fr)] gap-5 py-12 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]",
+                    "grid grid-cols-[minmax(0,1fr)] gap-4 py-8 min-[760px]:grid-cols-[200px_minmax(0,1fr)] min-[760px]:gap-12 min-[760px]:py-[120px]",
                     className,
                 )}
             >

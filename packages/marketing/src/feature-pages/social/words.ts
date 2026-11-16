@@ -90,6 +90,8 @@ export interface SocialWords {
         }[];
     };
     worth: {
+        /** On a phone, Ask AI's answer folds behind this. */
+        askMore: string;
         title: string;
         lead: string;
         label: string;
@@ -193,6 +195,8 @@ export interface SocialWords {
         inBio: string;
     };
     posted: {
+        /** On a phone, the feed is cut and this opens it. */
+        more: string;
         at: string;
         title: string;
         label: string;

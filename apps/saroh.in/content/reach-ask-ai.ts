@@ -317,6 +317,7 @@ export function askAiWords({
             ],
             phoneMore: "See it on Home, a customer and Calendar",
             asked: "Asked at the counter this week",
+            askedMore: "See what was asked this week",
             questions: [
                 { q: "Which orders go out today?", from: ["Orders"] },
                 ...(languages
@@ -395,11 +396,13 @@ export function askAiWords({
                 "Delete, cancel or refund",
                 "Never. Do those yourself.",
             ] as const,
+            listMore: "What it can change, and what it never does",
         },
 
         private: {
             id: "private",
             title: "What stays private.",
+            more: "Your conversations, and who uses it",
             role: {
                 title: "Only what your role can see.",
                 body: "It answers from what your role lets you see in Saroh. Someone without access to money gets no takings.",
@@ -433,6 +436,7 @@ export function askAiWords({
             title: "Prefer your own assistant? Connect Claude or ChatGPT.",
             body: "AI apps connects the assistant you already use to Saroh. It works on the same records as Ask AI, so a change it makes is a change everywhere.",
             link: "How AI apps work",
+            more: "See an answer from your assistant",
             rule: {
                 bold: "Which one?",
                 text: `Most owners use Ask AI: it's already in Saroh, ${languages ? "answers in Hinglish " : "answers from your records "}and asks before it changes anything. Connect your own assistant if you already live in Claude or ChatGPT, even on the bus.`,
@@ -503,7 +507,7 @@ export function askAiWords({
         ] as const,
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "See it in the app, step by step",
+            phone: "Help, every point and who uses it",
             everything: "Everything Ask AI does",
             usedBy: "Used by",
             of: "of",

@@ -288,6 +288,7 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             ],
             phoneMore: "See it on Home, a customer and Calendar",
             asked: "Asked at the counter this week",
+            askedMore: "See what was asked this week",
             questions: [
                 { q: "Which orders go out today?", from: ["Orders"] },
                 {
@@ -347,11 +348,13 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
                 ["Undo any of these the same day", "From the card"],
             ],
             never: ["Delete, cancel or refund", "Never. Do those yourself."],
+            listMore: "What it can change, and what it never does",
         },
 
         private: {
             id: "private",
             title: "What stays private.",
+            more: "Your conversations, and who uses it",
             role: {
                 title: "Only your business.",
                 body: "It answers from your own records in Saroh, for your business alone.",
@@ -381,6 +384,7 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             title: "Prefer your own assistant? Connect Claude or ChatGPT.",
             body: "AI apps connects the assistant you already use to Saroh, on Free. It works on the same records as Ask AI, so a change it makes is a change everywhere.",
             link: "How AI apps work",
+            more: "See an answer from your assistant",
             rule: {
                 bold: "Which one?",
                 text: "Ask AI is built into Saroh and asks before it changes anything, but it isn't part of Free. Connect your own assistant if you already live in Claude or ChatGPT, even on the bus.",
@@ -444,7 +448,7 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             usedBy: "Used by",
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "See it in the app, step by step",
+            phone: "Help, every point and who uses it",
         },
     };
 }

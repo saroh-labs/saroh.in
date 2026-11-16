@@ -27,7 +27,7 @@ export function AppList({
             titleId="apps-you-can-use"
             title={words.title}
             lead={words.lead}
-            className="grid gap-7 pt-[130px]"
+            className="grid gap-7 pt-14 min-[760px]:pt-[130px]"
         >
             {/* auto-fill: two live apps keep the board's four-across card width. */}
             {apps.length > 0 ? (

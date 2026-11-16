@@ -73,7 +73,8 @@ export function PhoneClip({
             >
                 {children}
             </div>
-            <details className="group min-[760px]:hidden">
+            {/* `data-pc`: a scene can show more of itself while this is open. */}
+            <details data-pc="toggle" className="group min-[760px]:hidden">
                 <summary
                     className={cn(
                         "inline-flex min-h-11 w-fit cursor-pointer list-none items-center rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden",

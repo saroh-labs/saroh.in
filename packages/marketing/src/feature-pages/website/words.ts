@@ -249,6 +249,8 @@ export interface WebsiteWords {
         phoneMoreMeta: string;
     };
     sections: {
+        /** On a phone, what the sections read and what you fill fold behind this. */
+        more: string;
         title: string;
         lead: string;
         pages: readonly (readonly [string, string])[];
@@ -263,6 +265,8 @@ export interface WebsiteWords {
         };
     };
     shared: {
+        /** On a phone, the shared preview is cut and this opens it. */
+        more: string;
         title: string;
         lead: string;
         chatLabel: string;
@@ -286,6 +290,8 @@ export interface WebsiteWords {
         phoneMoreMeta: string;
     };
     ask: {
+        /** On a phone, the assistant's answer folds behind this. */
+        more: string;
         title: string;
         at: string;
         body: string;

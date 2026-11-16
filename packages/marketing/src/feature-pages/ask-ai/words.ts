@@ -216,6 +216,8 @@ export interface AskAiWords {
         )[];
         phoneMore: string;
         asked: string;
+        /** On a phone, the questions asked this week and the history line fold behind this. */
+        askedMore: string;
         questions: {
             q: string;
             from: string[];
@@ -263,8 +265,12 @@ export interface AskAiWords {
             readonly [string, string],
         ];
         never: readonly [string, string];
+        /** On a phone, what it can and can't change folds behind this. */
+        listMore: string;
     };
     private: {
+        /** On a phone, the second and third points fold behind this. */
+        more: string;
         id: string;
         title: string;
         role: {
@@ -291,6 +297,8 @@ export interface AskAiWords {
         compare: string;
     };
     mcp: {
+        /** On a phone, the rule and the assistant's answer fold behind this. */
+        more: string;
         title: string;
         body: string;
         link: string;

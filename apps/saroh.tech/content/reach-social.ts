@@ -147,6 +147,7 @@ export function socialWords({
         },
 
         worth: {
+            askMore: "See what Ask AI says",
             title: "Share tells you what's worth posting.",
             lead: "Every morning it looks at what sold, your offers and your classes, and puts three ideas at the top. Ask AI can tell you too, and ends with the post worth making.",
             label: `Saroh's Social page for ${bakery.name} with Worth posting today`,
@@ -244,6 +245,7 @@ export function socialWords({
         },
 
         posted: {
+            more: "See it in the feed",
             at: "13:05",
             title: "Posted. Back to the ovens.",
             label: `${bakery.name}'s post on Instagram, on a phone`,
@@ -441,7 +443,7 @@ export function socialWords({
             usedBy: "Used by",
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
-            phone: "See it in the app, step by step",
+            phone: "Help, every point and who uses it",
         },
         insights,
     };

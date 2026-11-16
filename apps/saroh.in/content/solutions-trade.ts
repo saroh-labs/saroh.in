@@ -45,6 +45,7 @@ export const TRADE_WORDS = {
     allTradesShort: "All trades",
     /** On a phone, the hour's whole story folds behind this. */
     wholeHour: "Read the whole hour",
+    allQuestions: "All questions",
     /** A scene's cut pictures, when none of them names its own fold. */
     wholePicture: "See all of it",
     /** A trade without a written day: its sample day, cut on a phone. */

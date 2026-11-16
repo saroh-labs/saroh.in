@@ -121,7 +121,7 @@ export function Looks({
             <div className="mt-4 grid items-start gap-7 min-[1080px]:grid-cols-[1fr_290px]">
                 <figure
                     aria-label={`${frameLabel}, in the ${current.label.toLowerCase()}`}
-                    className="relative m-0 min-w-0 overflow-hidden rounded-mk-card bg-card shadow-[0_1px_2px_rgba(40,30,15,0.06),0_28px_60px_-24px_rgba(40,30,15,0.32)] max-[759px]:max-h-[620px]"
+                    className="relative m-0 min-w-0 overflow-hidden rounded-mk-card bg-card shadow-[0_1px_2px_rgba(40,30,15,0.06),0_28px_60px_-24px_rgba(40,30,15,0.32)] max-[759px]:max-h-[440px]"
                 >
                     <Address address={words.address} example={example} />
                     <div

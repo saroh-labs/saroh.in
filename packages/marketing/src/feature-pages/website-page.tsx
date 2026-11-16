@@ -10,6 +10,7 @@ import { cn } from "../cn";
 import { dayLink } from "../content/world";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
+import { PhoneClip, PhoneFold } from "../kit/phone-fold";
 import { StickyBar } from "../kit/sticky-bar";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
@@ -630,7 +631,7 @@ export function WebsiteView({
                     <div
                         role="img"
                         aria-label={w.draft.label}
-                        className="relative max-h-[390px] overflow-hidden rounded-mk-card border border-border bg-card shadow-[0_24px_50px_-28px_rgba(40,30,15,0.3)] min-[760px]:max-h-none"
+                        className="relative max-h-[320px] overflow-hidden rounded-mk-card border border-border bg-card shadow-[0_24px_50px_-28px_rgba(40,30,15,0.3)] min-[760px]:max-h-none"
                     >
                         <div className="flex h-[58px] items-center gap-3 border-b border-mk-line-row px-4">
                             <span className="text-[15px] font-semibold">
@@ -826,16 +827,18 @@ export function WebsiteView({
                             {w.sections.addPage}
                         </div>
                     </div>
-                    <div className="grid gap-7 pt-1.5">
-                        {[w.sections.read, w.sections.fill].map((b) => (
-                            <div key={b.title}>
-                                <h3 className={H3}>{b.title}</h3>
-                                <p className="m-0 mt-2 text-[16px] leading-normal text-mk-copy min-[760px]:text-[17px]">
-                                    {b.body}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
+                    <PhoneFold summary={w.sections.more}>
+                        <div className="grid gap-7 pt-1.5">
+                            {[w.sections.read, w.sections.fill].map((b) => (
+                                <div key={b.title}>
+                                    <h3 className={H3}>{b.title}</h3>
+                                    <p className="m-0 mt-2 text-[16px] leading-normal text-mk-copy min-[760px]:text-[17px]">
+                                        {b.body}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </PhoneFold>
                 </div>
             </Section>
 
@@ -848,37 +851,39 @@ export function WebsiteView({
                 className={SCENE}
             >
                 <div className="mt-10 grid items-start gap-10 min-[760px]:mt-[52px] min-[1080px]:grid-cols-[420px_1fr] min-[1080px]:gap-16">
-                    <div
-                        role="img"
-                        aria-label={w.shared.chatLabel}
-                        className="rounded-[18px] bg-mk-afternoon p-[22px]"
-                    >
-                        <div className="mb-2.5 text-[13px] font-semibold text-mk-copy">
-                            {w.shared.who}
-                        </div>
-                        <div className="max-w-[330px] rounded-[12px_12px_12px_4px] bg-card p-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.08)]">
-                            <div className="overflow-hidden rounded-lg bg-mk-noon">
-                                <Photo kind="buns" className="h-[150px]" />
-                                <div className="px-[11px] py-[9px]">
-                                    <b className="block text-[14.5px]">
-                                        {w.shared.card.title}
-                                    </b>
-                                    <span className="mt-0.5 block text-[13px] leading-snug text-mk-copy">
-                                        {w.shared.card.line}
-                                    </span>
-                                    <em className="mt-1 block text-[12.5px] not-italic text-muted-foreground">
-                                        {w.shared.card.url}
-                                    </em>
+                    <PhoneClip height={260} label={w.shared.more}>
+                        <div
+                            role="img"
+                            aria-label={w.shared.chatLabel}
+                            className="rounded-[18px] bg-mk-afternoon p-[22px]"
+                        >
+                            <div className="mb-2.5 text-[13px] font-semibold text-mk-copy">
+                                {w.shared.who}
+                            </div>
+                            <div className="max-w-[330px] rounded-[12px_12px_12px_4px] bg-card p-1.5 shadow-[0_1px_1px_rgba(0,0,0,0.08)]">
+                                <div className="overflow-hidden rounded-lg bg-mk-noon">
+                                    <Photo kind="buns" className="h-[150px]" />
+                                    <div className="px-[11px] py-[9px]">
+                                        <b className="block text-[14.5px]">
+                                            {w.shared.card.title}
+                                        </b>
+                                        <span className="mt-0.5 block text-[13px] leading-snug text-mk-copy">
+                                            {w.shared.card.line}
+                                        </span>
+                                        <em className="mt-1 block text-[12.5px] not-italic text-muted-foreground">
+                                            {w.shared.card.url}
+                                        </em>
+                                    </div>
+                                </div>
+                                <div className="px-1.5 pb-0.5 pt-2 text-[14.5px]">
+                                    {w.shared.message}
+                                </div>
+                                <div className="px-1.5 pb-0.5 text-right font-mono text-[12px] text-muted-foreground">
+                                    {w.shared.time}
                                 </div>
                             </div>
-                            <div className="px-1.5 pb-0.5 pt-2 text-[14.5px]">
-                                {w.shared.message}
-                            </div>
-                            <div className="px-1.5 pb-0.5 text-right font-mono text-[12px] text-muted-foreground">
-                                {w.shared.time}
-                            </div>
                         </div>
-                    </div>
+                    </PhoneClip>
                     <div className="hidden overflow-hidden rounded-mk-card border border-border bg-card pb-2 min-[760px]:block">
                         <h3 className="m-0 flex justify-between border-b border-mk-line-row px-5 py-4 text-[16px] font-semibold">
                             {w.shared.panel}
@@ -993,36 +998,38 @@ export function WebsiteView({
                             </TextLink>
                         ) : null}
                     </div>
-                    <div
-                        role="img"
-                        aria-label={w.ask.label}
-                        className="flex min-w-0 flex-col gap-3 rounded-mk-card border border-border bg-mk-noon p-[18px]"
-                    >
-                        <div className="flex items-center gap-2.5 text-[13.5px] text-muted-foreground">
-                            <b className="font-semibold text-foreground">
-                                {w.ask.app}
-                            </b>
-                            {w.ask.connected}
+                    <PhoneClip height={220} label={w.ask.more}>
+                        <div
+                            role="img"
+                            aria-label={w.ask.label}
+                            className="flex min-w-0 flex-col gap-3 rounded-mk-card border border-border bg-mk-noon p-[18px]"
+                        >
+                            <div className="flex items-center gap-2.5 text-[13.5px] text-muted-foreground">
+                                <b className="font-semibold text-foreground">
+                                    {w.ask.app}
+                                </b>
+                                {w.ask.connected}
+                            </div>
+                            <div className="max-w-[88%] self-end rounded-xl bg-mk-hover px-3 py-[9px] text-[14px] leading-snug">
+                                {w.ask.ask}
+                            </div>
+                            <p className="m-0 font-serif text-[15px] leading-normal text-foreground">
+                                {w.ask.answer}
+                            </p>
+                            <div className="flex items-center gap-3.5 rounded-xl border border-border bg-card px-3.5 py-3">
+                                <Photo
+                                    kind="festive"
+                                    className="h-11 w-16 shrink-0 rounded-md"
+                                />
+                                <span className="min-w-0 flex-1 text-[14.5px] leading-snug">
+                                    {w.ask.draft}
+                                    <small className="block truncate font-mono text-[12.5px] text-muted-foreground">
+                                        {w.ask.draftUrl}
+                                    </small>
+                                </span>
+                            </div>
                         </div>
-                        <div className="max-w-[88%] self-end rounded-xl bg-mk-hover px-3 py-[9px] text-[14px] leading-snug">
-                            {w.ask.ask}
-                        </div>
-                        <p className="m-0 font-serif text-[15px] leading-normal text-foreground">
-                            {w.ask.answer}
-                        </p>
-                        <div className="flex items-center gap-3.5 rounded-xl border border-border bg-card px-3.5 py-3">
-                            <Photo
-                                kind="festive"
-                                className="h-11 w-16 shrink-0 rounded-md"
-                            />
-                            <span className="min-w-0 flex-1 text-[14.5px] leading-snug">
-                                {w.ask.draft}
-                                <small className="block truncate font-mono text-[12.5px] text-muted-foreground">
-                                    {w.ask.draftUrl}
-                                </small>
-                            </span>
-                        </div>
-                    </div>
+                    </PhoneClip>
                 </div>
             </Container>
 

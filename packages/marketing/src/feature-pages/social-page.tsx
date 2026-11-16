@@ -19,6 +19,7 @@ import { cn } from "../cn";
 import { dayLink } from "../content/world";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
+import { PhoneClip } from "../kit/phone-fold";
 import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
@@ -128,7 +129,7 @@ export function SocialView({
                 note={w.note}
                 stacked
             >
-                <CropToggle label={w.stage.more} height={400}>
+                <CropToggle label={w.stage.more} height={330}>
                     <div
                         role="group"
                         aria-label={w.stage.label}
@@ -428,57 +429,59 @@ export function SocialView({
                                 className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-card min-[760px]:hidden"
                             />
                         </div>
-                        <div
-                            role="img"
-                            aria-label={w.worth.ask.label}
-                            className={cn(
-                                PANEL,
-                                "flex flex-col gap-2.5 px-[22px] py-5",
-                            )}
-                        >
-                            <div className="flex items-center gap-2 text-[15px] font-semibold">
-                                <Sparkles
-                                    aria-hidden
-                                    className="size-[18px] text-brand-700"
-                                />
-                                {w.worth.ask.title}
-                            </div>
-                            <div className="max-w-[82%] self-end rounded-[14px_14px_4px_14px] bg-foreground px-[13px] py-[9px] text-[15px] text-background">
-                                {w.worth.ask.q}
-                            </div>
-                            <div>
-                                <b className="block text-[17px] font-semibold">
-                                    {w.worth.ask.a}
-                                </b>
-                                <span className="text-[15px]">
-                                    {w.worth.ask.more}
-                                </span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
-                                {w.worth.ask.from}
-                                {w.worth.ask.sources.map((src) => (
-                                    <span
-                                        key={src}
-                                        className="inline-flex h-7 items-center gap-1.5 rounded-full bg-background px-2.5 text-[13px] font-semibold text-mk-copy"
-                                    >
-                                        <i
-                                            aria-hidden
-                                            className="block size-[7px] rounded-full bg-brand-500"
-                                        />
-                                        {src}
+                        <PhoneClip height={200} label={w.worth.askMore}>
+                            <div
+                                role="img"
+                                aria-label={w.worth.ask.label}
+                                className={cn(
+                                    PANEL,
+                                    "flex flex-col gap-2.5 px-[22px] py-5",
+                                )}
+                            >
+                                <div className="flex items-center gap-2 text-[15px] font-semibold">
+                                    <Sparkles
+                                        aria-hidden
+                                        className="size-[18px] text-brand-700"
+                                    />
+                                    {w.worth.ask.title}
+                                </div>
+                                <div className="max-w-[82%] self-end rounded-[14px_14px_4px_14px] bg-foreground px-[13px] py-[9px] text-[15px] text-background">
+                                    {w.worth.ask.q}
+                                </div>
+                                <div>
+                                    <b className="block text-[17px] font-semibold">
+                                        {w.worth.ask.a}
+                                    </b>
+                                    <span className="text-[15px]">
+                                        {w.worth.ask.more}
                                     </span>
-                                ))}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
+                                    {w.worth.ask.from}
+                                    {w.worth.ask.sources.map((src) => (
+                                        <span
+                                            key={src}
+                                            className="inline-flex h-7 items-center gap-1.5 rounded-full bg-background px-2.5 text-[13px] font-semibold text-mk-copy"
+                                        >
+                                            <i
+                                                aria-hidden
+                                                className="block size-[7px] rounded-full bg-brand-500"
+                                            />
+                                            {src}
+                                        </span>
+                                    ))}
+                                </div>
+                                <span className="mt-1 inline-flex h-11 items-center gap-2 self-start rounded-full border-[1.5px] border-foreground bg-card px-4 text-[14.5px] font-semibold">
+                                    <Sparkles aria-hidden className="size-4" />
+                                    {w.worth.ask.follow}
+                                </span>
+                                {w.worth.ask.plans ? (
+                                    <p className="m-0 text-[13.5px] text-muted-foreground">
+                                        {w.worth.ask.plans}
+                                    </p>
+                                ) : null}
                             </div>
-                            <span className="mt-1 inline-flex h-11 items-center gap-2 self-start rounded-full border-[1.5px] border-foreground bg-card px-4 text-[14.5px] font-semibold">
-                                <Sparkles aria-hidden className="size-4" />
-                                {w.worth.ask.follow}
-                            </span>
-                            {w.worth.ask.plans ? (
-                                <p className="m-0 text-[13.5px] text-muted-foreground">
-                                    {w.worth.ask.plans}
-                                </p>
-                            ) : null}
-                        </div>
+                        </PhoneClip>
                     </div>
                     <p className="m-0 mt-4 text-[15px] text-mk-copy min-[760px]:hidden">
                         {w.worth.phoneAlso}
@@ -733,29 +736,31 @@ export function SocialView({
                 className="mt-12 bg-mk-hover min-[760px]:mt-[140px]"
             >
                 <Container className="grid items-center gap-10 py-12 min-[760px]:py-[110px] min-[1080px]:grid-cols-[420px_1fr] min-[1080px]:gap-16">
-                    <div className="order-2 flex justify-center min-[1080px]:order-none">
-                        <div
-                            role="img"
-                            aria-label={w.posted.label}
-                            className="relative w-full max-w-[270px] rounded-[44px] bg-foreground p-2.5 shadow-mk-hero min-[760px]:max-w-[330px]"
-                        >
-                            <span
-                                aria-hidden
-                                className="absolute left-1/2 top-4 z-[3] h-[22px] w-[84px] -translate-x-1/2 rounded-xl bg-foreground"
-                            />
-                            <div className="overflow-hidden rounded-[36px] bg-card pb-6 pt-8">
-                                <Feed {...w.feed} className="rounded-none">
-                                    <ItemCard
-                                        set={card}
-                                        look={leadLook}
-                                        kind="price"
-                                        photo="buns"
-                                        flat
-                                        className="w-full"
-                                    />
-                                </Feed>
+                    <div className="order-2 grid justify-items-center min-[1080px]:order-none">
+                        <PhoneClip height={320} label={w.posted.more}>
+                            <div
+                                role="img"
+                                aria-label={w.posted.label}
+                                className="relative w-full max-w-[270px] rounded-[44px] bg-foreground p-2.5 shadow-mk-hero min-[760px]:max-w-[330px]"
+                            >
+                                <span
+                                    aria-hidden
+                                    className="absolute left-1/2 top-4 z-[3] h-[22px] w-[84px] -translate-x-1/2 rounded-xl bg-foreground"
+                                />
+                                <div className="overflow-hidden rounded-[36px] bg-card pb-6 pt-8">
+                                    <Feed {...w.feed} className="rounded-none">
+                                        <ItemCard
+                                            set={card}
+                                            look={leadLook}
+                                            kind="price"
+                                            photo="buns"
+                                            flat
+                                            className="w-full"
+                                        />
+                                    </Feed>
+                                </div>
                             </div>
-                        </div>
+                        </PhoneClip>
                     </div>
                     <div>
                         <StoryTime white>
@@ -851,7 +856,7 @@ export function SocialView({
                     aria-label={w.own.label}
                     className={cn(
                         PANEL,
-                        "relative mt-10 grid items-start gap-6 overflow-hidden p-5 max-[759px]:max-h-[560px] min-[760px]:mt-12 min-[760px]:p-6 min-[1080px]:grid-cols-[330px_1fr]",
+                        "relative mt-10 grid items-start gap-6 overflow-hidden p-5 max-[759px]:max-h-[420px] min-[760px]:mt-12 min-[760px]:p-6 min-[1080px]:grid-cols-[330px_1fr]",
                     )}
                 >
                     <Feed
@@ -920,90 +925,75 @@ export function SocialView({
                         className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-b from-transparent to-card min-[760px]:hidden"
                     />
                 </div>
-                <div className="hidden min-[760px]:block">
-                    <h3 className="m-0 mt-11 text-[18px] font-semibold">
-                        {w.own.listTitle}
-                    </h3>
-                    <ul className="m-0 mt-3 grid list-none grid-cols-3 gap-3.5 p-0 min-[1080px]:grid-cols-5">
-                        {w.own.list.map((p) => (
-                            <li key={p.name}>
-                                <div className="relative flex justify-center rounded-xl bg-mk-hover p-2">
-                                    <StateChip draft={p.state === "Draft"}>
-                                        {p.state}
-                                    </StateChip>
-                                    {p.kind === "text" ? (
-                                        leadLook.look ? (
-                                            <PostCard
-                                                look={leadLook.look}
-                                                band={leadLook.band}
-                                                kind="text"
-                                                fill={p.fill}
+                {/* The posts list, once: shown on desk, folded on a phone. */}
+                <PhoneClip height={240} label={w.own.phoneMore}>
+                    <div className="mt-3 min-[760px]:mt-0">
+                        <h3 className="m-0 text-[18px] font-semibold min-[760px]:mt-11">
+                            {w.own.listTitle}
+                        </h3>
+                        <ul className="m-0 mt-3 grid list-none grid-cols-3 gap-3.5 p-0 min-[1080px]:grid-cols-5">
+                            {w.own.list.map((p) => (
+                                <li key={p.name}>
+                                    <div className="relative flex justify-center rounded-xl bg-mk-hover p-2">
+                                        <StateChip draft={p.state === "Draft"}>
+                                            {p.state}
+                                        </StateChip>
+                                        {p.kind === "text" ? (
+                                            leadLook.look ? (
+                                                <PostCard
+                                                    look={leadLook.look}
+                                                    band={leadLook.band}
+                                                    kind="text"
+                                                    fill={p.fill}
+                                                    photo="buns"
+                                                    label={p.card ?? p.name}
+                                                    className="w-[118px]"
+                                                    words={{
+                                                        label: lead.name,
+                                                        name: p.card ?? p.name,
+                                                        line:
+                                                            "line" in p
+                                                                ? p.line
+                                                                : undefined,
+                                                        web: lead.site,
+                                                    }}
+                                                />
+                                            ) : null
+                                        ) : (
+                                            <ItemCard
+                                                set={card}
+                                                look={leadLook}
+                                                kind={p.kind}
                                                 photo="buns"
-                                                label={p.card ?? p.name}
                                                 className="w-[118px]"
-                                                words={{
-                                                    label: lead.name,
-                                                    name: p.card ?? p.name,
-                                                    line:
-                                                        "line" in p
-                                                            ? p.line
-                                                            : undefined,
-                                                    web: lead.site,
-                                                }}
                                             />
-                                        ) : null
-                                    ) : (
-                                        <ItemCard
-                                            set={card}
-                                            look={leadLook}
-                                            kind={p.kind}
-                                            photo="buns"
-                                            className="w-[118px]"
-                                        />
-                                    )}
-                                </div>
-                                <b className="mt-2.5 block text-[14px] font-semibold leading-snug">
-                                    {p.name}
-                                </b>
-                                <small className="block text-[12.5px] text-mk-copy">
-                                    {p.when}
-                                </small>
-                                {"visits" in p && p.visits ? (
-                                    <Claim on={insights}>
-                                        <Visits
-                                            visits={p.visits}
-                                            example={w.posted.example}
-                                            small
-                                        />
-                                    </Claim>
-                                ) : null}
-                            </li>
-                        ))}
-                    </ul>
-                    <Claim on={insights}>
-                        <p className="m-0 mt-[18px] text-[13px] text-muted-foreground">
-                            {w.own.foot}
-                        </p>
-                    </Claim>
-                </div>
-                <Fold
-                    phone
-                    label={w.own.phoneMore}
-                    meta={w.own.phoneMoreMeta}
-                    className="mt-3"
-                >
-                    <ul>
-                        {w.own.list.map((p) => (
-                            <li key={p.name}>
-                                {p.name} · {p.when}
-                                {insights && "visits" in p && p.visits
-                                    ? ` · ${p.visits} (${w.posted.example.toLowerCase()})`
-                                    : ""}
-                            </li>
-                        ))}
-                    </ul>
-                    {insights ? <p className="m-0 mt-2">{w.own.foot}</p> : null}
-                </Fold>
+                                        )}
+                                    </div>
+                                    <b className="mt-2.5 block text-[14px] font-semibold leading-snug">
+                                        {p.name}
+                                    </b>
+                                    <small className="block text-[12.5px] text-mk-copy">
+                                        {p.when}
+                                    </small>
+                                    {"visits" in p && p.visits ? (
+                                        <Claim on={insights}>
+                                            <Visits
+                                                visits={p.visits}
+                                                example={w.posted.example}
+                                                small
+                                            />
+                                        </Claim>
+                                    ) : null}
+                                </li>
+                            ))}
+                        </ul>
+                        <Claim on={insights}>
+                            <p className="m-0 mt-[18px] text-[13px] text-muted-foreground">
+                                {w.own.foot}
+                            </p>
+                        </Claim>
+                    </div>
+                </PhoneClip>
             </Section>
 
             {/* Saroh Social, the add-on (the footer links here). */}

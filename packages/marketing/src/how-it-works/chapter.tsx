@@ -8,8 +8,6 @@ import { Pill } from "../links/pill";
 import { TextLink } from "../links/text-link";
 import { ring } from "../ring";
 
-import { PhoneFold } from "../kit/phone-fold";
-
 import { Rich } from "./rich";
 
 export interface ChapterLink {
@@ -95,7 +93,7 @@ export function Chapter({
     return (
         <div
             id={id}
-            className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-6 min-[760px]:gap-14"
+            className="grid scroll-mt-[calc(var(--mk-nav-h)+16px)] grid-cols-[minmax(0,1fr)] gap-5 min-[760px]:gap-14"
         >
             <div className="grid gap-4 min-[960px]:grid-cols-2 min-[960px]:items-end min-[960px]:gap-12">
                 <h2
@@ -104,41 +102,45 @@ export function Chapter({
                 >
                     {title}
                 </h2>
-                <p
-                    className={cn(
-                        "m-0 text-mk-kit-lead [text-wrap:pretty]",
-                        rest && "max-[759px]:hidden",
-                        onInk
-                            ? "text-mk-ledger-fg/90 [&_b]:text-mk-ledger-fg"
-                            : "text-mk-copy",
-                    )}
-                >
-                    <Rich text={lead} />
-                </p>
-                {/* A phone: the lead's first sentence, the rest folded (PHONE.md). */}
-                {rest ? (
-                    <div
+                {/* The lead once: a phone shows its first sentence, the rest
+                    while Read more is open (PHONE.md). */}
+                <div className="group/lead grid gap-1">
+                    <p
                         className={cn(
-                            "grid gap-1 text-mk-kit-lead min-[760px]:hidden",
+                            "m-0 text-mk-kit-lead [text-wrap:pretty]",
                             onInk
                                 ? "text-mk-ledger-fg/90 [&_b]:text-mk-ledger-fg"
                                 : "text-mk-copy",
                         )}
                     >
-                        <p className="m-0 [text-wrap:pretty]">
-                            <Rich text={opening} />
-                        </p>
-                        <PhoneFold
-                            summary={readMore}
-                            tone={onInk ? "on-ink" : "ink"}
-                            className="text-[16px]"
-                        >
-                            <p className="m-0 mt-1 [text-wrap:pretty]">
+                        <Rich text={opening} />
+                        {rest ? (
+                            <span className="max-[759px]:hidden max-[759px]:group-has-[>details[open]]/lead:inline">
+                                {" "}
                                 <Rich text={rest} />
-                            </p>
-                        </PhoneFold>
-                    </div>
-                ) : null}
+                            </span>
+                        ) : null}
+                    </p>
+                    {rest ? (
+                        <details className="group min-[760px]:hidden">
+                            <summary
+                                className={cn(
+                                    "inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm text-[16px] font-semibold underline decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden",
+                                    onInk
+                                        ? "text-mk-lamp-fg decoration-mk-on-ink-line"
+                                        : "text-foreground decoration-border-strong",
+                                    ring(),
+                                )}
+                            >
+                                {readMore}
+                                <ChevronDown
+                                    aria-hidden
+                                    className="size-[18px] shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                                />
+                            </summary>
+                        </details>
+                    ) : null}
+                </div>
             </div>
             {before}
             <SwipeRow
