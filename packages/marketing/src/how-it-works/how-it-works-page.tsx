@@ -75,15 +75,6 @@ export interface HowItWorksProps {
 /** "/features/orders" → "orders", when it names a feature page. */
 const slugOf = (href: string) => /^\/features\/([\w-]+)/.exec(href)?.[1];
 
-/** A price times a count, in the price's own currency: "₹360" × 46 → "₹16,560". */
-function times(price: string, n: number, locale: string): string {
-    const value = Number(price.replace(/[^\d.]/g, "")) * n;
-    return price.replace(
-        /[\d,.]+/,
-        new Intl.NumberFormat(locale).format(value),
-    );
-}
-
 /**
  * /features, "How it works" (DEC-221; boards HWDesk and HWPhone2): what
  * Saroh keeps, what reaches customers, and how you ask and connect, told in
@@ -133,8 +124,6 @@ export function HowItWorksPage({
         if (!found) throw new Error(`No order "${id}" in the world`);
         return found;
     };
-    // Digits grouped the edition's way: "₹1,23,450" in India, "$123,450" elsewhere.
-    const locale = WORLD.edition === "india" ? "en-IN" : "en-US";
     const priced = (i: { price: string; unit?: string }) =>
         i.unit ? `${i.price} · ${i.unit}` : i.price;
     const paidOrder = order(STORY.paidOrder);
@@ -483,7 +472,7 @@ export function HowItWorksPage({
                             [
                                 top.name,
                                 String(STORY.topSeller.sold),
-                                times(top.price, STORY.topSeller.sold, locale),
+                                STORY.topSeller.takings,
                             ],
                         ]}
                         readFrom={P.answer.readFrom}

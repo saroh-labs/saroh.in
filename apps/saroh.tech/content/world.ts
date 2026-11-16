@@ -317,7 +317,7 @@ export const THISTLEWICK_TUESDAY = {
      */
     priceChange: { item: "cinnamon-six", from: "$24.00", to: "$25.00" },
     /** The best seller this week; the count is not in the seed. */
-    topSeller: { item: "cinnamon-bun", sold: 52 },
+    topSeller: { item: "cinnamon-bun", sold: 52, takings: "$234.00" },
     /**
      * Not in the seed, and examples as every drawing says: this morning's
      * counts (the seed's stock levels), a class (the seed's bakery runs

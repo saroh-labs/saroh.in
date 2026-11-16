@@ -153,7 +153,8 @@ export interface WorldStory {
         price: string;
     };
     week: { takings: string; orders: number; change: string };
-    topSeller: { item: string; sold: number };
+    /** The week's top seller, and its takings as the edition writes money. */
+    topSeller: { item: string; sold: number; takings: string };
     /** The product a post is made of (Share), and the ones Share lists. */
     featured: string;
     shareItems: readonly string[];

@@ -17,9 +17,6 @@ export type { HomeHeroScene };
  * `--font-site-serif` and `--font-site-sans`.
  */
 
-const SERIF = "var(--font-site-serif), Georgia, serif";
-const SANS = "var(--font-site-sans), ui-sans-serif, system-ui, sans-serif";
-
 const RYE_LOOK: SiteLook = TRADE_LOOKS.bakery;
 
 /** Rye & Co., the lead: Asha's Monday is every story's home. */
@@ -459,7 +456,7 @@ export const RYE_MONDAY = {
         price: "₹1,800",
     },
     week: { takings: "₹48,200", orders: 68, change: "up 12% on last week" },
-    topSeller: { item: "bun-box", sold: 46 },
+    topSeller: { item: "bun-box", sold: 46, takings: "₹16,560" },
     /** The product Share makes a post of, and the ones its sheet lists. */
     featured: "bun-box",
     shareItems: ["bun-box", "sourdough", "rose-pistachio"],
