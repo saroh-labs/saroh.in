@@ -20,6 +20,7 @@ import type { Rng } from "../showcase/random";
 import { createRng } from "../showcase/random";
 import { writeTraffic } from "../showcase/traffic";
 import { writesStandIns } from "../stand-in-providers";
+import { planBilling } from "./billing";
 import type {
     GlobalBusiness,
     GlobalManualInvoice,
@@ -118,8 +119,10 @@ interface Person {
 interface Doc {
     id: string;
     status: "DRAFT" | "ISSUED" | "PAID";
-    source: "BOOKING" | "MANUAL" | "ORDER";
+    source: "BOOKING" | "MANUAL" | "ORDER" | "SUBSCRIPTION";
     bookingId?: string;
+    subscriptionId?: string;
+    period?: { start: Date; end: Date };
     orderId?: string;
     contactId?: string;
     billToName: string;
@@ -253,6 +256,17 @@ async function seedOne(
             enabled: true,
         },
     });
+    // Ask AI is rolled out per business (DEC-220): on where its page shows it.
+    if (biz.askAi) {
+        await prisma.featureFlagOverride.create({
+            data: {
+                id: sid("flagoverride", "ask-ai"),
+                flagKey: "ASK_AI",
+                organizationId: orgId,
+                enabled: true,
+            },
+        });
+    }
     // Its paid plan where the live catalogue has one (dev's, imported), else
     // Free, the only plan production offers Global today (DEC-211).
     // A throwaway database gets sample paid plans when it has none, so CI's
@@ -539,7 +553,17 @@ async function seedOne(
 
     // --- people, and the diary they're on
     const plan = planGlobal(biz, now, demoUserId);
-    const { people, regularOf, docs, bookings, events } = plan;
+    const { people, regularOf, bookings, events } = plan;
+    // Memberships (paid plans), invoiced each period.
+    const billing = planBilling(biz, {
+        orgId,
+        sid,
+        rng,
+        now,
+        demoUserId,
+        people,
+    });
+    const docs = [...plan.docs, ...billing.docs];
     await prisma.contact.createMany({
         data: people.map((p, i) => ({
             id: p.contactId,
@@ -644,6 +668,10 @@ async function seedOne(
 
     for (let k = 0; k < bookings.length; k += 1000) {
         await prisma.booking.createMany({ data: bookings.slice(k, k + 1000) });
+    }
+    if (billing.plans.length) {
+        await prisma.subscriptionPlan.createMany({ data: billing.plans });
+        await prisma.customerSubscription.createMany({ data: billing.subs });
     }
     for (let k = 0; k < events.length; k += 1000) {
         await prisma.bookingEvent.createMany({
@@ -2013,6 +2041,9 @@ async function writeInvoices(
             source: d.source,
             bookingId: d.bookingId,
             orderId: d.orderId,
+            subscriptionId: d.subscriptionId,
+            periodStart: d.period?.start,
+            periodEnd: d.period?.end,
             contactId: d.contactId,
             billToName: d.billToName,
             billToEmail: d.billToEmail,
@@ -2081,21 +2112,16 @@ async function checkGlobal(prisma: Db, orgIds: readonly string[], now: Date) {
         }
     }
     const scoped = { organizationId: { in: [...orgIds] } };
-    // What a Free business can be: one person, no Payments and no class packs.
-    // Insights and Courses are switches it may turn on (no catalogue row).
-    const [members, otherStaff, modules] = await Promise.all([
+    // One person each: a diary person with no login would take a seat.
+    // Payments is on where the business sells memberships (paid plans, owner
+    // 16 Nov 2026), with no provider connected.
+    const [members, otherStaff] = await Promise.all([
         prisma.membership.count({ where: scoped }),
         prisma.staffMember.count({ where: { ...scoped, membershipId: null } }),
-        prisma.organizationModule.count({
-            where: {
-                ...scoped,
-                moduleKey: { in: ["PAYMENTS", "CLASS_PACKS"] },
-            },
-        }),
     ]);
-    if (members !== orgIds.length || otherStaff > 0 || modules > 0) {
+    if (members !== orgIds.length || otherStaff > 0) {
         throw new Error(
-            `[global] more than Free: ${members} members, ${otherStaff} staff with no login, ${modules} paid modules`,
+            `[global] more than one person: ${members} members, ${otherStaff} staff with no login`,
         );
     }
     // Free's monthly caps, counted in each business's own months.

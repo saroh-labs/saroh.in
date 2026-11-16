@@ -8,12 +8,13 @@ import { RYE_CAKE_PHOTOS } from "../showcase/catalog-photos";
  * Everything is sample data. Emails are on example.com. US phones are in
  * 555-0100..0199 and UK ones in Ofcom's 0117 496 0xxx, both set aside for
  * fiction. Tax numbers say SAMPLE or are all zeros, and the businesses, people
- * and streets are made up. No GSTIN, no payment provider, nothing online: what
- * a Global business can do today. They sit on the Free plan, the only plan
- * Global can use (no working subscriptions, deposits or pay links).
+ * and streets are made up. No GSTIN, no payment provider, nothing online.
+ * They sit on paid plans so the shots show what a paying business gets
+ * (owner, 16 Nov 2026): the gym and the bakery sell memberships, invoiced
+ * each period and paid at the desk, so Payments is on there.
  *
- * Each is what a new Free business has after setup and some real use: the
- * modules setup offers, no Payments, and one person: the owner, with no other
+ * Each is what a business has after setup and some real use: the modules
+ * setup offers, and one person: the owner, with no other
  * login or diary person, since each would take a team seat. Numbers stay inside
  * the limits of dev's catalogue (LOCAL_DEV), which aren't written here: the
  * repo is public.
@@ -164,6 +165,26 @@ export interface GlobalBusiness {
      * what a paying business gets (owner, 16 Nov 2026).
      */
     plan: "grow" | "pro";
+    /**
+     * Memberships sold at the desk and invoiced each period (`billing.ts`):
+     * the first `members` people, regulars first, are on one each.
+     */
+    memberships?: {
+        plans: readonly {
+            name: string;
+            description: string;
+            /** Smallest unit of the business's currency. */
+            price: number;
+            interval: "WEEK" | "MONTH" | "YEAR";
+            classesPerMonth?: number;
+            weight: number;
+        }[];
+        members: number;
+        /** ISO weekday of a weekly collection (6 = Saturday). */
+        collectionWeekday?: number;
+    };
+    /** Ask AI's rollout flag on (DEC-220): a paying plan's feature. */
+    askAi?: boolean;
     /** With Payments off an enrolment issues no invoice, so none is written. */
     courses?: readonly GlobalCourse[];
     invoiceStyle?: string;
@@ -257,8 +278,40 @@ export const THISTLEWICK: GlobalBusiness = {
     taxName: "Sales tax",
     taxRate: 5.5,
     taxId: "00-0000000",
-    modules: ["COMMERCE", "CRM", "WEBSITE", "INSIGHTS"],
+    // Payments for its Saturday loaves, invoiced each period (paid plans).
+    modules: ["COMMERCE", "CRM", "WEBSITE", "INSIGHTS", "PAYMENTS"],
     plan: "pro",
+    askAi: true,
+    memberships: {
+        plans: [
+            {
+                name: "Weekly sourdough",
+                description:
+                    "A large sourdough loaf every Saturday, collected Downtown from 7am.",
+                price: 950,
+                interval: "WEEK",
+                weight: 3,
+            },
+            {
+                name: "Saturday bread box",
+                description:
+                    "A sourdough loaf, a rye and six rolls every Saturday, collected Downtown.",
+                price: 2400,
+                interval: "WEEK",
+                weight: 1,
+            },
+            {
+                name: "Sourdough, monthly",
+                description:
+                    "Every Saturday's sourdough loaf for a month, paid once: four or five collections.",
+                price: 3600,
+                interval: "MONTH",
+                weight: 1,
+            },
+        ],
+        members: 9,
+        collectionWeekday: 6,
+    },
     invoiceStyle: "CLASSIC",
     stores: [
         { key: "main", name: "Downtown" },
@@ -833,8 +886,36 @@ export const IRONVALE: GlobalBusiness = {
     taxName: null,
     taxRate: null,
     taxId: null,
-    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COURSES"],
+    // Payments for its memberships, invoiced each period (paid plans).
+    modules: ["CRM", "APPOINTMENTS", "WEBSITE", "COURSES", "PAYMENTS"],
     plan: "pro",
+    memberships: {
+        plans: [
+            {
+                name: "Unlimited",
+                description: "Every class, every week, and open gym hours.",
+                price: 12900,
+                interval: "MONTH",
+                weight: 4,
+            },
+            {
+                name: "Eight classes",
+                description: "Eight classes a month, any you like.",
+                price: 8900,
+                interval: "MONTH",
+                classesPerMonth: 8,
+                weight: 3,
+            },
+            {
+                name: "Unlimited, yearly",
+                description: "A year of Unlimited, paid once: two months free.",
+                price: 129000,
+                interval: "YEAR",
+                weight: 1,
+            },
+        ],
+        members: 16,
+    },
     invoiceStyle: "CLASSIC",
     stores: [{ key: "main", name: "Front desk" }],
     hours: hoursFrom({

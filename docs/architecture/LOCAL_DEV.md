@@ -533,7 +533,8 @@ Global catalogue's, a local copy of dev's when imported, else on a throwaway
 database the sample's paid plans in dollars (`ensureSampleGlobalPaidPlans`).
 The data is still what a small business has after setup: setup's modules, plus the Insights (the
 bakery), Courses (the gym) and Sell (the salon and clinic, for a treatment over
-several visits) switches Free offers, no Payments or class packs, one person
+several visits) switches, Payments for the gym's and bakery's memberships
+(`billing.ts`), Ask AI on for the bakery, no class packs, one person
 (a diary person with no login would take a seat), a quiet diary
 (`BOOKINGS_A_MONTH`, asserted), plan limits enforced for these four. Local
 addresses have no edition (`editionOfHost` returns null), so the seed sets it
