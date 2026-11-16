@@ -21,6 +21,7 @@ import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 
 import type { World } from "../content/world";
+import { AnswerTable, AskStep, ROW } from "./ask-ai/answer";
 import {
     Asked,
     AskPanel,
@@ -34,15 +35,13 @@ import type { AskAiWords } from "./ask-ai/words";
 import { TimeChip } from "./reach/app-card";
 import { CropToggle } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
-import { InTheApp } from "./reach/in-the-app";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Questions } from "./reach/questions";
+import { ReachSteps } from "./reach/reach-steps";
 import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 
 const SCENE = "pt-12 min-[760px]:pt-[120px]";
-const ROW =
-    "grid items-center gap-3 border-t border-mk-line-row px-3.5 text-[14px] first:border-t-0";
 
 /** What the site resolves for this page (its `content/` and `lib/`). */
 export interface AskAiPageProps {
@@ -331,96 +330,7 @@ export function AskAiView({
                             >
                                 {p.why}
                             </p>
-                            <div className="overflow-hidden rounded-xl border border-border text-[14px]">
-                                <div
-                                    className={cn(
-                                        ROW,
-                                        "min-h-8 grid-cols-[70px_1fr_64px_70px] bg-mk-noon text-[12.5px] font-semibold text-muted-foreground",
-                                    )}
-                                >
-                                    {p.head.map((x, i) => (
-                                        <span
-                                            key={x}
-                                            className={cn(
-                                                i > 1 && "text-right",
-                                            )}
-                                        >
-                                            {x}
-                                        </span>
-                                    ))}
-                                </div>
-                                {p.rows.map((r) => (
-                                    <div
-                                        key={r.id}
-                                        data-wire={r.from ? "p-ord" : undefined}
-                                        className={cn(
-                                            ROW,
-                                            "min-h-10 grid-cols-[70px_1fr_64px_70px]",
-                                            r.from && "bg-mk-tint",
-                                        )}
-                                    >
-                                        <span>{r.id}</span>
-                                        <span className="truncate">
-                                            {r.customer}
-                                        </span>
-                                        <span className="text-right">
-                                            {r.total}
-                                        </span>
-                                        <span
-                                            className={cn(
-                                                "text-right",
-                                                r.paid !== "Paid" &&
-                                                    "font-semibold text-mk-warn",
-                                            )}
-                                        >
-                                            {r.paid}
-                                        </span>
-                                    </div>
-                                ))}
-                                {stockOn ? (
-                                    <>
-                                        <div
-                                            className={cn(
-                                                ROW,
-                                                "min-h-8 grid-cols-[1fr_64px_70px] border-t border-mk-line-row bg-mk-noon text-[12px] font-semibold text-muted-foreground",
-                                            )}
-                                        >
-                                            {p.stockHead.map((x, i) => (
-                                                <span
-                                                    key={x}
-                                                    className={cn(
-                                                        i > 0 && "text-right",
-                                                    )}
-                                                >
-                                                    {x}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        {p.stockRows.map((r, i) => (
-                                            <div
-                                                key={r.name}
-                                                data-wire={
-                                                    i === 0
-                                                        ? "p-stk"
-                                                        : undefined
-                                                }
-                                                className={cn(
-                                                    ROW,
-                                                    "min-h-10 grid-cols-[1fr_64px_70px] bg-mk-tint",
-                                                )}
-                                            >
-                                                <span>{r.name}</span>
-                                                <span className="text-right">
-                                                    {r.need}
-                                                </span>
-                                                <span className="text-right">
-                                                    {r.have}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </>
-                                ) : null}
-                            </div>
+                            <AnswerTable p={p} stockOn={stockOn} />
                             <ReadFrom
                                 sources={p.sources}
                                 label={p.from}
@@ -834,7 +744,13 @@ export function AskAiView({
                 </Container>
             ) : null}
 
-            <InTheApp {...inTheApp} site={site} words={w.inTheApp} />
+            <ReachSteps
+                data={inTheApp}
+                foot={w.inTheApp.foot}
+                picture={(step) => (
+                    <AskStep w={w} shot={step.shot} stockOn={stockOn} />
+                )}
+            />
 
             <Questions items={w.faq} ask={w.askUs} />
 

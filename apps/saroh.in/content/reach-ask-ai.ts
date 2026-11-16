@@ -501,6 +501,7 @@ export function askAiWords({
             /** On a phone, the steps and what follows fold behind this. */
             phone: "Help and setup",
             of: "of",
+            foot: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
         },
     };
 }

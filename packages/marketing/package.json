@@ -55,6 +55,7 @@
         "./feature-cards": "./src/sections/feature-cards.tsx",
         "./solution-cards": "./src/sections/solution-cards.tsx",
         "./feature-steps": "./src/sections/feature-steps.tsx",
+        "./steps-showcase": "./src/sections/steps-showcase.tsx",
         "./feature-points": "./src/sections/feature-points.tsx",
         "./feature-works-with": "./src/sections/feature-works-with.tsx",
         "./feature-used-by": "./src/sections/feature-used-by.tsx",

@@ -44,6 +44,22 @@ function Screen({ shot }: { shot: ShotView | undefined }) {
     ) : null;
 }
 
+/** The feature's lead and step words, less any sentence whose claim is off. */
+export function claimed<F extends Feature>(all: F, hide?: RegExp): F {
+    const strip = (text: string) =>
+        hide
+            ? (text.match(/[^.!?]+[.!?]+/g) ?? [text])
+                  .filter((sentence) => !hide.test(sentence))
+                  .join("")
+                  .trim()
+            : text;
+    return {
+        ...all,
+        sub: strip(all.sub),
+        steps: all.steps.map((st) => ({ ...st, body: strip(st.body) })),
+    };
+}
+
 export function InTheApp({
     feature: all,
     help,
@@ -58,19 +74,7 @@ export function InTheApp({
         phone: string;
     };
 }) {
-    // A sentence whose claim is off goes.
-    const strip = (text: string) =>
-        hide
-            ? (text.match(/[^.!?]+[.!?]+/g) ?? [text])
-                  .filter((sentence) => !hide.test(sentence))
-                  .join("")
-                  .trim()
-            : text;
-    const feature = {
-        ...all,
-        sub: strip(all.sub),
-        steps: all.steps.map((st) => ({ ...st, body: strip(st.body) })),
-    };
+    const feature = claimed(all, hide);
     return (
         <Section
             id="in-the-app"

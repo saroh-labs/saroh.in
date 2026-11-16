@@ -727,7 +727,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Sign in and allow it",
-                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick your business and allow it.",
+                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick the businesses it may use, and allow it. One connection covers them all.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-consent",
             },
@@ -812,10 +812,29 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         howTitle: "Ask in your own words.",
         steps: [
             {
-                title: "Answers from your own records",
-                body: "It reads your bookings, orders, customers and products, and says where each answer came from.",
+                title: "Open Ask AI from any screen",
+                body: "The Ask AI button sits at the top of Saroh. Type a question, or tap one of the ready ones to start.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ask-start",
+            },
+            {
+                title: "Ask in your own words",
+                body: "Type it the way you'd say it. It reads only your own business.",
+                who: "Thistlewick Bakery (demo bakery)",
+                // Drawn on the page, as are the other three (the panel's question).
+                shot: "ask-hero",
+            },
+            {
+                title: "See the rows behind the answer",
+                body: "It reads your bookings, orders, customers and products, shows the rows behind each answer, and says which parts of the business it read.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ask-answer",
+            },
+            {
+                title: "Confirm a change, or don't",
+                body: "Ask it to add or change something and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo it the same day.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ask-confirm",
             },
         ],
         points: [
@@ -860,7 +879,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 shot: "sh-cards",
             },
             {
-                title: "Post it from your phone",
+                title: "Post it from your phone or computer",
                 body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "sh-phone",

@@ -190,21 +190,32 @@ describe("/features/[slug]", () => {
         });
     });
 
-    it("/features/social and /features/ask-ai render every step, each with its shot", async () => {
+    it("/features/social and /features/ask-ai draw every step's picture in the HTML (Steps A)", async () => {
         for (const slug of ["social", "ask-ai"] as const) {
             const { unmount } = render(await FeaturePage(params(slug)));
-            const how = screen
-                .getByRole("heading", { name: features[slug].howTitle })
-                .closest("section");
-            // The hero's shot leads the row, then a shot per step.
+            const how = found(
+                screen
+                    .getByRole("heading", { name: features[slug].howTitle })
+                    .closest("section"),
+            );
+            // Four steps, no heading-only card, each picture under its step.
+            expect(how.querySelector("ol")?.children).toHaveLength(4);
+            const pictures = how.querySelectorAll("[data-step-picture]");
+            expect(pictures).toHaveLength(4);
+            for (const p of Array.from(pictures))
+                expect(
+                    p.textContent.trim() || p.querySelector("img"),
+                ).toBeTruthy();
+            // Share's are its captured shots; Ask AI's are drawn, readable large.
             expect(
-                Array.from(how?.querySelectorAll("[data-shot]") ?? []).map(
-                    (el) => el.getAttribute("data-shot"),
+                Array.from(how.querySelectorAll("[data-shot]")).map((el) =>
+                    el.getAttribute("data-shot"),
                 ),
-            ).toEqual([
-                features[slug].hero.shot,
-                ...features[slug].steps.map((st) => st.shot),
-            ]);
+            ).toEqual(
+                slug === "social"
+                    ? features[slug].steps.map((st) => st.shot)
+                    : [],
+            );
             unmount();
         }
     });
@@ -216,16 +227,13 @@ describe("/features/[slug]", () => {
             });
         });
 
-        it("shows the hero and every step as real shots, Claude's chats included", async () => {
+        it("draws every step, Claude's real chat captured, its connector form drawn", async () => {
             env.NEXT_PUBLIC_AI_APPS = "on";
             const { container } = render(await FeaturePage(params("ai-apps")));
             // Real chats in Claude now, not drawings (owner, 15 Nov 2026).
             expect(
                 container.querySelectorAll("figure[data-chat]"),
             ).toHaveLength(0);
-            expect(
-                container.querySelector('[data-shot="ai-hero"]'),
-            ).not.toBeNull();
             const how = found(
                 screen
                     .getByRole("heading", {
@@ -233,8 +241,14 @@ describe("/features/[slug]", () => {
                     })
                     .closest("section"),
             );
-            // The hero's shot, then the four steps'.
-            expect(how.querySelectorAll("[data-shot]")).toHaveLength(5);
+            // Saroh's consent and Claude's real chat are captured; Claude's
+            // connector form and Saroh's record are drawn (Steps A).
+            expect(
+                Array.from(how.querySelectorAll("[data-shot]")).map((el) =>
+                    el.getAttribute("data-shot"),
+                ),
+            ).toEqual(["ai-consent", "ai-ask"]);
+            expect(how.querySelectorAll("[data-step-picture]")).toHaveLength(4);
         });
 
         it("lists only the live AI apps under Apps you can use", async () => {
