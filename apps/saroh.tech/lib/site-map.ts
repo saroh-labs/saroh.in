@@ -200,7 +200,7 @@ export const PAGES: SitePage[] = [
             "/pricing",
             "pricing",
             "Pricing and plans | Saroh",
-            "Start free with no card. Free is the plan you can use today, and paid plans aren't available yet.",
+            "Start free with no card. Free is the plan you can use today, and Grow and Pro are coming soon.",
             PRICING.title,
             "Pricing",
         ),

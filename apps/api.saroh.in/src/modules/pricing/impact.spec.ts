@@ -201,6 +201,33 @@ describe("catalogueImpact", () => {
         );
     });
 
+    it("names a new plan's price in the catalogue's own currency (Global: dollars)", () => {
+        const usd = (c: ReturnType<typeof fakeCatalog>) => {
+            c.currency = "USD";
+            c.tax = "none";
+        };
+        const live = fakeCatalog(usd);
+        const next = fakeCatalog((c) => {
+            usd(c);
+            c.plans.push({
+                id: "d",
+                name: "Plan D",
+                pricePaise: 2000,
+                tagline: "",
+                cta: "",
+                featured: false,
+                retired: false,
+            });
+        });
+        const r = catalogueImpact({
+            live,
+            next,
+            businesses: [],
+            measured: MEASURED,
+        });
+        expect(titles(r)).toContain("Pricing page: New plan: Plan D at $20");
+    });
+
     it("finds who could buy a new add-on", () => {
         const next = fakeCatalog((c) => {
             c.addons.push({

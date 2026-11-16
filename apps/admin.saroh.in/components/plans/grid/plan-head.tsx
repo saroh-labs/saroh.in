@@ -5,6 +5,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Pencil } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
+import { planCurrencySign } from "@/lib/plan-money";
 import { PRICE_HINT, parseRupees, rupeesText } from "../plans/catalog-edits";
 import type { GridKeys, GridPos } from "./use-grid-keys";
 
@@ -105,7 +106,7 @@ export function PlanHead({
                     )}
                 </span>
                 <div className="col-span-2 mt-1 flex items-center gap-1 text-[12.5px] text-muted-foreground">
-                    <span aria-hidden>₹</span>
+                    <span aria-hidden>{planCurrencySign()}</span>
                     <input
                         ref={priceRef}
                         type="text"

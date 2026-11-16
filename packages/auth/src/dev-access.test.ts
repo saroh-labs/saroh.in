@@ -111,6 +111,16 @@ describe("withDevAccess — the dev environment's key", () => {
         );
     });
 
+    it("Global production: a temporary redirect to saroh.in's home (DEV_REDIRECT_STATUS=302)", async () => {
+        vi.stubEnv("DEV_REDIRECT_ORIGIN", "https://saroh.in");
+        vi.stubEnv("DEV_REDIRECT_PATH", "/");
+        vi.stubEnv("DEV_REDIRECT_STATUS", "302");
+        const res = await gate(request("https://app.saroh.tech/orders"));
+        expect(next).not.toHaveBeenCalled();
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe("https://saroh.in/");
+    });
+
     it("a wrong key is treated as none, and is not carried to production", async () => {
         const res = await gate(
             request("https://app.saroh.io/orders?access=guess"),

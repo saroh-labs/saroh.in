@@ -18,6 +18,7 @@ import {
 } from "@/lib/pricing-actions";
 import type { AdminCoupon } from "@/lib/pricing-types";
 
+import { planCurrencySign } from "@/lib/plan-money";
 import { AddButton } from "../add-button";
 import { useDraft } from "../draft-store";
 import { usePlans } from "../plans-context";
@@ -504,7 +505,7 @@ function CouponFields({
                 />
             </Field>
             <Field
-                label="₹ off a month"
+                label={`${planCurrencySign()} off a month`}
                 htmlFor={`${id}-off`}
                 error={errors.discountPaise}
                 errorId={err("discountPaise")}
