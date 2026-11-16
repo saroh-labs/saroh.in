@@ -17,8 +17,8 @@ import type { JourneyStage, WebsiteWords } from "./words";
 export const STAGE_MS = 2600;
 
 const BADGE: Record<JourneyStage["tone"], string> = {
-    draft: "bg-mk-on-ink-hover text-mk-on-ink",
-    test: "bg-mk-on-ink-hover text-mk-on-ink-accent",
+    draft: "border border-mk-on-ink-line text-mk-on-ink-muted",
+    test: "border border-brand-500 text-mk-on-ink-accent",
     ok: "bg-mk-ok-tint text-mk-ok",
 };
 
@@ -123,8 +123,8 @@ export function Journey({
                                         i < at
                                             ? "bg-brand-500 text-[hsl(var(--foreground))]"
                                             : i === at
-                                              ? "bg-background text-[hsl(var(--foreground))] ring-[6px] ring-brand-500/35"
-                                              : "border border-mk-on-ink-line bg-mk-on-ink-hover text-mk-on-ink-muted",
+                                              ? "bg-background text-[hsl(var(--foreground))] ring-2 ring-brand-500 ring-offset-4 ring-offset-foreground"
+                                              : "border border-mk-on-ink-line bg-foreground text-mk-on-ink-muted",
                                     )}
                                 >
                                     {i < at ? (
@@ -156,7 +156,7 @@ export function Journey({
                     ))}
                 </ol>
 
-                <div className="grid items-center gap-8 min-[1080px]:grid-cols-[minmax(0,1fr)_360px] min-[1080px]:gap-14">
+                <div className="grid items-start gap-8 min-[1080px]:grid-cols-[minmax(0,1fr)_360px] min-[1080px]:gap-14">
                     <figure
                         aria-label={w.label}
                         data-stage={s.title}
@@ -165,7 +165,7 @@ export function Journey({
                             live ? "border-mk-ok" : "border-mk-on-ink-line",
                         )}
                     >
-                        <div className="flex items-center gap-3 border-b border-mk-on-ink-line bg-mk-on-ink-hover px-3 py-2.5 min-[760px]:px-4 min-[760px]:py-3">
+                        <div className="flex items-center gap-3 border-b border-mk-on-ink-line bg-foreground px-3 py-2.5 min-[760px]:px-4 min-[760px]:py-3">
                             <span
                                 aria-hidden
                                 className="hidden gap-1.5 min-[760px]:flex"
@@ -174,7 +174,7 @@ export function Journey({
                                 <i className="block size-2.5 rounded-full bg-mk-on-ink-line" />
                                 <i className="block size-2.5 rounded-full bg-mk-on-ink-line" />
                             </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg bg-foreground px-3 py-2 font-mono text-[13px] text-mk-on-ink min-[760px]:text-[15px]">
+                            <span className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border border-mk-on-ink-line bg-transparent px-3 py-2 font-mono text-[13px] text-mk-on-ink min-[760px]:text-[15px]">
                                 <span
                                     aria-hidden
                                     className={cn(

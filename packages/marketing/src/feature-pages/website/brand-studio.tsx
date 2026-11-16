@@ -69,7 +69,7 @@ export function BrandStudio({
             size="kit-h2"
             tone="ink"
             space="kit"
-            className="border-t border-mk-on-ink-hover"
+            className="border-t border-mk-on-ink-line"
         >
             <div
                 ref={box}
@@ -97,7 +97,7 @@ export function BrandStudio({
                                     className={cn(
                                         "flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-3 text-left text-[14px] font-semibold text-background",
                                         i === pal
-                                            ? "border-2 border-brand-500 bg-mk-on-ink-hover"
+                                            ? "border-2 border-brand-500 bg-transparent"
                                             : "m-px border border-mk-on-ink-line bg-transparent",
                                         ring({ color: "paper", offset: 2 }),
                                     )}
@@ -121,7 +121,7 @@ export function BrandStudio({
                         <div
                             role="group"
                             aria-labelledby="studio-screen"
-                            className="flex gap-1 rounded-xl bg-mk-on-ink-hover p-1"
+                            className="flex gap-1 rounded-xl border border-mk-on-ink-line p-1"
                         >
                             {w.devices.map((d, i) => (
                                 <button
@@ -149,18 +149,13 @@ export function BrandStudio({
                         {w.note}
                     </p>
                 </div>
-                <div
-                    className="flex justify-center rounded-[20px] px-3 py-8 min-[760px]:px-8 min-[760px]:py-12"
-                    style={{
-                        background: `radial-gradient(ellipse at 50% 60%, hsl(${o.look.accent} / 0.2), transparent 65%)`,
-                    }}
-                >
+                <div className="flex justify-center rounded-[20px] px-3 py-8 min-[760px]:px-8 min-[760px]:py-12">
                     <figure
                         aria-label={`${w.label}, in ${o.label.toLowerCase()}, on ${device.toLowerCase()}`}
                         data-look={o.label}
                         data-screen={device}
                         className={cn(
-                            "m-0 w-full overflow-hidden border-[10px] border-[hsl(var(--foreground))] shadow-mk-zoom transition-[max-width,border-radius] duration-500 ease-out motion-reduce:transition-none",
+                            "m-0 w-full overflow-hidden border border-mk-on-ink-line shadow-mk-zoom transition-[max-width,border-radius] duration-500 ease-out motion-reduce:transition-none",
                             SCREEN[dev],
                         )}
                         style={lookStyle(o.look, o.band)}

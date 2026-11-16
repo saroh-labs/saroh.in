@@ -309,7 +309,12 @@ export function MiniSite({
             </h5>
             {shop ? (
                 <div className="flex items-center justify-between rounded-[var(--site-radius)] bg-[hsl(var(--site-surface))] px-2.5 py-2 text-[13px]">
-                    <span>{first.name}</span>
+                    <span>
+                        {first.name}
+                        {first.unit ? (
+                            <span className="opacity-70"> · {first.unit}</span>
+                        ) : null}
+                    </span>
                     <b>{first.price}</b>
                 </div>
             ) : null}
