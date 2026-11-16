@@ -3,8 +3,8 @@
  * LAHomePhone2, in Global's words): the same sections and fields as
  * apps/saroh.in/content/home.ts (`HomeWords`), with Global's truths: one
  * person runs the business, customers pay at the counter or by card into
- * the business's own account, the site lives on saroh.app, and every
- * business is on Free for now (DEC-211; no paid plan is named, U16). Names, numbers and
+ * the business's own account, the site lives on saroh.app, and the plan
+ * line follows the paid-plans switch (DEC-211, `plan-words.ts`). Names, numbers and
  * times come from `world.ts`. No prices, no limits, and no line says what
  * Free leaves out. `tools` is the one section saroh.in's home doesn't have.
  *
@@ -18,6 +18,7 @@ import { countWord } from "@saroh/marketing/feature-switches";
 import type { HomeWords } from "@saroh/marketing/home/words";
 
 import { featureList } from "./features";
+import { planWords } from "./plan-words";
 
 /** The day this module's words last changed: Home's `updated`. */
 export const UPDATED = "2026-11-15";
@@ -210,13 +211,10 @@ export const home = {
     pricingTitle: "Pricing",
     pricingCompare: "See pricing",
     newTag: "New",
+    /** The plan block's other words follow the paid-plans switch (`homeWords`). */
     plans: {
         title: "Free to start.",
-        lede: "Every business is on Free for now. No card needed.",
-        /** The plan line: Free for now, and Tell me when (`/pricing`). */
-        start: "Everyone is on Free for now.",
         askAi: "",
-        compare: "Tell me when",
     },
     faqTitle: "Questions",
     allQuestions: "All questions",
@@ -263,7 +261,23 @@ export const home = {
             desk: true,
         },
     ],
-} as const satisfies HomeWords & Record<string, unknown>;
+} as const satisfies Omit<HomeWords, "plans"> & {
+    plans: Pick<HomeWords["plans"], "title" | "askAi">;
+} & Record<string, unknown>;
+
+/** Home's words, its plan line in the wording `on` asks for (`content/plan-words.ts`). */
+export function homeWords(on: boolean) {
+    const w = planWords(on);
+    return {
+        ...home,
+        plans: {
+            ...home.plans,
+            lede: w.homeLede,
+            start: w.homeLine,
+            compare: w.compare,
+        },
+    } satisfies HomeWords;
+}
 
 /**
  * The line under every hero's buttons: "Free to start: one website, … and ….

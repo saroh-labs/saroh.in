@@ -4,8 +4,8 @@
  * draws beyond its entry in `content/features.ts`, which keeps every word
  * the page had before. Same shape as apps/saroh.in/content/feature-keep.ts.
  *
- * Facts (names, orders, money) come from `content/world.ts`. No plan is on
- * sale (DEC-211), so the plan line's link is "Tell me when". Each page's
+ * Facts (names, orders, money) come from `content/world.ts`. The plan
+ * line's link follows the paid-plans switch (`plan-words.ts`). Each page's
  * Help links are Global's own articles (`content/help.ts`).
  */
 import type { FeatureSlug } from "@saroh/marketing/content-types";
@@ -52,8 +52,8 @@ export interface KeepWords {
     help: readonly { slug: string; label: string }[];
 }
 
-/** Words every Keep page shares. */
-export const KEEP: KeepTemplateWords = {
+/** Words every Keep page shares; its plan link is the page's (`compare` in `plan-words.ts`). */
+export const KEEP: Omit<KeepTemplateWords, "compare"> = {
     crumb: "Features",
     secondary: (hour, business) => `See ${hour} at ${business}`,
     heroNote: "Free to start. No card needed.",
@@ -66,7 +66,6 @@ export const KEEP: KeepTemplateWords = {
     },
     pointsTitle: "What it does",
     morePoints: (n) => `${n} more things it does`,
-    compare: "Tell me when",
     faqTitle: "Questions",
     faqAsk: { lead: "Something else?", label: "Ask us", href: "/contact" },
     allQuestions: "All questions",

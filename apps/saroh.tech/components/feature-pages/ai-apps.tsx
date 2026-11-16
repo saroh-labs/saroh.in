@@ -7,16 +7,18 @@ import { aiAppsWords } from "@/content/reach-ai-apps";
 import { WORLD } from "@/content/world";
 import { featuresOff } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
+import { paidPlansOn } from "@/lib/plans";
 
 import { inTheAppData, REACH_CRUMB } from "./data";
 
 /** /features/ai-apps: saroh.in's Connect page with Global's words and world. */
-export function AiAppsPage() {
+export async function AiAppsPage() {
+    const plansOn = await paidPlansOn();
     const apps = features["ai-apps"].apps;
-    return Promise.resolve(
+    return (
         <AiAppsView
             site={pageSite()}
-            words={aiAppsWords()}
+            words={aiAppsWords({ plansOn })}
             world={WORLD}
             crumb={REACH_CRUMB}
             inTheApp={inTheAppData("ai-apps")}
@@ -25,6 +27,6 @@ export function AiAppsPage() {
             developersHref={
                 featuresOff().includes("developers") ? null : DEVELOPERS_PATH
             }
-        />,
+        />
     );
 }

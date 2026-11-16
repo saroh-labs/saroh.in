@@ -390,31 +390,30 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         closer: "Open your calendar to bookings.",
     },
     /*
-     * Not usable yet for a business outside India, so nothing here is sold as
-     * working: the page and its place stay (the plan's Feature state rule), the
-     * hero says so, every part is marked, and no other feature or solution leans
-     * on it. The words name no plan's contents.
+     * Comes with a paid plan, and Global is Free until they're on sale
+     * (DEC-211). Its words say what it does; the page is tagged "On paid
+     * plans" and says it isn't part of Free while they aren't on sale, and
+     * drawn as any other once they are (DEC-222, `plan-words.ts`). No other
+     * feature or solution leans on it. The words name no plan's contents.
      */
     subscriptions: {
         slug: "subscriptions",
         state: "coming-soon",
-        worksToday:
-            "Subscriptions isn't available yet, so you can't start one.",
+        worksToday: "Subscriptions isn't part of Free.",
         phrase: "membership and subscription billing",
         seoTitle: "Membership and subscription billing software",
         seoDescription:
-            "Membership and subscription billing in Saroh is not available yet. Here's what it will do.",
+            "Membership and subscription billing in Saroh: plans that renew on their day, each with its invoice.",
         name: "Subscriptions",
-        navLine: "Plans that renew on their day. Not available yet",
-        cardLine: "Plans that renew on their day. Not available yet.",
-        homeBody:
-            "Not available yet. Plans that renew on their day, each with its invoice.",
-        headline: "Regulars on a plan. Not available yet.",
-        sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions. It isn't available yet, so here's what it will do.",
+        navLine: "Plans that renew on their day",
+        cardLine: "Plans that renew on their day.",
+        homeBody: "Plans that renew on their day, each with its invoice.",
+        headline: "Regulars on a plan.",
+        sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions.",
         hero: {
             shot: "g-subdetail",
         },
-        howTitle: "What it will do.",
+        howTitle: "What it does.",
         steps: [
             {
                 title: "Each plan renews on its day",
@@ -444,7 +443,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
         ],
         worksLead:
-            "Subscriptions will invoice through Billing and show on the customer's page.",
+            "Subscriptions invoices through Billing and shows on the customer's page.",
         worksWith: ["billing", "customers", "bookings"],
         usedBy: [],
         closer: "Start with bookings and invoices today.",

@@ -5,10 +5,11 @@ import type { Gate } from "@saroh/marketing/how-it-works/words";
 
 import { SITE_FONTS } from "@/components/feature-pages/site-fonts";
 import { JsonLd } from "@/components/shared/json-ld";
-import { HOW_IT_WORKS } from "@/content/how-it-works";
+import { howItWorksWords } from "@/content/how-it-works";
 import { THISTLEWICK_TUESDAY, WORLD } from "@/content/world";
 import { claimsOff, featuresOff } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
+import { paidPlansOn } from "@/lib/plans";
 import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageAt, pageOf } from "@/lib/site-map";
@@ -25,7 +26,8 @@ export const metadata = pageMetadata(page);
  * feature or an unlive claim is not drawn. Global has no written day yet,
  * so the "follow one day" line isn't drawn.
  */
-export default function Page() {
+export default async function Page() {
+    const plansOn = await paidPlansOn();
     const off = featuresOff();
     const claims = claimsOff();
     const claimOn = (c: ClaimSwitch) => !claims.includes(c);
@@ -33,7 +35,7 @@ export default function Page() {
         <div data-page-type={page.type}>
             <JsonLd data={pageSchema(page)} />
             <HowItWorksPage
-                words={HOW_IT_WORKS}
+                words={howItWorksWords(plansOn)}
                 world={WORLD}
                 story={THISTLEWICK_TUESDAY}
                 site={pageSite()}

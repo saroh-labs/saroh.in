@@ -20,7 +20,7 @@ import { SITE_FONTS } from "@/components/feature-pages/site-fonts";
 import { JsonLd } from "@/components/shared/json-ld";
 import { HOME_FAQ } from "@/content/faq";
 import { featureList } from "@/content/features";
-import { home, TOUR_LABEL, TOUR_VIDEO } from "@/content/home";
+import { homeWords, TOUR_LABEL, TOUR_VIDEO } from "@/content/home";
 import {
     HOME_HERO_SCENES,
     HOME_SITE_SHOWCASE,
@@ -30,7 +30,12 @@ import {
 import { claimsOff, featuresOff } from "@/lib/feature-switches";
 import { ALL_TOOLS, HOW_IT_WORKS_ALL } from "@/lib/nav";
 import { StartLink } from "@/lib/page-site";
-import { faqWithPlans, freePlanLine, readPricing } from "@/lib/plans";
+import {
+    faqWithPlans,
+    freePlanLine,
+    paidPlansOn,
+    readPricing,
+} from "@/lib/plans";
 import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -43,8 +48,8 @@ export const metadata = pageMetadata(page);
  * `/`, saroh.in's landing in Global's words (DEC-221; LAHomeDesk and
  * LAHomePhone2, one responsive page): the same shared sections, fed by
  * `content/home.ts` and Thistlewick Bakery's Tuesday (`content/world.ts`).
- * The free tools stay: tools are how people arrive here. Every business is
- * on Free, so the plan line says so with "Tell me when", and the `*-plans`
+ * The free tools stay: tools are how people arrive here. The plan line
+ * follows the paid-plans switch (`plan-words.ts`), and the `*-plans`
  * claims stay off. Its links don't prefetch: the site is static HTML.
  *
  * The pricing teaser is the plan line (`#pricing`, its cards on /pricing),
@@ -54,6 +59,8 @@ export const metadata = pageMetadata(page);
 export default async function HomePage() {
     const pricing = await readPricing();
     const catalog = pricing?.catalog ?? null;
+    const plansOn = await paidPlansOn(pricing);
+    const home = homeWords(plansOn);
     const off = claimsOff();
     const claimOn = (c: ClaimSwitch) => !off.includes(c);
     const shown = new Set<string>(featureList.map((f) => f.slug));
@@ -76,6 +83,7 @@ export default async function HomePage() {
         catalog,
         HOME_FAQ.filter((id) => id !== "ai-apps" || shown.has("ai-apps")),
         pricing?.cardOnline,
+        plansOn,
     );
     const paidTotal =
         WORLD.lead.orders?.find((o) => o.id === STORY.paidOrder)?.total ?? "";

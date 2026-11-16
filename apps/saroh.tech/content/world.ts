@@ -16,8 +16,8 @@ import type { World, WorldBusiness, WorldStory } from "@saroh/marketing/world";
  * do: the same bakery, salon and gym colours on both sites (owner, 16 Nov 2026).
  *
  * Global launches on Free (DEC-211): no GST, UPI, Razorpay or Hinglish; the
- * money path names Stripe, and a plan line says "Free until paid plans
- * open" with "Tell me when", never Grow or Pro.
+ * money path names Stripe, and a plan line follows the paid-plans switch
+ * (`plan-words.ts`), never a plan in the world itself.
  */
 
 /** Thistlewick Bakery (Madison, WI): the lead, a bakery as Rye & Co. is in India. */

@@ -21,9 +21,9 @@ import { faqs, HOME_FAQ, solutionFaq } from "@/content/faq";
 import { featureList, features } from "@/content/features";
 import { GUIDE_CONTENT, guideSteps } from "@/content/guides";
 import { ALL_HELP, HELP_FAQS } from "@/content/help";
-import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
+import { CTA_BAND, FREE_PLAN_LINE, home, homeWords } from "@/content/home";
 import { AI_APP_CARDS, INTEGRATIONS } from "@/content/integrations";
-import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
+import { billingFor, COOKIES, PRIVACY, termsFor } from "@/content/legal";
 import { SAROH_SOCIAL } from "@/content/social";
 import { solutionList, solutions } from "@/content/solutions";
 import { ALL_TRADES } from "@/content/solutions-hub";
@@ -80,7 +80,8 @@ describe("saroh.tech has saroh.in's shape", () => {
         for (const s of inSolutions) {
             expect(missing(s, solutions[s.slug]), s.slug).toEqual([]);
         }
-        expect(missing(inHome, home)).toEqual([]);
+        expect(missing(inHome, homeWords(false))).toEqual([]);
+        expect(missing(inHome, homeWords(true))).toEqual([]);
     });
 
     it("every question saroh.in asks, but its GST ones", () => {
@@ -236,7 +237,7 @@ describe("saroh.tech's words", () => {
     });
 
     it("give saroh.in's company facts, and only saroh.tech's address", () => {
-        const legal = words([TERMS, PRIVACY]);
+        const legal = words([termsFor(false), termsFor(true), PRIVACY]);
         expect(REGISTERED_OFFICE.join(", ")).toBe(officeLine());
         expect(legal).toContain(officeLine());
         expect(legal).toContain(SUPPORT_EMAIL);
@@ -258,9 +259,16 @@ describe("saroh.tech's words", () => {
     });
 
     it("have nothing false left in legal", () => {
-        expect(words([TERMS, PRIVACY, COOKIES, BILLING])).not.toMatch(
-            /\b(Stripe|PayPal|merchant of record)\b|\bquotes,/i,
-        );
+        expect(
+            words([
+                termsFor(false),
+                termsFor(true),
+                PRIVACY,
+                COOKIES,
+                billingFor(false),
+                billingFor(true),
+            ]),
+        ).not.toMatch(/\b(Stripe|PayPal|merchant of record)\b|\bquotes,/i);
     });
 
     it("say your place and your online shop: a Free business has one place customers visit", () => {

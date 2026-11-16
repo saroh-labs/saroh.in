@@ -6,8 +6,8 @@
  * counts are examples, and say so.
  *
  * What differs from saroh.in: captions in English (no Hinglish), no word
- * about Indian scripts, no plan on sale (DEC-211, so "Free until paid plans
- * open" and "Tell me when"), and the salon's cards wear a salon template's
+ * about Indian scripts, a plan line that follows the paid-plans switch
+ * (DEC-211, `plan-words.ts`), and the salon's cards wear a salon template's
  * look (`TEMPLATE_LOOKS`), since the Global seed sets no theme. The claim
  * switches shape the words as on saroh.in.
  */
@@ -16,6 +16,8 @@ import type {
     SocialWords,
 } from "@saroh/marketing/feature-pages/social/words";
 
+import { NOT_AVAILABLE_YET } from "./coming";
+import { planWords } from "./plan-words";
 import { TEMPLATE_LOOKS, THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -89,12 +91,16 @@ export function socialWords({
     posting,
     insights,
     askSocial,
+    plansOn,
 }: {
     everyPlan: boolean;
     posting: boolean;
     insights: boolean;
     askSocial: boolean;
+    /** The paid-plans switch (`plan-words.ts`). */
+    plansOn: boolean;
 }): SocialWords {
+    const plan = planWords(plansOn);
     return {
         name: "Share and posts",
         title: {
@@ -336,7 +342,7 @@ export function socialWords({
             lead: "Saroh Social connects Instagram, your Facebook Page and Threads once. Then your posts go out at your good time, when most of your customers are online, and sit in your Calendar beside the day's pick-ups.",
             pill: "Saroh Social · an add-on",
             notYetTitle: "Saroh Social",
-            notYet: "Not available yet",
+            notYet: NOT_AVAILABLE_YET,
             label: "Business Calendar, week of 16 to 22 November, with the Posts layer: the cinnamon bun post scheduled for Thursday at 7:30 pm",
             week: "16 to 22 Nov",
             views: ["Month", "Week"],
@@ -401,8 +407,8 @@ export function socialWords({
         },
 
         tail: {
-            plan: "Everyone is on Free for now.",
-            compare: "Tell me when",
+            plan: plan.socialLine,
+            compare: plan.compare,
         },
 
         faq: [

@@ -22,6 +22,7 @@ import type {
     WebsiteWords,
 } from "@saroh/marketing/feature-pages/website/words";
 
+import { planWords } from "./plan-words";
 import { TEMPLATE_LOOKS, THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -51,11 +52,15 @@ const cap = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
 export function websiteWords({
     shop,
     templates = false,
+    plansOn,
 }: {
     shop: boolean;
     /** The Templates switch is on (DEC-216): the page may name a template. */
     templates?: boolean;
+    /** The paid-plans switch (`plan-words.ts`). */
+    plansOn: boolean;
 }): WebsiteWords {
+    const plan = planWords(plansOn);
     return {
         name: "Website builder",
         title: {
@@ -251,7 +256,7 @@ export function websiteWords({
 
         address: {
             title: "Your address, from the first day.",
-            lead: `Every site starts at a free ${host.slice(1)} address. Connect a domain you own with two records at your registrar, and the screen tells you when it's live. Your own domain comes with a paid plan.`,
+            lead: `Every site starts at a free ${host.slice(1)} address. Connect a domain you own with two records at your registrar, and the screen tells you when it's live. ${plan.domain}`,
             web: {
                 title: "Web address",
                 sub: "Free, on every plan.",
@@ -261,7 +266,7 @@ export function websiteWords({
             },
             own: {
                 title: "Your own domain",
-                sub: "Connected through www. Comes with a paid plan. Paid plans open soon.",
+                sub: plan.domainCard,
                 domain: "www.thistlewick.example",
                 foot: "Add both at the place you bought the domain. Example domain. Yours will differ.",
             },
@@ -458,8 +463,8 @@ export function websiteWords({
         },
 
         tail: {
-            plan: "Everyone is on Free for now.",
-            compare: "Tell me when",
+            plan: plan.websiteLine,
+            compare: plan.compare,
         },
 
         faq: [
@@ -469,7 +474,7 @@ export function websiteWords({
             },
             {
                 q: "Can I use my own domain?",
-                a: `Every site lives at a ${host.slice(1)} address from the first day. A domain you own comes with paid plans, which open soon.`,
+                a: `Every site lives at a ${host.slice(1)} address from the first day. ${plan.domain}`,
             },
             {
                 q: "Does anything go live without me?",

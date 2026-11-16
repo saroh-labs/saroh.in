@@ -7,11 +7,12 @@ import { KEEP, KEEP_WORDS } from "@/content/feature-keep";
 import { ORDERS_MOMENTS } from "@/content/feature-orders";
 import { featureHref, features, NOT_AVAILABLE_YET } from "@/content/features";
 import { HELP } from "@/content/help";
+import { PAID_PLAN_FEATURES, planWords } from "@/content/plan-words";
 import { shotView } from "@/content/shots";
 import { WORLD } from "@/content/world";
 import { featuresOff } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
-import { freePlanLine, readCatalog } from "@/lib/plans";
+import { freePlanLine, paidPlansOn, readPricing } from "@/lib/plans";
 
 /** A key's shot, or the neutral frame of a pending one (never nothing in a Keep slot). */
 const shot = (key: ShotKey, alt?: string) =>
@@ -26,15 +27,20 @@ const shot = (key: ShotKey, alt?: string) =>
  * FODesk/FOPhone2 template, shared from `@saroh/marketing`): Global's words
  * (`content/features.ts`, every word the page had), Thistlewick's facts,
  * the same shot keys as saroh.in in the same slots. A Limited page says
- * what works today in place of the hero note; a Coming soon page marks
- * every step and point "Not available yet". There is no written Global day,
- * so no day button. No plan is on sale: the plan line is the
- * free plan's, with "Tell me when".
+ * what works today in place of the hero note. A feature that comes with a
+ * paid plan is tagged "On paid plans", with its note, while they aren't on
+ * sale, and drawn as any other once they are (DEC-222). There is no written
+ * Global day, so no day button. The plan line is the free plan's; its link
+ * follows the paid-plans switch (`plan-words.ts`).
  */
 export async function KeepPage({ slug }: { slug: KeepSlug }) {
     const feature = features[slug];
     const words = KEEP_WORDS[slug];
-    const catalog = await readCatalog();
+    const read = await readPricing();
+    const catalog = read?.catalog ?? null;
+    const plan = planWords(await paidPlansOn(read));
+    // A paid-plan feature is tagged until paid plans are on sale, then drawn as any other (DEC-222).
+    const paid = PAID_PLAN_FEATURES.includes(slug);
     const live = new Set(HELP.map((a) => a.slug));
     const ask =
         words.ask && !featuresOff().includes("ask-ai")
@@ -63,7 +69,7 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
     return (
         <Keep
             slug={slug}
-            words={KEEP}
+            words={{ ...KEEP, compare: plan.compare }}
             site={pageSite()}
             feature={{
                 ...feature,
@@ -89,9 +95,17 @@ export async function KeepPage({ slug }: { slug: KeepSlug }) {
             planLine={freePlanLine(catalog)}
             compareHref="/pricing"
             faq={words.faq}
-            note={feature.state === "full" ? undefined : feature.worksToday}
+            note={
+                feature.state === "full" || (paid && !plan.paidTag)
+                    ? undefined
+                    : feature.worksToday
+            }
             notYet={
-                feature.state === "coming-soon" ? NOT_AVAILABLE_YET : undefined
+                paid
+                    ? plan.paidTag || undefined
+                    : feature.state === "coming-soon"
+                      ? NOT_AVAILABLE_YET
+                      : undefined
             }
             moments={
                 slug === "orders" ? (

@@ -27,12 +27,10 @@ import { featuresOff } from "@/lib/feature-switches";
 
 import { LEGAL_UPDATED } from "@/content/legal";
 
-import { PRICING } from "@/content/pricing";
-
 import { home, UPDATED as HOME_UPDATED } from "@/content/home";
 import {
-    HOW_IT_WORKS,
     UPDATED as HOW_IT_WORKS_UPDATED,
+    howItWorksWords,
 } from "@/content/how-it-works";
 
 import {
@@ -43,6 +41,10 @@ import {
 
 import { HUB_PATH, HUB_WORDS } from "@/content/solutions-hub";
 import { TRADE_PAGES, UPDATED as TRADES_UPDATED } from "@/content/trades";
+
+/** How it works' h1; it doesn't follow the paid-plans switch. */
+const { title: howTitle } = howItWorksWords(false);
+const HOW_TITLE = `${howTitle.before}${howTitle.mark}${howTitle.after}`;
 
 /**
  * Every page, as the site map and page-spec boards list them. Title,
@@ -201,7 +203,7 @@ export const PAGES: SitePage[] = [
             "features",
             "Features: how Saroh works | Saroh",
             "How Saroh keeps your records, reaches your customers and answers your questions, and how the money moves.",
-            `${HOW_IT_WORKS.title.before}${HOW_IT_WORKS.title.mark}${HOW_IT_WORKS.title.after}`,
+            HOW_TITLE,
             "Features",
         ),
         updated: HOW_IT_WORKS_UPDATED,
@@ -255,8 +257,9 @@ export const PAGES: SitePage[] = [
             "/pricing",
             "pricing",
             "Pricing and plans | Saroh",
-            "Start free with no card. Free is the plan you can use today, and paid plans aren't available yet.",
-            PRICING.title,
+            // True whether or not paid plans are on sale; the page's own title follows the switch.
+            "Start free with no card, and see what each plan includes.",
+            "Start free.",
             "Pricing",
         ),
         unreviewed: true,

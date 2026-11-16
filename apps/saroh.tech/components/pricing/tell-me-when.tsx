@@ -7,11 +7,11 @@ import type { FormEvent } from "react";
 import { useId, useRef, useState } from "react";
 
 import { Field } from "@/components/shared/field";
-import { PRICING } from "@/content/pricing";
+import { TELL_ME } from "@/content/plan-words";
 import { emailLooksRight, sendTellMeWhen } from "@/lib/tell-me-when";
 import { site } from "@/site.config";
 
-const copy = PRICING.tellMe;
+const copy = TELL_ME;
 
 type Send = "idle" | "sending" | "failed" | "check";
 

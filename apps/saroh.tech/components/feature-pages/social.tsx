@@ -3,14 +3,16 @@ import { SocialView } from "@saroh/marketing/feature-pages/social-page";
 import { socialWords } from "@/content/reach-social";
 import { WORLD } from "@/content/world";
 import { pageSite } from "@/lib/page-site";
+import { paidPlansOn } from "@/lib/plans";
 
 import { inTheAppData, REACH_CRUMB } from "./data";
 import { SITE_FONTS } from "./site-fonts";
 
 /** /features/social: saroh.in's Reach page with Global's words and world. */
-export function SocialPage() {
+export async function SocialPage() {
+    const plansOn = await paidPlansOn();
     const site = pageSite();
-    return Promise.resolve(
+    return (
         <SocialView
             site={site}
             words={socialWords({
@@ -18,11 +20,12 @@ export function SocialPage() {
                 posting: site.claimOn("social-posting"),
                 insights: site.claimOn("share-insights"),
                 askSocial: site.claimOn("ask-ai-social"),
+                plansOn,
             })}
             world={WORLD}
             crumb={REACH_CRUMB}
             inTheApp={inTheAppData("social")}
             fonts={SITE_FONTS}
-        />,
+        />
     );
 }

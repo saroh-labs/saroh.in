@@ -5,20 +5,23 @@ import { websiteWords } from "@/content/reach-website";
 import { WORLD } from "@/content/world";
 import { featuresOff } from "@/lib/feature-switches";
 import { pageSite } from "@/lib/page-site";
+import { paidPlansOn } from "@/lib/plans";
 
 import { inTheAppData, REACH_CRUMB } from "./data";
 import { SITE_FONTS } from "./site-fonts";
 
 /** /features/website: saroh.in's Reach page with Global's words and world. */
-export function WebsitePage() {
+export async function WebsitePage() {
+    const plansOn = await paidPlansOn();
     const site = pageSite();
     const templates = !featuresOff().includes("templates");
-    return Promise.resolve(
+    return (
         <WebsiteView
             site={site}
             words={websiteWords({
                 shop: site.claimOn("site-shop"),
                 templates,
+                plansOn,
             })}
             world={WORLD}
             crumb={REACH_CRUMB}
@@ -27,6 +30,6 @@ export function WebsitePage() {
             templates={templates ? features.website.templates : null}
             // No gallery of website templates here: /templates is the documents gallery.
             templatesHref={null}
-        />,
+        />
     );
 }

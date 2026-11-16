@@ -17,9 +17,14 @@ lists only where Global differs (DEC-221).
 - **Money words.** Dollars and pounds as the seed prices them; Stripe in
   `MoneyPath`; "Sales tax" in place of GST. No GST, GSTIN, UPI, Razorpay,
   ₹, +91 or Hinglish anywhere (`lib/world.test.ts`, `lib/content.test.ts`).
-- **Plans.** Global launches on Free (DEC-211): a `PlanLine` says "Free
-  until paid plans open" with "Tell me when" (`lib/tell-me-when.ts`), never
-  Grow or Pro. The `*-plans` claim switches stay off here.
+- **Plans.** Global launches on Free (DEC-211). Every plan line follows one
+  switch, the API's `offered` read once per build (`paidPlansOn`), and takes
+  its words from `content/plan-words.ts`: off, "Everyone is on Free for now"
+  with "Tell me when" (`lib/tell-me-when.ts`); on, Grow and Pro with
+  "Compare plans" and Start buttons on the paid cards. No other file may
+  carry those words (`lib/plan-words.test.ts`). A paid-plan feature
+  (Subscriptions) is tagged "On paid plans" while they aren't on sale
+  (DEC-222). The `*-plans` claim switches stay off here.
 - **Screenshots.** Same keys, crops and frames as India, captured from
   `db:seed:global` (`e2e/marketing-shots/shots.global.ts`), retaken fresh
   for every production release with India's. A key with no Global capture
@@ -62,9 +67,9 @@ lists only where Global differs (DEC-221).
   `THISTLEWICK_TUESDAY`, example orders ORD-041 to ORD-045, the hero's
   three phones, the example sites). Kept from the page before: the free
   tools on Home, every feature page's words (a Limited page says what
-  works today; Subscriptions marks each part "Not available yet"). Home's
+  works today; Subscriptions is tagged "On paid plans", DEC-222). Home's
   money band names no provider (Stripe only on /features, check-claims);
-  the plan line is "Everyone is on Free for now" with "Tell me when". There
+  the plan line follows the paid-plans switch (`content/plan-words.ts`). There
   is no written Global day yet, so no day button or moment. /features is
   indexed. A pending shot draws saroh.in's neutral frame, never nothing.
 - **17 Nov 2026, Solutions (unit/web-techsol).** saroh.in's /for hub and

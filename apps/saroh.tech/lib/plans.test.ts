@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { faqs, PAY_CARD_ONLINE } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
+import { planWords } from "@/content/plan-words";
 import { PRICING } from "@/content/pricing";
 
 import {
@@ -12,6 +13,7 @@ import {
     freeLimitLines,
     freePlanLine,
     freeUsage,
+    paidPlansOn,
     pricingModel,
     readCatalog,
     readPricing,
@@ -276,7 +278,7 @@ describe("Free's limits beyond /pricing", () => {
     it("answers Start free with the limits, once they're read", () => {
         const catalog = parseCatalog(fakeInput());
         const answer = (c: typeof catalog | null) =>
-            faqWithPlans(c, ["start-free", "tax"])[0].a;
+            faqWithPlans(c, ["start-free", "tax"], false, false)[0].a;
         expect(answer(catalog)).toMatch(/^Free includes 7 things/);
         expect(answer(catalog)).not.toContain("77");
         expect(answer(null)).toBe(faqs["start-free"].a);
@@ -384,9 +386,27 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
 describe("faqWithPlans: card payment online follows the API (STRIPE_PAYMENTS, #7)", () => {
     it("says customers can pay by card online only while cardOnline is true", () => {
         const pay = (on: boolean) =>
-            faqWithPlans(null, ["pay"], on).find((q) => q.q.includes("pay"))
-                ?.a ?? "";
+            faqWithPlans(null, ["pay"], on, false).find((q) =>
+                q.q.includes("pay"),
+            )?.a ?? "";
         expect(pay(false)).not.toContain("card online");
         expect(pay(true)).toContain(PAY_CARD_ONLINE);
+    });
+});
+
+describe("faqWithPlans: the domain answer follows the paid-plans switch (#45)", () => {
+    it("says a domain comes with a paid plan once they're on sale", () => {
+        const domain = (plansOn: boolean) =>
+            faqWithPlans(null, ["domain"], false, plansOn)[0].a;
+        expect(domain(true)).toBe(`${faqs.domain.a} ${planWords(true).domain}`);
+        expect(domain(false)).toContain("which open soon");
+    });
+});
+
+describe("paidPlansOn: the API's offered, and off with no answer", () => {
+    it("reads offered, and is off when the API couldn't be read", async () => {
+        expect(await paidPlansOn({ offered: true })).toBe(true);
+        expect(await paidPlansOn({ offered: false })).toBe(false);
+        expect(await paidPlansOn(null)).toBe(false);
     });
 });

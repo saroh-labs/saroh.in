@@ -1,4 +1,5 @@
 import { REGISTERED_OFFICE, SUPPORT_EMAIL } from "./contact";
+import { planWords } from "./plan-words";
 
 /**
  * Drafts for a lawyer to read, not in force. The company's facts and its limits
@@ -27,10 +28,8 @@ export interface LegalSection {
 const CUSTOMER_MONEY =
     "Your customers pay you directly. We don't hold or move your customers' money. You record in Saroh that a payment happened.";
 
-const PAID_PLANS =
-    "There's a free plan, and it needs no card. Paid plans aren't on sale on saroh.tech. This page will say how they work before they are.";
-
-export const TERMS: readonly LegalSection[] = [
+/** Terms, "Paying for Saroh" in the paid-plans switch's wording (`plan-words.ts`). */
+export const termsFor = (on: boolean): readonly LegalSection[] => [
     {
         title: "Who we are",
         paragraphs: [
@@ -69,7 +68,7 @@ export const TERMS: readonly LegalSection[] = [
     },
     {
         title: "Paying for Saroh",
-        paragraphs: [PAID_PLANS],
+        paragraphs: [planWords(on).legal],
         links: [{ name: "Billing", href: "/legal/billing" }],
     },
     {
@@ -272,13 +271,14 @@ export const PRIVACY: readonly LegalSection[] = [
     },
 ];
 
-export const BILLING: readonly LegalSection[] = [
+/** Billing, "How paying for Saroh works" in the paid-plans switch's wording. */
+export const billingFor = (on: boolean): readonly LegalSection[] => [
     {
         title: "Your customers' money is never ours",
         paragraphs: [CUSTOMER_MONEY],
     },
     {
         title: "How paying for Saroh works",
-        paragraphs: [PAID_PLANS],
+        paragraphs: [planWords(on).legal],
     },
 ];
