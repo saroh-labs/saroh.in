@@ -291,7 +291,7 @@ const RULES: Rule[] = [
     {
         name: "a value read once in the browser is useBrowserValue() (B7)",
         pattern: /=\s*\(\)\s*=>\s*\(\)\s*=>\s*undefined\b/,
-        home: ["lib/use-browser-value.ts"],
+        home: [`${MK}/use-browser-value.ts`],
         allow: {},
         files: SITE,
     },

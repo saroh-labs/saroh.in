@@ -73,6 +73,14 @@ describe("saroh.tech's Reach and Ask words", () => {
         );
     });
 
+    it("draw Website's draft-to-live and brand sections at Thistlewick, never Rye & Co.", () => {
+        for (const { website } of all) {
+            const own = JSON.stringify([website.journey, website.studio]);
+            expect(own).toContain("thistlewick");
+            expect(own).not.toMatch(/Rye|Ravi|₹/);
+        }
+    });
+
     it("count no packs once paid plans are on sale either", () => {
         expect(text).not.toMatch(/\bupgrade\b|\bpack(s|ages?)?\b/i);
     });
