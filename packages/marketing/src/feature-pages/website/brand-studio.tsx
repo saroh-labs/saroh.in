@@ -98,7 +98,7 @@ export function BrandStudio({
                                         "flex min-h-12 cursor-pointer items-center gap-2.5 rounded-xl py-1.5 pl-1.5 pr-3 text-left text-[14px] font-semibold text-background",
                                         i === pal
                                             ? "border-2 border-brand-500 bg-mk-on-ink-hover"
-                                            : "m-px border border-mk-lamp-line bg-transparent",
+                                            : "m-px border border-mk-on-ink-line bg-transparent",
                                         ring({ color: "paper", offset: 2 }),
                                     )}
                                 >
@@ -135,7 +135,7 @@ export function BrandStudio({
                                     className={cn(
                                         "min-h-11 flex-1 cursor-pointer rounded-[9px] border-none text-[15px] font-semibold",
                                         i === dev
-                                            ? "bg-background text-foreground"
+                                            ? "bg-background text-[hsl(var(--foreground))]"
                                             : "bg-transparent text-mk-on-ink-muted",
                                         ring({ color: "paper", offset: 2 }),
                                     )}
@@ -160,7 +160,7 @@ export function BrandStudio({
                         data-look={o.label}
                         data-screen={device}
                         className={cn(
-                            "m-0 w-full overflow-hidden border-[10px] border-mk-lamp shadow-mk-zoom transition-[max-width,border-radius] duration-500 ease-out motion-reduce:transition-none",
+                            "m-0 w-full overflow-hidden border-[10px] border-[hsl(var(--foreground))] shadow-mk-zoom transition-[max-width,border-radius] duration-500 ease-out motion-reduce:transition-none",
                             SCREEN[dev],
                         )}
                         style={lookStyle(o.look, o.band)}

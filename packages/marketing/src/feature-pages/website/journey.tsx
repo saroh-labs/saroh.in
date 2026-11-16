@@ -18,7 +18,7 @@ export const STAGE_MS = 2600;
 
 const BADGE: Record<JourneyStage["tone"], string> = {
     draft: "bg-mk-on-ink-hover text-mk-on-ink",
-    test: "bg-mk-lamp-2 text-mk-on-ink-accent",
+    test: "bg-mk-on-ink-hover text-mk-on-ink-accent",
     ok: "bg-mk-ok-tint text-mk-ok",
 };
 
@@ -97,7 +97,7 @@ export function Journey({
                 >
                     <span
                         aria-hidden
-                        className="absolute left-5 top-[19px] h-[3px] rounded-sm bg-mk-lamp-line"
+                        className="absolute left-5 top-[19px] h-[3px] rounded-sm bg-mk-on-ink-line"
                         style={{ width: `${((n - 1) / n) * 100}%` }}
                     />
                     <span
@@ -121,9 +121,9 @@ export function Journey({
                                     className={cn(
                                         "grid size-10 place-items-center rounded-full font-mono text-[15px] font-bold transition-colors duration-300 motion-reduce:transition-none",
                                         i < at
-                                            ? "bg-brand-500 text-foreground"
+                                            ? "bg-brand-500 text-[hsl(var(--foreground))]"
                                             : i === at
-                                              ? "bg-background text-foreground ring-[6px] ring-brand-500/35"
+                                              ? "bg-background text-[hsl(var(--foreground))] ring-[6px] ring-brand-500/35"
                                               : "border border-mk-on-ink-line bg-mk-on-ink-hover text-mk-on-ink-muted",
                                     )}
                                 >
@@ -162,10 +162,10 @@ export function Journey({
                         data-stage={s.title}
                         className={cn(
                             "m-0 min-w-0 overflow-hidden rounded-2xl border shadow-mk-zoom transition-colors duration-500 motion-reduce:transition-none",
-                            live ? "border-mk-ok" : "border-mk-lamp-line",
+                            live ? "border-mk-ok" : "border-mk-on-ink-line",
                         )}
                     >
-                        <div className="flex items-center gap-3 border-b border-mk-lamp-line bg-mk-lamp-2 px-3 py-2.5 min-[760px]:px-4 min-[760px]:py-3">
+                        <div className="flex items-center gap-3 border-b border-mk-on-ink-line bg-mk-on-ink-hover px-3 py-2.5 min-[760px]:px-4 min-[760px]:py-3">
                             <span
                                 aria-hidden
                                 className="hidden gap-1.5 min-[760px]:flex"
@@ -174,7 +174,7 @@ export function Journey({
                                 <i className="block size-2.5 rounded-full bg-mk-on-ink-line" />
                                 <i className="block size-2.5 rounded-full bg-mk-on-ink-line" />
                             </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg bg-mk-lamp px-3 py-2 font-mono text-[13px] text-mk-on-ink min-[760px]:text-[15px]">
+                            <span className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg bg-foreground px-3 py-2 font-mono text-[13px] text-mk-on-ink min-[760px]:text-[15px]">
                                 <span
                                     aria-hidden
                                     className={cn(
@@ -212,7 +212,7 @@ export function Journey({
                                 </span>
                             ) : null}
                             {s.chip ? (
-                                <span className="absolute bottom-4 right-4 flex items-center gap-2.5 rounded-full bg-card py-2 pl-2 pr-3.5 text-[14px] text-foreground shadow-mk-menu">
+                                <span className="absolute bottom-4 right-4 flex items-center gap-2.5 rounded-full bg-card py-2 pl-2 pr-3.5 text-[14px] text-[hsl(var(--foreground))] shadow-mk-menu">
                                     <span
                                         aria-hidden
                                         className="grid size-7 place-items-center rounded-full bg-mk-ok-tint text-mk-ok"
