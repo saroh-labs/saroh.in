@@ -14,7 +14,6 @@ import {
     X,
 } from "lucide-react";
 import { Fragment } from "react";
-import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
@@ -24,7 +23,6 @@ import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
-import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 
 import type { World } from "../content/world";
@@ -87,14 +85,9 @@ export function SocialView({
         <div className={fonts}>
             <PageTop
                 crumb={crumb}
-                name={w.name}
-                title={
-                    <>
-                        {w.title.before}
-                        <Mark>{w.title.mark}</Mark>
-                    </>
-                }
-                lede={w.lede}
+                words={w}
+                start={site.start(`feature-${slug}`)}
+                secondaryHref={`#${s.id}`}
                 aside={
                     <Claim on={everyPlan}>
                         <p className="m-0 flex items-center gap-2 text-[15px] text-mk-copy max-[1079px]:mt-5">
@@ -106,22 +99,6 @@ export function SocialView({
                         </p>
                     </Claim>
                 }
-                actions={
-                    <>
-                        <span id={HERO_CTA}>
-                            {site.start(`feature-${slug}`)}
-                        </span>
-                        <ButtonLink
-                            href={`#${s.id}`}
-                            variant="secondary"
-                            size="kit"
-                            className="max-[759px]:hidden"
-                        >
-                            {w.secondary}
-                        </ButtonLink>
-                    </>
-                }
-                note={w.note}
                 stacked
             >
                 <CropToggle label={w.stage.more} height={330}>

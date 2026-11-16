@@ -15,7 +15,7 @@ import { SwipeRow } from "../kit/swipe-row";
 import { hourAnchor, hourLabel, hourTint } from "../kit/time";
 import { TradeSwitcher } from "../kit/trade-switcher";
 import { Container } from "../layout/container";
-import { TextLink } from "../links/text-link";
+import { LinkRow, TextLink } from "../links/text-link";
 import { ring } from "../ring";
 import { FaqItems } from "../sections/faq";
 import { SplitHero } from "../sections/split-hero";
@@ -806,18 +806,10 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                                 </p>
                             ) : null}
                             {starter.template ? (
-                                <div className="mt-2 grid justify-items-start gap-1">
-                                    {starter.template.links.map((l) => (
-                                        <TextLink
-                                            key={l.href}
-                                            href={l.href}
-                                            tone="ink"
-                                            arrow
-                                        >
-                                            {l.label}
-                                        </TextLink>
-                                    ))}
-                                </div>
+                                <LinkRow
+                                    links={starter.template.links}
+                                    className="mt-2 grid justify-items-start gap-1"
+                                />
                             ) : null}
                         </div>
                         <div className="grid content-start gap-4">

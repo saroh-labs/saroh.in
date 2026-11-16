@@ -7,6 +7,7 @@ import { CONTACT_LIMITS, firstName } from "@/lib/contact-message";
 
 import { Button } from "@saroh/marketing/button";
 import { ChoiceChip } from "@saroh/marketing/choice-chip";
+import { ContactFormFrame, ContactSent } from "@saroh/marketing/form-parts";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import { fieldClasses } from "../shared/fields/field-classes";
 import { useContactForm } from "./use-contact-form";
@@ -43,67 +44,48 @@ export function ContactForm() {
 
     if (sent) {
         return (
-            <div
-                role="status"
-                className="grid justify-items-start gap-[14px] py-3"
-                // The name and the email, said back (DEC-125).
-                data-ph-mask=""
+            <ContactSent
+                mark={
+                    <svg
+                        width={40}
+                        height={40}
+                        viewBox="0 0 64 64"
+                        fill="none"
+                        aria-hidden
+                        className="text-foreground"
+                    >
+                        <path
+                            d="M44 11 L27 26 L40 37 L20 53"
+                            stroke="currentColor"
+                            strokeWidth={8.5}
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                        <circle
+                            cx={50}
+                            cy={48}
+                            r={6}
+                            className="fill-brand-500"
+                        />
+                    </svg>
+                }
+                thanksRef={thanks}
+                title={done.title(firstName(name))}
+                againLabel={done.again}
+                onAgain={again}
             >
-                <svg
-                    width={40}
-                    height={40}
-                    viewBox="0 0 64 64"
-                    fill="none"
-                    aria-hidden
-                    className="text-foreground"
-                >
-                    <path
-                        d="M44 11 L27 26 L40 37 L20 53"
-                        stroke="currentColor"
-                        strokeWidth={8.5}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                    />
-                    <circle cx={50} cy={48} r={6} className="fill-brand-500" />
-                </svg>
-                <h2
-                    ref={thanks}
-                    tabIndex={-1}
-                    className="m-0 font-display text-mk-kit-h3 font-bold focus:outline-none"
-                >
-                    {done.title(firstName(name))}
-                </h2>
-                <p className="m-0 max-w-[44ch] text-[16px] leading-[1.6] text-mk-copy">
-                    {done.replyTo}{" "}
-                    <span className="break-all">{email.trim()}</span>{" "}
-                    {done.replyBy}.{done.urgent}
-                </p>
-                <Button variant="secondary" size="sm" onClick={again}>
-                    {done.again}
-                </Button>
-            </div>
+                {done.replyTo} <span className="break-all">{email.trim()}</span>{" "}
+                {done.replyBy}.{done.urgent}
+            </ContactSent>
         );
     }
 
     return (
-        <form
-            noValidate
+        <ContactFormFrame
             onSubmit={onSubmit}
-            aria-labelledby="contact-form-title"
-            className="grid gap-[18px]"
+            title={copy.title}
+            note={copy.note}
         >
-            <div className="grid gap-1">
-                <h2
-                    id="contact-form-title"
-                    className="m-0 font-display text-mk-kit-h3 font-bold"
-                >
-                    {copy.title}
-                </h2>
-                <span className="text-[14px] text-muted-foreground">
-                    {copy.note}
-                </span>
-            </div>
-
             <div className="grid gap-2">
                 <span id="contact-topic-label" className={LABEL}>
                     {copy.topicLabel}
@@ -282,6 +264,6 @@ export function ContactForm() {
                     </a>
                 </span>
             </div>
-        </form>
+        </ContactFormFrame>
     );
 }

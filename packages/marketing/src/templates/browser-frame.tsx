@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import { cn } from "../cn";
 
+/** A framed picture's card: 14px corners and a hairline (the gallery's frame, Reach's app card). */
+export const CARD_FRAME =
+    "min-w-0 overflow-hidden rounded-[14px] border border-border bg-card";
+
 /**
  * The gallery's browser frame (Templates design): 14px corners, a hairline,
  * and a bar with three dots and the site's address in mono. The address is
@@ -16,12 +20,7 @@ export function BrowserFrame({
     className?: string;
 }) {
     return (
-        <div
-            className={cn(
-                "min-w-0 overflow-hidden rounded-[14px] border border-border bg-card",
-                className,
-            )}
-        >
+        <div className={cn(CARD_FRAME, className)}>
             <div className="flex items-center gap-3 border-b border-border bg-background px-3.5 py-2.5">
                 <span aria-hidden className="flex gap-1.5">
                     <span className="size-2 rounded-full bg-border-strong" />

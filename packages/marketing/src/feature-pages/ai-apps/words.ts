@@ -4,6 +4,7 @@
  * saroh.in's builder's type with every word widened to `string`, so
  * saroh.tech's Global words fill the same shape.
  */
+import type { AskUsWords, QuestionWords } from "../reach/questions";
 
 export interface AiAppsWords {
     name: string;
@@ -227,16 +228,8 @@ export interface AiAppsWords {
         line: string;
         compare: string;
     };
-    faq: {
-        q: string;
-        a: string;
-    }[];
-    askUs: {
-        lead: string;
-        label: string;
-        href: string;
-        more: string;
-    };
+    faq: QuestionWords[];
+    askUs: AskUsWords;
     close: {
         title: string;
     };

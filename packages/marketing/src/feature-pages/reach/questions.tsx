@@ -9,6 +9,14 @@ export interface QuestionWords {
     a: string;
 }
 
+/** "Something else? Ask us →", and the phone's "All questions". */
+export interface AskUsWords {
+    lead: string;
+    label: string;
+    href: string;
+    more: string;
+}
+
 /**
  * "Questions" (the boards' shared FAQ): the heading and "Something else?
  * Ask us →" beside the questions on desk. On a phone the first three show,
@@ -22,7 +30,7 @@ export function Questions({
 }: {
     items: QuestionWords[];
     title?: string;
-    ask: { lead: string; label: string; href: string; more: string };
+    ask: AskUsWords;
 }) {
     const first = items.slice(0, 3);
     const rest = items.slice(3);

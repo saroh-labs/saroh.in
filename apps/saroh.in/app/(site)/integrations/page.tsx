@@ -14,9 +14,12 @@ import { Arrow } from "@saroh/marketing/arrow";
 import { cardLinkClasses } from "@saroh/marketing/card-link";
 import { cn } from "@saroh/marketing/cn";
 import { Container } from "@saroh/marketing/container";
+import {
+    IntegrationCardHead,
+    PlannedSection,
+} from "@saroh/marketing/integration-parts";
 import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
 import { PageHero } from "@saroh/marketing/page-hero";
-import { Pill } from "@saroh/marketing/pill";
 import { TextLink } from "@saroh/marketing/text-link";
 
 /**
@@ -75,22 +78,9 @@ export default function IntegrationsPage() {
                 </Container>
             )}
 
-            <Container
-                as="section"
-                aria-labelledby="planned"
-                className="grid gap-5 pt-[72px] min-[760px]:pt-[120px]"
-            >
-                <h2
-                    id="planned"
-                    className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
-                >
-                    {page.plannedTitle}
-                </h2>
-                <p className="m-0 mb-3 max-w-[70ch] text-[16px] leading-[1.6] text-mk-copy">
-                    {page.plannedIntro}
-                </p>
+            <PlannedSection title={page.plannedTitle} intro={page.plannedIntro}>
                 <ComingList items={plannedIntegrations} idPrefix="planned" />
-            </Container>
+            </PlannedSection>
 
             <Container className="pb-[72px] pt-14 min-[760px]:pb-[120px]">
                 <p className="m-0 border-t border-border pt-6 text-[16px] leading-[1.6] text-mk-copy">
@@ -175,19 +165,11 @@ function Cards({
                 "flex h-full flex-col gap-3.5 p-[22px]",
             )}
         >
-            <span className="flex items-start gap-3">
-                <span className="grid">
-                    <span className="font-display text-mk-kit-h3 font-bold">
-                        {item.name}
-                    </span>
-                    <span className="text-[13px] text-muted-foreground">
-                        {item.kind ?? item.category}
-                    </span>
-                </span>
-                <Pill tone="ok" className="ml-auto">
-                    Available
-                </Pill>
-            </span>
+            <IntegrationCardHead
+                name={item.name}
+                kind={item.kind ?? item.category}
+                available="Available"
+            />
             <span className="flex-1 text-[15px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
                 {item.line}
             </span>

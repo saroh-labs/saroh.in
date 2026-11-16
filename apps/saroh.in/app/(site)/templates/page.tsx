@@ -2,10 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { CtaLink } from "@/components/shared/buttons/cta-link";
-import { TemplatesGallery } from "@/components/templates/templates-gallery";
 import {
     earlyAccessOpen,
-    galleryChips,
     galleryTemplates,
     templatesPage as page,
     TEMPLATES_PATH,
@@ -13,9 +11,7 @@ import {
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
-import { Container } from "@saroh/marketing/container";
-import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
-import { PageHero } from "@saroh/marketing/page-hero";
+import { TemplatesIndex } from "@saroh/marketing/templates/templates-index";
 
 export const metadata: Metadata = pageMetadata({
     title: page.seo.title,
@@ -43,31 +39,11 @@ export default function TemplatesPage() {
     const open = earlyAccessOpen(ctx.now);
     return (
         <>
-            <PageHero
-                title={page.title}
-                lead={page.intro(templates)}
-                className="pb-8 min-[760px]:pb-10"
-            />
-
-            <Container>
-                <TemplatesGallery
-                    templates={templates}
-                    chips={galleryChips(templates)}
-                    allLabel={page.allChip}
-                    previewLabel={page.preview}
-                />
-                <p className="m-0 pt-8 text-[13px] text-muted-foreground">
-                    {page.sampleNote}
-                </p>
-            </Container>
-
-            <ClosingCTA
-                visual={null}
-                id="templates-start"
-                className="mt-[72px] min-[760px]:mt-[120px]"
-                title={open ? page.band.after : page.band.before}
-                primary={<CtaLink src="templates-band" size="kit" />}
-                note={page.band.body}
+            <TemplatesIndex
+                words={page}
+                templates={templates}
+                bandTitle={open ? page.band.after : page.band.before}
+                start={<CtaLink src="templates-band" size="kit" />}
             />
         </>
     );

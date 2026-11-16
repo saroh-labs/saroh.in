@@ -9,6 +9,7 @@
  * apps), `ask-ai-languages` (Ask AI answering in Hinglish), `ask-ai-plans`.
  */
 import type { AiAppsWords } from "@saroh/marketing/feature-pages/ai-apps/words";
+import { ASK_US } from "./reach-ask-us";
 import { RYE_MONDAY, WORLD } from "./world";
 
 const rye = WORLD.lead;
@@ -431,12 +432,7 @@ export function aiAppsWords({
                 a: "MCP (Model Context Protocol) is the open standard AI apps use to connect to other tools. Saroh has an MCP server, so an AI app that supports it can connect to your business after you sign in.",
             },
         ],
-        askUs: {
-            lead: "Something else?",
-            label: "Ask us",
-            href: "/contact",
-            more: "All questions",
-        },
+        askUs: ASK_US,
         close: { title: "Do your Saroh work by asking." },
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */

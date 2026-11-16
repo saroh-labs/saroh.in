@@ -1,5 +1,4 @@
 import { AlertTriangle, FileText, Plus, Wallet } from "lucide-react";
-import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
@@ -8,7 +7,6 @@ import { StickyBar } from "../kit/sticky-bar";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
 import { TextLink } from "../links/text-link";
-import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 
 import type { FeatureTemplates } from "../content/types";
@@ -99,30 +97,9 @@ export function WebsiteView({
         <div className={fonts}>
             <PageTop
                 crumb={crumb}
-                name={w.name}
-                title={
-                    <>
-                        {w.title.before}
-                        <Mark>{w.title.mark}</Mark>
-                    </>
-                }
-                lede={w.lede}
-                actions={
-                    <>
-                        <span id={HERO_CTA}>
-                            {site.start(`feature-${slug}`)}
-                        </span>
-                        <ButtonLink
-                            href={`#${w.looks.id}`}
-                            variant="secondary"
-                            size="kit"
-                            className="max-[759px]:hidden"
-                        >
-                            {w.secondary}
-                        </ButtonLink>
-                    </>
-                }
-                note={w.note}
+                words={w}
+                start={site.start(`feature-${slug}`)}
+                secondaryHref={`#${w.looks.id}`}
             >
                 {/* The signature: one price, changed once, already on the site. */}
                 <Claim on={shop}>

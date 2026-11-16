@@ -17,6 +17,7 @@ import type {
     WebsiteWords,
 } from "@saroh/marketing/feature-pages/website/words";
 
+import { ASK_US } from "./reach-ask-us";
 import { LOOK_BANDS } from "./reach-looks";
 import { RYE_MONDAY, WORLD } from "./world";
 
@@ -505,12 +506,7 @@ export function websiteWords({
                 a: "Yes. Write posts and list them on a page of your site, in the same look.",
             },
         ],
-        ask_us: {
-            lead: "Something else?",
-            label: "Ask us",
-            href: "/contact",
-            more: "All questions",
-        },
+        ask_us: ASK_US,
 
         close: {
             title: "Put your business on a site of its own.",

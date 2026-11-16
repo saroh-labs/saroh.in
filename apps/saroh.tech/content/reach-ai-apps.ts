@@ -12,6 +12,7 @@
 import type { AiAppsWords } from "@saroh/marketing/feature-pages/ai-apps/words";
 
 import { planWords } from "./plan-words";
+import { ASK_US } from "./reach-ask-us";
 import { THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -406,12 +407,7 @@ export function aiAppsWords({ plansOn }: { plansOn: boolean }): AiAppsWords {
                 a: "MCP (Model Context Protocol) is the open standard AI apps use to connect to other tools. Saroh has an MCP server, so an AI app that supports it can connect to your business after you sign in.",
             },
         ],
-        askUs: {
-            lead: "Something else?",
-            label: "Ask us",
-            href: "/contact",
-            more: "All questions",
-        },
+        askUs: ASK_US,
         close: { title: "Do your Saroh work by asking." },
         inTheApp: {
             of: "of",

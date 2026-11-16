@@ -17,7 +17,6 @@ import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
-import { Mark } from "../sections/mark";
 import { Section } from "../sections/section";
 
 import type { World } from "../content/world";
@@ -103,14 +102,9 @@ export function AskAiView({
         <div>
             <PageTop
                 crumb={crumb}
-                name={w.name}
-                title={
-                    <>
-                        {w.title.before}
-                        <Mark>{w.title.mark}</Mark>
-                    </>
-                }
-                lede={w.lede}
+                words={w}
+                start={site.start(`feature-${slug}`)}
+                secondaryHref={"/pricing"}
                 aside={
                     w.plan ? (
                         <p className="m-0 mt-5 text-[15px] text-mk-copy">
@@ -118,22 +112,6 @@ export function AskAiView({
                         </p>
                     ) : null
                 }
-                actions={
-                    <>
-                        <span id={HERO_CTA}>
-                            {site.start(`feature-${slug}`)}
-                        </span>
-                        <ButtonLink
-                            href="/pricing"
-                            variant="secondary"
-                            size="kit"
-                            className="max-[759px]:hidden"
-                        >
-                            {w.secondary}
-                        </ButtonLink>
-                    </>
-                }
-                note={w.note}
             >
                 <Wires
                     pairs={[

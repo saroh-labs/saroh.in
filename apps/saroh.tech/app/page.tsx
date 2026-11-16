@@ -1,18 +1,13 @@
 import { ButtonLink } from "@saroh/marketing/button";
-import { Container } from "@saroh/marketing/container";
 import type { ClaimSwitch } from "@saroh/marketing/feature-switches";
+import { HomeChapters } from "@saroh/marketing/home/home-chapters";
 import {
     PlansAndQuestions,
     YoursLine,
 } from "@saroh/marketing/home/home-endings";
 import { HERO_CTA_ID, HomeHero } from "@saroh/marketing/home/home-hero";
 import { HomeTools } from "@saroh/marketing/home/home-tools";
-import { MoneyBand } from "@saroh/marketing/home/money-band";
-import { NewInSaroh } from "@saroh/marketing/home/new-in-saroh";
-import { OrdersChapter } from "@saroh/marketing/home/orders-chapter";
-import { SiteChapter } from "@saroh/marketing/home/site-chapter";
 import { TourVideo } from "@saroh/marketing/home/tour-video";
-import { Chip } from "@saroh/marketing/kit/chip";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
 
@@ -85,8 +80,6 @@ export default async function HomePage() {
         pricing?.cardOnline,
         plansOn,
     );
-    const paidTotal =
-        WORLD.lead.orders?.find((o) => o.id === STORY.paidOrder)?.total ?? "";
 
     return (
         <div data-page-type={page.type} className={SITE_FONTS}>
@@ -106,46 +99,13 @@ export default async function HomePage() {
             />
             <TourVideo video={TOUR_VIDEO} />
 
-            <Container
-                as="nav"
-                aria-label={home.chapters.label}
-                className="pt-5 min-[760px]:hidden"
-            >
-                <ul className="m-0 -mr-mk-gutter flex list-none gap-2 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {home.chapters.items
-                        .filter((c) => c.href !== "#new" || anyNews)
-                        .map((c) => (
-                            <li key={c.href}>
-                                <Chip variant="chapter" href={c.href}>
-                                    {c.label}
-                                </Chip>
-                            </li>
-                        ))}
-                </ul>
-            </Container>
-
             {/* The tools are document templates here, not site templates: no gallery link. */}
-            <SiteChapter
-                words={home.site}
+            <HomeChapters
+                home={home}
+                news={news}
+                anyNews={anyNews}
                 showcase={HOME_SITE_SHOWCASE}
                 templates={false}
-            />
-            <OrdersChapter
-                words={home.orders}
-                business={WORLD.lead}
-                rows={STORY.todayRows}
-                cls={STORY.class}
-            />
-            <MoneyBand
-                words={home.money}
-                chips={home.chips}
-                amount={paidTotal}
-            />
-
-            {/* Straight after the money band: the door that sat between went (16 Nov 2026). */}
-            <NewInSaroh
-                on={news}
-                words={home.news}
                 business={WORLD.lead}
                 story={STORY}
             />

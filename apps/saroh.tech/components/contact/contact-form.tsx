@@ -2,6 +2,7 @@
 
 import { Button } from "@saroh/marketing/button";
 import { ChoiceChip } from "@saroh/marketing/choice-chip";
+import { ContactFormFrame, ContactSent } from "@saroh/marketing/form-parts";
 import { nextIndex } from "@saroh/marketing/roving";
 import { Field as FieldFrame } from "@saroh/ui/field";
 import type { FormEvent, KeyboardEvent } from "react";
@@ -131,49 +132,25 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
 
     if (sent) {
         return (
-            <div
-                role="status"
-                className="grid justify-items-start gap-[14px] py-3"
-                data-ph-mask=""
+            <ContactSent
+                thanksRef={thanks}
+                title={done.title(firstName(name))}
+                againLabel={done.again}
+                onAgain={again}
             >
-                <h2
-                    ref={thanks}
-                    tabIndex={-1}
-                    className="m-0 font-display text-mk-kit-h3 font-bold focus:outline-none"
-                >
-                    {done.title(firstName(name))}
-                </h2>
-                <p className="m-0 max-w-[44ch] text-[16px] leading-[1.6] text-mk-copy">
-                    {done.replyTo}{" "}
-                    <span className="break-all">{email.trim()}</span>.
-                </p>
-                <Button variant="secondary" size="sm" onClick={again}>
-                    {done.again}
-                </Button>
-            </div>
+                {done.replyTo} <span className="break-all">{email.trim()}</span>
+                .
+            </ContactSent>
         );
     }
 
     return (
-        <form
-            ref={form}
-            noValidate
+        <ContactFormFrame
+            formRef={form}
             onSubmit={onSubmit}
-            aria-labelledby="contact-form-title"
-            className="grid gap-[18px]"
+            title={copy.title}
+            note={copy.note}
         >
-            <div className="grid gap-1">
-                <h2
-                    id="contact-form-title"
-                    className="m-0 font-display text-mk-kit-h3 font-bold"
-                >
-                    {copy.title}
-                </h2>
-                <span className="text-[14px] text-muted-foreground">
-                    {copy.note}
-                </span>
-            </div>
-
             <FieldFrame group htmlFor="contact-topic" label={copy.topicLabel}>
                 <div
                     role="radiogroup"
@@ -274,6 +251,6 @@ export function ContactForm({ apiUrl }: { apiUrl: string }) {
                     {sending ? copy.sending : copy.submit}
                 </Button>
             </div>
-        </form>
+        </ContactFormFrame>
     );
 }

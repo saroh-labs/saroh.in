@@ -18,6 +18,7 @@ import type {
 
 import { NOT_AVAILABLE_YET } from "./coming";
 import { planWords } from "./plan-words";
+import { ASK_US } from "./reach-ask-us";
 import { TEMPLATE_LOOKS, THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -433,12 +434,7 @@ export function socialWords({
                 a: "To the item's live page on your site, where people can book or buy.",
             },
         ],
-        askUs: {
-            lead: "Something else?",
-            label: "Ask us",
-            href: "/contact",
-            more: "All questions",
-        },
+        askUs: ASK_US,
         close: {
             title: "Start managing your online presence with Saroh today.",
             note: everyPlan

@@ -6,6 +6,7 @@
  */
 import type { ShareEverywhereWords } from "../../kit/share-everywhere";
 import type { SiteLook } from "../../kit/site-drawing";
+import type { AskUsWords, QuestionWords } from "../reach/questions";
 
 export interface CardWordsSet {
     label: string;
@@ -355,16 +356,8 @@ export interface SocialWords {
         plan: string;
         compare: string;
     };
-    faq: {
-        q: string;
-        a: string;
-    }[];
-    askUs: {
-        lead: string;
-        label: string;
-        href: string;
-        more: string;
-    };
+    faq: QuestionWords[];
+    askUs: AskUsWords;
     close: {
         title: string;
         note: string;

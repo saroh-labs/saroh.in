@@ -5,6 +5,8 @@
  * saroh.tech's Global words fill the same shape.
  */
 import type { WorldBusiness } from "../../content/world";
+import type { AskUsWords, QuestionWords } from "../reach/questions";
+import type { ShopSiteWords } from "./shop-site";
 
 /**
  * /features/website, the Reach page built around its signature (boards
@@ -127,46 +129,7 @@ export interface WebsiteWords {
                   band?: undefined;
               }
         )[];
-        site: {
-            name: string;
-            address: string;
-            nav: string[];
-            order: string;
-            headline: string;
-            line: string;
-            ctas: string[];
-            open: string;
-            shopTitle: string;
-            seeShop: string;
-            products: (
-                | {
-                      key: string;
-                      name: string;
-                      unit: string;
-                      price: string;
-                      badge?: undefined;
-                  }
-                | {
-                      key: string;
-                      name: string;
-                      unit: string;
-                      price: string;
-                      badge: string;
-                  }
-            )[];
-            classTitle: string;
-            classLine: string;
-            slot: string;
-            classShort: string;
-            leftShort: string;
-            book: string;
-            foot: string[];
-            pins: {
-                products: string;
-                bookings: string;
-                hours: string;
-            };
-        };
+        site: ShopSiteWords;
         templates: string;
         templatesLink: string;
         templatesMeta: string;
@@ -332,16 +295,8 @@ export interface WebsiteWords {
         plan: string;
         compare: string;
     };
-    faq: {
-        q: string;
-        a: string;
-    }[];
-    ask_us: {
-        lead: string;
-        label: string;
-        href: string;
-        more: string;
-    };
+    faq: QuestionWords[];
+    ask_us: AskUsWords;
     close: {
         title: string;
         note: string;

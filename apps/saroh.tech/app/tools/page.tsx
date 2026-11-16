@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { ButtonLink } from "@/components/shared/button";
 import { CtaBand } from "@/components/shared/cta-band";
+import { HubPage } from "@/components/shared/hub-head";
 import { JsonLd } from "@/components/shared/json-ld";
 import { itemListSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
@@ -89,10 +90,7 @@ const LINE = "m-0 text-[15px] leading-normal text-mk-copy";
 
 export default function ToolsHubPage() {
     return (
-        <div
-            data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter min-[760px]:gap-[72px]"
-        >
+        <HubPage page={page}>
             <JsonLd
                 data={[...pageSchema(page), itemListSchema(page.h1, live)]}
             />
@@ -164,6 +162,6 @@ export default function ToolsHubPage() {
                 href={signupHref(page.type)}
                 from="start-free-band"
             />
-        </div>
+        </HubPage>
     );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@saroh/marketing/button";
+import { ReportDone, ReportFormFrame } from "@saroh/marketing/form-parts";
 import type { FormEvent } from "react";
 import { useRef, useState, useSyncExternalStore } from "react";
 
@@ -77,23 +77,18 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
     };
 
     if (state.at === "done") {
-        return (
-            <p
-                role="status"
-                className="m-0 max-w-[600px] rounded-mk-crop border border-border bg-card px-4 py-3 text-[15px] leading-[1.55] text-foreground"
-            >
-                {copy.done}
-            </p>
-        );
+        return <ReportDone>{copy.done}</ReportDone>;
     }
 
     return (
-        <form
-            ref={form}
-            noValidate
+        <ReportFormFrame
+            formRef={form}
             onSubmit={onSubmit}
-            aria-label={copy.title}
-            className="grid max-w-[600px] gap-4"
+            label={copy.title}
+            error={state.at === "error" ? state.message : null}
+            sending={state.at === "sending"}
+            sendLabel={copy.submit}
+            sendingLabel={copy.sending}
         >
             {REPORT_FIELDS.map((field) => {
                 const shared = {
@@ -148,23 +143,6 @@ export function ReportForm({ apiUrl }: { apiUrl: string }) {
                     />
                 );
             })}
-            {state.at === "error" ? (
-                <p
-                    role="alert"
-                    className="m-0 text-[14px] font-medium text-destructive"
-                >
-                    {state.message}
-                </p>
-            ) : null}
-            <div>
-                <Button
-                    type="submit"
-                    size="kit"
-                    disabled={state.at === "sending"}
-                >
-                    {state.at === "sending" ? copy.sending : copy.submit}
-                </Button>
-            </div>
-        </form>
+        </ReportFormFrame>
     );
 }

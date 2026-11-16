@@ -1,8 +1,4 @@
-import { Container } from "@saroh/marketing/container";
-import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
-import { PageHero } from "@saroh/marketing/page-hero";
-import { galleryChips } from "@saroh/marketing/templates/gallery";
-import { TemplatesGallery } from "@saroh/marketing/templates/templates-gallery";
+import { TemplatesIndex } from "@saroh/marketing/templates/templates-index";
 import { notFound } from "next/navigation";
 
 import { JsonLd } from "@/components/shared/json-ld";
@@ -32,30 +28,12 @@ export default function WebsiteTemplatesPage() {
     return (
         <>
             <JsonLd data={pageSchema(entry)} />
-            <PageHero
+            <TemplatesIndex
                 crumbs={[{ name: "Home", href: "/" }, { name: page.name }]}
-                title={page.title}
-                lead={page.intro(templates)}
-                className="pb-8 min-[760px]:pb-10"
-            />
-            <Container>
-                <TemplatesGallery
-                    templates={templates}
-                    chips={galleryChips(templates)}
-                    allLabel={page.allChip}
-                    previewLabel={page.preview}
-                />
-                <p className="m-0 pt-8 text-[13px] text-muted-foreground">
-                    {page.sampleNote}
-                </p>
-            </Container>
-            <ClosingCTA
-                visual={null}
-                id="templates-start"
-                className="mt-[72px] min-[760px]:mt-[120px]"
-                title={page.band.title}
-                primary={<StartLink src="website-templates-band" />}
-                note={page.band.body}
+                words={page}
+                templates={templates}
+                bandTitle={page.band.title}
+                start={<StartLink src="website-templates-band" />}
             />
         </>
     );

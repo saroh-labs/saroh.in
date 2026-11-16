@@ -55,6 +55,16 @@ export interface SiteItem {
 const HEAD =
     "font-[family-name:var(--site-font-heading)] [font-weight:var(--site-heading-weight)]";
 
+/** A merchant's site as a drawing shows it: its look, address, name, menu and hero. */
+export interface SiteFace {
+    look: SiteLook;
+    address: string;
+    name: string;
+    nav: readonly string[];
+    cta: string;
+    hero: { title: string; line: string };
+}
+
 /**
  * A merchant's site, drawn from its look (the landing's site section, the
  * 10 am scene, Website's signature): its address bar, name and menu, its
@@ -72,13 +82,7 @@ export function SiteDrawing({
     phone = false,
     label,
     className,
-}: {
-    look: SiteLook;
-    address: string;
-    name: string;
-    nav: readonly string[];
-    cta: string;
-    hero: { title: string; line: string };
+}: SiteFace & {
     items: readonly SiteItem[];
     phone?: boolean;
     label: string;

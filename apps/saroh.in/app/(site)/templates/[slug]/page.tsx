@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { TemplateCard } from "@/components/templates/template-card";
-import { TemplateViewer } from "@/components/templates/template-viewer";
 import type { GalleryTemplate } from "@/content/templates";
 import {
     templateDetail as detail,
@@ -15,18 +13,12 @@ import {
     TEMPLATES_PATH,
     templatesPage,
 } from "@/content/templates";
-import { sentenceList } from "@/lib/format/list";
 import { resourcesContext } from "@/lib/resources-context";
-import { Container } from "@saroh/marketing/container";
-import { PageHero } from "@saroh/marketing/page-hero";
 
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 import { templatesLive } from "@/lib/templates-live";
-import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
-import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
-import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
-import { SectionHeading } from "@saroh/marketing/section-heading";
+import { TemplateDetail } from "@saroh/marketing/templates/template-detail";
 
 /**
  * One template (Resources plan U6, industry templates plan U13; design
@@ -73,21 +65,18 @@ export default async function TemplatePage({ params }: Props) {
     if (!t) notFound();
     const open = earlyAccessOpen(resourcesContext().now);
     const save = { slug: t.slug, name: t.name };
-    const notes = [
-        detail.notes.pages(t),
-        detail.notes.uses(t),
-        detail.notes.look(t),
-    ];
-    const facts: [string, string][] = [
-        [detail.facts.pages, sentenceList(t.pages.map((p) => p.title))],
-        [
-            detail.facts.uses,
-            t.uses.length ? sentenceList(t.uses) : "Your website",
-        ],
-        [detail.facts.type, t.type],
-        [detail.facts.colours, sentenceList(t.colourways)],
-    ];
     const related = relatedTemplates(t);
+    const cta = (where: "hero" | "band" | "sticky") => (
+        <CtaLink
+            src={
+                where === "hero"
+                    ? `templates-${t.slug}`
+                    : `templates-${t.slug}-${where}`
+            }
+            template={save}
+            size="kit"
+        />
+    );
 
     return (
         <>
@@ -98,129 +87,21 @@ export default async function TemplatePage({ params }: Props) {
                     { name: t.name, path: t.href },
                 ])}
             />
-            <PageHero
-                crumbs={[
-                    { name: detail.crumb, href: TEMPLATES_PATH },
-                    { name: t.name },
-                ]}
-                title={`${t.name}: ${t.idea}.`}
-                mark={`${t.name}:`}
-                lead={t.description}
-                className="pb-8 min-[760px]:pb-12"
-            >
-                <div className="grid justify-items-start gap-3">
-                    <span id="template-cta">
-                        <CtaLink
-                            src={`templates-${t.slug}`}
-                            template={save}
-                            size="kit"
-                        />
-                    </span>
-                    <span className="max-w-[60ch] text-[13px] text-muted-foreground">
-                        {detail.saveNote(t.name)}
-                    </span>
-                </div>
-            </PageHero>
-
-            <Container>
-                <TemplateViewer
-                    template={t}
-                    labels={{
-                        pages: detail.switcher,
-                        device: "Show it on",
-                        desktop: detail.desktop,
-                        phone: detail.phone,
-                    }}
-                />
-                <p className="m-0 pt-4 text-[13px] text-muted-foreground">
-                    {templatesPage.sampleNote}
-                </p>
-            </Container>
-
-            <Container
-                as="section"
-                aria-label="About this template"
-                className="pt-[72px] min-[760px]:pt-[96px]"
-            >
-                <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,280px),1fr))] gap-x-10 gap-y-8 p-0">
-                    {notes.map((n) => (
-                        <li
-                            key={n.title}
-                            className="grid content-start gap-2 border-t border-border pt-5"
-                        >
-                            <h2 className="m-0 font-display text-mk-kit-h3 font-bold">
-                                {n.title}
-                            </h2>
-                            <p className="m-0 text-[16px] leading-[1.6] text-mk-copy [text-wrap:pretty]">
-                                {n.body}
-                            </p>
-                        </li>
-                    ))}
-                </ul>
-                <dl className="m-0 mt-12 grid grid-cols-[repeat(auto-fit,minmax(min(100%,200px),1fr))] gap-6 rounded-mk-card border border-border bg-card p-6">
-                    {facts.map(([term, value]) => (
-                        <div key={term} className="grid content-start gap-1">
-                            <dt className="text-[13px] text-muted-foreground">
-                                {term}
-                            </dt>
-                            <dd className="m-0 text-[15px] font-medium">
-                                {value}
-                            </dd>
-                        </div>
-                    ))}
-                </dl>
-            </Container>
-
-            {related.length > 0 ? (
-                <Container
-                    as="section"
-                    aria-labelledby="related"
-                    className="grid grid-cols-[minmax(0,1fr)] gap-10 pt-[72px] min-[760px]:pt-[120px]"
-                >
-                    <SectionHeading
-                        id="related"
-                        title={detail.related}
-                        size="kit-h2"
-                    />
-                    <SwipeRow label={detail.related}>
-                        {related.map((r) => (
-                            <TemplateCard
-                                key={r.slug}
-                                template={r}
-                                previewLabel={templatesPage.preview}
-                                headingLevel={3}
-                            />
-                        ))}
-                    </SwipeRow>
-                </Container>
-            ) : null}
-
-            <ClosingCTA
-                visual={null}
-                id="template-start"
-                className="mt-[72px] min-[760px]:mt-[120px]"
-                title={
+            <TemplateDetail
+                template={t}
+                related={related}
+                words={detail}
+                galleryHref={TEMPLATES_PATH}
+                sampleNote={templatesPage.sampleNote}
+                previewLabel={templatesPage.preview}
+                bandTitle={
                     open
                         ? detail.band.after(t.name)
                         : detail.band.before(t.name)
                 }
-                primary={
-                    <CtaLink
-                        src={`templates-${t.slug}-band`}
-                        template={save}
-                        size="kit"
-                    />
-                }
-                note={templatesPage.band.body}
+                bandNote={templatesPage.band.body}
+                start={cta}
             />
-
-            <StickyBar watch="template-cta">
-                <CtaLink
-                    src={`templates-${t.slug}-sticky`}
-                    template={save}
-                    size="kit"
-                />
-            </StickyBar>
         </>
     );
 }

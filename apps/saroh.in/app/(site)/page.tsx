@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 
+import { SITE_FONTS } from "@/components/feature-pages/reach/site-fonts";
 import { HomeHero } from "@/components/home/home-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
@@ -31,19 +31,14 @@ import {
     webSiteLd,
 } from "@/lib/structured-data";
 import { ButtonLink } from "@saroh/marketing/button";
-import { Container } from "@saroh/marketing/container";
+import { HomeChapters } from "@saroh/marketing/home/home-chapters";
 import {
     PlansAndQuestions,
     YoursLine,
 } from "@saroh/marketing/home/home-endings";
 import { HERO_CTA_ID } from "@saroh/marketing/home/home-hero";
 import { HomeTools } from "@saroh/marketing/home/home-tools";
-import { MoneyBand } from "@saroh/marketing/home/money-band";
-import { NewInSaroh } from "@saroh/marketing/home/new-in-saroh";
-import { OrdersChapter } from "@saroh/marketing/home/orders-chapter";
-import { SiteChapter } from "@saroh/marketing/home/site-chapter";
 import { TourVideo } from "@saroh/marketing/home/tour-video";
-import { Chip } from "@saroh/marketing/kit/chip";
 import { Claim } from "@saroh/marketing/kit/claim";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
 import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
@@ -64,18 +59,6 @@ import { StickyBar } from "@saroh/marketing/kit/sticky-bar";
  * one published ahead of launch must not put a plan's name or price in the
  * answers or the structured data, and no plan or Pricing link is drawn.
  */
-
-// The example sites wear their own fonts, never Saroh's.
-const siteSerif = localFont({
-    src: "../../../../packages/site-blocks/fonts/fraunces/Fraunces-wght-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-serif",
-});
-const siteSans = localFont({
-    src: "../../../../packages/site-blocks/fonts/figtree/Figtree-400-700-latin.woff2",
-    weight: "400 700",
-    variable: "--font-site-sans",
-});
 
 export const metadata: Metadata = pageMetadata({
     title: pageTitle(home.seoTitle),
@@ -117,9 +100,6 @@ export default async function HomePage() {
             socialPosting: claimOn("social-posting"),
         },
     };
-    const paidTotal =
-        WORLD.lead.orders?.find((o) => o.id === RYE_MONDAY.paidOrder)?.total ??
-        "";
     const anyNews = news.askAi || news.share || news.aiApps || news.api;
     const faq = faqWithPlans(
         catalog,
@@ -127,7 +107,7 @@ export default async function HomePage() {
     );
 
     return (
-        <div className={`${siteSerif.variable} ${siteSans.variable}`}>
+        <div className={SITE_FONTS}>
             <JsonLd
                 data={[
                     organizationLd(),
@@ -140,45 +120,12 @@ export default async function HomePage() {
             <HomeHero />
             <TourVideo video={TOUR_VIDEO} />
 
-            <Container
-                as="nav"
-                aria-label={home.chapters.label}
-                className="pt-5 min-[760px]:hidden"
-            >
-                <ul className="m-0 -mr-mk-gutter flex list-none gap-2 overflow-x-auto p-0 pr-mk-gutter [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                    {home.chapters.items
-                        .filter((c) => c.href !== "#new" || anyNews)
-                        .map((c) => (
-                            <li key={c.href}>
-                                <Chip variant="chapter" href={c.href}>
-                                    {c.label}
-                                </Chip>
-                            </li>
-                        ))}
-                </ul>
-            </Container>
-
-            <SiteChapter
-                words={home.site}
+            <HomeChapters
+                home={home}
+                news={news}
+                anyNews={anyNews}
                 showcase={HOME_SITE_SHOWCASE}
                 templates={templates}
-            />
-            <OrdersChapter
-                words={home.orders}
-                business={WORLD.lead}
-                rows={RYE_MONDAY.todayRows}
-                cls={RYE_MONDAY.class}
-            />
-            <MoneyBand
-                words={home.money}
-                chips={home.chips}
-                amount={paidTotal}
-            />
-
-            {/* Straight after the money band: the door that sat between went (16 Nov 2026). */}
-            <NewInSaroh
-                on={news}
-                words={home.news}
                 business={WORLD.lead}
                 story={RYE_MONDAY}
             />

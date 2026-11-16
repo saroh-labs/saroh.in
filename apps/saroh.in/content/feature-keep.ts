@@ -10,25 +10,14 @@
  * `content/world.ts`, never from here. The template never claims one
  * customer record across an order and a booking (PRODUCT.md).
  */
+import type { KeepSlug } from "@saroh/marketing/content-types";
 import type { ClaimSwitch } from "@saroh/marketing/feature-switches";
-
-import type { FeatureSlug } from "./types";
 
 /** The day these words last changed (`pnpm check:content-dates`). */
 export const UPDATED = "2026-11-15";
 
 /** The Keep pages: every record feature. Website, Share, Ask AI and AI apps have their own. */
-export const KEEP_SLUGS = [
-    "dashboard",
-    "products",
-    "orders",
-    "customers",
-    "bookings",
-    "subscriptions",
-    "billing",
-    "insights",
-] as const satisfies readonly FeatureSlug[];
-export type KeepSlug = (typeof KEEP_SLUGS)[number];
+export { KEEP_SLUGS, type KeepSlug } from "@saroh/marketing/content-types";
 
 export interface AskExchange {
     q: string;

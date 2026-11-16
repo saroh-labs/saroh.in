@@ -3,6 +3,17 @@ import type { CSSProperties, ReactNode } from "react";
 import { cn } from "../cn";
 import { ring } from "../ring";
 
+/** A fold's summary, drawn as a TextLink: Ink, or on an Ink band. */
+export function foldSummaryClasses(tone: "ink" | "on-ink") {
+    return cn(
+        "inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden",
+        tone === "ink"
+            ? "text-foreground decoration-border-strong"
+            : "text-mk-lamp-fg decoration-mk-on-ink-line",
+        ring(),
+    );
+}
+
 /**
  * A fold on a phone only (PHONE.md, the indexing rule): from 760px the
  * content shows as it is; under it the content sits behind `summary`, in
@@ -24,15 +35,7 @@ export function PhoneFold({
     return (
         <div className={cn("group/pf", className)}>
             <details className="group min-[760px]:hidden">
-                <summary
-                    className={cn(
-                        "inline-flex min-h-11 w-fit cursor-pointer list-none items-center gap-2 rounded-sm font-semibold underline decoration-1 underline-offset-[3px] [&::-webkit-details-marker]:hidden",
-                        tone === "ink"
-                            ? "text-foreground decoration-border-strong"
-                            : "text-mk-lamp-fg decoration-mk-on-ink-line",
-                        ring(),
-                    )}
-                >
+                <summary className={foldSummaryClasses(tone)}>
                     {summary}
                     <ChevronDown
                         aria-hidden
