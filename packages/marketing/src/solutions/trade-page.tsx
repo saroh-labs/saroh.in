@@ -226,6 +226,30 @@ function TradeBar({
     );
 }
 
+/** A problem's answer: its title, words, picture and the feature it uses. */
+function Answer({
+    x,
+    f,
+}: {
+    x: TradeProblem;
+    f: { href: string; label: string } | undefined;
+}) {
+    return (
+        <>
+            {x.title ? (
+                <h3 className="m-0 text-[16px] font-semibold">{x.title}</h3>
+            ) : null}
+            {x.body ? <p className={BODY}>{x.body}</p> : null}
+            {x.picture ? <div className="mt-2">{x.picture}</div> : null}
+            {f ? (
+                <TextLink href={f.href} tone="ink" arrow>
+                    {x.link ?? f.label}
+                </TextLink>
+            ) : null}
+        </>
+    );
+}
+
 /* ------------------------------------------------------------------ problems */
 
 function Problems({
@@ -287,39 +311,26 @@ function Problems({
                                     </p>
                                 </div>
                                 {x.title || x.body ? (
-                                    <details className="group">
-                                        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-[14px] font-medium text-mk-copy [&::-webkit-details-marker]:hidden">
-                                            {W.problemHow}
-                                            <ChevronDown
-                                                aria-hidden
-                                                className="size-5 transition-transform group-open:rotate-180"
-                                            />
-                                        </summary>
+                                    // An answer with a picture stays open (owner, 16 Nov:
+                                    // screens are never behind a click); words only fold.
+                                    x.picture ? (
                                         <div className="grid gap-1.5 pb-2">
-                                            {x.title ? (
-                                                <h3 className="m-0 text-[16px] font-semibold">
-                                                    {x.title}
-                                                </h3>
-                                            ) : null}
-                                            {x.body ? (
-                                                <p className={BODY}>{x.body}</p>
-                                            ) : null}
-                                            {x.picture ? (
-                                                <div className="mt-2">
-                                                    {x.picture}
-                                                </div>
-                                            ) : null}
-                                            {f ? (
-                                                <TextLink
-                                                    href={f.href}
-                                                    tone="ink"
-                                                    arrow
-                                                >
-                                                    {x.link ?? f.label}
-                                                </TextLink>
-                                            ) : null}
+                                            <Answer x={x} f={f} />
                                         </div>
-                                    </details>
+                                    ) : (
+                                        <details className="group">
+                                            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-[14px] font-medium text-mk-copy [&::-webkit-details-marker]:hidden">
+                                                {W.problemHow}
+                                                <ChevronDown
+                                                    aria-hidden
+                                                    className="size-5 transition-transform group-open:rotate-180"
+                                                />
+                                            </summary>
+                                            <div className="grid gap-1.5 pb-2">
+                                                <Answer x={x} f={f} />
+                                            </div>
+                                        </details>
+                                    )
                                 ) : null}
                             </article>
                         );

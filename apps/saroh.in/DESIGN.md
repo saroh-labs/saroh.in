@@ -98,6 +98,10 @@ it are DEC-221.
 
 ## Rules that bite
 
+- **A screenshot is never behind a click (owner, 16 Nov 2026).** On desk
+  and phone, an app screen shows in the page. A phone may crop it
+  (CroppedCard, PhoneClip), never fold it whole into a `<details>`; only
+  extra words fold.
 - **Show what Saroh does, never its internal limits (owner, 16 Nov 2026).**
   A marketing page doesn't draw a locked panel, an upgrade wall, a "questions
   used up" screen or a quota. Those read like telling a visitor our internal
