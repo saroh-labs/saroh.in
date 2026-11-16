@@ -329,6 +329,36 @@ export const CAPTURED: Record<
         width: 2880,
         height: 1800,
     },
+    "r-subdetail": {
+        src: "/shots/v2/r-subdetail.webp",
+        alt: "Maya Thompson's weekly sourdough at Thistlewick Bakery (demo bakery): next charge, upcoming collections and changes",
+        width: 2880,
+        height: 1800,
+    },
+    "s-subs": {
+        src: "/shots/v2/s-subs.webp",
+        alt: "Subscriptions at Thistlewick Bakery (demo bakery) with one failed renewal flagged",
+        width: 2560,
+        height: 1600,
+    },
+    "g-subs": {
+        src: "/shots/v2/g-subs.webp",
+        alt: "Memberships at Ironvale Fitness (demo gym) with their next charge",
+        width: 2560,
+        height: 1600,
+    },
+    "g-subdetail": {
+        src: "/shots/v2/g-subdetail.webp",
+        alt: "Active memberships at Ironvale Fitness (demo gym), each with its next renewal and what it pays",
+        width: 2880,
+        height: 1800,
+    },
+    "g-plans": {
+        src: "/shots/v2/g-plans.webp",
+        alt: "The memberships Ironvale Fitness (demo gym) sells, each with its price and how often it renews",
+        width: 2560,
+        height: 1600,
+    },
     "sh-sheet": {
         src: "/shots/v2/sh-sheet.webp",
         alt: "The Share sheet for the Sourdough loaf at Thistlewick Bakery (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",

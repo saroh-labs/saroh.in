@@ -1,7 +1,8 @@
 /**
  * The screenshots this site shows: its own, taken from the real app on the
- * Global demo businesses (`e2e/marketing-shots/shots.global.ts`), each what a
- * Free business can have, and each read by a person for rupees, GST, UPI,
+ * Global demo businesses (`e2e/marketing-shots/shots.global.ts`), which sit
+ * on paid plans so the shots show what a paying business gets (owner, 16 Nov
+ * 2026), each read by a person for rupees, GST, UPI,
  * +91, India's places, plan offers and "team" (plan U11). A key still pending
  * draws the same neutral frame saroh.in draws for an uncaptured shot (same
  * slot, same shape), never nothing and never another kind of picture.
@@ -17,10 +18,13 @@ const NOT_TAKEN =
     "Its spec is in shots.global.ts; not captured yet (the marketing-shots workflow takes it).";
 /** Claude's own screens, put in place by hand (`supplied` in shots.global.ts). */
 const SUPPLIED = "Claude's own screen, put in place by hand; not supplied yet.";
-const NO_SUBSCRIPTIONS = "Subscriptions isn't usable on Global yet.";
-/** Ask AI refuses a Free business, and Global is Free until paid plans open (DEC-211). */
-const NO_ASK_AI =
-    "Ask AI is for paying plans, and Global's businesses are on Free.";
+/**
+ * Ask AI's panel on Global still says "English or Hinglish" and that answers
+ * go to a provider "outside India": the app's words need fixing before a
+ * shot. Its specs are in shots.global.ts (the conversations are asked first).
+ */
+const ASK_AI_INDIA_WORDS =
+    'Ask AI\'s panel on Global says "English or Hinglish" and "outside India"; retake once the app\'s words are fixed (specs in shots.global.ts).';
 
 /**
  * Keys pages name but this site has no capture of yet, each with why; the
@@ -28,13 +32,8 @@ const NO_ASK_AI =
  * missing image. A key comes off once its capture is committed.
  */
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
-    "r-subdetail": NO_SUBSCRIPTIONS,
-    "s-subs": NO_SUBSCRIPTIONS,
-    "g-subs": NO_SUBSCRIPTIONS,
-    "g-subdetail": NO_SUBSCRIPTIONS,
-    "g-plans": NO_SUBSCRIPTIONS,
     "g-packs":
-        "Class packs are a paid module, and Global's businesses are on Free.",
+        "Class packs aren't offered on any plan (DEC-099): the app hides the module, so there's no page to take.",
     "r-supply":
         "A bill of supply is India's GST rule; Global's invoices have no exempt-supply wording.",
     "ai-hero": SUPPLIED,
@@ -42,12 +41,12 @@ export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
     "ai-ask": SUPPLIED,
     "ai-consent": NOT_TAKEN,
     "ai-activity": NOT_TAKEN,
-    "ask-hero": NO_ASK_AI,
-    "ask-hero-phone": NO_ASK_AI,
-    "ask-start": NO_ASK_AI,
-    "ask-answer": NO_ASK_AI,
-    "ask-confirm": NO_ASK_AI,
-    "ask-history": NO_ASK_AI,
+    "ask-hero": ASK_AI_INDIA_WORDS,
+    "ask-hero-phone": ASK_AI_INDIA_WORDS,
+    "ask-start": ASK_AI_INDIA_WORDS,
+    "ask-answer": ASK_AI_INDIA_WORDS,
+    "ask-confirm": ASK_AI_INDIA_WORDS,
+    "ask-history": ASK_AI_INDIA_WORDS,
 };
 
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */

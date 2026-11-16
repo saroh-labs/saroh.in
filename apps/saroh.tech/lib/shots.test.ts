@@ -73,14 +73,14 @@ describe("saroh.tech's screenshots", () => {
 
     it("draws saroh.in's neutral frame for a pending key, and nothing for no key", () => {
         expect(shotView(undefined)).toBeUndefined();
-        const view = shotView("r-subdetail", "A renewal");
+        const view = shotView("r-supply", "A bill of supply");
         expect(view?.image).toMatchObject({
             src: null,
-            alt: "A renewal",
+            alt: "A bill of supply",
             width: 1600,
             height: 1000,
         });
-        expect(view?.id).toBe("r-subdetail");
+        expect(view?.id).toBe("r-supply");
     });
 
     it("names only this site's demo businesses and never shows a plan's working screens", () => {
@@ -89,7 +89,6 @@ describe("saroh.tech's screenshots", () => {
                 /Rye & Co|Kavi|Pulse Fitness|Northwind|GST|₹/,
             );
         }
-        expect(GLOBAL_SHOTS["g-subs"]).toBeUndefined();
     });
 
     it("never says team or plan in an alt: one person, nothing to buy", () => {
