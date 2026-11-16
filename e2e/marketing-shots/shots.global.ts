@@ -5,13 +5,13 @@
  * use that Global can show, taken with India's crop and frame (`sameAs`,
  * DEC-221); the `l-` keys are the salon's.
  *
- * A person looks at every image: nothing checks pixels for ₹ or GST. A screen
- * that still shows India's details, or a feature a Global business can't use
- * (subscriptions and class packs, online payments, pay links, Ask AI, which is
- * for paying plans, or India's GST bill of supply) isn't listed here, and its
- * key stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS. Nothing is
- * hidden from a shot: what's on the page is what a Free business sees, with
- * Insights (the bakery) and Courses (the gym) turned on, as Free can.
+ * A person looks at every image: nothing checks pixels for ₹ or GST. The
+ * businesses sit on paid plans (owner, 16 Nov 2026), so memberships and Ask
+ * AI are taken too. A screen that still shows India's details, or a feature
+ * no Global business can use (class packs, on no plan; online payments and
+ * pay links, with no provider; India's GST bill of supply), isn't taken, and
+ * its key stays in `apps/saroh.tech/content/shots.ts`'s PENDING_SHOTS.
+ * Nothing is hidden from a shot.
  *
  * `d-customer` isn't taken: the note card says "for the team" to one person
  * (PENDING_SHOTS). Retake it when the app's words are fixed.
@@ -20,7 +20,7 @@
  * and names the business as a demo.
  */
 import { morningZone } from "../../packages/database/src/seed/global/morning-zone";
-import type { Shot } from "./shots.config";
+import type { Shot, Step } from "./shots.config";
 import { DESK, SHOTS } from "./shots.config";
 
 export { morningZone };
@@ -196,6 +196,87 @@ const AI_APPS_SHOTS: Shot[] = [
     sameAs("ai-activity", {
         alt: "AI assistants in Settings at Thistlewick Bakery (demo bakery): a connected AI app and the changes it made",
         gap: "Connect Claude first: `pnpm --filter @saroh/e2e shots:connect-claude --edition=global`, then make a change or two through it.",
+    }),
+];
+
+/*
+ * Memberships, on the paid plans the demo businesses sit on (owner, 16 Nov
+ * 2026): Ironvale's, and Thistlewick's Saturday loaves (`memberships` in the
+ * Global seed). Class packs aren't offered on any plan (DEC-099): the app
+ * hides the module, so `g-packs` stays pending.
+ */
+const MEMBERSHIP_SHOTS: Shot[] = [
+    sameAs("r-subdetail", {
+        route: `/billing/subscriptions/${SHOP}_sub_0`,
+        alt: "Maya Thompson's weekly sourdough at Thistlewick Bakery (demo bakery): next charge, upcoming collections and changes",
+    }),
+    sameAs("s-subs", {
+        alt: "Subscriptions at Thistlewick Bakery (demo bakery) with one failed renewal flagged",
+    }),
+    sameAs("g-subs", {
+        business: "ironvale",
+        alt: "Memberships at Ironvale Fitness (demo gym) with their next charge",
+    }),
+    sameAs("g-subdetail", {
+        business: "ironvale",
+        alt: "Active memberships at Ironvale Fitness (demo gym), each with its next renewal and what it pays",
+    }),
+    sameAs("g-plans", {
+        business: "ironvale",
+        alt: "The memberships Ironvale Fitness (demo gym) sells, each with its price and how often it renews",
+    }),
+];
+
+/*
+ * Ask AI (paying plans, DEC-220) at Thistlewick, in English: each shot a
+ * conversation already asked on the capture database, opened from the
+ * history list by its question, as saroh.in's are; the capture never asks.
+ */
+const ASK_GAP =
+    'Asked first on the capture database through the API\'s own Ask AI (Anthropic key in .env.local), after the last re-seed, which removes them: "How did the last seven days go, and which products sold the most?", "Which products sold best this month?", then "Change the Sourdough loaf\'s description to: …", its card left unconfirmed. Set the API\'s R2_PUBLIC_BASE_URL first so the product cards carry photos.';
+const HERO_Q = "How did the last seven days go";
+const openAsk = (question: string): Step[] => [
+    {
+        click: `nav[aria-label="Your conversations"] button:has-text("${question}")`,
+    },
+    { waitFor: 'button:has-text("Report this answer")' },
+];
+const ASK_SHOTS: Shot[] = [
+    sameAs("ask-hero", {
+        steps: openAsk(HERO_Q),
+        alt: "Ask AI at Thistlewick Bakery (demo bakery) answering how the last seven days went, with its best sellers as cards",
+        gap: ASK_GAP,
+    }),
+    sameAs("ask-hero-phone", {
+        steps: [
+            { click: 'button[aria-label="Your conversations"]' },
+            ...openAsk(HERO_Q),
+            { scrollTop: "#ask-ai-page .overflow-y-auto" },
+        ],
+        alt: "Ask AI on a phone at Thistlewick Bakery (demo bakery), answering how the last seven days went",
+        gap: ASK_GAP,
+    }),
+    sameAs("ask-start", {
+        alt: "Ask AI at Thistlewick Bakery (demo bakery) before a question, with ready questions",
+    }),
+    sameAs("ask-answer", {
+        steps: openAsk("Which products sold best"),
+        alt: "Ask AI at Thistlewick Bakery (demo bakery) answering which products sold best this month, with the best sellers as cards",
+        gap: ASK_GAP,
+    }),
+    sameAs("ask-confirm", {
+        steps: openAsk("Change the Sourdough"),
+        alt: "Ask AI at Thistlewick Bakery (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
+        gap: ASK_GAP,
+    }),
+    sameAs("ask-history", {
+        clip: {
+            selector: 'nav[aria-label="Your conversations"] h1',
+            until: `nav[aria-label="Your conversations"] button:has-text("${HERO_Q}")`,
+            pad: 20,
+        },
+        alt: "Ask AI's history at Thistlewick Bakery (demo bakery)",
+        gap: ASK_GAP,
     }),
 ];
 
@@ -591,6 +672,8 @@ const LISTED: Shot[] = [
         "site:/",
         "The site of Wrenfield Dental (demo clinic): free times today and Book an appointment",
     ),
+    ...MEMBERSHIP_SHOTS,
+    ...ASK_SHOTS,
     ...SHARE_SHOTS,
     ...AI_APPS_SHOTS,
 ];
