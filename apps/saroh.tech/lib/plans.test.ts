@@ -2,7 +2,7 @@ import type { CatalogInput } from "@saroh/pricing-catalog";
 import { parseCatalog } from "@saroh/pricing-catalog";
 import { describe, expect, it, vi } from "vitest";
 
-import { faqs } from "@/content/faq";
+import { faqs, PAY_CARD_ONLINE } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { PRICING } from "@/content/pricing";
 
@@ -378,5 +378,15 @@ describe("Global's paid plans once Saroh sells them (stage 9, DEC-211)", () => {
         const read = await readPricing("https://api.example.test", fetcher);
         expect(read?.offered).toBe(true);
         expect(read?.catalog.currency).toBe("USD");
+    });
+});
+
+describe("faqWithPlans: card payment online follows the API (STRIPE_PAYMENTS, #7)", () => {
+    it("says customers can pay by card online only while cardOnline is true", () => {
+        const pay = (on: boolean) =>
+            faqWithPlans(null, ["pay"], on).find((q) => q.q.includes("pay"))
+                ?.a ?? "";
+        expect(pay(false)).not.toContain("card online");
+        expect(pay(true)).toContain(PAY_CARD_ONLINE);
     });
 });

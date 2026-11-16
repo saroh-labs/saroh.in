@@ -21,7 +21,7 @@ import {
 } from "@saroh/pricing-catalog";
 
 import type { FaqId } from "@/content/faq";
-import { faqItems } from "@/content/faq";
+import { faqItems, PAY_CARD_ONLINE } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
 import { PRICING } from "@/content/pricing";
 
@@ -76,7 +76,7 @@ export async function readCatalog(
 export async function readPricing(
     api = process.env.API_URL?.trim(),
     fetcher: typeof fetch = fetch,
-): Promise<{ catalog: Catalog; offered: boolean } | null> {
+): Promise<{ catalog: Catalog; offered: boolean; cardOnline: boolean } | null> {
     if (!api) return null;
     try {
         const res = await fetcher(`${api}/public/pricing`, {
@@ -89,10 +89,12 @@ export async function readPricing(
         const body = (await res.json()) as {
             catalog?: unknown;
             offered?: unknown;
+            cardOnline?: unknown;
         };
         return {
             catalog: parseCatalog(body.catalog),
             offered: body.offered === true,
+            cardOnline: body.cardOnline === true,
         };
     } catch (err) {
         console.warn(
@@ -133,7 +135,12 @@ export function freePlanLine(catalog: Catalog | null): string {
 }
 
 /** A page's questions. "start-free" lists Free's limits when the catalogue was read. */
-export function faqWithPlans(catalog: Catalog | null, ids: FaqId[]) {
+export function faqWithPlans(
+    catalog: Catalog | null,
+    ids: FaqId[],
+    /** The API's `cardOnline` (`STRIPE_PAYMENTS`): the pay answer says card online only then. */
+    cardOnline = false,
+) {
     const limits = catalog && freeLimitLines(catalog);
     return faqItems(ids).map((item, i) =>
         ids[i] === "start-free" && limits
@@ -141,7 +148,9 @@ export function faqWithPlans(catalog: Catalog | null, ids: FaqId[]) {
                   ...item,
                   a: `Free includes ${sentenceList(limits.map(lowerFirst))}. No card needed.`,
               }
-            : item,
+            : ids[i] === "pay" && cardOnline
+              ? { ...item, a: `${item.a} ${PAY_CARD_ONLINE}` }
+              : item,
     );
 }
 

@@ -1,4 +1,3 @@
-import { claimsOff } from "@/lib/feature-switches";
 /**
  * Questions for a business outside India, after apps/saroh.in/content/faq.ts.
  * saroh.in's two GST questions are one tax question here, and currencies, import
@@ -33,8 +32,8 @@ export const faqs = {
     },
     pay: {
         q: "How do my customers pay?",
-        // Card online only while its claim is on: the API's STRIPE_PAYMENTS opens it (#7).
-        a: `You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh.${claimsOff().includes("card-online") ? "" : " Customers can also pay by card online, into your own account."}`,
+        // "by card online" is added only while the API says cardOnline (#7, `faqWithPlans`).
+        a: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh.",
     },
     team: {
         q: "Can more than one person use it?",
@@ -124,3 +123,7 @@ export function solutionFaq(own: SolutionFaqId): FaqId[] {
 export const TRADE_FAQ: FaqId[] = ["tax", "team"];
 
 export const faqItems = (ids: FaqId[]): FaqItem[] => ids.map((id) => faqs[id]);
+
+/** The pay answer's last sentence, while card payment online is on (STRIPE_PAYMENTS). */
+export const PAY_CARD_ONLINE =
+    "Customers can also pay by card online, into your own account.";

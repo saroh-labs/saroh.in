@@ -30,7 +30,7 @@ import {
 import { claimsOff, featuresOff } from "@/lib/feature-switches";
 import { ALL_TOOLS, HOW_IT_WORKS_ALL } from "@/lib/nav";
 import { StartLink } from "@/lib/page-site";
-import { faqWithPlans, freePlanLine, readCatalog } from "@/lib/plans";
+import { faqWithPlans, freePlanLine, readPricing } from "@/lib/plans";
 import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -52,7 +52,8 @@ export const metadata = pageMetadata(page);
  * and the folded feature grid went on both sites (owner, 16 Nov 2026).
  */
 export default async function HomePage() {
-    const catalog = await readCatalog();
+    const pricing = await readPricing();
+    const catalog = pricing?.catalog ?? null;
     const off = claimsOff();
     const claimOn = (c: ClaimSwitch) => !off.includes(c);
     const shown = new Set<string>(featureList.map((f) => f.slug));
@@ -74,6 +75,7 @@ export default async function HomePage() {
     const faq = faqWithPlans(
         catalog,
         HOME_FAQ.filter((id) => id !== "ai-apps" || shown.has("ai-apps")),
+        pricing?.cardOnline,
     );
     const paidTotal =
         WORLD.lead.orders?.find((o) => o.id === STORY.paidOrder)?.total ?? "";

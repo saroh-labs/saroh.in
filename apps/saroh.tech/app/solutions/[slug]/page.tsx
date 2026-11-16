@@ -36,6 +36,7 @@ import {
     freeCardModel,
     freePlanLine,
     readCatalog,
+    readPricing,
 } from "@/lib/plans";
 import { faqSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
@@ -75,7 +76,11 @@ const isLead = (slug: string): slug is SolutionSlug =>
     (SOLUTION_SLUGS as readonly string[]).includes(slug);
 
 /** A lead trade's page: every word of `solutions.ts`, with its screens. */
-function leadPage(s: Solution, catalog: Catalog): OwnProps {
+function leadPage(
+    s: Solution,
+    catalog: Catalog,
+    cardOnline: boolean,
+): OwnProps {
     const hero = s.hero && shotView(s.hero.shot, s.hero.alt);
     return {
         name: s.name,
@@ -105,7 +110,7 @@ function leadPage(s: Solution, catalog: Catalog): OwnProps {
                 };
             }),
         },
-        faq: faqWithPlans(catalog, solutionFaq(s.faq)),
+        faq: faqWithPlans(catalog, solutionFaq(s.faq), cardOnline),
         pricingTitle: s.pricing.title,
         questionsTitle: W.questions(s.longName),
         related: solutionList
@@ -124,11 +129,16 @@ function leadPage(s: Solution, catalog: Catalog): OwnProps {
  * questions, and its Home drawn on an ordinary morning, as no Global screen
  * of the trade is captured yet. Its problems are words alone.
  */
-function otherPage(t: TradePage, catalog: Catalog): OwnProps {
-    const [start, ...general] = faqWithPlans(catalog, [
-        "start-free",
-        ...TRADE_FAQ,
-    ]);
+function otherPage(
+    t: TradePage,
+    catalog: Catalog,
+    cardOnline: boolean,
+): OwnProps {
+    const [start, ...general] = faqWithPlans(
+        catalog,
+        ["start-free", ...TRADE_FAQ],
+        cardOnline,
+    );
     // The invoice templates gallery is always built, as the nav's Templates
     // menu links it; `templatesOn` is the website templates' switch.
     const template = TEMPLATE_TRADES.find((x) => x.slug === t.templates);
@@ -208,15 +218,17 @@ export default async function SolutionPage({ params }: Props) {
     const page = pageAt(`/solutions/${slug}`);
     const other = tradePage(slug);
     if (!page || (!isLead(slug) && !other)) notFound();
-    const catalog = await readCatalog();
+    const pricing = await readPricing();
+    const catalog = pricing?.catalog ?? null;
+    const cardOnline = pricing?.cardOnline ?? false;
     const shown = new Set<string>(featureList.map((f) => f.slug));
     const off = claimsOff();
     const templatesOn = !featuresOff().includes("templates");
     const src = `solutions-${slug}`;
     const free = freePlanLine(catalog);
     const own = other
-        ? otherPage(other, catalog)
-        : leadPage(solutions[slug as SolutionSlug], catalog);
+        ? otherPage(other, catalog, cardOnline)
+        : leadPage(solutions[slug as SolutionSlug], catalog, cardOnline);
 
     return (
         <div data-page-type={page.type}>

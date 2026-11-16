@@ -46,7 +46,6 @@ export const browserEnv = {
     NEXT_PUBLIC_CLAIM_SITE_SHOP: process.env.NEXT_PUBLIC_CLAIM_SITE_SHOP,
     NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS:
         process.env.NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS,
-    NEXT_PUBLIC_CLAIM_CARD_ONLINE: process.env.NEXT_PUBLIC_CLAIM_CARD_ONLINE,
     NODE_ENV: process.env.NODE_ENV,
     /** `API_URL`, written in by next.config.js `env` (the header's session check). */
     SAROH_API_URL: process.env.SAROH_API_URL,
@@ -76,6 +75,5 @@ export const browserEnv = {
     | "NEXT_PUBLIC_CLAIM_AI_APPS_PLANS"
     | "NEXT_PUBLIC_CLAIM_SITE_SHOP"
     | "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS"
-    | "NEXT_PUBLIC_CLAIM_CARD_ONLINE"
     | "NODE_ENV"
 >;
