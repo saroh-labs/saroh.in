@@ -3002,3 +3002,14 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **saroh.tech's plan words follow one switch.** Every line that changes when Global's paid plans go on sale (the plan lines, Tell me when, "Free for now", the pricing title and cards, own-domain lines, the legal "Paying for Saroh", the paid-plan tag) is a pair in `apps/saroh.tech/content/plan-words.ts`. Pages read the API's `offered` (`GET /public/pricing`, `SAROH_BILLING_GLOBAL` on and a paid plan published, DEC-211) once per build (`paidPlansOn`) and take the pair's wording; no other file carries the Free-only words (`lib/plan-words.test.ts`). On, the paid cards start to sign-up and the plan lines name Grow and Pro with Compare plans.
     - **Applied first to Subscriptions on saroh.tech:** its page is tagged "On paid plans" while paid plans aren't on sale, and drawn as any other feature once they are, in place of "Not available yet" on every line.
 - Consequences: flipping `SAROH_BILLING_GLOBAL` changes all of saroh.tech at the next build. A new hard-coded "Free for now" fails the test. Each other unreleased feature gets its tag (Coming soon, or its plan) as it's next touched; the claim and release switch machinery is unchanged.
+
+## DEC-223 AI apps (MCP) is for paid plans only
+
+**Status: Accepted — 2026-11-16** · owner · narrows the plan in `plans/api-mcp` that gave Free businesses MCP
+
+- Context (owner, 16 Nov 2026, web-redesign bug #55): saroh.in's AI apps page said "AI apps comes with Grow and Pro" while saroh.tech said "on every plan, Free included", and the API's MCP module has no plan check, so Free businesses can connect today. Owner: "MCP only for paid users."
+- Decision:
+    - **AI apps (connecting Claude, ChatGPT or another app over MCP) comes with paid plans only**, on both editions. Free does not include it.
+    - **Marketing:** both sites say it comes with a paid plan. saroh.tech names no plan beside it (DEC-221's `ai-apps-plans` claim); while Global is Free-only it says AI apps isn't part of Free.
+    - **Product (to build):** the API enforces it from the catalogue (an AI apps row, paid plans only), at sign-in/consent and on every MCP call, the same way API keys are gated. Open questions for the owner before building: what happens to Free businesses already connected (disconnect at the switch, or a grace period), and the in-app wording on Free.
+- Consequences: saroh.tech's "AI apps is on Free" lines are gone (6ab181447). Until the API gate ships, a Free business can still connect; the marketing must not promise it.
