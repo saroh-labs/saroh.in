@@ -27,7 +27,7 @@ export function YoursLine({
     // /features already: a hidden copy on the landing (owner, 16 Nov 2026, #14).
     return (
         <Container as="section" aria-label={home.featuresEyebrow}>
-            <div className="border-b border-border py-8 min-[760px]:py-12">
+            <div className="border-b border-border pb-8 pt-12 min-[760px]:pb-12 min-[760px]:pt-20">
                 <p className="m-0 flex flex-wrap items-center gap-x-6 gap-y-2 text-[17px] leading-normal text-foreground min-[760px]:text-[20px]">
                     {home.yours.line}
                     <span className="flex flex-wrap gap-x-6 gap-y-1">

@@ -488,7 +488,7 @@ export function NewInSaroh({
         <section
             id="new"
             aria-labelledby="new-title"
-            className="scroll-mt-24 bg-foreground py-12 text-mk-lamp-fg min-[760px]:py-[72px]"
+            className="scroll-mt-24 bg-foreground pb-12 pt-14 text-mk-lamp-fg min-[760px]:pb-[72px] min-[760px]:pt-24"
         >
             <Container>
                 <div className="grid gap-3 min-[960px]:grid-cols-[minmax(0,1fr)_460px] min-[960px]:items-start min-[960px]:gap-12">

@@ -33,7 +33,7 @@ export function MoneyBand({
         <section
             id="money"
             aria-labelledby="money-title"
-            className="mt-12 scroll-mt-24 bg-mk-ledger py-12 text-mk-ledger-fg min-[760px]:mt-[72px] min-[760px]:py-16"
+            className="mt-12 scroll-mt-24 bg-mk-ledger pb-14 pt-12 text-mk-ledger-fg min-[760px]:mt-[72px] min-[760px]:pb-24 min-[760px]:pt-16"
         >
             <Container>
                 <div className="grid gap-4 min-[960px]:grid-cols-[minmax(0,1fr)_460px] min-[960px]:items-start min-[960px]:gap-10">
