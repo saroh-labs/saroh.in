@@ -6783,3 +6783,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** `Section`'s `ink` tone rewrote every `.text-foreground` descendant to Paper, including buttons and light chips.
 - **Fix:** the rewrite now skips `a` and `button`; dark text on a light surface inside Ink uses `text-[hsl(var(--foreground))]`.
 - **Rule:** when a section flips colours for its descendants, check every light surface and every button inside it in the browser before calling it done.
+
+### A grid with no column template grows past a phone screen (16 Nov 2026)
+
+- **Symptom:** at a true 320px, the Ask AI hero rows, the Orders card, the saroh.tech features example and the AI apps connector card ran off their frame and were cut mid-word. The page's own width stayed 320, so the overflow check passed.
+- **Cause:** `grid` with no `grid-cols-*` makes one `auto` column, and an `auto` column is never narrower than its widest child's min-content (a `truncate` line, a no-wrap list). An `overflow-hidden` ancestor then hides the excess. Separately, a desktop Chrome window doesn't shrink below 500px, so earlier "320px" screenshots were really 500px wide.
+- **Fix:** `grid-cols-[minmax(0,1fr)]` on single-column grids that hold rows or cards; `flex-wrap` on step lists. Check phones with DevTools device emulation (`emulate` viewport `320x720x1,mobile`), not by resizing the window, and look for text cut by a clipping ancestor, not only for page scroll.
