@@ -57,6 +57,8 @@ jobs:
     env:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_shots
+      # Each business's shots sign in under its owner's name, not "Demo Owner" (capture.ts).
+      SHOTS_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_shots
       DATABASE_TARGET_CONFIRM: saroh_shots
       PORT: 3333
       TRUST_PROXY: private
