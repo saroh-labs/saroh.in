@@ -247,6 +247,34 @@ function nameOwner(business: Business) {
     named = name;
 }
 
+/**
+ * A local stack names a business's site `<name>.saroh.app.localhost`; the
+ * app in production says `<name>.saroh.app`. The words on the page (text,
+ * fields) are shown with the production suffix, so no shot carries a
+ * machine-only address (owner, 16 Nov 2026). Nothing is saved.
+ */
+async function productionHosts(page: Page) {
+    await page.evaluate(() => {
+        const local = /\.saroh\.app\.localhost(:\d+)?/g;
+        const walker = document.createTreeWalker(
+            document.body,
+            NodeFilter.SHOW_TEXT,
+        );
+        for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+            if (n.nodeValue?.includes(".saroh.app.localhost"))
+                n.nodeValue = n.nodeValue.replace(local, ".saroh.app");
+        }
+        for (const el of Array.from(
+            document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>(
+                "input, textarea",
+            ),
+        )) {
+            if (el.value.includes(".saroh.app.localhost"))
+                el.value = el.value.replace(local, ".saroh.app");
+        }
+    });
+}
+
 /** The marked control's box within the area `clip` (CSS px), as fractions. */
 async function markOf(
     page: Page,
@@ -308,6 +336,7 @@ async function capture(
             });
     }
     await loaded(page);
+    await productionHosts(page);
     if (!shot.clip) {
         const whole = { x: 0, y: 0, ...shot.viewport };
         const mark = await markOf(page, shot, whole);

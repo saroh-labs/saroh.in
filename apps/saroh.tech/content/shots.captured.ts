@@ -329,4 +329,40 @@ export const CAPTURED: Record<
         width: 2880,
         height: 1800,
     },
+    "sh-sheet": {
+        src: "/shots/v2/sh-sheet.webp",
+        alt: "The Share sheet for the Sourdough loaf at Thistlewick Bakery (demo bakery): the Price tag card in the bakery's look, its sizes, the caption and the ways to share it",
+        width: 1480,
+        height: 1800,
+    },
+    "sh-button": {
+        src: "/shots/v2/sh-button.webp",
+        alt: "The Sourdough loaf's page at Thistlewick Bakery (demo bakery), live on the shop, with the Share button beside QR",
+        width: 1608,
+        height: 1144,
+    },
+    "sh-cards": {
+        src: "/shots/v2/sh-cards.webp",
+        alt: "Card styles for the Sourdough loaf at Thistlewick Bakery (demo bakery) in the bakery's own look, the Colour card in Square",
+        width: 1480,
+        height: 1800,
+    },
+    "sh-phone": {
+        src: "/shots/v2/sh-phone.webp",
+        alt: "The Share sheet on a phone for the Sourdough loaf at Thistlewick Bakery (demo bakery), with Share now",
+        width: 780,
+        height: 1688,
+    },
+    "sh-post": {
+        src: "/shots/v2/sh-post.webp",
+        alt: "Create post at Thistlewick Bakery (demo bakery): Text only, the headline We're hiring a morning baker, a link and the card drawn in the bakery's look",
+        width: 2880,
+        height: 1800,
+    },
+    "sh-post-card": {
+        src: "/shots/v2/sh-post-card.webp",
+        alt: "A finished own post at Thistlewick Bakery (demo bakery): the headline, a caption, the Shop link and its card in the bakery's look",
+        width: 2024,
+        height: 1592,
+    },
 };
