@@ -294,6 +294,10 @@ const envSchema = z.object({
     // (`src/common/robots-header.ts`): set on the dev API (api.saroh.io) so
     // search engines never list it. Unset or `off`: no header (production).
     ROBOTS_NOINDEX: z.enum(["on", "off"]).optional(),
+    // Global's API behind the access key while saroh.tech isn't open (owner,
+    // 16 Nov 2026; common/global-access.ts): the saroh.tech sites' key. Unset,
+    // *.saroh.tech answers everyone, as at launch.
+    GLOBAL_API_ACCESS_KEY: z.string().optional(),
     // TEST ONLY. Hosts the link preview tool may fetch although they resolve
     // to loopback (comma-separated, e.g. `localhost`): the browser tests
     // point it at a page served on the test machine, which the SSRF guard
