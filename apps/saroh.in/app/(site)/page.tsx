@@ -175,14 +175,13 @@ export default async function HomePage() {
                 amount={paidTotal}
             />
 
-            <div className="mt-16 min-[760px]:mt-20">
-                <NewInSaroh
-                    on={news}
-                    words={home.news}
-                    business={WORLD.lead}
-                    story={RYE_MONDAY}
-                />
-            </div>
+            {/* Straight after the money band: the door that sat between went (16 Nov 2026). */}
+            <NewInSaroh
+                on={news}
+                words={home.news}
+                business={WORLD.lead}
+                story={RYE_MONDAY}
+            />
 
             <YoursLine
                 words={{ ...home, allFeatures: NAV_WORDS.howItWorksAll }}
