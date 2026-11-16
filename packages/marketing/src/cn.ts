@@ -51,6 +51,7 @@ const twMerge = extendTailwindMerge({
                         "mk-kit-h2",
                         "mk-kit-h3",
                         "mk-kit-lead",
+                        "mk-kit-address",
                     ],
                 },
             ],

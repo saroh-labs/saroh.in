@@ -1,3 +1,5 @@
+import { ClosingNamesProvider } from "@saroh/marketing/kit/closing-address";
+import { closingNames } from "@saroh/marketing/kit/closing-cta";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 
@@ -5,6 +7,7 @@ import { Analytics } from "@/components/shared/analytics";
 import { Footer } from "@/components/shared/footer";
 import { Header } from "@/components/shared/header";
 import { RegionBar } from "@/components/shared/region-bar";
+import { WORLD } from "@/content/world";
 import { site } from "@/site.config";
 
 import "@saroh/marketing/tokens.css";
@@ -74,7 +77,12 @@ export default function RootLayout({
                     <RegionBar />
                     <div className="overflow-x-clip bg-background">
                         <Header />
-                        <main id="main">{children}</main>
+                        <main id="main">
+                            {/* The closing band's names: this site's demo businesses. */}
+                            <ClosingNamesProvider names={closingNames(WORLD)}>
+                                {children}
+                            </ClosingNamesProvider>
+                        </main>
                         <Footer />
                     </div>
                 </div>

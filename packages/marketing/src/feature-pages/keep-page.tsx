@@ -466,7 +466,6 @@ export function KeepPage({
             <ClosingCTA
                 title={feature.closer}
                 primary={site.start(`feature-${slug}-band`)}
-                className="pt-0 min-[760px]:pt-0"
             />
         </>
     );

@@ -113,6 +113,7 @@
         "./kit/plan-line": "./src/kit/plan-line.tsx",
         "./kit/sticky-bar": "./src/kit/sticky-bar.tsx",
         "./kit/closing-cta": "./src/kit/closing-cta.tsx",
+        "./kit/closing-address": "./src/kit/closing-address.tsx",
         "./kit/trade-switcher": "./src/kit/trade-switcher.tsx",
         "./kit/sun-arc": "./src/kit/sun-arc.tsx",
         "./kit/hour-strip": "./src/kit/hour-strip.tsx",
