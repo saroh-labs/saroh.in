@@ -1,43 +1,50 @@
-import { Container } from "@saroh/marketing/container";
-import { SectionHeading } from "@saroh/marketing/section-heading";
-import { TextLink } from "@saroh/marketing/text-link";
+import type { ClaimSwitch } from "@saroh/marketing/feature-switches";
+import { HowItWorksPage } from "@saroh/marketing/how-it-works/how-it-works-page";
+import type { Gate } from "@saroh/marketing/how-it-works/words";
 
-import { featureHref, featureList } from "@/content/features";
+import { SITE_FONTS } from "@/components/feature-pages/site-fonts";
+import { JsonLd } from "@/components/shared/json-ld";
+import { HOW_IT_WORKS } from "@/content/how-it-works";
+import { THISTLEWICK_TUESDAY, WORLD } from "@/content/world";
+import { claimsOff, featuresOff } from "@/lib/feature-switches";
+import { pageSite } from "@/lib/page-site";
+import { pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
-import { pageOf } from "@/lib/site-map";
+import { pageAt, pageOf } from "@/lib/site-map";
 
 const page = pageOf("/features");
 
 export const metadata = pageMetadata(page);
 
 /**
- * /features, "How it works" (DEC-221): the route shell the redesign's
- * /features agent fills, as saroh.in's. Noindex and out of the sitemap
- * until then (`unreviewed`); it lists every shown feature so the nav's
- * see-all never lands on an empty page.
+ * /features, "How it works" (DEC-221; HWDesk and HWPhone2), saroh.in's page
+ * in Global's words and world: the six ownership chapters, how money moves
+ * (through the business's own Stripe), everything that stays yours and the
+ * full feature index. A chapter, drawing, line or link of a switched-off
+ * feature or an unlive claim is not drawn. Global has no written day yet,
+ * so the "follow one day" line isn't drawn.
  */
 export default function Page() {
+    const off = featuresOff();
+    const claims = claimsOff();
+    const claimOn = (c: ClaimSwitch) => !claims.includes(c);
     return (
-        <Container
-            as="section"
-            data-page-type={page.type}
-            className="grid gap-8 py-[72px] min-[760px]:py-[120px]"
-        >
-            <SectionHeading
-                as="h1"
-                size="kit-h1"
-                title={page.h1}
-                lead="This page is being redrawn. Every feature has its own page meanwhile."
+        <div data-page-type={page.type}>
+            <JsonLd data={pageSchema(page)} />
+            <HowItWorksPage
+                words={HOW_IT_WORKS}
+                world={WORLD}
+                story={THISTLEWICK_TUESDAY}
+                site={pageSite()}
+                isOn={(g: Gate) =>
+                    (!g.release || !off.includes(g.release)) &&
+                    (!g.claim || claimOn(g.claim))
+                }
+                pageShown={(href) => Boolean(pageAt(href.split("#")[0]))}
+                isNew={() => false}
+                dayOn={false}
+                className={SITE_FONTS}
             />
-            <ul className="m-0 grid list-none gap-1 p-0">
-                {featureList.map((f) => (
-                    <li key={f.slug}>
-                        <TextLink href={featureHref(f.slug)} tone="ink" arrow>
-                            {f.name}
-                        </TextLink>
-                    </li>
-                ))}
-            </ul>
-        </Container>
+        </div>
     );
 }

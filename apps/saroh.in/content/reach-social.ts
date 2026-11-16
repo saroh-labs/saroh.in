@@ -12,6 +12,10 @@
  * - `ask-ai-plans`, `ask-ai-languages`, `ask-ai-social`: Ask AI's plan, its
  *   Hinglish question and its reading of posts.
  */
+import type {
+    CardWordsSet,
+    SocialWords,
+} from "@saroh/marketing/feature-pages/social/words";
 import { LOOK_BANDS } from "./reach-looks";
 import { RYE_MONDAY, WORLD } from "./world";
 
@@ -44,17 +48,6 @@ const meera = rye.customers[0].name.split(" ")[0];
 const priya = rye.customers.find((c) => c.name.startsWith("Priya"))?.name ?? "";
 const meeraFull = rye.customers[0].name;
 const handle = rye.domain?.split(".")[0] ?? rye.site.split(".")[0];
-
-export interface CardWordsSet {
-    label: string;
-    name: string;
-    photoLine: string;
-    tag: { price: string; unit?: string };
-    offer: { big: string; was: string; now: string; label: string };
-    simpleLine: string;
-    mark: string;
-    web: string;
-}
 
 const ryeCard: CardWordsSet = {
     label: `${rye.name} · Bakery`,
@@ -103,7 +96,7 @@ export function socialWords({
     askPlans: boolean;
     askLanguages: boolean;
     askSocial: boolean;
-}) {
+}): SocialWords {
     return {
         name: "Share and posts",
         title: {
@@ -115,10 +108,10 @@ export function socialWords({
         secondary: "Watch one post, start to finish",
         note: "Free to start. No card needed.",
         looks: {
-            rye: { look: rye.look, band: LOOK_BANDS.rye },
-            neel: { look: neel.look, band: LOOK_BANDS.neel },
+            lead: { look: rye.look, band: LOOK_BANDS.rye },
+            other: { look: neel.look, band: LOOK_BANDS.neel },
         },
-        cards: { rye: ryeCard, neel: neelCard },
+        cards: { lead: ryeCard, other: neelCard },
 
         stage: {
             /** On a phone, the cards are cut; this opens them. */
@@ -469,4 +462,4 @@ export function socialWords({
     };
 }
 
-export type SocialWords = ReturnType<typeof socialWords>;
+export type { CardWordsSet, SocialWords };

@@ -8,6 +8,7 @@
  * Claims wait for their switch: `ai-apps-plans` (a plan named beside AI
  * apps), `ask-ai-languages` (Ask AI answering in Hinglish), `ask-ai-plans`.
  */
+import type { AiAppsWords } from "@saroh/marketing/feature-pages/ai-apps/words";
 import { RYE_MONDAY, WORLD } from "./world";
 
 const rye = WORLD.lead;
@@ -33,7 +34,7 @@ export function aiAppsWords({
     plans: boolean;
     askPlans: boolean;
     languages: boolean;
-}) {
+}): AiAppsWords {
     return {
         name: "AI apps",
         title: { before: "Run Saroh from your own ", mark: "assistant." },
@@ -499,4 +500,4 @@ export function aiAppsWords({
     };
 }
 
-export type AiAppsWords = ReturnType<typeof aiAppsWords>;
+export type { AiAppsWords };

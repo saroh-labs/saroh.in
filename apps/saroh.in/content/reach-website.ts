@@ -12,7 +12,10 @@
  * - `open` is the launch switch: plan terms ("on every plan", "a paid plan")
  *   are said only once it is open, as a point's `openNote` is (DEC-136).
  */
-import type { WorldBusiness } from "@saroh/marketing/world";
+import type {
+    LookWords,
+    WebsiteWords,
+} from "@saroh/marketing/feature-pages/website/words";
 
 import { LOOK_BANDS } from "./reach-looks";
 import { RYE_MONDAY, WORLD } from "./world";
@@ -45,15 +48,6 @@ const cap = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
 /** The second provider the world names: "Cashfree, or Stripe abroad" → "Cashfree". */
 const otherProvider = WORLD.money.otherProviders?.split(",")[0];
 
-/** A look in the switcher: whose look, and the line under it. */
-export interface LookWords {
-    business: WorldBusiness;
-    label: string;
-    line: string;
-    /** A band colour the look's site uses beside its accent (HSL channels). */
-    band?: { bg: string; fg: string };
-}
-
 export function websiteWords({
     shop,
     open,
@@ -63,7 +57,7 @@ export function websiteWords({
     open: boolean;
     /** The Templates gallery is on (DEC-135): the page may name a template. */
     templates?: boolean;
-}) {
+}): WebsiteWords {
     return {
         name: "Website builder",
         title: {
@@ -475,4 +469,4 @@ export function websiteWords({
     };
 }
 
-export type WebsiteWords = ReturnType<typeof websiteWords>;
+export type { LookWords, WebsiteWords };

@@ -499,6 +499,40 @@ registry.ts` (stubs drawing the old page until agent reach lands).
       trades with a written day; on a phone a swipe row per group, a closed
       A to Z list and a sticky "Find your trade". "Tell us your trade" goes
       to /contact until the hub has its own form.
+- **17 Nov 2026, the shared pages (DEC-221, unit/web-techcore).** The
+  landing's sections, How it works and the Keep template moved from
+  saroh.in's `components/` into `@saroh/marketing`, so saroh.tech draws the
+  same pages with its own words and world:
+    - `@saroh/marketing/home/*`: `HomeHero`, `HeroStage` (and the
+      `HomeHeroScene` type), `SiteChapter` (`SiteShowcase`),
+      `OrdersChapter`, `MoneyBand`, `DayDoor`, `NewInSaroh`, `YoursLine`,
+      `PlansAndQuestions`, `TourVideo`, `Fold`, `Tag`; words typed by
+      `HomeWords` (`home/words`).
+    - `@saroh/marketing/how-it-works/*`: the whole page body
+      (`HowItWorksPage`), `Chapter`, `GroupHead`, the panels, `HeroVisual`,
+      `MoneyFlow`, `ExampleSwitch`, `Rich`; words typed by
+      `HowItWorksWords` (`how-it-works/words`, which also holds `Gate`,
+      `Chapter`, `IndexItem`).
+    - `@saroh/marketing/feature-pages/keep-page`: `KeepPage`, drawn from
+      resolved props (`KeepTemplateWords`, shots as `ShotView`s, Help links,
+      the Ask band with its claims applied, the plan line). It can say what
+      works today in place of the hero note, and mark parts "Not available
+      yet".
+    - The Reach and Ask pages (`feature-pages/website-page`, `social-page`,
+      `ask-ai-page`, `ai-apps-page`, with `reach/*`, `website/*`,
+      `social/*`, `ask-ai/*` and their `words` types).
+    - What a shared page needs from its site comes in as `PageSite`
+      (`feature-pages/site`: start button, claim switches, launch switch,
+      shown feature pages, shots); each site has `lib/page-site.tsx`. The
+      lead business's day beyond its orders is a `WorldStory`
+      (`@saroh/marketing/world`): saroh.in's `RYE_MONDAY`, saroh.tech's
+      `THISTLEWICK_TUESDAY`.
+    - saroh.in draws byte for byte as before: the landing, /features and
+      all twelve feature pages were rendered before and after and diffed.
+    - After the phone polish: `OrdersMoments` is
+      `@saroh/marketing/feature-pages/orders-moments` (KeepPage's `moments`),
+      and saroh.tech's world gives its businesses and items drawn photo
+      kinds, so both editions draw the same art.
 - **3 Oct 2026.** Marketing Site V2: light only, Space Grotesk and Geist,
   the `--mk-*` layer (earlier history in git).
 

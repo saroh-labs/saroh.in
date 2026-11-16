@@ -15,7 +15,11 @@ export type FaqId =
     | "medical-notes"
     | "currencies"
     | "import"
-    | "export";
+    | "export"
+    | "card"
+    | "money"
+    | "domain"
+    | "ai-apps";
 
 export const faqs = {
     "start-free": {
@@ -66,14 +70,39 @@ export const faqs = {
         q: "Can a client book without messaging me?",
         a: "Yes. Your booking page shows your services and only the times you're free, and the client picks one.",
     },
+    // Home's, from the landing board (saroh.in's, in Global's words).
+    card: {
+        q: "Do I need a card to start?",
+        a: "No. Saroh is free to start, and you don't need a card to set up your site and bookings.",
+    },
+    money: {
+        q: "Where does my customers' money go?",
+        a: "Into your own payment account, in your name, or into your hand at the counter. Saroh never holds it.",
+    },
+    domain: {
+        q: "Can I use my own domain?",
+        a: "Not yet. Your site lives at yourname.saroh.app.",
+    },
+    "ai-apps": {
+        q: "Can I run it from Claude or ChatGPT?",
+        a: "Yes. Connect Saroh as an AI app (it uses MCP, an open standard for AI assistants). It works as you, and nothing on your website goes live until you publish it.",
+    },
 } satisfies Record<FaqId, FaqItem>;
 
-/** Home's questions (`#faq`). */
+/**
+ * Home's questions (`#faq`): the landing board's first (a phone shows the
+ * first three, the rest under "All questions"), then the earlier ones.
+ * "ai-apps" shows only while AI apps does.
+ */
 export const HOME_FAQ: FaqId[] = [
+    "card",
+    "money",
+    "domain",
     "start-free",
     "currencies",
     "tax",
     "pay",
+    "ai-apps",
     "team",
     "medical-notes",
     "import",

@@ -51,8 +51,11 @@ function missingFields(theirs: unknown, ours: unknown, at = ""): string[] {
     );
 }
 
-/** Optional on saroh.in: a site may have no shot or plan note for a line. */
-const OPTIONAL = /\.(openNote|label|shot|alt|hero|heroNote)$/;
+/**
+ * Optional on saroh.in: a site may have no shot or plan note for a line. A
+ * caption keyed by a world business ("rye") is the edition's own world's.
+ */
+const OPTIONAL = /\.(openNote|label|shot|alt|hero|heroNote)$|\.captions\.\w+$/;
 const missing = (theirs: unknown, ours: unknown) =>
     missingFields(theirs, ours).filter((f) => !OPTIONAL.test(f));
 

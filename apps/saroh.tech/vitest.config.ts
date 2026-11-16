@@ -7,6 +7,7 @@ export default defineConfig({
     test: {
         environment: "node",
         globals: true,
+        setupFiles: ["./vitest.setup.ts"],
         include: [
             "lib/**/*.test.ts",
             "worker/**/*.test.ts",

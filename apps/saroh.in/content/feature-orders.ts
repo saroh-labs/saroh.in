@@ -1,4 +1,4 @@
-import type { OrdersMomentsData } from "@/components/feature-pages/orders-moments";
+import type { OrdersMomentsData } from "@saroh/marketing/feature-pages/orders-moments";
 
 import { RYE_MONDAY, WORLD } from "./world";
 

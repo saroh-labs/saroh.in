@@ -1,6 +1,9 @@
+import type { HomeHeroScene } from "@saroh/marketing/home/hero-stage";
 import type { DrawnPhotoKind } from "@saroh/marketing/kit/drawn-photo";
 import type { SiteLook } from "@saroh/marketing/kit/site-drawing";
-import type { World, WorldBusiness, WorldTrade } from "@saroh/marketing/world";
+import type { World, WorldBusiness } from "@saroh/marketing/world";
+
+export type { HomeHeroScene };
 
 /**
  * saroh.in's example world (DEC-221): every name, number, time and address
@@ -499,6 +502,16 @@ export const RYE_MONDAY = {
     },
     week: { takings: "₹48,200", orders: 68, change: "up 12% on last week" },
     topSeller: { item: "bun-box", sold: 46 },
+    /** The product Share makes a post of, and the ones its sheet lists. */
+    featured: "bun-box",
+    shareItems: ["bun-box", "sourdough", "rose-pistachio"],
+    /** The landing's list: today's, due first, one of each state. */
+    todayRows: ["ORD-1041", "ORD-1045", "ORD-1044"],
+    /** Anjali's cake: the payment the money story follows. */
+    paidOrder: "ORD-1044",
+    /** 7 am Home: the cakes ordered earlier, to bake today, and who hasn't paid. */
+    toMake: ["ORD-1041", "ORD-1043", "ORD-1044"],
+    unpaidOrder: "ORD-1044",
     /** 9:45 am, between bakes: "Aaj ke orders ke liye sab ready hai?" */
     askAt945: { pickups: 6, paid: 4, bunBoxesInStock: 38, bunBoxesNeeded: 2 },
     /** 9 pm: "Bun box ₹380 kar do"; on her site Tuesday morning. */
@@ -522,50 +535,6 @@ export const RYE_MONDAY = {
     apiKey: { name: "Key for the accounts sheet", ends: "7f2a" },
     webhook: { event: "When an order is paid", to: "Send it to your sheet" },
 } as const;
-
-/**
- * The landing hero's three phones for a trade (round 4, LAHomeDesk): the
- * customer on the business's own site, the owner's morning in Saroh, and
- * the customer's done screen. The words on the site phones are the
- * merchant's; the middle phone uses Saroh's own Home words. Each trade the
- * hero's switcher offers has one; Global writes its own from its seed.
- */
-export interface HomeHeroScene {
-    trade: WorldTrade;
-    business: WorldBusiness;
-    /** Under the phones: "Example: Rye & Co., a bakery on Hill Road. …". */
-    caption: string;
-    site: {
-        time: string;
-        hero: string;
-        items: readonly {
-            name: string;
-            line: string;
-            photo?: DrawnPhotoKind;
-        }[];
-        note: string;
-        action: string;
-    };
-    home: {
-        time: string;
-        greeting: string;
-        summary: string;
-        rows: readonly {
-            icon: "bag" | "alert" | "box" | "calendar" | "user";
-            title: string;
-            line: string;
-            warn?: boolean;
-        }[];
-        paid?: { title: string; line: string };
-    };
-    done: {
-        time: string;
-        title: string;
-        line: string;
-        rows: readonly (readonly [string, string])[];
-        back: string;
-    };
-}
 
 const itemLine = (b: WorldBusiness, key: string) => {
     const i = b.items.find((x) => x.key === key);

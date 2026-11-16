@@ -2,7 +2,9 @@
  * The screenshots this site shows: its own, taken from the real app on the
  * Global demo businesses (`e2e/marketing-shots/shots.global.ts`), each what a
  * Free business can have, and each read by a person for rupees, GST, UPI,
- * +91, India's places, plan offers and "team" (plan U11). A key with no shot draws no frame.
+ * +91, India's places, plan offers and "team" (plan U11). A key still pending
+ * draws the same neutral frame saroh.in draws for an uncaptured shot (same
+ * slot, same shape), never nothing and never another kind of picture.
  */
 import type { ShotKey } from "@saroh/marketing/content-types";
 import type { Shot, ShotView } from "@saroh/marketing/shot";
@@ -21,8 +23,8 @@ const NO_ASK_AI =
     "Ask AI is for paying plans, and Global's businesses are on Free.";
 
 /**
- * Keys pages name but this site doesn't show, each with why; the slot draws
- * no shot. `lib/shots.test.ts` and `pnpm check:shots` fail on any other
+ * Keys pages name but this site has no capture of yet, each with why; the
+ * slot draws saroh.in's neutral frame (`ShotImage` with `src: null`). `lib/shots.test.ts` and `pnpm check:shots` fail on any other
  * missing image. A key comes off once its capture is committed.
  */
 export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
@@ -79,8 +81,27 @@ export const GLOBAL_SHOTS: Partial<Record<ShotKey, Shot>> = Object.fromEntries(
     Object.entries(CAPTURED).map(([key, c]) => [key, shot(key, c)]),
 );
 
-/** The shot as `@saroh/marketing` draws it, or nothing when this site has none. */
+/**
+ * The shape saroh.in gives a shot it hasn't captured (`content/shots.ts`
+ * `pending`): the frame a pending key draws here, so the slot matches.
+ */
+const PENDING_SIZE = { width: 1600, height: 1000 } as const;
+
+/** What a pending frame is called, where the slot gives it no caption. */
+const PENDING_ALT = "A screen from Saroh, shown here once it's captured";
+
+/**
+ * The shot as `@saroh/marketing` draws it: the capture, else for a pending
+ * key the neutral frame of the same shape saroh.in draws, else nothing.
+ */
 export function shotView(key?: ShotKey, alt?: string): ShotView | undefined {
-    const image = key && GLOBAL_SHOTS[key];
-    return image ? { id: key, image, alt } : undefined;
+    if (!key) return undefined;
+    const image = GLOBAL_SHOTS[key];
+    if (image) return { id: key, image, alt };
+    if (!(key in PENDING_SHOTS)) return undefined;
+    return {
+        id: key,
+        image: { src: null, alt: alt ?? PENDING_ALT, ...PENDING_SIZE },
+        alt,
+    };
 }

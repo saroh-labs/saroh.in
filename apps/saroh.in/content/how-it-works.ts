@@ -20,67 +20,29 @@
  * - Hinglish and Hindi questions, "On Grow and Pro" and Saroh Social posting
  *   for you sit behind their claim switches.
  */
+import type { ClaimSwitch } from "@saroh/marketing/feature-switches";
 import type {
-    ClaimSwitch,
-    ReleaseSwitch,
-} from "@saroh/marketing/feature-switches";
-
-import type { FeatureSlug } from "./types";
+    Chapter,
+    Gate,
+    GatedText,
+    GroupId,
+    IndexItem,
+} from "@saroh/marketing/how-it-works/words";
 
 /** The day these words last changed (`pnpm check:content-dates`). */
 export const UPDATED = "2026-11-15";
 
-/** Shown only while its claim switch, or its feature's release switch, is on. */
-export interface Gate {
-    claim?: ClaimSwitch;
-    release?: ReleaseSwitch;
-}
-
-/** A line that may grow a gated sentence at its end. */
-export interface GatedText {
-    text: string;
-    tails?: readonly ({ text: string } & Gate)[];
-}
-
-export interface Caption {
-    title: string;
-    body: GatedText;
-    /** The caption drawn instead while `gate` is off. */
-    off?: { gate: Gate; title: string; body: string };
-}
-
-export interface ReadMore extends Gate {
-    label: string;
-    href: string;
-}
-
-export type GroupId = "records" | "reach" | "ask";
-export type ChapterId = "shop" | "site" | "posts" | "money" | "ai" | "data";
-
-export interface Chapter extends Gate {
-    id: ChapterId;
-    group: GroupId;
-    /** The h2, with its full stop. */
-    title: string;
-    /** The contents list's name for it, and its line. */
-    name: string;
-    line: string;
-    /** The phone chip's name. */
-    chip: string;
-    lead: GatedText;
-    captions: readonly [Caption, Caption, Caption];
-    more: readonly ReadMore[];
-    /** A link at the end of the Read more row ("Browse templates …"). */
-    aside?: ReadMore;
-}
-
-export interface IndexItem extends Gate {
-    name: string;
-    line: string;
-    /** A feature page; or `href` for a page that isn't one. */
-    feature?: FeatureSlug;
-    href?: string;
-}
+// The shapes live with the shared page (`@saroh/marketing/how-it-works`).
+export type {
+    Caption,
+    Chapter,
+    ChapterId,
+    Gate,
+    GatedText,
+    GroupId,
+    IndexItem,
+    ReadMore,
+} from "@saroh/marketing/how-it-works/words";
 
 export const HOW_IT_WORKS = {
     href: "/features",
@@ -486,9 +448,10 @@ export const HOW_IT_WORKS = {
             connected: "Connected",
             connect: "Connect",
             /** The other providers a business in India may connect. */
-            others: ["Cashfree", "Stripe"],
-            cashfree: "If you already use it",
-            stripe: "For businesses outside India",
+            others: [
+                { name: "Cashfree", line: "If you already use it" },
+                { name: "Stripe", line: "For businesses outside India" },
+            ],
         },
         paying: {
             label: "Paying",

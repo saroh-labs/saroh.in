@@ -54,6 +54,19 @@ lists only where Global differs (DEC-221).
   referral's steps and related pages are `SwipeRow`s; each template page
   gets the `StickyBar`. Tool UIs keep their controls as they were. Words,
   routes, titles and SEO fields are unchanged.
+- **17 Nov 2026, Home, How it works and the feature pages (DEC-221,
+  unit/web-techcore).** `/`, `/features` and every `/features/<slug>` are
+  saroh.in's pages from `@saroh/marketing`, in Global's words
+  (`content/home.ts`, `content/how-it-works.ts`, `content/feature-keep.ts`,
+  `content/reach-*.ts`) and Thistlewick's Tuesday (`content/world.ts`:
+  `THISTLEWICK_TUESDAY`, example orders ORD-041 to ORD-045, the hero's
+  three phones, the example sites). Kept from the page before: the free
+  tools on Home, every feature page's words (a Limited page says what
+  works today; Subscriptions marks each part "Not available yet"). Home's
+  money band names no provider (Stripe only on /features, check-claims);
+  the plan line is "Everyone is on Free for now" with "Tell me when". There
+  is no written Global day yet, so no day button or moment. /features is
+  indexed. A pending shot draws saroh.in's neutral frame, never nothing.
 - **17 Nov 2026, Solutions (unit/web-techsol).** saroh.in's /for hub and
   trade-page layout, from `@saroh/marketing/solutions/*`, over saroh.tech's
   own trades and words. New hub at `/solutions` (noindex until reviewed):

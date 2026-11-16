@@ -1,24 +1,15 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 
-import type { DoorOption } from "@/components/home/day-door";
-import { DayDoor } from "@/components/home/day-door";
-import { Fold } from "@/components/home/fold";
-import { PlansAndQuestions, YoursLine } from "@/components/home/home-endings";
-import { HERO_CTA_ID, HomeHero } from "@/components/home/home-hero";
-import { MoneyBand } from "@/components/home/money-band";
-import { NewInSaroh } from "@/components/home/new-in-saroh";
-import { OrdersChapter } from "@/components/home/orders-chapter";
-import { SiteChapter } from "@/components/home/site-chapter";
-import { TourVideo } from "@/components/home/tour-video";
+import { HomeHero } from "@/components/home/home-hero";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { HOME_FAQ } from "@/content/faq";
 import { featureHref, featureList, NEW_FEATURES } from "@/content/features";
-import { home } from "@/content/home";
+import { home, TOUR_VIDEO } from "@/content/home";
 import { shownResources } from "@/content/resources";
 import { solutionList, solutions } from "@/content/solutions";
-import { WORLD } from "@/content/world";
+import { HOME_SITE_SHOWCASE, RYE_MONDAY, WORLD } from "@/content/world";
 import { claimOn } from "@/lib/feature-switches";
 import { LAUNCH_MODE } from "@/lib/links";
 import { HOME_OG_ALT } from "@/lib/og-card";
@@ -35,6 +26,19 @@ import {
 } from "@/lib/structured-data";
 import { ButtonLink } from "@saroh/marketing/button";
 import { Container } from "@saroh/marketing/container";
+import type { DoorOption } from "@saroh/marketing/home/day-door";
+import { DayDoor } from "@saroh/marketing/home/day-door";
+import { Fold } from "@saroh/marketing/home/fold";
+import {
+    PlansAndQuestions,
+    YoursLine,
+} from "@saroh/marketing/home/home-endings";
+import { HERO_CTA_ID } from "@saroh/marketing/home/home-hero";
+import { MoneyBand } from "@saroh/marketing/home/money-band";
+import { NewInSaroh } from "@saroh/marketing/home/new-in-saroh";
+import { OrdersChapter } from "@saroh/marketing/home/orders-chapter";
+import { SiteChapter } from "@saroh/marketing/home/site-chapter";
+import { TourVideo } from "@saroh/marketing/home/tour-video";
 import { Chip } from "@saroh/marketing/kit/chip";
 import { Claim } from "@saroh/marketing/kit/claim";
 import { ClosingCTA } from "@saroh/marketing/kit/closing-cta";
@@ -131,6 +135,9 @@ export default async function HomePage() {
             socialPosting: claimOn("social-posting"),
         },
     };
+    const paidTotal =
+        WORLD.lead.orders?.find((o) => o.id === RYE_MONDAY.paidOrder)?.total ??
+        "";
     const anyNews = news.askAi || news.share || news.aiApps || news.api;
     const faq = faqWithPlans(
         catalog,
@@ -149,7 +156,7 @@ export default async function HomePage() {
                 ]}
             />
             <HomeHero />
-            <TourVideo />
+            <TourVideo video={TOUR_VIDEO} />
 
             <Container
                 as="nav"
@@ -169,9 +176,22 @@ export default async function HomePage() {
                 </ul>
             </Container>
 
-            <SiteChapter templates={templates} />
-            <OrdersChapter />
-            <MoneyBand />
+            <SiteChapter
+                words={home.site}
+                showcase={HOME_SITE_SHOWCASE}
+                templates={templates}
+            />
+            <OrdersChapter
+                words={home.orders}
+                business={WORLD.lead}
+                rows={RYE_MONDAY.todayRows}
+                cls={RYE_MONDAY.class}
+            />
+            <MoneyBand
+                words={home.money}
+                chips={home.chips}
+                amount={paidTotal}
+            />
 
             <Container
                 as="section"
@@ -236,10 +256,16 @@ export default async function HomePage() {
             </Container>
 
             <div className="mt-16 min-[760px]:mt-20">
-                <NewInSaroh on={news} />
+                <NewInSaroh
+                    on={news}
+                    words={home.news}
+                    business={WORLD.lead}
+                    story={RYE_MONDAY}
+                />
             </div>
 
             <YoursLine
+                words={home}
                 features={featureList.map((f) => ({
                     href: featureHref(f.slug),
                     name: f.name,
@@ -249,6 +275,7 @@ export default async function HomePage() {
             />
 
             <PlansAndQuestions
+                words={home}
                 planLede={catalog ? freePlanLine(catalog) : home.plans.lede}
                 planLine={
                     open ? (

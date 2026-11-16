@@ -412,22 +412,22 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         headline: "Regulars on a plan. Not available yet.",
         sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions. It isn't available yet, so here's what it will do.",
         hero: {
-            shot: "r-subdetail",
+            shot: "g-subdetail",
         },
         howTitle: "What it will do.",
         steps: [
             {
                 title: "Each plan renews on its day",
                 body: "You sign members up at the desk, and each plan renews on its day.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-subs",
+                who: "Ironvale Fitness (demo gym)",
+                shot: "g-subs",
                 notYet: true,
             },
             {
                 title: "Every renewal makes its invoice",
                 body: "The invoice is made on the renewal day, and your customer pays it by hand.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-billing",
+                who: "Ironvale Fitness (demo gym)",
+                shot: "g-billing",
                 notYet: true,
             },
         ],

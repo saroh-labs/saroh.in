@@ -24,11 +24,11 @@ import {
 import type { ReactElement, ReactNode } from "react";
 import { cloneElement } from "react";
 
-import { Fold } from "@/components/home/fold";
 import { CtaLink } from "@/components/shared/buttons/cta-link";
 import { PhoneClip } from "@/components/shared/layout/phone-fold";
 import type { TradeDay } from "@/content/solutions-days";
 import { TRADE_WORDS as W } from "@/content/solutions-trade";
+import { Fold } from "@saroh/marketing/home/fold";
 
 export type { FeatureLink };
 

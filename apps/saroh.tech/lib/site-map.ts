@@ -23,6 +23,10 @@ import { LEGAL_UPDATED } from "@/content/legal";
 import { PRICING } from "@/content/pricing";
 
 import { home, UPDATED as HOME_UPDATED } from "@/content/home";
+import {
+    HOW_IT_WORKS,
+    UPDATED as HOW_IT_WORKS_UPDATED,
+} from "@/content/how-it-works";
 
 import {
     solutionHref,
@@ -176,21 +180,20 @@ export const PAGES: SitePage[] = [
         type: "home",
         title: `${home.seoTitle} | Saroh`,
         description: home.seoDescription,
-        h1: home.headlineLabel,
+        h1: home.titleLabel,
         updated: HOME_UPDATED,
     },
-    // Features (DEC-221; "Features", not "How it works", owner 17 Nov): a noindex shell until its page is drawn.
+    // Features (DEC-221; "Features" in the nav, owner 17 Nov): How it works, drawn and indexed.
     {
         ...hub(
             "/features",
             "features",
             "Features: how Saroh works | Saroh",
             "How Saroh keeps your records, reaches your customers and answers your questions, and how the money moves.",
-            "How Saroh works",
+            `${HOW_IT_WORKS.title.before}${HOW_IT_WORKS.title.mark}${HOW_IT_WORKS.title.after}`,
             "Features",
         ),
-        unreviewed: true,
-        updated: FEATURES_UPDATED,
+        updated: HOW_IT_WORKS_UPDATED,
     },
     ...featureList.map((f): SitePage => ({
         path: featureHref(f.slug),

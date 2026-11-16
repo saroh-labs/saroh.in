@@ -82,8 +82,9 @@ describe("the site map", () => {
         }
     });
 
-    it("keeps the sitemap to its ten pages", () => {
-        expect(indexedPages()).toHaveLength(10);
+    it("keeps the sitemap to its eleven pages", () => {
+        // /features is drawn and indexed (DEC-221), as on saroh.in.
+        expect(indexedPages()).toHaveLength(11);
     });
 
     it("every tool card on Home lands on a built page", () => {

@@ -68,13 +68,19 @@ describe("saroh.tech's screenshots", () => {
     it("lists a key as pending only while it has no image", () => {
         for (const key of Object.keys(PENDING_SHOTS) as ShotKey[]) {
             expect(GLOBAL_SHOTS[key], key).toBeUndefined();
-            expect(shotView(key)).toBeUndefined();
         }
     });
 
-    it("draws no frame for a key with no shot", () => {
+    it("draws saroh.in's neutral frame for a pending key, and nothing for no key", () => {
         expect(shotView(undefined)).toBeUndefined();
-        expect(shotView("r-subdetail")).toBeUndefined();
+        const view = shotView("r-subdetail", "A renewal");
+        expect(view?.image).toMatchObject({
+            src: null,
+            alt: "A renewal",
+            width: 1600,
+            height: 1000,
+        });
+        expect(view?.id).toBe("r-subdetail");
     });
 
     it("names only this site's demo businesses and never shows a plan's working screens", () => {

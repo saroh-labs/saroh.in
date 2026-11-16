@@ -131,13 +131,13 @@ const RULES: Rule[] = [
             `${MK}/nav/marketing-footer.tsx`,
         ],
         allow: {
-            "components/home/fold.tsx":
+            "packages/marketing/src/home/fold.tsx":
                 "the landing's phone folds (DEC-221): CroppedCard's fold with no screen to crop; the questions themselves are FaqItems",
-            "app/(site)/features/page.tsx":
+            "packages/marketing/src/how-it-works/how-it-works-page.tsx":
                 "keep: How it works' phone folds (PHONE.md): the yours rows and the feature index, in the HTML, open from 760px",
-            "components/how-it-works/chapter.tsx":
+            "packages/marketing/src/how-it-works/chapter.tsx":
                 "keep: a chapter's Read more links, folded on a phone, open from 760px",
-            "components/feature-pages/keep-page.tsx":
+            "packages/marketing/src/feature-pages/keep-page.tsx":
                 "keep: the Keep template's folded points and its questions (FOPhone2), every answer in the HTML",
             "packages/marketing/src/solutions/moments/moments.tsx":
                 "keep (DEC-221): a moment's second picture folds on a phone, kept in the HTML",
@@ -145,7 +145,7 @@ const RULES: Rule[] = [
                 "keep (DEC-221): a problem's answer and a day trade's other parts fold, kept in the HTML",
             "packages/marketing/src/solutions/hub-finder.tsx":
                 "keep (DEC-221): the phone's closed A to Z list of every trade",
-            "components/feature-pages/reach/fold.tsx":
+            [`${MK}/feature-pages/reach/fold.tsx`]:
                 "keep: the Reach and Ask pages' phone folds and crop toggles (FWPhone2, FSPhone2, FAPhone2, FMPhone2), content in the HTML",
         },
         files: SITE,

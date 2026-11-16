@@ -130,6 +130,56 @@ export interface World {
 }
 
 /**
+ * The lead business's day beyond its orders: the facts the landing and
+ * /features draw (stock, a class, the week, a price change, a menu an AI
+ * app adds, a post, an API key). Items and orders are named by key and id
+ * from the lead business; money is written the edition's way.
+ */
+export interface WorldStory {
+    /** This morning's stock: made-to-order items are never counted. */
+    stock: readonly {
+        item: string;
+        left: number;
+        /** Of how many, where it's running low. */
+        of?: number;
+        note?: string;
+    }[];
+    /** A class or session the business runs, with its places. */
+    class: {
+        name: string;
+        when: string;
+        places: number;
+        booked: number;
+        price: string;
+    };
+    week: { takings: string; orders: number; change: string };
+    topSeller: { item: string; sold: number };
+    /** The product a post is made of (Share), and the ones Share lists. */
+    featured: string;
+    shareItems: readonly string[];
+    /** The orders the landing's list shows, due first, one of each state. */
+    todayRows: readonly string[];
+    /** The order whose payment the money story follows. */
+    paidOrder: string;
+    /** Home's first row: the orders made today (cakes to bake). */
+    toMake: readonly string[];
+    /** Home's "hasn't paid" row, if one is waiting. */
+    unpaidOrder?: string;
+    /** "Make it $26": a price changed by asking. */
+    priceChange: { item: string; from: string; to: string };
+    /** What an AI app adds as drafts, on a new page the owner approves. */
+    christmas: { at: string; items: readonly string[]; page: string };
+    /** What Home says came in yesterday. */
+    paidYesterday: string;
+    /** This week's two best sellers, for an Ask AI answer. */
+    weekSales: readonly { item: string; sold: number; total: string }[];
+    /** A post Saroh Social scheduled. */
+    scheduledPost: { when: string; where: string };
+    apiKey: { name: string; ends: string };
+    webhook: { event: string; to: string };
+}
+
+/**
  * The example for a trade, for `?trade=`: the world's business of that
  * trade, else the lead. Anything unknown (a typo, an old link) gets the lead,
  * never an error or an empty page.

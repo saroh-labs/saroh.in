@@ -9,6 +9,7 @@
  * - `ask-ai-stock`: reading Stock. Off, the answer reads Orders and Customers;
  * - `ask-ai-plans`: "Grow and Pro" beside Ask AI.
  */
+import type { AskAiWords } from "@saroh/marketing/feature-pages/ask-ai/words";
 import { RYE_MONDAY, WORLD } from "./world";
 
 const rye = WORLD.lead;
@@ -51,7 +52,7 @@ export function askAiWords({
     languages: boolean;
     stockOn: boolean;
     plans: boolean;
-}) {
+}): AskAiWords {
     const reads = stockOn
         ? "Orders, Customers and Stock"
         : "Orders and Customers";
@@ -552,4 +553,4 @@ export function askAiWords({
     };
 }
 
-export type AskAiWords = ReturnType<typeof askAiWords>;
+export type { AskAiWords };
