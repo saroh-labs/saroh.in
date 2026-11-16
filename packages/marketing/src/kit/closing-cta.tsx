@@ -56,13 +56,15 @@ export function ClosingCTA({
                 >
                     {visual === undefined ? ADDRESS_TITLE : title}
                 </h2>
-                {visual === undefined ? <ClosingAddress /> : visual}
+                <div className="w-full min-w-0">
+                    {visual === undefined ? <ClosingAddress /> : visual}
+                </div>
                 <div className="mt-4 flex flex-wrap gap-3 min-[760px]:mt-10">
                     {primary}
                     {secondary}
                 </div>
                 {note ? (
-                    <p className="m-0 text-[15px] text-mk-on-ink-muted">
+                    <p className="m-0 max-w-full text-[15px] text-mk-on-ink-muted">
                         {note}
                     </p>
                 ) : null}

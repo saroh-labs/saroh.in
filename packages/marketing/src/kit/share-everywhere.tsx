@@ -127,7 +127,7 @@ export function ShareEverywhere({
             <SwipeRow
                 label={words.row}
                 of={words.of}
-                className="[&>p]:text-mk-on-ink-muted"
+                className="min-w-0 [&>p]:text-mk-on-ink-muted"
             >
                 {column(
                     words.apps.whatsapp,
