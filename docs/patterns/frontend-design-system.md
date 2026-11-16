@@ -331,6 +331,10 @@
       center). Top-aligned (`items-start`); `split-hero.test.tsx` fails on a
       bottom-aligned heading grid.
     - A plain page head (about, help, legal, tools): `PageHero`.
+    - "How it works" as numbered steps beside one large picture (Ask AI,
+      AI apps, Share; board "Steps A", #42/#49/#51): `StepsShowcase`
+      (`/steps-showcase`), through `ReachSteps` on a Reach page. Every
+      step's picture is in the HTML; a phone shows each under its step.
     - A section's heading, eyebrow and lead: `SectionHeading` / `Section`.
     - The closing band: `ClosingCTA` (`kit/closing-cta`).
     - The plan line under a feature: `PlanLine` (`kit/plan-line`).

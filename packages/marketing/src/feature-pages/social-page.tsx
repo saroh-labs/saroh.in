@@ -30,10 +30,10 @@ import type { World } from "../content/world";
 import { LivePill } from "./reach/app-card";
 import { CropToggle, Fold } from "./reach/fold";
 import type { InTheAppData } from "./reach/in-the-app";
-import { InTheApp } from "./reach/in-the-app";
 import { HERO_CTA, PageTop } from "./reach/page-top";
 import { Photo } from "./reach/photo";
 import { Questions } from "./reach/questions";
+import { PanelShot, ReachSteps } from "./reach/reach-steps";
 import { Tail } from "./reach/tail";
 import type { PageSite } from "./site";
 import { Feed, ItemCard, Seg, StateChip, StoryTime } from "./social/pieces";
@@ -1065,7 +1065,13 @@ export function SocialView({
                 )}
             </Container>
 
-            <InTheApp {...inTheApp} site={site} words={w.inTheApp} />
+            <ReachSteps
+                data={inTheApp}
+                picture={(step) => {
+                    const shot = site.shot(step.shot, step.alt);
+                    return shot ? <PanelShot shot={shot} /> : null;
+                }}
+            />
 
             <Tail
                 line={w.tail.plan}

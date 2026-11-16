@@ -811,22 +811,23 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "ask-start",
             },
             {
-                title: "Answers from your own records",
-                body: "It reads your bookings, orders, customers and products, says where each answer came from, and links to that screen. Ask in Hinglish and it answers in Hinglish.",
+                title: "Ask in your own words",
+                body: "Type it the way you'd say it. It reads only your own business. Ask in English, Hinglish or Hindi, and it answers in the language you ask in.",
+                who: "Rye & Co. (demo bakery)",
+                // Drawn on the page, as are the other three (the panel's question).
+                shot: "ask-hero",
+            },
+            {
+                title: "See the rows behind the answer",
+                body: "It reads your bookings, orders, customers and products, shows the rows behind each answer, says which parts of the business it read, and links to that screen.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "ask-answer",
             },
             {
-                title: "Changes come as a card you confirm",
+                title: "Confirm a change, or don't",
                 body: "Ask it to add a service, move a booking or update a customer and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo an edit the same day.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "ask-confirm",
-            },
-            {
-                title: "Go back to an earlier question",
-                body: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "ask-history",
             },
         ],
         points: [
@@ -882,7 +883,7 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "sh-cards",
             },
             {
-                title: "Post it from your phone",
+                title: "Post it from your phone or computer",
                 body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "sh-phone",

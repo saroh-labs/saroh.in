@@ -441,6 +441,7 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             of: "of",
             /** On a phone, the steps and what follows fold behind this. */
             phone: "Help and setup",
+            foot: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
         },
     };
 }
