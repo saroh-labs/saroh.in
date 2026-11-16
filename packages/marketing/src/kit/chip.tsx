@@ -14,11 +14,13 @@ import { ring } from "../ring";
  * - `source` — Paper fill with a coloured dot: a part of the business an
  *   answer read (`SourceChips`, "Read from").
  * - `plan` — plain meta text, not a pill: plan pills read as buttons.
+ * - `ink` — the `filter` chip on an Ink band: outline in the band's line,
+ *   Paper when `on` (a closing band's picks).
  *
  * With `href` it is a link, with `onClick` a toggle button (`aria-pressed`
  * from `on`), otherwise words. `count` sits after the label in mono.
  */
-export type ChipVariant = "filter" | "chapter" | "source" | "plan";
+export type ChipVariant = "filter" | "chapter" | "source" | "plan" | "ink";
 
 const BASE =
     "inline-flex min-h-9 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3.5 text-[14px] font-medium leading-none no-underline transition-[background-color,border-color,color] duration-fast ease-out [@media(pointer:coarse)]:min-h-11";
@@ -40,6 +42,11 @@ const LOOK: Record<ChipVariant, { off: string; on: string }> = {
         off: "min-h-0 rounded-none px-0 text-mk-note font-normal text-muted-foreground [@media(pointer:coarse)]:min-h-0",
         on: "min-h-0 rounded-none px-0 text-mk-note font-semibold text-foreground [@media(pointer:coarse)]:min-h-0",
     },
+    ink: {
+        off: "border border-mk-on-ink-line bg-transparent text-mk-on-ink hover:border-mk-on-ink",
+        // Dark text named by its value: an Ink section rewrites `text-foreground`.
+        on: "border border-background bg-background text-[hsl(var(--foreground))]",
+    },
 };
 
 export function chipClasses({
@@ -52,7 +59,12 @@ export function chipClasses({
     className?: string;
 } = {}) {
     const look = LOOK[variant][on ? "on" : "off"];
-    return cn(BASE, look, ring(), className);
+    return cn(
+        BASE,
+        look,
+        variant === "ink" ? ring({ offset: 3, color: "paper" }) : ring(),
+        className,
+    );
 }
 
 export function Chip({

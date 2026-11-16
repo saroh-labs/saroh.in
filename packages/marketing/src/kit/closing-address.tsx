@@ -1,10 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 
 import { cn } from "../cn";
 import { ring } from "../ring";
+import { Caret, useAutoplay } from "./autoplay";
 import type { SiteLook } from "./site-drawing";
 
 /** One demo business the closing band's address types: its name, slug and look. */
@@ -50,11 +51,8 @@ export function ClosingAddress({ note = "On Saroh:" }: { note?: ReactNode }) {
     const [moving, setMoving] = useState(false);
     const at = useRef({ k: 0, len, del: false, hold: 0 });
 
-    useEffect(() => {
-        if (names.length < 2) return;
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
-            return;
-        const timer = setInterval(() => {
+    useAutoplay(
+        () => {
             // The caret shows once the typing runs, never in the server's HTML.
             setMoving(true);
             const s = at.current;
@@ -76,9 +74,10 @@ export function ClosingAddress({ note = "On Saroh:" }: { note?: ReactNode }) {
             }
             setK(s.k);
             setLen(s.len);
-        }, TICK);
-        return () => clearInterval(timer);
-    }, [names]);
+        },
+        TICK,
+        { stopped: names.length < 2 },
+    );
 
     if (names.length === 0) return null;
     const current = names[k];
@@ -101,9 +100,7 @@ export function ClosingAddress({ note = "On Saroh:" }: { note?: ReactNode }) {
                         <span className="text-background">
                             {current.slug.slice(0, len)}
                         </span>
-                        {moving ? (
-                            <span className="ml-[0.04em] inline-block h-[0.8em] w-[0.05em] animate-[mk-caret_1s_steps(1)_infinite] bg-brand-500 align-[-0.05em]" />
-                        ) : null}
+                        {moving ? <Caret /> : null}
                     </span>
                     <span className="block text-mk-on-ink-line min-[1280px]:inline">
                         .saroh.app

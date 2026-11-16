@@ -489,6 +489,16 @@ export const RYE_MONDAY = {
     ],
     /** The landing's post, scheduled by Saroh Social. */
     scheduledPost: { when: "Thu, 6 pm", where: "Instagram" },
+    /** Share's closing band: the weekend offer and a blog post, beside the bun box and the class. */
+    offer: {
+        name: "Weekend bakes",
+        line: "20% off till Sunday",
+        big: "20% off",
+    },
+    blogPost: {
+        title: "Why our sourdough takes 36 hours",
+        slug: "36-hour-sourdough",
+    },
     /** The landing's API key and webhook. */
     apiKey: { name: "Key for the accounts sheet", ends: "7f2a" },
     webhook: { event: "When an order is paid", to: "Send it to your sheet" },

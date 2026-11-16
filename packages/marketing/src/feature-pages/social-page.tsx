@@ -19,6 +19,7 @@ import { cn } from "../cn";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
 import { PhoneClip } from "../kit/phone-fold";
+import { ShareEverywhere } from "../kit/share-everywhere";
 import { StickyBar } from "../kit/sticky-bar";
 import { SwipeRow } from "../kit/swipe-row";
 import { TimeStamp } from "../kit/time-stamp";
@@ -1082,6 +1083,18 @@ export function SocialView({
 
             <ClosingCTA
                 title={w.close.title}
+                visual={
+                    lead.look ? (
+                        <ShareEverywhere
+                            words={w.close.share}
+                            business={{
+                                name: lead.name,
+                                site: lead.site,
+                                look: lead.look,
+                            }}
+                        />
+                    ) : undefined
+                }
                 primary={site.start(`feature-${slug}-close`)}
                 note={w.close.note}
                 className="mt-[72px] min-[760px]:mt-[120px]"

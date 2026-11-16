@@ -4,6 +4,7 @@
  * saroh.in's builder's type with every word widened to `string`, so
  * saroh.tech's Global words fill the same shape.
  */
+import type { AskTypesWords } from "../../kit/ask-types";
 
 export interface AskAiWords {
     name: string;
@@ -330,6 +331,8 @@ export interface AskAiWords {
     close: {
         title: string;
         note: string;
+        /** The band's picture: the question types itself (#46 "N"). */
+        ask: AskTypesWords;
     };
     chapters: readonly [
         readonly [string, string],

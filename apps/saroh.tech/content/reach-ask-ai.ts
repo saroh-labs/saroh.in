@@ -436,8 +436,38 @@ export function askAiWords({
             more: "All questions",
         },
         close: {
-            title: "Ask your business, in your words.",
-            note: "Free to start. No card needed.",
+            title: "Ask across your whole business.",
+            note: "Nothing changes until you confirm.",
+            ask: {
+                pick: "Ask one",
+                readFrom: "Read from",
+                questions: [
+                    {
+                        label: "What sold most?",
+                        text: "What sold most this week?",
+                        answer: `${item(THISTLEWICK_TUESDAY.topSeller.item)}: ${THISTLEWICK_TUESDAY.topSeller.sold} sold this week.`,
+                        from: "Orders, Products",
+                    },
+                    {
+                        label: "Who hasn't paid?",
+                        text: "Who still owes me money?",
+                        answer: `${maya.customer} pays at pick-up, and ${lucy.customer} pays online, ${lucy.total}.`,
+                        from: "Orders, Billing",
+                    },
+                    {
+                        label: "Who hasn't come back?",
+                        text: "Which regulars haven't come back?",
+                        answer: "5 regulars haven't been back.",
+                        from: "Customers, Orders",
+                    },
+                    {
+                        label: "Free time this week?",
+                        text: "When am I free this week?",
+                        answer: "Wednesday, Thursday and Friday, with nothing booked.",
+                        from: "Calendar",
+                    },
+                ],
+            },
         },
         chapters: [
             ["anywhere", "Ask anywhere"],
