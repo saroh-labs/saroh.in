@@ -23,7 +23,8 @@ export const TONE_BAND: Record<SectionTone, string> = {
     dusk: "bg-mk-dusk text-foreground",
     // Its headings and copy turn light with it (`[&_h2]`, `.text-mk-copy`).
     lamp: "bg-mk-lamp text-mk-lamp-fg [&_.text-foreground]:text-mk-lamp-fg [&_.text-mk-copy]:text-mk-lamp-meta",
-    ink: "bg-foreground text-background [&_.text-foreground]:text-background [&_.text-mk-copy]:text-mk-on-ink",
+    // Buttons and links keep their own colours (a Saffron button stays Ink on Saffron).
+    ink: "bg-foreground text-background [&_.text-foreground:not(a):not(button)]:text-background [&_.text-mk-copy]:text-mk-on-ink",
 };
 
 /**
