@@ -197,7 +197,7 @@ function TradeBar({
         { id: "all", label: W.allTradesShort, href: hubHref },
     ];
     return (
-        <div className="sticky top-[var(--mk-nav-h)] z-30 border-y border-border bg-background/95 backdrop-blur-[6px]">
+        <div className="sticky top-[var(--mk-nav-h)] z-20 border-y border-border bg-background/95 backdrop-blur-[6px]">
             <Container className="flex h-[60px] items-center gap-4 min-[760px]:h-[68px]">
                 <TradeSwitcher
                     legend={W.tradeBar}
