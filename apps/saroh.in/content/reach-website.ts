@@ -295,6 +295,13 @@ export function websiteWords({
             label: `${rye.name}'s Christmas menu page, from draft to live`,
             track: "From draft to live",
             startOver: "Start over",
+            page: {
+                heading: "The Christmas menu",
+                items: [
+                    { name: `${plum.name}, ${plum.unit}`, price: plum.price },
+                    { name: hamper.name, price: hamper.price },
+                ],
+            },
             draft: {
                 title: "Draft",
                 sub: "Only you see it",

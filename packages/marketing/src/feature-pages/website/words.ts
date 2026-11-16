@@ -244,6 +244,11 @@ export interface WebsiteWords {
         label: string;
         track: string;
         startOver: string;
+        /** The page being released, in the business's look (the design's frame). */
+        page: {
+            heading: string;
+            items: readonly { name: string; price: string }[];
+        };
         draft: JourneyStage;
         release: readonly JourneyStage[];
         live: JourneyStage;

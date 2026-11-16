@@ -10,7 +10,7 @@ import { ring } from "../../ring";
 import { Section } from "../../sections/section";
 import { useAutoplay } from "./autoplay";
 import type { ShopSiteWords } from "./shop-site";
-import { lookStyle, MiniSite } from "./shop-site";
+import { lookStyle } from "./shop-site";
 import type { JourneyStage, WebsiteWords } from "./words";
 
 /** How long each stage shows while the section plays. */
@@ -37,14 +37,14 @@ export function Journey({
     words: w,
     stages,
     site,
-    shop,
     look,
 }: {
     words: WebsiteWords["journey"];
     /** The stages drawn: with test releases, or draft then live. */
     stages: readonly JourneyStage[];
     site: ShopSiteWords;
-    shop: boolean;
+    /** Kept for the page's call; the frame draws the released page, not the shop. */
+    shop?: boolean;
     look?: SiteLook;
 }) {
     const last = stages.length - 1;
@@ -157,7 +157,7 @@ export function Journey({
                     ))}
                 </ol>
 
-                <div className="grid items-start gap-8 min-[1080px]:grid-cols-[minmax(0,1fr)_360px] min-[1080px]:gap-14">
+                <div className="grid items-center gap-8 min-[1080px]:grid-cols-[minmax(0,1fr)_360px] min-[1080px]:gap-14">
                     <figure
                         aria-label={w.label}
                         data-stage={s.title}
@@ -206,9 +206,32 @@ export function Journey({
                             className="relative"
                             style={look ? lookStyle(look) : undefined}
                         >
-                            <MiniSite words={site} shop={shop} />
+                            <div className="flex min-h-[300px] flex-col gap-5 bg-[hsl(var(--site-bg))] px-6 pb-8 pt-6 font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))] min-[760px]:px-10 min-[760px]:pt-8">
+                                <div className="flex items-center justify-between">
+                                    <span className="font-[family-name:var(--site-font-heading)] text-[18px] font-semibold min-[760px]:text-[22px]">
+                                        {site.name}
+                                    </span>
+                                    <span className="rounded-[var(--site-radius)] bg-[hsl(var(--site-accent))] px-3 py-1.5 text-[13px] font-semibold text-[hsl(var(--site-accent-fg))]">
+                                        {site.order}
+                                    </span>
+                                </div>
+                                <p className="m-0 font-[family-name:var(--site-font-heading)] text-[30px] font-bold leading-[1.05] tracking-[-0.02em] min-[760px]:text-[44px]">
+                                    {w.page.heading}
+                                </p>
+                                <ul className="m-0 grid list-none gap-3 p-0 min-[560px]:grid-cols-2">
+                                    {w.page.items.map((x) => (
+                                        <li
+                                            key={x.name}
+                                            className="flex items-center justify-between gap-3 rounded-[var(--site-radius)] bg-[hsl(var(--site-surface))] px-4 py-3 text-[15px]"
+                                        >
+                                            <span>{x.name}</span>
+                                            <b>{x.price}</b>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                             {s.stamp ? (
-                                <span className="absolute right-4 top-4 rotate-[4deg] rounded-lg border-2 border-dashed border-brand-700 bg-mk-tint/90 px-3 py-1.5 font-mono text-[13px] font-bold text-brand-700">
+                                <span className="absolute bottom-6 right-6 rotate-[4deg] rounded-lg border-2 border-dashed border-brand-700 bg-mk-tint/90 px-3 py-1.5 font-mono text-[13px] font-bold text-brand-700">
                                     {s.stamp}
                                 </span>
                             ) : null}

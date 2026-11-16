@@ -40,6 +40,7 @@ const BOX = "box of six";
 const loaf = item("sourdough");
 const focaccia = item("focaccia");
 const truffle = item("truffle-cake");
+const holidayBox = item("holiday-box");
 const beans = item("beans");
 const box = THISTLEWICK_TUESDAY.holiday.box;
 const notice = THISTLEWICK_TUESDAY.cakeNotice;
@@ -287,6 +288,13 @@ export function websiteWords({
             label: `${bakery.name}'s holiday menu page, from draft to live`,
             track: "From draft to live",
             startOver: "Start over",
+            page: {
+                heading: "The holiday menu",
+                items: [
+                    { name: holidayBox.name, price: holidayBox.price },
+                    { name: truffle.name, price: truffle.price },
+                ],
+            },
             draft: {
                 title: "Draft",
                 sub: "Only you see it",

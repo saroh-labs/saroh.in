@@ -56,6 +56,10 @@ const journey: WebsiteWords["journey"] = {
     lead: "Lead",
     label: "The page",
     track: "From draft to live",
+    page: {
+        heading: "The Christmas menu",
+        items: [{ name: "Plum cake", price: "₹650" }],
+    },
     startOver: "Start over",
     draft: stage("Draft", {
         tone: "draft",

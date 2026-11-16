@@ -284,7 +284,10 @@ export function MiniSite({
     const [first] = words.products;
     return (
         <div
-            className={`flex ${fit ? "" : "h-[286px]"}flex-col gap-[9px] overflow-hidden bg-[hsl(var(--site-bg))] px-4 pb-4 pt-3.5 font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))]`}
+            className={cn(
+                "flex flex-col gap-[9px] overflow-hidden bg-[hsl(var(--site-bg))] px-4 pb-4 pt-3.5 font-[family-name:var(--site-font-body)] text-[hsl(var(--site-fg))]",
+                !fit && "h-[286px]",
+            )}
         >
             <div className="flex items-center justify-between text-[12px]">
                 <span
