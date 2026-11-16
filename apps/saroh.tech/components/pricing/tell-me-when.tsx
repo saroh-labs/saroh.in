@@ -1,5 +1,6 @@
 "use client";
 
+import type { ButtonVariant } from "@saroh/marketing/button";
 import { Button } from "@saroh/marketing/button";
 import { ChallengeWidget } from "@saroh/site-blocks/challenge";
 import type { FormEvent } from "react";
@@ -20,7 +21,14 @@ type Send = "idle" | "sending" | "failed" | "check";
  * tell you", whether or not the address was already on the list (the API
  * answers both alike). A failed send keeps the email typed.
  */
-export function TellMeWhen({ plan }: { plan: string }) {
+export function TellMeWhen({
+    plan,
+    look,
+}: {
+    plan: string;
+    /** The card's button look: on the Ink card, its Saffron one, so the words show. */
+    look?: { variant: ButtonVariant; className: string };
+}) {
     const id = useId();
     const [open, setOpen] = useState(false);
     const [asked, setAsked] = useState(false);
@@ -35,7 +43,8 @@ export function TellMeWhen({ plan }: { plan: string }) {
         return (
             <div className="grid justify-items-start gap-2">
                 <Button
-                    variant="secondary"
+                    variant={look?.variant ?? "secondary"}
+                    className={look?.className}
                     size="sm"
                     disabled={asked}
                     onClick={() => setOpen(true)}

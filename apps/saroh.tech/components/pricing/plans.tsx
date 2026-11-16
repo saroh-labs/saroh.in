@@ -37,7 +37,7 @@ export function Plans({
                         >
                             {PRICING.notYet}
                         </Pill>
-                        <TellMeWhen plan={plan.id} />
+                        <TellMeWhen plan={plan.id} look={look} />
                     </div>
                 ) : (
                     <ButtonLink

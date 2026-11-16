@@ -551,6 +551,26 @@ Then:
 (`marketing-shots/shots.global.ts`) and `pnpm --filter tech shots:sizes --force`. If the app reloads itself in a
 loop in a capture, restart its `next dev`.
 
+### saroh.tech with dev's prices, locally
+
+saroh.tech reads its plans from the API at `API_URL`, and the API picks the
+edition from the address it was called at: every local address is India's.
+To see the Global plans dev shows (owner, 16 Nov 2026):
+
+1. Import dev's Global catalogue as above (Admin › Plans on the Global dev
+   console, Download catalogue; the file goes in `.local/`, never the repo).
+   The import reads the edition from the file's currency.
+2. Run the API (and app and accounts, for Global sign-up) with
+   `GLOBAL_DEV_DOMAIN=saroh-tech.localhost`, and give the API that edition's
+   name: `portless alias api.saroh-tech <the API's port>` (`portless list`).
+   `https://api.saroh-tech.localhost/public/pricing` then answers in dollars.
+3. Run saroh.tech with `API_URL=https://api.saroh-tech.localhost` and
+   `NODE_EXTRA_CA_CERTS=~/.portless/ca.pem` (its server must trust portless's
+   certificate).
+
+The pricing page shows the prices and, as in production, "Not available yet"
+with Tell me when on a paid plan until Global's paid plans open (DEC-211).
+
 ## Databases
 
 `packages/database/src/database-target.ts` refuses to migrate or seed a
