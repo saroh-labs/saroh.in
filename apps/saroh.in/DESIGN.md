@@ -98,6 +98,11 @@ it are DEC-221.
 
 ## Rules that bite
 
+- **Show what Saroh does, never its internal limits (owner, 16 Nov 2026).**
+  A marketing page doesn't draw a locked panel, an upgrade wall, a "questions
+  used up" screen or a quota. Those read like telling a visitor our internal
+  mechanics. A plan difference is one PlanLine sentence and "Compare plans";
+  the details live on /pricing and in Help.
 - **Light only.** No dark theme, no `dark:` classes, no
   `prefers-color-scheme` styles, no toggle. `color-scheme: light` is set in
   `@saroh/marketing/tokens.css`. The night scene's dark band (`lamp`) is a
