@@ -35,15 +35,20 @@ export const SOLUTIONS: NavItem[] = ALL_TRADES.map((t) => ({
 }));
 
 /** The footer's trades: a group per hub group, the last ending on the hub. */
-const TRADE_COLUMNS = HUB_GROUPS.map((g, i) => ({
-    title: g.title,
+/**
+ * One Solutions column, as saroh.in's footer has (owner, 16 Nov 2026, #6,
+ * #17): each family's first trade, then all of them on /solutions. Six
+ * columns of every trade made the footer about 1,430px tall.
+ */
+const SOLUTIONS_COLUMN = {
+    title: "Solutions",
     links: [
-        ...SOLUTIONS.filter((s) => s.group === g.title),
-        ...(i === HUB_GROUPS.length - 1
-            ? [{ name: "All trades", href: HUB_PATH }]
-            : []),
+        ...HUB_GROUPS.flatMap((g) =>
+            SOLUTIONS.filter((s) => s.group === g.title).slice(0, 1),
+        ),
+        { name: "See all trades", href: HUB_PATH },
     ],
-}));
+};
 
 const LEARN = "Learn";
 const SAROH = "Saroh";
@@ -143,7 +148,10 @@ export const TOOLS: NavItem[] = [
     },
 ];
 
-export const ALL_TOOLS: MenuLink = { name: "All tools", href: "/tools" };
+export const ALL_TOOLS: MenuLink = {
+    name: "See all free tools",
+    href: "/tools",
+};
 
 /** The first six are the gallery's most asked-for trades. */
 const POPULAR_TRADES = TRADES.slice(0, 6);
@@ -170,7 +178,7 @@ export const TEMPLATES: NavItem[] = [
 ];
 
 export const ALL_TEMPLATES: MenuLink = {
-    name: "All templates",
+    name: "All document templates",
     href: "/templates",
 };
 
@@ -191,7 +199,8 @@ export const NAV_WORDS = {
     allTrades: "See all trades",
     /** The nav entry for /features (owner, 17 Nov 2026: "Features"). */
     howItWorks: "Features",
-    templates: "Templates",
+    // "Document templates": saroh.in's are website templates (owner, 16 Nov 2026, #1).
+    templates: "Document templates",
     pricing: "Pricing",
     resources: "Resources",
     tools: "Tools",
@@ -243,10 +252,10 @@ export const FOOTER_COLUMNS: { title: string; links: MenuLink[] }[] = [
         title: "Also in Saroh",
         links: FEATURES.filter((f) => !PRODUCT.some((p) => p.href === f.href)),
     },
-    ...TRADE_COLUMNS,
+    SOLUTIONS_COLUMN,
     { title: "Tools", links: [...TOOLS.slice(0, 5), ALL_TOOLS] },
     {
-        title: "Templates",
+        title: NAV_WORDS.templates,
         links: [
             ...TEMPLATES.filter((t) => t.group === "Documents").slice(0, 4),
             ALL_TEMPLATES,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { KeyboardEvent } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { TextLink } from "../links/text-link";
 import { ring } from "../ring";
@@ -16,10 +16,12 @@ import { menuColumns } from "./nav-types";
 const COLUMN_WIDTH = 232;
 
 /**
- * A desk menu's panel, open across the nav: columns ruled apart, under family
- * or group headings where the items have them, and a strip below with the
- * "see all" and the quieter links. The header owns its trigger and when it
- * is open, and mounts this only while it is.
+ * A desk menu's panel, under the button that opened it (its left edge level
+ * with the button's, moved in only as far as it must to stay inside the nav;
+ * owner, 16 Nov 2026, bug #4): columns ruled apart, under family or group
+ * headings where the items have them, and a strip below with the "see all"
+ * and the quieter links. The header owns its trigger and when it is open,
+ * and mounts this only while it is, right after the button.
  */
 export function MenuPanel({
     id,
@@ -42,6 +44,21 @@ export function MenuPanel({
     pathname: string;
 }) {
     const menu = useRef<HTMLDivElement>(null);
+    const [left, setLeft] = useState<number | null>(null);
+
+    // Placed against the nav (its offset parent) from the button before it.
+    useLayoutEffect(() => {
+        const el = menu.current;
+        const button = el?.previousElementSibling;
+        const nav = el?.offsetParent;
+        if (!el || !button || !nav) return;
+        const edge = 16;
+        const room = nav.clientWidth - el.offsetWidth - edge;
+        const at =
+            button.getBoundingClientRect().left -
+            nav.getBoundingClientRect().left;
+        setLeft(Math.max(edge, Math.min(at, room)));
+    }, []);
 
     // Opening a menu puts focus on its first item, as the design's script
     // does, so the arrow keys work straight away.
@@ -52,15 +69,18 @@ export function MenuPanel({
     const shown = menuColumns(items, columns);
 
     return (
-        // Across the nav, not under its button: the nav is what's `relative`.
         <div
             ref={menu}
             id={`nav-menu-${id}`}
             role="menu"
             aria-label={label}
             onKeyDown={(e) => moveWithArrows(e)}
-            style={{ width: shown.length * COLUMN_WIDTH + 22 }}
-            className="absolute inset-x-0 top-[calc(100%-8px)] mx-auto max-w-[calc(100%-32px)] rounded-mk-card border border-border bg-background p-2.5 shadow-mk-menu"
+            style={{
+                width: shown.length * COLUMN_WIDTH + 22,
+                // Set before the first paint (a layout effect).
+                left: left ?? undefined,
+            }}
+            className="absolute top-[calc(100%-8px)] max-w-[calc(100%-32px)] rounded-mk-card border border-border bg-background p-2.5 shadow-mk-menu"
         >
             <div className="max-h-[calc(100dvh-160px)] overflow-y-auto overflow-x-hidden rounded-[10px] border border-border bg-card">
                 {/* The last column's and row's rules are clipped, under the box's own. */}

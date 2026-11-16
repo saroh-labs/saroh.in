@@ -54,13 +54,21 @@ describe("the nav", () => {
         }
     });
 
-    it("lists every trade in a column per group, menu and footer, and ends on the hub", () => {
+    it("groups every trade in the menu, and the footer's one Solutions column takes each family's first, then the hub", () => {
         const groups = HUB_GROUPS.map((g) => g.title);
         expect(new Set(SOLUTIONS.map((s) => s.group))).toEqual(new Set(groups));
-        const footer = FOOTER_COLUMNS.filter((c) => groups.includes(c.title));
-        expect(footer.map((c) => c.title)).toEqual(groups);
-        expect(footer.flatMap((c) => c.links).map((l) => l.href)).toEqual([
-            ...ALL_TRADES.map((t) => t.href),
+        expect(FOOTER_COLUMNS.map((c) => c.title)).toEqual([
+            "Product",
+            "Also in Saroh",
+            "Solutions",
+            "Tools",
+            "Document templates",
+            "Resources",
+            "Saroh",
+        ]);
+        const column = FOOTER_COLUMNS.find((c) => c.title === "Solutions");
+        expect(column?.links.map((l) => l.href)).toEqual([
+            ...groups.map((g) => SOLUTIONS.find((s) => s.group === g)?.href),
             "/solutions",
         ]);
     });

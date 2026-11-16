@@ -69,16 +69,11 @@ export function sectionOf(
 export function splitResources(resources: readonly NavItem[]) {
     const page = (href: string) => resources.find((r) => r.href === href);
     const templates = page("/templates");
-    const developers = page("/developers");
+    // Developers is a Resources item, not a top-level entry (owner, 16 Nov 2026, #2).
     return {
         templates: templates
             ? { name: templates.name, href: templates.href }
             : undefined,
-        developers: developers
-            ? { name: developers.name, href: developers.href }
-            : undefined,
-        rest: resources.filter(
-            (r) => r.href !== "/templates" && r.href !== "/developers",
-        ),
+        rest: resources.filter((r) => r.href !== "/templates"),
     };
 }

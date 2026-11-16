@@ -94,7 +94,6 @@ export function MobileMenu({
                     pathname={pathname}
                     featuresLabel={NAV_WORDS.howItWorks}
                     templatesPage={split.templates}
-                    developers={split.developers}
                     resources={split.rest}
                     tools={menus.tools ?? []}
                     featureItems={menus.features}

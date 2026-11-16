@@ -486,7 +486,7 @@ export const templatesPage = {
 } as const;
 
 export const templateDetail = {
-    crumb: "Templates",
+    crumb: "Website templates",
     saveNote: (name: string) =>
         `Start free, and pick ${name} when you set up your website.`,
     switcher: "Pages",

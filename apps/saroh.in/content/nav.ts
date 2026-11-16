@@ -22,7 +22,10 @@ export const FOOTER_WORDS = {
     product: "Product",
     /** The shown features the Product group doesn't name. */
     more: "Also in Saroh",
-    trades: "For your trade",
+    // The same column names on both sites (owner, 16 Nov 2026, #17).
+    trades: "Solutions",
+    templates: "Website templates",
+    allTemplates: "All website templates",
     resources: "Resources",
     tools: "Tools",
     saroh: "Saroh",

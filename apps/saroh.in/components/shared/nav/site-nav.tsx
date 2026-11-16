@@ -32,10 +32,10 @@ const PANEL =
 /**
  * saroh.in's nav, on the redesign's shared `MarketingNav` (DEC-221): from
  * 1240px, the wordmark, then Solutions (every trade, by family, and "See all
- * trades"), How it works (every shown feature and "How Saroh works" to
- * /features), Templates, Pricing (once the launch switch is open; before
- * that it would only bounce to the waitlist), Developers (once live),
- * Resources and Tools, then Sign in (also once open) and the start button. Below
+ * trades"), Features (every shown feature and "All features" to
+ * /features), Website templates, Pricing (once the launch switch is open;
+ * before that it would only bounce to the waitlist), Resources (Developers
+ * among them, once live; owner, 16 Nov 2026) and Tools, then Sign in (also once open) and the start button. Below
  * 1240px: the start button and Menu, whose sheet keeps every level,
  * Resources and Tools included.
  *
@@ -96,15 +96,6 @@ export function SiteNav({
             : []),
         ...(LAUNCH_MODE === "open"
             ? [{ id: "pricing", label: NAV_WORDS.pricing, href: "/pricing" }]
-            : []),
-        ...(split.developers
-            ? [
-                  {
-                      id: "developers",
-                      label: split.developers.name,
-                      href: split.developers.href,
-                  },
-              ]
             : []),
         // Resources and Tools keep their own desk menus (owner, 17 Nov 2026):
         // the guides and the free tools are how people find Saroh.

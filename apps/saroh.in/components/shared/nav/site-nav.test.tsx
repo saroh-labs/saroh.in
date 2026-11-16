@@ -257,27 +257,30 @@ describe("SiteNav: Resources (plan U1)", () => {
         ).toBe("page");
     });
 
-    it("draws Templates and Developers as entries of their own once live, marked on their pages", () => {
+    it("draws Website templates as an entry of its own, and Developers inside Resources (owner, 16 Nov 2026)", () => {
         pathname = "/templates/bakery";
         render(
             <Nav
                 resources={[
                     ...RESOURCES,
-                    { name: "Templates", line: "", href: "/templates" },
+                    { name: "Website templates", line: "", href: "/templates" },
                     { name: "Developers", line: "", href: "/developers" },
                 ]}
             />,
         );
         const nav = desktop();
         const templates = within(nav).getAllByRole("link", {
-            name: "Templates",
+            name: "Website templates",
         })[0];
         expect(templates.className).toContain("decoration-brand-500");
+        expect(within(nav).queryByRole("link", { name: "Developers" })).toBe(
+            null,
+        );
+        fireEvent.click(button("Resources"));
         expect(
-            within(nav)
-                .getAllByRole("link", { name: "Developers" })[0]
-                .getAttribute("href"),
-        ).toBe("/developers");
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+        ).toContain("/developers");
+        fireEvent.click(button("Resources"));
         fireEvent.click(button("Features"));
         expect(
             screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),

@@ -82,7 +82,8 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
     },
     {
         id: "templates",
-        name: "Templates",
+        // Website templates, never bare "Templates": saroh.tech's are documents (owner, 16 Nov 2026, #1).
+        name: "Website templates",
         line: "Sites made for your kind of business, ready to start from.",
         href: "/templates",
         // With early access, as Help (industry templates plan U13).

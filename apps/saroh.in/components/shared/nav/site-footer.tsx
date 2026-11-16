@@ -18,6 +18,11 @@ import { SAROH_NAME } from "@/content/name";
 import { FOOTER_WORDS, NAV_WORDS, PRODUCT_GROUP } from "@/content/nav";
 import { MADE_BY } from "@/content/resources";
 import { SAROH_SOCIAL } from "@/content/social";
+import {
+    galleryTemplates,
+    templateHref,
+    TEMPLATES_PATH,
+} from "@/content/templates";
 import { claimOn } from "@/lib/feature-switches";
 import { LAUNCH_MODE, SIGN_IN_URL } from "@/lib/links";
 
@@ -78,6 +83,7 @@ export function SiteFooter({
     cookieChoices?: boolean;
 }) {
     const developers = resources.find((r) => r.href === "/developers");
+    const templates = resources.find((r) => r.href === TEMPLATES_PATH);
     const product = productGroup(developers);
     const named = new Set(product.map((l) => l.href));
     const groups: FooterGroup[] = [
@@ -89,12 +95,32 @@ export function SiteFooter({
                 .map((f) => ({ name: f.name, href: featureHref(f.slug) })),
         },
         { title: FOOTER_WORDS.trades, links: solutions },
+        { title: FOOTER_WORDS.tools, links: tools },
+        // Once the gallery is live: four looks, then all of them.
+        ...(templates
+            ? [
+                  {
+                      title: FOOTER_WORDS.templates,
+                      links: [
+                          ...galleryTemplates()
+                              .slice(0, 4)
+                              .map((t) => ({
+                                  name: t.name,
+                                  href: templateHref(t.slug),
+                              })),
+                          {
+                              name: FOOTER_WORDS.allTemplates,
+                              href: templates.href,
+                          },
+                      ],
+                  },
+              ]
+            : []),
         // Developers is in Product, as API and webhooks.
         {
             title: FOOTER_WORDS.resources,
-            links: resources.filter((r) => r !== developers),
+            links: resources.filter((r) => r !== developers && r !== templates),
         },
-        { title: FOOTER_WORDS.tools, links: tools },
         {
             title: FOOTER_WORDS.saroh,
             links: [

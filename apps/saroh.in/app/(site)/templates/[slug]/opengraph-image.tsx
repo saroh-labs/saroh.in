@@ -4,7 +4,7 @@ import { resourcesContext } from "@/lib/resources-context";
 import { templatesLive } from "@/lib/templates-live";
 
 /**
- * A template's share card: "Templates" and "{Name}: {idea}." Words only.
+ * A template's share card: "Website templates" and "{Name}: {idea}." Words only.
  * A 404 while the gallery isn't shown (DEC-135), as the page is.
  */
 export const alt = "A Saroh website template";

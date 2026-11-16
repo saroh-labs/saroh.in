@@ -141,13 +141,13 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
     it("Templates and every gallery template join the nav and sitemap on 17 Oct", () => {
         const names = (ctx: PublishContext) =>
             resourceItems(shownResources(ctx)).map((i) => i.name);
-        expect(names(before)).not.toContain("Templates");
+        expect(names(before)).not.toContain("Website templates");
         expect(
             indexedPaths("waitlist", before).filter((p) =>
                 p.startsWith("/templates"),
             ),
         ).toEqual([]);
-        expect(names(after)).toContain("Templates");
+        expect(names(after)).toContain("Website templates");
         const paths = indexedPaths("waitlist", after);
         expect(paths).toContain("/templates");
         for (const t of galleryTemplates()) {
