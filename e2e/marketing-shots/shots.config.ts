@@ -1623,14 +1623,13 @@ const SHARE_SHOTS: Shot[] = [
 
 /**
  * Ask AI (owner, 15 Nov 2026): Rye & Co. through the page, each shot a
- * conversation already asked on the capture database, opened from the
- * history list by its question; the capture never asks. Ask them first
- * (`gap`): "How did this week go, and which products sold the most?",
- * "Is hafte sabse zyada kya bika?" and "Change the Sourdough loaf's
- * description to: …", the change card left unconfirmed.
+ * conversation the showcase seed writes already asked (`showcase/rye-ask-ai.ts`:
+ * "How did this week go, and which products sold the most?", "Is hafte sabse
+ * zyada kya bika?" and "Change the Sourdough loaf's description to: …", its
+ * card unconfirmed), opened from the history list by its question; the
+ * capture never asks, so no model key is needed. The seed seals them with
+ * `AI_TEXT_ENC_KEY`, which must be the API's.
  */
-const ASK_GAP =
-    "Asked by hand on the capture database first (Anthropic key in .env.local), with the API's R2_PUBLIC_BASE_URL set so the product cards show photos.";
 const openAsk = (question: string): Step[] => [
     {
         click: `nav[aria-label="Your conversations"] button:has-text("${question}")`,
@@ -1650,7 +1649,6 @@ const ASK_AI_SHOTS: Shot[] = [
         alt: "Ask AI at Rye & Co. (demo bakery) answering how the week went, with its best sellers as cards",
         caption:
             "Ask AI's page: How did this week go, and which products sold the most? Answered from the bakery's own orders, with the best sellers as product cards",
-        gap: ASK_GAP,
     },
     {
         // The hero on a phone: the same answer as the app draws it there.
@@ -1669,7 +1667,6 @@ const ASK_AI_SHOTS: Shot[] = [
         alt: "Ask AI on a phone at Rye & Co. (demo bakery), answering how the week went with its best sellers as cards",
         caption:
             "Ask AI on a phone: how the week went, answered from the bakery's own orders",
-        gap: ASK_GAP,
     },
     {
         key: "ask-start",
@@ -1700,7 +1697,6 @@ const ASK_AI_SHOTS: Shot[] = [
         alt: "Ask AI at Rye & Co. (demo bakery) answering a question in Hinglish, with the best sellers as cards",
         caption:
             "Is hafte sabse zyada kya bika? Answered in Hinglish from the bakery's own orders, with the week's best sellers as product cards",
-        gap: ASK_GAP,
     },
     {
         key: "ask-confirm",
@@ -1713,7 +1709,6 @@ const ASK_AI_SHOTS: Shot[] = [
         alt: "Ask AI at Rye & Co. (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
         caption:
             "A change to the Sourdough loaf's description comes back as a card: the old words struck through, the new ones, and Change product or Cancel",
-        gap: ASK_GAP,
     },
     {
         key: "ask-history",
@@ -1730,7 +1725,6 @@ const ASK_AI_SHOTS: Shot[] = [
         alt: "Ask AI's history at Rye & Co. (demo bakery)",
         caption:
             "Your conversations: each kept for 90 days and seen only by you, newest first",
-        gap: ASK_GAP,
     },
 ];
 const AI_APPS_SHOTS: Shot[] = [

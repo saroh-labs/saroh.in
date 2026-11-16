@@ -13,18 +13,16 @@ import type { Shot, ShotView } from "@saroh/marketing/shot";
 import PLACEHOLDERS from "./shot-placeholders.json";
 import { CAPTURED } from "./shots.captured";
 
-/** A spec in `shots.global.ts` with no capture yet: the next release run takes it. */
-const NOT_TAKEN =
-    "Its spec is in shots.global.ts; not captured yet (the marketing-shots workflow takes it).";
 /** Claude's own screens, put in place by hand (`supplied` in shots.global.ts). */
 const SUPPLIED = "Claude's own screen, put in place by hand; not supplied yet.";
 /**
- * Ask AI's panel on Global still says "English or Hinglish" and that answers
- * go to a provider "outside India": the app's words need fixing before a
- * shot. Its specs are in shots.global.ts (the conversations are asked first).
+ * Saroh's own sign-in for an AI app and the AI assistants list, at
+ * Thistlewick: the local stack can't run Global's sign-in for an AI app (the
+ * consent page is India's accounts there, listing India's businesses), and
+ * no stack the release run starts connects one.
  */
-const ASK_AI_INDIA_WORDS =
-    'Ask AI\'s panel on Global says "English or Hinglish" and "outside India"; retake once the app\'s words are fixed (specs in shots.global.ts).';
+const NO_GLOBAL_AI_APP =
+    "Global's sign-in for an AI app can't run on a local or release stack yet (it lists India's businesses); its spec is in shots.global.ts.";
 
 /**
  * Keys pages name but this site has no capture of yet, each with why; the
@@ -39,14 +37,8 @@ export const PENDING_SHOTS: Partial<Record<ShotKey, string>> = {
     "ai-hero": SUPPLIED,
     "ai-connect": SUPPLIED,
     "ai-ask": SUPPLIED,
-    "ai-consent": NOT_TAKEN,
-    "ai-activity": NOT_TAKEN,
-    "ask-hero": ASK_AI_INDIA_WORDS,
-    "ask-hero-phone": ASK_AI_INDIA_WORDS,
-    "ask-start": ASK_AI_INDIA_WORDS,
-    "ask-answer": ASK_AI_INDIA_WORDS,
-    "ask-confirm": ASK_AI_INDIA_WORDS,
-    "ask-history": ASK_AI_INDIA_WORDS,
+    "ai-consent": NO_GLOBAL_AI_APP,
+    "ai-activity": NO_GLOBAL_AI_APP,
 };
 
 /** The widths `pnpm --filter tech shots:sizes` makes (saroh.in's shot-widths.json). */

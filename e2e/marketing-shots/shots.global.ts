@@ -229,11 +229,10 @@ const MEMBERSHIP_SHOTS: Shot[] = [
 
 /*
  * Ask AI (paying plans, DEC-220) at Thistlewick, in English: each shot a
- * conversation already asked on the capture database, opened from the
- * history list by its question, as saroh.in's are; the capture never asks.
+ * conversation the Global seed writes already asked (`global/ask-ai.ts`),
+ * opened from the history list by its question, as saroh.in's are; the
+ * capture never asks, so no model key is needed.
  */
-const ASK_GAP =
-    'Asked first on the capture database through the API\'s own Ask AI (Anthropic key in .env.local), after the last re-seed, which removes them: "How did the last seven days go, and which products sold the most?", "Which products sold best this month?", then "Change the Sourdough loaf\'s description to: …", its card left unconfirmed. Set the API\'s R2_PUBLIC_BASE_URL first so the product cards carry photos.';
 const HERO_Q = "How did the last seven days go";
 const openAsk = (question: string): Step[] => [
     {
@@ -245,7 +244,6 @@ const ASK_SHOTS: Shot[] = [
     sameAs("ask-hero", {
         steps: openAsk(HERO_Q),
         alt: "Ask AI at Thistlewick Bakery (demo bakery) answering how the last seven days went, with its best sellers as cards",
-        gap: ASK_GAP,
     }),
     sameAs("ask-hero-phone", {
         steps: [
@@ -254,7 +252,6 @@ const ASK_SHOTS: Shot[] = [
             { scrollTop: "#ask-ai-page .overflow-y-auto" },
         ],
         alt: "Ask AI on a phone at Thistlewick Bakery (demo bakery), answering how the last seven days went",
-        gap: ASK_GAP,
     }),
     sameAs("ask-start", {
         alt: "Ask AI at Thistlewick Bakery (demo bakery) before a question, with ready questions",
@@ -262,12 +259,10 @@ const ASK_SHOTS: Shot[] = [
     sameAs("ask-answer", {
         steps: openAsk("Which products sold best"),
         alt: "Ask AI at Thistlewick Bakery (demo bakery) answering which products sold best this month, with the best sellers as cards",
-        gap: ASK_GAP,
     }),
     sameAs("ask-confirm", {
         steps: openAsk("Change the Sourdough"),
         alt: "Ask AI at Thistlewick Bakery (demo bakery): a change to the Sourdough loaf's description, as a card to check before it is saved",
-        gap: ASK_GAP,
     }),
     sameAs("ask-history", {
         clip: {
@@ -276,7 +271,6 @@ const ASK_SHOTS: Shot[] = [
             pad: 20,
         },
         alt: "Ask AI's history at Thistlewick Bakery (demo bakery)",
-        gap: ASK_GAP,
     }),
 ];
 
