@@ -29,6 +29,8 @@ export function PricingTeaser({
             <div className="max-w-[420px]">
                 <Plans
                     model={freeCardModel(catalog)}
+                    // Free's card alone: no paid card for the switch to change.
+                    on={false}
                     src={src}
                     compare={{ href: "/pricing", label: home.pricingCompare }}
                 />

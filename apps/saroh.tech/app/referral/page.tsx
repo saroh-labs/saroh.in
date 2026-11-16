@@ -35,7 +35,8 @@ const STEPS = [
 const RULES = [
     {
         question: "What do you and your friend each get?",
-        answer: "Nothing today. Paid plans aren't on sale on saroh.tech, so there's no reward and no discount. This page will say if that changes.",
+        // True whether or not paid plans are on sale: the code gives no reward either way (DEC-156).
+        answer: "Nothing today: there's no reward and no discount. This page will say if that changes.",
     },
     {
         question: "Can I see who I've referred?",

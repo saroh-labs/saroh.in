@@ -11,6 +11,7 @@
  */
 import type { AskAiWords } from "@saroh/marketing/feature-pages/ask-ai/words";
 
+import { planWords } from "./plan-words";
 import { THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -41,7 +42,14 @@ const paidLabel = (id: string) =>
 const pickups = DUE.length;
 const paid = DUE.length - unpaid.size;
 
-export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
+export function askAiWords({
+    stockOn,
+    plansOn,
+}: {
+    stockOn: boolean;
+    plansOn: boolean;
+}): AskAiWords {
+    const plan = planWords(plansOn);
     const reads = stockOn
         ? "Orders, Customers and Stock"
         : "Orders and Customers";
@@ -49,7 +57,7 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
         name: "Ask AI",
         title: { before: "Ask across your whole ", mark: "business." },
         lede: "One Ask button sits over every screen in Saroh. Ask in your own words and the answer comes from your own records, with the rows behind it and the parts of the business it read. Then it offers the next step, and waits for your OK.",
-        plan: "Not part of Free yet.",
+        plan: plan.askAiHero,
         secondary: "See pricing",
         note: "Free to start. No card needed.",
 
@@ -376,8 +384,8 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
 
         plans: {
             id: "plans",
-            line: "Everyone is on Free for now. Ask AI isn't part of Free.",
-            compare: "Tell me when",
+            line: plan.askAiLine,
+            compare: plan.compare,
         },
 
         mcp: {
@@ -419,7 +427,7 @@ export function askAiWords({ stockOn }: { stockOn: boolean }): AskAiWords {
             },
             {
                 q: "Is it on Free?",
-                a: "Not yet. Everyone is on Free for now, and Ask AI isn't part of it. AI apps is, if you'd like to ask Claude or ChatGPT instead.",
+                a: plan.askAiFaq,
             },
             {
                 q: "Is it the same as using Saroh from Claude or ChatGPT?",

@@ -13,19 +13,23 @@ import { ONE_PERSON } from "../scripts/check-claims.mjs";
  * `content.test.ts` holds saroh.tech's other words to.
  */
 const both = [true, false];
-const all = both.flatMap((on) =>
-    both.map((other) => ({
-        website: websiteWords({ shop: on, templates: other }),
-        social: socialWords({
-            everyPlan: on,
-            posting: other,
-            insights: on,
-            askSocial: other,
-        }),
-        askAi: askAiWords({ stockOn: on }),
-        aiApps: aiAppsWords(),
-    })),
-);
+/** Every word a page can draw, with paid plans on sale (`plansOn`) or not. */
+const wordsFor = (plansOn: boolean) =>
+    both.flatMap((on) =>
+        both.map((other) => ({
+            website: websiteWords({ shop: on, templates: other, plansOn }),
+            social: socialWords({
+                everyPlan: on,
+                posting: other,
+                insights: on,
+                askSocial: other,
+                plansOn,
+            }),
+            askAi: askAiWords({ stockOn: on, plansOn }),
+            aiApps: aiAppsWords({ plansOn }),
+        })),
+    );
+const all = [...wordsFor(false), ...wordsFor(true)];
 /** Every word a page can draw: the string values, never the keys. */
 const strings = (v: unknown): string[] =>
     typeof v === "string"
@@ -53,9 +57,16 @@ describe("saroh.tech's Reach and Ask words", () => {
         // Own domains are named as coming with paid plans (owner, 16 Nov 2026, #21).
         const domains =
             /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans/g;
-        expect(text.replace(domains, "")).not.toMatch(
+        const off = JSON.stringify(wordsFor(false), (key, value: unknown) =>
+            key === "business" ? undefined : value,
+        );
+        expect(off.replace(domains, "")).not.toMatch(
             /\bpaid plans?\b|\bupgrade\b|\bGrow\b|\bPro\b|\bpack(s|ages?)?\b/i,
         );
+    });
+
+    it("count no packs once paid plans are on sale either", () => {
+        expect(text).not.toMatch(/\bupgrade\b|\bpack(s|ages?)?\b/i);
     });
 
     it("ask for one person", () => {

@@ -35,6 +35,7 @@ import {
     faqWithPlans,
     freeCardModel,
     freePlanLine,
+    paidPlansOn,
     readCatalog,
     readPricing,
 } from "@/lib/plans";
@@ -80,6 +81,7 @@ function leadPage(
     s: Solution,
     catalog: Catalog,
     cardOnline: boolean,
+    plansOn: boolean,
 ): OwnProps {
     const hero = s.hero && shotView(s.hero.shot, s.hero.alt);
     return {
@@ -110,7 +112,7 @@ function leadPage(
                 };
             }),
         },
-        faq: faqWithPlans(catalog, solutionFaq(s.faq), cardOnline),
+        faq: faqWithPlans(catalog, solutionFaq(s.faq), cardOnline, plansOn),
         pricingTitle: s.pricing.title,
         questionsTitle: W.questions(s.longName),
         related: solutionList
@@ -133,11 +135,13 @@ function otherPage(
     t: TradePage,
     catalog: Catalog,
     cardOnline: boolean,
+    plansOn: boolean,
 ): OwnProps {
     const [start, ...general] = faqWithPlans(
         catalog,
         ["start-free", ...TRADE_FAQ],
         cardOnline,
+        plansOn,
     );
     // The invoice templates gallery is always built, as the nav's Templates
     // menu links it; `templatesOn` is the website templates' switch.
@@ -221,14 +225,20 @@ export default async function SolutionPage({ params }: Props) {
     const pricing = await readPricing();
     const catalog = pricing?.catalog ?? null;
     const cardOnline = pricing?.cardOnline ?? false;
+    const plansOn = await paidPlansOn(pricing);
     const shown = new Set<string>(featureList.map((f) => f.slug));
     const off = claimsOff();
     const templatesOn = !featuresOff().includes("templates");
     const src = `solutions-${slug}`;
     const free = freePlanLine(catalog);
     const own = other
-        ? otherPage(other, catalog, cardOnline)
-        : leadPage(solutions[slug as SolutionSlug], catalog, cardOnline);
+        ? otherPage(other, catalog, cardOnline, plansOn)
+        : leadPage(
+              solutions[slug as SolutionSlug],
+              catalog,
+              cardOnline,
+              plansOn,
+          );
 
     return (
         <div data-page-type={page.type}>
@@ -286,6 +296,7 @@ export default async function SolutionPage({ params }: Props) {
                         <div className="max-w-[420px]">
                             <Plans
                                 model={freeCardModel(catalog)}
+                                on={plansOn}
                                 src={`${src}-pricing`}
                                 compare={{
                                     href: "/pricing",

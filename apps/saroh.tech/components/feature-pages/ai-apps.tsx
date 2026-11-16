@@ -5,16 +5,18 @@ import { AI_APP_CARDS } from "@/content/integrations";
 import { aiAppsWords } from "@/content/reach-ai-apps";
 import { WORLD } from "@/content/world";
 import { pageSite } from "@/lib/page-site";
+import { paidPlansOn } from "@/lib/plans";
 
 import { featureName, inTheAppData, REACH_CRUMB } from "./data";
 
 /** /features/ai-apps: saroh.in's Connect page with Global's words and world. */
-export function AiAppsPage() {
+export async function AiAppsPage() {
+    const plansOn = await paidPlansOn();
     const apps = features["ai-apps"].apps;
-    return Promise.resolve(
+    return (
         <AiAppsView
             site={pageSite()}
-            words={aiAppsWords()}
+            words={aiAppsWords({ plansOn })}
             world={WORLD}
             crumb={REACH_CRUMB}
             featureName={featureName}
@@ -22,6 +24,6 @@ export function AiAppsPage() {
             apps={apps ? { words: apps, list: AI_APP_CARDS } : null}
             // No Developers page on Global yet: the page links none.
             developersHref={null}
-        />,
+        />
     );
 }

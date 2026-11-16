@@ -15,14 +15,18 @@
  * says team, staff or roles; customers pay at the counter or by card
  * through the business's own Stripe, named only on /features pages; the
  * site lives on a saroh.app address; invoices made from an order carry no
- * tax line; Subscriptions isn't available yet; no plan is named.
+ * tax line; Subscriptions comes with a paid plan; a domain you own follows
+ * the paid-plans switch (`plan-words.ts`); no plan is named.
  */
 import type { HowItWorksWords } from "@saroh/marketing/how-it-works/words";
+
+import { planWords } from "./plan-words";
 
 /** The day these words last changed. */
 export const UPDATED = "2026-11-15";
 
-export const HOW_IT_WORKS: HowItWorksWords = {
+/** The page's words, its domain lines in the wording `on` asks for. */
+export const howItWorksWords = (on: boolean): HowItWorksWords => ({
     href: "/features",
     seoTitle: "Features: how Saroh works",
     seoDescription:
@@ -132,7 +136,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
             line: "A website in your look, live today",
             chip: "Your site",
             lead: {
-                text: "A website builder that starts from **a template made for your trade**, in your colours, live at a saroh.app address from the first day, and at a domain you own once paid plans open. Your booking page is already in it, and prices and hours come from where you keep them.",
+                text: `A website builder that starts from **a template made for your trade**, in your colours, live at a saroh.app address from the first day, and at a domain you own ${planWords(on).domainWhen}. Your booking page is already in it, and prices and hours come from where you keep them.`,
             },
             captions: [
                 {
@@ -523,7 +527,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
             {
                 name: "Your address",
                 body: {
-                    text: "Live at yourname.saroh.app from the first day, and at a domain you own once paid plans open.",
+                    text: `Live at yourname.saroh.app from the first day, and at a domain you own ${planWords(on).domainWhen}.`,
                 },
                 chip: "{site}",
             },
@@ -617,7 +621,7 @@ export const HOW_IT_WORKS: HowItWorksWords = {
                 {
                     feature: "subscriptions",
                     name: "Subscriptions",
-                    line: "Regulars on a plan, not available yet",
+                    line: "Regulars on a plan",
                 },
                 {
                     feature: "billing",
@@ -688,4 +692,4 @@ export const HOW_IT_WORKS: HowItWorksWords = {
         pricing: "See pricing",
         note: "Free to start. No card needed.",
     },
-};
+});

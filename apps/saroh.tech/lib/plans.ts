@@ -23,6 +23,7 @@ import {
 import type { FaqId } from "@/content/faq";
 import { faqItems, PAY_CARD_ONLINE } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
+import { planWords } from "@/content/plan-words";
 import { PRICING } from "@/content/pricing";
 import { featuresOff } from "@/lib/feature-switches";
 
@@ -106,6 +107,21 @@ export async function readPricing(
     }
 }
 
+/**
+ * Whether Saroh sells Grow and Pro here now: the API's `offered`, read once
+ * per build (the fetch is cached). Every plan line follows it
+ * (`content/plan-words.ts`); no answer is off.
+ */
+export async function paidPlansOn(
+    /** A page that has read the API already passes what it read. */
+    read:
+        | { offered: boolean }
+        | null
+        | Promise<{ offered: boolean } | null> = readPricing(),
+): Promise<boolean> {
+    return (await read)?.offered ?? false;
+}
+
 const freePlanOf = (catalog: Catalog) =>
     catalog.plans.find(
         (p) => p.id === "free" && p.pricePaise === 0 && !p.retired,
@@ -141,7 +157,10 @@ export function faqWithPlans(
     ids: FaqId[],
     /** The API's `cardOnline` (`STRIPE_PAYMENTS`): the pay answer says card online only then. */
     cardOnline = false,
+    /** The API's `offered` ({@link paidPlansOn}): the domain answer's plan words. */
+    plansOn: boolean,
 ) {
+    const domain = planWords(plansOn).domain;
     const limits = catalog && freeLimitLines(catalog);
     return faqItems(ids).map((item, i) =>
         ids[i] === "start-free" && limits
@@ -151,7 +170,9 @@ export function faqWithPlans(
               }
             : ids[i] === "pay" && cardOnline
               ? { ...item, a: `${item.a} ${PAY_CARD_ONLINE}` }
-              : item,
+              : ids[i] === "domain"
+                ? { ...item, a: `${item.a} ${domain}` }
+                : item,
     );
 }
 
@@ -213,7 +234,7 @@ export function freeUsage(
 /**
  * The pricing page's plans. While Saroh doesn't sell its paid plans here
  * (DEC-211), only Free's limits come from a catalogue and paid plans say
- * they come later. Once it does (`offered`, stage 9), the whole catalogue
+ * nothing they'd include. Once it does (`offered`, stage 9), the whole catalogue
  * in its own money, dollars with no tax: never an India catalogue, which
  * is in rupees.
  */

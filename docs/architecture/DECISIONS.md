@@ -2989,3 +2989,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Google indexes the phone page.** Content moved behind a tap stays in the HTML (closed `<details>`, swipe rows); desk and phone share one h1.
     - **Screenshots are one type in both editions and retaken fresh for every production release** (owner, 17 Nov 2026). The same slot uses the same shot key, crop and frame on saroh.in and saroh.tech; both editions' shots are captured again from their demo seeds before each production release (`docs/patterns/devops-tooling-and-deploy.md`). A Global key with no capture yet stays on `PENDING_SHOTS` and draws India's fallback kind.
 - Consequences: a page is words plus a world plus kit components, so the two editions can't drift apart. Each unlive claim is a switch to turn on at its release, with a test. Every release retakes both editions' shots. Built on `batch-2026-11-15-4`; the kit sheet is `/dev/kit` under `next dev`.
+
+## DEC-222 A feature that isn't live yet is shown with a tag, not hidden, and saroh.tech's plan words follow one switch
+
+**Status: Accepted — 2026-11-16** · owner · amends DEC-221's "unlive claims behind switches"
+
+- Context (owner, 16 Nov 2026, web-redesign bugs #34 and #45): "show features on the marketing site as paid or coming soon if they're not published, because if we think something will be added later, we might miss it". And saroh.tech still said "Tell me when" with paid plans switched on locally: "changing them from one place changes everywhere".
+- Decision:
+    - **Shown with a tag, not hidden.** A feature that is built but not released, or planned, is drawn on saroh.in and saroh.tech with a "Coming soon" tag, or with its plan ("On Grow and Pro", "On paid plans"), not left out. Only a claim that isn't true is left out: DEC-221's claim switches still hide a sentence the product can't back.
+    - **Tags only.** A tag is a few words beside the feature's name or on its page. Never a locked panel, an upgrade wall, a used-up screen or an internal limit; no prices or limits in the words.
+    - **No dates.** "Coming soon" and "Coming next" carry no day, month or quarter.
+    - **saroh.tech's plan words follow one switch.** Every line that changes when Global's paid plans go on sale (the plan lines, Tell me when, "Free for now", the pricing title and cards, own-domain lines, the legal "Paying for Saroh", the paid-plan tag) is a pair in `apps/saroh.tech/content/plan-words.ts`. Pages read the API's `offered` (`GET /public/pricing`, `SAROH_BILLING_GLOBAL` on and a paid plan published, DEC-211) once per build (`paidPlansOn`) and take the pair's wording; no other file carries the Free-only words (`lib/plan-words.test.ts`). On, the paid cards start to sign-up and the plan lines name Grow and Pro with Compare plans.
+    - **Applied first to Subscriptions on saroh.tech:** its page is tagged "On paid plans" while paid plans aren't on sale, and drawn as any other feature once they are, in place of "Not available yet" on every line.
+- Consequences: flipping `SAROH_BILLING_GLOBAL` changes all of saroh.tech at the next build. A new hard-coded "Free for now" fails the test. Each other unreleased feature gets its tag (Coming soon, or its plan) as it's next touched; the claim and release switch machinery is unchanged.

@@ -11,6 +11,7 @@
  */
 import type { AiAppsWords } from "@saroh/marketing/feature-pages/ai-apps/words";
 
+import { planWords } from "./plan-words";
 import { THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -27,7 +28,8 @@ const holiday = THISTLEWICK_TUESDAY.holiday;
 const cls = THISTLEWICK_TUESDAY.class;
 const owner = bakery.owner;
 
-export function aiAppsWords(): AiAppsWords {
+export function aiAppsWords({ plansOn }: { plansOn: boolean }): AiAppsWords {
+    const plan = planWords(plansOn);
     return {
         name: "AI apps",
         title: { before: "Run Saroh from your own ", mark: "assistant." },
@@ -428,8 +430,8 @@ export function aiAppsWords(): AiAppsWords {
             link: "API keys and webhooks are on Developers",
         },
         plan: {
-            line: "Everyone is on Free for now, AI apps included. Your assistant's app may need a subscription of its own.",
-            compare: "Tell me when",
+            line: plan.aiAppsLine,
+            compare: plan.compare,
         },
 
         faq: [

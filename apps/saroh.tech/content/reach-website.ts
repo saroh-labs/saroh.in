@@ -21,6 +21,7 @@ import type {
     WebsiteWords,
 } from "@saroh/marketing/feature-pages/website/words";
 
+import { planWords } from "./plan-words";
 import { TEMPLATE_LOOKS, THISTLEWICK_TUESDAY, WORLD } from "./world";
 
 const bakery = WORLD.lead;
@@ -50,11 +51,15 @@ const cap = (s = "") => s.charAt(0).toUpperCase() + s.slice(1);
 export function websiteWords({
     shop,
     templates = false,
+    plansOn,
 }: {
     shop: boolean;
     /** The Templates switch is on (DEC-216): the page may name a template. */
     templates?: boolean;
+    /** The paid-plans switch (`plan-words.ts`). */
+    plansOn: boolean;
 }): WebsiteWords {
+    const plan = planWords(plansOn);
     return {
         name: "Website builder",
         title: {
@@ -245,7 +250,7 @@ export function websiteWords({
 
         address: {
             title: "Your address, from the first day.",
-            lead: `Every site starts at a ${host.slice(1)} address, ready the moment you publish. A domain you own comes with paid plans, which open soon.`,
+            lead: `Every site starts at a ${host.slice(1)} address, ready the moment you publish. ${plan.domain}`,
             web: {
                 title: "Web address",
                 sub: `At ${host.slice(1)}.`,
@@ -389,8 +394,8 @@ export function websiteWords({
             momentLead: "Seen in a day:",
             momentAt: "10:00",
             momentLink: `See 10 am at ${bakery.name}`,
-            plan: "Everyone is on Free for now.",
-            compare: "Tell me when",
+            plan: plan.websiteLine,
+            compare: plan.compare,
             works: "Works with",
         },
 
@@ -401,7 +406,7 @@ export function websiteWords({
             },
             {
                 q: "Can I use my own domain?",
-                a: `Every site lives at a ${host.slice(1)} address from the first day. A domain you own comes with paid plans, which open soon.`,
+                a: `Every site lives at a ${host.slice(1)} address from the first day. ${plan.domain}`,
             },
             {
                 q: "Does anything go live without me?",
