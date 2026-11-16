@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { ButtonLink } from "../buttons/button";
 import { cn } from "../cn";
-import { dayLink } from "../content/world";
+import { AskTypes } from "../kit/ask-types";
 import { Chip } from "../kit/chip";
 import { Claim } from "../kit/claim";
 import { ClosingCTA } from "../kit/closing-cta";
@@ -76,7 +76,6 @@ export function AskAiView({
     const p = h.panel;
     const s = h.slips;
     const aiApps = site.featureHref("ai-apps");
-    const ninePm = lead.day?.find((x) => x.at === "21:00");
 
     const slip = (
         title: string,
@@ -755,18 +754,14 @@ export function AskAiView({
 
             <ClosingCTA
                 title={w.close.title}
+                visual={<AskTypes words={w.close.ask} />}
                 primary={site.start(`feature-${slug}-close`)}
                 secondary={
-                    ninePm ? (
-                        <ButtonLink
-                            href={dayLink(lead, ninePm)}
-                            variant="secondary"
-                            size="kit"
-                        >
-                            {w.moment.link}
-                        </ButtonLink>
-                    ) : null
+                    <ButtonLink href="/pricing" variant="secondary" size="kit">
+                        {w.plans.compare}
+                    </ButtonLink>
                 }
+                note={w.close.note}
                 className="mt-[72px] min-[760px]:mt-[120px]"
             />
             <StickyBar watch={HERO_CTA}>

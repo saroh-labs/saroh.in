@@ -488,8 +488,44 @@ export function askAiWords({
             more: "All questions",
         },
         close: {
-            title: "Ask your business, in your words.",
-            note: "Free to start. No card needed.",
+            title: "Ask across your whole business.",
+            note: languages
+                ? "English, Hinglish or Hindi. Nothing changes until you confirm."
+                : "Nothing changes until you confirm.",
+            ask: {
+                pick: "Ask one",
+                readFrom: "Read from",
+                questions: [
+                    {
+                        label: "What sold most?",
+                        text: languages
+                            ? "Is hafte sabse zyada kya bika?"
+                            : "What sold most this week?",
+                        answer: `${item(RYE_MONDAY.topSeller.item)}: ${RYE_MONDAY.topSeller.sold} sold this week.`,
+                        from: "Orders, Products",
+                    },
+                    {
+                        label: "Who hasn't paid?",
+                        text: "Who still owes me money?",
+                        answer: `${meera.customer} pays at pick-up, and ${anjali.customer} has a pay link for ${anjali.total}.`,
+                        from: "Orders, Billing",
+                    },
+                    {
+                        label: "Who hasn't come back?",
+                        text: languages
+                            ? "Kaun regulars wapas nahi aaye?"
+                            : "Which regulars haven't come back?",
+                        answer: "5 regulars haven't been back.",
+                        from: "Customers, Orders",
+                    },
+                    {
+                        label: "Free time this week?",
+                        text: "When am I free this week?",
+                        answer: "Tuesday, Wednesday and Thursday afternoons.",
+                        from: "Calendar",
+                    },
+                ],
+            },
         },
         chapters: [
             ["anywhere", "Ask anywhere"],

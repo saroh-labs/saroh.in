@@ -85,6 +85,20 @@ describe("saroh.tech's Reach and Ask words", () => {
         expect(text).not.toMatch(/\bupgrade\b|\bpack(s|ages?)?\b/i);
     });
 
+    it("close Share and Ask AI with Thistlewick's own words (#46)", () => {
+        for (const w of all) {
+            const close = JSON.stringify([w.social.close, w.askAi.close]);
+            expect(close).not.toMatch(/₹|Rye|ryeandco|rye-and-co|Asha/);
+            expect(w.social.close.share.posts.map((p) => p.label)).toEqual([
+                "A product",
+                "A class",
+                "An offer",
+                "A blog post",
+            ]);
+            expect(w.askAi.close.ask.questions).toHaveLength(4);
+        }
+    });
+
     it("ask for one person", () => {
         for (const phrase of ONE_PERSON) expect(text).not.toMatch(phrase);
     });

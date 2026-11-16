@@ -344,6 +344,16 @@ export const THISTLEWICK_TUESDAY = {
     ],
     paidYesterday: "$412.50",
     scheduledPost: { when: "Thu, 6 pm", where: "Instagram" },
+    /** Not in the seed: Share's closing band's weekend offer and blog post. */
+    offer: {
+        name: "Weekend bakes",
+        line: "20% off till Sunday",
+        big: "20% off",
+    },
+    blogPost: {
+        title: "Why our sourdough takes 36 hours",
+        slug: "36-hour-sourdough",
+    },
     apiKey: { name: "Key for the accounts sheet", ends: "4c1e" },
     webhook: { event: "When an order is paid", to: "Send it to your sheet" },
     /** The product Share makes a post of, and the ones its sheet lists. */

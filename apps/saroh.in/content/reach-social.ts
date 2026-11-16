@@ -449,8 +449,69 @@ export function socialWords({
             more: "All questions",
         },
         close: {
-            title: "Something new? Share it today.",
-            note: "Free to start. No card needed.",
+            title: "Start managing your online presence with Saroh today.",
+            note: everyPlan
+                ? "Share is on every plan, Free included. You post it yourself from your phone."
+                : "You post it yourself from your phone.",
+            share: {
+                lede: "Press Share on anything with a page. It's ready for every app, in your own colours, with a link back to you.",
+                pick: "What to share",
+                row: "The same post on WhatsApp, Instagram and Facebook",
+                apps: {
+                    whatsapp: "WhatsApp · a chat",
+                    instagram: "Instagram · a square post",
+                    facebook: "Facebook · a link post",
+                },
+                handle,
+                of: "of",
+                posts: [
+                    {
+                        label: "A product",
+                        kind: "New",
+                        title: bun.name,
+                        sub: `${bun.price} · ${bun.unit}`,
+                        line: bun.price,
+                        caption:
+                            "Fresh this morning. Order by tonight for tomorrow.",
+                        reply: "Saving two boxes for Saturday.",
+                        path: `/shop/${bun.name.toLowerCase().replace(/\W+/g, "-")}`,
+                        photo: "buns",
+                    },
+                    {
+                        label: "A class",
+                        kind: "Class",
+                        title: cls.name,
+                        sub: `${cls.when} · ${cls.places - cls.booked} places left`,
+                        line: `${cls.places - cls.booked} places left`,
+                        caption: "Bake your own loaf with us this Saturday.",
+                        reply: "Booked two places.",
+                        path: "/book",
+                        photo: "class",
+                    },
+                    {
+                        label: "An offer",
+                        kind: "Offer",
+                        title: RYE_MONDAY.offer.name,
+                        sub: RYE_MONDAY.offer.line,
+                        line: RYE_MONDAY.offer.big,
+                        caption: `${RYE_MONDAY.offer.big} on our weekend bakes, till Sunday.`,
+                        reply: "Perfect timing.",
+                        path: "/shop",
+                        photo: "brownies",
+                    },
+                    {
+                        label: "A blog post",
+                        kind: "Blog",
+                        title: RYE_MONDAY.blogPost.title,
+                        sub: "From the blog",
+                        line: "Read it on our site",
+                        caption: "The slow way, and why it tastes better.",
+                        reply: "Loved reading this.",
+                        path: `/blog/${RYE_MONDAY.blogPost.slug}`,
+                        photo: "loaf",
+                    },
+                ],
+            },
         },
         inTheApp: {
             /** On a phone, the steps and what follows fold behind this. */

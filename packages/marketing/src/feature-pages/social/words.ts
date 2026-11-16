@@ -4,6 +4,7 @@
  * saroh.in's builder's type with every word widened to `string`, so
  * saroh.tech's Global words fill the same shape.
  */
+import type { ShareEverywhereWords } from "../../kit/share-everywhere";
 import type { SiteLook } from "../../kit/site-drawing";
 
 export interface CardWordsSet {
@@ -367,6 +368,8 @@ export interface SocialWords {
     close: {
         title: string;
         note: string;
+        /** The band's picture: one post, everywhere (#46 "U"). */
+        share: ShareEverywhereWords;
     };
     inTheApp: {
         of: string;
