@@ -179,8 +179,10 @@ function DateSheetBody({
                     <ChevronRight aria-hidden className="size-4" />
                 </button>
             </div>
+            {/* Days that go somewhere when pressed, as the month's below:
+                not a choice the arrows would move (each move would leave). */}
             <div
-                role="radiogroup"
+                role="group"
                 aria-label="Pick a day"
                 className="mt-0.5 grid grid-cols-7 gap-0.5"
             >
@@ -188,8 +190,7 @@ function DateSheetBody({
                     <button
                         key={c.date}
                         type="button"
-                        role="radio"
-                        aria-checked={isPicked(c)}
+                        aria-current={isPicked(c) ? "date" : undefined}
                         aria-label={c.label}
                         onClick={() => onPick(c.date)}
                         className="flex cursor-pointer flex-col items-center justify-center gap-0.5 rounded-[10px] py-1.5 text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-[759px]:h-[60px] max-[759px]:rounded-[12px] max-[759px]:py-0"

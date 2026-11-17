@@ -3,7 +3,7 @@
 import { useId } from "react";
 
 import { LimitNoticeBlock } from "@/components/billing/limit-notice";
-import { Chip, Eyebrow } from "@/components/bookings/calendar/parts";
+import { Eyebrow } from "@/components/bookings/calendar/parts";
 import type { PlanLock } from "@/lib/billing/access";
 import { depositLock } from "@/lib/billing/access";
 import type { OnlineProblem } from "@/lib/services/online-booking";
@@ -15,6 +15,7 @@ import type { BookingPayment } from "@/lib/staff/types";
 import { PlanWay } from "@/components/billing/plan-way";
 import { HELP } from "@/components/services/service-editor/fields";
 import { isPlanHref } from "@/lib/billing/plan-access";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Notice } from "@saroh/ui/notice";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -95,25 +96,18 @@ export function DepositField({
             <Eyebrow id={label} className="mt-3">
                 At booking, they pay
             </Eyebrow>
-            <div
-                role="radiogroup"
-                aria-labelledby={label}
-                className="flex flex-wrap gap-1.5"
-            >
-                {DEPOSITS.map(([value, text]) => (
-                    <Chip
-                        key={value}
-                        on={deposit === value}
-                        // Locked: off, or the deposit it already has.
-                        disabled={
-                            lock !== null && value !== "NONE" && value !== saved
-                        }
-                        onClick={() => onChange(value)}
-                    >
-                        {text}
-                    </Chip>
-                ))}
-            </div>
+            <ChipGroup
+                labelledBy={label}
+                value={deposit}
+                onChange={onChange}
+                choices={DEPOSITS.map(([value, text]) => ({
+                    value,
+                    label: text,
+                    // Locked: off, or the deposit it already has.
+                    disabled:
+                        lock !== null && value !== "NONE" && value !== saved,
+                }))}
+            />
             {note === null ? null : <p className={HELP}>{note}</p>}
             {lock ? (
                 <LimitNoticeBlock

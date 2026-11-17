@@ -14,6 +14,7 @@
         "check:docs-links": "node scripts/check-docs-links.mjs",
         "check:native-selects": "node scripts/check-native-selects.mjs",
         "check:overlays": "node scripts/check-overlays.mjs",
+        "check:choices": "node scripts/check-choices.mjs",
         "check:db-teardown": "node scripts/check-db-teardown.mjs",
         "check:cycles": "madge --circular --extensions ts,tsx --exclude 'node_modules|\\.next|dist|\\.turbo' apps packages",
         "check:icon-button-tips": "node scripts/check-icon-button-tips.mjs",

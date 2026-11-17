@@ -1,5 +1,6 @@
 "use client";
 
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field, FieldError } from "@saroh/ui/field";
 import { cn } from "@saroh/ui/lib/utils";
 import { MoneyInput } from "@saroh/ui/money-input";
@@ -14,7 +15,6 @@ import {
     Section,
 } from "@/components/services/service-editor/fields";
 import { GstFields } from "@/components/services/service-editor/gst-fields";
-import { Chip } from "@/components/shared/lists/chip";
 import type { GstAsk } from "@/lib/gst/item-words";
 import { NOT_ASKED } from "@/lib/gst/item-words";
 import { rateBps } from "@/lib/gst/price-mode";
@@ -33,8 +33,6 @@ import {
     renewalAmountChanges,
     renewalChangeLines,
 } from "@/lib/subscriptions/renewal-change";
-
-export const CHIP = "";
 
 /**
  * Under the price of a plan that has been published (UX audit, 12 Oct
@@ -196,22 +194,15 @@ export function PriceSection({
                 Charged
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <div
-                    role="radiogroup"
-                    aria-labelledby={ids.every}
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {shown.map((k) => (
-                        <Chip
-                            key={k}
-                            on={values.interval === k}
-                            className={CHIP}
-                            onClick={() => set({ interval: k })}
-                        >
-                            {INTERVAL_LABEL[k]}
-                        </Chip>
-                    ))}
-                </div>
+                <ChipGroup
+                    labelledBy={ids.every}
+                    value={values.interval}
+                    onChange={(k) => set({ interval: k })}
+                    choices={shown.map((k) => ({
+                        value: k,
+                        label: INTERVAL_LABEL[k],
+                    }))}
+                />
                 {/* Not one of the choices: it shows two more of them (week
                     and quarter), so it is a link beside the group and not a
                     chip in it. A dashed, grey chip read as a choice that

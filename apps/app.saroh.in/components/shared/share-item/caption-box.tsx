@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
-import { Chip } from "@saroh/ui/chip";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
 import { showUndo } from "@saroh/ui/toast";
@@ -79,17 +79,15 @@ export function CaptionBox({
                     </Button>
                 ) : null}
             </div>
-            <div
-                role="radiogroup"
-                aria-labelledby={`${id}-label`}
-                className="flex flex-wrap gap-1.5"
-            >
-                {kinds.map((k) => (
-                    <Chip key={k} on={kind === k} onClick={() => pick(k)}>
-                        {CAPTION_NAMES[k]}
-                    </Chip>
-                ))}
-            </div>
+            <ChipGroup
+                labelledBy={`${id}-label`}
+                value={kind}
+                onChange={pick}
+                choices={kinds.map((k) => ({
+                    value: k,
+                    label: CAPTION_NAMES[k],
+                }))}
+            />
             <div className="rounded-[10px] border border-input bg-card px-3 py-2.5 focus-within:ring-2 focus-within:ring-ring">
                 <Textarea
                     aria-labelledby={`${id}-label`}

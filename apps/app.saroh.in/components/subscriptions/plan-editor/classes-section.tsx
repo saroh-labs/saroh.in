@@ -1,16 +1,16 @@
 "use client";
 
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { useId } from "react";
 
 import type { EditorFields } from "@/components/editor-shell/editor-shell";
 import { Section } from "@/components/services/service-editor/fields";
-import { Chip } from "@/components/shared/lists/chip";
 import type { PlanForm } from "@/lib/subscriptions/plan-editor";
 import { CLASS_CHOICES } from "@/lib/subscriptions/plan-editor";
 
-import { CHIP } from "./price-section";
+const OTHER = "other";
 
 /**
  * Classes included (D7): shown only where the business sells classes
@@ -41,33 +41,27 @@ export function ClassesSection({
             >
                 Each billing month. Unused classes don&apos;t carry over.
             </p>
-            <div
-                role="radiogroup"
-                aria-label="Classes included"
-                aria-describedby={ids.note}
-                className="mt-2 flex flex-wrap gap-1.5"
-            >
-                {CLASS_CHOICES.map((n) => (
-                    <Chip
-                        key={n || "unlimited"}
-                        on={!custom && values.classes === n}
-                        className={CHIP}
-                        onClick={() => {
-                            onOther(false);
-                            set({ classes: n });
-                        }}
-                    >
-                        {n || "Unlimited"}
-                    </Chip>
-                ))}
-                <Chip
-                    on={custom}
-                    className={CHIP}
-                    onClick={() => onOther(true)}
-                >
-                    Other…
-                </Chip>
-            </div>
+            <ChipGroup
+                label="Classes included"
+                describedBy={ids.note}
+                className="mt-2"
+                value={custom ? OTHER : values.classes}
+                onChange={(n) => {
+                    if (n === OTHER) {
+                        onOther(true);
+                        return;
+                    }
+                    onOther(false);
+                    set({ classes: n });
+                }}
+                choices={[
+                    ...CLASS_CHOICES.map((n) => ({
+                        value: n,
+                        label: n || "Unlimited",
+                    })),
+                    { value: OTHER, label: "Other…" },
+                ]}
+            />
             {custom ? (
                 <Field label="Classes a month" className="mt-2.5 space-y-[5px]">
                     <Input

@@ -1,12 +1,15 @@
 "use client";
 
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { useId, useRef, useState } from "react";
 
 import { parseWhole, VALIDITY_CHIPS } from "@/lib/class-packs/pack-editor";
 
-import { LABEL, PackChip } from "./parts";
+import { LABEL } from "./parts";
+
+const OTHER = "other";
 
 /**
  * "Use within" (E18): the design's day chips, then "Other…", which reveals
@@ -34,35 +37,29 @@ export function ValidityChips({
             <div data-ph-unmask="" id={ids.label} className={LABEL}>
                 Use within
             </div>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.label}
-                aria-describedby={error && !showField ? ids.error : undefined}
-                className="mt-1.5 flex flex-wrap gap-1.5"
-            >
-                {VALIDITY_CHIPS.map((d) => (
-                    <PackChip
-                        key={d}
-                        on={!other && value === d}
-                        onClick={() => {
-                            setOther(false);
-                            onChange(d);
-                        }}
-                    >
-                        {d} days
-                    </PackChip>
-                ))}
-                <PackChip
-                    on={showField}
-                    onClick={() => {
+            <ChipGroup
+                labelledBy={ids.label}
+                describedBy={error && !showField ? ids.error : undefined}
+                className="mt-1.5"
+                value={showField ? OTHER : String(value)}
+                onChange={(v) => {
+                    if (v === OTHER) {
                         setOther(true);
                         // The field appears on this render; type into it next.
                         requestAnimationFrame(() => fieldRef.current?.focus());
-                    }}
-                >
-                    Other…
-                </PackChip>
-            </div>
+                        return;
+                    }
+                    setOther(false);
+                    onChange(Number(v));
+                }}
+                choices={[
+                    ...VALIDITY_CHIPS.map((d) => ({
+                        value: String(d),
+                        label: `${d} days`,
+                    })),
+                    { value: OTHER, label: "Other…" },
+                ]}
+            />
             {showField ? (
                 <Field label="Number of days" className="mt-2.5 space-y-[5px]">
                     <Input

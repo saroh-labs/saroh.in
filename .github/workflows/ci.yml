@@ -261,6 +261,10 @@ jobs:
             - name: Overlays
               run: pnpm run check:overlays
 
+            # One of several in an app is @saroh/ui's, never a hand-built radio group.
+            - name: Choices
+              run: pnpm run check:choices
+
             # An address written in place is one Next's router follows (null state).
             - name: History state
               run: pnpm run check:history-state

@@ -1,7 +1,7 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { Chip } from "@saroh/ui/chip";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { ListSearch } from "@saroh/ui/list-search";
 import { ListToolbar } from "@saroh/ui/list-toolbar";
 import { Segmented } from "@saroh/ui/segmented";
@@ -104,11 +104,7 @@ export function TeamPeople({
                     />
                 }
                 filters={
-                    <div
-                        role="radiogroup"
-                        aria-label="Works as"
-                        className="flex flex-wrap items-center gap-2"
-                    >
+                    <div className="flex flex-wrap items-center gap-2">
                         {/* Says the chips are by job, so they read apart
                             from the summary's role count. */}
                         <span
@@ -117,18 +113,23 @@ export function TeamPeople({
                         >
                             Works as
                         </span>
-                        {jobChips(counts).map((chip) => (
-                            <Chip
-                                key={chip}
-                                on={filter === chip}
-                                onClick={() => setFilter(chip)}
-                            >
-                                {JOB_FILTER_LABEL[chip]}
-                                <span className="tabular-nums opacity-70">
-                                    {counts[chip]}
-                                </span>
-                            </Chip>
-                        ))}
+                        <ChipGroup
+                            label="Works as"
+                            className="gap-2"
+                            value={filter}
+                            onChange={setFilter}
+                            choices={jobChips(counts).map((chip) => ({
+                                value: chip,
+                                label: (
+                                    <>
+                                        {JOB_FILTER_LABEL[chip]}
+                                        <span className="tabular-nums opacity-70">
+                                            {counts[chip]}
+                                        </span>
+                                    </>
+                                ),
+                            }))}
+                        />
                     </div>
                 }
                 onClear={

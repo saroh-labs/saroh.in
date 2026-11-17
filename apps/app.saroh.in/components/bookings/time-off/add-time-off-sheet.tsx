@@ -1,6 +1,7 @@
 "use client";
 
-import { Chip } from "@saroh/ui/chip";
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -257,28 +258,20 @@ export function AddTimeOffSheet({
             <PanelLabel id={`${id}-when`} className="mb-0 mt-3">
                 When
             </PanelLabel>
-            <div
-                role="radiogroup"
-                aria-labelledby={`${id}-when`}
+            <ChoiceGroup
+                labelledBy={`${id}-when`}
                 className="flex gap-1.5"
-            >
-                {(
-                    [
-                        ["today", "Today"],
-                        ["tomorrow", "Tomorrow"],
-                        ["pick", "Pick dates"],
-                    ] as const
-                ).map(([w, label]) => (
-                    <Chip
-                        key={w}
-                        on={when === w}
-                        onClick={() => quick(w)}
-                        className="h-11 flex-1 justify-center px-2"
-                    >
-                        {label}
-                    </Chip>
-                ))}
-            </div>
+                value={when}
+                onChange={quick}
+                choices={[
+                    { value: "today", label: "Today" },
+                    { value: "tomorrow", label: "Tomorrow" },
+                    { value: "pick", label: "Pick dates" },
+                ]}
+                itemClassName={(on) =>
+                    chipClass(on, "h-11 flex-1 justify-center px-2")
+                }
+            />
             <div className="flex flex-wrap gap-3">
                 <div className="grid min-w-[9.5rem] flex-1 gap-1.5">
                     <Label htmlFor={`${id}-from`}>From</Label>
