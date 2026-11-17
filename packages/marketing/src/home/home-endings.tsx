@@ -82,7 +82,7 @@ export function PlansAndQuestions({
         <Container
             as="section"
             aria-label={`${home.plans.title} ${home.faqTitle}`}
-            className="grid gap-8 pt-8 min-[760px]:gap-11 min-[760px]:pt-[72px] min-[960px]:grid-cols-[minmax(0,470px)_1fr] min-[960px]:gap-24"
+            className="grid gap-8 pb-12 pt-8 min-[760px]:gap-11 min-[760px]:pb-24 min-[760px]:pt-[72px] min-[960px]:grid-cols-[minmax(0,470px)_1fr] min-[960px]:gap-24"
         >
             {/* `#pricing` only once Pricing is open (Gate W): nothing links here before. */}
             <div id={planLine ? "pricing" : undefined} className="scroll-mt-24">
