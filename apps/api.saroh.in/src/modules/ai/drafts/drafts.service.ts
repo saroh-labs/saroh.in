@@ -188,7 +188,7 @@ export class DraftsService {
                     field: "when",
                     label: labelOf("when"),
                     old: null,
-                    new: when(new Date(body.startsAt), service.timezone),
+                    new: when(new Date(body.startsAt), service.timezone, "h12"),
                 },
             ],
             missing: ["customer_id"],

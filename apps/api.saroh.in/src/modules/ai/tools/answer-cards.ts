@@ -158,6 +158,8 @@ export function slotsCard(
         serviceName: d.service_name,
         days: shown,
         ...withMore(more),
+        // find_free_slots stops at a page; say so, so the card never looks whole.
+        ...(d.more ? { later: true } : {}),
     };
 }
 

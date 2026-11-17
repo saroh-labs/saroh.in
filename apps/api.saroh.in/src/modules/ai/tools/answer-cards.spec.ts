@@ -1004,6 +1004,23 @@ describe("every link a card can carry", () => {
 
 describe("free times card (AF 3)", () => {
     const at = (iso: string) => ({ starts_at: iso, when: iso });
+    it("says there are more when the read stopped at its page", () => {
+        const card = answerCard(
+            "find_free_slots",
+            {
+                service_id: "s1",
+                service_name: "Cake tasting",
+                timezone: "Asia/Kolkata",
+                slots: [at("2026-11-17T06:30:00.000Z")],
+                more: true,
+            },
+            new Map(),
+            undefined,
+        );
+        expect(askAiInfoCard.safeParse(card).success).toBe(true);
+        expect(card?.kind === "slots" && card.data.later).toBe(true);
+    });
+
     it("one row a day, first to last start, Book here on the first", () => {
         const card = answerCard(
             "find_free_slots",

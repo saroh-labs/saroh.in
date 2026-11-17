@@ -237,6 +237,8 @@ export const askAiSlotsCard = z.object({
         .max(ASK_AI_CARD_ITEMS),
     /** Days not shown. */
     more: z.number().optional(),
+    /** The read stopped at its first page: there are free starts after the last day. */
+    later: z.boolean().optional(),
 });
 export type AskAiSlotsCard = z.infer<typeof askAiSlotsCard>;
 

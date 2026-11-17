@@ -225,7 +225,7 @@ async function readBooking(
         updatedAt: b.updatedAt.toISOString(),
         fields: {
             service: b.service.name,
-            when: when(b.startAt, b.timezone),
+            when: when(b.startAt, b.timezone, "h12"),
             customer: b.bookerName,
             status: b.status.toLowerCase(),
         },

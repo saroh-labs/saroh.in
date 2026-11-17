@@ -127,6 +127,9 @@ function SlotsCard({
                     {card.serviceName}&apos;s free starts. Your Calendar
                     isn&apos;t marked with them.
                     {card.more ? ` +${card.more} more days.` : ""}
+                    {card.later
+                        ? " There are more after these: ask for a later day."
+                        : ""}
                 </span>
             </div>
         </section>

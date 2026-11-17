@@ -333,7 +333,8 @@ export function DraftCard({
                               )}
                               <span
                                   data-ph-unmask=""
-                                  className="mt-1 block text-[12.5px] font-semibold text-destructive-subtle-foreground"
+                                  // A prompt, not an error: nothing was tried yet.
+                                  className="mt-1 block text-[12.5px] text-muted-foreground"
                               >
                                   {m.field === "customer_id"
                                       ? "Needed to book it"
@@ -345,7 +346,7 @@ export function DraftCard({
             </dl>
             {open && card.missing.length ? (
                 <Notice
-                    tone="warning"
+                    tone="neutral"
                     icon={<Info />}
                     className="mx-3.5 mb-3 px-[11px] py-[9px] text-[13px]"
                 >
