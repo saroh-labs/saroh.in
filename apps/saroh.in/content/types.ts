@@ -37,6 +37,10 @@ export const FAQ_IDS = [
     "gyms-pack-and-membership",
     "clinics-medical-notes",
     "salons-choose-stylist",
+    "card",
+    "money",
+    "domain",
+    "ai-apps",
 ] as const;
 export type FaqId = (typeof FAQ_IDS)[number];
 

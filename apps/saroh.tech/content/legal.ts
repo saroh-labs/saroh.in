@@ -1,4 +1,5 @@
 import { REGISTERED_OFFICE, SUPPORT_EMAIL } from "./contact";
+import { planWords } from "./plan-words";
 
 /**
  * Drafts for a lawyer to read, not in force. The company's facts and its limits
@@ -27,10 +28,118 @@ export interface LegalSection {
 const CUSTOMER_MONEY =
     "Your customers pay you directly. We don't hold or move your customers' money. You record in Saroh that a payment happened.";
 
-const PAID_PLANS =
-    "There's a free plan, and it needs no card. Paid plans aren't on sale on saroh.tech. This page will say how they work before they are.";
+/*
+ * Paid plans (shown once SAROH_BILLING_GLOBAL is on and the API says plans are
+ * on sale). DRAFT for the owner and a lawyer, 16 Nov 2026, not reviewed. Built
+ * from saroh.in's agreed Terms and Refund policy and the owner's billing
+ * decisions: monthly only, cancel to the end of the paid period, no refund of a
+ * part-used period, double charges refunded automatically (DEC-164), billing
+ * details before any charge, 7 days to pay a failed renewal then Free (DEC-210).
+ * To confirm before launch: how a renewal is collected (pay link each month or
+ * card autopay, DEC-211), and the tax wording for sales outside India (CA).
+ */
+const FREE_ONLY_TERMS: readonly LegalSection[] = [
+    {
+        title: "Paying for Saroh",
+        paragraphs: [planWords(false).legal],
+        links: [{ name: "Billing", href: "/legal/billing" }],
+    },
+];
 
-export const TERMS: readonly LegalSection[] = [
+const PAID_TERMS: readonly LegalSection[] = [
+    {
+        title: "Plans and billing",
+        items: [
+            "Free costs nothing and needs no card. Each paid plan's price, limits and extras are shown on saroh.tech/pricing and in the app before you choose.",
+            "Paid plans are billed monthly, in US dollars, by Virashi Softwares LLP. Taxes, where the law requires them, are shown on the invoice.",
+            "Before we charge you, we ask for the name and address to bill. Every charge comes with an invoice by email.",
+            "We give you at least 30 days' notice by email before a price you pay goes up. Until then, you keep paying the price you have.",
+            "When you reach a plan's limit, Saroh warns you first, then offers a bigger plan. It never deletes what you already have.",
+        ],
+        links: [{ name: "Billing", href: "/legal/billing" }],
+    },
+    {
+        title: "Moving to a lower plan",
+        paragraphs: [
+            "If your plan moves to a lower one (you cancel, or a payment isn't made in time), what's over the new plan's limits becomes read-only. People beyond the limit are paused, products and posts beyond the limit are hidden from your site, and extra places stop taking orders and bookings. We email you before it happens. Nothing is deleted, and moving back up restores everything at once.",
+        ],
+    },
+    {
+        title: "Cancelling and refunds",
+        paragraphs: [
+            "You can cancel a paid plan at any time, in the app or by writing to us. You keep it until the end of the month you've paid for, then it moves to Free. A month that's partly used isn't refunded.",
+            "If we charge you twice for the same month, or the wrong amount, because of an error on our side, we refund the difference to the way you paid. A double charge is refunded without you asking. For anything else, write to us within 30 days.",
+        ],
+    },
+    {
+        title: "Fair use",
+        paragraphs: [
+            "Plans with no limit, or with large allowances, are for the normal running of one business. Don't resell Saroh or use it as file hosting. If an account uses far more than a typical business on its plan, or puts Saroh at risk for others, we'll contact you to agree a way forward before limiting anything, unless we need to act at once to keep Saroh running.",
+        ],
+    },
+    {
+        title: "Your website and domain",
+        paragraphs: [
+            "You're responsible for what your website says. A domain you connect stays registered to you. We can take down a page that breaks the law or these terms.",
+        ],
+    },
+];
+
+const PAID_BILLING: readonly LegalSection[] = [
+    {
+        title: "Plans and prices",
+        items: [
+            "Free costs nothing, has no time limit and needs no card.",
+            "Paid plans are priced per month in US dollars. The price is shown on saroh.tech/pricing and in the app before you choose, and on every invoice.",
+            "Taxes, where the law requires them, are shown on the invoice.",
+        ],
+    },
+    {
+        title: "Before the first charge",
+        paragraphs: [
+            "We ask for the name and address to bill, and an email for invoices. They appear on every invoice, and you can change them in the app.",
+        ],
+    },
+    {
+        title: "Paying each month",
+        items: [
+            "You pay by card. Your plan starts when the first payment goes through.",
+            "Each month we charge, or send you a link to pay, on the day your plan renews, and email the invoice.",
+            "If a renewal isn't paid, your plan stays for 7 days and the app shows how to pay. After that it moves to Free, and nothing you've made is deleted.",
+        ],
+    },
+    {
+        title: "Changing plans",
+        paragraphs: [
+            "Moving up starts the bigger plan at once. Moving down, or cancelling, takes effect at the end of the month you've paid for.",
+            "We give you at least 30 days' notice by email before a price you pay goes up.",
+        ],
+    },
+    {
+        title: "Cancelling and refunds",
+        items: [
+            "Cancel at any time, in the app or by writing to us. You keep your plan until the end of the paid month, then it moves to Free.",
+            "A month that's partly used isn't refunded.",
+            "Charged twice for the same month by an error on our side? We refund it automatically to the way you paid, and email you when it's done.",
+            "Charged the wrong amount? Write to us within 30 days and we refund the difference within 7 working days of confirming it.",
+        ],
+    },
+    {
+        title: "Nothing is shipped",
+        paragraphs: [
+            "Saroh is an online service. There are no physical goods and no delivery.",
+        ],
+    },
+    {
+        title: "Questions",
+        paragraphs: [
+            `Write to ${SUPPORT_EMAIL}. We reply within 30 days, and most things are sorted out much sooner.`,
+        ],
+    },
+];
+
+/** Terms, "Paying for Saroh" in the paid-plans switch's wording (`plan-words.ts`). */
+export const termsFor = (on: boolean): readonly LegalSection[] => [
     {
         title: "Who we are",
         paragraphs: [
@@ -67,11 +176,7 @@ export const TERMS: readonly LegalSection[] = [
             "Refunds and disputes with your customers are between you and them.",
         ],
     },
-    {
-        title: "Paying for Saroh",
-        paragraphs: [PAID_PLANS],
-        links: [{ name: "Billing", href: "/legal/billing" }],
-    },
+    ...(on ? PAID_TERMS : FREE_ONLY_TERMS),
     {
         title: "What you can't do",
         items: [
@@ -272,13 +377,18 @@ export const PRIVACY: readonly LegalSection[] = [
     },
 ];
 
-export const BILLING: readonly LegalSection[] = [
+/** Billing, "How paying for Saroh works" in the paid-plans switch's wording. */
+export const billingFor = (on: boolean): readonly LegalSection[] => [
     {
         title: "Your customers' money is never ours",
         paragraphs: [CUSTOMER_MONEY],
     },
-    {
-        title: "How paying for Saroh works",
-        paragraphs: [PAID_PLANS],
-    },
+    ...(on
+        ? PAID_BILLING
+        : [
+              {
+                  title: "How paying for Saroh works",
+                  paragraphs: [planWords(on).legal],
+              },
+          ]),
 ];

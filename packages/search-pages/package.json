@@ -26,6 +26,7 @@
         "./embedded": "./src/embedded.ts",
         "./embed-docs": "./scripts/embed-docs.mjs",
         "./embed-content": "./scripts/embed-content.mjs",
+        "./address-filters": "./src/address-filters.ts",
         "./download": "./src/tools/download.ts",
         "./tool-slot": "./src/tools/tool-slot.tsx",
         "./tools": "./src/tools/every-tool-slot.tsx",

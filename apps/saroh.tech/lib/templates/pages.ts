@@ -546,7 +546,7 @@ function entryOf(p: TemplatePage): TemplateEntry {
         h1: p.h1,
         crumb: own
             ? [
-                  { name: "Templates", path: "/templates" },
+                  { name: "Document templates", path: "/templates" },
                   {
                       name: p.document.name,
                       path: `/templates/${p.document.slug}`,
@@ -555,7 +555,7 @@ function entryOf(p: TemplatePage): TemplateEntry {
               ]
             : [
                   { name: "Home", path: "/" },
-                  { name: "Templates", path: "/templates" },
+                  { name: "Document templates", path: "/templates" },
                   { name: p.document.name },
               ],
         ...(p.reviewed ? {} : { unreviewed: true }),
@@ -565,7 +565,7 @@ function entryOf(p: TemplatePage): TemplateEntry {
 
 const hubCrumb = (name: string) => [
     { name: "Home", path: "/" },
-    { name: "Templates", path: "/templates" },
+    { name: "Document templates", path: "/templates" },
     { name },
 ];
 

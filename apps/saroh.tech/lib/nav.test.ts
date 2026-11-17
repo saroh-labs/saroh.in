@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { ALL_TRADES, HUB_GROUPS } from "@/content/solutions-hub";
 import {
     FEATURES,
     FOOTER_COLUMNS,
@@ -8,6 +9,7 @@ import {
     SOLUTIONS,
     TEMPLATES,
 } from "./nav";
+
 import { sectionOf } from "./nav-section";
 import { PAGES } from "./site-map";
 
@@ -19,9 +21,8 @@ const menuLinks = [
     ...MENUS.solutions,
     ...MENUS.resources,
     ...MENUS.tools,
-    ...MENUS.templates,
     MENUS.allTools,
-    MENUS.allTemplates,
+    ...(MENUS.websiteTemplates ? [MENUS.websiteTemplates] : []),
 ];
 const allLinks = [
     ...menuLinks,
@@ -42,11 +43,33 @@ describe("the nav", () => {
             "website",
             "insights",
         ]);
-        expect(SOLUTIONS.map((s) => s.href.split("/").pop())).toEqual([
-            "shops",
-            "salons",
-            "gyms",
-            "clinics",
+        expect(SOLUTIONS.map((s) => s.href)).toEqual(
+            ALL_TRADES.map((t) => t.href),
+        );
+        for (const lead of ["shops", "salons", "gyms", "clinics"]) {
+            expect(SOLUTIONS.map((s) => s.href)).toContain(
+                `/solutions/${lead}`,
+            );
+        }
+    });
+
+    it("groups every trade in the menu, and the footer's one Solutions column takes each family's first, then the hub", () => {
+        const groups = HUB_GROUPS.map((g) => g.title);
+        expect(new Set(SOLUTIONS.map((s) => s.group))).toEqual(new Set(groups));
+        expect(FOOTER_COLUMNS.map((c) => c.title)).toEqual([
+            "Product",
+            "Also in Saroh",
+            "Solutions",
+            "Tools",
+            // The website templates column, while templates are on (DEC-135).
+            ...(MENUS.websiteTemplates ? ["Templates"] : []),
+            "Resources",
+            "Saroh",
+        ]);
+        const column = FOOTER_COLUMNS.find((c) => c.title === "Solutions");
+        expect(column?.links.map((l) => l.href)).toEqual([
+            ...groups.map((g) => SOLUTIONS.find((s) => s.group === g)?.href),
+            "/solutions",
         ]);
     });
 
@@ -86,7 +109,9 @@ describe("the nav", () => {
     it("marks the section a page is in", () => {
         expect(sectionOf("/features/billing")).toBe("features");
         expect(sectionOf("/solutions/gyms")).toBe("solutions");
-        expect(sectionOf("/templates/invoice/uk")).toBe("templates");
+        // "Templates" is the website templates; document templates are Resources (owner, 16 Nov 2026).
+        expect(sectionOf("/website-templates/gym")).toBe("templates");
+        expect(sectionOf("/templates/invoice/uk")).toBe("resources");
         expect(sectionOf("/tools/vat-calculator")).toBe("tools");
         expect(sectionOf("/help/some-task")).toBe("resources");
         expect(sectionOf("/pricing")).toBe("pricing");

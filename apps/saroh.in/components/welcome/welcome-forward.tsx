@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
 import type { TagConfig } from "@/lib/ga";
 import { readWelcome } from "@/lib/welcome";
 import { forwardWelcome } from "@/lib/welcome-forward";
-import { ring } from "@saroh/marketing/ring";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /**
  * `/welcome`'s one job, done as the page opens (`lib/welcome-forward.ts`):
@@ -36,7 +36,7 @@ export function WelcomeForward({
         <a
             ref={link}
             href={`${accountsUrl}/apps`}
-            className={`cursor-pointer rounded-sm text-foreground underline underline-offset-[3px] hover:text-mk-copy ${ring()} active:text-muted-foreground`}
+            className={textLinkClasses({ tone: "ink" })}
         >
             Continue
         </a>

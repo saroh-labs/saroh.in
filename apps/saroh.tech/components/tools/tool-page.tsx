@@ -1,4 +1,6 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { chipClasses } from "@saroh/marketing/kit/chip";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -30,7 +32,7 @@ export interface ToolContent {
 }
 
 export const H2 =
-    "m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]";
+    "m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]";
 
 /** Every tool's page, in the spec's order: the job first, the app second. */
 export function ToolPage({
@@ -46,7 +48,7 @@ export function ToolPage({
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-3.5 px-mk-gutter pt-4 md:gap-7 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-6 px-mk-gutter pt-8 min-[760px]:gap-8 min-[760px]:pt-10"
         >
             <JsonLd
                 data={[
@@ -57,12 +59,12 @@ export function ToolPage({
             />
             {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
             <div className="flex items-end justify-between gap-10">
-                <div className="flex flex-col gap-2.5">
-                    <PageTitle size="article">{page.h1}</PageTitle>
-                    <p className="m-0 text-base leading-snug text-mk-copy md:text-[19px]">
-                        {content.lede}
-                    </p>
-                </div>
+                <SectionHeading
+                    as="h1"
+                    size="kit-h1"
+                    title={markTitle(page.h1)}
+                    lead={content.lede}
+                />
                 {content.ticks ? (
                     <div className="hidden shrink-0 gap-[18px] text-sm text-mk-copy xl:flex">
                         {content.ticks.map((t) => (
@@ -75,22 +77,22 @@ export function ToolPage({
             {children}
 
             {how ? (
-                <section className="flex flex-col gap-3 pt-7 md:gap-[22px] md:pt-10">
+                <section className="flex flex-col gap-6 pt-12 min-[760px]:gap-10 min-[760px]:pt-[72px]">
                     <h2 className={H2}>{how.title}</h2>
                     <StepList steps={how.steps} />
                 </section>
             ) : null}
 
-            <div className="grid gap-8 pt-6 lg:grid-cols-2 lg:gap-14">
+            <div className="grid gap-12 pt-12 min-[760px]:pt-[72px] lg:grid-cols-2 lg:gap-14">
                 <div className="flex flex-col gap-4">{content.explain}</div>
                 <section className="flex flex-col">
-                    <h2 className={`${H2} mb-3`}>Questions</h2>
+                    <h2 className={`${H2} mb-4`}>Questions</h2>
                     <FaqList items={faqs} />
                 </section>
             </div>
 
-            <section className="flex flex-col gap-[18px] pt-6">
-                <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+            <section className="flex flex-col gap-6 pt-12 min-[760px]:pt-[72px]">
+                <h2 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                     More free tools
                 </h2>
                 <div className="grid gap-2.5 md:grid-cols-2 md:gap-5 xl:grid-cols-4">
@@ -102,7 +104,9 @@ export function ToolPage({
                             className="flex items-center justify-between gap-2.5 rounded-mk-card border border-border bg-card px-4 py-3.5 no-underline transition-colors duration-150 hover:border-border-strong md:rounded-mk-card md:p-5"
                         >
                             <span className="flex flex-col gap-1">
-                                <b className="text-[17px]">{m.title}</b>
+                                <b className="font-display text-mk-kit-h3 font-bold">
+                                    {m.title}
+                                </b>
                                 <span className="text-[15px] text-mk-copy">
                                     {m.line}
                                 </span>
@@ -123,7 +127,7 @@ export function ToolPage({
                                 key={t.href}
                                 prefetch={false}
                                 href={t.href}
-                                className="inline-flex h-11 items-center rounded-full border border-border-strong bg-card px-3 text-sm no-underline md:h-8"
+                                className={chipClasses()}
                             >
                                 {t.name}
                             </Link>
@@ -132,15 +136,13 @@ export function ToolPage({
                 ) : null}
             </section>
 
-            <div className="pt-6 md:pt-12">
-                <CtaBand
-                    title={band.title}
-                    line={band.line}
-                    action="Start free"
-                    href={signupHref("tool", { tool: content.tool })}
-                    from="start-free-band"
-                />
-            </div>
+            <CtaBand
+                title={band.title}
+                line={band.line}
+                action="Start free"
+                href={signupHref("tool", { tool: content.tool })}
+                from="start-free-band"
+            />
         </div>
     );
 }

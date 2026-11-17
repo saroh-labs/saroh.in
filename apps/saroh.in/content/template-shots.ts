@@ -14,17 +14,12 @@
  * (the file is twice that); the alt text is written by the page from the
  * template and page names.
  */
-export interface TemplateShot {
-    /** Under `public/`, e.g. `/templates/gym/home-desktop.webp`. */
-    src: string;
-    width: number;
-    height: number;
-}
+import type {
+    TemplatePageShots,
+    TemplateShot,
+} from "@saroh/marketing/templates/gallery";
 
-export interface TemplatePageShots {
-    desktop?: TemplateShot;
-    phone?: TemplateShot;
-}
+export type { TemplatePageShots, TemplateShot };
 
 export const TEMPLATE_SHOTS: Readonly<
     Partial<

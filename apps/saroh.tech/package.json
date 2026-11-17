@@ -24,6 +24,7 @@
     "dependencies": {
         "@saroh/edition": "workspace:*",
         "@saroh/marketing": "workspace:*",
+        "@saroh/templates": "workspace:*",
         "@saroh/pricing-catalog": "workspace:^",
         "@saroh/site-blocks": "workspace:*",
         "@saroh/ui": "workspace:*",

@@ -3,6 +3,7 @@
  * does, so `ai-activity` has a connection and its changes to show:
  *
  *   pnpm --filter @saroh/e2e shots:connect-claude              # connect
+ *   pnpm --filter @saroh/e2e shots:connect-claude --edition=global  # to Thistlewick Bakery
  *   pnpm --filter @saroh/e2e shots:connect-claude tools        # list tools
  *   pnpm --filter @saroh/e2e shots:connect-claude call <tool> '<json args>'
  *
@@ -20,12 +21,16 @@ import path from "node:path";
 import { chromium, request } from "@playwright/test";
 
 import { urls } from "../playwright.config";
-import { ROLES } from "./shots.config";
+import { BUSINESSES, ROLES } from "./shots.config";
 
 const CLIENT_ID = "https://claude.ai/oauth/mcp-oauth-client-metadata";
 const REDIRECT = "https://claude.ai/api/mcp/auth_callback";
 const TOKEN_FILE = path.join(__dirname, "../.auth/claude-mcp.json");
 const PASSWORD = "demo-password-123";
+/** The business ticked: Rye & Co., or saroh.tech's bakery with `--edition=global`. */
+const BUSINESS = process.argv.includes("--edition=global")
+    ? BUSINESSES.thistlewick.name
+    : BUSINESSES.rye.name;
 
 const api = new URL(urls.API_URL);
 if (!api.hostname.endsWith(".localhost")) {
@@ -73,7 +78,7 @@ async function connect() {
     await page.getByRole("button", { name: "Sign in" }).click();
     await page.waitForURL((u) => !u.pathname.startsWith("/login"));
     await page.goto(authorize);
-    await page.getByRole("checkbox", { name: "Rye & Co." }).click();
+    await page.getByRole("checkbox", { name: BUSINESS }).click();
     await page.getByRole("button", { name: "Continue" }).click();
     // Allowed once already, a sign-in goes straight back without asking.
     const allow = page.getByRole("button", { name: "Allow", exact: true });
@@ -103,7 +108,7 @@ async function connect() {
     fs.writeFileSync(TOKEN_FILE, JSON.stringify({ access_token }), {
         mode: 0o600,
     });
-    console.log("Claude connected to Rye & Co.; token kept in e2e/.auth.");
+    console.log(`Claude connected to ${BUSINESS}; token kept in e2e/.auth.`);
 }
 
 let id = 0;
@@ -135,7 +140,9 @@ async function rpc(method: string, params: unknown) {
 }
 
 async function main() {
-    const [command, tool, args] = process.argv.slice(2);
+    const [command, tool, args] = process.argv
+        .slice(2)
+        .filter((a) => !a.startsWith("--"));
     if (!command) return connect();
     if (command === "tools") {
         const out = (await rpc("tools/list", {})) as {

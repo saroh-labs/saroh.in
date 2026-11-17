@@ -4,6 +4,7 @@ import type {
     AskAiState,
 } from "@saroh/api-contract";
 
+import { PROFILE } from "@/lib/edition";
 import { formatDate } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 
@@ -14,7 +15,11 @@ import { count } from "@/lib/format/plural";
  */
 
 export const DIDNT_USE = "This didn't use a question.";
-export const PLACEHOLDER = "Ask anything, in English or Hinglish";
+/** Hinglish is offered where the edition's captions offer it (India), never on Global. */
+export const HINGLISH = PROFILE.hinglishCaptions;
+export const PLACEHOLDER = HINGLISH
+    ? "Ask anything, in English or Hinglish"
+    : "Ask anything about your business";
 export const FOLLOW_UP = "Ask a follow-up";
 export const PAUSED = "Typed questions are paused";
 
@@ -26,8 +31,9 @@ export const UNAVAILABLE = "Ask AI isn't available right now.";
 export const DAILY_LIMIT =
     "You've reached today's Ask AI limit. It resets tomorrow.";
 export const REPORTED = "Thanks. Saroh will look at it.";
-export const PRIVACY_LINE =
-    "Your question and the business details needed to answer it go to Anthropic, our AI provider, outside India. Ask AI only sees what you can see.";
+/** Where the AI provider sits, said only where it's news: India's data leaves India. */
+export const PROVIDER_WHERE = HINGLISH ? ", outside India" : "";
+export const PRIVACY_LINE = `Your question and the business details needed to answer it go to Anthropic, our AI provider${PROVIDER_WHERE}. Ask AI only sees what you can see.`;
 export const HISTORY_LINE =
     "Only you see these. Each is kept for 90 days, then deleted.";
 

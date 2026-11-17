@@ -25,10 +25,10 @@ import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata, pageTitle, SITE_URL } from "@/lib/seo";
 import { breadcrumbLd, howToLd, techArticleLd } from "@/lib/structured-data";
-import { Arrow } from "@saroh/marketing/arrow";
 import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
-import { PageTitle } from "@saroh/marketing/page-title";
-import { textLinkClasses } from "@saroh/marketing/text-link";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
+import { TextLink, textLinkClasses } from "@saroh/marketing/text-link";
 
 /**
  * One Help article (Resources plan U5, design 2a): the product areas down
@@ -156,11 +156,15 @@ export default async function HelpArticlePage({ params }: Props) {
                         { name: fm.area },
                     ]}
                 />
-                <PageTitle size="article">{fm.title}</PageTitle>
-                <p className="m-0 text-mk-lead text-mk-copy [text-wrap:pretty]">
+                <SectionHeading
+                    as="h1"
+                    size="kit-h1"
+                    title={markTitle(fm.title)}
+                />
+                <p className="m-0 text-mk-kit-lead text-mk-copy [text-wrap:pretty]">
                     {fm.intro}
                 </p>
-                <div className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border pb-1.5 text-mk-note text-muted-foreground">
+                <div className="flex flex-wrap gap-x-5 gap-y-1 border-b border-border pb-3 text-[13px] text-muted-foreground">
                     <span>{fm.readMinutes} min read</span>
                     <span>
                         Updated{" "}
@@ -209,7 +213,7 @@ export default async function HelpArticlePage({ params }: Props) {
                     >
                         <h2
                             id={TROUBLES_ID}
-                            className="m-0 border-b border-border pb-4 font-display text-[22px] font-bold leading-[1.15] tracking-[-0.02em] sm:text-[26px]"
+                            className="m-0 border-b border-border pb-4 font-display text-mk-kit-h3 font-bold"
                         >
                             {TROUBLES_TITLE}
                         </h2>
@@ -218,7 +222,7 @@ export default async function HelpArticlePage({ params }: Props) {
                                 key={t.title}
                                 className="grid gap-1.5 border-b border-border py-4 last:border-b-0"
                             >
-                                <h3 className="m-0 text-mk-faq font-semibold">
+                                <h3 className="m-0 text-[16px] font-semibold">
                                     {t.title}
                                 </h3>
                                 <p className="m-0 text-[17px] leading-[1.6] text-mk-prose [text-wrap:pretty]">
@@ -230,25 +234,26 @@ export default async function HelpArticlePage({ params }: Props) {
                 ) : null}
                 <HelpVote slug={fm.slug} />
                 {next.length > 0 ? (
-                    <nav aria-labelledby="next" className="grid gap-2.5">
+                    <nav
+                        aria-labelledby="next"
+                        className="grid gap-1 pb-[72px]"
+                    >
                         <h2
                             id="next"
-                            className="m-0 font-display text-mk-card-lg font-bold"
+                            className="m-0 font-display text-mk-kit-h3 font-bold"
                         >
                             Next
                         </h2>
                         {next.map((a) => (
-                            <Link
+                            <TextLink
                                 key={a.slug}
                                 href={helpHref(a.slug)}
-                                className={textLinkClasses({
-                                    className:
-                                        "w-fit text-mk-faq font-semibold",
-                                })}
+                                tone="ink"
+                                arrow
+                                className="w-fit"
                             >
                                 {a.title}
-                                <Arrow />
-                            </Link>
+                            </TextLink>
                         ))}
                     </nav>
                 ) : null}

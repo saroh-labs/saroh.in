@@ -140,7 +140,7 @@ function StepPanel({
     return (
         <figure
             aria-label={`Step ${n} in ${path.join(" › ")}`}
-            className="m-0 overflow-hidden rounded-[14px] border border-border bg-card shadow-mk-panel"
+            className="m-0 overflow-hidden rounded-mk-crop border border-border bg-card shadow-mk-panel"
         >
             <div className="flex flex-wrap gap-2 border-b border-muted px-3.5 py-2.5 text-[13px] text-muted-foreground">
                 {path.map((part, i) => (

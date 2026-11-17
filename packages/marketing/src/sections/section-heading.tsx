@@ -15,26 +15,44 @@ import { Eyebrow } from "./eyebrow";
  *   Contact's "Before you write".
  * - `article` — 26px at −0.02em: an H2 inside an article's column (an
  *   integration page's sections and its Questions).
+ * - `kit-h1` — the redesign's page title, 72px on desk and 42px on a phone
+ *   (KIT.md); drawn as the page's `<h1>` with `as="h1"`, one `Mark` in it.
+ * - `kit-h2` — the redesign's section heading, 44px and 30px.
+ *
+ * `align="center"` centres the heading and its lead (a landing hero, a
+ * closing CTA). Its lead is the scene lead at the kit sizes.
  */
 export function SectionHeading({
     eyebrow,
     title,
     lead,
     size = "lg",
+    as: Tag = "h2",
+    align = "start",
     id,
     className,
 }: {
     eyebrow?: ReactNode;
     title: ReactNode;
     lead?: ReactNode;
-    size?: "lg" | "md" | "sm" | "article";
+    size?: "lg" | "md" | "sm" | "article" | "kit-h1" | "kit-h2";
+    as?: "h1" | "h2";
+    align?: "start" | "center";
     id?: string;
     className?: string;
 }) {
+    const kit = size === "kit-h1" || size === "kit-h2";
     return (
-        <div className={cn("grid gap-2", className)}>
+        <div
+            className={cn(
+                "grid",
+                kit ? "gap-5 min-[760px]:gap-6" : "gap-2",
+                align === "center" && "justify-items-center text-center",
+                className,
+            )}
+        >
             {eyebrow ? <Eyebrow>{eyebrow}</Eyebrow> : null}
-            <h2
+            <Tag
                 id={id}
                 className={cn(
                     "m-0 font-display font-bold text-foreground [text-wrap:balance]",
@@ -44,13 +62,22 @@ export function SectionHeading({
                           ? "text-mk-h2-sm"
                           : size === "sm"
                             ? "text-mk-h2-xs"
-                            : "text-mk-h2-article",
+                            : size === "kit-h1"
+                              ? "max-w-[18ch] text-mk-kit-h1"
+                              : size === "kit-h2"
+                                ? "max-w-[22ch] text-mk-kit-h2"
+                                : "text-mk-h2-article",
                 )}
             >
                 {title}
-            </h2>
+            </Tag>
             {lead ? (
-                <p className="m-0 text-mk-body text-mk-copy [text-wrap:pretty]">
+                <p
+                    className={cn(
+                        "m-0 text-mk-copy [text-wrap:pretty]",
+                        kit ? "max-w-[62ch] text-mk-kit-lead" : "text-mk-body",
+                    )}
+                >
                     {lead}
                 </p>
             ) : null}

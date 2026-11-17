@@ -30,6 +30,13 @@ export interface PublicPricing {
      * saroh.tech shows prices only when true (DEC-211).
      */
     offered?: boolean;
+    /**
+     * Whether a business on this edition can take card payments online,
+     * through its own Stripe: `STRIPE_PAYMENTS` on (DEC-208). Absent on
+     * India's. saroh.tech says customers can pay by card online only when
+     * true (owner, 16 Nov 2026, #7).
+     */
+    cardOnline?: boolean;
 }
 
 /** The visitor's view of a snapshot. */

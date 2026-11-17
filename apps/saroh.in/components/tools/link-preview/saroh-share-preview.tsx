@@ -13,25 +13,21 @@ import { CtaLink } from "../../shared/buttons/cta-link";
 export function SarohSharePreview() {
     const s = copy.saroh;
     return (
-        <div className="px-mk-gutter pt-[72px]">
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-center gap-10 rounded-3xl border border-border bg-card px-12 py-10 max-[640px]:px-6 max-[640px]:py-8">
+        <div className="mx-auto max-w-mk-page px-mk-gutter pt-[72px]">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] items-center gap-10 rounded-mk-card border border-border bg-card px-12 py-10 max-[640px]:px-5 max-[640px]:py-8">
                 <div className="grid justify-items-start gap-3.5">
-                    <h2 className="m-0 font-display text-[clamp(30px,5vw,38px)] font-bold leading-[1.02] tracking-[-0.04em] [text-wrap:balance]">
+                    <h2 className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
                         {s.title}
                     </h2>
-                    <p className="m-0 text-[15.5px] leading-[1.6] text-mk-copy">
+                    <p className="m-0 text-[16px] leading-[1.6] text-mk-copy">
                         {s.body}
                     </p>
-                    <CtaLink
-                        src="link-preview"
-                        size="lg"
-                        className="h-[50px] rounded-xl"
-                    />
+                    <CtaLink src="link-preview" size="kit" />
                 </div>
                 <div
                     aria-label={s.path}
                     role="img"
-                    className="grid min-w-0 gap-3 rounded-[14px] border border-border bg-background p-[18px]"
+                    className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3 overflow-hidden rounded-mk-crop border border-border bg-background p-3 sm:p-[18px]"
                 >
                     <span className="text-[12.5px] font-semibold text-muted-foreground">
                         {s.path}

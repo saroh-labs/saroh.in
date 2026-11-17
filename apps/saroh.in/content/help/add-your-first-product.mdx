@@ -10,12 +10,16 @@
 #         location's currency.")
 #   SHELL apps/app.saroh.in/components/commerce/product-editor-v2/editor-shell.tsx
 #         ("Create draft" / "Create and publish"; you stay on the page)
-#   BASIC .../product-editor-v2/basics-section.tsx (Name, Address on the
-#         shop "Made from the name. You can change it after it is created.",
-#         Price, MRP, Category)
+#   BASIC .../product-editor-v2/basics-section.tsx (Name, Path "Made from
+#         the name. You can change it after it is created.", Price, MRP,
+#         Category; the field was "Address on the shop" until it became Path,
+#         re-checked 15 Nov 2026: shot 2 is to be captured again)
 #   PHOTO .../product-editor-v2/photos-section.tsx ("The first is the
 #         cover, on the shop and in lists."; what each photo shows)
-#   VISIB .../product-editor-v2/visibility-section.tsx (Draft, Published)
+#   VISIB .../product-editor-v2/visibility-section.tsx (Draft "Only the team
+#         can see it.", Live "Customers can buy it."; on a saved draft the
+#         section's button says Publish; was "Published" until 15 Nov:
+#         shot 4 is to be captured again)
 #   VARI  .../product-variants/variants-section.tsx ("Add variants", SKU,
 #         Price; "Blank price uses the product's …", "Save variants")
 #   STOCK .../product-editor-v2/stock-section.tsx, lib/products/tracking.ts
@@ -28,9 +32,9 @@ area: Products
 group: Sell products
 order: 10
 intro: "A product is anything you sell: a loaf, a mug, a shampoo. You add it once, and your site, your orders and your invoices all read it from the same place. This takes about two minutes."
-description: "Add a product in Saroh: its name and price, its photos, draft or published, then its sizes and stock. Five steps, with a picture of each screen."
+description: "Add a product in Saroh: its name and price, its photos, draft or live, then its sizes and stock. Five steps, with a picture of each screen."
 readMinutes: 2
-updated: "2026-10-06"
+updated: "2026-11-15"
 publishOn: "2026-10-17"
 steps:
     # NAV, LIST, EMPTY, NEW.
@@ -41,10 +45,10 @@ steps:
       marker: New product
     # BASIC.
     - title: Name and price
-      body: "Give it a name and a price: both are needed before you can create it. Its address on the shop is made from the name, so “Walnut and raisin loaf” becomes /products/walnut-and-raisin-loaf. You can change the address after it's created. Add a category if you'd like it grouped on your site, and an MRP if it sells below the printed price."
+      body: "Give it a name and a price: both are needed before you can create it. Its Path is made from the name, so “Walnut and raisin loaf” becomes /products/walnut-and-raisin-loaf. You can change the path after it's created. Add a category if you'd like it grouped on your site, and an MRP if it sells below the printed price."
       shot: help-add-product-2
-      caption: "Basics for a new loaf at Rye & Co. (demo bakery): the name, its address on the shop, the price."
-      marker: Address on the shop
+      caption: "Basics for a new loaf at Rye & Co. (demo bakery): the name, its path, the price."
+      marker: Path
     # PHOTO. The design's "square photos look best" and "when someone shares
     # the link" are not things the screen says: cut.
     - title: Photos
@@ -54,11 +58,11 @@ steps:
       marker: Cover
     # VISIB, SHELL. The design had "Publish" and "Save it as a draft" as the
     # last step; the create screen asks first and has one button.
-    - title: Draft or published, then create
-      body: "Under Visibility, choose who sees it once it's created: Draft keeps it to your team, Published puts it on the shop straight away. Then press the button at the top right. It says Create draft, or Create and publish, and you stay on the same page."
+    - title: Draft or live, then create
+      body: "Under Visibility, choose who sees it once it's created: Draft keeps it to your team, and Live puts it on sale on your shop straight away. Then press the button at the top right. It says Create draft, or Create and publish, and you stay on the same page."
       shot: help-add-product-4
       caption: "A new loaf at Rye & Co. (demo bakery), Visibility on Draft and Create draft at the top right."
-      tip: "Not ready yet? Leave it as a draft. When you are, set Visibility to Published and press Publish."
+      tip: "Not ready yet? Leave it as a draft. When you are, set Visibility to Live and press Publish."
       marker: Create draft
     # VARI, STOCK. Variants and Stock open only once the product exists, so
     # this comes after creating it, not before as the design had it.

@@ -121,6 +121,14 @@ export function tradesHubLinks(list: PublishList = publishList()) {
         : [];
 }
 
+/**
+ * Where "Solutions" in a trail goes: the /for hub once a trade page is
+ * live, else home (its "#solutions" door went, owner, 16 Nov 2026).
+ */
+export function solutionsHub(list: PublishList = publishList()): string {
+    return liveSearchPages(list).length > 0 ? FOR_HUB.path : "/";
+}
+
 /** The /tools hub: the menus' "Free tools" and every tool's breadcrumb. */
 export const TOOLS_HUB = { name: "Free tools", path: "/tools" } as const;
 
@@ -169,8 +177,8 @@ const SOLUTION_FAMILY: Record<SolutionSlug, string> = {
 /**
  * The desk Solutions menu: once a /for/ page is live, every trade under its
  * family, the solutions first, names only (a trade's name says what it is).
- * Before that, the solutions alone with their lines. The footer and the phone
- * sheet keep the short list (`solutionItems`).
+ * Before that, the solutions alone with their lines. The phone sheet shows
+ * it too; the footer keeps the short list (`solutionItems`).
  */
 export function solutionMenuItems(list: PublishList = publishList()) {
     const trades = liveSearchPages(list);

@@ -86,6 +86,13 @@ const nextConfig = {
     // lives at api.saroh.in).
     reactStrictMode: false,
 
+    // `*.dev.tsx` routes (the kit sheet, /dev/kit) exist only under `next dev`,
+    // as saroh.tech's: a build never has them (DEC-221).
+    pageExtensions:
+        process.env.NODE_ENV === "development"
+            ? ["dev.tsx", "tsx", "ts", "jsx", "js"]
+            : ["tsx", "ts", "jsx", "js"],
+
     /**
      * The pages this build has, read from `app/` as it is built
      * (`routes.config.js`). The Resources list (`content/resources.ts`) shows a

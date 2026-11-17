@@ -1,8 +1,9 @@
-import { buttonClasses } from "@saroh/marketing/button";
-import { CtaBand as Band } from "@saroh/marketing/cta-band";
-import Link from "next/link";
+import { Closing } from "./closing";
 
-/** saroh.in's closing band, inside a page that already has its gutter. */
+/**
+ * A closing inside a page that already has its gutter: the redesign's
+ * ClosingCTA (`Closing`), its line read as the note.
+ */
 export function CtaBand({
     title,
     line,
@@ -18,20 +19,14 @@ export function CtaBand({
     from: string;
 }) {
     return (
-        <Band
+        <Closing
+            id={from}
+            inset
             title={title}
-            body={line}
-            className="max-w-none px-0 pt-0"
-            actions={
-                <Link
-                    prefetch={false}
-                    href={href}
-                    data-cta={from}
-                    className={buttonClasses({ variant: "saffron" })}
-                >
-                    {action}
-                </Link>
-            }
+            href={href}
+            from={from}
+            action={action}
+            note={line}
         />
     );
 }

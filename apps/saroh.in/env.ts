@@ -82,6 +82,13 @@ import { z } from "zod";
  * docs.saroh.in is live), anything else hides them. Unset counts as `on`
  * only under `next dev`. One reader decides: `lib/feature-switches.ts`.
  *
+ * `NEXT_PUBLIC_CLAIM_*` are the claim switches (DEC-221): finer than a
+ * release switch, each lets one claim the product can't back in production
+ * yet be drawn (Saroh Social posting for you, Ask AI reading Stock, a plan
+ * named beside Ask AI…). Same rule: `on` shows it, anything else hides it,
+ * unset is on only under `next dev`, and a claim is off with its feature.
+ * One reader decides: `claimsOff` in `lib/feature-switches.ts`.
+ *
  * `NEXT_PUBLIC_WHATSAPP_CHAT` and `NEXT_PUBLIC_WHATSAPP_NUMBER` (digits
  * with the country code, no `+`) show the floating "Chat with us on
  * WhatsApp" button on the V2 pages (#1188). Both must be set, the switch to
@@ -114,6 +121,17 @@ export const env = createEnv({
         NEXT_PUBLIC_SOCIAL: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_DEVELOPERS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_DOCS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_SOCIAL_POSTING: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_ASK_AI_STOCK: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_ASK_AI_WEBSITE: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_ASK_AI_SOCIAL: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_ASK_AI_PLANS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_AI_APPS_PLANS: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_SITE_SHOP: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES: z.enum(["on", "off"]).optional(),
+        NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_CHAT: z.enum(["on", "off"]).optional(),
         NEXT_PUBLIC_WHATSAPP_NUMBER: z
             .string()
@@ -210,6 +228,27 @@ export const env = createEnv({
         NEXT_PUBLIC_SOCIAL: process.env.NEXT_PUBLIC_SOCIAL,
         NEXT_PUBLIC_DEVELOPERS: process.env.NEXT_PUBLIC_DEVELOPERS,
         NEXT_PUBLIC_DOCS: process.env.NEXT_PUBLIC_DOCS,
+        NEXT_PUBLIC_CLAIM_SOCIAL_POSTING:
+            process.env.NEXT_PUBLIC_CLAIM_SOCIAL_POSTING,
+        NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN:
+            process.env.NEXT_PUBLIC_CLAIM_SHARE_EVERY_PLAN,
+        NEXT_PUBLIC_CLAIM_ASK_AI_STOCK:
+            process.env.NEXT_PUBLIC_CLAIM_ASK_AI_STOCK,
+        NEXT_PUBLIC_CLAIM_ASK_AI_WEBSITE:
+            process.env.NEXT_PUBLIC_CLAIM_ASK_AI_WEBSITE,
+        NEXT_PUBLIC_CLAIM_ASK_AI_SOCIAL:
+            process.env.NEXT_PUBLIC_CLAIM_ASK_AI_SOCIAL,
+        NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES:
+            process.env.NEXT_PUBLIC_CLAIM_ASK_AI_LANGUAGES,
+        NEXT_PUBLIC_CLAIM_ASK_AI_PLANS:
+            process.env.NEXT_PUBLIC_CLAIM_ASK_AI_PLANS,
+        NEXT_PUBLIC_CLAIM_AI_APPS_PLANS:
+            process.env.NEXT_PUBLIC_CLAIM_AI_APPS_PLANS,
+        NEXT_PUBLIC_CLAIM_SITE_SHOP: process.env.NEXT_PUBLIC_CLAIM_SITE_SHOP,
+        NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES:
+            process.env.NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES,
+        NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS:
+            process.env.NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS,
         NEXT_PUBLIC_WHATSAPP_CHAT: process.env.NEXT_PUBLIC_WHATSAPP_CHAT,
         NEXT_PUBLIC_WHATSAPP_NUMBER: process.env.NEXT_PUBLIC_WHATSAPP_NUMBER,
         NEXT_PUBLIC_DEMOS: process.env.NEXT_PUBLIC_DEMOS,

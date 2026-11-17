@@ -23,6 +23,7 @@ export type NavSection =
     | "resources"
     | "tools"
     | "templates"
+    | "developers"
     | null;
 
 /**

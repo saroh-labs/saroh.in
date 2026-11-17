@@ -142,8 +142,17 @@ test.describe("GST pages, guides and downloads", () => {
         page,
     }) => {
         await page.goto(`${WEB}/for`);
-        const links = page.locator('main a[href^="/for/"]');
-        await expect(links).toHaveCount(34);
+        // Each trade once, whatever links it twice (its tile and the phone's A to Z list).
+        const trades = await page
+            .locator('main a[href^="/for/"]')
+            .evaluateAll((as) => [
+                ...new Set(
+                    as.map(
+                        (a) => new URL((a as HTMLAnchorElement).href).pathname,
+                    ),
+                ),
+            ]);
+        expect(trades).toHaveLength(34);
         await page.getByRole("button", { name: /^Learning/ }).click();
         await expect(page).toHaveURL(/\?family=learning/);
         await expect(page.getByText("4 of 34 trades")).toBeVisible();

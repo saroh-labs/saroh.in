@@ -21,11 +21,14 @@ import { faqs, HOME_FAQ, solutionFaq } from "@/content/faq";
 import { featureList, features } from "@/content/features";
 import { GUIDE_CONTENT, guideSteps } from "@/content/guides";
 import { ALL_HELP, HELP_FAQS } from "@/content/help";
-import { CTA_BAND, FREE_PLAN_LINE, home } from "@/content/home";
+import { CTA_BAND, FREE_PLAN_LINE, home, homeWords } from "@/content/home";
 import { AI_APP_CARDS, INTEGRATIONS } from "@/content/integrations";
-import { BILLING, COOKIES, PRIVACY, TERMS } from "@/content/legal";
+import { billingFor, COOKIES, PRIVACY, termsFor } from "@/content/legal";
 import { SAROH_SOCIAL } from "@/content/social";
 import { solutionList, solutions } from "@/content/solutions";
+import { ALL_TRADES } from "@/content/solutions-hub";
+import { TRADES as TEMPLATE_TRADES } from "@/content/templates";
+import { TRADE_PAGES } from "@/content/trades";
 import { pageSchema } from "@/lib/schema";
 
 import { ONE_PERSON } from "../scripts/check-claims.mjs";
@@ -51,8 +54,11 @@ function missingFields(theirs: unknown, ours: unknown, at = ""): string[] {
     );
 }
 
-/** Optional on saroh.in: a site may have no shot or plan note for a line. */
-const OPTIONAL = /\.(openNote|label|shot|alt|hero|heroNote)$/;
+/**
+ * Optional on saroh.in: a site may have no shot or plan note for a line. A
+ * caption keyed by a world business ("rye") is the edition's own world's.
+ */
+const OPTIONAL = /\.(openNote|label|shot|alt|hero|heroNote)$|\.captions\.\w+$/;
 const missing = (theirs: unknown, ours: unknown) =>
     missingFields(theirs, ours).filter((f) => !OPTIONAL.test(f));
 
@@ -74,7 +80,8 @@ describe("saroh.tech has saroh.in's shape", () => {
         for (const s of inSolutions) {
             expect(missing(s, solutions[s.slug]), s.slug).toEqual([]);
         }
-        expect(missing(inHome, home)).toEqual([]);
+        expect(missing(inHome, homeWords(false))).toEqual([]);
+        expect(missing(inHome, homeWords(true))).toEqual([]);
     });
 
     it("every question saroh.in asks, but its GST ones", () => {
@@ -145,6 +152,14 @@ describe("saroh.tech's feature states", () => {
                 /\b(renewals?|memberships?)\b/i,
             );
         }
+        for (const t of TRADE_PAGES) {
+            expect(t.problems.map((p) => p.feature)).not.toContain(
+                "subscriptions",
+            );
+            expect(words(t), t.slug).not.toMatch(
+                /\b(renewals?|memberships?)\b/i,
+            );
+        }
     });
 });
 
@@ -159,6 +174,7 @@ describe("saroh.tech's words", () => {
         HELP: ALL_HELP,
         HELP_FAQS,
         AI_APP_CARDS,
+        TRADE_PAGES,
     };
     const sold = words(all);
 
@@ -180,8 +196,9 @@ describe("saroh.tech's words", () => {
         const banned =
             /\b(GST|GSTIN|UPI|HSN|SAC|Razorpay|Cashfree|bills? of supply|Stripe|PayPal|SMS|pay link|deposits?|autopay|custom domain|your own domain|quotes?|estimates?|client pages?|approvals?|acceptance|any currency|see when|reminders?)\b|₹/i;
         // Home names its two free tools; help has the free reminder writer, and
-        // `currencies` says who uses saroh.in. Nothing else may.
-        const { tools: _tools, ...homeWords } = home;
+        // `currencies` says who uses saroh.in. Home's money band names Stripe,
+        // as saroh.in's names Razorpay (owner, 16 Nov 2026, #11). Nothing else may.
+        const { tools: _tools, money: _money, ...homeWords } = home;
         const { HELP: _help, ...rest } = { ...all, home: homeWords };
         // Features alone says card payments go through your own Stripe (KTD9).
         const stripe = /through your own Stripe/g;
@@ -220,7 +237,7 @@ describe("saroh.tech's words", () => {
     });
 
     it("give saroh.in's company facts, and only saroh.tech's address", () => {
-        const legal = words([TERMS, PRIVACY]);
+        const legal = words([termsFor(false), termsFor(true), PRIVACY]);
         expect(REGISTERED_OFFICE.join(", ")).toBe(officeLine());
         expect(legal).toContain(officeLine());
         expect(legal).toContain(SUPPORT_EMAIL);
@@ -242,9 +259,16 @@ describe("saroh.tech's words", () => {
     });
 
     it("have nothing false left in legal", () => {
-        expect(words([TERMS, PRIVACY, COOKIES, BILLING])).not.toMatch(
-            /\b(Stripe|PayPal|merchant of record)\b|\bquotes,/i,
-        );
+        expect(
+            words([
+                termsFor(false),
+                termsFor(true),
+                PRIVACY,
+                COOKIES,
+                billingFor(false),
+                billingFor(true),
+            ]),
+        ).not.toMatch(/\b(Stripe|PayPal|merchant of record)\b|\bquotes,/i);
     });
 
     it("say your place and your online shop: a Free business has one place customers visit", () => {
@@ -268,7 +292,13 @@ describe("saroh.tech's words", () => {
     });
 
     it("name no paid plan while Global is Free only (plan 2026-11-13-002, U16)", () => {
-        expect(words({ ...all, INTEGRATIONS })).not.toMatch(
+        // Own domains are named as coming with paid plans (owner, 16 Nov 2026,
+        // #21), and so are API keys, teams and reviewers (#41, #43).
+        const domains =
+            /A domain you own comes with paid plans(, which open soon)?|a domain you own once paid plans open|Then, with paid plans|API keys come with paid plans|Teams come with paid plans|Sending them to a reviewer comes with paid plans/g;
+        expect(
+            words({ ...all, INTEGRATIONS }).replace(domains, ""),
+        ).not.toMatch(
             /\bpaid plans?\b|\bupgrade\b|\b(Grow|Pro)( and Pro)? plans?\b|comes with (Grow|Pro)/i,
         );
     });
@@ -305,10 +335,24 @@ describe("saroh.tech's words", () => {
             }
         }
         for (const id of HOME_FAQ) expect(faqs[id], id).toBeTruthy();
+        const trades = new Set(ALL_TRADES.map((t) => t.slug));
+        const templates = new Set<string>(TEMPLATE_TRADES.map((t) => t.slug));
+        for (const t of TRADE_PAGES) {
+            for (const p of t.problems) {
+                expect(
+                    features[p.feature],
+                    `${t.slug}: ${p.feature}`,
+                ).toBeTruthy();
+                expect(p.feature, t.slug).not.toBe("subscriptions");
+            }
+            for (const r of t.related) expect(trades.has(r), r).toBe(true);
+            if (t.templates)
+                expect(templates.has(t.templates), t.slug).toBe(true);
+        }
     });
 
     it("say to search what saroh.in's pages say, within the limits", () => {
-        for (const p of [...featureList, ...solutionList]) {
+        for (const p of [...featureList, ...solutionList, ...TRADE_PAGES]) {
             expect(p.seoTitle.length, p.slug).toBeLessThanOrEqual(52);
             expect(p.seoDescription.length, p.slug).toBeLessThanOrEqual(150);
             expect(p.sub.toLowerCase(), p.slug).toContain(p.phrase);
@@ -319,6 +363,56 @@ describe("saroh.tech's words", () => {
         expect(`${home.seoTitle} | Saroh`.length).toBeLessThanOrEqual(60);
         expect(home.seoDescription.length).toBeLessThanOrEqual(155);
         expect(home.eyebrow.toLowerCase()).toContain(home.phrase);
+    });
+});
+
+describe("the other trades' pages (owner, 16 Nov 2026)", () => {
+    const all = [...solutionList, ...TRADE_PAGES];
+    const unique = (list: string[]) =>
+        list.filter((x, i) => list.indexOf(x) !== i);
+
+    it("each is its own page, not a name swapped into one template", () => {
+        expect(unique(all.map((p) => p.sub))).toEqual([]);
+        expect(unique(all.map((p) => p.headline))).toEqual([]);
+        expect(unique(all.map((p) => p.seoTitle))).toEqual([]);
+        expect(unique(all.map((p) => p.seoDescription))).toEqual([]);
+        expect(unique(all.map((p) => p.closer))).toEqual([]);
+        expect(unique(TRADE_PAGES.map((t) => t.moment))).toEqual([]);
+        // Every problem is told in its own trade's words.
+        expect(
+            unique([
+                ...solutionList.flatMap((s) => s.segments.map((g) => g.pain)),
+                ...TRADE_PAGES.flatMap((t) => t.problems.map((p) => p.pain)),
+            ]),
+        ).toEqual([]);
+        expect(
+            unique(TRADE_PAGES.flatMap((t) => t.faq.map((f) => f.q + f.a))),
+        ).toEqual([]);
+    });
+
+    it("leave out the India-only trades", () => {
+        const slugs = ALL_TRADES.map((t) => t.slug).join(" ");
+        expect(slugs).not.toMatch(
+            /mehendi|ayurveda|homeopathy|coaching|cloud-kitchen|pathology/,
+        );
+    });
+
+    it("are held back until the owner reads them", () => {
+        for (const t of TRADE_PAGES) {
+            const page = pageAt(`/solutions/${t.slug}`);
+            expect(page?.unreviewed, t.slug).toBe(true);
+            expect(page?.h1, t.slug).toBe(t.headline);
+        }
+    });
+
+    it("draw no rupee bill icon, and every Home has something that needs you", () => {
+        for (const t of TRADE_PAGES) {
+            expect(t.home.needs.length, t.slug).toBeGreaterThan(0);
+            expect(
+                t.home.needs.map((n) => n.icon),
+                t.slug,
+            ).not.toContain("bill");
+        }
     });
 });
 

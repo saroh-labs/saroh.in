@@ -24,6 +24,21 @@ export interface Crumb {
 }
 
 /**
+ * A title with the site mark (saroh.in's KIT.md) under its last word, for
+ * the pages drawn in the redesign's kit (`.sp-kit`): the content pages and
+ * the tools. The mark runs to the end, so the heading's name reads whole.
+ */
+export function Marked({ text }: { text: string }) {
+    const at = text.trimEnd().lastIndexOf(" ") + 1;
+    return (
+        <>
+            {text.slice(0, at)}
+            <span className="sp-mark">{text.slice(at)}</span>
+        </>
+    );
+}
+
+/**
  * The trail above a page's title, "/" between. The last crumb is the page
  * itself, `aria-current`; `brand` draws it amber 600, as saroh.in's
  * solution heroes do.

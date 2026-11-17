@@ -16,6 +16,10 @@ import { searchPages } from "./lib/search-pages";
  */
 const env = vi.hoisted((): Record<string, string | undefined> => ({}));
 vi.mock("@/env", () => ({ env }));
+// The trade page loads a merchant's own fonts for its drawings.
+vi.mock("next/font/local", () => ({
+    default: () => ({ variable: "", className: "", style: {} }),
+}));
 vi.mock("next/navigation", () => ({
     usePathname: () => "/",
     notFound: () => {

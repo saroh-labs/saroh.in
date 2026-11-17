@@ -84,7 +84,7 @@ export function NextStepCard({
     }
     return (
         <div className="flex flex-col gap-2.5 rounded-mk-card border border-foreground bg-card px-[22px] py-5">
-            <span className="font-display text-mk-card-lg font-bold [text-wrap:balance]">
+            <span className="font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                 {copy.cardTitle}
             </span>
             <span className="text-[15px] leading-normal text-mk-copy">

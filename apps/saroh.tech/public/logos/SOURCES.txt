@@ -1,0 +1,1 @@
+claude.svg, openai.svg: the official marks from svgl.app, used only to say Saroh works with these apps.

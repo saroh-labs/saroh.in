@@ -1,8 +1,11 @@
 import { ComingList } from "@saroh/marketing/coming-list";
 import { Container } from "@saroh/marketing/container";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
-import { PageTitle } from "@saroh/marketing/page-title";
-import { Pill } from "@saroh/marketing/pill";
+import {
+    IntegrationCardHead,
+    PlannedSection,
+} from "@saroh/marketing/integration-parts";
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
@@ -28,73 +31,55 @@ export default function IntegrationsPage() {
     return (
         <div data-page-type={entry.type}>
             <JsonLd data={pageSchema(entry)} />
-            <Container
-                as="header"
-                className="grid justify-items-center gap-3.5 pt-16 text-center"
-            >
-                <PageTitle size="page">{entry.h1}</PageTitle>
-                <p className="m-0 max-w-[54ch] text-mk-band-body text-mk-copy">
-                    {page.intro}
-                </p>
-            </Container>
+            <PageHero
+                title={entry.h1}
+                lead={page.intro}
+                className="pb-0 min-[760px]:pb-0"
+            />
 
-            <Container className="pt-12">
+            <Container className="pt-10">
                 <h2 className="sr-only">Available now</h2>
-                <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(min(100%,260px),1fr))] gap-[18px] p-0">
+                <SwipeRow label="Available now">
                     {live.map((item) => (
-                        <li
+                        <div
                             key={item.name}
-                            className="grid content-start gap-3.5 rounded-mk-card border border-border bg-card p-[22px] text-foreground"
+                            className="grid h-full content-start gap-3.5 rounded-mk-card border border-border bg-card p-[22px] text-foreground"
                         >
-                            <span className="flex items-start gap-3">
-                                <span className="grid">
-                                    <span className="text-[17px] font-semibold">
-                                        {item.name}
-                                    </span>
-                                    <span className="text-[13px] text-muted-foreground">
-                                        {item.category}
-                                    </span>
-                                </span>
-                                <Pill tone="ok" className="ml-auto">
-                                    {page.available}
-                                </Pill>
-                            </span>
-                            <span className="text-[14.5px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
+                            <IntegrationCardHead
+                                name={item.name}
+                                kind={item.category}
+                                available={page.available}
+                            />
+                            <span className="text-[15px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
                                 {item.line}
                             </span>
-                            <span className="rounded-[10px] border border-mk-line-soft bg-background px-3 py-2.5 text-[13px] text-muted-foreground">
+                            <span className="rounded-mk-crop border border-mk-line-soft bg-background px-3 py-2.5 text-[13px] text-muted-foreground">
                                 {item.where}
                             </span>
-                        </li>
+                        </div>
                     ))}
-                </ul>
+                </SwipeRow>
             </Container>
 
-            <Container
-                as="section"
-                aria-labelledby="planned"
+            <PlannedSection
                 id="planned-list"
-                className="grid gap-1 pt-[72px]"
+                title={page.plannedTitle}
+                intro={page.plannedIntro}
             >
-                <Eyebrow as="h2" id="planned" tone="muted" className="m-0 pb-1">
-                    {page.plannedTitle}
-                </Eyebrow>
-                <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
-                    {page.plannedIntro}
-                </p>
                 <ComingList
                     groups={page.planned}
                     idPrefix="planned"
                     mark={page.notYet}
                 />
-            </Container>
+            </PlannedSection>
 
-            <Container className="pt-14">
-                <p className="m-0 border-t border-border pt-[22px] text-[15px] leading-[1.6] text-mk-copy">
+            <Container className="pb-[72px] pt-14 min-[760px]:pb-[120px]">
+                <p className="m-0 border-t border-border pt-6 text-[16px] leading-[1.6] text-mk-copy">
                     {page.ask.before}{" "}
                     <Link
+                        prefetch={false}
                         href="/contact"
-                        className={textLinkClasses({ className: "underline" })}
+                        className={textLinkClasses({ tone: "prose" })}
                     >
                         {page.ask.link}
                     </Link>

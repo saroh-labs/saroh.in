@@ -87,6 +87,7 @@ the right-hand files **before** writing code.
 | Turn a feature on in production, or add a page that waits for a feature's switch                           | `docs/architecture/runbooks/FEATURE_RELEASE.md`                                                |
 | Respond to an outage, roll back a release                                                                  | `docs/architecture/runbooks/DEPLOY_ROLLBACK_INCIDENT.md`                                       |
 | Start work, create a branch, push, open a PR or release                                                    | `docs/patterns/devops-tooling-and-deploy.md` → Branches, batches and pull requests             |
+| Ship a production release, or add or change a screenshot on saroh.in or saroh.tech                         | `docs/patterns/devops-tooling-and-deploy.md` → Marketing screenshots are taken fresh           |
 
 ## Before you finish
 

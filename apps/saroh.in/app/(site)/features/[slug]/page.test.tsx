@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { shownFeatures } from "@saroh/marketing/feature-switches";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { featureList, features } from "@/content/features";
@@ -57,7 +58,8 @@ describe("/features/[slug]", () => {
         expect(
             screen.getByRole("heading", {
                 level: 1,
-                name: "Invoices you don't have to write.",
+                // jsdom spaces out the Saffron mark's span; a browser doesn't.
+                name: /^Invoices you don't have to write ?\.$/,
             }),
         ).toBeTruthy();
         const how = screen
@@ -86,7 +88,8 @@ describe("/features/[slug]", () => {
             const hrefs = Array.from(container.querySelectorAll("a"))
                 .map((a) => a.getAttribute("href") ?? "")
                 .filter((h) => /^\/(features|solutions)\//.test(h));
-            expect(hrefs.length).toBeGreaterThan(0);
+            // No "Used by" or "Works with" chips any more (BUGS #37-#39): a page
+            // may link no other feature or trade, but never a missing one.
             for (const h of hrefs) expect(known).toContain(h);
             expect(hrefs).not.toContain(`/features/${slug}`);
             unmount();
@@ -152,35 +155,28 @@ describe("/features/[slug]", () => {
             expect(document.querySelector('a[href="/templates"]')).toBeNull();
         });
 
-        it("sits between How it works and What it does when on, linking to /templates", async () => {
+        it("folds its words under the looks when on, linking to /templates", async () => {
             env.NEXT_PUBLIC_TEMPLATES = "on";
-            render(await FeaturePage(params("website")));
-            const s = found(section());
-            const how = found(
-                screen
-                    .getByRole("heading", { name: features.website.howTitle })
-                    .closest("section"),
+            const { container } = render(await FeaturePage(params("website")));
+            const words = found(features.website.templates);
+            // The redesign (FWDesk) folds the section into the looks: its
+            // title is the fold's label, its lead and points inside it.
+            const fold = found(
+                Array.from(container.querySelectorAll("details")).find((d) =>
+                    d
+                        .querySelector("summary")
+                        ?.textContent.includes(words.title),
+                ),
             );
-            const what = found(
-                screen
-                    .getByRole("heading", { name: "What it does" })
-                    .closest("section"),
+            expect(fold.textContent).toContain(words.lead);
+            expect(fold.querySelectorAll("ul > li")).toHaveLength(
+                words.points.length,
             );
-            const after = (a: Node, b: Node) =>
-                Boolean(
-                    a.compareDocumentPosition(b) &
-                    Node.DOCUMENT_POSITION_FOLLOWING,
-                );
-            expect(after(how, s)).toBe(true);
-            expect(after(s, what)).toBe(true);
             expect(
-                within(s)
+                within(fold as HTMLElement)
                     .getByRole("link", { name: /See every template/ })
                     .getAttribute("href"),
             ).toBe("/templates");
-            // Three points, and the two drawings say what they are.
-            expect(s.querySelectorAll("ul > li")).toHaveLength(3);
-            expect(s.querySelectorAll("figure figcaption")).toHaveLength(2);
         });
 
         it("draws only gallery templates, and claims no lossless switching", async () => {
@@ -195,17 +191,54 @@ describe("/features/[slug]", () => {
         });
     });
 
-    it("/features/social and /features/ask-ai render every step", async () => {
-        for (const slug of ["social", "ask-ai"] as const) {
-            const { unmount } = render(await FeaturePage(params(slug)));
-            const how = screen
-                .getByRole("heading", { name: features[slug].howTitle })
-                .closest("section");
-            expect(how?.querySelectorAll("ol > li")).toHaveLength(
-                features[slug].steps.length,
-            );
-            unmount();
-        }
+    it("/features/social draws every step's picture in the HTML (Steps A)", async () => {
+        render(await FeaturePage(params("social")));
+        const how = found(
+            screen
+                .getByRole("heading", { name: features.social.howTitle })
+                .closest("section"),
+        );
+        // Four steps, no heading-only card, each picture under its step.
+        expect(how.querySelector("ol")?.children).toHaveLength(4);
+        const pictures = how.querySelectorAll("[data-step-picture]");
+        expect(pictures).toHaveLength(4);
+        for (const p of Array.from(pictures))
+            expect(p.textContent.trim() || p.querySelector("img")).toBeTruthy();
+        // Share's are its captured shots.
+        expect(
+            Array.from(how.querySelectorAll("[data-shot]")).map((el) =>
+                el.getAttribute("data-shot"),
+            ),
+        ).toEqual(features.social.steps.map((st) => st.shot));
+    });
+
+    it("/features/ask-ai's steps hold the whole conversation in the server HTML, then start at step 1 (overdrive, #49)", async () => {
+        // The server HTML: every step's words, one panel, the finished story.
+        const box = document.createElement("div");
+        box.innerHTML = renderToStaticMarkup(
+            await FeaturePage(params("ask-ai")),
+        );
+        const html = found(box.querySelector("#in-the-app"));
+        expect(html.querySelector("ol")?.children).toHaveLength(4);
+        for (const st of features["ask-ai"].steps)
+            expect(html.textContent).toContain(st.title);
+        expect(html.querySelectorAll("[data-step-picture]")).toHaveLength(0);
+        expect(html.querySelectorAll("[data-shot]")).toHaveLength(0);
+        const panel = found(html.querySelector("[data-step-panel]"));
+        expect(panel.getAttribute("role")).toBe("region");
+        // The answer's rows, two of them Ready (and the card's "Then"), the card done.
+        expect(panel.textContent).toContain("ORD-1046");
+        expect(panel.textContent).toContain("Mark as ready for pick-up");
+        expect(panel.textContent.match(/Ready/g)?.length).toBe(3);
+        expect(panel.textContent).toContain("Undo");
+
+        // With script it starts still, at the ready questions.
+        render(await FeaturePage(params("ask-ai")));
+        const live = found(document.querySelector("[data-step-panel]"));
+        expect(live.getAttribute("data-step-panel")).toBe("0");
+        expect(
+            screen.getByRole("button", { name: /Mark today's orders ready/ }),
+        ).toBeTruthy();
     });
 
     describe("/features/ai-apps (board VFAiApps)", () => {
@@ -215,61 +248,35 @@ describe("/features/[slug]", () => {
             });
         });
 
-        it("shows the hero and every step as real shots, Claude's chats included", async () => {
+        it("How it works is one section: Saroh's address with Copy, the steps and each app's guide (variant I)", async () => {
             env.NEXT_PUBLIC_AI_APPS = "on";
-            const { container } = render(await FeaturePage(params("ai-apps")));
-            // Real chats in Claude now, not drawings (owner, 15 Nov 2026).
-            expect(
-                container.querySelectorAll("figure[data-chat]"),
-            ).toHaveLength(0);
-            expect(
-                container.querySelector('[data-shot="ai-hero"]'),
-            ).not.toBeNull();
+            render(await FeaturePage(params("ai-apps")));
             const how = found(
                 screen
                     .getByRole("heading", {
+                        level: 2,
                         name: features["ai-apps"].howTitle,
                     })
                     .closest("section"),
             );
-            expect(how.querySelectorAll("ol > li")).toHaveLength(4);
-            expect(how.querySelectorAll("[data-shot]")).toHaveLength(4);
-        });
-
-        it("lists only the live AI apps under Apps you can use", async () => {
-            env.NEXT_PUBLIC_AI_APPS = "on";
-            const { liveIntegrations, shownIntegrations } =
-                await import("@/content/integrations");
-            render(await FeaturePage(params("ai-apps")));
-            const s = found(
-                screen
-                    .getByRole("heading", {
-                        level: 2,
-                        name: "Apps you can use",
-                    })
-                    .closest("section"),
+            // Shown without https://, copied whole.
+            expect(how.querySelector("code")?.textContent).toBe(
+                "mcp.saroh.in/mcp",
             );
-            const live = shownIntegrations([]).filter(
-                (c) => c.category === "AI apps",
-            );
-            const hrefs = Array.from(s.querySelectorAll("li a")).map((a) =>
-                a.getAttribute("href"),
-            );
-            expect(hrefs).toEqual(live.map((c) => c.href));
-            // A card not walked on dev is never listed.
-            for (const c of liveIntegrations.filter(
-                (x) => x.category === "AI apps" && !x.liveOnDev,
-            )) {
-                expect(hrefs).not.toContain(c.href);
-            }
-            expect(s.textContent).toContain("Gemini CLI");
-        });
-
-        it("other feature pages have no app list", async () => {
-            render(await FeaturePage(params("bookings")));
+            expect(
+                within(how).getByRole("button", { name: "Copy" }),
+            ).toBeTruthy();
+            expect(
+                Array.from(how.querySelectorAll("ol > li h3")).map(
+                    (h) => h.textContent,
+                ),
+            ).toEqual(features["ai-apps"].steps.map((st) => st.title));
+            // No pictures in it now, and no separate app list after it.
+            expect(how.querySelectorAll("[data-step-picture]")).toHaveLength(0);
             expect(
                 screen.queryByRole("heading", { name: "Apps you can use" }),
             ).toBeNull();
+            expect(how.textContent).toContain("Gemini CLI");
         });
     });
 

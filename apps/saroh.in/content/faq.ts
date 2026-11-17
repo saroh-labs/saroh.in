@@ -55,15 +55,41 @@ export const faqs = {
         q: "Can a client choose their stylist?",
         a: "Yes. When more than one person takes a service, your booking page offers Anyone or a named person, and shows only the times that person is free. You choose who takes each service.",
     },
+    // Home's, from the landing board (round 4).
+    card: {
+        q: "Do I need a card to start?",
+        a: "No. You can set up your site and bookings for free, and add a card only when you move to a paid plan.",
+    },
+    money: {
+        q: "Where does my customers' money go?",
+        a: "Into your own Razorpay or Cashfree account. Saroh never holds it.",
+    },
+    domain: {
+        q: "Can I use my own domain?",
+        a: "Yes. Start on yourname.saroh.app and connect your own domain on a paid plan.",
+    },
+    "ai-apps": {
+        q: "Can I run it from Claude or ChatGPT?",
+        a: "Yes. Connect Saroh as an AI app (it uses MCP, an open standard for AI assistants). It works as you, and changes wait for you to publish.",
+    },
 } satisfies Record<FaqId, FaqItem>;
 
 export type { FaqId };
 
-/** Home's questions (`#faq`), in the design's order, without its Hindi one. */
+/**
+ * Home's questions (`#faq`): the landing board's first (a phone shows the
+ * first three, the rest under "All questions"), then the earlier design's,
+ * without its Hindi one. "ai-apps" shows only while AI apps does
+ * (`homeFaq`).
+ */
 export const HOME_FAQ: FaqId[] = [
+    "card",
+    "money",
+    "domain",
     "start-free",
     "gst",
     "pay",
+    "ai-apps",
     "team",
     "medical-notes",
 ];

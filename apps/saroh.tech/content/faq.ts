@@ -15,7 +15,11 @@ export type FaqId =
     | "medical-notes"
     | "currencies"
     | "import"
-    | "export";
+    | "export"
+    | "card"
+    | "money"
+    | "domain"
+    | "ai-apps";
 
 export const faqs = {
     "start-free": {
@@ -28,7 +32,8 @@ export const faqs = {
     },
     pay: {
         q: "How do my customers pay?",
-        a: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh. Customers can also pay by card online, into your own account.",
+        // "by card online" is added only while the API says cardOnline (#7, `faqWithPlans`).
+        a: "You take the money yourself, in cash, by card machine or by bank transfer, and record it in Saroh.",
     },
     team: {
         q: "Can more than one person use it?",
@@ -66,14 +71,40 @@ export const faqs = {
         q: "Can a client book without messaging me?",
         a: "Yes. Your booking page shows your services and only the times you're free, and the client picks one.",
     },
+    // Home's, from the landing board (saroh.in's, in Global's words).
+    card: {
+        q: "Do I need a card to start?",
+        a: "No. Saroh is free to start, and you don't need a card to set up your site and bookings.",
+    },
+    money: {
+        q: "Where does my customers' money go?",
+        a: "Into your own payment account, in your name, or into your hand at the counter. Saroh never holds it.",
+    },
+    domain: {
+        q: "Can I use my own domain?",
+        // The own-domain sentence follows the paid-plans switch (`faqWithPlans`, plan words).
+        a: "Your site lives at yourname.saroh.app from the first day.",
+    },
+    "ai-apps": {
+        q: "Can I run it from Claude or ChatGPT?",
+        a: "Yes. Connect Saroh as an AI app (it uses MCP, an open standard for AI assistants). It works as you, and nothing on your website goes live until you publish it.",
+    },
 } satisfies Record<FaqId, FaqItem>;
 
-/** Home's questions (`#faq`). */
+/**
+ * Home's questions (`#faq`): the landing board's first (a phone shows the
+ * first three, the rest under "All questions"), then the earlier ones.
+ * "ai-apps" shows only while AI apps does.
+ */
 export const HOME_FAQ: FaqId[] = [
+    "card",
+    "money",
+    "domain",
     "start-free",
     "currencies",
     "tax",
     "pay",
+    "ai-apps",
     "team",
     "medical-notes",
     "import",
@@ -85,4 +116,15 @@ export function solutionFaq(own: SolutionFaqId): FaqId[] {
     return ["start-free", own, "tax", "pay", "team"];
 }
 
+/**
+ * The general questions on a page in `trades/`, after its own. No "pay":
+ * card payments online wait on a release switch (STRIPE_PAYMENTS) the code
+ * can't show is on.
+ */
+export const TRADE_FAQ: FaqId[] = ["tax", "team"];
+
 export const faqItems = (ids: FaqId[]): FaqItem[] => ids.map((id) => faqs[id]);
+
+/** The pay answer's last sentence, while card payment online is on (STRIPE_PAYMENTS). */
+export const PAY_CARD_ONLINE =
+    "Customers can also pay by card online, into your own account.";

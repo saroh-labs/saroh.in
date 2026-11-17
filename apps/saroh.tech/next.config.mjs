@@ -16,7 +16,12 @@ export default {
     images: { unoptimized: true },
     poweredByHeader: false,
     pageExtensions: dev ? ["dev.tsx", "tsx", "ts"] : ["tsx", "ts"],
-    transpilePackages: ["@saroh/ui", "@saroh/marketing", "@saroh/site-blocks"],
+    transpilePackages: [
+        "@saroh/ui",
+        "@saroh/marketing",
+        "@saroh/search-pages",
+        "@saroh/site-blocks",
+    ],
     // A tool's sign-up link is built in the browser, and its address follows
     // the deploy (`site.config.ts`). Only ever set on a deploy.
     env: {
