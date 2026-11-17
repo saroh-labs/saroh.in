@@ -3013,3 +3013,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Each plan has its own limits,** set in the pricing catalogue (an AI apps row per plan), never in the repo or in marketing copy (DEC-207 rule: no internal limits on the sites). The marketing says it is on every plan; the plan table shows each plan's row from the catalogue.
     - **Product (to build):** the API reads the AI apps row and enforces it on MCP calls, the way API keys are gated; when a business reaches its plan's limit the app says so and offers a bigger plan, and nothing is cut off mid-change.
 - Consequences: saroh.in's plan line drops "comes with Grow and Pro"; saroh.tech keeps "AI apps is on every plan, Free included". The per-plan numbers and the load test that sets them live in saroh-internal.
+
+## DEC-225 saroh.tech's website templates wait for Global's paid plans
+
+**Status: Accepted — 2026-11-17** · owner
+
+- Context (release #1425, 17 Nov 2026): Global's development deploy turned `NEXT_PUBLIC_TEMPLATES` on for saroh.tech, and the build's claims check (`ONE_PERSON`, DEC-155, DEC-203) stopped on `/website-templates/salon`: the shared gallery's salon sample site has a team of stylists. Global launches Free-only, so nothing on saroh.tech may need a second person. Production already leaves the switch off.
+- Decision (owner chose A of three): **saroh.tech's `/website-templates` stays off, on Global development and production, until Global's paid plans are on sale**, with Ask AI and Developers. Not the alternatives: drawing the salon template without its team section, or letting the gallery past the claims check.
+- Consequences: `scripts/cf-global-dev.mjs` no longer sets `NEXT_PUBLIC_TEMPLATES` for saroh.tech, and `apps/saroh.tech/wrangler.jsonc`'s launch note moves it beside Ask AI and Developers. saroh.in's `/templates` is unchanged (DEC-135).

@@ -20,7 +20,8 @@ test("the site: no public workers.dev address, and the gate's cookie", () => {
     // Global's launch set on, and what waits for paid plans off.
     assert.equal(out.vars.NEXT_PUBLIC_AI_APPS, "on");
     assert.equal(out.vars.NEXT_PUBLIC_SOCIAL, "on");
-    assert.equal(out.vars.NEXT_PUBLIC_TEMPLATES, "on");
+    // The templates wait with Ask AI and Developers (DEC-225).
+    assert.equal(out.vars.NEXT_PUBLIC_TEMPLATES, undefined);
     assert.equal(out.vars.NEXT_PUBLIC_ASK_AI, undefined);
     assert.equal(out.vars.NEXT_PUBLIC_DEVELOPERS, undefined);
 });
