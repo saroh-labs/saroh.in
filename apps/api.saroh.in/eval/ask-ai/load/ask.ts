@@ -195,7 +195,8 @@ export async function main(argv: readonly string[]): Promise<number> {
                         });
                     } else if (event.type === "error") r.error = event.reason;
                     else if (event.type === "done") r.outcome = event.outcome;
-                    else r.error = `refused: ${event.refusal.reason}`;
+                    else if (event.type === "refused")
+                        r.error = `refused: ${event.refusal.reason}`;
                 }
             } catch (error) {
                 r.error = error instanceof Error ? error.name : "error";

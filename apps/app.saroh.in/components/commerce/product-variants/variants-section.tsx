@@ -361,10 +361,8 @@ export function VariantsSection({
             ) : (
                 <>
                     <FieldHelp className="mb-[11px]">
-                        SKU, price and photo can differ for each {opt}
-                        {shownPrice
-                            ? `; a blank price uses ${shownPrice}.`
-                            : "."}
+                        SKU, price and photo can differ for each {opt}.
+                        {shownPrice ? ` A blank price uses ${shownPrice}.` : ""}
                     </FieldHelp>
                     {rows.length === 0 ? (
                         // Nothing listed yet: any option can be chosen.

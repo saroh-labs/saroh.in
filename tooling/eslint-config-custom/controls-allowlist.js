@@ -70,8 +70,6 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/header/calendar-header.tsx": ["button"],
     // button: a calendar cell (the week strip and the month), a step
     "components/bookings/calendar/header/date-sheet.tsx": ["button"],
-    // button: a row that is one button (a person, picked to see theirs)
-    "components/bookings/calendar/header/people-sheet.tsx": ["button"],
     // button: a menu row that is one button (the quick look's More)
     "components/bookings/quick-look/quick-look-more.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button
