@@ -582,7 +582,7 @@ describe("NeedGroups: Finish setting up, said once (HPHomeDesk)", () => {
             ...SETUP,
             rows: [
                 {
-                    ...SETUP.rows[0]!,
+                    ...SETUP.rows[0],
                     title: "Choose where your online shop sells from",
                     link: { label: "Choose", href: "/settings/trade" },
                 },

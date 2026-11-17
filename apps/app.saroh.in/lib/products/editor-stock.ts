@@ -160,7 +160,7 @@ export function elsewhereShelves(
     stock: Pick<ProductStock, "mode" | "sizes"> | null,
     here: string,
 ): PlaceShelf[] {
-    if (!stock || stock.mode !== "product") return [];
+    if (stock?.mode !== "product") return [];
     const shelves = stock.sizes[0]?.shelves ?? [];
     return shelves
         .filter((s) => s.storeId !== here && (s.soldHere || s.onHand > 0))
