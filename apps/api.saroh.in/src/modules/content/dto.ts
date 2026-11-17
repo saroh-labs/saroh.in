@@ -1,3 +1,4 @@
+import { POST_TITLE_MAX } from "@saroh/api-contract";
 import { Transform } from "class-transformer";
 import {
     IsBoolean,
@@ -37,7 +38,9 @@ export class CreatePostDto {
     @Transform(trim)
     @IsString()
     @MinLength(1, { message: "Title is required" })
-    @MaxLength(200)
+    @MaxLength(POST_TITLE_MAX, {
+        message: `Keep the title to ${POST_TITLE_MAX} characters`,
+    })
     title!: string;
 
     @IsOptional()
@@ -88,7 +91,9 @@ export class UpdatePostDto {
     @Transform(trim)
     @IsString()
     @MinLength(1, { message: "Title is required" })
-    @MaxLength(200)
+    @MaxLength(POST_TITLE_MAX, {
+        message: `Keep the title to ${POST_TITLE_MAX} characters`,
+    })
     title!: string;
 
     @Transform(trim)

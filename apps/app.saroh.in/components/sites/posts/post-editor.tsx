@@ -2,6 +2,7 @@
 
 import { EditorLoading } from "@/components/sites/rich-text/editor-loading";
 import { formatDate, formatDateTime } from "@/lib/format/datetime";
+import { POST_TITLE_MAX } from "@saroh/api-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
@@ -169,6 +170,14 @@ export function PostEditor({
      * during render, because a render may be thrown away.
      */
     const latest = useRef({ title, content, slug, excerpt, categoryId, image });
+    // The title grows with its text where `field-sizing` isn't supported.
+    const titleRef = useRef<HTMLTextAreaElement>(null);
+    useEffect(() => {
+        const box = titleRef.current;
+        if (!box) return;
+        box.style.height = "auto";
+        box.style.height = `${box.scrollHeight}px`;
+    }, [title]);
     useEffect(() => {
         latest.current = { title, content, slug, excerpt, categoryId, image };
     }, [title, content, slug, excerpt, categoryId, image]);
@@ -501,13 +510,26 @@ export function PostEditor({
                         {/* The title is the document's own heading, not a
                             labelled field: this is the one place in the
                             product where a form would be the wrong metaphor. */}
-                        <input
+                        {/* A long title wraps onto more lines, as a heading
+                            does; it stays one line of text (Enter adds no
+                            break, and a pasted one becomes a space). */}
+                        <Textarea
+                            ref={titleRef}
+                            rows={1}
+                            maxLength={POST_TITLE_MAX}
                             value={title}
                             readOnly={readOnly}
-                            onChange={(e) => touched(setTitle)(e.target.value)}
+                            onChange={(e) =>
+                                touched(setTitle)(
+                                    e.target.value.replace(/\s*\n+\s*/g, " "),
+                                )
+                            }
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") e.preventDefault();
+                            }}
                             placeholder="Title"
                             aria-label="Post title"
-                            className="w-full border-0 bg-transparent p-0 font-display text-4xl font-bold tracking-tight outline-none placeholder:text-muted-foreground focus-visible:ring-0"
+                            className="block min-h-0 w-full resize-none overflow-hidden rounded-none border-0 bg-transparent p-0 font-display text-4xl font-bold leading-tight tracking-tight outline-none [field-sizing:content] placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 coarse:text-4xl"
                         />
                         {/* Borderless on purpose: the title above is a
                             document heading, not a labelled field, and a boxed

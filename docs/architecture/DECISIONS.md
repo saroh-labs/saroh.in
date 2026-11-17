@@ -3033,3 +3033,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context (release #1425, 17 Nov 2026): Global's development deploy turned `NEXT_PUBLIC_TEMPLATES` on for saroh.tech, and the build's claims check (`ONE_PERSON`, DEC-155, DEC-203) stopped on `/website-templates/salon`: the shared gallery's salon sample site has a team of stylists. Global launches Free-only, so nothing on saroh.tech may need a second person. Production already leaves the switch off.
 - Decision (owner chose A of three): **saroh.tech's `/website-templates` stays off, on Global development and production, until Global's paid plans are on sale**, with Ask AI and Developers. Not the alternatives: drawing the salon template without its team section, or letting the gallery past the claims check.
 - Consequences: `scripts/cf-global-dev.mjs` no longer sets `NEXT_PUBLIC_TEMPLATES` for saroh.tech, and `apps/saroh.tech/wrangler.jsonc`'s launch note moves it beside Ask AI and Developers. saroh.in's `/templates` is unchanged (DEC-135).
+
+## DEC-226 A reviewer can approve a change waiting to go live, as can an admin or the owner
+
+**Status: Accepted — 2026-11-17** · owner · amends DEC-103 · extends DEC-200
+
+- Context (Website redesign boards, 17 Nov 2026): DEC-103 says a teammate's site edits wait for "an owner's or admin's approval", so the boards drew the reviewer leaving Feedback only and sending approval to the owner. The owner: "the reviewer can approve, we should give them the button, the admin, and owner can also approve."
+- Decision: when "Publishing needs approval" is on, **any one of a reviewer, an admin or the owner can approve** a waiting change (a site's changes or one post). The reviewer gets an Approve button in the read-only editor (DEC-200), beside Ask for changes and the Feedback tab. Approving doesn't let a reviewer edit or publish anything else.
+- Consequences: the approval check accepts the reviewer role as well as admin and owner, and the approval record names who approved. Still Pro only (DEC-103). Whether approving changes how a reviewer counts against seats (DEC-105, DEC-155) is checked against the pricing catalogue before building.
