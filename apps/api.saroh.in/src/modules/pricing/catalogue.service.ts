@@ -234,6 +234,9 @@ export class CatalogueService {
                           (await this.flags.isEnabled(
                               FlagKey.SAROH_BILLING_GLOBAL,
                           )),
+                      cardOnline: await this.flags.isEnabled(
+                          FlagKey.STRIPE_PAYMENTS,
+                      ),
                   }),
         };
     }

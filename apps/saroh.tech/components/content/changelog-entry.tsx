@@ -1,3 +1,5 @@
+import { Arrow } from "@saroh/marketing/arrow";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
 import { CtaBand } from "@/components/shared/cta-band";
@@ -15,7 +17,7 @@ export function EntryMeta({ entry }: { entry: ChangelogEntry }) {
                 {formatDate(entry.date)}
             </time>
             <span
-                className={`self-start rounded-full border px-[9px] py-[3px] text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                className={`self-start rounded-full border px-[9px] py-[3px] text-[12px] font-semibold ${
                     entry.tag === "Global"
                         ? "border-foreground bg-foreground text-background"
                         : "border-foreground text-foreground"
@@ -38,9 +40,13 @@ export function EntryBody({ entry }: { entry: ChangelogEntry }) {
                 <Link
                     prefetch={false}
                     href={entry.try.href}
-                    className="inline-flex min-h-11 items-center self-start font-semibold md:min-h-0"
+                    className={textLinkClasses({
+                        tone: "ink",
+                        className: "self-start",
+                    })}
                 >
-                    {entry.try.label} →
+                    {entry.try.label}
+                    <Arrow />
                 </Link>
             ) : null}
         </>
@@ -49,14 +55,12 @@ export function EntryBody({ entry }: { entry: ChangelogEntry }) {
 
 export function ChangelogBand() {
     return (
-        <div className="pt-10 md:pt-16">
-            <CtaBand
-                title="See what's new in Saroh."
-                line="Try what's new on the free plan."
-                action="Start free"
-                href={signupHref("changelog")}
-                from="start-free-band"
-            />
-        </div>
+        <CtaBand
+            title="See what's new in Saroh."
+            line="Try what's new on the free plan."
+            action="Start free"
+            href={signupHref("changelog")}
+            from="start-free-band"
+        />
     );
 }

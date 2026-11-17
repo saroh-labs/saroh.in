@@ -1,4 +1,5 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -37,22 +38,26 @@ export default async function Page({ params }: Props) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-mk-page px-mk-gutter pt-4 md:pt-10"
+            className="mx-auto max-w-mk-page px-mk-gutter pt-8 min-[760px]:pt-10"
         >
             <JsonLd data={[articleSchema(page), ...pageSchema(page)]} />
-            <div className="flex max-w-[860px] flex-col gap-4">
+            <div className="flex max-w-[860px] flex-col gap-5">
                 {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
                 <div className="flex items-center gap-2.5">
                     <EntryMeta entry={entry} />
                 </div>
-                <PageTitle size="article">{page.h1}</PageTitle>
+                <SectionHeading
+                    as="h1"
+                    size="kit-h1"
+                    title={markTitle(page.h1)}
+                />
                 <EntryBody entry={entry} />
                 {entry.sections?.map((s) => (
                     <section
                         key={s.name}
                         className="flex flex-col gap-1.5 pt-2"
                     >
-                        <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                        <h2 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                             {s.name}
                         </h2>
                         <p className="m-0 text-[17px] leading-[1.6] text-mk-copy">

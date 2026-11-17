@@ -30,9 +30,9 @@ export function HelpStep({ step, index }: { step: Step; index: number }) {
         >
             <h2
                 id={stepId(index)}
-                className="m-0 flex items-baseline gap-3.5 font-display text-[22px] font-bold leading-[1.15] tracking-[-0.02em] [text-wrap:balance] sm:text-[26px]"
+                className="m-0 flex items-baseline gap-3.5 font-display text-mk-kit-h3 font-bold [text-wrap:balance]"
             >
-                <span className="font-mono text-[15px] font-normal tracking-normal text-brand-700">
+                <span className="font-mono text-[14px] font-normal tracking-normal text-brand-700">
                     {stepNumber(index)}
                 </span>
                 {step.title}
@@ -67,7 +67,7 @@ function StepShot({ step, shotKey }: { step: Step; shotKey: string }) {
         <figure className="m-0 grid gap-2">
             <div
                 data-shot={shotKey}
-                className="relative overflow-hidden rounded-xl border border-border bg-card shadow-mk-lift"
+                className="relative overflow-hidden rounded-mk-crop border border-border bg-card shadow-mk-lift"
             >
                 {/* Files, never the optimizer (it re-encoded on every
                     request, and in CI one request could hang): the
@@ -82,7 +82,7 @@ function StepShot({ step, shotKey }: { step: Step; shotKey: string }) {
                     <span
                         aria-hidden
                         data-marker
-                        className="pointer-events-none absolute rounded-[10px] border-[3px] border-mk-saffron shadow-[0_0_0_4px_rgba(240,169,43,0.22)]"
+                        className="pointer-events-none absolute rounded-[10px] border-[3px] border-brand-500 shadow-[0_0_0_4px_rgba(217,138,21,0.22)]"
                         style={{
                             left: `${mark.x * 100}%`,
                             top: `${mark.y * 100}%`,
@@ -107,7 +107,7 @@ function AppCards({ apps }: { apps: readonly HelpAppCard[] }) {
                 <div
                     key={app.id}
                     id={app.id}
-                    className="grid scroll-mt-6 gap-2 rounded-xl border border-border bg-card p-4"
+                    className="grid scroll-mt-6 gap-2 rounded-mk-crop border border-border bg-card p-4"
                 >
                     <h3 className="m-0 text-mk-faq font-semibold">
                         {app.name}

@@ -1,5 +1,6 @@
 import { Container } from "@saroh/marketing/container";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 
 import { ReportForm } from "@/components/customers/report-form";
 import { CUSTOMERS } from "@/content/customers";
@@ -18,16 +19,16 @@ export default function CustomersPage() {
             as="article"
             width="article"
             data-page-type={page.type}
-            className="grid gap-5 pt-[72px]"
+            className="grid gap-5 pt-12 min-[760px]:pt-[72px]"
         >
-            <PageTitle size="article">{page.h1}</PageTitle>
+            <SectionHeading as="h1" size="kit-h1" title={markTitle(page.h1)} />
             <div className="grid gap-3.5 text-mk-body text-mk-copy">
                 <p className="m-0 leading-[1.7] [text-wrap:pretty]">
                     {CUSTOMERS.intro}
                 </p>
                 {CUSTOMERS.sections.map((section) => (
                     <section key={section.title} className="contents">
-                        <h2 className="m-0 mt-6 border-t border-border pt-6 font-display text-mk-card-lg font-bold text-foreground">
+                        <h2 className="m-0 mt-6 border-t border-border pt-6 font-display text-mk-kit-h3 font-bold text-foreground">
                             {section.title}
                         </h2>
                         <p className="m-0 leading-[1.7] [text-wrap:pretty]">

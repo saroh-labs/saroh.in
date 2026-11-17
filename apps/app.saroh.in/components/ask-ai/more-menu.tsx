@@ -17,24 +17,40 @@ import Link from "next/link";
 
 import { MARKETING_URL } from "@/lib/help/links";
 
+import { HINGLISH } from "./words";
+
 const SETTINGS_HREF = "/settings/developers/ask-ai";
 const SETTINGS_LINE = "Owner and Admin: switch, usage, who can use it";
 const PRIVACY_HREF = `${MARKETING_URL}/privacy`;
 
+/** Hinglish and Hindi where the edition's captions offer them (India), never on Global. */
 export const LANGUAGES: {
     value: AskAiLanguage;
     name: string;
     line?: string;
-}[] = [
-    {
-        value: "MATCH",
-        name: "Match my question",
-        line: "The default. English in, English out. Hinglish in, Hinglish out.",
-    },
-    { value: "ENGLISH", name: "English" },
-    { value: "HINGLISH", name: "Hinglish", line: "Hindi in English letters" },
-    { value: "HINDI", name: "Hindi", line: "हिन्दी में" },
-];
+}[] = HINGLISH
+    ? [
+          {
+              value: "MATCH",
+              name: "Match my question",
+              line: "The default. English in, English out. Hinglish in, Hinglish out.",
+          },
+          { value: "ENGLISH", name: "English" },
+          {
+              value: "HINGLISH",
+              name: "Hinglish",
+              line: "Hindi in English letters",
+          },
+          { value: "HINDI", name: "Hindi", line: "हिन्दी में" },
+      ]
+    : [
+          {
+              value: "MATCH",
+              name: "Match my question",
+              line: "The default. Answers in the language you ask in.",
+          },
+          { value: "ENGLISH", name: "English" },
+      ];
 
 export const LANGUAGE_FOOT =
     "Just for you. Answers and the “Reading…” line follow it. Saroh's buttons and screens stay as they are.";

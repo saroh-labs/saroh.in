@@ -1,4 +1,6 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
 
 import { ButtonLink } from "@/components/shared/button";
 import { Card } from "@/components/shared/card";
@@ -33,7 +35,8 @@ const STEPS = [
 const RULES = [
     {
         question: "What do you and your friend each get?",
-        answer: "Nothing today. Paid plans aren't on sale on saroh.tech, so there's no reward and no discount. This page will say if that changes.",
+        // True whether or not paid plans are on sale: the code gives no reward either way (DEC-156).
+        answer: "Nothing today: there's no reward and no discount. This page will say if that changes.",
     },
     {
         question: "Can I see who I've referred?",
@@ -53,23 +56,23 @@ const RULES = [
     },
 ];
 
-const H2 = "m-0 font-display text-mk-h2-sm font-bold [text-wrap:balance]";
+const H2 = "m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]";
 
 export default function ReferralPage() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-10 px-mk-gutter pt-4 md:gap-[72px] md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-12 px-mk-gutter pt-8 min-[760px]:gap-[120px] min-[760px]:pt-10"
         >
             <JsonLd data={[...pageSchema(page), faqSchema(RULES)]} />
             <section className="grid items-center gap-8 xl:grid-cols-[minmax(0,1fr)_520px] xl:gap-16">
-                <div className="flex flex-col items-start gap-5">
-                    <PageTitle size="page">{page.h1}</PageTitle>
-                    <p className="m-0 text-[17px] leading-[1.6] text-mk-copy md:text-xl">
-                        Know someone who runs a small business? Send them the
-                        link from your site. If they set up on Saroh, we note
-                        that you sent them.
-                    </p>
+                <div className="flex flex-col items-start gap-6">
+                    <SectionHeading
+                        as="h1"
+                        size="kit-h1"
+                        title={markTitle(page.h1)}
+                        lead="Know someone who runs a small business? Send them the link from your site. If they set up on Saroh, we note that you sent them."
+                    />
                     <ButtonLink
                         href={signupHref("referral")}
                         data-cta="referral-start-free"
@@ -78,7 +81,7 @@ export default function ReferralPage() {
                     </ButtonLink>
                 </div>
                 <Card className="!gap-3 !border-foreground !p-5 md:!p-7">
-                    <span className="font-display text-mk-card-lg font-bold [text-wrap:balance]">
+                    <span className="font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                         There's no reward today
                     </span>
                     <p className="m-0 text-base leading-[1.6] text-mk-copy">
@@ -88,25 +91,23 @@ export default function ReferralPage() {
                 </Card>
             </section>
 
-            <section className="flex flex-col gap-4 md:gap-6">
+            <section className="flex flex-col gap-6 min-[760px]:gap-10">
                 <h2 className={H2}>How it works</h2>
-                <ol className="m-0 grid list-none gap-3 p-0 md:gap-5 xl:grid-cols-3">
+                <SwipeRow label="How it works">
                     {STEPS.map((s, i) => (
-                        <li key={s.title}>
-                            <Card className="h-full !p-5 md:!p-7">
-                                <span className="font-mono text-sm text-muted-foreground">
-                                    {String(i + 1).padStart(2, "0")}
-                                </span>
-                                <span className="font-display text-mk-card-lg font-bold [text-wrap:balance]">
-                                    {s.title}
-                                </span>
-                                <p className="m-0 text-base leading-[1.6] text-mk-copy">
-                                    {s.line}
-                                </p>
-                            </Card>
-                        </li>
+                        <Card key={s.title} className="h-full !p-5 md:!p-7">
+                            <span className="font-mono text-sm text-muted-foreground">
+                                {String(i + 1).padStart(2, "0")}
+                            </span>
+                            <span className="font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
+                                {s.title}
+                            </span>
+                            <p className="m-0 text-base leading-[1.6] text-mk-copy">
+                                {s.line}
+                            </p>
+                        </Card>
                     ))}
-                </ol>
+                </SwipeRow>
             </section>
 
             <section className="grid gap-3 lg:grid-cols-[420px_minmax(0,1fr)] lg:gap-14">

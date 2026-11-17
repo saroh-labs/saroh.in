@@ -82,6 +82,8 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
     },
     {
         id: "templates",
+        // "Templates" is the website templates on both sites; document templates
+        // are in Resources (owner, 16 Nov 2026).
         name: "Templates",
         line: "Sites made for your kind of business, ready to start from.",
         href: "/templates",

@@ -1,3 +1,4 @@
+import { NEW_FEATURES as SHARED_NEW } from "@saroh/marketing/feature-switches";
 /**
  * The feature pages (nine, plus AI apps, Ask AI and Share behind their
  * switches): eight from the Features template's `F` and `LINE`
@@ -29,7 +30,7 @@ import type { Feature, FeatureSlug } from "./types";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-15";
+export const UPDATED = "2026-11-16";
 
 export const features: Record<FeatureSlug, Feature> = {
     dashboard: {
@@ -206,15 +207,16 @@ export const features: Record<FeatureSlug, Feature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Orders from your site and the counter land together, newest first, with how each one is collected, delivered or visited. Late ones are flagged.",
         hero: {
-            shot: "k-orders",
+            // Rye & Co.'s list, as the scene line above it says (never a clinic under a bakery's line).
+            shot: "s-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
                 body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money. A shop's order prints a ticket for the kitchen.",
-                who: "Kavi Dental (demo clinic)",
-                shot: "d-order",
+                who: "Rye & Co. (demo bakery)",
+                shot: "r-order",
             },
             {
                 title: "Orders that take several visits",
@@ -718,35 +720,30 @@ export const features: Record<FeatureSlug, Feature> = {
             "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
         headline: "Use Saroh from your AI assistant.",
         sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up today's bookings or move one. It can do only what you can do in Saroh, and nothing on your website goes live until someone on your team publishes it.",
-        // The hero and step 3 are real chats in Claude, shot by hand and kept
-        // as supplied shots (owner, 15 Nov 2026), not drawings.
+        // The hero is a real chat in Claude, shot by hand and kept as a
+        // supplied shot (owner, 15 Nov 2026), not a drawing. The page draws
+        // the steps as words under Saroh's address (variant I, 16 Nov); its shot
+        // keys are the Feature shape's, not drawn there.
         hero: { shot: "ai-hero" },
         howTitle: "Connected in a minute. In charge after.",
         steps: [
             {
-                title: "Add Saroh to your AI app",
-                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector. Each app's guide shows where.",
+                title: "Add a connector",
+                body: "In Claude, ChatGPT, Gemini CLI, Copilot Studio, Windsurf, Notion or another app that connects to MCP servers, add Saroh's address as a connector.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "ai-connect",
             },
             {
-                title: "Sign in and pick your businesses",
-                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick one business, several or all of yours, and allow it. One connection covers them all.",
+                title: "Sign in and allow",
+                body: "Saroh shows what the app may and may not do. Tick the businesses it may use: one connection covers them all.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "ai-consent",
             },
             {
-                title: "Ask in your own words",
-                body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in AI activity in Settings, kept for 90 days. When a booking moves, the customer is told. Website changes stay a draft until you publish them in Saroh.",
+                title: "Ask",
+                body: "“Add the Christmas menu.” It drafts, you publish.",
                 who: "Rye & Co. (demo bakery)",
-                // A real chat in Claude (owner, 15 Nov 2026), not a drawing.
                 shot: "ai-ask",
-            },
-            {
-                title: "See everything it did",
-                body: "Settings lists each AI app you connected and every change it made. Put the website draft back as it was before the app's changes, or disconnect it at any time.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "ai-activity",
             },
         ],
         points: [
@@ -775,11 +772,6 @@ export const features: Record<FeatureSlug, Feature> = {
                 body: "Tick the ones it may use. It names the business on every change it makes.",
             },
         ],
-        apps: {
-            title: "Apps you can use",
-            lead: "Saroh connects through MCP, the open standard AI apps use to reach other tools. Each app has a short guide.",
-            also: "Also works with Gemini CLI, Microsoft Copilot Studio, Windsurf and Notion, and other apps that connect to MCP servers with a sign-in. Some apps need one of their own paid plans.",
-        },
         worksLead:
             "Your AI assistant works on the same records as the rest of Saroh, so a change it makes is a change everywhere.",
         worksWith: ["website", "products", "bookings", "orders"],
@@ -809,22 +801,23 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "ask-start",
             },
             {
-                title: "Answers from your own records",
-                body: "It reads your bookings, orders, customers and products, says where each answer came from, and links to that screen. Ask in Hinglish and it answers in Hinglish.",
+                title: "Ask in your own words",
+                body: "Type it the way you'd say it. It reads only your own business. Ask in English, Hinglish or Hindi, and it answers in the language you ask in.",
+                who: "Rye & Co. (demo bakery)",
+                // Drawn on the page, as are the other three (the panel's question).
+                shot: "ask-hero",
+            },
+            {
+                title: "See the rows behind the answer",
+                body: "It reads your bookings, orders, customers and products, shows the rows behind each answer, says which parts of the business it read, and links to that screen.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "ask-answer",
             },
             {
-                title: "Changes come as a card you confirm",
+                title: "Confirm a change, or don't",
                 body: "Ask it to add a service, move a booking or update a customer and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo an edit the same day.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "ask-confirm",
-            },
-            {
-                title: "Go back to an earlier question",
-                body: "History keeps your conversations for 90 days, then deletes them. Only you can see yours.",
-                who: "Rye & Co. (demo bakery)",
-                shot: "ask-history",
             },
         ],
         points: [
@@ -880,7 +873,7 @@ export const features: Record<FeatureSlug, Feature> = {
                 shot: "sh-cards",
             },
             {
-                title: "Post it from your phone",
+                title: "Post it from your phone or computer",
                 body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
                 who: "Rye & Co. (demo bakery)",
                 shot: "sh-phone",
@@ -933,14 +926,10 @@ export const featureList: Feature[] = shownFeatures(featuresOff()).map(
 export const featureHref = (slug: FeatureSlug) => `/features/${slug}`;
 
 /**
- * Tagged "new" in the menus, the footer and Home's grid while their release
- * is fresh (plan 2026-11-13-002, U2); empty this list in a later commit.
+ * Tagged "new" in the menus, the footer and /features while their release
+ * is fresh (plan 2026-11-13-002, U2): the shared list, saroh.tech's too.
  */
-export const NEW_FEATURES: readonly FeatureSlug[] = [
-    "ai-apps",
-    "ask-ai",
-    "social",
-];
+export const NEW_FEATURES = SHARED_NEW as readonly FeatureSlug[];
 
 /** Whether `value` names a feature page, shown or not. */
 export function isFeatureSlug(value: string): value is FeatureSlug {

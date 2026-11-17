@@ -28,6 +28,10 @@ import {
 } from "@/content/help";
 import { UPDATED as HOME_UPDATED } from "@/content/home";
 import {
+    HOW_IT_WORKS,
+    UPDATED as HOW_IT_WORKS_UPDATED,
+} from "@/content/how-it-works";
+import {
     INTEGRATION_SLUGS,
     integrationHref,
     INTEGRATIONS_PATH,
@@ -130,6 +134,8 @@ export function indexedPaths(
     return [
         "/",
         ...(mode === "open" ? ["/pricing", "/pricing.md"] : []),
+        // How it works, and each shown feature (DEC-221).
+        HOW_IT_WORKS.href,
         ...featureList.map((f) => featureHref(f.slug)),
         ...SOLUTION_SLUGS.map(solutionHref).filter(
             (path) =>
@@ -165,6 +171,7 @@ const indiaDayOf = (iso: string) =>
 /** Each page's content module's `UPDATED`: the day its words last changed. */
 const PAGE_DAYS: Readonly<Record<string, string>> = {
     "/": HOME_UPDATED,
+    [HOW_IT_WORKS.href]: HOW_IT_WORKS_UPDATED,
     ...Object.fromEntries(
         featureList.map((f) => [featureHref(f.slug), FEATURES_UPDATED]),
     ),

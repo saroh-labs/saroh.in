@@ -197,15 +197,16 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         headline: "Every order in one list, and none slip.",
         sub: "Order management for a small business. Take orders at the counter and follow each one to done, with its next step on the order. Late ones are flagged.",
         hero: {
-            shot: "k-orders",
+            // The same slot and key as saroh.in: the bakery's own list.
+            shot: "s-orders",
         },
         howTitle: "From placed to picked up.",
         steps: [
             {
                 title: "Open it and see the next step",
                 body: "The order shows what to do next, who it's for, anything to watch for like an allergy, and the money.",
-                who: "Wrenfield Dental (demo clinic)",
-                shot: "d-order",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "r-order",
             },
             {
                 title: "Orders that take several visits",
@@ -215,7 +216,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Make its invoice",
-                body: "Each order makes a numbered invoice with your tax line, ready to send or print.",
+                body: "Each order makes a numbered invoice, ready to send or print. Add your tax line on an invoice you write.",
                 who: "Wrenfield Dental (demo clinic)",
                 shot: "k-invoice",
             },
@@ -389,44 +390,43 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         closer: "Open your calendar to bookings.",
     },
     /*
-     * Not usable yet for a business outside India, so nothing here is sold as
-     * working: the page and its place stay (the plan's Feature state rule), the
-     * hero says so, every part is marked, and no other feature or solution leans
-     * on it. The words name no plan's contents.
+     * Comes with a paid plan, and Global is Free until they're on sale
+     * (DEC-211). Its words say what it does; the page is tagged "On paid
+     * plans" and says it isn't part of Free while they aren't on sale, and
+     * drawn as any other once they are (DEC-222, `plan-words.ts`). No other
+     * feature or solution leans on it. The words name no plan's contents.
      */
     subscriptions: {
         slug: "subscriptions",
         state: "coming-soon",
-        worksToday:
-            "Subscriptions isn't available yet, so you can't start one.",
+        worksToday: "Subscriptions isn't part of Free.",
         phrase: "membership and subscription billing",
         seoTitle: "Membership and subscription billing software",
         seoDescription:
-            "Membership and subscription billing in Saroh is not available yet. Here's what it will do.",
+            "Membership and subscription billing in Saroh: plans that renew on their day, each with its invoice.",
         name: "Subscriptions",
-        navLine: "Plans that renew on their day. Not available yet",
-        cardLine: "Plans that renew on their day. Not available yet.",
-        homeBody:
-            "Not available yet. Plans that renew on their day, each with its invoice.",
-        headline: "Regulars on a plan. Not available yet.",
-        sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions. It isn't available yet, so here's what it will do.",
+        navLine: "Plans that renew on their day",
+        cardLine: "Plans that renew on their day.",
+        homeBody: "Plans that renew on their day, each with its invoice.",
+        headline: "Regulars on a plan.",
+        sub: "Membership and subscription billing for your regulars: memberships, weekly boxes, monthly sessions.",
         hero: {
-            shot: "r-subdetail",
+            shot: "g-subdetail",
         },
-        howTitle: "What it will do.",
+        howTitle: "What it does.",
         steps: [
             {
                 title: "Each plan renews on its day",
                 body: "You sign members up at the desk, and each plan renews on its day.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-subs",
+                who: "Ironvale Fitness (demo gym)",
+                shot: "g-subs",
                 notYet: true,
             },
             {
                 title: "Every renewal makes its invoice",
                 body: "The invoice is made on the renewal day, and your customer pays it by hand.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "s-billing",
+                who: "Ironvale Fitness (demo gym)",
+                shot: "g-billing",
                 notYet: true,
             },
         ],
@@ -443,7 +443,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
         ],
         worksLead:
-            "Subscriptions will invoice through Billing and show on the customer's page.",
+            "Subscriptions invoices through Billing and shows on the customer's page.",
         worksWith: ["billing", "customers", "bookings"],
         usedBy: [],
         closer: "Start with bookings and invoices today.",
@@ -477,7 +477,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Add your tax line",
-                body: "Set your sales tax once and every invoice made from an order carries it.",
+                body: "Set your sales tax once and every invoice you write carries it.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "t-invoice",
             },
@@ -702,8 +702,9 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             "Ask Claude, ChatGPT or another AI app to add a product, move a booking or draft a page.",
         headline: "Use Saroh from your AI assistant.",
         sub: "AI assistant integration for your business. Connect Claude, ChatGPT or another AI assistant, then ask for your Saroh work in your own words: draft a page on your website, add a product, look up an order or move it along. It can do only what you can do in Saroh, and nothing on your website goes live until you publish it.",
-        // The hero and step 3 happen in another company's app: drawn, never
-        // captured (`ChatExchange`). `ai-hero` stays the share card's key.
+        // The hero happens in another company's app: drawn, never captured
+        // (`ChatExchange`). `ai-hero` stays the share card's key. The page
+        // draws the steps as words under Saroh's address (variant I, 16 Nov).
         hero: { shot: "ai-hero" },
         heroChat: {
             caption:
@@ -720,40 +721,22 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         howTitle: "Connected in a minute. In charge after.",
         steps: [
             {
-                title: "Add Saroh to your AI app",
-                body: "In Claude, ChatGPT or another app that connects to MCP servers, add Saroh's address as a connector: https://mcp.saroh.tech/mcp. Each app's help article shows where.",
+                title: "Add a connector",
+                body: "In Claude, ChatGPT, Gemini CLI, Copilot Studio, Windsurf, Notion or another app that connects to MCP servers, add Saroh's address as a connector.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-connect",
             },
             {
-                title: "Sign in and allow it",
-                body: "Saroh asks you to sign in and shows what the app may and may not do. Tick your business and allow it.",
+                title: "Sign in and allow",
+                body: "Saroh shows what the app may and may not do. Tick the businesses it may use: one connection covers them all.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-consent",
             },
             {
-                title: "Ask in your own words",
-                body: "A new booking, a moved one, an order's status or a customer's details change at once, and each change shows in AI activity in Settings, kept for 90 days. Website changes stay a draft until you publish them in Saroh.",
+                title: "Ask",
+                body: "“Add the holiday menu.” It drafts, you publish.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ai-ask",
-                chat: {
-                    caption:
-                        "Drawing of a chat in an AI assistant: the owner of Thistlewick Bakery (demo bakery) marks a customer's order ready for pick-up, and it changes at once",
-                    ask: "Mark Maya Thompson's order ready for pick-up.",
-                    tools: "Saroh · Thistlewick Bakery · list_orders, update_order_status",
-                    reply: "Done. Maya Thompson's order is now Ready, waiting for her to pick it up.",
-                    outcome: "at_once",
-                    result: {
-                        title: "Order for Maya Thompson",
-                        line: "Ready · changed just now",
-                    },
-                },
-            },
-            {
-                title: "See everything it did",
-                body: "Settings lists each AI app you connected and every change it made. Put the website draft back as it was before the app's changes, or disconnect it at any time.",
-                who: "Thistlewick Bakery (demo bakery)",
-                shot: "ai-activity",
             },
         ],
         points: [
@@ -771,18 +754,18 @@ export const features: Record<FeatureSlug, StatedFeature> = {
             },
             {
                 title: "Only what you can do",
-                body: "It acts as you. It can't cancel bookings, give refunds or touch billing, and it never sees sensitive customer details.",
+                // Teams and reviewers are paid-plan facts here (#43), not dropped.
+                body: "It acts as you. It can't cancel bookings, give refunds or touch billing, and it never sees sensitive customer details. Teams come with paid plans: there it keeps to your role and can't change who's in it.",
             },
             {
                 title: "Nothing goes live by itself",
-                body: "You publish website changes in Saroh. The app can't.",
+                body: "You publish website changes in Saroh. The app can't. Sending them to a reviewer comes with paid plans.",
+            },
+            {
+                title: "Several businesses, one connection",
+                body: "Tick the ones it may use. It names the business on every change it makes.",
             },
         ],
-        apps: {
-            title: "Apps you can use",
-            lead: "Saroh connects through MCP, the open standard AI apps use to reach other tools. Each app has a short guide.",
-            also: "Also works with Gemini CLI, Microsoft Copilot Studio, Windsurf and Notion, and other apps that connect to MCP servers with a sign-in. Some apps add connectors only on an account of their own that allows it.",
-        },
         worksLead:
             "Your AI assistant works on the same records as the rest of Saroh, so a change it makes is a change everywhere.",
         worksWith: ["website", "products", "bookings", "orders"],
@@ -807,10 +790,29 @@ export const features: Record<FeatureSlug, StatedFeature> = {
         howTitle: "Ask in your own words.",
         steps: [
             {
-                title: "Answers from your own records",
-                body: "It reads your bookings, orders, customers and products, and says where each answer came from.",
+                title: "Open Ask AI from any screen",
+                body: "The Ask AI button sits at the top of Saroh. Type a question, or tap one of the ready ones to start.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ask-start",
+            },
+            {
+                title: "Ask in your own words",
+                body: "Type it the way you'd say it. It reads only your own business.",
+                who: "Thistlewick Bakery (demo bakery)",
+                // Drawn on the page, as are the other three (the panel's question).
+                shot: "ask-hero",
+            },
+            {
+                title: "See the rows behind the answer",
+                body: "It reads your bookings, orders, customers and products, shows the rows behind each answer, and says which parts of the business it read.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "ask-answer",
+            },
+            {
+                title: "Confirm a change, or don't",
+                body: "Ask it to add or change something and it fills in a card, checked by the same rules as the form. Nothing is saved until you press the button, and you can undo it the same day.",
+                who: "Thistlewick Bakery (demo bakery)",
+                shot: "ask-confirm",
             },
         ],
         points: [
@@ -855,7 +857,7 @@ export const features: Record<FeatureSlug, StatedFeature> = {
                 shot: "sh-cards",
             },
             {
-                title: "Post it from your phone",
+                title: "Post it from your phone or computer",
                 body: "On a phone, Saroh copies the caption and opens your phone's share sheet with the picture. On a computer, download it, copy the caption, or send it on WhatsApp or Facebook. The link brings people back to your page.",
                 who: "Thistlewick Bakery (demo bakery)",
                 shot: "sh-phone",

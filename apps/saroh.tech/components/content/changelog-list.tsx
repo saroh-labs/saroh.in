@@ -1,9 +1,10 @@
 "use client";
 
+import { Chip } from "@saroh/marketing/kit/chip";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 import { useState } from "react";
 
-import { Chip } from "@/components/shared/chip";
 import type { ChangelogEntry } from "@/content/changelog";
 import { CHANGELOG, changelogPath } from "@/content/changelog";
 
@@ -32,7 +33,10 @@ export function ChangelogList() {
                 </div>
                 <a
                     href="/changelog/rss.xml"
-                    className="inline-flex min-h-11 items-center text-[15px] md:min-h-0"
+                    className={textLinkClasses({
+                        tone: "ink",
+                        className: "text-[15px]",
+                    })}
                 >
                     RSS feed
                 </a>
@@ -48,7 +52,7 @@ export function ChangelogList() {
                                 <EntryMeta entry={e} />
                             </div>
                             <div className="flex flex-col gap-3">
-                                <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                                <h2 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                                     <Link
                                         prefetch={false}
                                         href={changelogPath(e)}

@@ -16,8 +16,10 @@ export function StepList({
                     <span className="font-mono text-muted-foreground">
                         {String(i + 1).padStart(2, "0")}
                     </span>
-                    <b className="text-[17px]">{s.title}</b>
-                    <span className="text-[15px] leading-normal text-mk-copy">
+                    <b className="font-display text-mk-kit-h3 font-bold">
+                        {s.title}
+                    </b>
+                    <span className="text-[16px] leading-[1.6] text-mk-copy">
                         {s.text}
                     </span>
                 </li>

@@ -389,9 +389,10 @@ describe("search page redirects (DEC-193)", () => {
 });
 
 describe("indexed pages", () => {
-    it("lists Home, the shown features, 4 solutions, About, Contact, /customers, /llms.txt and the waitlist while it is the ask; Pricing once it opens", () => {
+    it("lists Home, How it works, the shown features, 4 solutions, About, Contact, /customers, /llms.txt and the waitlist while it is the ask; Pricing once it opens", () => {
         const waitlist = indexedPaths("waitlist");
-        expect(waitlist).toHaveLength(10 + featureList.length);
+        expect(waitlist).toHaveLength(11 + featureList.length);
+        expect(waitlist).toContain("/features");
         expect(waitlist).toEqual(
             expect.arrayContaining(["/features/website", "/solutions/salons"]),
         );

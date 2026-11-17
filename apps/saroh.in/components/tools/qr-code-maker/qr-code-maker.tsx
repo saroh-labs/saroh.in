@@ -261,7 +261,7 @@ export function QrCodeMaker() {
                                 <span
                                     data-logo-placeholder
                                     style={{ width: `${art.tilePct}%` }}
-                                    className="flex aspect-square items-center justify-center rounded-[22%] border-[1.5px] border-dashed border-border-strong text-[11px] text-mk-hint"
+                                    className="flex aspect-square items-center justify-center rounded-[22%] border-[1.5px] border-dashed border-border-strong text-[12px] text-mk-hint"
                                 >
                                     {copy.logo.placeholder}
                                 </span>

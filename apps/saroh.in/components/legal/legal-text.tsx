@@ -142,7 +142,7 @@ export function LegalText({ blocks }: { blocks: LegalBlock[] }) {
                             <h2
                                 key={i}
                                 id={block.id}
-                                className="m-0 mt-6 scroll-mt-6 border-t border-border pt-6 font-display text-mk-card-lg font-bold text-foreground"
+                                className="m-0 mt-6 scroll-mt-6 border-t border-border pt-6 font-display text-mk-kit-h3 font-bold text-foreground"
                             >
                                 {block.text}
                             </h2>

@@ -231,7 +231,7 @@ export function WaitlistForm({
                 </label>
             </div>
 
-            <Button type="submit" size="md" disabled={isSubmitting}>
+            <Button type="submit" size="kit" disabled={isSubmitting}>
                 {isSubmitting ? "Joining…" : "Join the waitlist"}
             </Button>
             {sendError && (

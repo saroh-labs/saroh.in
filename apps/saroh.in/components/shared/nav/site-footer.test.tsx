@@ -68,9 +68,9 @@ describe("SiteFooter", () => {
         );
         const changelog = screen.getByRole("link", { name: "Changelog" });
         expect(changelog.getAttribute("href")).toBe("/changelog");
-        expect(changelog.parentElement?.firstElementChild?.textContent).toBe(
-            "Resources",
-        );
+        expect(
+            changelog.closest("details")?.querySelector("summary")?.textContent,
+        ).toBe("Resources");
         expect(
             screen.getByRole("link", { name: "Privacy" }).getAttribute("href"),
         ).toBe("/privacy");
@@ -96,9 +96,9 @@ describe("SiteFooter", () => {
             />,
         );
         const tool = screen.getByRole("link", { name: "QR code maker" });
-        expect(tool.parentElement?.firstElementChild?.textContent).toBe(
-            "Tools",
-        );
+        expect(
+            tool.closest("details")?.querySelector("summary")?.textContent,
+        ).toBe("Tools");
     });
 
     it("says what the name means under the logo", () => {
@@ -121,6 +121,49 @@ describe("SiteFooter", () => {
             expect(link.getAttribute("href")).toBe(href);
             expect(link.querySelectorAll("svg path").length).toBeGreaterThan(0);
         }
+    });
+});
+
+describe("SiteFooter: the redesign's groups (DEC-221)", () => {
+    it("starts with Product in the LOCKED order, each a page that is shown", () => {
+        render(
+            <SiteFooter
+                resources={[
+                    { name: "Developers", line: "", href: "/developers" },
+                ]}
+            />,
+        );
+        const product = screen
+            .getAllByRole("group")
+            .find((g) => g.querySelector("summary")?.textContent === "Product");
+        const names = Array.from(product?.querySelectorAll("li a") ?? []).map(
+            (a) => a.textContent,
+        );
+        const locked = [
+            "Website builder",
+            "Orders",
+            "Bookings",
+            "Billing",
+            "Share and posts",
+            "Saroh Social",
+            "Ask AI",
+            "AI apps",
+            "API and webhooks",
+        ];
+        // Under vitest every switch is unset and NODE_ENV isn't development,
+        // so only the always-on four and the developers page show, in order.
+        expect(names).toEqual(locked.filter((n) => names.includes(n)));
+        expect(names.at(-1)).toBe("API and webhooks");
+    });
+
+    it("folds every group into a closed <details> on a phone, links still in the page", () => {
+        const { container } = render(<SiteFooter />);
+        const folds = container.querySelectorAll("details.mk-fold");
+        expect(folds.length).toBeGreaterThan(2);
+        for (const d of folds) expect(d.hasAttribute("open")).toBe(false);
+        expect(container.querySelectorAll("details a").length).toBeGreaterThan(
+            5,
+        );
     });
 });
 

@@ -35,6 +35,7 @@
         "check:mktemp": "node scripts/check-mktemp.mjs",
         "check:domains": "node scripts/check-hard-coded-domains.mjs",
         "check:shared-data": "node scripts/check-shared-data.mjs",
+        "check:shots": "node --test scripts/check-shots.test.mjs && node scripts/check-shots.mjs",
         "check:tag-strip": "node scripts/check-tag-strip.mjs",
         "check:titles": "node scripts/check-page-titles.mjs",
         "check:routes": "node scripts/check-app-routes.mjs",

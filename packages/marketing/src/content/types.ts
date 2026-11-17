@@ -26,6 +26,23 @@ export const FEATURE_SLUGS = [
 ] as const;
 export type FeatureSlug = (typeof FEATURE_SLUGS)[number];
 
+/** The features with a page of their own; every other is a Keep page. */
+export const BESPOKE_SLUGS = [
+    "website",
+    "ai-apps",
+    "ask-ai",
+    "social",
+] as const;
+export type BespokeSlug = (typeof BESPOKE_SLUGS)[number];
+
+/** The Keep pages: every record feature, in the menu's order. */
+export type KeepSlug = Exclude<FeatureSlug, BespokeSlug>;
+export const KEEP_SLUGS: readonly KeepSlug[] = FEATURE_SLUGS.filter(
+    (s): s is KeepSlug => !(BESPOKE_SLUGS as readonly string[]).includes(s),
+);
+export const isKeep = (slug: string): slug is KeepSlug =>
+    (KEEP_SLUGS as readonly string[]).includes(slug);
+
 /** A `[slug]` route's props: both sites' feature pages take the same. */
 export interface SlugPageProps {
     params: Promise<{ slug: string }>;
@@ -191,14 +208,6 @@ export interface FeatureStep extends ShotRef {
     chat?: ChatWords;
 }
 
-/** AI apps' "Apps you can use": the cards come from the site's Integrations list. */
-export interface FeatureAppList {
-    title: string;
-    lead: string;
-    /** The apps named in one line, without cards. */
-    also: string;
-}
-
 export interface Point {
     title: string;
     body: string;
@@ -248,8 +257,6 @@ export interface Feature extends SearchWords {
     /** Website only: the templates section, while templates are on. */
     templates?: FeatureTemplates;
     points: Point[];
-    /** AI apps only: "Apps you can use", after What it does. */
-    apps?: FeatureAppList;
     worksLead: string;
     /** Other features, by slug; the test fails on a missing one. */
     worksWith: FeatureSlug[];

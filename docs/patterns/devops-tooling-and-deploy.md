@@ -461,6 +461,44 @@ backfills the release names.
 
 On each unit's GitHub issue, comment when the unit lands on development.
 
+### Marketing screenshots are taken fresh for every production release — **Adopted** (owner, 17 Nov 2026)
+
+Every picture of the app on saroh.in and saroh.tech is a capture from the
+app as it ships, never a stale one. Once per release, before the
+`development` → `main` PR is merged:
+
+1. **Seed both demo worlds**: India (`pnpm --filter @saroh/database db:seed`
+   plus the showcase businesses) and Global (`db:seed:global`).
+2. **Capture both editions with one list**: `e2e/marketing-shots/capture.ts`
+   for India (`shots.config.ts`) and `--edition=global` (`shots.global.ts`).
+3. **Check every key.** A slot names one shot key, and both editions fill it
+   with the same crop and frame. A key the pages use that has no fresh
+   capture fails the release check. A Global key whose screen Global can't
+   show yet stays in saroh.tech's `PENDING_SHOTS` with a reason, and that
+   slot draws the same fallback as India, never another kind of visual.
+4. **Look at every changed image** against its page's claims
+   (FEATURE_RELEASE.md step 3), then commit the images on the release batch.
+
+Steps 1–3 run in `.github/workflows/marketing-shots.yml`, on every PR into
+`main` (the release PR) and by hand from the Actions tab, never on a
+schedule (the owner starts every release). It seeds a throwaway Postgres with
+both worlds, starts the stack as CI's browser shards do, captures both
+editions, makes the sized copies and runs `pnpm check:shots --since=<this
+run>`, then uploads the changed images and the report as the
+`marketing-shots` artifact. It needs no secrets and never commits: unzip the
+artifact at the repo root, look at each image (step 4), commit.
+
+`pnpm check:shots` (`scripts/check-shots.mjs`) lists every key each site's
+pages name and fails on one with no image, except a saroh.tech key in
+`PENDING_SHOTS` and a saroh.in help shot whose feature's switch is off in
+production. It prints each image's age (its last commit, or "uncommitted"
+for a fresh capture). With `--since` a key whose image is older fails too,
+unless its spec is `supplied` (Claude's own screens, put in by hand). A few
+keys need a hand step the workflow can't do (Ask AI's conversations,
+`shots:connect-claude` before `ai-activity`, Help's newcomer account): take
+those locally on a throwaway database (`LOCAL_DEV.md` → Global demo
+businesses) and add them to the same commit.
+
 ## Shipping the API
 
 - **Current** — `.github/workflows/deploy-api.yml` builds

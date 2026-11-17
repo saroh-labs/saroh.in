@@ -43,7 +43,8 @@ export function sectionOf(
     resources: readonly NavItem[] = [],
     tools: readonly NavItem[] = [],
 ): NavSection {
-    if (features.some((i) => i.href === pathname)) return "features";
+    if (pathname === "/features" || features.some((i) => i.href === pathname))
+        return "features";
     if (
         solutions.some((i) => i.href === pathname) ||
         within(pathname, "/for")
@@ -51,6 +52,9 @@ export function sectionOf(
         return "solutions";
     }
     if (pathname === "/pricing") return "pricing";
+    // The redesign's nav names these two on its own (DEC-221).
+    if (within(pathname, "/templates")) return "templates";
+    if (within(pathname, "/developers")) return "developers";
     if (resources.some((i) => within(pathname, i.href))) return "resources";
     // The /tools hub too (#1253), which no menu item is.
     if (
@@ -59,4 +63,17 @@ export function sectionOf(
     )
         return "tools";
     return null;
+}
+
+/** The Templates and Developers pages, which the nav names on its own, apart from the rest of Resources. */
+export function splitResources(resources: readonly NavItem[]) {
+    const page = (href: string) => resources.find((r) => r.href === href);
+    const templates = page("/templates");
+    // Developers is a Resources item, not a top-level entry (owner, 16 Nov 2026, #2).
+    return {
+        templates: templates
+            ? { name: templates.name, href: templates.href }
+            : undefined,
+        rest: resources.filter((r) => r.href !== "/templates"),
+    };
 }

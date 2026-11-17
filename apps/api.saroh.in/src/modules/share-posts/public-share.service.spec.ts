@@ -23,6 +23,7 @@ import type { CardRender } from "./cards/card-renderer";
 import { renderCard } from "./cards/card-renderer";
 import {
     classWhen,
+    drawnHost,
     offerUntil,
     PublicShareService,
 } from "./public-share.service";
@@ -551,5 +552,19 @@ describe("photos", () => {
         }
         expect(storage.readObjectStart).not.toHaveBeenCalled();
         expect(drawn.mock.calls.map(([c]) => c.photo)).toEqual([null, null]);
+    });
+});
+
+describe("drawnHost", () => {
+    it("draws a local or test host the way production names it, and a real one as it is", () => {
+        expect(drawnHost("rye-and-co.saroh.app.localhost")).toBe(
+            "rye-and-co.saroh.app",
+        );
+        expect(drawnHost("rye-and-co.localhost:3005")).toBe(
+            "rye-and-co.saroh.app",
+        );
+        expect(drawnHost("rye-and-co.saroh.app")).toBe("rye-and-co.saroh.app");
+        expect(drawnHost("ryeandco.example.com")).toBe("ryeandco.example.com");
+        expect(drawnHost("")).toBe("");
     });
 });

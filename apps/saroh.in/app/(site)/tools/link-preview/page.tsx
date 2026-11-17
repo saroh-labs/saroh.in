@@ -3,16 +3,18 @@ import "@saroh/search-pages/styles.css";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { toolsCrumb } from "@/components/resources/page-hero";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { LinkPreviewTool } from "@/components/tools/link-preview/link-preview-tool";
 import { SarohSharePreview } from "@/components/tools/link-preview/saroh-share-preview";
 import { linkPreview as copy } from "@/content/link-preview";
 import { linkShown } from "@/content/resources";
 import { resourcesContext } from "@/lib/resources-context";
+import { builtTools } from "@/lib/search-pages";
 import { pageMetadata, SITE_URL } from "@/lib/seo";
 import { faqPageLd, toolLd } from "@/lib/structured-data";
 import { Faq } from "@saroh/marketing/faq";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { PointGrid } from "@saroh/marketing/point-grid";
 
 /**
@@ -51,17 +53,19 @@ export default function LinkPreviewPage() {
                     faqPageLd(copy.faq),
                 ]}
             />
-            <div className="grid gap-[18px] px-mk-gutter pt-12">
-                <div className="flex flex-wrap items-end justify-between gap-8">
-                    <PageTitle size="article">{copy.title}</PageTitle>
-                    <span className="text-[15px] text-mk-copy">
-                        {copy.apps}
-                    </span>
-                </div>
-                <p className="m-0 max-w-[72ch] text-[15px] leading-[1.55] text-mk-copy [text-wrap:pretty]">
-                    {copy.definition}
+            <PageHero
+                crumbs={[
+                    toolsCrumb(builtTools().length > 0),
+                    { name: copy.title },
+                ]}
+                title={copy.title}
+                lead={copy.definition}
+                className="pb-6 min-[760px]:pb-8"
+            >
+                <p className="m-0 -mt-2 text-[15px] text-muted-foreground">
+                    {copy.apps}
                 </p>
-            </div>
+            </PageHero>
 
             <LinkPreviewTool />
 
@@ -72,12 +76,14 @@ export default function LinkPreviewPage() {
                 }))}
                 size="sm"
                 titleAs="h2"
-                className="px-mk-gutter pt-16"
+                className="mx-auto max-w-mk-page px-mk-gutter pt-16"
             />
 
             <SarohSharePreview />
 
-            <Faq items={copy.faq} className="pt-[72px]" />
+            <div className="mx-auto max-w-mk-page">
+                <Faq items={copy.faq} className="pb-[72px] pt-[72px]" />
+            </div>
         </>
     );
 }

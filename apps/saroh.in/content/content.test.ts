@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { faqs, HOME_FAQ, solutionFaq } from "./faq";
 import { features } from "./features";
 import { CTA_BAND, FREE_PLAN_LINE, home, PLAN_TEASERS } from "./home";
+import { aiAppsWords } from "./reach-ai-apps";
 import { shots } from "./shots";
 import { segmentViews, solutions } from "./solutions";
 import type { ShotRef } from "./types";
@@ -193,7 +194,8 @@ describe("solution pages", () => {
 
 describe("questions", () => {
     it("Home asks the design's questions, without the Hindi one", () => {
-        expect(HOME_FAQ).toHaveLength(5);
+        // The landing board's five, then the earlier design's other four.
+        expect(HOME_FAQ).toHaveLength(9);
         for (const id of HOME_FAQ) expect(faqs[id]).toBeDefined();
     });
 
@@ -217,7 +219,6 @@ describe("questions", () => {
  */
 describe("captions", () => {
     const refs: ShotRef[] = [
-        home.hero,
         ...Object.values(features).flatMap((f) => [f.hero, ...f.steps]),
         ...Object.values(solutions).flatMap((s) => [
             ...(s.hero ? [s.hero] : []),
@@ -315,28 +316,33 @@ describe("AI apps says only what's true (MARKETING_CLAIMS.md)", () => {
     });
 
     it("says website changes stay a draft and other changes happen at once, logged", () => {
-        const step = features["ai-apps"].steps.find((s) => s.shot === "ai-ask");
-        expect(step?.body).toMatch(/change at once/);
-        expect(step?.body).toMatch(/AI activity in Settings, kept for 90 days/);
-        expect(step?.body).toMatch(/stay a draft until you publish/);
-        // `move_booking` tells the customer (apps/api.saroh.in mcp day tools).
-        expect(step?.body).toMatch(
-            /When a booking moves, the customer is told/,
+        // How it works is three short steps now (variant I, 16 Nov); what
+        // changes at once and the 90-day record are said on the page's own
+        // sections ("And there it is", "Everything it did, on record").
+        const page = JSON.stringify(
+            aiAppsWords({ plans: false, askPlans: false, languages: false }),
         );
-        // Both are real chats in Claude now (owner, 15 Nov 2026): the hero's
-        // change is a draft, step 3's happens at once.
+        expect(page).toMatch(/change straight away/);
+        expect(page).toMatch(/When a booking moves, the customer is told/);
+        expect(page).toMatch(/kept for 90 days/);
+        expect(page).toMatch(/Put the website draft back as it was/);
+        expect(page).toMatch(/disconnect it any time/);
+        expect(
+            features["ai-apps"].steps.find((s) => s.shot === "ai-ask")?.body,
+        ).toMatch(/It drafts, you publish/);
+        // Both are real chats in Claude now (owner, 15 Nov 2026).
         expect(features["ai-apps"].hero.shot).toBe("ai-hero");
     });
 
-    it("names the four apps without cards in one line", () => {
-        const also = features["ai-apps"].apps?.also ?? "";
+    it("names the four apps beside Claude and ChatGPT in its first step", () => {
+        const first = features["ai-apps"].steps[0]?.body ?? "";
         for (const name of [
             "Gemini CLI",
             "Copilot Studio",
             "Windsurf",
             "Notion",
         ]) {
-            expect(also).toContain(name);
+            expect(first).toContain(name);
         }
     });
 });

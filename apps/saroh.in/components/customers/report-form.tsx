@@ -4,7 +4,7 @@ import { CUSTOMERS } from "@/content/customers";
 import { REPORT_LIMITS } from "@/lib/business-report";
 import { PhoneInput } from "@saroh/ui/phone-input";
 
-import { Button } from "@saroh/marketing/button";
+import { ReportDone, ReportFormFrame } from "@saroh/marketing/form-parts";
 import { fieldClasses } from "../shared/fields/field-classes";
 import { useReportForm } from "./use-report-form";
 
@@ -33,22 +33,18 @@ export function ReportForm() {
     const { fieldRef, wrong, describedBy } = form;
 
     if (state.at === "done") {
-        return (
-            <p
-                role="status"
-                className="m-0 max-w-[600px] rounded-[10px] border border-border bg-card px-4 py-3 text-[15px] leading-[1.55] text-foreground"
-            >
-                {copy.done}
-            </p>
-        );
+        return <ReportDone>{copy.done}</ReportDone>;
     }
 
     return (
-        <form
-            noValidate
+        <ReportFormFrame
             onSubmit={onSubmit}
-            aria-label={copy.title}
-            className="grid max-w-[600px] gap-4"
+            label={copy.title}
+            error={state.at === "error" ? state.message : null}
+            errorId="report-error"
+            sending={state.at === "sending"}
+            sendLabel={copy.submit}
+            sendingLabel={copy.sending}
         >
             <div className="grid gap-1.5">
                 <label
@@ -188,25 +184,6 @@ export function ReportForm() {
                     {copy.phoneHint}
                 </p>
             </div>
-            {state.at === "error" ? (
-                <p
-                    id="report-error"
-                    role="alert"
-                    className="m-0 text-[14px] font-medium text-destructive"
-                >
-                    {state.message}
-                </p>
-            ) : null}
-            <div>
-                <Button
-                    type="submit"
-                    size="md"
-                    className="w-auto px-[18px]"
-                    disabled={state.at === "sending"}
-                >
-                    {state.at === "sending" ? copy.sending : copy.submit}
-                </Button>
-            </div>
-        </form>
+        </ReportFormFrame>
     );
 }

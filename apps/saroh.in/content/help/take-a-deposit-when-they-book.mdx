@@ -14,8 +14,11 @@
 #         booking, and the rest (…) at the visit. Refunded if they cancel in
 #         time."; "A deposit is part of the price. Set a price first, or take
 #         nothing at booking.")
-#   SAVE  .../service-editor/service-editor.tsx ("Save changes", "Discard
-#         changes"; "Changes apply to bookings made after you save.")
+#   SAVE  .../service-editor/edit-service.tsx, service-rows.tsx,
+#         lib/services/service-panels.ts (since U16, a saved service reads
+#         first: cards "What it is", "Time and place" and "Money", each with
+#         "Edit" opening its own panel with one "Save"; Money holds "Price"
+#         and "At booking, they pay")
 #   BOOK  packages/site-blocks/src/booking-flow/ (pay-step.tsx "Paying";
 #         model.ts "Pay … deposit now", "The rest (…) at ‹business›. Refunded
 #         if you cancel in time.", "Pay the full … now", "Pay at the desk";
@@ -47,6 +50,8 @@
 #         page shows no payment line when it can't take the deposit under
 #         Online only (#822, DEC-089)
 # Where the design said otherwise, the app won: content/help/README.md.
+# Shots 2 and 3 are to be captured again (15 Nov): the service now reads
+# first and changes in a Money panel.
 # Shots 1, 2, 3 and 5 re-captured on 6 Oct after DEC-089. The demo
 # clinic's Razorpay connection has no key id, so its checkout can't open
 # and the app reads it as no provider connected (WARN). Its booking rules
@@ -65,7 +70,7 @@ order: 20
 intro: "A deposit holds the time: the customer pays part of the price, or all of it, when they book on your site, and the rest at the visit. You set it on each service. This takes about two minutes."
 description: "Ask for a deposit, or the full price, when customers book a service on your site, and see what they see when they pay."
 readMinutes: 3
-updated: "2026-10-12"
+updated: "2026-11-15"
 publishOn: "2026-10-17"
 steps:
     # NAV.
@@ -76,22 +81,22 @@ steps:
       marker: Root canal treatment
     # PRICE, NOTE.
     - title: Choose what they pay at booking
-      body: "Under Price, At booking, they pay has four choices: Nothing, they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."
+      body: "On the service, find the Money card and press Edit, or press its At booking, they pay row. At booking, they pay has four choices: Nothing, they pay at the visit, a 25% deposit, a 50% deposit, or The full price. Under them, Saroh says what that means for this service: what they pay when booking, the rest at the visit, and that it's refunded if they cancel in time. A deposit is part of the price, so the service needs a price first. If it can't be taken online — no payment provider connected, Payments off, or your booking rules taking payment at the desk only — Saroh says right under it that it's paid at the desk instead, with a link to what fixes it. If your booking rules take payment online only, it says people can't book it online."
       shot: help-take-deposit-2
       caption: "The root canal's price at Kavi Dental (demo clinic), with a 50% deposit at booking, and the note that it's paid at the desk for now, as no payment provider is connected."
       tip: "In time means before the free cancellation time in your booking rules, under Bookings › Hours and time off. A late cancel keeps the deposit."
       marker: 50% deposit
     # SAVE.
     - title: Save the service
-      body: "Press Save changes at the top right. It applies to bookings made after you save; bookings already made keep their time and price."
+      body: "Press Save at the foot of the panel. The service reads its new deposit straight away; bookings already made keep their time and price."
       shot: help-take-deposit-3
-      caption: "A change to the root canal at Kavi Dental (demo clinic), waiting for Save changes."
-      marker: Save changes
+      caption: "A change to the root canal's Money at Kavi Dental (demo clinic), waiting for Save."
+      marker: Save
     # BOOK, DESK.
     - title: What your customer sees
       body: "On your booking page, once they've picked a time and given their name, Paying offers the deposit now and the rest at the visit, or the full price now. Paying at the desk isn't offered for a service with a deposit while you can take payment online. On your booking, it then reads Deposit … paid, with what's still due at the visit, and Take takes the rest at the desk."
       shot: help-take-deposit-4
-      caption: "Paying on the booking page of Northwind Supply (demo store): the deposit, or the full price."
+      caption: "Paying on the booking page of Northwind Supply (demo business): the deposit, or the full price."
       marker: Pay the deposit now
     # PAY, PROV.
     - title: Connect a payment provider

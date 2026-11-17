@@ -1,22 +1,36 @@
 ---
 # Every label below was checked against the real screens on 6 Oct 2026
-# (R7), in the code and in the captured shots. Sources, from the repo root:
+# (R7), and again in the code on 15 Nov 2026: sign-up now emails a code
+# with no password, and setup is four steps, one question to a screen
+# (DEC-130 as amended 11 Oct), with what to do first as its last step.
+# Every shot is to be captured again. Sources, from the repo root:
 #   SIGNUP apps/accounts.saroh.in/components/auth/signup-form.tsx ("Make your
-#          account", Your name, Email, Password, "Send the code")
-#   VERIFY apps/accounts.saroh.in/components/auth/verify-email-form.tsx
-#          ("Check your email", 6 digits, 10 minutes, "Verify")
-#   SETUP  apps/app.saroh.in/app/onboarding/page.tsx ("Set up Saroh")
-#   FORM   apps/app.saroh.in/components/organizations/setup/business-setup-form.tsx
-#          ("What are you setting up?", "What is it called?", "Its address
-#          on Saroh", "Is it registered as a company?", "Where does it
-#          trade?", "Create the business"; the address follows the name and
-#          is the one thing that's hard to change)
+#          account", Your name, Email, "No password. We email you a code,
+#          and then you set up your business.", "Email me a code");
+#          social-buttons.tsx ("Continue with …")
+#   VERIFY apps/accounts.saroh.in/lib/sign-in-code.ts CODE_WORDS ("Check
+#          your email", "Code", "Sign in", "Resend code", "Not there? Look in
+#          spam."); the length and lifetime from @saroh/auth/constants
+#   STEPS  packages/ui/src/lib/setup-plan.ts ("Make your account", "Say what
+#          you are setting up", "Give it a name and a web address", "Pick
+#          what to do first"); apps/app.saroh.in/lib/organizations/setup-steps.ts
+#          ("Continue", "Back"; the last button "Create the business")
 #   KIND   apps/app.saroh.in/components/organizations/setup/setup-kind-choice.tsx
-#          (A business, Just me, A site for my work)
-#   READY  apps/app.saroh.in/lib/settings/ready.ts (Registered at setup:
-#          "Choose your business type" before taking money)
-#   FIRST  apps/app.saroh.in/components/home/dashboard/first-run-jobs.tsx ("What will
-#          you do first?", the four cards, the Turn on sheet)
+#          (A business "Shop, studio, practice", Just me, A site for my work
+#          "Portfolio, blog, projects"); setup-trade-choice.tsx ("What kind
+#          of place is it?"; a salon or gym gets sample services, DEC-189)
+#   NAME   .../setup/setup-name-step.tsx (lib/organizations/kind.ts nameLabel
+#          "What is it called?"; "Web address", "Available. Your website will
+#          live here.", "That web address is taken. Try another.", "Follows
+#          the name until you edit it. Changing it later breaks saved links,
+#          so it is worth getting right now.")
+#   FIRST  .../setup/setup-goal-choice.tsx, lib/modules/goals.ts ("What will
+#          you do first?": Sell things, Take bookings, Put up a website, Keep
+#          track of people, "Decide later" "Opens Home."; a goal lands on the
+#          thing itself, ready to fill in)
+#   READY  business-setup-form.tsx (whether it's registered is not asked at
+#          setup); apps/app.saroh.in/lib/settings/ready.ts ("Choose your
+#          business type" before taking money); Settings › Business
 # The design only named this article. Its shots: a sign-up form never sent,
 # a newcomer's setup form never created, and Asha's Bakery, the seed's
 # business with nothing on yet (setup's own business has every module dark
@@ -26,42 +40,41 @@ slug: create-your-business
 area: Getting started
 group: Get set up
 order: 10
-intro: "Your Saroh account is you; the business is what you set up inside it. You make the account, name the business and pick its address, then choose what Saroh does for it first. This takes about three minutes."
-description: "Make your Saroh account, set up your business with its name and address, and pick what it does first. Five steps, with a picture of each screen."
+intro: "Your Saroh account is you; the business is what you set up inside it. You make the account, name the business and pick its web address, then choose what Saroh does for it first. This takes about three minutes."
+description: "Make your Saroh account, set up your business with its name and web address, and pick what it does first. Five steps, with a picture of each screen."
 readMinutes: 3
-updated: "2026-10-06"
+updated: "2026-11-15"
 publishOn: "2026-10-17"
 steps:
     # SIGNUP, VERIFY.
     - title: Make your account
-      body: "Open Sign up and enter your name, your email and a password of eight characters or more, then press Send the code. Saroh emails you a six-digit code: type it on the next screen and press Verify. You're only signed in once the code is accepted, and the code lasts ten minutes."
+      body: "Open Sign up and enter your name and your email, then press Email me a code. There's no password: Saroh emails you a code. Type it under Code on the next screen and press Sign in. Not there? Look in spam, or press Resend code."
       shot: help-create-business-1
-      caption: "Make your account, filled in for Kiran at Tulsi Florist (a demo florist), with Send the code."
-      marker: Send the code
-    # SETUP, KIND.
+      caption: "Make your account, filled in for Kiran at Tulsi Florist (a demo florist), with Email me a code."
+      marker: Email me a code
+    # STEPS, KIND.
     - title: Say what you're setting up
-      body: "Set up Saroh asks one question first: what are you setting up? Choose A business for a shop, studio or practice. Just me is for a freelancer or consultant, and A site for my work is for a portfolio or blog. The answer changes the words Saroh uses, not what it can do."
+      body: "Setup asks one question to a screen, with Back and Continue. First: what are you setting up? Choose A business for a shop, studio or practice, and say what kind of place it is. Just me is for a freelancer or consultant, and A site for my work is for a portfolio or blog. The answer changes the words Saroh uses, not what it can do."
       shot: help-create-business-2
       caption: "What are you setting up?, with A business, Just me and A site for my work."
       marker: A business
-    # FORM: name and address.
-    - title: Name it and pick its address
-      body: "Under What is it called?, type the name people will see on your site and invoices. Its address on Saroh is made from the name, so Tulsi Florist becomes tulsi-florist.saroh.app, and Saroh checks that it's free as you type. You can change the name later, but changing the address breaks links people have saved, so get it right now."
+    # NAME.
+    - title: Give it a name and a web address
+      body: "Under What is it called?, type the name people will see on your site and invoices. Your web address follows the name until you edit it, so Tulsi Florist becomes tulsi-florist.saroh.app, and Saroh checks that it's free as you type. You can change the name later, but changing the web address breaks links people have saved, so get it right now. Press Continue."
       shot: help-create-business-3
-      caption: "Tulsi Florist (a demo florist), with its address on Saroh marked free."
-      marker: Its address on Saroh
-    # FORM: registered, country, the button.
-    - title: Registered or not, then create it
-      body: "Say whether it's registered as a company (a Pvt Ltd, LLP or partnership) or not, and where it trades. This decides what your invoices say and what a payment provider will ask you for. Then press Create the business, and Saroh opens on Home."
+      caption: "Tulsi Florist (a demo florist), with its web address marked available."
+      marker: Web address
+    # FIRST, STEPS.
+    - title: Pick what you'll do first, then create it
+      body: "The last question is What will you do first? Sell things, Take bookings, Put up a website or Keep track of people, or Decide later to look around first. Press Create the business. Saroh turns on what you picked and opens it, ready to fill in, such as your first product. You can add the others whenever you like."
       shot: help-create-business-4
-      caption: "Tulsi Florist (a demo florist): Not registered, trading in India, and Create the business."
-      tip: "Chose Registered? Before you take money, Home and Settings ask you to choose your business type: private limited, LLP, partnership or another."
+      caption: "Tulsi Florist (a demo florist): What will you do first?, and Create the business."
       marker: Create the business
-    # FIRST.
-    - title: Pick what you'll do first
-      body: "Home asks What will you do first? Sell things, Take bookings, Put up a website or Keep track of people. Pick one and a Turn on sheet asks for the little it needs, such as your first location and how orders leave. Press Turn on, and its screens join the sidebar. You can add the others whenever you like."
+    # READY.
+    - title: Finish setting up when you need to
+      body: "Setup doesn't ask whether you're registered as a company. Once something invoices or takes money, Home and Settings ask you to choose your business type: private limited, LLP, partnership or another. The rest of your business details, like your registered address, are in Settings › Business."
       shot: help-create-business-5
-      caption: "Home at Asha's Bakery (a demo bakery) with nothing on yet, and Turn on Sell open."
+      caption: "Home at Asha's Bakery (a demo bakery) with nothing on yet."
       marker: Turn on
 next: [add-your-first-product, add-your-gstin, connect-razorpay]
 ---

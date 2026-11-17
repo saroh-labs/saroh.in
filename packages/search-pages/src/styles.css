@@ -5165,3 +5165,197 @@
         width: auto;
     }
 }
+
+/*
+ * The redesign's kit (DEC-221, saroh.in's DESIGN.md) on the pages it
+ * reaches without a board of their own: the GST, guide and download pages,
+ * their hubs, the tools hub and each tool (`.sp-kit` on their root; the
+ * /for/ pages keep the rules above). Saroh's Saffron and lines, the three
+ * heading sizes (h1 72/42, h2 44/30, h3 20), the Saffron mark under the
+ * h1's last word, "/" between crumbs, the 48px Ink button and the closing
+ * band as the kit's ClosingCTA: on Paper, centred, one h2 and one button.
+ * Small caps labels read as plain 13px words (no eyebrows), and nothing is
+ * under 12px.
+ */
+.sp.sp-kit {
+    --sp-amber: #d98a15;
+    --sp-amber-text: #91550c;
+    --sp-amber-dark: #91550c;
+    --sp-amber-deep: #6e3a04;
+    --sp-line: #d9d6cc;
+    --sp-muted: #6c6659;
+    --sp-muted-2: #6c6659;
+}
+.sp.sp-kit .sp-mark {
+    text-decoration: underline;
+    text-decoration-color: var(--sp-amber);
+    text-decoration-thickness: 0.08em;
+    text-underline-offset: 0.14em;
+    text-decoration-skip-ink: none;
+}
+.sp.sp-kit .sp-gst-h1,
+.sp.sp-kit .sp-gd-h1,
+.sp.sp-kit .sp-dl-h1,
+.sp.sp-kit .sp-hp-h1,
+.sp.sp-kit .tp-h1 {
+    max-width: 18ch;
+    font-family: var(--sp-display);
+    font-weight: 700;
+    font-size: clamp(42px, 5vw, 72px);
+    line-height: 1.04;
+    letter-spacing: -0.04em;
+    text-wrap: balance;
+}
+.sp.sp-kit .sp-hc-h,
+.sp.sp-kit .tp-hub-h2 {
+    font-size: clamp(30px, 3.06vw, 44px);
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+}
+/* An h2 inside a reading column: the kit's h2 at its phone size. */
+.sp.sp-kit .sp-h2c,
+.sp.sp-kit .tp-h2 {
+    font-size: 30px;
+    line-height: 1.1;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+}
+.sp.sp-kit .sp-lc-t,
+.sp.sp-kit .tp-hub-title {
+    font-family: var(--sp-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+.sp.sp-kit .sp-hp-lead,
+.sp.sp-kit .tp-lead,
+.sp.sp-kit .sp-gd-lead,
+.sp.sp-kit .sp-dl-lead {
+    font-size: clamp(17px, 1.4vw, 20px);
+    line-height: 1.55;
+}
+.sp.sp-kit .sp-crumb [aria-current] {
+    color: var(--sp-muted-2);
+    font-weight: 400;
+}
+/* A crumb hidden on a phone takes its "/" with it. */
+@media (max-width: 899.98px) {
+    .sp.sp-kit .sp-crumb-i.sp-d + .sp-crumb-i > [aria-hidden]:first-child {
+        display: none;
+    }
+}
+.sp.sp-kit .sp-btn {
+    height: 48px;
+    padding: 0 22px;
+    border-radius: 10px;
+}
+.sp.sp-kit .sp-btn-amber {
+    background: var(--sp-ink);
+    color: var(--sp-paper);
+}
+.sp.sp-kit .sp-cta,
+.sp.sp-kit .sp-cta-wide,
+.sp.sp-kit .sp-cta-stack,
+.sp.sp-kit .sp-cl-solo .sp-cta-stack {
+    background: transparent;
+    color: var(--sp-ink);
+    border-radius: 0;
+    border-top: 1px solid var(--sp-line);
+    padding: 72px 0 24px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 28px;
+}
+.sp.sp-kit .sp-cta-copy {
+    flex: none;
+    justify-items: center;
+    gap: 14px;
+}
+.sp.sp-kit .sp-cta-h,
+.sp.sp-kit .sp-cta-wide .sp-cta-h,
+.sp.sp-kit .sp-cta-stack .sp-cta-h,
+.sp.sp-kit .sp-cl-solo .sp-cta-stack .sp-cta-h {
+    max-width: 22ch;
+    font-size: clamp(30px, 3.06vw, 44px);
+    line-height: 1.06;
+    letter-spacing: -0.035em;
+}
+.sp.sp-kit .sp-cta-line,
+.sp.sp-kit .sp-cta-stack .sp-cta-line,
+.sp.sp-kit .sp-cl-solo .sp-cta-stack .sp-cta-line {
+    max-width: 52ch;
+    font-size: 16px;
+    color: var(--sp-body);
+}
+.sp.sp-kit .sp-cta-act {
+    justify-items: center;
+}
+.sp.sp-kit .sp-cta-note {
+    font-size: 15px;
+    color: var(--sp-muted-2);
+}
+.sp.sp-kit .sp-lc-eye,
+.sp.sp-kit .sp-rel-eye,
+.sp.sp-kit .sp-otp-eye,
+.sp.sp-kit .sp-facts dt,
+.sp.sp-kit .tp-eyebrow {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.sp.sp-kit .tp-new,
+.sp.sp-kit .tp-tc,
+.sp.sp-kit .td-tc {
+    font-size: 12px;
+}
+.sp.sp-kit .sp-lc,
+.sp.sp-kit .tp-hub-card {
+    border-radius: 16px;
+}
+.sp.sp-kit .tp-hub-open,
+.sp.sp-kit .sp-lc-more {
+    color: var(--sp-ink);
+    text-decoration: underline;
+    text-decoration-color: var(--sp-line-strong);
+    text-underline-offset: 3px;
+}
+/* Three or more cards on a phone swipe (PHONE.md): one in full, the next
+   peeking 24px; every card stays in the HTML. */
+@media (max-width: 759.98px) {
+    .sp.sp-kit .sp-hc-grid,
+    .sp.sp-kit .tp-hub-grid {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+    }
+    .sp.sp-kit .sp-hc-grid::-webkit-scrollbar,
+    .sp.sp-kit .tp-hub-grid::-webkit-scrollbar {
+        display: none;
+    }
+    .sp.sp-kit .sp-hc-grid > li,
+    .sp.sp-kit .tp-hub-grid > li {
+        flex: 0 0 calc(100% - 24px);
+        scroll-snap-align: start;
+    }
+    .sp.sp-kit .sp-hc-grid > li:only-child,
+    .sp.sp-kit .tp-hub-grid > li:only-child {
+        flex-basis: 100%;
+    }
+}
+/* A reading page's h1 (GST, guide, download): the kit's h1 at its phone
+   size on every screen, so a full search title keeps to a few lines in its
+   column (Read mode: comfortable measure, nothing flashy). */
+.sp.sp-kit .sp-gst-h1,
+.sp.sp-kit .sp-gd-h1,
+.sp.sp-kit .sp-dl-h1 {
+    max-width: 22ch;
+    font-size: 42px;
+    line-height: 1.06;
+}

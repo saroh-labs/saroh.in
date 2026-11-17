@@ -38,7 +38,7 @@ const PAGES: Listed[] = [
         title: pageTitle(home.seoTitle),
         description: home.seoDescription,
         phrase: home.phrase,
-        firstScreen: `${home.eyebrow} ${home.headlineLabel} ${home.sub}`,
+        firstScreen: `${home.titleLabel} ${home.eyebrow} ${home.lede}`,
     },
     ...featureList.map((f) => ({
         path: `/features/${f.slug}`,

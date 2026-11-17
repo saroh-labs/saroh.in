@@ -36,14 +36,14 @@ export function EntryRow({ entry }: { entry: ChangelogEntry }) {
                     {entry.kind}
                 </span>
             </span>
-            <span className="grid min-w-0 flex-[1_1_420px] gap-3">
-                <span className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em]">
+            <span className="grid min-w-0 flex-[1_1_420px] gap-2.5">
+                <span className="font-display text-mk-kit-h3 font-bold">
                     {entry.title}
                 </span>
                 <span className="text-mk-body leading-[1.65] text-mk-prose">
                     {entry.summary}
                 </span>
-                <span className="font-semibold text-brand-700 underline-offset-[3px] group-hover:underline group-active:text-foreground">
+                <span className="w-fit font-semibold text-foreground underline decoration-border-strong decoration-1 underline-offset-[3px] group-hover:decoration-foreground">
                     {CHANGELOG.readMore}
                     <Arrow />
                 </span>
@@ -70,8 +70,8 @@ export function FirstEntrySoon({ day }: { day: string }) {
                     Early access
                 </span>
             </span>
-            <span className="grid min-w-0 flex-[1_1_420px] gap-3">
-                <span className="font-display text-[32px] font-bold leading-[1.1] tracking-[-0.03em]">
+            <span className="grid min-w-0 flex-[1_1_420px] gap-2.5">
+                <span className="font-display text-mk-kit-h3 font-bold">
                     First entry on {entryDayLong(day)}
                 </span>
                 <span className="text-mk-body leading-[1.65] text-mk-prose">
@@ -90,15 +90,15 @@ export function ComingNextList() {
             as="section"
             width="list"
             aria-labelledby="coming-next"
-            className="grid gap-2 pt-[72px]"
+            className="grid gap-5 py-[72px] min-[760px]:py-[120px]"
         >
             <h2
                 id="coming-next"
-                className="m-0 font-display text-[32px] font-bold tracking-[-0.03em]"
+                className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
             >
                 {CHANGELOG.comingTitle}
             </h2>
-            <p className="m-0 mb-4 text-mk-faq text-mk-copy">
+            <p className="m-0 mb-4 text-[16px] leading-[1.6] text-mk-copy">
                 {CHANGELOG.comingSub}
             </p>
             <ComingList items={COMING} idPrefix="coming" />

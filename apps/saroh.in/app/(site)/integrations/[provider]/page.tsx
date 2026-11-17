@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { IntegrationSteps } from "@/components/integrations/integration-steps";
@@ -19,13 +18,12 @@ import { integrationMeta, loadIntegration } from "@/lib/integration-docs";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
-import { Arrow } from "@saroh/marketing/arrow";
 import { Breadcrumbs } from "@saroh/marketing/breadcrumbs";
 import { Article, Container } from "@saroh/marketing/container";
 import { Faq } from "@saroh/marketing/faq";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { markTitle } from "@saroh/marketing/page-hero";
 import { SectionHeading } from "@saroh/marketing/section-heading";
-import { textLinkClasses } from "@saroh/marketing/text-link";
+import { LinkRow, TextLink } from "@saroh/marketing/text-link";
 
 /**
  * One integration's page (Resources plan U3, design "Saroh Resources -
@@ -107,26 +105,20 @@ export default async function IntegrationPage({ params }: Props) {
                         { name: fm.category },
                     ]}
                 />
-                <PageTitle size="article">{fm.name}</PageTitle>
-                <p className="m-0 text-mk-lead leading-[1.65] text-mk-prose [text-wrap:pretty]">
+                <SectionHeading
+                    as="h1"
+                    size="kit-h1"
+                    title={markTitle(fm.name)}
+                />
+                <p className="m-0 text-mk-kit-lead text-mk-prose [text-wrap:pretty]">
                     {fm.intro}
                 </p>
                 <div className="flex flex-wrap items-center gap-3">
-                    <CtaLink
-                        src={`integrations-${provider}`}
-                        className="h-[50px] px-[22px] text-[15px]"
-                    />
+                    <CtaLink src={`integrations-${provider}`} size="kit" />
                     {fm.category === "AI apps" ? (
-                        <Link
-                            href="/features/ai-apps"
-                            className={textLinkClasses({
-                                className:
-                                    "inline-flex min-h-11 items-center text-[15px] font-semibold",
-                            })}
-                        >
+                        <TextLink href="/features/ai-apps" tone="ink" arrow>
                             See what AI apps can do
-                            <Arrow />
-                        </Link>
+                        </TextLink>
                     ) : null}
                 </div>
                 <section
@@ -142,7 +134,7 @@ export default async function IntegrationPage({ params }: Props) {
                         components={{
                             p: (props) => (
                                 <p
-                                    className="m-0 text-mk-body leading-[1.7] text-mk-prose [text-wrap:pretty]"
+                                    className="m-0 text-[16px] leading-[1.7] text-mk-prose [text-wrap:pretty]"
                                     {...props}
                                 />
                             ),
@@ -181,7 +173,7 @@ export default async function IntegrationPage({ params }: Props) {
             <Container
                 as="article"
                 width="article"
-                className="grid gap-6 pt-14"
+                className="grid gap-6 pb-[72px] pt-14"
             >
                 <Faq
                     items={fm.faq}
@@ -190,20 +182,7 @@ export default async function IntegrationPage({ params }: Props) {
                     // Inside the article's column: its width and gutter.
                     className="max-w-none px-0 pt-0"
                 />
-                {links.length > 0 ? (
-                    <div className="flex flex-wrap gap-5 text-[15px] font-semibold">
-                        {links.map((l) => (
-                            <Link
-                                key={l.href}
-                                href={l.href}
-                                className={textLinkClasses()}
-                            >
-                                {l.label}
-                                <Arrow />
-                            </Link>
-                        ))}
-                    </div>
-                ) : null}
+                {links.length > 0 ? <LinkRow links={links} /> : null}
             </Container>
         </>
     );

@@ -1,6 +1,5 @@
 import { ComingList } from "@saroh/marketing/coming-list";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { PageHero } from "@saroh/marketing/page-hero";
 import type { Metadata } from "next";
 
 import { ChangelogBand } from "@/components/content/changelog-entry";
@@ -30,28 +29,32 @@ export default function Page() {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-mk-page px-mk-gutter pt-6 md:pt-12"
+            className="mx-auto max-w-mk-page px-mk-gutter"
         >
-            <div className="flex max-w-[940px] flex-col gap-6">
-                <div className="flex flex-col gap-3.5">
-                    <PageTitle size="page">{page.h1}</PageTitle>
-                    <p className="m-0 text-[17px] leading-[1.6] text-mk-copy md:text-[19px]">
+            <PageHero
+                title={page.h1}
+                className="px-0"
+                lead={
+                    <>
                         Every change to Saroh, newest first. <b>Global</b> means
                         saroh.tech only. <b>Both</b> means saroh.tech and
                         saroh.in.
-                    </p>
-                </div>
+                    </>
+                }
+            />
+            <div className="flex max-w-[940px] flex-col gap-6">
                 <ChangelogList />
-                <section aria-labelledby="coming" className="grid gap-1 pt-10">
-                    <Eyebrow
-                        as="h2"
+                <section
+                    aria-labelledby="coming"
+                    className="grid gap-5 pt-[72px] min-[760px]:pt-[120px]"
+                >
+                    <h2
                         id="coming"
-                        tone="muted"
-                        className="m-0 pb-1"
+                        className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
                     >
                         {COMING_TITLE}
-                    </Eyebrow>
-                    <p className="m-0 mb-3 max-w-[70ch] text-[15px] leading-[1.6] text-mk-copy">
+                    </h2>
+                    <p className="m-0 mb-4 max-w-[70ch] text-[16px] leading-[1.6] text-mk-copy">
                         {COMING_INTRO}
                     </p>
                     <ComingList

@@ -21,9 +21,11 @@ import {
 } from "@saroh/pricing-catalog";
 
 import type { FaqId } from "@/content/faq";
-import { faqItems } from "@/content/faq";
+import { faqItems, PAY_CARD_ONLINE } from "@/content/faq";
 import { FREE_PLAN_LINE } from "@/content/home";
+import { planWords } from "@/content/plan-words";
 import { PRICING } from "@/content/pricing";
+import { featuresOff } from "@/lib/feature-switches";
 
 /** Words of India's catalogue that mean nothing on this edition (`indiaOnlyWord`). */
 const indiaOnly = (text: string) => indiaOnlyWord(text) !== null;
@@ -83,7 +85,7 @@ export async function readCatalog(
 export async function readPricing(
     api = process.env.API_URL?.trim(),
     fetcher: typeof fetch = fetch,
-): Promise<{ catalog: Catalog; offered: boolean } | null> {
+): Promise<{ catalog: Catalog; offered: boolean; cardOnline: boolean } | null> {
     if (!api) return null;
     try {
         const res = await fetcher(`${api}/public/pricing`, {
@@ -96,10 +98,12 @@ export async function readPricing(
         const body = (await res.json()) as {
             catalog?: unknown;
             offered?: unknown;
+            cardOnline?: unknown;
         };
         return {
             catalog: parseCatalog(body.catalog),
             offered: body.offered === true,
+            cardOnline: body.cardOnline === true,
         };
     } catch (err) {
         console.warn(
@@ -108,6 +112,21 @@ export async function readPricing(
         );
         return null;
     }
+}
+
+/**
+ * Whether Saroh sells Grow and Pro here now: the API's `offered`, read once
+ * per build (the fetch is cached). Every plan line follows it
+ * (`content/plan-words.ts`); no answer is off.
+ */
+export async function paidPlansOn(
+    /** A page that has read the API already passes what it read. */
+    read:
+        | { offered: boolean }
+        | null
+        | Promise<{ offered: boolean } | null> = readPricing(),
+): Promise<boolean> {
+    return (await read)?.offered ?? false;
 }
 
 const freePlanOf = (catalog: Catalog) =>
@@ -140,7 +159,15 @@ export function freePlanLine(catalog: Catalog | null): string {
 }
 
 /** A page's questions. "start-free" lists Free's limits when the catalogue was read. */
-export function faqWithPlans(catalog: Catalog | null, ids: FaqId[]) {
+export function faqWithPlans(
+    catalog: Catalog | null,
+    ids: FaqId[],
+    /** The API's `cardOnline` (`STRIPE_PAYMENTS`): the pay answer says card online only then. */
+    cardOnline = false,
+    /** The API's `offered` ({@link paidPlansOn}): the domain answer's plan words. */
+    plansOn: boolean,
+) {
+    const domain = planWords(plansOn).domain;
     const limits = catalog && freeLimitLines(catalog);
     return faqItems(ids).map((item, i) =>
         ids[i] === "start-free" && limits
@@ -148,7 +175,11 @@ export function faqWithPlans(catalog: Catalog | null, ids: FaqId[]) {
                   ...item,
                   a: `Free includes ${sentenceList(limits.map(lowerFirst))}. No card needed.`,
               }
-            : item,
+            : ids[i] === "pay" && cardOnline
+              ? { ...item, a: `${item.a} ${PAY_CARD_ONLINE}` }
+              : ids[i] === "domain"
+                ? { ...item, a: `${item.a} ${domain}` }
+                : item,
     );
 }
 
@@ -222,11 +253,16 @@ export function pricingModel(catalog: Catalog | null = null): PricingPageModel {
         money?.tax === "none" &&
         catalog.plans.some((p) => p.pricePaise > 0)
     ) {
-        return pricingPageModel(withoutIndiaWords(catalog), {
-            money: (minor) => formatMinor(minor, money.currency),
-            count: (n) => n.toLocaleString("en-US"),
-            tax: null,
-        });
+        return pricingPageModel(
+            withoutIndiaWords(catalog),
+            {
+                money: (minor) => formatMinor(minor, money.currency),
+                count: (n) => n.toLocaleString("en-US"),
+                tax: null,
+            },
+            // A feature's rows wait on its release switch, as on saroh.in.
+            featuresOff(),
+        );
     }
     const limits = catalog && freeLimitLines(catalog);
     const model = placeholderPricingModel({

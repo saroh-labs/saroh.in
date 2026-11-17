@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import type { ToolPageData } from "../tool-schema";
-import { ClosingBand, Crumbs, Questions } from "./page-parts";
+import { ClosingBand, Crumbs, Marked, Questions } from "./page-parts";
 
 /**
  * Where a tool page's links go. saroh.in passes its addresses; the admin
@@ -72,7 +72,7 @@ export function ToolPage({
 }: ToolPageProps) {
     const how = p.how ?? [];
     return (
-        <div className="sp tp">
+        <div className="sp sp-kit tp">
             <div className="tp-wrap">
                 <section className="tp-intro">
                     {draft ? (
@@ -87,7 +87,9 @@ export function ToolPage({
                             { name: p.name },
                         ]}
                     />
-                    <h1 className="tp-h1">{p.h1}</h1>
+                    <h1 className="tp-h1">
+                        <Marked text={p.h1} />
+                    </h1>
                     <p className="tp-lead">
                         <Both desk={p.lead} phone={p.phoneLead} />
                     </p>

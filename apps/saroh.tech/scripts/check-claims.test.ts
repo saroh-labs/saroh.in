@@ -104,13 +104,17 @@ describe("what saroh.tech may not say", () => {
         ).toEqual([]);
     });
 
-    it("lets Features say payments go through your own Stripe, and no other page name it (KTD9)", () => {
+    it("lets Features and the home page say payments go through your own Stripe, and no other page name it (KTD9, #11)", () => {
         const line =
             "Customers can pay by card online, through your own Stripe.";
         expect(findClaims("/features/billing", line)).toEqual([]);
         expect(findClaims("/features/orders", line)).toEqual([]);
         expect(findClaims("/pricing", line)).not.toEqual([]);
-        expect(findClaims("/", "Add your Stripe account.")).not.toEqual([]);
+        // The home page's money section names Stripe (owner, 16 Nov 2026, #11).
+        expect(findClaims("/", line)).toEqual([]);
+        expect(
+            findClaims("/solutions", "Add your Stripe account."),
+        ).not.toEqual([]);
         // PayPal isn't built: "your own PayPal" stays banned even on Features.
         expect(
             findClaims("/features/billing", "Take it through your own PayPal."),

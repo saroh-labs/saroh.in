@@ -16,7 +16,7 @@ import type { Column } from "./data-table";
 import { DataTable } from "./data-table";
 import type { ContentLinks } from "./page-links";
 import { PageBand } from "./page-links";
-import { Crumbs, Questions } from "./page-parts";
+import { Crumbs, Marked, Questions } from "./page-parts";
 import { Prose, Words } from "./prose";
 
 /*
@@ -111,10 +111,12 @@ export function GstPage({
                         { name: p.name },
                     ]}
                     home={{ href: links.home }}
-                    sep="›"
+                    sep="/"
                     collapse
                 />
-                <h1 className="sp-gst-h1">{p.h1}</h1>
+                <h1 className="sp-gst-h1">
+                    <Marked text={p.h1} />
+                </h1>
                 <AnswerBox>
                     <Words inline={p.answer} resolve={links.resolve} />
                 </AnswerBox>

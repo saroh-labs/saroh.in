@@ -49,7 +49,7 @@ describe("demoHref", () => {
 describe("flag on", () => {
     it("home opens the salon demo in a new tab", () => {
         env.NEXT_PUBLIC_DEMOS = "on";
-        render(<HomeHero freeLine="Free to start." />);
+        render(<HomeHero />);
         expect(demo()?.getAttribute("href")).toBe(
             "https://demo-salon.saroh.app/book",
         );
@@ -105,7 +105,7 @@ describe("flag on", () => {
 
 describe("flag off", () => {
     it("shows no button anywhere", () => {
-        render(<HomeHero freeLine="Free to start." />);
+        render(<HomeHero />);
         render(
             <SolutionHero
                 solution={solutions.gyms}

@@ -8,7 +8,7 @@ import { Byline, Figure, Related } from "./content-blocks";
 import { ContentLayout } from "./content-layout";
 import type { ContentLinks } from "./page-links";
 import { PageBand } from "./page-links";
-import { Crumbs, Questions } from "./page-parts";
+import { Crumbs, Marked, Questions } from "./page-parts";
 import { Prose } from "./prose";
 
 /*
@@ -105,10 +105,12 @@ export function DownloadPage({
                         { name: p.name },
                     ]}
                     home={{ href: links.home }}
-                    sep="›"
+                    sep="/"
                     collapse
                 />
-                <h1 className="sp-dl-h1">{p.h1}</h1>
+                <h1 className="sp-dl-h1">
+                    <Marked text={p.h1} />
+                </h1>
                 <p className="sp-dl-lead">{p.lead}</p>
                 <ul className="sp-dl-ben">
                     {p.benefits.map((b) => (

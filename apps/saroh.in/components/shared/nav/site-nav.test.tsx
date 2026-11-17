@@ -21,6 +21,7 @@ const Nav = (props: {
     solutions?: NavItem[];
     solutionMenu?: NavItem[];
     allTrades?: { name: string; href: string };
+    allTools?: { name: string; href: string };
 }) => (
     <SiteNav features={FEATURE_ITEMS} solutions={SOLUTION_ITEMS} {...props} />
 );
@@ -124,7 +125,7 @@ describe("SiteNav", () => {
         launch.mode = "waitlist";
     });
 
-    it("Features opens a menu of every shown feature, focused on the first", () => {
+    it("Features opens a menu of every shown feature and /features, focused on the first", () => {
         render(<Nav />);
         const chevron = () =>
             button("Features").querySelector("[data-chevron]")?.classList;
@@ -133,7 +134,10 @@ describe("SiteNav", () => {
         expect(chevron()?.contains("rotate-180")).toBe(true);
         expect(button("Features").getAttribute("aria-expanded")).toBe("true");
         const items = screen.getAllByRole("menuitem");
-        expect(items).toHaveLength(FEATURE_ITEMS.length);
+        expect(items.map((i) => i.getAttribute("href"))).toEqual([
+            ...FEATURE_ITEMS.map((f) => f.href),
+            "/features",
+        ]);
         expect(document.activeElement).toBe(items[0]);
     });
 
@@ -251,6 +255,36 @@ describe("SiteNav: Resources (plan U1)", () => {
                 .getByRole("menuitem", { name: /^Changelog/ })
                 .getAttribute("aria-current"),
         ).toBe("page");
+    });
+
+    it("draws Website templates as an entry of its own, and Developers inside Resources (owner, 16 Nov 2026)", () => {
+        pathname = "/templates/bakery";
+        render(
+            <Nav
+                resources={[
+                    ...RESOURCES,
+                    { name: "Templates", line: "", href: "/templates" },
+                    { name: "Developers", line: "", href: "/developers" },
+                ]}
+            />,
+        );
+        const nav = desktop();
+        const templates = within(nav).getAllByRole("link", {
+            name: "Templates",
+        })[0];
+        expect(templates.className).toContain("decoration-brand-500");
+        expect(within(nav).queryByRole("link", { name: "Developers" })).toBe(
+            null,
+        );
+        fireEvent.click(button("Resources"));
+        expect(
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+        ).toContain("/developers");
+        fireEvent.click(button("Resources"));
+        fireEvent.click(button("Features"));
+        expect(
+            screen.getAllByRole("menuitem").map((i) => i.getAttribute("href")),
+        ).not.toContain("/templates");
     });
 
     it("the phone sheet has Resources as a level, marked on a Resources page", async () => {

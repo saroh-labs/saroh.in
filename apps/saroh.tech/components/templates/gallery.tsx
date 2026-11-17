@@ -1,7 +1,6 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { PageHero } from "@saroh/marketing/page-hero";
 import type { ReactNode } from "react";
 
-import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { CtaBand } from "@/components/shared/cta-band";
 import { JsonLd } from "@/components/shared/json-ld";
 import { COUNTRIES, DOCUMENTS, TRADES } from "@/content/templates";
@@ -13,7 +12,7 @@ import { cardOf } from "@/lib/templates/pages";
 import { CardGrid, ChipLink } from "./blocks";
 
 const LABEL =
-    "w-full flex-none text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground md:w-[90px]";
+    "w-full flex-none text-[13px] font-semibold text-muted-foreground md:w-[90px]";
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
     return (
@@ -88,7 +87,7 @@ export function GalleryPage({
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-7 px-mk-gutter pt-4 md:gap-9 md:pt-10"
+            className="mx-auto flex max-w-mk-page flex-col gap-8 px-mk-gutter min-[760px]:gap-10"
         >
             <JsonLd
                 data={[
@@ -99,13 +98,15 @@ export function GalleryPage({
                     ),
                 ]}
             />
-            <div className="flex max-w-[1100px] flex-col gap-4">
-                {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <PageTitle size="page">{page.h1}</PageTitle>
-                <p className="m-0 text-[17px] leading-relaxed text-mk-copy md:text-[19px]">
-                    {lede}
-                </p>
-            </div>
+            <PageHero
+                crumbs={page.crumb?.map((c) => ({
+                    name: c.name,
+                    href: c.path,
+                }))}
+                title={page.h1}
+                lead={lede}
+                className="px-0 pb-0 min-[760px]:pb-0"
+            />
             <FilterChips current={page.path} />
             <CardGrid cards={pages.map(cardOf)} />
             {children}
