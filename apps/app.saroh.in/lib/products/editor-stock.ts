@@ -1,4 +1,6 @@
+import type { ProductStock } from "@/lib/stock/product-stock";
 import type { StockDraft } from "./editor-sections";
+
 import type { ProductDetail } from "./service";
 
 /**
@@ -118,4 +120,55 @@ export function stockDraftFrom(
                 };
             }),
     };
+}
+
+/** Another location's shelf of a product counted as a whole, as typed. */
+export interface PlaceShelf {
+    storeId: string;
+    name: string;
+    quantity: string;
+    lowStockAlert: string;
+    promised: number;
+}
+
+/**
+ * Every location's shelf, added up (HPEditDesk): "All locations 440 on
+ * hand, 150 promised", and what that leaves to sell. The same totals the
+ * product page's To sell card says. A count not yet a whole number adds
+ * nothing.
+ */
+export function allLocations(
+    shelves: readonly Pick<PlaceShelf, "quantity" | "promised">[],
+): { onHand: number; promised: number; toSell: number } {
+    const n = (v: string) => (/^\d+$/.test(v.trim()) ? Number(v) : 0);
+    const onHand = shelves.reduce((t, s) => t + n(s.quantity), 0);
+    const promised = shelves.reduce((t, s) => t + s.promised, 0);
+    const toSell = shelves.reduce(
+        (t, s) => t + Math.max(0, n(s.quantity) - s.promised),
+        0,
+    );
+    return { onHand, promised, toSell };
+}
+
+/**
+ * The shelves at the business's other locations for the editor's Stock
+ * table (HPEditDesk), from the levels read: only while the product counts
+ * as a whole, and only where it sells or still has stock. Empty otherwise,
+ * and the section counts this location alone, as before.
+ */
+export function elsewhereShelves(
+    stock: Pick<ProductStock, "mode" | "sizes"> | null,
+    here: string,
+): PlaceShelf[] {
+    if (!stock || stock.mode !== "product") return [];
+    const shelves = stock.sizes[0]?.shelves ?? [];
+    return shelves
+        .filter((s) => s.storeId !== here && (s.soldHere || s.onHand > 0))
+        .map((s) => ({
+            storeId: s.storeId,
+            name: s.name,
+            quantity: String(s.onHand),
+            lowStockAlert: String(s.warnAt),
+            promised: s.promised,
+        }));
 }

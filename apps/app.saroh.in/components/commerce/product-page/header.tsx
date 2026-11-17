@@ -2,7 +2,7 @@ import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { PageHeader } from "@saroh/ui/page-header";
-import { Camera, ExternalLink } from "lucide-react";
+import { Camera, ExternalLink, Globe } from "lucide-react";
 import Link from "next/link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
@@ -12,17 +12,19 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { productEditHref, productHref } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { priceLabel } from "@/lib/products/overview-rules";
-import { whereItSells } from "@/lib/products/overview-words";
+import { visibilityLine, whereItSells } from "@/lib/products/overview-words";
 import type { ShareItem, ShareSetup } from "@/lib/share-item/share";
 import { Notice } from "@saroh/ui/notice";
 
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { PhoneShopMenu } from "./phone-shop-menu";
+import type { MoreEntry } from "./product-actions";
 import { ProductActions } from "./product-actions";
 
 export const STATUS_BADGE = {
-    PUBLISHED: { label: "Live", variant: "success" },
-    DRAFT: { label: "Draft", variant: "draft" },
-    ARCHIVED: { label: "Archived", variant: "neutral" },
+    PUBLISHED: { label: PRODUCT_STATUS_WORD.PUBLISHED, variant: "success" },
+    DRAFT: { label: PRODUCT_STATUS_WORD.DRAFT, variant: "draft" },
+    ARCHIVED: { label: PRODUCT_STATUS_WORD.ARCHIVED, variant: "neutral" },
 } as const;
 
 /** Share as a post (#1375): the live product and the live site's read. */
@@ -54,6 +56,44 @@ export function shopNote(
  * Before the header's button (#522): why the shop's page can't open yet,
  * the Team / Customer switch, its QR and "View on the shop".
  */
+/** Your view · Customer view, the switch between the two. */
+function ViewAs({
+    productId,
+    storeId,
+    view,
+}: {
+    productId: string;
+    storeId: string;
+    view: "team" | "customer";
+}) {
+    return (
+        <div
+            role="group"
+            aria-label="View as"
+            className="flex rounded-lg bg-muted p-0.5"
+        >
+            {(["team", "customer"] as const).map((v) => (
+                <Link
+                    data-ph-unmask=""
+                    key={v}
+                    href={`${productHref(storeId, productId)}${v === "customer" ? "&view=customer" : ""}`}
+                    scroll={false}
+                    aria-current={view === v ? "page" : undefined}
+                    className={cn(
+                        FOCUS,
+                        "flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold coarse:min-h-11",
+                        view === v
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground",
+                    )}
+                >
+                    {v === "team" ? "Your" : "Customer"} view
+                </Link>
+            ))}
+        </div>
+    );
+}
+
 function ShopControls({
     overview,
     storeId,
@@ -83,30 +123,7 @@ function ShopControls({
                     {note}
                 </span>
             ) : null}
-            <div
-                role="group"
-                aria-label="View as"
-                className="flex rounded-lg bg-muted p-0.5"
-            >
-                {(["team", "customer"] as const).map((v) => (
-                    <Link
-                        data-ph-unmask=""
-                        key={v}
-                        href={`${productHref(storeId, product.id)}${v === "customer" ? "&view=customer" : ""}`}
-                        scroll={false}
-                        aria-current={view === v ? "page" : undefined}
-                        className={cn(
-                            FOCUS,
-                            "flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold coarse:min-h-11",
-                            view === v
-                                ? "bg-card text-foreground shadow-sm"
-                                : "text-muted-foreground hover:text-foreground",
-                        )}
-                    >
-                        {v === "team" ? "Your" : "Customer"} view
-                    </Link>
-                ))}
-            </div>
+            <ViewAs productId={product.id} storeId={storeId} view={view} />
             {shopUrl ? (
                 // Its page is live, so a code for it has somewhere to go.
                 <QrButton
@@ -179,10 +196,13 @@ export function ProductHeader({
     view,
     shopUrl = null,
     share = null,
+    shopLive = null,
 }: {
     overview: ProductOverview;
     storeId: string;
     photosHref: string;
+    /** Whether the online shop is live; null when not known. */
+    shopLive?: boolean | null;
     /** Share as a post; null unless the page and the site are live. */
     share?: ProductShare | null;
     view: "team" | "customer";
@@ -208,6 +228,54 @@ export function ProductHeader({
         product.status,
         (product.storefronts ?? []).map((s) => s.name),
     );
+    const note = shopNote(product.status, shopUrl, paused);
+    const base = productHref(storeId, product.id);
+    // Someone who changes it has one ⋯ (HPProductDesk, HPProductPhone):
+    // QR and Share in it, and on a phone the shop page and the views,
+    // which a desk has on the website card. Anyone else keeps the
+    // controls as they were.
+    const writes = overview.canWrite;
+    const entries: (MoreEntry | null)[] = writes
+        ? [
+              shopUrl
+                  ? {
+                        key: "shop",
+                        label: "View on the shop",
+                        icon: "shop",
+                        href: shopUrl,
+                        newTab: true,
+                        phoneOnly: true,
+                    }
+                  : note
+                    ? {
+                          key: "shop",
+                          label: "View on the shop",
+                          icon: "shop",
+                          note,
+                          phoneOnly: true,
+                      }
+                    : null,
+              {
+                  key: "view",
+                  label: view === "customer" ? "Your view" : "Customer view",
+                  icon: view === "customer" ? "users" : "eye",
+                  href: view === "customer" ? base : `${base}&view=customer`,
+                  phoneOnly: true,
+              },
+              shopUrl
+                  ? { key: "qr", label: "QR code", icon: "qr", proxy: "qr" }
+                  : null,
+              shopUrl && share
+                  ? {
+                        key: "share",
+                        label: "Share",
+                        icon: "share",
+                        proxy: "share",
+                    }
+                  : null,
+          ]
+        : [];
+    const more = entries.filter((e): e is MoreEntry => e !== null);
     const meta = [
         priceLabel(price, money),
         product.category?.name ?? "no category",
@@ -215,7 +283,7 @@ export function ProductHeader({
     ].join(" · ");
 
     return (
-        <div className="border-b border-border px-4 pb-4 pt-5 sm:px-[22px]">
+        <div className="relative border-b border-border px-4 pb-4 pt-5 sm:px-[22px]">
             <PageHeader
                 holdsData
                 className="mb-0"
@@ -236,7 +304,7 @@ export function ProductHeader({
                         <Badge variant={status.variant} size="sm">
                             {status.label}
                         </Badge>
-                        {shopUrl && share ? (
+                        {writes ? null : shopUrl && share ? (
                             // The desk has it by the QR code; a phone, here.
                             <span className="sm:hidden">
                                 <ShareItemButton
@@ -245,36 +313,57 @@ export function ProductHeader({
                                 />
                             </span>
                         ) : null}
-                        <PhoneShopMenu
-                            productId={product.id}
-                            storeId={storeId}
-                            view={view}
-                            shopUrl={shopUrl}
-                            note={shopNote(product.status, shopUrl, paused)}
-                        />
+                        {writes ? null : (
+                            <PhoneShopMenu
+                                productId={product.id}
+                                storeId={storeId}
+                                view={view}
+                                shopUrl={shopUrl}
+                                note={note}
+                            />
+                        )}
                     </>
                 }
                 description={
-                    <p className="text-pretty text-[13px] tabular-nums text-muted-foreground">
-                        {meta} · Changed{" "}
-                        <ViewerDate
-                            iso={overview.lastChanged}
-                            variant="dayMonth"
-                        />
-                    </p>
+                    <>
+                        <p className="text-pretty text-[13px] tabular-nums text-muted-foreground">
+                            {meta} · Changed{" "}
+                            <ViewerDate
+                                iso={overview.lastChanged}
+                                variant="dayMonth"
+                            />
+                        </p>
+                        {writes ? (
+                            <StatusLine
+                                status={product.status}
+                                shopLive={shopLive}
+                                paused={paused}
+                            />
+                        ) : null}
+                    </>
                 }
                 meta={
-                    // A phone has these in the ⋯ beside the state instead.
-                    <div className="contents max-sm:hidden">
-                        <ShopControls
+                    writes ? (
+                        <WriterMeta
                             overview={overview}
                             storeId={storeId}
                             view={view}
                             shopUrl={shopUrl}
-                            paused={paused}
                             share={share}
                         />
-                    </div>
+                    ) : (
+                        // A phone has these in the ⋯ beside the state instead.
+                        <div className="contents max-sm:hidden">
+                            <ShopControls
+                                overview={overview}
+                                storeId={storeId}
+                                view={view}
+                                shopUrl={shopUrl}
+                                paused={paused}
+                                share={share}
+                            />
+                        </div>
+                    )
                 }
                 actions={
                     overview.canWrite ? (
@@ -282,6 +371,7 @@ export function ProductHeader({
                             product={product}
                             storeId={storeId}
                             editHref={productEditHref(storeId, product.id)}
+                            more={more}
                             deleteFrom={
                                 places.length > 1
                                     ? "every location that sells it"
@@ -334,6 +424,108 @@ export function ProductHeader({
                 }
             />
         </div>
+    );
+}
+
+/**
+ * Where QR's and Share's own buttons wait for the ⋯ to press them: out of
+ * sight and out of the tab order (`invisible`), but laid out under the ⋯,
+ * so the QR popover opens beside it at a desk.
+ */
+const PROXY = "invisible absolute right-[22px] top-[72px]";
+
+/**
+ * The one status sentence under the name (HPProductNotes), with Set up
+ * your shop while the shop isn't live.
+ */
+function StatusLine({
+    status,
+    shopLive,
+    paused,
+}: {
+    status: ProductOverview["product"]["status"];
+    shopLive: boolean | null;
+    paused: boolean;
+}) {
+    return (
+        <p
+            data-ph-unmask=""
+            data-product-status-line=""
+            className="mt-2 inline-flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted px-3 py-1.5 text-[13px] text-foreground"
+        >
+            <Globe
+                aria-hidden
+                className="size-4 shrink-0 text-muted-foreground"
+            />
+            <span>{visibilityLine(status, shopLive, paused)}</span>
+            {shopLive === false && status === "PUBLISHED" && !paused ? (
+                <Link
+                    href="/sites"
+                    className={cn(
+                        FOCUS,
+                        "rounded-sm font-semibold underline underline-offset-4 coarse:min-h-11",
+                    )}
+                >
+                    Set up your shop
+                </Link>
+            ) : null}
+        </p>
+    );
+}
+
+/**
+ * Beside the actions, for someone who changes it (HPProductDesk): the
+ * view switch while in the Customer view, to come back. QR and Share wait
+ * here hidden, pressed from the ⋯ (`MoreEntry.proxy`): their own buttons
+ * and sheets, unchanged.
+ */
+function WriterMeta({
+    overview,
+    storeId,
+    view,
+    shopUrl,
+    share,
+}: {
+    overview: ProductOverview;
+    storeId: string;
+    view: "team" | "customer";
+    shopUrl: string | null;
+    share: ProductShare | null;
+}) {
+    const { product } = overview;
+    return (
+        <>
+            {view === "customer" ? (
+                <span className="max-sm:hidden">
+                    <ViewAs
+                        productId={product.id}
+                        storeId={storeId}
+                        view={view}
+                    />
+                </span>
+            ) : null}
+            {shopUrl ? (
+                <span data-menu-proxy="qr" className={PROXY}>
+                    <QrButton
+                        compact="always"
+                        variant="ghost"
+                        link={{
+                            mode: "saved",
+                            kind: "PRODUCT",
+                            ref: product.id,
+                            url: shopUrl,
+                            what: product.name,
+                            from: "Product page",
+                        }}
+                    />
+                </span>
+            ) : null}
+            {shopUrl && share ? (
+                <span data-menu-proxy="share" className={PROXY}>
+                    <ShareItemButton item={share.item} setup={share.setup} />
+                </span>
+            ) : null}
+        </>
     );
 }
 

@@ -13,6 +13,9 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { HomeNeedGroup } from "@/lib/home/service";
+import type { ReadyStep } from "@/lib/settings/ready";
+
+import type { HomeSetup } from "@/components/home/dashboard/home-setup";
 
 import { NeedGroups } from "./need-groups";
 
@@ -504,5 +507,81 @@ describe("NeedGroups: cheques not in the bank (plan U18)", () => {
         expect(lineOrder()).toEqual(["CHEQUES"]);
         expect(host.textContent).toContain("1 thing");
         expect(host.textContent).not.toContain("Nothing needs you");
+    });
+});
+
+describe("NeedGroups: Finish setting up, said once (HPHomeDesk)", () => {
+    const SETUP: HomeNeedGroup = {
+        kind: "SETUP",
+        count: 1,
+        late: 0,
+        totals: null,
+        oldest: null,
+        rows: [
+            {
+                id: "s1",
+                code: "COURSES_EMPTY",
+                severity: "ATTENTION",
+                title: "Make a course to start taking enrolments",
+                sub: "Courses are switched on but empty",
+                amountMinor: null,
+                currency: null,
+                amountIn: null,
+                tag: null,
+                tone: "due",
+                href: "/courses",
+                link: { label: "Make a course", href: "/courses?new=1" },
+            },
+        ],
+        more: 0,
+        href: "/courses",
+        codes: ["COURSES_EMPTY"],
+    };
+    const step = (key: ReadyStep["key"], done: boolean): ReadyStep => ({
+        key,
+        label: `Step ${key}`,
+        why: "Why it matters.",
+        cta: "Do it",
+        href: `/settings/${key}`,
+        broken: false,
+        done,
+    });
+    const setup: HomeSetup = {
+        businessId: "org_setup",
+        list: {
+            steps: [
+                step("address", true),
+                step("email", true),
+                step("trade", false),
+            ],
+            left: [],
+            done: 2,
+            total: 3,
+            outside: [],
+        },
+    };
+
+    it("lists Needs you's setup things as steps of the one group", () => {
+        draw({ groups: [ORDERS, SETUP], total: 8, setup });
+        expect(groupEl("SETUP")).toBeNull();
+        const group = host.querySelector('[data-setup-checklist="home"]');
+        expect(group?.closest("ul")).not.toBeNull();
+        expect(group?.textContent).toContain("Step trade");
+        expect(group?.textContent).toContain(
+            "Make a course to start taking enrolments",
+        );
+        expect(
+            group?.querySelector('a[href="/courses?new=1"]')?.textContent,
+        ).toBe("Make a course");
+        // The done ones fold.
+        expect(group?.textContent).not.toContain("Step address");
+    });
+
+    it("keeps the setup group when some of its things weren't sent", () => {
+        draw({ groups: [ORDERS, { ...SETUP, count: 4, more: 3 }], setup });
+        expect(groupEl("SETUP")).not.toBeNull();
+        expect(
+            host.querySelectorAll('[data-setup-checklist="home"]'),
+        ).toHaveLength(1);
     });
 });

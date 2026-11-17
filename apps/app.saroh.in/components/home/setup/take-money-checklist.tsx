@@ -5,6 +5,7 @@ import { PlanAsides, readyRows } from "@/components/settings/ready/ready-rows";
 import { SetupChecklist } from "@/components/shared/setup-checklist/setup-checklist";
 import type { ReadyChecklist } from "@/lib/settings/ready";
 import { checklistWords, takeMoneyPlace } from "@/lib/settings/ready";
+import type { ChecklistRow } from "@/lib/setup-checklist";
 
 import { setSetupHidden, useSetupHidden } from "./use-setup-hidden";
 
@@ -47,6 +48,8 @@ export function TakeMoneyChecklist({
     slot,
     compact = false,
     phoneOwnCard = false,
+    inNeedsYou = false,
+    extraRows = [],
 }: {
     list: ReadyChecklist;
     businessId: string;
@@ -61,6 +64,16 @@ export function TakeMoneyChecklist({
      * (U17, `HPStates`): this one is then the desk's alone.
      */
     phoneOwnCard?: boolean;
+    /**
+     * Drawn as the last group of Needs you, one "Finish setting up"
+     * (HPHomeDesk): with `compact`, no card of its own.
+     */
+    inNeedsYou?: boolean;
+    /**
+     * Needs you's own setup things ("Make a course to start taking
+     * enrolments"), listed as steps here so setup is said once.
+     */
+    extraRows?: readonly ChecklistRow[];
 }) {
     const hidden = useSetupHidden(businessId);
     // A step that is the way to another plan is a plan prompt.
@@ -80,7 +93,7 @@ export function TakeMoneyChecklist({
         <SetupChecklist
             name="home"
             {...checklistWords(list)}
-            rows={readyRows(list.steps, canChangePlan)}
+            rows={[...readyRows(list.steps, canChangePlan), ...extraRows]}
             hide={{
                 hidden,
                 onHide: () => setSetupHidden(businessId, true),
@@ -88,6 +101,7 @@ export function TakeMoneyChecklist({
                 said: "Setup hidden. Show it again from the bottom of Home or Settings › Business.",
             }}
             compact={compact}
+            lineVariant={inNeedsYou ? "group" : "card"}
             className={
                 phoneOwnCard && place === "first" ? "max-sm:hidden" : undefined
             }

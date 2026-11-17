@@ -28,6 +28,7 @@ import {
 } from "@/components/sites/section-fields/display-options";
 import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { Segmented } from "@saroh/ui/segmented";
 import { TextLink } from "@saroh/ui/text-link";
 
@@ -356,7 +357,9 @@ function CollectionField({
 /** Why a picked product won't show, or null when it can. */
 function notShown(status: string | undefined): string | null {
     if (status === undefined) return "Deleted, not shown on the site";
-    if (status === "ARCHIVED") return "Archived, not shown on the site";
+    if (status === "ARCHIVED") {
+        return `${PRODUCT_STATUS_WORD.ARCHIVED}, not shown on the site`;
+    }
     if (status === "DRAFT") return "Draft, not shown until published";
     return null;
 }

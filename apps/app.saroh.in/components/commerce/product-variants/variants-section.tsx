@@ -26,6 +26,7 @@ import type { ProductDetail, ProductOptionView } from "@/lib/products/service";
 import { skuFrom } from "@/lib/products/sku-pattern";
 import type { VariantRow } from "@/lib/products/variant-rows";
 import {
+    isLegacy,
     rowsFrom,
     sameRows,
     variantProblem,
@@ -126,6 +127,8 @@ export function VariantsSection({
     const [adding, setAdding] = useState(false);
     const [open, setOpen] = useState<string | null>(null);
     const [newValue, setNewValue] = useState("");
+    // "Add another size" opens the staging row; open while it holds a value.
+    const [staging, setStaging] = useState(false);
     const [newSku, setNewSku] = useState("");
     const [newPrice, setNewPrice] = useState("");
     // Keys for rows not saved yet; ids arrive when they are.
@@ -143,6 +146,8 @@ export function VariantsSection({
     const optName = option?.name ?? "Size";
     const opt = optName.toLowerCase();
     const values = option?.values ?? [];
+    // The listed variants still on their own names, with no value yet.
+    const legacyTitles = rows.filter(isLegacy).map((r) => r.legacyTitle.trim());
     const titleOf = (r: VariantRow) =>
         values.find((x) => x.id === r.valueId)?.value ?? r.legacyTitle;
     const takenIds = rows.map((r) => r.valueId).filter(Boolean);
@@ -286,6 +291,8 @@ export function VariantsSection({
     );
 
     function add() {
+        // Adding one after another keeps the row open for the next.
+        setStaging(true);
         if (addOff) return;
         setRows([
             ...rows,
@@ -354,10 +361,10 @@ export function VariantsSection({
             ) : (
                 <>
                     <FieldHelp className="mb-[11px]">
-                        Each {opt} is the same product, with the same
-                        description and category. SKU, price and photo can
-                        differ.
-                        {shownPrice ? ` A blank price uses ${shownPrice}.` : ""}
+                        SKU, price and photo can differ for each {opt}
+                        {shownPrice
+                            ? `; a blank price uses ${shownPrice}.`
+                            : "."}
                     </FieldHelp>
                     {rows.length === 0 ? (
                         // Nothing listed yet: any option can be chosen.
@@ -402,6 +409,7 @@ export function VariantsSection({
                             existing={values.map((v) => v.value)}
                             locked={locked}
                             onOption={setOptionId}
+                            suggest={legacyTitles.join(", ")}
                         />
                     ) : null}
 
@@ -472,50 +480,70 @@ export function VariantsSection({
                         />
                     )}
 
-                    <VariantAddRow
-                        opt={opt}
-                        values={values}
-                        takenIds={takenIds}
-                        value={newValue}
-                        sku={newSku}
-                        suggested={suggested}
-                        price={newPrice}
-                        currency={currency}
-                        productPrice={productPrice}
-                        skuBad={dupSku || newSkuValue.length > LIMITS.sku}
-                        priceBad={newPriceBad}
-                        addOff={addOff}
-                        locked={locked}
-                        noteBad={!capNote && (dupSku || newPriceBad)}
-                        noteAction={
-                            capNote ? (
-                                <PlanWay className="text-[11.5px] leading-[1.45]">
-                                    <TextLink href={capNote.href} tone="muted">
-                                        {capNote.cta}
-                                    </TextLink>
-                                </PlanWay>
-                            ) : null
-                        }
-                        note={
-                            capNote
-                                ? capNote.text
-                                : values.length === 0
-                                  ? `No values for ${opt} yet. Add them above.`
-                                  : allTaken
-                                    ? `Every ${opt} is already a variant. Add another value above.`
-                                    : dupSku
-                                      ? "That SKU is already on this product."
-                                      : newOverMrp
-                                        ? mrpNote(newPrice, null)
-                                        : newPriceBad
-                                          ? "A number with at most two decimal places."
-                                          : `Blank price uses the product's ${shownPrice}. Save variants to keep it.`
-                        }
-                        onValue={setNewValue}
-                        onSku={setNewSku}
-                        onPrice={setNewPrice}
-                        onAdd={add}
-                    />
+                    {rows.length > 0 && !staging && !capNote ? (
+                        // The list leads (HPEditDesk); adding one opens the
+                        // row that stages it.
+                        <Button
+                            variant="outline"
+                            type="button"
+                            disabled={locked}
+                            onClick={() => setStaging(true)}
+                            className="gap-[7px]"
+                        >
+                            <Plus aria-hidden className="size-3.5" />
+                            Add another {opt}
+                        </Button>
+                    ) : (
+                        <VariantAddRow
+                            opt={opt}
+                            values={values}
+                            takenIds={takenIds}
+                            value={newValue}
+                            sku={newSku}
+                            suggested={suggested}
+                            price={newPrice}
+                            currency={currency}
+                            productPrice={productPrice}
+                            skuBad={dupSku || newSkuValue.length > LIMITS.sku}
+                            priceBad={newPriceBad}
+                            addOff={addOff}
+                            locked={locked}
+                            noteBad={!capNote && (dupSku || newPriceBad)}
+                            noteAction={
+                                capNote ? (
+                                    <PlanWay className="text-[11.5px] leading-[1.45]">
+                                        <TextLink
+                                            href={capNote.href}
+                                            tone="muted"
+                                        >
+                                            {capNote.cta}
+                                        </TextLink>
+                                    </PlanWay>
+                                ) : null
+                            }
+                            note={
+                                capNote
+                                    ? capNote.text
+                                    : values.length === 0
+                                      ? legacyTitles.length > 0
+                                          ? `${legacyTitles.join(", ")} ${legacyTitles.length === 1 ? "stays" : "stay"} as listed. Add ${optionPlural(opt)} above to add another.`
+                                          : `No values for ${opt} yet. Add them above.`
+                                      : allTaken
+                                        ? `Every ${opt} is already a variant. Add another value above.`
+                                        : dupSku
+                                          ? "That SKU is already on this product."
+                                          : newOverMrp
+                                            ? mrpNote(newPrice, null)
+                                            : newPriceBad
+                                              ? "A number with at most two decimal places."
+                                              : `Blank price uses the product's ${shownPrice}. Save variants to keep it.`
+                            }
+                            onValue={setNewValue}
+                            onSku={setNewSku}
+                            onPrice={setNewPrice}
+                            onAdd={add}
+                        />
+                    )}
                 </>
             )}
         </SectionCard>

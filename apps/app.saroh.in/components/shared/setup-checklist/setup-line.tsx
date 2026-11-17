@@ -3,6 +3,7 @@
 import { cn } from "@saroh/ui/lib/utils";
 import { ProgressBar } from "@saroh/ui/progress-bar";
 import { TextLink } from "@saroh/ui/text-link";
+import { SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
 
@@ -32,6 +33,7 @@ export function SetupLine({
     hide,
     className,
     children,
+    variant = "card",
 }: {
     name: string;
     title: string;
@@ -44,13 +46,21 @@ export function SetupLine({
     className?: string;
     /** What is listed beside the steps and never counted. */
     children?: ReactNode;
+    /**
+     * `group`: one group inside a list of groups (Home's Needs you,
+     * HPHomeDesk) — no card of its own, the glyph tile the groups have,
+     * and every step left listed, the done ones folded.
+     */
+    variant?: "card" | "group";
 }) {
     const headingId = useId();
     const listId = useId();
     const [all, setAll] = useState(false);
     const ordered = orderRows(rows);
     const next = ordered.find((row) => !row.done) ?? null;
-    const shown = all ? ordered : next ? [next] : [];
+    const group = variant === "group";
+    const left = ordered.filter((row) => !row.done);
+    const shown = all ? ordered : group ? left : next ? [next] : [];
 
     return (
         <section
@@ -58,35 +68,70 @@ export function SetupLine({
             data-setup-checklist={name}
             data-state="line"
             className={cn(
-                "grid justify-items-start gap-3 rounded-xl border border-border bg-card px-4 py-3.5",
+                "grid justify-items-start",
+                group
+                    ? "gap-2 py-3 pl-3.5 pr-2.5"
+                    : "gap-3 rounded-xl border border-border bg-card px-4 py-3.5",
                 className,
             )}
         >
-            <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
-                <h2
-                    id={headingId}
-                    data-ph-unmask=""
-                    className="text-[14.5px] font-semibold"
-                >
-                    {title}
-                </h2>
-                <span className="text-[12.5px] tabular-nums text-muted-foreground">
-                    {count}
-                </span>
-                <ProgressBar
-                    value={done}
-                    max={total}
-                    label={count}
-                    className="min-w-20 flex-1"
-                />
-                {hide ? <HideForNow hide={hide} /> : null}
-            </div>
+            {group ? (
+                <div className="flex w-full items-center gap-3">
+                    <span
+                        aria-hidden
+                        className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-muted text-neutral-700 dark:text-muted-foreground"
+                    >
+                        <SlidersHorizontal className="size-[18px]" />
+                    </span>
+                    <span className="grid min-w-0 flex-1 gap-1">
+                        <h2
+                            id={headingId}
+                            data-ph-unmask=""
+                            className="text-[14.5px] font-semibold"
+                        >
+                            {title}
+                        </h2>
+                        <span className="text-[12.5px] tabular-nums text-muted-foreground">
+                            {count}
+                        </span>
+                        <ProgressBar
+                            value={done}
+                            max={total}
+                            label={count}
+                            className="w-[120px]"
+                        />
+                    </span>
+                    {hide ? <HideForNow hide={hide} /> : null}
+                </div>
+            ) : (
+                <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
+                    <h2
+                        id={headingId}
+                        data-ph-unmask=""
+                        className="text-[14.5px] font-semibold"
+                    >
+                        {title}
+                    </h2>
+                    <span className="text-[12.5px] tabular-nums text-muted-foreground">
+                        {count}
+                    </span>
+                    <ProgressBar
+                        value={done}
+                        max={total}
+                        label={count}
+                        className="min-w-20 flex-1"
+                    />
+                    {hide ? <HideForNow hide={hide} /> : null}
+                </div>
+            )}
             <ul
                 id={listId}
                 className={cn(
                     "grid w-full gap-1",
+                    group && "pl-12",
                     // The next step alone sits in its own tinted band.
                     !all &&
+                        !group &&
                         "rounded-[10px] border border-border bg-muted/40 px-3 py-1.5",
                 )}
             >
@@ -100,7 +145,10 @@ export function SetupLine({
                     aria-expanded={all}
                     aria-controls={listId}
                     onClick={() => setAll((open) => !open)}
-                    className="text-[12.5px] coarse:min-h-11"
+                    className={cn(
+                        "text-[12.5px] coarse:min-h-11",
+                        group && "ml-12",
+                    )}
                 >
                     {all
                         ? "Show fewer"

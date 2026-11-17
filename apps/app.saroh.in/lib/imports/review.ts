@@ -3,6 +3,7 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { count, plural } from "@/lib/format/plural";
 import { MRP_LABEL } from "@/lib/products/mrp-label";
 
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { fieldLabel } from "./labels";
 import type { ImportEntity, ImportPlan, IssueGroup } from "./service";
 
@@ -106,11 +107,7 @@ export function problemsLead(passing: number): string {
         : "Fix these in your file and choose it again.";
 }
 
-const STATUS_WORDS: Readonly<Record<string, string>> = {
-    DRAFT: "Draft",
-    PUBLISHED: "Live",
-    ARCHIVED: "Archived",
-};
+const STATUS_WORDS: Readonly<Record<string, string>> = PRODUCT_STATUS_WORD;
 
 /**
  * One planned row as it will read once it's in: "Kraft Tape 48mm · ₹120 ·

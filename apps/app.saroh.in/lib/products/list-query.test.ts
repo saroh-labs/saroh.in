@@ -29,8 +29,25 @@ describe("the Products list's address (#519)", () => {
             collection: "c1",
             page: 1,
             size: 50,
+            sort: "newest",
         });
         expect(isNarrowed(query)).toBe(true);
+    });
+
+    it("reads the sort, keeps it in the address, and asks the API for it", () => {
+        const query = readListQuery({ sort: "-price", page: "3" });
+        expect(query.sort).toBe("-price");
+        expect(readListQuery({ sort: "colour" }).sort).toBe("newest");
+        // A new order is a new list: back to its first page.
+        expect(listHref(query, { sort: "stock" })).toBe(
+            "/commerce/products?sort=stock",
+        );
+        expect(listHref(query, { page: 2 })).toBe(
+            "/commerce/products?sort=-price&page=2",
+        );
+        expect(listHref(query, { sort: "newest" })).toBe("/commerce/products");
+        expect(catalogueFilter(query).sort).toBe("-price");
+        expect(catalogueFilter(readListQuery({})).sort).toBeUndefined();
     });
 
     it("reads the page and the rows a page, and opens at the size last chosen", () => {
@@ -114,7 +131,7 @@ describe("the Products list's address (#519)", () => {
         expect(emptyCopy(readListQuery({}), "Hill Road")).toMatchObject({
             kind: "first-run",
             title: "No products yet",
-            note: "Add your first product and it appears in Hill Road straight away.",
+            note: "Add what you sell, one at a time, or bring a list in from a spreadsheet. Stock, prices and photos can come later. It sells at Hill Road straight away.",
         });
         expect(emptyCopy(readListQuery({ status: "DRAFT" }), null).kind).toBe(
             "filters",
@@ -171,6 +188,7 @@ describe("the Products list's address (#519)", () => {
             collection: undefined,
             page: undefined,
             size: 50,
+            sort: undefined,
         });
     });
 

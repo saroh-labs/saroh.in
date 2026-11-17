@@ -8,6 +8,7 @@ import { useTransition } from "react";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { patchProduct } from "@/lib/products/actions";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { Notice } from "@saroh/ui/notice";
 
 /**
@@ -72,7 +73,7 @@ export function ArchivedBanner({
                                 .
                             </>
                         ) : (
-                            "Archived."
+                            `${PRODUCT_STATUS_WORD.ARCHIVED}.`
                         )}
                     </strong>{" "}
                     It is not sold and its page does not open. Past orders,

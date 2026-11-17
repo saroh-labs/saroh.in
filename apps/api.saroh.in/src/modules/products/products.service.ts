@@ -303,6 +303,8 @@ export class ProductsService {
             where?: Prisma.ProductWhereInput;
             take?: number;
             skip?: number;
+            /** The list's sort (`catalogueOrder`); newest first without. */
+            orderBy?: Prisma.ProductOrderByWithRelationInput[];
         } = {},
     ): Promise<CatalogueItemDto[]> {
         const { status, storefront } = filter;
@@ -315,7 +317,7 @@ export class ProductsService {
                 ...(status ? { status } : {}),
                 ...(page.where ? { AND: [page.where] } : {}),
             },
-            orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+            orderBy: page.orderBy ?? [{ createdAt: "desc" }, { id: "asc" }],
             ...(page.take !== undefined ? { take: page.take } : {}),
             ...(page.skip ? { skip: page.skip } : {}),
             include: {

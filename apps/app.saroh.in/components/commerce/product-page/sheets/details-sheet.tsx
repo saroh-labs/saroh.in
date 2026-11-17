@@ -34,6 +34,7 @@ import type { ProductDetail, ProductPatch } from "@/lib/products/service";
 import { OptionSelect } from "@saroh/ui/option-select";
 
 import { EXAMPLES } from "@/lib/edition";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { QuickSheet } from "../quick-sheet";
 
 const schema = z.intersection(
@@ -177,12 +178,15 @@ export function DetailsSheet({
                                         options={[
                                             {
                                                 value: "PUBLISHED",
-                                                label: "Live",
+                                                label: PRODUCT_STATUS_WORD.PUBLISHED,
                                             },
-                                            { value: "DRAFT", label: "Draft" },
+                                            {
+                                                value: "DRAFT",
+                                                label: PRODUCT_STATUS_WORD.DRAFT,
+                                            },
                                             {
                                                 value: "ARCHIVED",
-                                                label: "Archived",
+                                                label: PRODUCT_STATUS_WORD.ARCHIVED,
                                             },
                                         ]}
                                     />
@@ -235,7 +239,7 @@ export function DetailsSheet({
                                         How to use or care for it
                                     </FormLabel>
                                     <ShopSwitch
-                                        field="How to use"
+                                        field="Care and use"
                                         checked={form.watch("showHowToUse")}
                                         onCheckedChange={(v) =>
                                             form.setValue("showHowToUse", v, {

@@ -7,6 +7,8 @@ import { useState } from "react";
 
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, optionPlural } from "@/lib/products/editor-sections";
+import type { PlaceShelf } from "@/lib/products/editor-stock";
+import { allLocations } from "@/lib/products/editor-stock";
 
 import {
     FIND_FROM,
@@ -105,6 +107,111 @@ export function WholeStock({
 
 const GRID =
     "grid grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.9fr)] gap-1.5";
+
+/**
+ * A product counted as a whole at several locations (HPEditDesk): a row
+ * per location with its On hand and Low at, what its open orders hold, and
+ * "All locations" under them — the same total the product page says. The
+ * location this editor was opened at comes first.
+ */
+export function PlacesStock({
+    shelves,
+    ro,
+    badStoreId,
+    onShelf,
+}: {
+    shelves: readonly PlaceShelf[];
+    ro: boolean;
+    /** The shelf whose count is below what its orders hold. */
+    badStoreId: string | null;
+    onShelf: (storeId: string, patch: Partial<PlaceShelf>) => void;
+}) {
+    const all = allLocations(shelves);
+    return (
+        <div
+            role="table"
+            aria-label="Stock by location"
+            className="text-[13.5px]"
+        >
+            <div
+                role="row"
+                data-ph-unmask=""
+                className={cn(GRID, "label pb-1.5 text-muted-foreground")}
+            >
+                <span role="columnheader">Location</span>
+                <span role="columnheader">On hand</span>
+                <span role="columnheader">Low at</span>
+                <span role="columnheader" className="text-right">
+                    Promised
+                </span>
+            </div>
+            {shelves.map((s) => (
+                <div
+                    role="row"
+                    key={s.storeId}
+                    className={cn(GRID, "items-center py-1")}
+                >
+                    <span role="cell" className="min-w-0 truncate">
+                        {s.name}
+                    </span>
+                    <span role="cell">
+                        <Input
+                            dense
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={s.quantity}
+                            disabled={ro}
+                            aria-invalid={
+                                !isCount(s.quantity) || badStoreId === s.storeId
+                            }
+                            aria-label={`On hand at ${s.name}`}
+                            onChange={(e) =>
+                                onShelf(s.storeId, { quantity: e.target.value })
+                            }
+                        />
+                    </span>
+                    <span role="cell">
+                        <Input
+                            dense
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={s.lowStockAlert}
+                            disabled={ro}
+                            aria-invalid={!isCount(s.lowStockAlert)}
+                            aria-label={`Warn at ${s.name} when on hand reaches`}
+                            onChange={(e) =>
+                                onShelf(s.storeId, {
+                                    lowStockAlert: e.target.value,
+                                })
+                            }
+                        />
+                    </span>
+                    <span role="cell" className="text-right tabular-nums">
+                        {s.promised}
+                    </span>
+                </div>
+            ))}
+            <div
+                role="row"
+                className={cn(
+                    GRID,
+                    "mt-1 border-t border-border pt-2 font-semibold",
+                )}
+            >
+                <span role="cell" data-ph-unmask="">
+                    All locations
+                </span>
+                <span role="cell" className="tabular-nums">
+                    {all.onHand}
+                </span>
+                <span role="cell" />
+                <span role="cell" className="text-right tabular-nums">
+                    {all.promised}
+                </span>
+            </div>
+        </div>
+    );
+}
 
 /** The variants the Stock section counts at or under their warning level. */
 export function lowLines(lines: readonly StockLine[]): StockLine[] {

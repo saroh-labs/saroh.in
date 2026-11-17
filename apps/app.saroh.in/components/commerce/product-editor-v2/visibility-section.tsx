@@ -8,22 +8,33 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { cn } from "@saroh/ui/lib/utils";
-import { Check, ChevronDown, Clock } from "lucide-react";
+import { TextLink } from "@saroh/ui/text-link";
+import { Check, ChevronDown, Clock, Globe } from "lucide-react";
 import { useState } from "react";
 
 import { patchProduct } from "@/lib/products/actions";
+import { visibilityLine } from "@/lib/products/overview-words";
 import type { ProductDetail, ProductStatus } from "@/lib/products/service";
 
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { Notice } from "@saroh/ui/notice";
 import { useEditor, useSection } from "./editor-state";
 import { SectionCard } from "./section-card";
 
 const STATUSES: { value: ProductStatus; label: string; note: string }[] = [
-    { value: "DRAFT", label: "Draft", note: "Only the team can see it." },
-    { value: "PUBLISHED", label: "Live", note: "Customers can buy it." },
+    {
+        value: "DRAFT",
+        label: PRODUCT_STATUS_WORD.DRAFT,
+        note: "Only the team can see it.",
+    },
+    {
+        value: "PUBLISHED",
+        label: PRODUCT_STATUS_WORD.PUBLISHED,
+        note: "Customers can buy it.",
+    },
     {
         value: "ARCHIVED",
-        label: "Archived",
+        label: PRODUCT_STATUS_WORD.ARCHIVED,
         note: "No longer sold. Its orders keep their record.",
     },
 ];
@@ -48,9 +59,15 @@ export function VisibilitySection({
     storeId,
     value,
     onChange,
+    shopLive = null,
+    paused = false,
 }: {
     product: ProductDetail | null;
     storeId: string;
+    /** Whether the online shop is live; null when not known. */
+    shopLive?: boolean | null;
+    /** Paused by the plan (#800). */
+    paused?: boolean;
     /** Creating keeps the choice in the shell: it names the create button. */
     value?: ProductStatus;
     onChange?: (status: ProductStatus) => void;
@@ -125,18 +142,14 @@ export function VisibilitySection({
 
     return (
         <SectionCard k="visibility" title="Visibility">
-            <p
-                data-ph-unmask=""
-                className="mb-2.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground"
-            >
-                {creating
-                    ? "Choose who can see it once it is created."
-                    : saved === "PUBLISHED"
-                      ? "Live. Customers can buy it."
-                      : saved === "DRAFT"
-                        ? "Draft. Only the team can see it."
-                        : "Archived. It isn't sold, and its link doesn't open."}
-            </p>
+            {creating ? (
+                <p
+                    data-ph-unmask=""
+                    className="mb-2.5 text-pretty text-[12px] leading-[1.5] text-muted-foreground"
+                >
+                    Choose who can see it once it is created.
+                </p>
+            ) : null}
             <DropdownMenu>
                 <DropdownMenuTrigger asChild disabled={!canWrite}>
                     <button
@@ -200,6 +213,25 @@ export function VisibilitySection({
                     </DropdownMenuRadioGroup>
                 </DropdownMenuContent>
             </DropdownMenu>
+            {creating ? null : (
+                // The product's one status sentence, as its page says it
+                // (HPEditDesk), with the way to the shop while it is off.
+                <p
+                    data-ph-unmask=""
+                    className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg bg-muted px-3 py-2 text-[13px] text-foreground"
+                >
+                    <Globe
+                        aria-hidden
+                        className="size-4 shrink-0 text-muted-foreground"
+                    />
+                    <span>{visibilityLine(saved, shopLive, paused)}</span>
+                    {shopLive === false && saved === "PUBLISHED" ? (
+                        <TextLink href="/sites" className="font-semibold">
+                            Set up your shop
+                        </TextLink>
+                    ) : null}
+                </p>
+            )}
             {creating ? (
                 <Notice
                     tone={status === "PUBLISHED" ? "success" : "info"}

@@ -27,16 +27,45 @@ import { formatMoneyMajor } from "@/lib/format/money";
 import { rowRating } from "@/lib/product-reviews/describe";
 import type { ProductRating } from "@/lib/product-reviews/service";
 import type { CatalogueRow } from "@/lib/products/catalogue";
-import { rowFacts, stockWords } from "@/lib/products/catalogue";
+import { rowFacts, stockWhere, stockWords } from "@/lib/products/catalogue";
 import type { NeedDetail } from "@/lib/products/needs-you";
 
 import { IconButton } from "@saroh/ui/icon-button";
 import { ProductThumb } from "./product-thumb";
 import { STATUS_LABEL, STATUS_VARIANT, TONE_TEXT } from "./tones";
 
-/** The status in words, for the folded second line: "Live", "Paused". */
-function statusWord(r: CatalogueRow): string {
-    return r.paused ? "Paused" : STATUS_LABEL[r.status];
+/**
+ * The product's state beside its name, only when it isn't plainly on sale
+ * (owner, 15 Nov; HPProductsStatesDesk): Draft, Archived, or Paused by your
+ * plan. A live product says nothing; there is no Status column of 51
+ * "Live" pills.
+ */
+function StatusPill({ row }: { row: CatalogueRow }) {
+    // Past the plan's limit (#800): hidden from the site, so its status
+    // there is not what the list would otherwise say. The notice above
+    // the list says why, in words.
+    if (row.paused) {
+        return (
+            <Badge
+                variant="error"
+                size="sm"
+                className="shrink-0"
+                title="Hidden from your site and read-only: past your plan's products limit"
+            >
+                Paused by your plan
+            </Badge>
+        );
+    }
+    if (row.status === "PUBLISHED") return null;
+    return (
+        <Badge
+            variant={STATUS_VARIANT[row.status]}
+            size="sm"
+            className="shrink-0"
+        >
+            {STATUS_LABEL[row.status]}
+        </Badge>
+    );
 }
 
 /** The row's price: the variants' range when they differ. */
@@ -48,20 +77,16 @@ export function priceText(row: CatalogueRow): string {
 }
 
 /**
- * The table's columns, as the design lays them out: Product (tile, name,
- * variants · SKU · where it sells), Status, Inventory, Price. Not sortable:
- * a page of the catalogue sorted on its own would be a lie about the rest.
+ * The table's columns, as the polished design lays them out
+ * (HPProductsDesk): Product (tile, name with a pill only when it isn't
+ * live, variants · SKU), Category, Stock (what can be sold, then where),
+ * Price. The headers don't sort: the list's own Sort reads the whole
+ * catalogue in that order (`?sort=`), never one page on its own.
  */
 export function catalogueColumns({
-    many,
-    filtered,
     ratingById,
     needById = new Map(),
 }: {
-    /** More than one storefront: rows say where they sell. */
-    many: boolean;
-    /** Narrowed to one storefront: rows needn't say. */
-    filtered: boolean;
     ratingById: Map<string, ProductRating>;
     /** What Needs you says about each product: the Stock cell agrees. */
     needById?: Map<string, NeedDetail>;
@@ -72,25 +97,26 @@ export function catalogueColumns({
             header: "Product",
             priority: "primary",
             cell: (r) => (
-                <span className="flex min-w-0 items-center gap-[11px]">
+                <span className="flex min-w-0 items-center gap-3">
                     <ProductThumb name={r.name} image={r.image} />
                     <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-medium">
-                            {r.name}
+                        <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-[14px] font-semibold">
+                                {r.name}
+                            </span>
+                            <StatusPill row={r} />
                         </span>
                         {(() => {
-                            // An aggregate view must say which places a row
-                            // belongs to; no variants, no "0 variants".
-                            const facts = rowFacts(r, !filtered && many);
+                            // Where it sells moved under Stock ("across 2
+                            // locations", HPProductsNotes); a narrowed or
+                            // one-place list never needed it.
+                            const facts = rowFacts(r, false);
                             const rating = rowRating([r.id], ratingById);
                             const parts = [
                                 facts.variants,
                                 facts.sku ? (
-                                    <span key="sku" className="font-mono">
-                                        {facts.sku}
-                                    </span>
+                                    <span key="sku">{facts.sku}</span>
                                 ) : null,
-                                facts.places,
                                 rating ? (
                                     <span
                                         key="rating"
@@ -101,20 +127,8 @@ export function catalogueColumns({
                                     </span>
                                 ) : null,
                             ].filter((p) => p !== null);
-                            // On a narrow desk (924 px) Status folds into
-                            // this line, so Product · Stock · Price · ⋯ fit.
-                            const status = (
-                                <span
-                                    key="status"
-                                    className="hidden min-[760px]:inline min-[1100px]:hidden"
-                                >
-                                    {statusWord(r)}
-                                    {parts.length > 0 ? " · " : ""}
-                                </span>
-                            );
-                            return (
-                                <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
-                                    {status}
+                            return parts.length > 0 ? (
+                                <span className="mt-0.5 block truncate text-[12.5px] text-muted-foreground">
                                     {parts.map((p, i) => (
                                         <Fragment key={i}>
                                             {i > 0 ? " · " : null}
@@ -122,52 +136,54 @@ export function catalogueColumns({
                                         </Fragment>
                                     ))}
                                 </span>
-                            );
+                            ) : null;
                         })()}
                     </span>
                 </span>
             ),
         },
         {
-            id: "status",
-            header: "Status",
-            priority: "secondary",
-            width: "118px",
-            // Folded into the product's second line below 1100 px.
+            id: "category",
+            header: "Category",
+            // A desk's column; a phone's card leaves it out (HPProductsPhone).
+            priority: "detail",
+            width: "200px",
             tableClassName: "hidden min-[1100px]:table-cell",
-            cell: (r) =>
-                // Past the plan's limit (#800): hidden from the site, so its
-                // status there is not what the list would otherwise say.
-                // The notice above the list says why, in words.
-                r.paused ? (
-                    <Badge
-                        variant="warning"
-                        size="sm"
-                        title="Hidden from your site and read-only: past your plan's products limit"
-                    >
-                        Paused
-                    </Badge>
-                ) : (
-                    <Badge variant={STATUS_VARIANT[r.status]} size="sm">
-                        {STATUS_LABEL[r.status]}
-                    </Badge>
-                ),
+            cell: (r) => (
+                <span className="text-[13.5px] text-neutral-700 dark:text-muted-foreground">
+                    {r.categoryName ?? "Uncategorized"}
+                </span>
+            ),
         },
         {
             id: "inventory",
             header: "Stock",
             priority: "secondary",
+            // A phone's card: on the right, under the price (HPProductsPhone).
+            listPlace: "end",
             width: "164px",
+            numeric: true,
             cell: (r) => {
                 const s = stockWords(r, needById.get(r.id) ?? null);
+                const where = stockWhere(r, s);
                 return (
-                    <span
-                        className={cn(
-                            "text-balance text-[12.5px]",
-                            TONE_TEXT[s.tone],
-                        )}
-                    >
-                        {s.text}
+                    <span className="grid justify-items-end text-right">
+                        <span
+                            className={cn(
+                                "text-balance text-[13.5px] font-semibold",
+                                s.tone === "plain"
+                                    ? "text-foreground"
+                                    : TONE_TEXT[s.tone],
+                            )}
+                        >
+                            {s.text}
+                        </span>
+                        {where ? (
+                            // A phone's card says the figure alone.
+                            <span className="hidden text-[12.5px] font-normal text-muted-foreground sm:block">
+                                {where}
+                            </span>
+                        ) : null}
                     </span>
                 );
             },
@@ -176,6 +192,7 @@ export function catalogueColumns({
             id: "price",
             header: "Price",
             priority: "secondary",
+            listPlace: "end",
             width: "132px",
             numeric: true,
             money: true,

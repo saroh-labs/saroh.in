@@ -56,7 +56,12 @@ export interface ProductStock {
     /** More than one storefront shows: a sub-row per storefront. */
     split: boolean;
     /** What each storefront that sells it can sell, in the levels' order. */
-    byStore: { storeId: string; name: string; canSell: number }[];
+    byStore: {
+        storeId: string;
+        name: string;
+        onHand: number;
+        canSell: number;
+    }[];
 }
 
 /** The levels read's rows and storefronts — the part this needs. */
@@ -148,6 +153,14 @@ export function productStock(
         .map((s) => ({
             storeId: s.id,
             name: s.name,
+            // What is there and what can be sold, per place: the product
+            // page's location table adds up to its totals (HPProductDesk).
+            onHand: sizes.reduce(
+                (n, z) =>
+                    n +
+                    (z.shelves.find((x) => x.storeId === s.id)?.onHand ?? 0),
+                0,
+            ),
             canSell: sizes.reduce(
                 (n, z) =>
                     n +

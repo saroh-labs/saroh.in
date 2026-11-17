@@ -323,9 +323,9 @@ describe("the phone Home, busy day (HPHome)", () => {
             host.querySelectorAll<HTMLAnchorElement>("[data-figure]"),
         ).map((a) => [a.textContent, a.getAttribute("href")]);
         expect(figures).toEqual([
-            ["₹8,240in today", "/billing/invoices?paid=today"],
+            ["7to pack, late", "/commerce/orders"],
             ["6bookings", "/calendar"],
-            ["7to pack", "/commerce/orders"],
+            ["₹8,240in today", "/billing/invoices?paid=today"],
         ]);
         expect(host.querySelector("[data-phone-next]")?.textContent).toContain(
             "Next: 11:30 am Sourdough basics",
@@ -462,13 +462,13 @@ describe("the day sheet (HPMore)", () => {
         expect(open?.textContent).toContain("Cake tasting");
     });
 
-    it("holds Mark arrived for Undo, even past closing the sheet", async () => {
+    it("holds Came for Undo, even past closing the sheet", async () => {
         draw(home());
         const next = host.querySelector<HTMLElement>("[data-phone-next]");
         await press(next);
         const arrive = Array.from(
             sheet()?.querySelectorAll("button") ?? [],
-        ).find((b) => b.textContent === "Mark arrived");
+        ).find((b) => b.textContent === "Came");
         await press(arrive);
         expect(sheet()?.textContent).toContain("Came at");
         expect(recordBookingOutcome).not.toHaveBeenCalled();
@@ -548,7 +548,7 @@ describe("the phone Home's states", () => {
         const labels = Array.from(host.querySelectorAll("[data-figure]")).map(
             (a) => a.getAttribute("data-figure"),
         );
-        expect(labels).toEqual(["bookings", "came", "toPack"]);
+        expect(labels).toEqual(["toPack", "bookings", "came"]);
         expect(text()).toContain("3 of 6");
         expect(text()).not.toContain("₹");
         expect(text()).toContain(

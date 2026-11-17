@@ -35,6 +35,8 @@ export interface TileView {
     /** What the dash means, to a screen reader. */
     absent?: "Not known" | "None";
     sub: string;
+    /** "bad": the line under the figure reads in the late colour. */
+    tone?: "bad";
     href: string;
     /** The currency Money in today is in, for its icon. */
     currency?: string;
@@ -67,7 +69,8 @@ const LABEL: Record<TileKey, string> = {
     bookings: "Bookings today",
     toPack: "To pack or hand over",
     moneyIn: "Money in today",
-    came: "Came",
+    // Its outcome, not a roll call (HPHomeNotes, 15 Nov).
+    came: "Showed up",
 };
 
 function failed(key: TileKey, unavailable: readonly HomeUnavailable[]) {
@@ -151,7 +154,29 @@ export function cameSub(c: NonNullable<HomeTiles["came"]>): string {
 }
 
 /**
- * The tiles to draw, in the boards' order. `today` is the business's date
+ * To pack's line, the same late count Needs you's group and pill say
+ * (HPHomeNotes): "All late · oldest 24 days", "29 late · oldest 24 days",
+ * else what is due.
+ */
+function lateLine(
+    pack: NonNullable<HomeTiles["toPack"]>,
+    oldestLate: number | null,
+): string {
+    if (pack.late > 0) {
+        if (pack.late >= pack.count) {
+            return oldestLate && oldestLate > 0
+                ? `All late · oldest ${count(oldestLate, "day")}`
+                : "All late";
+        }
+        const due = pack.dueToday > 0 ? ` · ${pack.dueToday} due today` : "";
+        return `${pack.late} late${due}`;
+    }
+    return pack.dueToday > 0 ? `${pack.dueToday} due today` : "Due by tomorrow";
+}
+
+/**
+ * The tiles to draw, in the boards' order (HPHomeDesk): To pack first,
+ * the work, then Bookings today, Showed up and Money in today. `today` is the business's date
  * ("2026-10-19"), so a next booking on another day says which.
  */
 export function tileViews({
@@ -159,21 +184,18 @@ export function tileViews({
     unavailable,
     today,
     fresh,
+    oldestLate = null,
 }: {
     tiles: HomeTiles | null;
     unavailable: readonly HomeUnavailable[];
     today: string | null;
     /** Nothing sold, booked or paid yet (`lastDay.fresh`). */
     fresh: boolean;
+    /** Days the oldest late order has waited (`oldestLateDays`). */
+    oldestLate?: number | null;
 }): TileView[] {
     if (!tiles) return [];
     const out: TileView[] = [];
-
-    if (tiles.bookingsToday) {
-        out.push(bookingsTile(tiles.bookingsToday, today, fresh));
-    } else if (failed("bookings", unavailable)) {
-        out.push(failedTile("bookings"));
-    }
 
     const pack = tiles.toPack;
     if (pack) {
@@ -192,15 +214,42 @@ export function tileViews({
                     : fresh
                       ? "Orders show here as they come in"
                       : "No orders to send"
-                : pack.dueToday > 0
-                  ? `${pack.dueToday} due today`
-                  : pack.late > 0
-                    ? `${pack.late} late`
-                    : "Due by tomorrow",
+                : lateLine(pack, oldestLate),
+            tone: none || pack.late === 0 ? undefined : "bad",
             href: pack.href,
         });
     } else if (failed("toPack", unavailable)) {
         out.push(failedTile("toPack"));
+    }
+
+    if (tiles.bookingsToday) {
+        out.push(bookingsTile(tiles.bookingsToday, today, fresh));
+    } else if (failed("bookings", unavailable)) {
+        out.push(failedTile("bookings"));
+    }
+
+    if (tiles.came) {
+        const c = tiles.came;
+        out.push({
+            key: "came",
+            label: LABEL.came,
+            value: `${c.came} of ${c.total}`,
+            sub: cameSub(c),
+            href: c.href,
+        });
+    } else if (tiles.bookingsToday) {
+        // Bookings are read, and nobody is booked one to one today: there
+        // is no one to mark, said with the dash (`HAQuietD`).
+        out.push({
+            key: "came",
+            label: LABEL.came,
+            value: null,
+            absent: "None",
+            sub: fresh ? "Shows once people book" : "No bookings to mark today",
+            href: "/bookings",
+        });
+    } else if (failed("came", unavailable)) {
+        out.push(failedTile("came"));
     }
 
     const money = tiles.moneyIn;
@@ -228,30 +277,6 @@ export function tileViews({
         });
     } else if (failed("moneyIn", unavailable)) {
         out.push(failedTile("moneyIn"));
-    }
-
-    if (tiles.came) {
-        const c = tiles.came;
-        out.push({
-            key: "came",
-            label: LABEL.came,
-            value: `${c.came} of ${c.total}`,
-            sub: cameSub(c),
-            href: c.href,
-        });
-    } else if (tiles.bookingsToday) {
-        // Bookings are read, and nobody is booked one to one today: there
-        // is no one to mark, said with the dash (`HAQuietD`).
-        out.push({
-            key: "came",
-            label: LABEL.came,
-            value: null,
-            absent: "None",
-            sub: fresh ? "Shows once people book" : "No bookings to mark today",
-            href: "/bookings",
-        });
-    } else if (failed("came", unavailable)) {
-        out.push(failedTile("came"));
     }
 
     return out;

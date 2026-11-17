@@ -7,7 +7,7 @@ import Link from "next/link";
 import { newProductHref } from "@/lib/products/links";
 import type { EmptyCopy, ListQuery } from "@/lib/products/list-query";
 import { newCollectionHref } from "@/lib/products/list-query";
-import { newStorefrontHref } from "@/lib/stores/links";
+import { importProductsHref, newStorefrontHref } from "@/lib/stores/links";
 import { EmptyState } from "@saroh/ui/data-state";
 
 /** A business with no storefront: nothing to sell from yet. */
@@ -71,9 +71,17 @@ export function emptyState(
                 Show all products
             </Button>
         ) : empty.action === "add-product" && canWrite ? (
-            <Button asChild>
-                <Link href={newProductHref(storeId)}>New product</Link>
-            </Button>
+            // Both ways in (HPProductsEmptyDesk): one at a time, or a list.
+            <span className="flex flex-wrap justify-center gap-2">
+                <Button asChild>
+                    <Link href={newProductHref(storeId)}>New product</Link>
+                </Button>
+                <Button asChild variant="outline">
+                    <Link href={importProductsHref(storeId)}>
+                        Import from a spreadsheet
+                    </Link>
+                </Button>
+            </span>
         ) : empty.action === "new-collection" && canWrite ? (
             <Button asChild>
                 <Link href={newCollectionHref(query)} scroll={false}>

@@ -12,10 +12,12 @@ import {
     mayManageModules,
     onButNotOpen,
 } from "@/lib/home/first-run";
+import { holdsNews } from "@/lib/home/late-orders";
 import { formatList } from "@/lib/home/needs";
 import type { HomeModel } from "@/lib/home/service";
 import { rolledOut } from "@/lib/modules/rollout";
 import type { ModuleView } from "@/lib/modules/schema";
+import type { MomentView } from "@/lib/moments/keys";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { firstStepsLead } from "@/lib/settings/ready";
 
@@ -61,6 +63,7 @@ export function HomeDashboard({
     kind,
     invoicing,
     insights = false,
+    news = null,
 }: {
     home: HomeModel;
     /** Read only for a business with nothing on — the first-run question. */
@@ -77,6 +80,8 @@ export function HomeDashboard({
     invoicing?: InvoiceJobFacts;
     /** Whether Insights is open to them: "See how the month went". */
     insights?: boolean;
+    /** A new feature, said under the work as one line (`NewsLine`). */
+    news?: MomentView | null;
 }) {
     // Nothing on yet: ask what the business wants to do, on Home itself,
     // rather than an empty dashboard whose every band says "nothing yet".
@@ -96,6 +101,8 @@ export function HomeDashboard({
     const first =
         setup?.first && firstStepsLead(setup.first) ? setup.first : null;
     const money = first ? null : setup;
+    // Held back while any order is over 3 days late (owner, 15 Nov).
+    const shownNews = news && !holdsNews(home, now) ? news : null;
 
     return (
         <div className="grid gap-[22px]">
@@ -135,6 +142,7 @@ export function HomeDashboard({
                     setup={money}
                     now={now}
                     insights={insights}
+                    news={shownNews}
                 />
             </div>
             <div data-home-layout="phone" className="sm:hidden">
@@ -143,6 +151,7 @@ export function HomeDashboard({
                     setup={money}
                     now={now}
                     insights={insights}
+                    news={shownNews}
                 />
             </div>
         </div>

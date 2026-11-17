@@ -73,12 +73,12 @@ export function detailsCopy(sellsFood: boolean): DetailsCopy {
                   label: "How to use or care for it",
                   placeholder: "e.g. how to use it, or how to care for it",
                   help: "One line under the price. Every variant shares it.",
-                  field: "How to use",
+                  field: "Care and use",
               },
               materials: {
-                  label: "Ingredients or material",
+                  label: "Materials",
                   placeholder: "e.g. what it is made of",
-                  field: "Ingredients or material",
+                  field: "Materials",
               },
               saves: "Saves how to use it, what it is made of and how it's fulfilled.",
           };

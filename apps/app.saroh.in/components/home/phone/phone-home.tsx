@@ -6,7 +6,11 @@ import type { HomeModel } from "@/lib/home/service";
 import { nextBookingSentence } from "@/lib/home/tiles";
 import { showsGoing } from "@/lib/home/week";
 
+import type { MomentView } from "@/lib/moments/keys";
+
 import type { HomeSetup } from "@/components/home/dashboard/home-setup";
+import { NewsLine } from "@/components/home/dashboard/news-line";
+import { TodayToMark } from "@/components/home/dashboard/today";
 import { NeedsYou } from "@/components/home/needs-you/needs-you";
 import { DaySheet, SinceYesterday } from "./day-sheet";
 import { PhoneFigures } from "./phone-figures";
@@ -27,7 +31,11 @@ import { PhoneSetup } from "./setup-sheet";
  * 4. Needs you, one line per group (five, then Show N more), each opening
  *    its rows and actions in a sheet;
  * 5. How it's going, one sentence and the way into Insights;
- * 6. setup once most of it is done, one line that can be hidden.
+ * 6. setup once most of it is done, one line that can be hidden;
+ * 7. a new feature's news, one line, held while orders are very late.
+ *
+ * A booking waiting for its outcome is asked about under the figures
+ * (HPHomePhone), with Came and Didn't come.
  *
  * The + is New's (`new-sheet.tsx`, U5), drawn with the header. Nothing the
  * old phone Home offered is gone: the plan's "Capabilities today that must
@@ -38,11 +46,14 @@ export function PhoneHome({
     setup,
     now,
     insights,
+    news = null,
 }: {
     home: HomeModel;
     setup: HomeSetup | null;
     now: Date;
     insights: boolean;
+    /** A new feature: one line at the foot, below the fold (HPHomePhone). */
+    news?: MomentView | null;
 }) {
     const fresh = home.lastDay?.fresh ?? false;
     const today = home.lastDay?.date ?? home.today?.date ?? null;
@@ -62,11 +73,17 @@ export function PhoneHome({
         // otherwise, and the page scrolls sideways at 320px (#178, §18).
         <div
             data-phone-home=""
-            className="grid min-w-0 content-start gap-[18px]"
+            // `pb-20`: the content ends above New's + button, so it never
+            // covers a row (HPHomeNotes).
+            className="grid min-w-0 content-start gap-[18px] pb-20"
         >
             {setup ? <PhoneSetup {...setup} slot="first" /> : null}
 
             <PhoneFigures figures={figures} />
+
+            {home.today && !fresh ? (
+                <TodayToMark today={home.today} now={now.toISOString()} />
+            ) : null}
 
             {next ? (
                 <DaySheet
@@ -113,6 +130,8 @@ export function PhoneHome({
             ) : null}
 
             {setup ? <PhoneSetup {...setup} slot="late" /> : null}
+
+            {news ? <NewsLine moment={news} /> : null}
         </div>
     );
 }

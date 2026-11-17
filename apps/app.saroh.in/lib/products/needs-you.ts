@@ -57,32 +57,58 @@ export function needWords(need: NeedDetail): NeedLine {
     };
 }
 
-/** "2 short · 7 out · 21 low"; empty for none. */
-export function needsSummary(needs: readonly CatalogueNeed[]): string {
-    const short = needs.filter((n) => n.kind === "short").length;
-    const out = needs.filter((n) => n.kind === "out").length;
-    const low = needs.filter((n) => n.kind === "low").length;
-    return [
-        short ? `${short} short` : "",
-        out ? `${out} out` : "",
-        low ? `${low} low` : "",
-    ]
-        .filter(Boolean)
-        .join(" · ");
-}
+/**
+ * The most lines the folded strip lists on a desk (HPProductsDesk): what
+ * it counts in its headline, so "4 out of stock" lists those 4. Past
+ * this, the strip opens to every one.
+ */
+export const NEEDS_PREVIEW = 8;
 
 /**
- * How many lines the folded panel shows on a desk: the worst two (the API
- * sends them most urgent first). A phone shows the one line only.
+ * The lines the strip shows: folded, the ones its headline counts (short
+ * and out; the low ones when nothing is short or out), up to
+ * `NEEDS_PREVIEW`; open, every one. The API sends them most urgent first.
  */
-export const NEEDS_PREVIEW = 2;
-
-/** The lines the panel shows: the worst two folded, every one open. */
 export function needsShown(
     needs: readonly CatalogueNeed[],
     open: boolean,
 ): NeedLine[] {
-    return (open ? needs : needs.slice(0, NEEDS_PREVIEW)).map(needWords);
+    if (open) return needs.map(needWords);
+    const urgent = needs.filter((n) => n.kind !== "low");
+    return (urgent.length > 0 ? urgent : needs)
+        .slice(0, NEEDS_PREVIEW)
+        .map(needWords);
+}
+
+/**
+ * The strip's headline, in two parts (HPProductsDesk): what it lists,
+ * "4 out of stock" or "2 short for orders · 4 out of stock", and the
+ * rest after it, "and 6 running low". The low ones lead when nothing is
+ * short or out: "6 running low", with no rest.
+ */
+export function needsHeadline(needs: readonly CatalogueNeed[]): {
+    lead: string;
+    rest: string;
+    /** The phone's one line: "4 out of stock, 6 low". */
+    phone: string;
+} {
+    const short = needs.filter((n) => n.kind === "short").length;
+    const out = needs.filter((n) => n.kind === "out").length;
+    const low = needs.filter((n) => n.kind === "low").length;
+    const urgent = [
+        short ? `${short} short for orders` : "",
+        out ? `${out} out of stock` : "",
+    ].filter(Boolean);
+    if (urgent.length === 0) {
+        const lead = low ? `${low} running low` : "";
+        return { lead, rest: "", phone: lead };
+    }
+    const lead = urgent.join(" · ");
+    return {
+        lead,
+        rest: low ? `and ${low} running low` : "",
+        phone: low ? `${lead}, ${low} low` : lead,
+    };
 }
 
 /** The need for one product, if it has one. */

@@ -7,6 +7,9 @@ import { needsYou } from "../fixtures/home";
 import { pressUntil } from "../fixtures/press";
 import { onPhone, openNorthwindAs } from "../fixtures/roles";
 
+/** Before it starts, Mark arrived; once it has, Came (HPHomeDesk). */
+const MARK_CAME = /^(Mark arrived|Came)$/;
+
 /**
  * Home on a phone, simplified (DEC-171, plan U17, #1103; boards `HPHome`,
  * `HPSheets`, `HPMore`, `HPStates`): three figures, a Next line that opens
@@ -295,9 +298,7 @@ test.describe("Home on a phone (U17)", () => {
             test.skip((await next.count()) === 0, "No day on Northwind");
             await pressUntil(next, sheet(page));
             const day = sheet(page);
-            const arrive = day
-                .getByRole("button", { name: "Mark arrived" })
-                .first();
+            const arrive = day.getByRole("button", { name: MARK_CAME }).first();
             test.skip(
                 (await arrive.count()) === 0,
                 "Nobody to mark on Northwind just now",
@@ -310,7 +311,7 @@ test.describe("Home on a phone (U17)", () => {
                 .first();
             await undo.click();
             await expect(
-                day.getByRole("button", { name: "Mark arrived" }).first(),
+                day.getByRole("button", { name: MARK_CAME }).first(),
             ).toBeVisible();
         },
     );

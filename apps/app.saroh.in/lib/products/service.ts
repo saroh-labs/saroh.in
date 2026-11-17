@@ -8,6 +8,7 @@ import { apiFetch, getJson, getList, orgBase } from "@/lib/api/http";
 import type { PlanRefusal } from "@/lib/billing/refusal";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 
+import type { CatalogueSort } from "./list-sort";
 import type { SoldOutPlace } from "./tracking";
 
 /**
@@ -377,6 +378,8 @@ export interface CatalogueFilter {
     page?: number;
     /** Rows a page for a numbered page: 10, 25, 50 or 100. */
     size?: number;
+    /** The list's order; newest first without (`CATALOGUE_SORTS`). */
+    sort?: CatalogueSort;
 }
 
 /** A product someone should restock, and why (#519). */

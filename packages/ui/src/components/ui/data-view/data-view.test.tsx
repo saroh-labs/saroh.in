@@ -560,3 +560,55 @@ describe("DataView — selection names and the bulk bar", () => {
         ).toBeNull();
     });
 });
+
+describe("DataView — a list's figures at the row's end", () => {
+    it("stacks `end` columns on the right, money first, and the rest under the name", () => {
+        const html = renderToString(
+            <DataView
+                viewId="list-end"
+                rows={[{ id: "p", name: "Platform Trolley", note: "TR-300" }]}
+                columns={[
+                    {
+                        id: "name",
+                        header: "Name",
+                        priority: "primary",
+                        cell: (r) => r.name,
+                    },
+                    {
+                        id: "sku",
+                        header: "SKU",
+                        priority: "secondary",
+                        cell: (r) => r.note,
+                    },
+                    {
+                        id: "stock",
+                        header: "Stock",
+                        priority: "secondary",
+                        listPlace: "end",
+                        cell: () => "18 to sell",
+                    },
+                    {
+                        id: "price",
+                        header: "Price",
+                        priority: "secondary",
+                        numeric: true,
+                        money: true,
+                        listPlace: "end",
+                        cell: () => "₹3,900",
+                    },
+                ]}
+                rowKey={(r) => r.id}
+                noun={{ one: "product", other: "products" }}
+            />,
+        );
+        const doc = new DOMParser().parseFromString(html, "text/html");
+        const li = doc.querySelector('[data-view-slot="phone"] li');
+        const end = li?.querySelector(".justify-items-end");
+        expect(
+            Array.from(end?.children ?? []).map((c) => c.textContent),
+        ).toEqual(["₹3,900", "18 to sell"]);
+        // SKU stays under the name, not in the stack.
+        expect(end?.textContent).not.toContain("TR-300");
+        expect(li?.textContent).toContain("TR-300");
+    });
+});

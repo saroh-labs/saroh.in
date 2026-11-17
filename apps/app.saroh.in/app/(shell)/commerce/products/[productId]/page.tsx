@@ -277,6 +277,7 @@ export default async function ProductPage({
                 paused={isPaused}
                 view={view}
                 shopUrl={shopUrl}
+                shopLive={shopLive}
                 share={share}
             />
             {isPaused ? (
@@ -334,7 +335,9 @@ export default async function ProductPage({
                                 tracking={tracking}
                                 stock={stock}
                                 onShop={shopUrl !== null}
+                                shopUrl={shopUrl}
                                 shopLive={shopLive}
+                                paused={isPaused}
                                 sellsFood={(allergens?.length ?? 0) > 0}
                                 priceHistory={priceHistory}
                             />

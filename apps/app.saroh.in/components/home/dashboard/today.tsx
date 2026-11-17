@@ -222,6 +222,7 @@ function TodayLine({
     onMark: (outcome: Outcome) => void;
 }) {
     const marks = row.canArrive || row.canNoShow;
+    const ask = row.canNoShow;
     return (
         <li
             className={cn(
@@ -262,16 +263,36 @@ function TodayLine({
                         {flag}
                     </Badge>
                 ))}
-                {marks ? (
+                {ask ? (
+                    // Once it has started, ask for the outcome right here
+                    // (HPHomeDesk): Came / Didn't come, 44px, one thumb.
+                    <>
+                        <span className="mt-1.5 text-[13px] text-foreground">
+                            {`This was earlier today. Did ${firstName(row)} come?`}
+                        </span>
+                        <span className="relative z-10 mt-2.5 grid grid-cols-2 gap-2">
+                            <Button
+                                type="button"
+                                className="h-11"
+                                onClick={() => onMark("ATTENDED")}
+                            >
+                                {BOOKING_WORDS.came}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className="h-11"
+                                onClick={() => onMark("NO_SHOW")}
+                            >
+                                {BOOKING_WORDS.didntCome}
+                            </Button>
+                        </span>
+                    </>
+                ) : marks ? (
                     <span className="relative z-10 mt-2 flex flex-wrap gap-2">
                         {row.canArrive ? (
                             <MarkButton onClick={() => onMark("ATTENDED")}>
                                 {BOOKING_WORDS.markArrived}
-                            </MarkButton>
-                        ) : null}
-                        {row.canNoShow ? (
-                            <MarkButton onClick={() => onMark("NO_SHOW")}>
-                                {BOOKING_WORDS.didntCome}
                             </MarkButton>
                         ) : null}
                     </span>
@@ -281,6 +302,34 @@ function TodayLine({
                 {row.state}
             </span>
         </li>
+    );
+}
+
+/** "Meera", for "Did Meera come?"; "they" with no name. */
+function firstName(row: TodayRow): string {
+    return row.person?.split(" ")[0] ?? "they";
+}
+
+/**
+ * The phone's one booking waiting for its outcome (HPHomePhone), on Home
+ * itself, above Needs you: its time, what and who, and Came / Didn't
+ * come. The rest of the day stays in the day sheet. Nothing when no one
+ * is waiting to be marked.
+ */
+export function TodayToMark({ today, now }: { today: HomeToday; now: string }) {
+    const own = useTodayMarks(today.zone);
+    const row = useMemo(
+        () => todayView(today, new Date(now)).rows.find((r) => r.canNoShow),
+        [today, now],
+    );
+    if (!row || own.marked[row.id]) return null;
+    return (
+        <ul
+            aria-label="To mark"
+            className="overflow-hidden rounded-[14px] border border-border bg-card"
+        >
+            <TodayLine row={row} first onMark={(o) => own.mark(row, o)} />
+        </ul>
     );
 }
 

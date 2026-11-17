@@ -233,7 +233,7 @@ describe("Home A at a desk", () => {
             "Bookings today",
             "To pack or hand over",
             "Money in today",
-            "Came",
+            "Showed up",
         ]) {
             expect(html).toContain(label);
         }
@@ -306,7 +306,7 @@ describe("Home A at a desk", () => {
         expect(html).not.toContain("Money in today");
         expect(html).not.toContain("₹");
         expect(html).toContain("Bookings today");
-        expect(html).toContain("Came");
+        expect(html).toContain("Showed up");
         expect(html).not.toContain("See how the month went");
         expect(html).toContain("4 more than the 7 days before");
     });

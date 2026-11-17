@@ -5,6 +5,7 @@ import { pinClock } from "@/lib/format/test-clock";
 import {
     groupLine,
     groupsCountLabel,
+    groupSub,
     groupTag,
     onItsWayLabel,
     phoneGroupName,
@@ -47,6 +48,29 @@ function group(over: Partial<HomeNeedGroup>): HomeNeedGroup {
         ...over,
     };
 }
+
+describe("the Orders line when every order is late (HPHomeDesk)", () => {
+    it("says they are all past their day, and what else is on its way", () => {
+        const all = {
+            kind: "ORDERS" as const,
+            count: 29,
+            late: 29,
+            totals: null,
+            oldest: null,
+            rows: [],
+            more: 0,
+            href: "/commerce/orders",
+            codes: [],
+        };
+        expect(groupSub(all, NOW, 25)).toBe(
+            "All past their ready-by day · 25 more are already on their way",
+        );
+        expect(groupSub(all, NOW, 1)).toBe(
+            "All past their ready-by day · 1 more is already on its way",
+        );
+        expect(groupSub(all, NOW)).toBe("All past their ready-by day");
+    });
+});
 
 describe("a group's line (board `HAPageD`)", () => {
     it("says the orders, their oldest and how many are late", () => {
@@ -206,7 +230,9 @@ describe("a group's line (board `HAPageD`)", () => {
 
 describe("the count beside Needs you", () => {
     it("is the sum of the groups, and says when a part is missing", () => {
-        expect(groupsCountLabel(24, false)).toBe("24 things");
+        expect(groupsCountLabel(24, false)).toBe(
+            "24 things, most urgent first",
+        );
         expect(groupsCountLabel(7, true)).toBe("7 things we could check");
         expect(groupsCountLabel(0, false)).toBe("");
     });

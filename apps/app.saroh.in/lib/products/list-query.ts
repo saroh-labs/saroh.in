@@ -1,5 +1,7 @@
 import { DEFAULT_PAGE_SIZE, readPageSize } from "@saroh/ui/lib/paging";
 
+import type { CatalogueSort } from "./list-sort";
+import { CATALOGUE_SORTS } from "./list-sort";
 import type { CatalogueView, ProductStatus } from "./service";
 
 /**
@@ -26,6 +28,8 @@ export interface ListQuery {
     page: number;
     /** Rows a page: 10, 25, 50 or 100. */
     size: number;
+    /** The order (owner, 15 Nov): newest first unless chosen. */
+    sort: CatalogueSort;
 }
 
 /** Rows a page before anyone chooses (the API's own default). */
@@ -78,6 +82,8 @@ export function readListQuery(
         collection: one(params, "collection") ?? null,
         page: Number.isInteger(page) && page >= 1 ? page : 1,
         size: readPageSize(one(params, "size"), remembered),
+        sort:
+            CATALOGUE_SORTS.find((s) => s === one(params, "sort")) ?? "newest",
     };
 }
 
@@ -106,6 +112,7 @@ export function listHref(
     if (next.category) q.set("category", next.category);
     if (next.option) q.set("option", next.option);
     if (next.collection) q.set("collection", next.collection);
+    if (next.sort !== "newest") q.set("sort", next.sort);
     if (next.page > 1) q.set("page", String(next.page));
     if (next.size !== PRODUCTS_PAGE_SIZE) q.set("size", String(next.size));
     const s = q.toString();
@@ -141,6 +148,7 @@ export function catalogueFilter(query: ListQuery) {
         collection: query.collection ?? undefined,
         page: query.page > 1 ? query.page : undefined,
         size: query.size,
+        sort: query.sort === "newest" ? undefined : query.sort,
     };
 }
 
@@ -227,7 +235,8 @@ export function emptyCopy(
     return {
         kind: "first-run",
         title: "No products yet",
-        note: `Add your first product and it appears in ${storeName ?? "your location"} straight away.`,
+        // HPProductsEmptyDesk's words; the place, when there is one.
+        note: `Add what you sell, one at a time, or bring a list in from a spreadsheet. Stock, prices and photos can come later.${storeName ? ` It sells at ${storeName} straight away.` : ""}`,
         action: "add-product",
     };
 }

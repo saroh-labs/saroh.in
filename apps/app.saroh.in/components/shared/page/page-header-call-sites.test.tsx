@@ -184,7 +184,10 @@ describe("Home", () => {
         const html = renderToStaticMarkup(
             <HomeHeader lastDay={null} name="Asha" businessName="Rye" />,
         );
-        isPageHeader(html);
+        // The one page header, with no crumb: Home is the top (HPHomeDesk).
+        expect(h1s(html)).toHaveLength(1);
+        expect(html).toContain(TITLE);
+        expect(html).not.toContain('aria-label="Breadcrumb"');
         expect(html).toMatch(/<h1[^>]*>[^<]*Asha/);
     });
 });

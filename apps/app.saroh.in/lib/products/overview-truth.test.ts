@@ -175,13 +175,17 @@ describe("variants in the product's own word", () => {
 describe("the reach is what it truly is", () => {
     it("says sold at the counter, not online, while the shop isn't live", () => {
         expect(visibilityLine("PUBLISHED", false)).toBe(
-            "Live. Sold at the counter. Not online yet.",
+            "Live at the counter. Online once your shop is live.",
         );
         expect(visibilityLine("PUBLISHED", true)).toBe(
             "Live. Customers can buy it on your website",
         );
         expect(visibilityLine("PUBLISHED", null)).toBe(
             "Live. Customers can buy it",
+        );
+        // Paused by the plan is the state customers meet.
+        expect(visibilityLine("PUBLISHED", true, true)).toBe(
+            "Paused by your plan. Customers can't buy it",
         );
     });
 

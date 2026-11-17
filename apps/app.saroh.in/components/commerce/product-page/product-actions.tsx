@@ -11,10 +11,20 @@ import {
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError, showSuccess } from "@saroh/ui/toast";
-import { Archive, Copy, MoreHorizontal, Trash2 } from "lucide-react";
+import {
+    Archive,
+    Copy,
+    ExternalLink,
+    Eye,
+    MoreHorizontal,
+    QrCode,
+    Share2,
+    Trash2,
+    Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
     refusedResult,
@@ -38,22 +48,112 @@ import { useProductStatus } from "./use-product-status";
  * On a phone the row docks at the foot of the screen, above the tab bar,
  * so the header is the name and its state.
  */
+/**
+ * One more entry of the ⋯ (HPProductDesk, HPProductPhone): the shop page
+ * and the views (a phone's, where the website card isn't beside them), and
+ * the QR code and Share, whose own buttons wait hidden in the header and
+ * are pressed from here (`proxy`), so neither is redrawn.
+ */
+export interface MoreEntry {
+    key: string;
+    label: string;
+    icon: "shop" | "eye" | "users" | "qr" | "share";
+    href?: string;
+    newTab?: boolean;
+    /** `data-menu-proxy` of the hidden button this entry presses. */
+    proxy?: string;
+    /** Only on a phone: a desk has it on the website card. */
+    phoneOnly?: boolean;
+    /** Off, and why (the shop page isn't live). */
+    note?: string;
+}
+
+const MORE_ICON = {
+    shop: ExternalLink,
+    eye: Eye,
+    users: Users,
+    qr: QrCode,
+    share: Share2,
+} as const;
+
+/** Presses a hidden button, once the menu has closed. */
+function press(proxy: string) {
+    document
+        .querySelector<HTMLElement>(`[data-menu-proxy="${proxy}"] button`)
+        ?.click();
+}
+
+function MoreItem({
+    entry,
+    onProxy,
+}: {
+    entry: MoreEntry;
+    /** Picked an entry that presses a hidden button. */
+    onProxy: (proxy: string) => void;
+}) {
+    const Icon = MORE_ICON[entry.icon];
+    const cls = entry.phoneOnly ? "sm:hidden" : undefined;
+    if (entry.note) {
+        return (
+            <DropdownMenuItem disabled className={cn("items-start", cls)}>
+                <Icon />
+                <span className="flex flex-col gap-0.5">
+                    <span data-ph-unmask="">{entry.label}</span>
+                    <span className="text-pretty text-[12px] leading-[1.4] text-muted-foreground">
+                        {entry.note}
+                    </span>
+                </span>
+            </DropdownMenuItem>
+        );
+    }
+    if (entry.proxy) {
+        const proxy = entry.proxy;
+        return (
+            <DropdownMenuItem className={cls} onSelect={() => onProxy(proxy)}>
+                <Icon />
+                {entry.label}
+            </DropdownMenuItem>
+        );
+    }
+    return (
+        <DropdownMenuItem asChild className={cls}>
+            {entry.newTab ? (
+                <a href={entry.href} target="_blank" rel="noopener noreferrer">
+                    <Icon />
+                    {entry.label}
+                </a>
+            ) : (
+                <Link href={entry.href ?? "#"} scroll={false}>
+                    <Icon />
+                    {entry.label}
+                </Link>
+            )}
+        </DropdownMenuItem>
+    );
+}
+
 export function ProductActions({
     product,
     storeId,
     editHref,
     deleteFrom,
+    more = [],
 }: {
     product: { id: string; name: string; status: ProductStatus };
     storeId: string;
     editHref: string;
     /** "every location that sells it", or the one location's name. */
     deleteFrom: string;
+    /** The shop page, the views, QR and Share, above Archive. */
+    more?: readonly MoreEntry[];
 }) {
     const router = useRouter();
     const { pending, setStatus } = useProductStatus(product);
     const [asking, setAsking] = useState(false);
     const [copying, setCopying] = useState(false);
+    // QR or Share picked: pressed once the menu has closed, instead of
+    // focus going back to the ⋯ (which would close QR's popover at once).
+    const proxyPicked = useRef<string | null>(null);
 
     async function duplicate() {
         setCopying(true);
@@ -125,7 +225,31 @@ export function ProductActions({
                         size="md"
                     />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent
+                    align="end"
+                    className="w-56"
+                    onCloseAutoFocus={(e) => {
+                        const proxy = proxyPicked.current;
+                        if (!proxy) return;
+                        proxyPicked.current = null;
+                        e.preventDefault();
+                        press(proxy);
+                    }}
+                >
+                    {more.map((entry) => (
+                        <MoreItem
+                            key={entry.key}
+                            entry={entry}
+                            onProxy={(proxy) => {
+                                proxyPicked.current = proxy;
+                            }}
+                        />
+                    ))}
+                    {more.some((e) => !e.phoneOnly) ? (
+                        <DropdownMenuSeparator />
+                    ) : more.length > 0 ? (
+                        <DropdownMenuSeparator className="sm:hidden" />
+                    ) : null}
                     {product.status === "PUBLISHED" ? (
                         <DropdownMenuItem
                             onSelect={() => setStatus("ARCHIVED")}

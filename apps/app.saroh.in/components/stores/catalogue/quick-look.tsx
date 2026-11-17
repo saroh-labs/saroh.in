@@ -20,12 +20,13 @@ import {
 } from "@saroh/ui/sheet";
 import {
     Archive,
-    ArrowRight,
     Check,
     ChevronDown,
+    ChevronRight,
     ChevronUp,
     Copy,
     MoreHorizontal,
+    Pencil,
     Trash2,
     X,
 } from "lucide-react";
@@ -274,23 +275,21 @@ export function QuickLook({
                                         )}
                                     </SheetTitle>
                                     <SheetDescription className="mt-[3px] font-mono text-[11px]">
-                                        {row.sku ? `SKU ${row.sku}` : "No SKU"}
+                                        {lookSub(row)}
                                     </SheetDescription>
                                 </div>
                             </div>
-                            <dl className="flex flex-col gap-[11px]">
+                            {/* The facts in one card (HPProductsSheetDesk);
+                                the stock and its Add under them. */}
+                            <dl className="flex flex-col gap-[11px] rounded-xl border border-border bg-card px-3.5 py-3">
                                 <Line label="Price" center>
                                     <PriceBlock row={row} />
                                 </Line>
-                                <StockBlock
-                                    key={row.id}
-                                    row={row}
-                                    storeId={storeId}
-                                    canStock={canStock}
-                                    canOrders={canOrders}
-                                    need={need}
-                                    onChanged={onChanged}
-                                />
+                                <Line label="Category" center>
+                                    <span className="text-[13px]">
+                                        {row.categoryName ?? "Uncategorized"}
+                                    </span>
+                                </Line>
                                 <Line label="Sold at" center>
                                     <span className="text-[13px]">
                                         {row.places.length > 0
@@ -301,7 +300,7 @@ export function QuickLook({
                                     </span>
                                 </Line>
                                 <Line label="Updated" center last>
-                                    <span className="font-mono text-[12px]">
+                                    <span className="text-[13px] tabular-nums">
                                         <ViewerDate
                                             iso={row.updatedAt}
                                             variant="datetime"
@@ -309,32 +308,39 @@ export function QuickLook({
                                     </span>
                                 </Line>
                             </dl>
+                            <dl className="mt-4 flex flex-col gap-[11px]">
+                                <StockBlock
+                                    key={row.id}
+                                    row={row}
+                                    storeId={storeId}
+                                    canStock={canStock}
+                                    canOrders={canOrders}
+                                    need={need}
+                                    onChanged={onChanged}
+                                />
+                            </dl>
                         </div>
                         {/* Edit as the strong next step; the menu holds
                             what the row's does. The page is the name; a role
                             that can't edit gets it here, in words. */}
                         <div className="flex items-center gap-2 border-t border-muted px-[18px] py-3.5">
-                            {canWrite || canStock ? null : (
-                                <Button
-                                    asChild
-                                    variant="outline"
-                                    className="flex-1"
-                                >
-                                    <Link href={pageHref}>
-                                        Open product page
-                                    </Link>
-                                </Button>
-                            )}
-                            {canWrite || canStock ? (
-                                <Button asChild className="flex-1">
-                                    <Link href={editHref}>
-                                        Edit
-                                        <ArrowRight className="ml-1.5 size-3.5" />
-                                    </Link>
+                            {/* The product page leads (HPProductsSheetDesk);
+                                Edit is one press away, in the ⋯ for someone
+                                who changes it, beside it for a stock role. */}
+                            <Button asChild className="flex-1">
+                                <Link href={pageHref}>
+                                    Open the product
+                                    <ChevronRight className="ml-1 size-4" />
+                                </Link>
+                            </Button>
+                            {canStock && !canWrite ? (
+                                <Button asChild variant="outline">
+                                    <Link href={editHref}>Edit</Link>
                                 </Button>
                             ) : null}
                             {canWrite ? (
                                 <RowActions
+                                    editHref={editHref}
                                     row={row}
                                     sellsOnline={sellsOnline}
                                     onStatus={onStatus}
@@ -357,12 +363,14 @@ export function QuickLook({
  * the Editor; never Publish.
  */
 function RowActions({
+    editHref,
     row,
     sellsOnline,
     onStatus,
     onDuplicate,
     onDelete,
 }: {
+    editHref: string;
     row: CatalogueRow;
     sellsOnline: SellsOnline;
     onStatus: (row: CatalogueRow, status: ProductStatus) => void;
@@ -387,6 +395,12 @@ function RowActions({
                 />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" side="top" className="w-64">
+                <DropdownMenuItem asChild>
+                    <Link href={editHref}>
+                        <Pencil />
+                        Edit
+                    </Link>
+                </DropdownMenuItem>
                 {canSell ? (
                     <DropdownMenuItem
                         className="items-start"
@@ -418,6 +432,18 @@ function RowActions({
             </DropdownMenuContent>
         </DropdownMenu>
     );
+}
+
+/**
+ * Under the name (HPProductsSheetDesk): "2 variants · SG-M, SG-L", or
+ * its one SKU.
+ */
+function lookSub(row: CatalogueRow): string {
+    const skus = row.variants.map((v) => v.sku).filter(Boolean);
+    if (row.variantCount > 1 && skus.length > 0) {
+        return `${row.variantCount} variants · ${skus.join(", ")}`;
+    }
+    return row.sku ? `SKU ${row.sku}` : "No SKU";
 }
 
 /** A thumb, not a mouse: no keyboard hints like "(K)" in the names. */

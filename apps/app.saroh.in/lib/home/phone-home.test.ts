@@ -124,22 +124,23 @@ function group(kind: HomeNeedKind, over: Partial<HomeNeedGroup> = {}) {
 }
 
 describe("phoneFigures (A1)", () => {
-    it("gives an owner Money in today, Bookings and To pack, each to its screen", () => {
+    it("gives an owner To pack (late first, in its colour), Bookings and Money in today, each to its screen", () => {
         const figures = phoneFigures({ tiles: TILES, unavailable: [] });
         expect(figures.map((f) => [f.label, f.value, f.href])).toEqual([
-            ["in today", "₹8,240", "/billing/invoices?paid=today"],
+            ["to pack, late", "7", "/commerce/orders?needs=1"],
             ["bookings", "6", "/calendar?view=day"],
-            ["to pack", "7", "/commerce/orders?needs=1"],
+            ["in today", "₹8,240", "/billing/invoices?paid=today"],
         ]);
+        expect(figures[0].tone).toBe("bad");
     });
 
-    it("gives a role without money Bookings, Came and To pack, no amount", () => {
+    it("gives a role without money To pack, Bookings and Came, no amount", () => {
         const { moneyIn: _m, ...tiles } = TILES;
         const figures = phoneFigures({ tiles, unavailable: [] });
         expect(figures.map((f) => [f.label, f.value])).toEqual([
+            ["to pack, late", "7"],
             ["bookings", "6"],
             ["came", "3 of 6"],
-            ["to pack", "7"],
         ]);
         expect(JSON.stringify(figures)).not.toContain("₹");
     });
@@ -154,7 +155,7 @@ describe("phoneFigures (A1)", () => {
             },
             unavailable: [],
         });
-        expect(figures.map((f) => f.value)).toEqual(["Nothing", "0", "0"]);
+        expect(figures.map((f) => f.value)).toEqual(["0", "0", "Nothing"]);
     });
 
     it("says one booking in the singular", () => {
@@ -174,7 +175,7 @@ describe("phoneFigures (A1)", () => {
             tiles,
             unavailable: [{ moduleKey: "PAYMENTS", label: "Money in today" }],
         });
-        expect(figures[0]).toMatchObject({
+        expect(figures[2]).toMatchObject({
             key: "moneyIn",
             value: null,
             absent: "Not known",
@@ -186,13 +187,13 @@ describe("phoneFigures (A1)", () => {
         const { bookingsToday: _b, came: _c, ...tiles } = TILES;
         expect(
             phoneFigures({ tiles, unavailable: [] }).map((f) => f.key),
-        ).toEqual(["moneyIn", "toPack"]);
+        ).toEqual(["toPack", "moneyIn"]);
         expect(phoneFigures({ tiles: null, unavailable: [] })).toEqual([]);
     });
 
     it("says no one to mark with a dash when nobody is booked one to one", () => {
         const { moneyIn: _m, came: _c, ...tiles } = TILES;
-        const came = phoneFigures({ tiles, unavailable: [] })[1];
+        const came = phoneFigures({ tiles, unavailable: [] })[2];
         expect(came).toMatchObject({
             key: "came",
             value: null,

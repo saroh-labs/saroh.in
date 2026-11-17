@@ -203,6 +203,9 @@ const button = (name: string) =>
     );
 const rowsShown = () => host.querySelectorAll("ol > li").length;
 const pick = (value: string) => {
+    // The list leads; "Add another size" opens the row that stages one.
+    const opener = button("Add another size");
+    if (opener) act(() => opener.click());
     const select = host.querySelector<HTMLSelectElement>(
         'select[aria-label="New variant size"]',
     );

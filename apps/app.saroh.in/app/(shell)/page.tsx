@@ -146,17 +146,20 @@ export default async function Home() {
             allModules.some(
                 (m) => m.key === "INSIGHTS" && m.readiness !== "DISABLED",
             ));
-    // The first order or booking, in its first day (wave G), said once.
-    // Else one new feature (release visibility U14), only while nothing
-    // else holds the slot: a part that couldn't load, or Finish setup
-    // while it leads. One message at a time, never stacked.
-    const moment = home.hasAnyModule
-        ? ((await homeMoment(home, business)) ??
-          (home.unavailable.length === 0 &&
-          !(setup && firstStepsLead(setup.first))
-              ? await homeNewFeature(business)
-              : null))
-        : null;
+    // The first order or booking, in its first day (wave G), said once,
+    // above the work. Else one new feature (release visibility U14), only
+    // while nothing else holds the slot: a part that couldn't load, or
+    // Finish setup while it leads. It sits under the work as one line
+    // (HPHomeDesk) and waits while an order is over 3 days late. One
+    // message at a time, never stacked.
+    const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
+    const news =
+        home.hasAnyModule &&
+        !moment &&
+        home.unavailable.length === 0 &&
+        !(setup && firstStepsLead(setup.first))
+            ? await homeNewFeature(business)
+            : null;
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -192,6 +195,7 @@ export default async function Home() {
                     kind={kind}
                     invoicing={invoicing}
                     insights={insights}
+                    news={news}
                 />
             </div>
             {newMenu.items.length > 0 ? <NewSpace /> : null}

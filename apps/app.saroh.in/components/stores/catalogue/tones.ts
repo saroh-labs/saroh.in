@@ -2,6 +2,7 @@ import type { BadgeProps } from "@saroh/ui/badge";
 
 import { STOCK_TEXT } from "@/components/commerce/stock/stock-tones";
 import type { ProductStatus } from "@/lib/products/service";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 
 /**
  * The Products list's colour roles (#519), in one place so the table and
@@ -9,11 +10,7 @@ import type { ProductStatus } from "@/lib/products/service";
  * in `lib/`, because Tailwind doesn't scan `lib/`.
  */
 
-export const STATUS_LABEL: Record<ProductStatus, string> = {
-    PUBLISHED: "Live",
-    DRAFT: "Draft",
-    ARCHIVED: "Archived",
-};
+export const STATUS_LABEL: Record<ProductStatus, string> = PRODUCT_STATUS_WORD;
 
 /** Live is success; a draft and an archived product ask nothing yet. */
 export const STATUS_VARIANT: Record<

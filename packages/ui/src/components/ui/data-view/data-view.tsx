@@ -534,7 +534,14 @@ export function DataView<TRow>({
                     // declare only `detail` columns, leaving this empty,
                     // and index access would type as always-present.
                     const primary = listColumns.at(0);
-                    const rest = listColumns.slice(1);
+                    const rest = listColumns
+                        .slice(1)
+                        .filter((c) => c.listPlace !== "end");
+                    // Money first in the stack: the figure scanned for.
+                    const end = listColumns
+                        .slice(1)
+                        .filter((c) => c.listPlace === "end")
+                        .sort((a, b) => Number(!!b.money) - Number(!!a.money));
                     const href = rowHref?.(row);
                     const body = (
                         <div className="flex min-h-[3.25rem] w-full items-center justify-between gap-3 py-[11px] pl-[14px]">
@@ -589,6 +596,23 @@ export function DataView<TRow>({
                                     </div>
                                 ) : null}
                             </div>
+                            {end.length ? (
+                                <div className="grid shrink-0 justify-items-end gap-0.5 text-right">
+                                    {end.map((col) => (
+                                        <span
+                                            key={col.id}
+                                            className={cn(
+                                                col.numeric && "tabular-nums",
+                                                col.money
+                                                    ? "font-display text-[15px] font-semibold text-foreground"
+                                                    : "text-xs",
+                                            )}
+                                        >
+                                            {col.cell(row)}
+                                        </span>
+                                    ))}
+                                </div>
+                            ) : null}
                         </div>
                     );
                     return (

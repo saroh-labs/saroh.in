@@ -95,14 +95,15 @@ test.describe("Products list", () => {
             await expect(look.getByText("1 of 1")).toBeVisible();
 
             // Archive takes it off sale, and Undo puts it back. It sits in
-            // the footer's menu beside Edit, in the row menu's order:
-            // Archive, Duplicate, then Delete.
+            // the footer's menu beside Open the product, after Edit, in the
+            // row menu's order: Edit, Archive, Duplicate, then Delete.
             await look.getByRole("button", { name: "More actions" }).click();
             const items = page.getByRole("menuitem");
-            await expect(items).toHaveCount(3);
-            await expect(items.nth(0)).toContainText("Archive");
-            await expect(items.nth(1)).toHaveText("Duplicate");
-            await expect(items.nth(2)).toHaveText("Delete");
+            await expect(items).toHaveCount(4);
+            await expect(items.nth(0)).toHaveText("Edit");
+            await expect(items.nth(1)).toContainText("Archive");
+            await expect(items.nth(2)).toHaveText("Duplicate");
+            await expect(items.nth(3)).toHaveText("Delete");
             await page.getByRole("menuitem", { name: /Archive/ }).click();
             await expect(
                 page.getByText(/^Archived E2E List Jar/),

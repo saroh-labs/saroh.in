@@ -46,6 +46,7 @@ import {
     CatalogueMoreFilters,
     catalogueNarrowed,
     CatalogueSearch,
+    CatalogueSortSelect,
 } from "./catalogue-toolbar";
 import { QuickLook } from "./quick-look";
 
@@ -423,7 +424,7 @@ export function CatalogueScreen({
         (store
             ? ` sold at ${store.name}`
             : many
-              ? ` across ${stores.length} locations`
+              ? ` · ${stores.length} locations`
               : "");
 
     return (
@@ -452,13 +453,15 @@ export function CatalogueScreen({
             <>{tabs}</>
             <>{notice}</>
             <>{collectionsPanel}</>
-            <div aria-busy={navigating} className="pt-0.5">
+            <div
+                aria-busy={navigating}
+                // A phone: search and Filters share one row (HPProductsPhone).
+                className="pt-0.5 max-sm:[&_[data-slot=list-search]]:w-auto max-sm:[&_[data-slot=list-search]]:flex-1"
+            >
                 <DataView
                     viewId="catalogue"
                     rows={rows}
                     columns={catalogueColumns({
-                        many,
-                        filtered: !!store,
                         ratingById,
                         needById,
                     })}
@@ -474,19 +477,43 @@ export function CatalogueScreen({
                             searching={navigating}
                         />
                     }
+                    // On a phone the dropdowns and the sort fold into
+                    // Filters, so search and Filters are one 44px row and
+                    // the first product sits higher (HPProductsPhone).
                     toolbarExtra={
-                        <CatalogueFilters
-                            query={query}
-                            go={go}
-                            storefronts={data.storefronts}
-                            choices={choices}
-                        />
+                        <span className="hidden sm:contents">
+                            <CatalogueFilters
+                                query={query}
+                                go={go}
+                                storefronts={data.storefronts}
+                                choices={choices}
+                            />
+                        </span>
+                    }
+                    toolbarEnd={
+                        <span className="hidden sm:contents">
+                            <CatalogueSortSelect query={query} go={go} />
+                        </span>
                     }
                     toolbarMore={
                         <CatalogueMoreFilters
                             query={query}
                             go={go}
                             choices={choices}
+                            phone={
+                                <span className="grid gap-3 sm:hidden">
+                                    <CatalogueFilters
+                                        query={query}
+                                        go={go}
+                                        storefronts={data.storefronts}
+                                        choices={choices}
+                                    />
+                                    <CatalogueSortSelect
+                                        query={query}
+                                        go={go}
+                                    />
+                                </span>
+                            }
                         />
                     }
                     // Only a search narrows: the way back says so.
