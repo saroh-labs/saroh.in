@@ -14,7 +14,7 @@ import { markMomentSeen } from "@/lib/moments/actions";
 import type { MomentKey, MomentView } from "@/lib/moments/keys";
 
 /** A new feature's glyph: the one its own screen and nav use. */
-const NEWS_GLYPH: Partial<Record<MomentKey, typeof Plug>> = {
+export const NEWS_GLYPH: Partial<Record<MomentKey, typeof Plug>> = {
     "new-ai-apps": Plug,
     "new-share": Megaphone,
     "new-ask-ai": Sparkles,

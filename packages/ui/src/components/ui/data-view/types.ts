@@ -49,6 +49,13 @@ export interface DataColumn<TRow> {
     money?: boolean;
     /** A fixed width for the table column, e.g. "118px". Omit on the one flexible column. */
     width?: string;
+    /**
+     * Where the list (a phone) draws it: `under` the name with the other
+     * columns (the default), or at the row's `end`, stacked on the right
+     * as a figure people scan down — a price, what is in stock. Money
+     * leads the stack.
+     */
+    listPlace?: "under" | "end";
     /** Hide from the table only; useful for a list-only summary line. */
     tableHidden?: boolean;
     /**

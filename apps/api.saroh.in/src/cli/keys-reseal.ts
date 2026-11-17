@@ -242,6 +242,33 @@ export const RESEAL_TARGETS: AnyTarget[] = [
             ).count === 1,
     }),
     target({
+        label: "Ask AI conversation pages",
+        key: aiTextKey,
+        page: (cursor) =>
+            prisma.aiConversation.findMany({
+                ...page,
+                where: { ...after(cursor), aboutCiphertext: { not: null } },
+                select: {
+                    id: true,
+                    aboutCiphertext: true,
+                    aboutIv: true,
+                    aboutAuthTag: true,
+                },
+            }),
+        values: (r) => [sealed(r.aboutCiphertext, r.aboutIv, r.aboutAuthTag)],
+        write: async (r, [next]) =>
+            (
+                await prisma.aiConversation.updateMany({
+                    where: { id: r.id, aboutCiphertext: r.aboutCiphertext },
+                    data: {
+                        aboutCiphertext: must(next).ciphertext,
+                        aboutIv: must(next).iv,
+                        aboutAuthTag: must(next).authTag,
+                    },
+                })
+            ).count === 1,
+    }),
+    target({
         label: "Ask AI drafts",
         key: aiTextKey,
         page: (cursor) =>

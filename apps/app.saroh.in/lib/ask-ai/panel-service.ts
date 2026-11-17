@@ -1,5 +1,7 @@
 import type {
+    AskAiBookBody,
     AskAiConfirmBody,
+    AskAiDraftCard,
     AskAiDraftResult,
     AskAiHandOff,
 } from "@saroh/api-contract";
@@ -16,6 +18,18 @@ import { mutate } from "@/lib/api/http";
 
 const draftPath = (draftId: string, verb: string) =>
     `/ask-ai/drafts/${encodeURIComponent(draftId)}/${verb}`;
+
+/** Book here (AF 4): a booking drafted from a free-times card, nothing saved. */
+export function bookAskAiDraft(
+    body: AskAiBookBody,
+): Promise<CrmResult<AskAiDraftCard>> {
+    return mutate(
+        "/ask-ai/drafts/book",
+        "POST",
+        body,
+        "That wasn't drafted. Try again.",
+    );
+}
 
 export function confirmAskAiDraft(
     draftId: string,

@@ -76,8 +76,13 @@ test.describe("Products — Needs you", () => {
                 );
                 const needs = page.getByRole("region", { name: "Needs you" });
                 await expect(needs).toBeVisible();
-                // One line by default: open it to see every one.
-                await needs.getByRole("button", { name: /^Needs you/ }).click();
+                // Folded (a desk lists what it counts, a phone one line):
+                // open it to see every one.
+                const opener = needs
+                    .locator('button[aria-expanded="false"]')
+                    .filter({ visible: true })
+                    .first();
+                if ((await opener.count()) > 0) await opener.click();
                 await expect(
                     needs.getByRole("button", { name: `Restock ${live}` }),
                 ).toBeVisible();

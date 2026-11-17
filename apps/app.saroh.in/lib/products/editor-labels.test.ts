@@ -68,9 +68,9 @@ describe("details by business type", () => {
     });
 
     it("reads as how to use and ingredients for anything else", () => {
-        expect(detailsCopy(false).title).toBe("How to use and ingredients");
-        expect(sectionNames(false).details).toBe("How to use and ingredients");
-        expect(sectionJumps(false).details).toBe("How to use");
+        expect(detailsCopy(false).title).toBe("Care and use");
+        expect(sectionNames(false).details).toBe("Care and use");
+        expect(sectionJumps(false).details).toBe("Care and use");
     });
 });
 

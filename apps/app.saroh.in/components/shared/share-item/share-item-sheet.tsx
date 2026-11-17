@@ -4,31 +4,34 @@ import { Button } from "@saroh/ui/button";
 import { FormSheet, FormSheetBody } from "@saroh/ui/form-sheet";
 import { useNarrow } from "@saroh/ui/lib/use-narrow";
 import { cn } from "@saroh/ui/lib/utils";
-import { Notice } from "@saroh/ui/notice";
+import { TextLink } from "@saroh/ui/text-link";
 import { Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { ShareItem, ShareSetup } from "@/lib/share-item/share";
+import { markColour } from "@/lib/share-item/share";
 import { SHARE_WORDS } from "@/lib/share-item/words";
 
+import { LookDots, PictureFailed, SizeSwitch, SwipeTrack } from "./card-picker";
+import { CardPicture, InstaFrame } from "./insta-frame";
+import { SharePayoff } from "./payoff";
+import { SocialLine } from "./schedule-lock";
+import type { Shared } from "./share-actions";
 import {
-    CardCarousel,
-    CardPreview,
-    CardRow,
-    PictureFailed,
-    SizeSwitch,
-} from "./card-picker";
+    DownloadIconButton,
+    ReadyActions,
+    ShareNowButton,
+} from "./share-actions";
 import {
-    DeskSchedule,
-    ScheduleButton,
-    ScheduleLine,
-    SocialOffer,
-} from "./schedule-lock";
-import { DeskActions, ShareNowButton } from "./share-actions";
-import { ShareCaption, ShareExtras, useShareState } from "./use-share-state";
+    LookPicker,
+    ShareCaption,
+    ShareExtras,
+    useShareState,
+} from "./use-share-state";
 
 /**
- * Share as a post (#1375 U2, boards SFBDesk and SFBPhone): "Share" beside
+ * Share as a post (#1375 U2; boards SBShare* and SPayoff*, 16 Nov:
+ * the finished post first, Ready to share beside it): "Share" beside
  * the QR button on a live product or service, in a live blog post's header
  * (SGShareBlog*), and on the booking page's row. Free on every plan.
  *
@@ -69,90 +72,179 @@ export function ShareItemButton({
             bottomOnPhone
             className="sm:max-w-[740px]"
         >
-            <ShareBody item={item} setup={setup} />
+            <ShareBody
+                item={item}
+                setup={setup}
+                onClose={() => setOpen(false)}
+            />
         </FormSheet>
     );
 }
 
 /**
  * The sheet's inside, mounted only while it is open, so the picture is
- * fetched then. Its parts (`CardRow`, `CardCarousel`, `CaptionBox`, the
- * actions) are what Create post reuses.
+ * fetched then. Its parts (`InstaFrame`, `ReadyActions`, `LookPicker`,
+ * `CaptionBox`, `SharePayoff`) are what Create post reuses.
  */
-function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
+function ShareBody({
+    item,
+    setup,
+    onClose,
+}: {
+    item: ShareItem;
+    setup: ShareSetup;
+    onClose: () => void;
+}) {
     const narrow = useNarrow();
     const share = useShareState(item, setup, narrow);
-    const { style, setStyle, size, setSize, image, retry, parts, picker } =
-        share;
-    const [copiedNote, setCopiedNote] = useState(false);
-    const [offer, setOffer] = useState(false);
-    const offerRef = useRef<HTMLDivElement | null>(null);
-    const extras = <ShareExtras item={item} setup={setup} share={share} />;
+    const { image, retry, parts } = share;
+    const [done, setDone] = useState<Shared | null>(null);
+    const [editing, setEditing] = useState(false);
+    const [look, setLook] = useState(false);
+    const editRef = useRef<HTMLDivElement | null>(null);
+    const business = setup.business ?? "";
+    const colour = markColour(setup.swatches);
+    const words = share.text;
 
-    // The phone's offer opens under the caption, scrolled to.
+    // The phone's caption and look open under the post, scrolled to.
     useEffect(() => {
-        if (offer && narrow) {
-            offerRef.current?.scrollIntoView({
+        if ((editing || look) && narrow) {
+            editRef.current?.scrollIntoView({
                 block: "nearest",
                 behavior: "smooth",
             });
         }
-    }, [offer, narrow]);
+    }, [editing, look, narrow]);
 
-    const caption = <ShareCaption share={share} showLabel={!narrow} />;
+    if (done) {
+        return (
+            <>
+                <FormSheetBody className="justify-center">
+                    <SharePayoff
+                        business={business}
+                        colour={colour}
+                        image={image}
+                        size={share.size}
+                        name={item.name}
+                        words={words}
+                        caption={parts.caption}
+                        done={done}
+                        lock={setup.schedule}
+                        back={{
+                            label: SHARE_WORDS.tryLook,
+                            onClick: () => setDone(null),
+                        }}
+                        narrow={narrow}
+                    />
+                </FormSheetBody>
+                {narrow ? null : (
+                    <div className="mt-4 flex justify-end border-t border-border pt-4">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            className="bg-card"
+                            onClick={onClose}
+                        >
+                            {SHARE_WORDS.captionDone}
+                        </Button>
+                    </div>
+                )}
+            </>
+        );
+    }
+
+    const picture =
+        image.state === "failed" ? (
+            <PictureFailed onRetry={retry} className="rounded-none border-0" />
+        ) : narrow ? (
+            <SwipeTrack
+                cards={share.picker}
+                style={share.style}
+                onStyle={share.setStyle}
+                size={share.size}
+                image={image}
+                name={item.name}
+            />
+        ) : (
+            <CardPicture image={image} size={share.size} name={item.name} />
+        );
+    const frame = (
+        <InstaFrame
+            business={business}
+            colour={colour}
+            words={words}
+            clamp={narrow}
+            picture={picture}
+        />
+    );
 
     if (narrow) {
         return (
             <>
-                <FormSheetBody className="gap-4">
-                    {copiedNote ? (
-                        <Notice tone="success">{SHARE_WORDS.pasteIt}</Notice>
-                    ) : null}
-                    {image.state === "failed" ? (
-                        <PictureFailed
-                            onRetry={retry}
-                            className="mx-auto w-full max-w-[260px]"
-                        />
-                    ) : (
-                        <CardCarousel
-                            cards={picker}
-                            style={style}
-                            onStyle={setStyle}
-                            size={size}
-                            image={image}
-                            name={item.name}
-                        />
-                    )}
-                    <SizeSwitch size={size} onSize={setSize} block />
-                    {extras}
-                    {caption}
-                    {offer ? (
-                        <div
-                            ref={offerRef}
-                            className="rounded-xl border border-border bg-card p-4"
-                        >
-                            <SocialOffer
-                                lock={setup.schedule}
-                                onClose={() => setOffer(false)}
+                <FormSheetBody className="gap-3">
+                    {frame}
+                    <LookDots cards={share.picker} style={share.style} />
+                    <div
+                        ref={editRef}
+                        className="grid grid-cols-[minmax(0,1fr)] gap-4"
+                    >
+                        {editing ? (
+                            <ShareCaption
+                                share={share}
+                                phone
+                                onDone={() => setEditing(false)}
                             />
-                        </div>
-                    ) : null}
+                        ) : null}
+                        {look ? (
+                            <div
+                                className="grid grid-cols-[minmax(0,1fr)] gap-3"
+                                data-share-look=""
+                            >
+                                <SizeSwitch
+                                    size={share.size}
+                                    onSize={share.setSize}
+                                    block
+                                />
+                                <ShareExtras
+                                    item={item}
+                                    setup={setup}
+                                    share={share}
+                                />
+                            </div>
+                        ) : null}
+                    </div>
                 </FormSheetBody>
                 <div className="mt-3 grid gap-2 border-t border-border pt-3">
                     <div className="flex items-center gap-2">
-                        <ShareNowButton
-                            {...parts}
-                            onCopied={() => setCopiedNote(true)}
-                        />
-                        <ScheduleButton
-                            aria-expanded={offer}
-                            onClick={() => setOffer((o) => !o)}
+                        <ShareNowButton {...parts} onShared={setDone} />
+                        <DownloadIconButton
+                            image={image}
+                            fileName={parts.fileName}
                         />
                     </div>
                     <p className="text-center text-[12.5px] text-muted-foreground">
-                        {SHARE_WORDS.copiedFirst}
+                        {SHARE_WORDS.copiesFirst}{" "}
+                        <TextLink
+                            onClick={() => setEditing((e) => !e)}
+                            aria-expanded={editing}
+                            className="font-semibold"
+                        >
+                            {SHARE_WORDS.editCaptionShort}
+                        </TextLink>
+                        {" · "}
+                        <TextLink
+                            onClick={() => setLook((l) => !l)}
+                            aria-expanded={look}
+                            className="font-semibold"
+                        >
+                            {SHARE_WORDS.sizeAndColours}
+                        </TextLink>
                     </p>
-                    <ScheduleLine lock={setup.schedule} phone />
+                    <SocialLine
+                        lock={setup.schedule}
+                        words={SHARE_WORDS.scheduleWith}
+                        className="text-center"
+                    />
                 </div>
             </>
         );
@@ -160,41 +252,43 @@ function ShareBody({ item, setup }: { item: ShareItem; setup: ShareSetup }) {
 
     return (
         <>
-            <FormSheetBody className="gap-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-[14px] font-semibold">
-                        {SHARE_WORDS.pick}
-                    </h3>
-                    <SizeSwitch size={size} onSize={setSize} />
+            <FormSheetBody className="gap-0">
+                <div className="grid items-start gap-6 sm:grid-cols-[minmax(0,350px)_minmax(0,1fr)]">
+                    <div className="grid gap-3">
+                        {frame}
+                        <p className="text-center text-[12.5px] text-muted-foreground">
+                            {SHARE_WORDS.previewNote}
+                        </p>
+                    </div>
+                    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5">
+                        <div className="grid gap-3">
+                            <h3 className="text-[20px] font-semibold tracking-[-0.01em]">
+                                {SHARE_WORDS.ready}
+                            </h3>
+                            <ReadyActions {...parts} onShared={setDone} />
+                        </div>
+                        <LookPicker item={item} setup={setup} share={share} />
+                        {editing ? (
+                            <ShareCaption
+                                share={share}
+                                onDone={() => setEditing(false)}
+                            />
+                        ) : (
+                            <div>
+                                <TextLink
+                                    onClick={() => setEditing(true)}
+                                    className="font-semibold"
+                                    data-edit-caption=""
+                                >
+                                    {SHARE_WORDS.editCaption}
+                                </TextLink>
+                            </div>
+                        )}
+                    </div>
                 </div>
-                <CardRow
-                    cards={picker}
-                    style={style}
-                    onStyle={setStyle}
-                    size={size}
-                    failed={image.state === "failed"}
-                />
-                {extras}
-                <div className="grid items-start gap-5 sm:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
-                    <CardPreview
-                        image={image}
-                        size={size}
-                        name={item.name}
-                        onRetry={retry}
-                    />
-                    {caption}
-                </div>
-                <DeskActions {...parts} />
             </FormSheetBody>
-            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-                <div className="min-w-0 flex-1">
-                    <ScheduleLine lock={setup.schedule} />
-                </div>
-                <DeskSchedule
-                    lock={setup.schedule}
-                    open={offer}
-                    onOpenChange={setOffer}
-                />
+            <div className="mt-4 border-t border-border pt-4">
+                <SocialLine lock={setup.schedule} />
             </div>
         </>
     );

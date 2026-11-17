@@ -27,6 +27,8 @@ export type TurnEvent =
     | { type: "status"; tool: string; words: string }
     | { type: "text-delta"; text: string }
     | { type: "card"; kind: string; data: Record<string, unknown> }
+    /** Next steps for the box (AF 3), after the answer's cards. */
+    | { type: "next"; items: { label: string; text: string }[] }
     | { type: "error"; reason: TurnErrorReason }
     /** Not asked (plan U7): nothing was sent and nothing counts. */
     | { type: "refused"; refusal: AskAiRefusal }

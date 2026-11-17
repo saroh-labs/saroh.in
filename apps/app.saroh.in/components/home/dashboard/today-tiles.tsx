@@ -73,7 +73,14 @@ function Tile({ tile }: { tile: TileView }) {
             <span className="font-display text-[26px] font-semibold tabular-nums leading-[1.15] tracking-[-0.03em]">
                 {tile.value ?? <AbsentValue says={tile.absent ?? "None"} />}
             </span>
-            <span className="text-pretty text-[12.5px] leading-[1.4] text-neutral-700 dark:text-muted-foreground">
+            <span
+                className={cn(
+                    "text-pretty text-[12.5px] leading-[1.4]",
+                    tile.tone === "bad"
+                        ? "font-medium text-destructive-subtle-foreground"
+                        : "text-neutral-700 dark:text-muted-foreground",
+                )}
+            >
                 {tile.sub}
             </span>
         </Link>

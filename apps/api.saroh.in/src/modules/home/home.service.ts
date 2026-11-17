@@ -760,6 +760,9 @@ export class HomeService {
                         severity: "OVERDUE",
                         moduleKey: "COMMERCE",
                         count: open.count,
+                        // Every late one, not only those shown: the group's
+                        // pill says the same count as the tile (HPHomeNotes).
+                        ...(open.late !== undefined ? { late: open.late } : {}),
                         evidence: open.evidence,
                         ...(open.moreTone ? { moreTone: open.moreTone } : {}),
                     });

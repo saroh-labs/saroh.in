@@ -1,24 +1,27 @@
 "use client";
 
 import type { AskAiState } from "@saroh/api-contract";
-import { Sheet, SheetContent, SheetDescription } from "@saroh/ui/sheet";
 import {
-    useCallback,
-    useEffect,
-    useRef,
-    useState,
-    useSyncExternalStore,
-} from "react";
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetTitle,
+} from "@saroh/ui/sheet";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { AskAiPanel } from "./ask-ai-panel";
 import { OPEN_ASK_AI, onAskPage, sayAskAiShown } from "./open";
+import { useAskAi } from "./use-ask-ai";
 
 /**
  * Where Ask AI's panel lives (plan 2026-11-13-001 U10): one host in the
  * shell, opened by the top bar's button or ⌘J (⌘K stays Search), closed by
- * Esc. On a desk it is a panel at the right over whatever screen is open,
- * so nobody loses their place; below 760px it is a full-screen sheet. What
- * was asked stays while the panel is closed and opened again.
+ * Esc. It is the shared sheet, as it comes (DEC-195): from the right on a
+ * desk, from the foot below 760px; the sheet traps focus and closes on Esc.
+ * With no `SheetTrigger` (the button and ⌘J open it by event) Radix gives
+ * focus back to nothing, so the host returns it to the opener. The host
+ * holds the conversation
+ * (`useAskAi`), so what was asked stays while the sheet is closed.
  */
 
 const DESK = "(min-width: 760px)";
@@ -44,106 +47,84 @@ export function AskAiHost({
         () => true,
     );
     const [open, setOpen] = useState(false);
-    // Mounted on first open, then kept, so the conversation survives a close.
+    // Nothing is read until it is first opened.
     const [seen, setSeen] = useState(false);
+    const ai = useAskAi({ state, active: seen });
     const box = useRef<HTMLTextAreaElement>(null);
-    const aside = useRef<HTMLElement>(null);
     const back = useRef<HTMLElement | null>(null);
 
-    const show = useCallback((next: boolean) => {
-        if (next) {
-            back.current = document.activeElement as HTMLElement | null;
-            setSeen(true);
-        }
-        setOpen(next);
-    }, []);
-
     useEffect(() => {
-        const onOpen = () => show(true);
+        const show = () => {
+            back.current ??= document.activeElement as HTMLElement | null;
+            setSeen(true);
+            setOpen(true);
+        };
         const onKey = (e: KeyboardEvent) => {
             if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
                 if (onAskPage()) return;
+                setSeen(true);
                 setOpen((o) => {
                     if (!o) {
                         back.current =
                             document.activeElement as HTMLElement | null;
-                        setSeen(true);
                     }
                     return !o;
                 });
             }
         };
-        window.addEventListener(OPEN_ASK_AI, onOpen);
+        window.addEventListener(OPEN_ASK_AI, show);
         document.addEventListener("keydown", onKey);
         return () => {
-            window.removeEventListener(OPEN_ASK_AI, onOpen);
+            window.removeEventListener(OPEN_ASK_AI, show);
             document.removeEventListener("keydown", onKey);
         };
-    }, [show]);
+    }, []);
 
     useEffect(() => {
         sayAskAiShown(open);
-        if (open) {
-            // The box, or the panel itself when it has none (locked, off),
-            // so Esc reaches it.
-            requestAnimationFrame(() =>
-                (box.current ?? aside.current)?.focus(),
-            );
-        } else if (back.current?.isConnected) {
-            back.current.focus();
-            back.current = null;
-        }
     }, [open]);
 
-    if (!seen) return null;
-    const panel = (
-        <AskAiPanel
-            state={state}
-            businessName={businessName}
-            zone={zone}
-            phone={!desk}
-            boxRef={box}
-            onClose={() => show(false)}
-        />
-    );
-
-    if (!desk) {
-        return (
-            <Sheet open={open} onOpenChange={show}>
-                <SheetContent
-                    side="bottom"
-                    closeButton={false}
-                    onOpenAutoFocus={(e) => {
-                        if (!box.current) return;
-                        e.preventDefault();
-                        box.current.focus();
-                    }}
-                    className="inset-0 flex h-dvh max-h-none flex-col gap-0 bg-neutral-50 p-0 pt-[env(safe-area-inset-top)] dark:bg-background"
-                >
-                    <SheetDescription className="sr-only">
-                        Ask about the business in plain words.
-                    </SheetDescription>
-                    {panel}
-                </SheetContent>
-            </Sheet>
-        );
-    }
     return (
-        <aside
-            ref={aside}
-            tabIndex={-1}
-            aria-label="Ask AI"
-            hidden={!open}
-            onKeyDown={(e) => {
-                if (e.key === "Escape" && !e.defaultPrevented) {
-                    e.stopPropagation();
-                    show(false);
+        <Sheet open={open} onOpenChange={setOpen}>
+            <SheetContent
+                side={desk ? "right" : "bottom"}
+                // Close lives in the panel's header row (board 17).
+                closeButton={false}
+                // Ask AI's own size on the shared sheet: 480 wide at the
+                // desk, the whole screen on a phone; the panel pads itself.
+                className={
+                    desk
+                        ? "w-full gap-0 bg-neutral-50 px-4 pb-4 pt-0 dark:bg-background sm:max-w-[480px]"
+                        : "h-dvh max-h-none gap-0 rounded-none border-t-0 bg-neutral-50 px-4 pb-3 pt-[env(safe-area-inset-top)] dark:bg-background"
                 }
-            }}
-            className={`fixed bottom-0 right-0 top-[61px] z-40 ${open ? "flex" : "hidden"} w-[440px] max-w-full flex-col border-l border-border bg-neutral-50 shadow-[-12px_0_32px_rgba(0,0,0,0.10)] outline-none dark:bg-background print:hidden`}
-        >
-            {panel}
-        </aside>
+                // The question box, when there is one (locked and off have none).
+                onOpenAutoFocus={(e) => {
+                    if (!box.current) return;
+                    e.preventDefault();
+                    box.current.focus();
+                }}
+                onCloseAutoFocus={(e) => {
+                    e.preventDefault();
+                    if (back.current?.isConnected) back.current.focus();
+                    back.current = null;
+                }}
+            >
+                <SheetTitle className="sr-only">Ask AI</SheetTitle>
+                <SheetDescription className="sr-only">
+                    Ask about the business in plain words.
+                </SheetDescription>
+                <div className="flex h-full min-h-0 flex-col">
+                    <AskAiPanel
+                        ai={ai}
+                        businessName={businessName}
+                        zone={zone}
+                        phone={!desk}
+                        boxRef={box}
+                        onClose={() => setOpen(false)}
+                    />
+                </div>
+            </SheetContent>
+        </Sheet>
     );
 }

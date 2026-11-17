@@ -97,7 +97,7 @@ export function ProductDetailsCard({
                 </Group>
                 <Group label="On the product page">
                     <DetailRow
-                        label="How to use"
+                        label="Care and use"
                         muted={!product.howToUse}
                         tag={detailTag(
                             Boolean(product.howToUse),

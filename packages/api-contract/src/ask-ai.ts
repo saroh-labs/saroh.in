@@ -16,12 +16,54 @@ export const ASK_AI_QUESTION_MAX = 2000;
 export const askAiLanguage = z.enum(["MATCH", "ENGLISH", "HINGLISH", "HINDI"]);
 export type AskAiLanguage = z.infer<typeof askAiLanguage>;
 
+/**
+ * The page a question is about (board AF 2, 5): what the panel was opened
+ * on, named as the page names it ("Calendar · 16–22 Nov", a customer's
+ * name), with the record's id where there is one. The browser says it, so
+ * the model reads it as a pointer, never as an instruction; the tools still
+ * check every read. Absent: the whole business (AF 7).
+ */
+export const askAiAbout = z.strictObject({
+    kind: z.enum(["calendar", "customer", "order", "product", "booking"]),
+    id: z.string().min(1).max(64).optional(),
+    label: z.string().trim().min(1).max(80),
+});
+export type AskAiAbout = z.infer<typeof askAiAbout>;
+
+/**
+ * The common questions the panel offers (owner, 15 Nov): asked as written,
+ * they don't use one of the month's questions. Fixed words, so the API can
+ * tell one from a typed question by its text alone; the page they are
+ * asked about travels in `about`.
+ */
+export const ASK_AI_STARTERS = [
+    // The whole business (AF 1).
+    "How did this month go compared with last month?",
+    "Which regulars haven't been back?",
+    "When do I have free time this week?",
+    "What sold best this month?",
+    // A week of the Calendar (AF 2).
+    "Which classes still have seats this week?",
+    "What's my busiest day this week?",
+    "Who booked more than once this week?",
+    // A customer (AF 5).
+    "What do they usually order?",
+    "When did they last come?",
+    "Why did they stop coming?",
+] as const;
+export type AskAiStarter = (typeof ASK_AI_STARTERS)[number];
+
+export const isAskAiStarter = (question: string): boolean =>
+    (ASK_AI_STARTERS as readonly string[]).includes(question.trim());
+
 /** A question. No `conversationId` starts a new conversation. */
 export const askAiTurnBody = z.strictObject({
     conversationId: z.string().min(1).max(64).optional(),
     question: z.string().trim().min(1).max(ASK_AI_QUESTION_MAX),
     /** Saved as the person's language before the question is asked. */
     language: askAiLanguage.optional(),
+    /** The page it is asked about; kept on a new conversation (AF 9). */
+    about: askAiAbout.optional(),
 });
 export type AskAiTurnBody = z.infer<typeof askAiTurnBody>;
 
@@ -59,6 +101,16 @@ export const askAiRefusal = z.looseObject({
 export type AskAiRefusal = z.infer<typeof askAiRefusal>;
 
 /**
+ * A next step offered under an answer (AF 3, 6, 8): its words go in the
+ * box, never sent on their own. Only steps Ask AI can draft.
+ */
+export const askAiNext = z.object({
+    label: z.string().max(60),
+    text: z.string().max(200),
+});
+export type AskAiNext = z.infer<typeof askAiNext>;
+
+/**
  * One server-sent event of a turn: `event: <type>` and `data: <json>`.
  * `turn` comes first; `done` comes last, once.
  */
@@ -87,6 +139,8 @@ export const askAiEvent = z.discriminatedUnion("type", [
         data: z.record(z.string(), z.unknown()),
     }),
     z.object({ type: z.literal("refused"), refusal: askAiRefusal }),
+    /** Next steps for the box, after the answer's cards. */
+    z.object({ type: z.literal("next"), items: z.array(askAiNext).max(3) }),
     z.object({
         type: z.literal("error"),
         reason: z.enum(["unavailable", "provider", "turn-limit", "no-answer"]),
@@ -160,11 +214,48 @@ export const askAiTableCard = z.object({
 });
 export type AskAiTableCard = z.infer<typeof askAiTableCard>;
 
+/**
+ * A service's free times (AF 3): one row a day, its first and last free
+ * start, and Book here for the first. From `find_free_slots`; the times
+ * are the business's own, written out in its zone.
+ */
+export const askAiSlotsCard = z.object({
+    title: z.string(),
+    serviceId: z.string(),
+    serviceName: z.string(),
+    days: z
+        .array(
+            z.object({
+                /** "Tue 17 Nov". */
+                label: z.string(),
+                /** "12:00 to 4:15 pm", or one start. */
+                range: z.string(),
+                /** The day's first free start: what Book here books. */
+                startsAt: z.string(),
+            }),
+        )
+        .max(ASK_AI_CARD_ITEMS),
+    /** Days not shown. */
+    more: z.number().optional(),
+    /** The read stopped at its first page: there are free starts after the last day. */
+    later: z.boolean().optional(),
+});
+export type AskAiSlotsCard = z.infer<typeof askAiSlotsCard>;
+
 /** A card under an answer, as the `card` event and a saved message carry it. */
 export const askAiInfoCard = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("products"), data: askAiProductsCard }),
     z.object({ kind: z.literal("table"), data: askAiTableCard }),
+    z.object({ kind: z.literal("slots"), data: askAiSlotsCard }),
 ]);
+
+/** Book here (AF 4): a booking drafted from a free-times card, who to ask. */
+export const askAiBookBody = z.strictObject({
+    conversationId: z.string().min(1).max(64),
+    serviceId: z.string().min(1).max(64),
+    startsAt: z.iso.datetime({ offset: true }),
+});
+export type AskAiBookBody = z.infer<typeof askAiBookBody>;
 export type AskAiInfoCard = z.infer<typeof askAiInfoCard>;
 
 /** Stop's answer: false when the turn had already ended. */
@@ -181,6 +272,13 @@ export const askAiConversationSummary = z.object({
     id: z.string(),
     agent: z.string(),
     title: z.string().nullable(),
+    /** Where it started (AF 9); null: about the whole business. */
+    about: z
+        .object({ kind: z.string(), label: z.string() })
+        .nullable()
+        .optional(),
+    /** What was done from it ("booked 1", "3 marked ready"); null for nothing. */
+    done: z.string().nullable().optional(),
     lastMessageAt: z.string(),
     createdAt: z.string(),
 });
@@ -209,6 +307,8 @@ export const askAiMessage = z.object({
             }),
         )
         .optional(),
+    /** The next steps offered under the answer. */
+    next: z.array(askAiNext).optional(),
     createdAt: z.string(),
 });
 export type AskAiMessage = z.infer<typeof askAiMessage>;

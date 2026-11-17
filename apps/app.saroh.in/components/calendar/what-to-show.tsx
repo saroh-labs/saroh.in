@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { cn } from "@saroh/ui/lib/utils";
 import { Switch } from "@saroh/ui/switch";
 import { Check, ChevronDown, ListFilter } from "lucide-react";
@@ -99,35 +100,21 @@ export function WhatToShow({
                     <div data-ph-unmask="" className="label mb-1.5">
                         Whose
                     </div>
-                    <div
-                        role="radiogroup"
-                        aria-label="Whose"
+                    {/* Everyone is the choice with no id. */}
+                    <ChoiceGroup
+                        label="Whose"
                         className="grid gap-1 max-[759px]:-mx-5 max-[759px]:flex max-[759px]:gap-1.5 max-[759px]:overflow-x-auto max-[759px]:px-5 max-[759px]:[scrollbar-width:none]"
-                    >
-                        {whose.map((p) => {
-                            const on = p.id === person;
-                            return (
-                                <button
-                                    key={p.id ?? "everyone"}
-                                    type="button"
-                                    role="radio"
-                                    aria-checked={on}
-                                    onClick={() => onPerson(p.id)}
-                                    className={cn(
-                                        ROW,
-                                        "min-h-12 cursor-pointer rounded-[10px] border border-border bg-card px-3 py-1.5 transition-colors duration-fast hover:border-foreground",
-                                        on &&
-                                            "border-foreground shadow-[inset_0_0_0_1px_hsl(var(--foreground))]",
-                                        "max-[759px]:h-11 max-[759px]:min-h-0 max-[759px]:w-auto max-[759px]:flex-none max-[759px]:whitespace-nowrap max-[759px]:rounded-full max-[759px]:px-3.5 max-[759px]:text-[13.5px] max-[759px]:font-medium max-[759px]:shadow-none",
-                                        on &&
-                                            "max-[759px]:bg-primary max-[759px]:text-primary-foreground",
-                                    )}
-                                >
+                        value={person ?? ""}
+                        onChange={(id) => onPerson(id || null)}
+                        choices={whose.map((p) => ({
+                            value: p.id ?? "",
+                            label: (
+                                <>
                                     <span
                                         aria-hidden
                                         className={cn(
                                             "size-[18px] shrink-0 rounded-full border-[1.5px] border-border-strong max-[759px]:hidden",
-                                            on &&
+                                            p.id === person &&
                                                 "border-[5.5px] border-foreground",
                                         )}
                                     />
@@ -136,10 +123,21 @@ export function WhatToShow({
                                             ? shortName(p.name)
                                             : p.name}
                                     </span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                                </>
+                            ),
+                        }))}
+                        itemClassName={(on) =>
+                            cn(
+                                ROW,
+                                "min-h-12 rounded-[10px] border border-border bg-card px-3 py-1.5 hover:border-foreground",
+                                on &&
+                                    "border-foreground shadow-[inset_0_0_0_1px_hsl(var(--foreground))]",
+                                "max-[759px]:h-11 max-[759px]:min-h-0 max-[759px]:w-auto max-[759px]:flex-none max-[759px]:whitespace-nowrap max-[759px]:rounded-full max-[759px]:px-3.5 max-[759px]:text-[13.5px] max-[759px]:font-medium max-[759px]:shadow-none",
+                                on &&
+                                    "max-[759px]:bg-primary max-[759px]:text-primary-foreground",
+                            )
+                        }
+                    />
                 </>
             ) : null}
 

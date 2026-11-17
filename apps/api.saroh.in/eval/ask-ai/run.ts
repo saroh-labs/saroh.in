@@ -443,7 +443,7 @@ export async function main(argv: readonly string[]): Promise<number> {
                             record.error = event.reason;
                         } else if (event.type === "done") {
                             record.outcome = event.outcome;
-                        } else {
+                        } else if (event.type === "refused") {
                             // Refused at the door (plan, permission, switch, limit): nothing ran.
                             record.error = `refused: ${event.refusal.reason}`;
                         }

@@ -69,7 +69,7 @@ test.describe("workspace: the marks a lower plan's pause leaves", () => {
             look.getByRole("button", { name: /Publish|Sell again/ }),
         ).toHaveCount(0);
 
-        await look.getByRole("link", { name: "Open product page" }).click();
+        await look.getByRole("link", { name: "Open the product" }).click();
         await expect(
             page
                 .getByRole("note")

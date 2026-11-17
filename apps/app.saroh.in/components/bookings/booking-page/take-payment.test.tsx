@@ -263,14 +263,18 @@ describe("Take ₹X at the desk", () => {
 
     it("never offers a link for what's left after a deposit, or without a provider", () => {
         openTake({ byLink: false });
-        expect(chip("Send a payment link").disabled).toBe(true);
+        expect(chip("Send a payment link").getAttribute("aria-disabled")).toBe(
+            "true",
+        );
         expect(
             chip("Send a payment link").getAttribute("aria-description"),
         ).toContain("take the rest here");
         act(() => root.unmount());
         root = createRoot(host);
         openTake({ canLink: false });
-        expect(chip("Send a payment link").disabled).toBe(true);
+        expect(chip("Send a payment link").getAttribute("aria-disabled")).toBe(
+            "true",
+        );
         expect(
             chip("Send a payment link").getAttribute("aria-description"),
         ).toContain("No payment provider connected");

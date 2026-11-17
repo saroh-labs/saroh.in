@@ -23,6 +23,7 @@ export function OptionValuesInline({
     existing,
     locked,
     onOption,
+    suggest = "",
 }: {
     /** The option the values join; null makes one called `optName`. */
     optionId: string | null;
@@ -32,10 +33,15 @@ export function OptionValuesInline({
     locked: boolean;
     /** A new option was made: pick it. */
     onOption: (id: string) => void;
+    /**
+     * Typed in already: the listed variants' own names, when none of them
+     * is a value yet ("Medium, Large"), so one press makes them sizes.
+     */
+    suggest?: string;
 }) {
     const id = useId();
     const router = useRouter();
-    const [typed, setTyped] = useState("");
+    const [typed, setTyped] = useState(suggest);
     const [pending, start] = useTransition();
     const opt = optName.toLowerCase();
     const values = parseOptionValues(typed, existing);

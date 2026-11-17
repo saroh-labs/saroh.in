@@ -27,13 +27,15 @@ export const STOPPED_BEFORE = "Stopped. This didn't use a question.";
 export const STOPPED_AFTER = "Stopped. This used a question.";
 export const CUT_OFF = "This answer was cut off. This didn't use a question.";
 export const COULDNT_ANSWER = "I couldn't answer that just now.";
+/** No end came back: whether it was answered (and counted) isn't known here. */
+export const LOST =
+    "The connection dropped. If it was answered, the answer is in your conversations.";
 export const UNAVAILABLE = "Ask AI isn't available right now.";
 export const DAILY_LIMIT =
     "You've reached today's Ask AI limit. It resets tomorrow.";
 export const REPORTED = "Thanks. Saroh will look at it.";
 /** Where the AI provider sits, said only where it's news: India's data leaves India. */
 export const PROVIDER_WHERE = HINGLISH ? ", outside India" : "";
-export const PRIVACY_LINE = `Your question and the business details needed to answer it go to Anthropic, our AI provider${PROVIDER_WHERE}. Ask AI only sees what you can see.`;
 export const HISTORY_LINE =
     "Only you see these. Each is kept for 90 days, then deleted.";
 
@@ -103,6 +105,39 @@ export function draftWords(card: AskAiDraftCard) {
             // Open in editor (owner, 14 Nov): unsaved, or once saved.
             editor: "Open in editor",
             handedOff: "Opened in the editor",
+            done: "Added",
+        };
+    }
+    // Several orders to one step (AF 8): "Change 3 orders", "Mark 3 ready".
+    if (card.tool === "update_orders_status") {
+        const n = card.targetId?.split(",").length ?? 0;
+        const step = card.fields.find((f) => f.field === "stage");
+        const to = typeof step?.new === "string" ? step.new : "moved on";
+        return {
+            noun: "orders",
+            tag: `Change ${n} orders`,
+            confirm: `Mark ${n} ${to.replace(/_/g, " ")}`,
+            state:
+                card.status === "refused" ? "Not changed" : "Not changed yet",
+            cancelled: "Not changed",
+            open: "Open orders",
+            editor: null,
+            handedOff: null,
+            done: "Done",
+        };
+    }
+    // A booking from a free time (AF 4): "Book it", then "Booked".
+    if (card.tool === "create_booking") {
+        return {
+            noun,
+            tag: "New booking",
+            confirm: "Book it",
+            state: card.status === "refused" ? "Not booked" : "Not booked yet",
+            cancelled: "Not booked",
+            open: "Open booking",
+            editor: null,
+            handedOff: null,
+            done: "Booked",
         };
     }
     const create = card.action === "create";
@@ -128,6 +163,7 @@ export function draftWords(card: AskAiDraftCard) {
         open: `Open ${noun}`,
         editor: null,
         handedOff: null,
+        done: create ? "Added" : "Done",
     };
 }
 

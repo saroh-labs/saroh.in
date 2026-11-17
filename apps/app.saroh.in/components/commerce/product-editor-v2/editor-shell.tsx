@@ -42,6 +42,7 @@ import { PlanWay } from "@/components/billing/plan-way";
 import { VariantsSection } from "@/components/commerce/product-variants/variants-section";
 import { StatusBadge } from "@/components/shared/lists/status-badge";
 import { UNREACHED } from "@/lib/api/unreached";
+import type { PlaceShelf } from "@/lib/products/editor-stock";
 import { TextLink } from "@saroh/ui/text-link";
 import { BasicsSection } from "./basics-section";
 import type { CategoryChoice } from "./category-picker";
@@ -51,6 +52,7 @@ import { NextSteps, ReadOnlyNote } from "./editor-parts";
 import { ProductEditorProvider, useEditor } from "./editor-state";
 import { MadeBySection } from "./made-by-section";
 import { PhotosSection } from "./photos-section";
+
 import { StockSection } from "./stock-section";
 import { VisibilitySection } from "./visibility-section";
 
@@ -105,6 +107,13 @@ export interface ProductEditorProps {
     paused?: boolean;
     /** The plan's cap on one product's variants (DEC-158); null for none. */
     variantCap?: VariantCap | null;
+    /**
+     * Its shelves at the other locations while it counts as a whole
+     * (HPEditDesk); empty when there are none or they weren't read.
+     */
+    elsewhere?: readonly PlaceShelf[];
+    /** Whether the online shop is live, for Visibility's sentence. */
+    shopLive?: boolean | null;
 }
 
 const PRODUCTS_HREF = "/commerce/products";
@@ -155,6 +164,8 @@ function EditorBody({
     defaults: initialDefaults,
     paused = false,
     variantCap = null,
+    elsewhere = [],
+    shopLive = null,
 }: ProductEditorProps) {
     const router = useRouter();
     const {
@@ -465,6 +476,8 @@ function EditorBody({
                         storeId={storeId}
                         value={createStatus}
                         onChange={setCreateStatus}
+                        shopLive={shopLive}
+                        paused={paused}
                     />
                     {product ? (
                         <>
@@ -487,6 +500,7 @@ function EditorBody({
                                     countedAt={
                                         stores.length > 1 ? storeName : null
                                     }
+                                    elsewhere={elsewhere}
                                     defaultWarn={
                                         defaults?.lowStockAlert ?? null
                                     }

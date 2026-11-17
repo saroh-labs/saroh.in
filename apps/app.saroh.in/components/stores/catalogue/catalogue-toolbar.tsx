@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+
 import {
     ListFilter,
     MoreFilters,
@@ -10,7 +12,9 @@ import { ListSearch } from "@saroh/ui/list-search";
 import { StorefrontFilter } from "@/components/stores/locations/storefront-filter";
 import type { FilterChoices } from "@/lib/products/filter-choices";
 import type { ListQuery } from "@/lib/products/list-query";
+import type { CatalogueSort } from "@/lib/products/list-sort";
 import type { CataloguePage, ProductStatus } from "@/lib/products/service";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 
 const ANY = "";
 /** `?category=none`: the products with no category. */
@@ -18,9 +22,9 @@ const UNCATEGORIZED = "none";
 
 const STATUSES: { value: ProductStatus | typeof ANY; label: string }[] = [
     { value: ANY, label: "All statuses" },
-    { value: "PUBLISHED", label: "Live" },
-    { value: "DRAFT", label: "Draft" },
-    { value: "ARCHIVED", label: "Archived" },
+    { value: "PUBLISHED", label: PRODUCT_STATUS_WORD.PUBLISHED },
+    { value: "DRAFT", label: PRODUCT_STATUS_WORD.DRAFT },
+    { value: "ARCHIVED", label: PRODUCT_STATUS_WORD.ARCHIVED },
 ];
 
 interface ToolbarProps {
@@ -118,12 +122,18 @@ export function CatalogueMoreFilters({
     query,
     go,
     choices,
-}: ToolbarProps & { choices: FilterChoices }) {
+    phone = null,
+}: ToolbarProps & {
+    choices: FilterChoices;
+    /** A phone's own row's filters and sort, folded in here. */
+    phone?: ReactNode;
+}) {
     return (
         <MoreFilters
             title="Filter products"
             count={(query.collection ? 1 : 0) + (query.option ? 1 : 0)}
         >
+            {phone}
             {query.option ? (
                 // Only reached from Settings › Options' count, so only
                 // offered while it narrows.
@@ -149,6 +159,33 @@ export function CatalogueMoreFilters({
                 onPick={(collection) => go({ collection })}
             />
         </MoreFilters>
+    );
+}
+
+const SORTS: { value: CatalogueSort; label: string }[] = [
+    { value: "newest", label: "Newest first" },
+    { value: "name", label: "Name, A to Z" },
+    { value: "-name", label: "Name, Z to A" },
+    { value: "stock", label: "Stock, lowest first" },
+    { value: "-stock", label: "Stock, highest first" },
+    { value: "price", label: "Price, lowest first" },
+    { value: "-price", label: "Price, highest first" },
+];
+
+/**
+ * The list's order (owner, 15 Nov; HPProductsDesk), at the toolbar's
+ * right: by name, stock or price, or newest first. The whole catalogue is
+ * read in that order (`?sort=`), never one page sorted on its own.
+ */
+export function CatalogueSortSelect({ query, go }: ToolbarProps) {
+    return (
+        <ListFilter<CatalogueSort>
+            label="Sort"
+            value={query.sort}
+            onValueChange={(sort) => go({ sort })}
+            options={SORTS}
+            narrowed={false}
+        />
     );
 }
 

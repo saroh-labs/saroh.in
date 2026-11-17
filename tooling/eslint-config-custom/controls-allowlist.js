@@ -20,6 +20,9 @@
 export const RAW_ALLOWED = {
     // button: a conversation row in Ask AI's list, pressed to open it (U10)
     "components/ask-ai/panel-states.tsx": ["button"],
+    // button: a suggestion row, and the page label's clear and undo (AF boards)
+    "components/ask-ai/about-label.tsx": ["button"],
+    "components/ask-ai/suggestions.tsx": ["button"],
     // button: a template's row in its preview's list, pressed to show it (DEC-216)
     "components/sites/templates/template-preview.tsx": ["button"],
     // button: a connection, key or address row that is one button, opening its sheet (U14)
@@ -67,8 +70,6 @@ export const RAW_ALLOWED = {
     "components/bookings/calendar/header/calendar-header.tsx": ["button"],
     // button: a calendar cell (the week strip and the month), a step
     "components/bookings/calendar/header/date-sheet.tsx": ["button"],
-    // button: a row that is one button (a person, picked to see theirs)
-    "components/bookings/calendar/header/people-sheet.tsx": ["button"],
     // button: a menu row that is one button (the quick look's More)
     "components/bookings/quick-look/quick-look-more.tsx": ["button"],
     // button: a cell covered by its button, a row or card that is one button

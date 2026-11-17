@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Plus, Search } from "lucide-react";
@@ -135,27 +136,23 @@ export function PeopleSheet({
                         className="h-10 pl-9 max-[759px]:h-11 max-[759px]:text-[15px]"
                     />
                 </div>
-                <div
-                    role="radiogroup"
-                    aria-label="Whose bookings"
+                <ChoiceGroup
+                    label="Whose bookings"
                     className="grid gap-1 max-[759px]:gap-2"
-                >
-                    {shown.map((c) => {
-                        const on = c.key === picked;
-                        return (
-                            <button
-                                key={c.key}
-                                type="button"
-                                role="radio"
-                                aria-checked={on}
-                                onClick={() => onPick(c.key)}
-                                className={cn(
-                                    "flex min-h-[50px] w-full cursor-pointer items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left text-foreground transition-colors duration-fast hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                    "max-[759px]:min-h-16 max-[759px]:gap-3 max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card max-[759px]:px-3 max-[759px]:py-2",
-                                    on &&
-                                        "bg-muted shadow-[inset_0_0_0_1.5px_hsl(var(--foreground))] max-[759px]:border-2 max-[759px]:border-foreground max-[759px]:px-[11px] max-[759px]:py-[7px] max-[759px]:shadow-none",
-                                )}
-                            >
+                    value={picked}
+                    onChange={onPick}
+                    itemClassName={(on) =>
+                        cn(
+                            "flex min-h-[50px] w-full items-center gap-2.5 rounded-[10px] px-2.5 py-1.5 text-left text-foreground hover:bg-muted",
+                            "max-[759px]:min-h-16 max-[759px]:gap-3 max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card max-[759px]:px-3 max-[759px]:py-2",
+                            on &&
+                                "bg-muted shadow-[inset_0_0_0_1.5px_hsl(var(--foreground))] max-[759px]:border-2 max-[759px]:border-foreground max-[759px]:px-[11px] max-[759px]:py-[7px] max-[759px]:shadow-none",
+                        )
+                    }
+                    choices={shown.map((c) => ({
+                        value: c.key,
+                        label: (
+                            <>
                                 <PersonFace
                                     choice={c}
                                     className="max-[759px]:size-9 max-[759px]:text-[12.5px]"
@@ -179,18 +176,18 @@ export function PeopleSheet({
                                         {periodWord}
                                     </span>
                                 </span>
-                            </button>
-                        );
-                    })}
-                    {shown.length === 0 ? (
-                        <p
-                            data-ph-unmask=""
-                            className="px-1 py-2 text-[13px] text-muted-foreground"
-                        >
-                            Nobody by that name takes bookings.
-                        </p>
-                    ) : null}
-                </div>
+                            </>
+                        ),
+                    }))}
+                />
+                {shown.length === 0 ? (
+                    <p
+                        data-ph-unmask=""
+                        className="px-1 py-2 text-[13px] text-muted-foreground"
+                    >
+                        Nobody by that name takes bookings.
+                    </p>
+                ) : null}
                 <p
                     data-ph-unmask=""
                     className="mx-1 mt-1.5 text-[12.5px] leading-normal text-muted-foreground max-[759px]:mx-0 max-[759px]:mt-1"

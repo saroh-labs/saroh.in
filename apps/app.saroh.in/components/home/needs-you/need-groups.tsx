@@ -1,4 +1,9 @@
 "use client";
+import type { HomeSetup } from "@/components/home/dashboard/home-setup";
+import { TakeMoneyChecklist } from "@/components/home/setup/take-money-checklist";
+import { useSetupHidden } from "@/components/home/setup/use-setup-hidden";
+import { takeMoneyPlace } from "@/lib/settings/ready";
+import type { ChecklistRow } from "@/lib/setup-checklist";
 
 import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
@@ -74,6 +79,7 @@ export function NeedGroups({
     defaultOpen = OPEN_FIRST,
     remindAll,
     cheques = null,
+    setup = null,
 }: {
     groups: readonly HomeNeedGroup[];
     /** The sum of every group's count. */
@@ -97,6 +103,12 @@ export function NeedGroups({
     remindAll?: (group: HomeNeedGroup, actions: InlineActions) => ReactNode;
     /** Cheques not in the bank (U18); null while none waits. */
     cheques?: HomeChequesWaiting | null;
+    /**
+     * Finish setup once most of it is done: the last group, "Finish
+     * setting up", with Needs you's own setup things as its steps, so
+     * setup is said once (HPHomeDesk). Null for someone it isn't for.
+     */
+    setup?: HomeSetup | null;
 }) {
     const headingId = useId();
     const [open, setOpen] = useState<ReadonlySet<HomeNeedKind>>(
@@ -156,7 +168,37 @@ export function NeedGroups({
         openTotal(totalWithCheques(total, cheques), doneHere),
         partial,
     );
+    const setupHidden = useSetupHidden(setup?.businessId ?? "");
+    const setupPlace = setup ? takeMoneyPlace(setup.list, setupHidden) : null;
+    // The setup group's things join the checklist while it is a group
+    // here, every one of them sent (none folded into "3 more").
+    const setupGroup = groups.find((g) => g.kind === "SETUP");
+    // A thing the checklist already has (same place to go) isn't said twice.
+    const known = new Set(setup?.list.steps.map((step) => step.href) ?? []);
+    const steps =
+        setupPlace === "late" && setupGroup?.more === 0
+            ? setupSteps(setupGroup).filter(
+                  (step) => !known.has(step.action?.href ?? ""),
+              )
+            : null;
+    const merged = steps !== null;
+    const shownGroups = merged
+        ? groups.filter((g) => g.kind !== "SETUP")
+        : groups;
+    const setupItem = setup ? (
+        <li key="setup" className="border-t border-border first:border-t-0">
+            <TakeMoneyChecklist
+                {...setup}
+                slot="late"
+                compact
+                inNeedsYou
+                extraRows={steps ?? []}
+            />
+        </li>
+    ) : null;
     const lines = groups.length > 0 || cheques !== null;
+    // Found among every group: SETUP is always last, so merging it away
+    // leaves the cheques line where it was.
     const chequesAt = deskChequesAt(groups);
     const chequesLine = cheques ? (
         <DeskChequesLine key="cheques" cheques={cheques} />
@@ -166,7 +208,12 @@ export function NeedGroups({
         REMIND_ALL_KEY in actions.done
             ? actions.done[REMIND_ALL_KEY].remind
             : undefined;
-    const onItsWay = onItsWayLabel(inProgress);
+    // Said in the Orders group's line when every one is late
+    // (HPHomeDesk); beside the count otherwise, as a link to them.
+    const ordersSayIt = groups.some(
+        (g) => g.kind === "ORDERS" && g.late > 0 && g.late >= g.count,
+    );
+    const onItsWay = ordersSayIt ? "" : onItsWayLabel(inProgress);
 
     return (
         <section aria-labelledby={headingId} className="grid min-w-0 gap-2.5">
@@ -226,10 +273,13 @@ export function NeedGroups({
 
             {lines ? (
                 <ul className="overflow-hidden rounded-xl border border-border bg-card">
-                    {groups.slice(0, chequesAt).map(drawGroup)}
+                    {shownGroups.slice(0, chequesAt).map(drawGroup)}
                     {chequesLine}
-                    {groups.slice(chequesAt).map(drawGroup)}
+                    {shownGroups.slice(chequesAt).map(drawGroup)}
+                    {setupItem}
                 </ul>
+            ) : setup ? (
+                <TakeMoneyChecklist {...setup} slot="late" compact />
             ) : null}
         </section>
     );
@@ -249,6 +299,7 @@ export function NeedGroups({
                                   group,
                                   now,
                                   group.kind === "ORDERS" ? dueToday : 0,
+                                  group.kind === "ORDERS" ? inProgress : 0,
                               ),
                               group.kind === "BILLS" ? remind : undefined,
                           )
@@ -355,4 +406,18 @@ export function GroupActions({
             {one.label}
         </Button>
     );
+}
+
+/** Needs you's setup things as checklist steps: what, why, and its one way in. */
+function setupSteps(group: HomeNeedGroup): ChecklistRow[] {
+    return group.rows.map((row) => ({
+        key: row.id,
+        label: row.title,
+        ...(row.sub ? { why: row.sub } : {}),
+        done: false,
+        action: {
+            label: row.link?.label ?? "Open",
+            href: row.link?.href ?? row.href,
+        },
+    }));
 }

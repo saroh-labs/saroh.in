@@ -24,6 +24,7 @@ import { SwitchRow } from "@saroh/ui/check-row";
 import { TextLink } from "@saroh/ui/text-link";
 
 import { StockSheetButton } from "@/components/commerce/product-stock/stock-sheet";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import type { SheetKind } from "./sheet-button";
 import { SheetButton } from "./sheet-button";
 
@@ -170,7 +171,7 @@ export function CustomerView({
                     {live
                         ? "The shop page as a customer opens it. Try the variants. Nothing is added to a basket."
                         : product.status === "ARCHIVED"
-                          ? "Archived. Customers cannot see this page. This is how it looked."
+                          ? `${PRODUCT_STATUS_WORD.ARCHIVED}. Customers cannot see this page. This is how it looked.`
                           : "A draft. Customers cannot see this yet. This is how it will look once it is published."}
                 </p>
                 <SwitchRow

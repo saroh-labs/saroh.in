@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import type { AskAiAbout, AskAiNext } from "@saroh/api-contract";
 import type { AiTurnOutcome } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
@@ -7,6 +8,7 @@ import type { AskAiRefusal, StartLimits } from "../access/ask-ai-access";
 import { AskAiAccess } from "../access/ask-ai-access";
 import type { AgentDefinition } from "../agents/agent-definition";
 import {
+    aboutTail,
     agentVersion,
     inLanguage,
     sharedInstructions,
@@ -41,7 +43,8 @@ import {
     totalTokens,
     trimHistory,
 } from "./guards";
-import { isCounted } from "./outcome";
+import { nextSteps } from "./next-steps";
+import { countsFor } from "./outcome";
 import type { TurnConversation } from "./turn-store";
 import { TurnStore } from "./turn-store";
 
@@ -66,6 +69,8 @@ export interface TurnInput {
     turnId: string;
     /** From {@link TurnRegistry.begin}: Stop. */
     signal: AbortSignal;
+    /** The page it is asked about (AF 2, 5); none, the whole business. */
+    about?: AskAiAbout;
 }
 
 interface TurnLimits {
@@ -105,6 +110,10 @@ interface TurnState {
     card?: TurnCard;
     /** Reads' cards by tool, shown under the answer once it is done. */
     cards: Map<string, TurnCard>;
+    /** The tools called, in order: what the next steps follow (AF 3). */
+    tools: string[];
+    /** The next steps under the answer, once it is done. */
+    next?: AskAiNext[];
     tokens: TurnTokens;
     rounds: number;
     over100k: boolean;
@@ -146,6 +155,8 @@ export class TurnRunner {
         agentKey: string,
         /** Its title, sealed. */
         firstQuestion?: string,
+        /** The page it was started on, kept for the list (AF 9). */
+        about?: AskAiAbout,
     ): Promise<TurnConversation> {
         const agent = this.agent(agentKey);
         const keys = agent.models.questions;
@@ -162,6 +173,7 @@ export class TurnRunner {
                 effort,
             },
             firstQuestion,
+            about,
         );
     }
 
@@ -226,6 +238,7 @@ export class TurnRunner {
         const state: TurnState = {
             text: "",
             cards: new Map(),
+            tools: [],
             tokens: NO_TOKENS,
             rounds: 0,
             over100k: false,
@@ -253,17 +266,25 @@ export class TurnRunner {
             if (!state.outcome) {
                 end(state, state.text ? "STOPPED_AFTER" : "STOPPED_BEFORE");
             }
+            if (state.outcome === "ANSWERED") {
+                state.next = nextSteps(
+                    state.tools,
+                    new Set(prepared.tools.map((t) => t.name)),
+                    !!state.card,
+                );
+            }
             await this.finish(input, prepared, state);
         }
         const outcome = state.outcome ?? "FAILED";
         // Whole, under the text, once it is done (never under a draft).
         for (const card of answerCards(state)) yield { type: "card", ...card };
+        if (state.next?.length) yield { type: "next", items: state.next };
         if (state.reason) yield { type: "error", reason: state.reason };
         yield {
             type: "done",
             turnId,
             outcome,
-            counted: isCounted(outcome),
+            counted: countsFor(outcome, input.question),
             usage: {
                 rounds: state.rounds,
                 inputTokens: state.tokens.inputTokens,
@@ -308,7 +329,9 @@ export class TurnRunner {
                 ...history,
                 {
                     role: "user",
-                    text: withLanguageTail(input.question, language),
+                    text:
+                        withLanguageTail(input.question, language) +
+                        aboutTail(input.about),
                 },
             ],
         };
@@ -459,6 +482,7 @@ export class TurnRunner {
             const results: AiToolResult[] = [];
             for (const call of calls) {
                 if (aborted()) return stopped(state);
+                state.tools.push(call.name);
                 yield {
                     type: "status",
                     tool: call.name,
@@ -521,7 +545,7 @@ export class TurnRunner {
         state: TurnState,
     ): Promise<void> {
         const outcome = state.outcome ?? "FAILED";
-        const counted = isCounted(outcome);
+        const counted = countsFor(outcome, input.question);
         const cost = costMicroUsd(state.tokens, p.limits.prices);
         const t = state.tokens;
         this.logger.log(
@@ -534,6 +558,7 @@ export class TurnRunner {
                 ...(answerCards(state).length
                     ? { cards: answerCards(state) }
                     : {}),
+                ...(state.next?.length ? { next: state.next } : {}),
                 outcome,
                 counted,
                 stopped:

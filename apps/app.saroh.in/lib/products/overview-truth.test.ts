@@ -150,38 +150,37 @@ describe("variants in the product's own word", () => {
         expect(optionNoun(null, 2)).toBe("variants");
     });
 
-    it("sums the Variants card: count, price, what is out", () => {
+    it("sums the Variants card under its count: price, what is out", () => {
         expect(
             variantsLine(
                 {
-                    count: 28,
-                    optionName: "Shade",
                     min: "420",
                     max: "420",
                     out: 1,
                 },
                 money,
             ),
-        ).toBe("28 shades · ₹420 each · 1 out");
-        expect(
-            variantsLine(
-                { count: 6, optionName: "Jar", min: "420", max: "490", out: 0 },
-                money,
-            ),
-        ).toBe("6 jars · ₹420 to ₹490");
+        ).toBe("₹420 each · 1 out");
+        expect(variantsLine({ min: "420", max: "490", out: 0 }, money)).toBe(
+            "₹420 to ₹490",
+        );
     });
 });
 
 describe("the reach is what it truly is", () => {
     it("says sold at the counter, not online, while the shop isn't live", () => {
         expect(visibilityLine("PUBLISHED", false)).toBe(
-            "Live. Sold at the counter. Not online yet.",
+            "Live at the counter. Online once your shop is live.",
         );
         expect(visibilityLine("PUBLISHED", true)).toBe(
             "Live. Customers can buy it on your website",
         );
         expect(visibilityLine("PUBLISHED", null)).toBe(
             "Live. Customers can buy it",
+        );
+        // Paused by the plan is the state customers meet.
+        expect(visibilityLine("PUBLISHED", true, true)).toBe(
+            "Paused by your plan. Customers can't buy it",
         );
     });
 

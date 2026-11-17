@@ -756,6 +756,8 @@ describe("Home lists only the orders that need attention soon (DEC-163)", () => 
         );
         // The rail's Orders badge counts what needs doing soon, too.
         expect(action?.count).toBe(2);
+        // Every late one, so the group's pill says the tile's count.
+        expect(action?.late).toBe(1);
     });
 
     it("says nothing needs doing when every open order is due later, and suggests no product", async () => {

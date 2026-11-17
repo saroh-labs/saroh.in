@@ -38,7 +38,7 @@ export interface AiSealBinding {
     organizationId: string;
     conversationId: string;
     rowId: string;
-    field: "body" | "title" | "draft" | "report";
+    field: "body" | "title" | "draft" | "report" | "about";
 }
 
 /** A message as sealed: its text, a draft's card, and the reads' cards under it. */
@@ -46,6 +46,8 @@ export interface AiMessageContent {
     text: string;
     card?: Record<string, unknown>;
     cards?: { kind: string; data: Record<string, unknown> }[];
+    /** The next steps offered under an answer (AF 3). */
+    next?: { label: string; text: string }[];
 }
 
 interface Envelope {

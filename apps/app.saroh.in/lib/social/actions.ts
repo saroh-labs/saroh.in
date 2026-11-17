@@ -1,7 +1,7 @@
 "use server";
 
 import type { OwnPostInput } from "./own-posts";
-import { createOwnPost, updateOwnPost } from "./own-posts";
+import { createOwnPost, deleteOwnPost, updateOwnPost } from "./own-posts";
 
 /**
  * Save an own post as it is written (#1378): the first save makes it, the
@@ -9,4 +9,9 @@ import { createOwnPost, updateOwnPost } from "./own-posts";
  */
 export async function saveOwnPost(id: string | null, input: OwnPostInput) {
     return id ? updateOwnPost(id, input) : createOwnPost(input);
+}
+
+/** Delete an own post (Your posts, "Delete this draft"). */
+export async function removeOwnPost(id: string) {
+    return deleteOwnPost(id);
 }

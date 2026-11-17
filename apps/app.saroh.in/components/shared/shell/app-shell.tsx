@@ -345,12 +345,11 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
                     storefronts={storefronts?.used ?? null}
                     kind={activeOrg?.kind ?? null}
                 />
-                {/* The working area is white and the rail sits on Paper: the
-                product spends white surfaces, and the page you work on is
-                the raised one (brand file §5, and the applied screens). In
-                dark it is the ground, as on the marketing site: the tables
-                and cards on it are what rise, a surface step up. */}
-                <div className="flex min-w-0 flex-1 flex-col bg-card dark:bg-background">
+                {/* The working area is Paper like the rail, and the cards and
+                tables on it are the white, raised surfaces (owner, 17 Nov
+                2026, after the HP* boards; was white). Dark already worked
+                this way: the ground, with cards a surface step up. */}
+                <div className="flex min-w-0 flex-1 flex-col bg-background">
                     {/*
                      * `tabIndex={-1}` makes this a valid focus target: following the
                      * skip link must MOVE focus, not just scroll, or the next Tab

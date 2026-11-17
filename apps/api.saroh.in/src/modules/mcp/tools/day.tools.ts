@@ -26,6 +26,7 @@ import {
     moveBookingTool,
     patchCustomerBody,
     updateCustomerTool,
+    updateOrdersStatusTool,
     updateOrderStatusTool,
 } from "@saroh/api-contract";
 import { prisma } from "@saroh/database";
@@ -440,6 +441,7 @@ export function dayTools(d: DayDeps): McpTool[] {
                         : `${JSON.stringify(service.name)} has no free time then${staff_id ? " with that staff member" : ""}. This doesn't say why: to tell the person, call list_bookings for that time${staff_id ? " and staff_id" : ""} (already booked) or get_hours (closed then).`,
                     data: {
                         service_id,
+                        service_name: service.name,
                         timezone: service.timezone,
                         slots: shown,
                         more: slots.length > shown.length,
@@ -700,6 +702,52 @@ export function dayTools(d: DayDeps): McpTool[] {
                     text: `Order ${after.number} (order_id ${order_id}) is now at ${after.stage} (status ${after.status}).`,
                     data: { order },
                     activity: { target: `order:${order_id}` },
+                };
+            },
+        }),
+        defineTool({
+            name: "update_orders_status",
+            title: "Move several orders on",
+            description:
+                'Use this when the person moves several orders to the same next step at once: preparing, ready, collected, handed_to_courier, out_for_delivery, delivered or sent. Example: "mark today\'s three paid orders ready". Take each order_id from list_orders. Not for one order (update_order_status), and not for cancelling or refunds, which are done in the Saroh app.',
+            contract: updateOrdersStatusTool,
+            capability: "order:stage",
+            module: "COMMERCE",
+            writeClass: "wind-down",
+            hints: { ...UPDATE, openWorldHint: true },
+            async run({ order_ids, stage }, { ctx }: McpCall) {
+                const orders = [];
+                // One at a time, each through the kitchen as the app moves it;
+                // an unknown id stops before any later one moves.
+                for (const order_id of order_ids) {
+                    const before = await orderById(
+                        ctx.organizationId,
+                        order_id,
+                        ctx,
+                    );
+                    if (!before) throw gone("order", order_id, "list_orders");
+                    if (before.stage !== stage) {
+                        await d.kitchen.moveStage(ctx, order_id, {
+                            to: orderStage.in(stage),
+                        });
+                    }
+                    const after =
+                        (await orderById(ctx.organizationId, order_id, ctx)) ??
+                        before;
+                    orders.push({
+                        order_id,
+                        number: after.number,
+                        status: after.status,
+                        stage: after.stage,
+                    });
+                }
+                return {
+                    text: `Now at ${stage}: ${orders.map((o) => `${o.number} (order_id ${o.order_id})`).join(", ")}.`,
+                    data: { orders },
+                    activity: {
+                        target: `order:${order_ids.join(",")}`,
+                        summary: `Moved ${orders.length} orders to ${stage}.`,
+                    },
                 };
             },
         }),

@@ -1,5 +1,7 @@
 "use client";
 
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
@@ -8,7 +10,6 @@ import { useState } from "react";
 import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
 import { useBusinessDetailsStep } from "@/components/organizations/business-details/use-business-details-step";
-import { Chip } from "@/components/shared/lists/chip";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { pickName } from "@/lib/customers/picker";
 import { orderHref } from "@/lib/orders/links";
@@ -230,22 +231,19 @@ function NewOrderBody({
                         <div data-ph-unmask="" className="label mb-[7px]">
                             Taken at
                         </div>
-                        <div
-                            role="radiogroup"
-                            aria-label="Location"
+                        <ChoiceGroup
+                            label="Location"
                             className="flex flex-wrap gap-1.5"
-                        >
-                            {stores.map((s) => (
-                                <Chip
-                                    key={s.id}
-                                    on={o.storeId === s.id}
-                                    onClick={() => o.setStoreId(s.id)}
-                                    className="cursor-pointer active:scale-[0.97]"
-                                >
-                                    {s.name}
-                                </Chip>
-                            ))}
-                        </div>
+                            value={o.storeId}
+                            onChange={o.setStoreId}
+                            choices={stores.map((s) => ({
+                                value: s.id,
+                                label: s.name,
+                            }))}
+                            itemClassName={(on) =>
+                                chipClass(on, "active:scale-[0.97]")
+                            }
+                        />
                     </div>
                 ) : null}
                 <CustomerStep

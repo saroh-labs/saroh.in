@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 /**
- * Create post (#1378, boards SGPick*, SGOwn*, SFCLocked*): picking each
- * kind leads to its own cards; a draft can't be picked and says why; an
- * own post saves itself as it is written and shows its cards once saved,
- * text only or with a photo; its link is one of the live pages, stored as
- * a path; Share now works on Free with Schedule locked; someone without
- * `social:post` can still share items and reads one message on own posts.
+ * Create post (#1378; boards BPick*, BPost*, BOwn*, BDone*, 16 Nov):
+ * each thing is drawn as the post it makes and opens finished, with its
+ * own cards; drafts are counted and shown greyed on request; an own post
+ * saves itself as it is written, shows its cards once saved, reopens and
+ * can be deleted; Ready to share works on Free with the channels locked;
+ * someone without `social:post` can still share items and reads one
+ * message on own posts.
  */
 import type { AnchorHTMLAttributes } from "react";
 import { act } from "react";
@@ -17,6 +18,7 @@ import type { ShareSetup } from "@/lib/share-item/share";
 import type { LinkChoice } from "@/lib/social/links";
 import type { PickRow } from "@/lib/social/pick";
 
+import type { Step } from "./create-post";
 import { CreatePost } from "./create-post";
 
 vi.mock("next/link", () => ({
@@ -33,7 +35,15 @@ vi.mock("next/link", () => ({
 const saved = vi.hoisted(() => ({
     calls: [] as { id: string | null; input: Record<string, unknown> }[],
 }));
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
+const removed = vi.hoisted(() => ({ ids: [] as string[] }));
+vi.mock("@saroh/ui/toast", () => ({ showUndo: vi.fn(), showError: vi.fn() }));
 vi.mock("@/lib/social/actions", () => ({
+    removeOwnPost: (id: string) => {
+        removed.ids.push(id);
+        return Promise.resolve({ ok: true, data: {} });
+    },
     saveOwnPost: (id: string | null, input: Record<string, unknown>) => {
         saved.calls.push({ id, input });
         return Promise.resolve({
@@ -107,6 +117,7 @@ const ROWS: PickRow[] = [
         price: "₹360",
         url: `${ORIGIN}/shop/cardamom-bun-box`,
         offerId: null,
+        hasPhoto: true,
     }),
     row("service", "service:s1", "Sourdough class", {
         kind: "service",
@@ -162,6 +173,8 @@ beforeEach(() => {
     document.body.appendChild(host);
     root = createRoot(host);
     saved.calls.length = 0;
+    removed.ids.length = 0;
+    router.push.mockReset();
     fetched = [];
     vi.stubGlobal(
         "fetch",
@@ -194,7 +207,7 @@ async function flush(ms = 0) {
     }
 }
 
-function render(canPost = true) {
+function render(canPost = true, start?: Step) {
     act(() =>
         root.render(
             <CreatePost
@@ -206,6 +219,8 @@ function render(canPost = true) {
                 canPost={canPost}
                 business="Rye & Co."
                 failed={[]}
+                ownCount={2}
+                start={start}
             />,
         ),
     );
@@ -222,13 +237,11 @@ function named(selector: string, name: string): HTMLElement {
     if (!hit) throw new Error(`No ${selector} "${name}"`);
     return hit;
 }
-const pickRow = (kind: string, n = 0) => {
+const pickRow = (kind: string) => {
     const el = Array.from(
-        host.querySelectorAll<HTMLElement>(
-            `[data-pick-row="${kind}"]:not([data-draft]) button`,
-        ),
-    ).at(n);
-    if (!el) throw new Error(`No ${kind} row`);
+        host.querySelectorAll<HTMLButtonElement>("[data-pick]"),
+    ).find((b) => b.dataset.pick?.startsWith(`${kind}:`) && !b.disabled);
+    if (!el) throw new Error(`No ${kind} tile`);
     return el;
 };
 async function press(el: HTMLElement) {
@@ -256,59 +269,87 @@ const cards = () =>
 describe("picking from the business", () => {
     it.each([
         ["product", ["photo", "price", "simple", "colour"], "/product/"],
-        ["service", ["photo", "price", "simple", "colour"], "/service/"],
+        ["service", ["simple", "colour"], "/service/"],
         ["post", ["photo", "colour", "simple"], "/post/"],
         ["offer", ["offer", "simple", "colour"], "/offer/d1/"],
-        ["book", ["colour", "photo", "simple"], "/api/share/book/image"],
-    ])("a %s leads to its own cards", async (kind, expected, path) => {
+        ["book", ["colour", "simple"], "/api/share/book/image"],
+    ])(
+        "a %s opens finished, with its own cards",
+        async (kind, expected, path) => {
+            render();
+            await press(pickRow(kind));
+            expect(
+                host.querySelector(`[data-item-composer="${kind}"]`),
+            ).not.toBeNull();
+            expect(host.querySelector("[data-insta-frame]")).not.toBeNull();
+            expect(cards()).toEqual(expected);
+            expect(fetched.some((u) => u.includes(path))).toBe(true);
+        },
+    );
+
+    it("draws each live thing as the post it makes", () => {
         render();
-        await press(pickRow(kind));
-        await press(named("button", "Continue"));
-        expect(
-            host.querySelector(`[data-item-composer="${kind}"]`),
-        ).not.toBeNull();
-        expect(cards()).toEqual(expected);
-        expect(fetched.some((u) => u.includes(path))).toBe(true);
+        const tile = host.querySelector('[data-pick="product:p1"] img');
+        expect(tile?.getAttribute("src")).toContain(
+            "/public/share/site_1/product/cardamom-bun-box/image?style=price&size=post&w=240",
+        );
     });
 
-    it("greys a draft with why, and it can't be picked", () => {
+    it("counts drafts, and shows them greyed with why on request", async () => {
         render();
-        const draft = host.querySelector("[data-draft]");
+        expect(host.querySelector('[data-pick="post:b2"]')).toBeNull();
+        expect(host.textContent).toContain(
+            "1 draft isn't shown: publish it first.",
+        );
+        await press(named("button", "Show them"));
+        const draft = host.querySelector<HTMLButtonElement>(
+            '[data-pick="post:b2"]',
+        );
+        expect(draft?.disabled).toBe(true);
         expect(draft?.textContent).toContain(
             "Publish it first. A draft has no public page.",
         );
-        expect(draft?.querySelector("button")).toBeNull();
     });
 
-    it("Continue waits for a pick", () => {
-        render();
-        expect(
-            (named("button", "Continue") as HTMLButtonElement).disabled,
-        ).toBe(true);
-    });
-
-    it("shares now on Free, with Schedule and Channels locked", async () => {
+    it("is ready to share on Free, with the channels locked, and Change goes back", async () => {
         render();
         await press(pickRow("product"));
-        await press(named("button", "Continue"));
-        await flush();
-        const share = host.querySelector<HTMLButtonElement>("[data-share-now]");
-        expect(share?.disabled).toBe(false);
+        expect(host.querySelector("[data-ready-actions]")).not.toBeNull();
         expect(
             host.querySelector('[data-channels-locked="free"]'),
         ).not.toBeNull();
+        await press(named("button", "Change"));
+        expect(host.querySelector("[data-pick-step]")).not.toBeNull();
+    });
+
+    it("opens straight on a thing from Social", () => {
+        render(true, { at: "item", key: "offer:d1" });
         expect(
-            host.querySelector('[aria-label="Schedule, locked"]'),
+            host.querySelector('[data-item-composer="offer"]'),
         ).not.toBeNull();
     });
 });
 
+const SAVED = {
+    id: "sp_9",
+    headline: "Open late on Saturday",
+    mediaId: null,
+    style: "colour" as const,
+    size: "post" as const,
+    caption: "Come by!",
+    linkPath: "/book",
+    imagePath: "/public/share/own/sp_9/image",
+    createdAt: "2026-11-15T10:00:00.000Z",
+    updatedAt: "2026-11-15T10:00:00.000Z",
+};
+
 describe("your own post", () => {
-    it("text only saves as it is written and shows its cards once saved", async () => {
+    it("saves as it is written and shows its cards once saved", async () => {
         render();
-        await press(named("button", "Text only"));
+        await press(named("button", "Write a headline"));
         expect(host.querySelector("[data-own-no-cards]")).not.toBeNull();
         expect(cards()).toEqual([]);
+        expect(host.textContent).toContain("Your posts (2)");
         const headline = host.querySelector<HTMLInputElement>(
             "[data-own-headline]",
         );
@@ -329,9 +370,12 @@ describe("your own post", () => {
         expect(
             fetched.some((u) => u.includes("/public/share/own/sp_1/image")),
         ).toBe(true);
-        expect(host.textContent).toContain("Saved to your posts as you go.");
+        expect(host.textContent).toContain("Draft saved");
+        // Counted in Your posts once saved.
+        expect(host.textContent).toContain("Your posts (3)");
 
         // The next change updates the same post.
+        await press(named("button", "Edit"));
         const caption =
             host.querySelector<HTMLTextAreaElement>("[data-own-caption]");
         if (!caption) throw new Error("No caption");
@@ -343,7 +387,7 @@ describe("your own post", () => {
 
     it("with a photo saves the photo and offers the Photo card", async () => {
         render();
-        await press(named("button", "Use a photo"));
+        await press(named("button", "Use your photo"));
         await press(named("button", "Choose a photo"));
         await flush(200);
         expect(saved.calls[0]?.input.mediaId).toBe("media_1");
@@ -351,44 +395,31 @@ describe("your own post", () => {
         expect(host.textContent).toContain("Shopfront");
     });
 
-    it("links only to the live pages offered, and stores the path", async () => {
-        render();
-        await press(named("button", "Text only"));
-        // The Link rows: radio cards, each a label around its radio.
-        const radios = Array.from(
-            host.querySelectorAll<HTMLElement>('[role="radio"]'),
-        ).filter((r) => r.closest("label"));
-        const labels = radios.map((r) => r.closest("label")?.textContent);
-        expect(labels).toEqual([
-            "Homerye.example.com",
-            "Booking pagerye.example.com/book",
-            "A page",
-        ]);
-        const aPage = radios.at(2);
-        if (!aPage) throw new Error("No A page");
-        await press(aPage);
-        expect(host.querySelector("[data-link-page]")?.textContent).toContain(
-            "rye.example.com/work-with-us",
-        );
-        const headline = host.querySelector<HTMLInputElement>(
-            "[data-own-headline]",
-        );
-        if (!headline) throw new Error("No headline");
-        typeIn(headline, "Join us");
+    it("reopens a saved post without saving it again, and deletes it", async () => {
+        render(true, { at: "own", photo: false, post: SAVED });
         await flush(200);
-        expect(saved.calls.at(-1)?.input.linkPath).toBe("/work-with-us");
+        expect(saved.calls).toEqual([]);
+        expect(
+            host.querySelector<HTMLInputElement>("[data-own-headline]")?.value,
+        ).toBe("Open late on Saturday");
+        expect(cards()).toEqual(["colour", "simple"]);
+        expect(host.textContent).toContain("Your posts (2)");
+        await press(named("button", "Delete this draft"));
+        await press(named("button", "Delete post"));
+        await flush();
+        expect(removed.ids).toEqual(["sp_9"]);
+        expect(router.push).toHaveBeenCalledWith("/social");
     });
 });
 
 describe("without social:post", () => {
     it("says one message on own posts and still shares items", async () => {
         render(false);
-        expect(host.querySelector("[data-no-own-posts]")?.textContent).toBe(
+        expect(host.textContent).toContain(
             "You can share, but making your own posts isn't part of your role.",
         );
-        expect(host.textContent).not.toContain("Text only");
+        expect(host.textContent).not.toContain("Write a headline");
         await press(pickRow("product"));
-        await press(named("button", "Continue"));
-        expect(host.querySelector("[data-share-now]")).not.toBeNull();
+        expect(host.querySelector("[data-ready-actions]")).not.toBeNull();
     });
 });

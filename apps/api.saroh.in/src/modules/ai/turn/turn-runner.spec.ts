@@ -31,6 +31,7 @@ import { AiSettingNotConfiguredError } from "../settings/ai-settings.service";
 import type { AiToolbox, AiToolRun } from "../tools/toolbox.port";
 import type { TurnEvent } from "./events";
 import { estimateTokens } from "./guards";
+import type { TurnInput } from "./turn-runner";
 import { LAST_ROUND, TurnRunner } from "./turn-runner";
 import type { TurnConversation, TurnFinish, TurnStore } from "./turn-store";
 
@@ -251,13 +252,14 @@ function setup(s: Setup) {
         access,
     );
     const controller = new AbortController();
-    const turn = () =>
+    const turn = (more: Partial<TurnInput> = {}) =>
         runner.run({
             ctx: s.asker ?? ctx,
             conversationId: conversation.id,
             question: QUESTION,
             turnId: "turn_1",
             signal: controller.signal,
+            ...more,
         });
     return {
         runner,
@@ -340,6 +342,55 @@ describe("TurnRunner", () => {
         expect(t.store.started).toEqual([
             expect.objectContaining({ question: QUESTION }),
         ]);
+    });
+
+    it("says the page it was asked from after the language, quoted as data", async () => {
+        const t = setup({ rounds: [[text("Ok."), done()]] });
+        await collect(
+            t.turn({
+                about: { kind: "customer", id: "c_1", label: "Kavya Menon" },
+            }),
+        );
+        const sent = last(t.provider.requests[0].messages);
+        expect(sent).toMatchObject({ role: "user" });
+        const words = (sent as { text: string }).text;
+        expect(words.startsWith(`${QUESTION}\n\n(From Saroh`)).toBe(true);
+        expect(words).toContain(
+            'looking at a customer page, labelled "Kavya Menon", id "c_1"',
+        );
+        // The question is kept as asked, without the page.
+        expect(t.store.started).toEqual([
+            expect.objectContaining({ question: QUESTION }),
+        ]);
+    });
+
+    it("a common question asked as written is answered and not counted", async () => {
+        const t = setup({ rounds: [[text("Saturday."), done()]] });
+        const events = await collect(
+            t.turn({ question: "What's my busiest day this week?" }),
+        );
+        expect(last(events)).toMatchObject({
+            outcome: "ANSWERED",
+            counted: false,
+        });
+        expect(t.store.finished[0]).toMatchObject({ counted: false });
+    });
+
+    it("ends an answer with its next steps, sent after the cards and kept with it", async () => {
+        const t = setup({
+            rounds: [toolRound("find_free_slots"), [text("Tue."), done()]],
+        });
+        const events = await collect(t.turn());
+        const next = events.find((e) => e.type === "next");
+        // Only a step this agent can draft: none books here, so one.
+        expect(next).toEqual({
+            type: "next",
+            items: [{ label: "Only after 5 pm", text: "Only after 5 pm" }],
+        });
+        expect(events.indexOf(next as TurnEvent)).toBe(events.length - 2);
+        expect(t.store.finished[0]).toMatchObject({
+            next: [{ label: "Only after 5 pm", text: "Only after 5 pm" }],
+        });
     });
 
     it("lays the request out for the cache and turns retries off", async () => {

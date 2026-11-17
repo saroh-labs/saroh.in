@@ -699,7 +699,8 @@ export type SectionKey = (typeof SECTION_ORDER)[number];
 export const SECTION_NAMES: Record<SectionKey, string> = {
     basics: "Basics",
     description: "Description",
-    details: "How to use and ingredients",
+    // The trade's words, not food's (HPProductNotes): gloves have care.
+    details: "Care and use",
     madeby: "Made by and returns",
     photos: "Photos and videos",
     visibility: "Visibility",
@@ -711,7 +712,7 @@ export const SECTION_NAMES: Record<SectionKey, string> = {
 export const SECTION_JUMPS: Record<SectionKey, string> = {
     basics: "Basics",
     description: "Description",
-    details: "How to use",
+    details: "Care and use",
     madeby: "Made by and returns",
     photos: "Photos and videos",
     visibility: "Visibility",

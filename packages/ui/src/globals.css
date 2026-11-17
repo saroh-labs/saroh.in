@@ -208,6 +208,12 @@
         --info-foreground: 40 31% 94%; /* 5.48:1 */
         --info-subtle: 212 42% 94%;
         --info-subtle-foreground: 209 63% 29%; /* 7.67:1 */
+        /* Ask AI's own (AF boards, 16 Nov): the page a question is about,
+           its hints and where a conversation started. Plum, apart from the
+           status hues and from Saffron, so it never reads as one of them. */
+        --ask: 306 32% 36%; /* #7B3F75 */
+        --ask-subtle: 288 25% 92%; /* #EEE6F0 */
+        --ask-subtle-foreground: 306 31% 24%; /* #4F2A4B, 9.7:1 */
 
         /* ---- just changed ----
            The ground of a row a live write just changed (admin console R9):
@@ -381,6 +387,9 @@
         --info-foreground: 60 4% 11%;
         --info-subtle: 211 37% 13%;
         --info-subtle-foreground: 211 74% 74%;
+        --ask: 306 34% 68%;
+        --ask-subtle: 300 18% 17%;
+        --ask-subtle-foreground: 306 42% 82%;
 
         --role-owner: 40 31% 94%; /* Paper */
         --role-admin: 33 58% 50%; /* #CA8837 */
@@ -833,6 +842,9 @@
     --destructive-subtle-foreground: var(--foreground);
     --info-subtle: var(--muted);
     --info-subtle-foreground: var(--foreground);
+    --ask: var(--foreground);
+    --ask-subtle: var(--muted);
+    --ask-subtle-foreground: var(--foreground);
     --role-owner: var(--foreground);
     --role-admin: var(--muted-foreground);
     --role-member: var(--highlight);

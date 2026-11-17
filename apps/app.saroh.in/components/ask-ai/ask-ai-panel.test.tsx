@@ -27,8 +27,13 @@ const actions = vi.hoisted(() => ({
     confirmDraft: vi.fn(),
     undoDraft: vi.fn(),
     redraftDraft: vi.fn(),
+    bookFromAnswer: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
+vi.mock("@/lib/customers/actions", () => ({
+    findCustomers: vi.fn().mockResolvedValue({ ok: true, results: [] }),
+    readCustomerAttention: vi.fn(),
+}));
 const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({
@@ -46,7 +51,30 @@ vi.mock("next/link", () => ({
     ),
 }));
 
-import { AskAiPanel, turnsOf } from "./ask-ai-panel";
+import { customerPage } from "@/lib/ask-ai/page-hints";
+import { AskAiPageIs } from "./ask-ai-page";
+import type { AskAiPanelProps } from "./ask-ai-panel";
+import { AskAiPanel } from "./ask-ai-panel";
+import { turnsOf } from "./turns";
+import type { UseAskAiOptions } from "./use-ask-ai";
+import { useAskAi } from "./use-ask-ai";
+
+/** The panel as the host and the full page draw it: the hook, then the drawing. */
+function Panel({
+    state,
+    conversation,
+    conversations,
+    layout,
+    ...rest
+}: Omit<AskAiPanelProps, "ai"> & UseAskAiOptions) {
+    const ai = useAskAi({
+        state,
+        page: layout === "page",
+        conversation,
+        conversations,
+    });
+    return <AskAiPanel ai={ai} layout={layout} {...rest} />;
+}
 
 const STATE: AskAiState = {
     available: true,
@@ -98,7 +126,7 @@ async function settle() {
 function render(state: AskAiState | null = STATE) {
     act(() =>
         root.render(
-            <AskAiPanel
+            <Panel
                 state={state}
                 businessName="Kesar Salon"
                 zone="Asia/Kolkata"
@@ -333,8 +361,8 @@ describe("refusals say their own words", () => {
                 askName: null,
             },
             [
-                "You've used all of this period's questions.",
-                "They reset on 14 Dec.",
+                "This month's 5 questions are used.",
+                "They come back on 14 Dec. This didn't use a question.",
                 "Request more",
             ],
         ],
@@ -383,7 +411,7 @@ describe("refusals say their own words", () => {
         ]);
         expect(host.querySelector("textarea")?.disabled).toBe(true);
         expect(host.querySelector("textarea")?.placeholder).toBe(
-            "Typed questions are paused",
+            "Paused until 14 Dec",
         );
     });
 });
@@ -398,7 +426,7 @@ describe("the panel's states", () => {
             usage: null,
         });
         expect(text()).toContain("Ask AI comes with Grow");
-        expect(text()).toContain("Example · sample data, not yours");
+        expect(text()).toContain("Examples, not Kesar Salon's own.");
         expect(host.querySelector("textarea")).toBeNull();
     });
 
@@ -436,14 +464,13 @@ describe("the panel's states", () => {
         expect(text()).toContain("19 questions left · resets 14 Dec");
     });
 
-    it("opens with the Hinglish placeholder and the privacy line", () => {
+    it("opens on the whole business; the provider line is in ⋯'s data link, not the foot", () => {
         render();
         expect(host.querySelector("textarea")?.placeholder).toBe(
-            "Ask anything, in English or Hinglish",
+            "Ask, or say what to do",
         );
-        expect(text()).toContain(
-            "go to Anthropic, our AI provider, outside India",
-        );
+        expect(text()).toContain("Ask about Kesar Salon");
+        expect(text()).not.toContain("Anthropic");
     });
 
     it("off for the business: Turn on for an Owner, conversations listed", async () => {
@@ -475,7 +502,7 @@ describe("the full page, /ask (board AI 9)", () => {
         const onClose = vi.fn();
         act(() =>
             root.render(
-                <AskAiPanel
+                <Panel
                     state={STATE}
                     businessName="Kesar Salon"
                     zone="Asia/Kolkata"
@@ -496,7 +523,7 @@ describe("the full page, /ask (board AI 9)", () => {
     function renderPage(state: AskAiState = STATE) {
         act(() =>
             root.render(
-                <AskAiPanel
+                <Panel
                     layout="page"
                     state={state}
                     businessName="Kesar Salon"
@@ -525,7 +552,7 @@ describe("the full page, /ask (board AI 9)", () => {
         await settle();
         expect(actions.readAskAiConversation).toHaveBeenCalledWith("c1");
         expect(row()?.getAttribute("aria-current")).toBe("true");
-        expect(host.querySelector("h2")?.textContent).toBe(
+        expect(host.querySelector("#ask-ai-page h2")?.textContent).toBe(
             "Add a keratin service",
         );
         expect(window.location.search).toBe("?c=c1");
@@ -537,7 +564,7 @@ describe("the full page, /ask (board AI 9)", () => {
         window.history.replaceState(null, "", "/ask?c=c1");
         act(() =>
             root.render(
-                <AskAiPanel
+                <Panel
                     layout="page"
                     state={STATE}
                     businessName="Kesar Salon"
@@ -624,5 +651,288 @@ describe("a saved conversation", () => {
         const [turn] = turnsOf(conversation);
         expect(turn.infoCards).toEqual([TABLE]);
         expect(turn.text).toBe("Five bills are unpaid.");
+    });
+});
+
+describe("knows the page (AF 1–9)", () => {
+    const KAVYA = customerPage(
+        {
+            id: "k1",
+            name: "Kavya Menon",
+            firstName: "Kavya",
+            createdAt: "2026-06-03T10:00:00Z",
+        },
+        { zone: "Asia/Kolkata", visits: [] },
+    );
+    const sent = () => {
+        const call = (fetchMock.mock.calls as [string, RequestInit][]).find(
+            (c) => c[0] === "/api/ask-ai/turns",
+        );
+        return JSON.parse(
+            (call?.[1].body as string | undefined) ?? "{}",
+        ) as Record<string, unknown>;
+    };
+
+    it("names the page, and a hint asks it with the page", async () => {
+        const s = feed();
+        answerWith(s.body);
+        act(() =>
+            root.render(
+                <>
+                    <AskAiPageIs page={KAVYA} />
+                    <Panel
+                        state={STATE}
+                        businessName="Kesar Salon"
+                        zone="Asia/Kolkata"
+                        phone={false}
+                    />
+                </>,
+            ),
+        );
+        expect(text()).toContain("About: Kavya Menon");
+        expect(host.querySelector("textarea")?.placeholder).toBe(
+            "Ask about Kavya",
+        );
+        act(() => button("When did they last come?")?.click());
+        await settle();
+        expect(sent()).toEqual({
+            question: "When did they last come?",
+            about: { kind: "customer", id: "k1", label: "Kavya Menon" },
+        });
+        await s.end();
+    });
+
+    it("a pencil suggestion only fills the box", () => {
+        act(() =>
+            root.render(
+                <>
+                    <AskAiPageIs page={KAVYA} />
+                    <Panel
+                        state={STATE}
+                        businessName="Kesar Salon"
+                        zone="Asia/Kolkata"
+                        phone={false}
+                    />
+                </>,
+            ),
+        );
+        act(() => button("Book Kavya in…")?.click());
+        expect(host.querySelector("textarea")?.value).toBe(
+            "Book Kavya Menon in for ",
+        );
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("clearing the label asks about the whole business, and it comes back", async () => {
+        const s = feed();
+        answerWith(s.body);
+        act(() =>
+            root.render(
+                <>
+                    <AskAiPageIs page={KAVYA} />
+                    <Panel
+                        state={STATE}
+                        businessName="Kesar Salon"
+                        zone="Asia/Kolkata"
+                        phone={false}
+                    />
+                </>,
+            ),
+        );
+        act(() => button("Ask about all of Kesar Salon instead")?.click());
+        expect(text()).toContain("All of Kesar Salon");
+        expect(text()).toContain("Ask about Kesar Salon");
+        act(() => button("Ask about Kavya Menon again")?.click());
+        expect(text()).toContain("About: Kavya Menon");
+        act(() => button("Ask about all of Kesar Salon instead")?.click());
+        await ask("How did the month go?");
+        expect(sent()).toEqual({ question: "How did the month go?" });
+        await s.end();
+    });
+
+    it("the clock lists conversations in the panel, each with where it began", async () => {
+        actions.readAskAiConversations.mockResolvedValue({
+            data: [
+                {
+                    id: "c1",
+                    agent: "ask-ai",
+                    title: "What do they usually order?",
+                    about: { kind: "customer", label: "Kavya Menon" },
+                    lastMessageAt: new Date().toISOString(),
+                    createdAt: "",
+                },
+                {
+                    id: "c2",
+                    agent: "ask-ai",
+                    title: "November vs October",
+                    about: null,
+                    lastMessageAt: new Date().toISOString(),
+                    createdAt: "",
+                },
+            ],
+            nextCursor: null,
+        });
+        render();
+        act(() => button("Your conversations")?.click());
+        await settle();
+        expect(actions.readAskAiConversations).toHaveBeenCalled();
+        expect(router.push).not.toHaveBeenCalled();
+        expect(text()).toContain("Kavya Menon");
+        expect(text()).toContain("All of Kesar Salon");
+        expect(button("New conversation")).toBeDefined();
+    });
+});
+
+describe("what a question used", () => {
+    it("an answer the API counted never says it didn't use one", async () => {
+        const s = feed();
+        answerWith(s.body);
+        render();
+        await ask("Who is Asha?");
+        await s.send({ type: "turn", turnId: "t1", conversationId: "c1" });
+        await s.send({ type: "text-delta", text: "You can't see that." });
+        await s.send({
+            type: "done",
+            turnId: "t1",
+            outcome: "NO_ACCESS",
+            counted: true,
+            usage: { rounds: 1, inputTokens: 1, outputTokens: 1 },
+        });
+        await s.end();
+        expect(text()).not.toContain("didn't use a question");
+    });
+
+    it("a dropped connection takes the saved answer, and never guesses", async () => {
+        const s = feed();
+        answerWith(s.body);
+        actions.readAskAiConversation.mockResolvedValue({
+            id: "c1",
+            agent: "ask-ai",
+            title: "x",
+            lastMessageAt: "",
+            createdAt: "",
+            messages: [
+                {
+                    id: "m1",
+                    role: "USER",
+                    outcome: null,
+                    text: "Bookings today?",
+                    createdAt: "",
+                },
+                {
+                    id: "m2",
+                    role: "ASSISTANT",
+                    outcome: "ANSWERED",
+                    text: "Two today.",
+                    createdAt: "",
+                },
+            ],
+        });
+        render();
+        await ask("Bookings today?");
+        await s.send({ type: "turn", turnId: "t1", conversationId: "c1" });
+        await s.send({ type: "text-delta", text: "Two" });
+        await s.end();
+        expect(text()).toContain("Two today.");
+        expect(text()).not.toContain("didn't use a question");
+        expect(text()).toContain("Report this answer");
+    });
+});
+
+describe("answers end in actions (AF 3, 4, 9)", () => {
+    it("Book here drafts the booking under the answer, asking who", async () => {
+        const s = feed();
+        answerWith(s.body);
+        actions.bookFromAnswer.mockResolvedValue({
+            ok: true,
+            data: {
+                draftId: "d1",
+                tool: "create_booking",
+                kind: "booking",
+                action: "create",
+                status: "drafted",
+                targetId: null,
+                targetName: "Cake tasting",
+                fields: [
+                    {
+                        field: "when",
+                        label: "When",
+                        old: null,
+                        new: "Tue 17 Nov, 12:00 pm",
+                    },
+                ],
+                missing: [{ field: "customer_id", label: "Who" }],
+                refusal: null,
+                note: null,
+                expiresAt: "2099-01-01T00:00:00.000Z",
+            },
+        });
+        render();
+        await ask("When am I free?");
+        await s.send({ type: "turn", turnId: "t1", conversationId: "c1" });
+        await s.send({ type: "text-delta", text: "Tuesday." });
+        await s.send({
+            type: "card",
+            kind: "slots",
+            data: {
+                title: "Cake tasting is free",
+                serviceId: "s1",
+                serviceName: "Cake tasting",
+                days: [
+                    {
+                        label: "Tue 17 Nov",
+                        range: "12:00 to 4:15 pm",
+                        startsAt: "2026-11-17T12:00:00.000+05:30",
+                    },
+                ],
+            },
+        });
+        await s.send({
+            type: "next",
+            items: [{ label: "Only after 5 pm", text: "Only after 5 pm" }],
+        });
+        await s.send({
+            type: "done",
+            turnId: "t1",
+            outcome: "ANSWERED",
+            counted: true,
+            usage: { rounds: 1, inputTokens: 1, outputTokens: 1 },
+        });
+        await s.end();
+        expect(text()).toContain("Your Calendar isn't marked with them.");
+
+        act(() => button("Only after 5 pm")?.click());
+        expect(host.querySelector("textarea")?.value).toBe("Only after 5 pm");
+
+        act(() => button("Book Cake tasting here, Tue 17 Nov")?.click());
+        await settle();
+        expect(actions.bookFromAnswer).toHaveBeenCalledWith({
+            conversationId: "c1",
+            serviceId: "s1",
+            startsAt: "2026-11-17T12:00:00.000+05:30",
+        });
+        expect(text()).toContain("New booking");
+        expect(button("Book it")).toBeDefined();
+    });
+
+    it("the list says what each conversation did", async () => {
+        actions.readAskAiConversations.mockResolvedValue({
+            data: [
+                {
+                    id: "c1",
+                    agent: "ask-ai",
+                    title: "Which orders go out today?",
+                    about: null,
+                    done: "3 marked ready",
+                    lastMessageAt: new Date().toISOString(),
+                    createdAt: "",
+                },
+            ],
+            nextCursor: null,
+        });
+        render();
+        act(() => button("Your conversations")?.click());
+        await settle();
+        expect(text()).toContain("3 marked ready");
     });
 });

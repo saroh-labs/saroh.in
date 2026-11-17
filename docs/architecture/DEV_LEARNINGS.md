@@ -6769,6 +6769,30 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Rule:** a freshness check accepts "already today" as fresh.
 - **Category:** tooling · content
 
+## Ask AI said "This didn't use a question" for one it used (16 Nov 2026)
+
+- **Symptom:** after a question ended with "This didn't use a question.", the month's count went from 1 to 2. Common questions, which the owner decided don't count, counted too, and on a phone the clock's list never loaded.
+- **Cause:** the panel chose its words from its own view of how a turn ended, not the API's `done.counted`. A connection that dropped was drawn as cut off ("didn't use"), while the API reads every turn to its end and counted the answer; a `NO_ACCESS` answer (counted) fell into the "couldn't answer" branch. The API had no notion of a common question. The phone's clock set the view without reading the list.
+- **Fix:** the panel keeps `counted` from `done`; a turn without `done` says the connection dropped and adopts the saved answer once it is there (`savedTurn`); a counted answer is drawn as an answer. The API counts by `countsFor(outcome, question)`: the panel's common questions (`ASK_AI_STARTERS`), asked as written, never count. History opens through `showHistory`, which reads the list, desk and phone alike.
+- **Rule:** a screen that says what something cost repeats the server's verdict, never its own guess; a view switch that needs data reads it in the same handler.
+- **Category:** frontend · api · ask-ai
+
+## Ask AI built its own dialog (17 Nov 2026)
+
+- **Symptom:** Ask AI's desk panel was an `<aside role="dialog" aria-modal>` with its own focus trap (`keepTabInside`), Esc, focus return, border, shadow and z-index, kept mounted with `hidden`; on a phone it used `@saroh/ui/sheet` but overrode its size and position and switched its close off. `ask-ai-panel.tsx` had grown to 1,480 lines holding every piece of state, the raw `fetch` calls and five drawing pieces, and the reply language had two pickers (a radio menu on a desk, a second sheet on a phone).
+- **Cause:** the shared overlay rule ("Overlays come in fixed sizes and one head and foot") and DEC-183's split of drawing from state were in the pattern files, but nothing checked them; keeping the conversation alive across a close was solved by never unmounting the panel, which only a hand-built dialog allows.
+- **Fix:** the host holds the conversation in `use-ask-ai.ts` and draws the shared `Sheet` as it comes (right on a desk, bottom on a phone); the stream reducer and derivations are pure in `turns.ts`, asking and Stop in `lib/ask-ai/turn-requests.ts`; the panel only draws, split into `composer`, `suggestions`, `about-label`, `more-menu` and `language-select`. Reply language is one `Select` in the panel's foot. Report this answer moved from a popover marked `role="dialog"` to the shared small `Dialog`. `keepTabInside` is gone. The host returns focus to the opener itself, since Radix's modal returns it only to a `SheetTrigger`.
+- **Rule:** an app never writes `role="dialog"` or `aria-modal`. Overlays are `@saroh/ui`'s, unpatched, and state that must survive a close lives in a hook above the overlay. `pnpm run check:overlays` (`scripts/check-overlays.mjs`, in prepush and CI) refuses a new one; the seven files that had it before are allowed until they are next changed. `frontend-design-system.md` → Overlays.
+- **Category:** frontend · ask-ai · tooling
+
+## Hand-built radio groups had no arrow keys (17 Nov 2026)
+
+- **Symptom:** 22 files in the workspace and the admin console wrote `role="radiogroup"` themselves; 18 of them (the new order's location, customer, payment and way out, take payment, deposits, the pack and plan editors' chips, time off's When, the clock picker, caption kinds, Works as, …) had no arrow keys and a tab stop on every chip, and in the week view the date sheet marked seven days "checked" at once.
+- **Cause:** `Chip` is a `role="radio"` on its own, so a `div role="radiogroup"` around chips looked done; the shared `ChipGroup`, `RadioCards` and `ChoiceGroup` existed, but nothing pointed a screen at them.
+- **Fix:** each moved onto the shared piece that draws it (`ChipGroup`; `ChoiceGroup` with `chipClass` where a chip is sized for its place; `ChoiceGroup` with its own drawing for the Whose rows, Whose bookings and the admin offers switch). The date sheet's week is a `group` of day buttons with `aria-current`, as its month is, since each press goes somewhere. The new order's customer chip choice is `customer-choice.ts`. Three that jump with Home and End (the two day strips and the share card picker) are allowed until `ChoiceGroup` has Home and End.
+- **Rule:** one of several in an app is `@saroh/ui/choice-group` or `Segmented`, never a hand-written `role="radiogroup"`. `pnpm run check:choices` (`scripts/check-choices.mjs`, in prepush and CI) refuses a new one; its allowlist only shrinks. `frontend-design-system.md` → shared pieces.
+- **Category:** frontend · accessibility · tooling
+
 ## A page's heading sat low beside its words, again (16 Nov 2026)
 
 - **Symptom:** on Ask AI, Website and Share (desk), the h1 sat at the bottom of its column while the lede and buttons sat at the top (bug #47), after the same thing had been fixed on Keep pages, Home's chapters and Features (#9, #26).

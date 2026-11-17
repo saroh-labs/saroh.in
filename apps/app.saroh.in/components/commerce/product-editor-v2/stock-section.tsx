@@ -9,7 +9,9 @@ import { SoldOutActions } from "@/components/commerce/product-stock/sold-out-act
 import { setInventory, setVariantStock } from "@/lib/products/actions";
 import type { StockDraft, StockLine } from "@/lib/products/editor-sections";
 import { isCount, mergeDraft } from "@/lib/products/editor-sections";
+import type { PlaceShelf } from "@/lib/products/editor-stock";
 import {
+    allLocations,
     SPLIT_NEEDS_WRITE,
     stockCounting,
     stockDraftFrom,
@@ -31,6 +33,7 @@ import { SectionCard } from "./section-card";
 import {
     lowLines,
     LowNote,
+    PlacesStock,
     VariantStockTable,
     WholeStock,
 } from "./stock-fields";
@@ -60,6 +63,7 @@ export function StockSection({
     defaultWarn,
     control,
     opt = "variant",
+    elsewhere = [],
 }: {
     product: ProductDetail;
     storeId: string;
@@ -71,6 +75,11 @@ export function StockSection({
     control: TrackingControl;
     /** The product's option, lower case ("shade"); "variant" with none. */
     opt?: string;
+    /**
+     * Its shelves at the business's other locations, while it counts as a
+     * whole (HPEditDesk): counted here too, with All locations under them.
+     */
+    elsewhere?: readonly PlaceShelf[];
 }) {
     const { canWrite, mayEdit, states, sayError } = useEditor();
     const ro = !mayEdit("stock");
@@ -107,12 +116,47 @@ export function StockSection({
         setOpenedSaved(false);
     }
 
+    // The other locations' counts, kept like the draft: reset when the
+    // product comes back, kept while typed.
+    const elsewhereKey = JSON.stringify(elsewhere);
+    const [othersBase, setOthersBase] = useState(elsewhere);
+    const [others, setOthers] = useState(elsewhere);
+    const [seenElsewhere, setSeenElsewhere] = useState(elsewhereKey);
+    if (seenElsewhere !== elsewhereKey) {
+        setSeenElsewhere(elsewhereKey);
+        setOthersBase(elsewhere);
+        setOthers(elsewhere);
+    }
+    const changedOthers = others.filter((o) => {
+        const was = othersBase.find((b) => b.storeId === o.storeId);
+        return (
+            was?.quantity !== o.quantity ||
+            was.lowStockAlert !== o.lowStockAlert
+        );
+    });
+
     const hasVariants = product.variants.length > 0;
     const layout = stockLayout(counting, hasVariants, opened);
-    const dirty = tracked && (!same(draft, base) || (opened && !openedSaved));
+    const places = layout === "whole" && others.length > 0;
+    const dirty =
+        tracked &&
+        (!same(draft, base) ||
+            (opened && !openedSaved) ||
+            (places && changedOthers.length > 0));
     const splitting = switchesToVariants(counting, layout);
 
-    const qtyBad = !isCount(draft.quantity) || !isCount(draft.lowStockAlert);
+    const qtyBad =
+        !isCount(draft.quantity) ||
+        !isCount(draft.lowStockAlert) ||
+        (places &&
+            others.some(
+                (o) => !isCount(o.quantity) || !isCount(o.lowStockAlert),
+            ));
+    const otherBelow = places
+        ? others.find(
+              (o) => isCount(o.quantity) && Number(o.quantity) < o.promised,
+          )
+        : undefined;
     const reserved = product.inventory?.reserved ?? 0;
     const lines = layout === "lines";
     const belowPromised = lines
@@ -121,7 +165,9 @@ export function StockSection({
           )
         : isCount(draft.quantity) && Number(draft.quantity) < reserved
           ? { title: "", promised: reserved }
-          : undefined;
+          : otherBelow
+            ? { title: "", promised: otherBelow.promised }
+            : undefined;
     const lineBad = draft.lines.some(
         (l) => !isCount(l.quantity) || !isCount(l.lowStockAlert),
     );
@@ -167,11 +213,26 @@ export function StockSection({
                     return false;
                 }
                 setBase(draft);
+                // Each other location's count it was given, one call each.
+                if (!lines && places) {
+                    for (const o of changedOthers) {
+                        const at = await setInventory(o.storeId, product.id, {
+                            quantity: Number(o.quantity),
+                            lowStockAlert: Number(o.lowStockAlert),
+                        });
+                        if (!at.ok) {
+                            sayError("stock", at.error);
+                            return false;
+                        }
+                    }
+                    setOthersBase(others);
+                }
                 if (opened) setOpenedSaved(true);
                 return true;
             },
             discard: () => {
                 setDraft(base);
+                setOthers(othersBase);
                 setOpened(false);
                 setOpenedSaved(false);
             },
@@ -208,7 +269,7 @@ export function StockSection({
                     {TRACKING_LOCKED}
                 </p>
             ) : null}
-            {countedAt && tracked ? (
+            {countedAt && tracked && !places ? (
                 <p className="mb-2.5 text-[12px] text-muted-foreground">
                     Counted at {countedAt}.
                 </p>
@@ -284,27 +345,85 @@ export function StockSection({
         return (
             <SectionCard k="stock" title="Stock" aside={aside}>
                 {head}
-                <WholeStock
-                    draft={draft}
-                    promised={reserved}
-                    ro={ro}
-                    qtyBad={!!belowPromised}
-                    noteBad={!!problem}
-                    note={
-                        problem ||
-                        (hasVariants
-                            ? "Counted for the whole product, not per variant: an order for any variant takes from this count. Promised updates itself as orders come in and are collected."
-                            : "Promised updates itself as orders come in and are collected.")
-                    }
-                    onChange={(patch) => setDraft({ ...draft, ...patch })}
-                />
+                {places ? (
+                    <>
+                        <PlacesStock
+                            shelves={[
+                                {
+                                    storeId,
+                                    name: countedAt ?? "Here",
+                                    quantity: draft.quantity,
+                                    lowStockAlert: draft.lowStockAlert,
+                                    promised: reserved,
+                                },
+                                ...others,
+                            ]}
+                            ro={ro}
+                            badStoreId={
+                                isCount(draft.quantity) &&
+                                Number(draft.quantity) < reserved
+                                    ? storeId
+                                    : (otherBelow?.storeId ?? null)
+                            }
+                            onShelf={(id, patch) =>
+                                id === storeId
+                                    ? setDraft({
+                                          ...draft,
+                                          ...(patch.quantity !== undefined
+                                              ? { quantity: patch.quantity }
+                                              : {}),
+                                          ...(patch.lowStockAlert !== undefined
+                                              ? {
+                                                    lowStockAlert:
+                                                        patch.lowStockAlert,
+                                                }
+                                              : {}),
+                                      })
+                                    : setOthers(
+                                          others.map((o) =>
+                                              o.storeId === id
+                                                  ? { ...o, ...patch }
+                                                  : o,
+                                          ),
+                                      )
+                            }
+                        />
+                        <PlacesNote
+                            problem={problem}
+                            shelves={[
+                                {
+                                    quantity: draft.quantity,
+                                    promised: reserved,
+                                },
+                                ...others,
+                            ]}
+                            hasVariants={hasVariants}
+                            opt={opt}
+                        />
+                    </>
+                ) : (
+                    <WholeStock
+                        draft={draft}
+                        promised={reserved}
+                        ro={ro}
+                        qtyBad={!!belowPromised}
+                        noteBad={!!problem}
+                        note={
+                            problem ||
+                            (hasVariants
+                                ? "Counted for the whole product, not per variant: an order for any variant takes from this count. Promised updates itself as orders come in and are collected."
+                                : "Promised updates itself as orders come in and are collected.")
+                        }
+                        onChange={(patch) => setDraft({ ...draft, ...patch })}
+                    />
+                )}
                 {hasVariants && canWrite ? (
                     <TextLink
                         data-ph-unmask=""
                         onClick={() => setOpened(true)}
                         className="mt-2 text-[12px] coarse:min-h-11"
                     >
-                        Count each variant instead
+                        Count each {opt} instead
                     </TextLink>
                 ) : null}
                 {lowNow ? (
@@ -346,5 +465,41 @@ export function StockSection({
                 </LowNote>
             ) : null}
         </SectionCard>
+    );
+}
+
+/**
+ * Under every location's count (HPEditDesk): "290 to sell (440 on hand,
+ * 150 promised)", and how it counts; or what is wrong.
+ */
+function PlacesNote({
+    problem,
+    shelves,
+    hasVariants,
+    opt,
+}: {
+    problem: string;
+    shelves: readonly { quantity: string; promised: number }[];
+    hasVariants: boolean;
+    opt: string;
+}) {
+    if (problem) {
+        return (
+            <FieldHelp className="mt-[9px]" tone="bad">
+                {problem}
+            </FieldHelp>
+        );
+    }
+    const all = allLocations(shelves);
+    return (
+        <p className="mt-3 text-pretty rounded-lg border border-border bg-muted/50 px-3 py-2 text-[12.5px] leading-[1.5] text-muted-foreground">
+            <b className="font-semibold text-foreground">
+                {all.toSell} to sell
+            </b>{" "}
+            ({all.onHand} on hand, {all.promised} promised).{" "}
+            {hasVariants
+                ? `Counted for the whole product: an order for any ${opt} takes from this count.`
+                : "Promised updates itself as orders come in and are collected."}
+        </p>
     );
 }

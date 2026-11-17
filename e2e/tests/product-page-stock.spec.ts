@@ -74,8 +74,11 @@ test.describe("product page — Overview and Stock", () => {
                 tabs.getByRole("link", { name: new RegExp(`^${name}`) }),
             ).toBeVisible();
         }
+        // The card's title; the stock table under it has a "To sell" column too.
         await expect(
-            page.getByText(/^To sell$|^Short for orders already placed$/),
+            page.getByRole("paragraph").filter({
+                hasText: /^To sell$|^Short for orders already placed$/,
+            }),
         ).toBeVisible();
         await expect(
             page.getByText("How it's sold", { exact: false }),

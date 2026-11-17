@@ -2,6 +2,8 @@
 
 import { Refusal } from "@/components/shared/states/refusal";
 import { Button } from "@saroh/ui/button";
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { FormDialog, FormDialogFoot } from "@saroh/ui/form-dialog";
 import { FormSheet, FormSheetBody, FormSheetFoot } from "@saroh/ui/form-sheet";
 import { Input } from "@saroh/ui/input";
@@ -11,7 +13,6 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { useGstRateStep } from "@/components/gst-rates/use-gst-rate-step";
-import { Chip } from "@/components/shared/lists/chip";
 import { runAction } from "@/lib/api/run-action";
 import { UNREACHED } from "@/lib/api/unreached";
 import { formatMoney } from "@/lib/format/money";
@@ -29,7 +30,6 @@ import {
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
 import { Segmented } from "@saroh/ui/segmented";
-import { Tip } from "@saroh/ui/tooltip";
 import { Link2 } from "lucide-react";
 import type { PayLinkResult } from "./pay-link-panel";
 import { LINK_STEP, makePayLink, PayLinkPanel } from "./pay-link-panel";
@@ -217,24 +217,26 @@ export function TakePayment({
             >
                 How they pay
             </div>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.how}
+            <ChoiceGroup
+                labelledBy={ids.how}
                 className="flex flex-wrap gap-1.5"
-            >
-                {choices.map((c) => (
-                    <Tip key={c.key} label={c.off ?? undefined}>
-                        <Chip
-                            on={choice === c.key}
-                            disabled={c.off !== null}
-                            onClick={() => pick(c.key)}
-                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                        >
-                            {c.label}
-                        </Chip>
-                    </Tip>
-                ))}
-            </div>
+                value={choice}
+                onChange={pick}
+                choices={choices.map((c) => ({
+                    value: c.key,
+                    label: c.label,
+                    disabled: c.off !== null,
+                    tip: c.off ?? undefined,
+                }))}
+                itemClassName={(on, c) =>
+                    chipClass(
+                        on,
+                        c.disabled && !on
+                            ? "border-border bg-disabled text-disabled-foreground hover:border-border hover:bg-disabled"
+                            : "active:scale-[0.97]",
+                    )
+                }
+            />
         </>
     );
 

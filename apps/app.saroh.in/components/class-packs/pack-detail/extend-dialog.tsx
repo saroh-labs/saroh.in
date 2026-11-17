@@ -2,13 +2,13 @@
 
 import { Refusal } from "@/components/shared/states/refusal";
 import { formatDate } from "@/lib/format/datetime";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { showSuccess } from "@saroh/ui/toast";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
-import { Chip } from "@/components/shared/lists/chip";
 import { runAction } from "@/lib/api/run-action";
 import { extendHolder } from "@/lib/class-packs/actions";
 import {
@@ -93,22 +93,16 @@ export function ExtendDialog({
             onClose={onClose}
             onSubmit={save}
         >
-            <div
-                role="radiogroup"
-                aria-label="How many days"
-                className="flex flex-wrap gap-1.5"
-            >
-                {choices.map((c) => (
-                    <Chip
-                        key={c.days}
-                        on={days === c.days}
-                        disabled={!c.ok}
-                        onClick={() => setDays(c.days)}
-                    >
-                        +{c.days} days
-                    </Chip>
-                ))}
-            </div>
+            <ChipGroup
+                label="How many days"
+                value={String(days)}
+                onChange={(v) => setDays(Number(v))}
+                choices={choices.map((c) => ({
+                    value: String(c.days),
+                    label: `+${c.days} days`,
+                    disabled: !c.ok,
+                }))}
+            />
             <p
                 id={ids.days}
                 aria-live="polite"

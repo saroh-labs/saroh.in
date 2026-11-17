@@ -11,6 +11,7 @@ import { MRP_LABEL, MRP_WORD } from "@/lib/products/mrp-label";
 import type { LogLike } from "@/lib/stock/product-stock";
 import { weekLine } from "@/lib/stock/product-stock";
 
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import type { ProductPlacement, StockLine } from "./overview-rules";
 
 // ---- Availability ----
@@ -136,13 +137,11 @@ export function stockException(
 }
 
 /**
- * The Variants card: "28 shades · ₹420 each · 1 out", "6 jars · ₹420 to
+ * Under the Variants card's count: "₹420 each · 1 out", "₹420 to
  * ₹490". The out count only for a product that counts each one.
  */
 export function variantsLine(
     v: {
-        count: number;
-        optionName: string | null | undefined;
         min: string;
         max: string;
         /** Variants out at the page's storefront; null when not counted. */
@@ -154,13 +153,8 @@ export function variantsLine(
         v.min === v.max
             ? `${money(v.min)} each`
             : `${money(v.min)} to ${money(v.max)}`;
-    return [
-        `${v.count} ${optionNoun(v.optionName, v.count)}`,
-        price,
-        v.out ? `${v.out} out` : null,
-    ]
-        .filter(Boolean)
-        .join(" · ");
+    // The card's figure and label already say how many and of what.
+    return [price, v.out ? `${v.out} out` : null].filter(Boolean).join(" · ");
 }
 
 /** "10 at Hill Road, 15 online" — only when there is more than one. */
@@ -305,21 +299,29 @@ export function detailTag(
 }
 
 /**
- * The Visibility row, as far as it truly reaches: live and on the
- * website, live at the counter only while the online shop isn't, a draft,
+ * The product's one status sentence (HPProductNotes): under its name, in
+ * Details' Visibility row, on the website card and in the editor's
+ * Visibility, all the same words. Live and on the website, live at the
+ * counter only while the online shop isn't, paused by the plan, a draft,
  * or archived. `shopLive` null: not known (a role that can't read the web
  * address), so nothing is claimed about the website.
  */
 export function visibilityLine(
     status: "PUBLISHED" | "DRAFT" | "ARCHIVED",
     shopLive: boolean | null,
+    paused = false,
 ): string {
+    if (paused && status !== "ARCHIVED") {
+        return "Paused by your plan. Customers can't buy it";
+    }
     if (status === "DRAFT") return "Draft. Only the team can see it";
     if (status === "ARCHIVED") {
-        return "Archived. Not sold, and its page does not open";
+        return `${PRODUCT_STATUS_WORD.ARCHIVED}. Not sold, and its page does not open`;
     }
     if (shopLive === true) return "Live. Customers can buy it on your website";
-    if (shopLive === false) return "Live. Sold at the counter. Not online yet.";
+    if (shopLive === false) {
+        return "Live at the counter. Online once your shop is live.";
+    }
     return "Live. Customers can buy it";
 }
 

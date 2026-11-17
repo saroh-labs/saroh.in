@@ -11,6 +11,7 @@ import { ProductThumb } from "@/components/stores/catalogue/product-thumb";
 import type { PickableProduct } from "@/lib/collections/actions";
 import { findProducts } from "@/lib/collections/actions";
 import { capacity, movePicked, togglePicked } from "@/lib/collections/rules";
+import { PRODUCT_STATUS_WORD } from "@/lib/products/status-word";
 import { CheckRow } from "@saroh/ui/check-row";
 import { EmptyState } from "@saroh/ui/data-state";
 import { Field } from "@saroh/ui/field";
@@ -266,8 +267,8 @@ export function ProductsPicker({
                                                     className="shrink-0 text-[11.5px] text-muted-foreground"
                                                 >
                                                     {p.status === "DRAFT"
-                                                        ? "Draft"
-                                                        : "Archived"}
+                                                        ? PRODUCT_STATUS_WORD.DRAFT
+                                                        : PRODUCT_STATUS_WORD.ARCHIVED}
                                                 </span>
                                             ) : null}
                                         </CheckRow>

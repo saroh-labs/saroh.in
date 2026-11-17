@@ -356,7 +356,7 @@ describe("the Pack Editor", () => {
     it("a sold pack's kind is locked, and says why", () => {
         render(LIVE, 3);
         const other = button("One-to-one sessions");
-        expect(other.disabled).toBe(true);
+        expect(other.getAttribute("aria-disabled")).toBe("true");
         expect(button("Classes").getAttribute("aria-checked")).toBe("true");
         expect(text()).toContain(
             "Locked. 3 already sold. Class and one-to-one credits never mix.",

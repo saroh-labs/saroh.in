@@ -66,7 +66,8 @@ export function HomeHeader({
                 // header's side slot holds nothing; without this its 12px
                 // gap still stood under the date (U5's note).
                 className="mb-0 max-sm:[&_[data-slot=page-side]]:hidden"
-                breadcrumb={["Home"]}
+                // No crumb: Home is the top, the greeting says where you are
+                // (HPHomeDesk).
                 title={greeting(lastDay, name)}
                 actions={offersNew ? <NewMenu {...newMenu} /> : undefined}
                 description={

@@ -393,7 +393,7 @@ test.describe("product editor", () => {
                 `/commerce/products/${id}/edit?storefront=${STORE}`,
             );
             const details = page.getByRole("region", {
-                name: /How to use|Ready time/,
+                name: /Care and use|Ready time/,
             });
             const chips = details.getByRole("group", {
                 name: "How it's fulfilled",

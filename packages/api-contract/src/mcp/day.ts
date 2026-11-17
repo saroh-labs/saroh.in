@@ -91,6 +91,7 @@ export const findFreeSlotsTool = {
         .strict(),
     output: z.object({
         service_id: z.string(),
+        service_name: z.string(),
         timezone: z.string(),
         slots: z.array(
             z.object({
@@ -224,6 +225,32 @@ export const updateOrderStatusTool = {
             status: true,
             stage: true,
         }),
+    }),
+};
+
+/** Several orders to the same step at once (Ask AI's "Mark 3 ready", AF 8). */
+export const updateOrdersStatusTool = {
+    input: z
+        .object({
+            order_ids: z
+                .array(toolId)
+                .min(1)
+                .max(20)
+                .refine((ids) => new Set(ids).size === ids.length, {
+                    message: "Name each order once.",
+                }),
+            stage: z.enum(ORDER_STEPS),
+        })
+        .strict(),
+    output: z.object({
+        orders: z.array(
+            orderItem.pick({
+                order_id: true,
+                number: true,
+                status: true,
+                stage: true,
+            }),
+        ),
     }),
 };
 

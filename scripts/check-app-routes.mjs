@@ -234,7 +234,7 @@ function askAiLinks() {
             re: /return\s+`(\/[^`]*)`/g,
         },
         {
-            file: join(APP_ROOT, "components/ask-ai/ask-ai-panel.tsx"),
+            file: join(APP_ROOT, "components/ask-ai/turns.ts"),
             re: /\bASK_PAGE\s*=\s*"(\/[^"]*)"/g,
         },
     ];

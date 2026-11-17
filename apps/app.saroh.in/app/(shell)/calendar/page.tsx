@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import { BusinessCalendar } from "@/components/calendar/business-calendar";
 import { BusinessWeek } from "@/components/calendar/business-week";
 import {
@@ -7,6 +8,7 @@ import {
     CalendarNothing,
 } from "@/components/calendar/calendar-nothing";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { calendarMonthPage, calendarWeekPage } from "@/lib/ask-ai/page-hints";
 import {
     calendarLocked,
     calendarRange,
@@ -139,6 +141,11 @@ export default async function CalendarPage({
     return (
         <PageContainer width="full">
             {data ? (
+                <AskAiPageIs
+                    page={calendarMonthPage(data.month, todayIn(data.timezone))}
+                />
+            ) : null}
+            {data ? (
                 <BusinessCalendar
                     // A new month starts with its own day picked and every
                     // layer on.
@@ -209,6 +216,8 @@ async function CalendarWeek({
 
     return (
         <PageContainer width="full">
+            {/* What Ask AI offers on this week, counted from it (AF 2). */}
+            <AskAiPageIs page={calendarWeekPage(data, today)} />
             <BusinessWeek
                 // A new week starts with its own day picked and every layer
                 // on.

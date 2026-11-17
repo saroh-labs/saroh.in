@@ -233,7 +233,7 @@ describe("Go to a day", () => {
         draw();
         click(button(/Change the day or the view$/));
         const thu = popover()?.querySelector(
-            '[role="radiogroup"][aria-label="Pick a day"] [aria-label="Thu 22 Oct, 3 bookings"]',
+            '[role="group"][aria-label="Pick a day"] [aria-label="Thu 22 Oct, 3 bookings"]',
         );
         click(thu);
         expect(push).toHaveBeenCalledWith(

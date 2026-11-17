@@ -5,7 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
-import { Gem, Lock, Power } from "lucide-react";
+import { Info, Lock, Power, Sparkles } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
@@ -13,8 +13,7 @@ import { useCanChangePlan } from "@/components/billing/plan-way";
 import { upgradeHref } from "@/lib/billing/access";
 import { formatRecent, localDateKey } from "@/lib/format/datetime";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
-import { Question } from "./thread";
-import { HISTORY_LINE, planName } from "./words";
+import { planName } from "./words";
 
 /**
  * The panel's whole-panel states (boards 8, 9, 18): locked on the plan,
@@ -47,43 +46,107 @@ function LockCard({
 
 const body = "m-0 text-sm leading-[1.5] text-neutral-700 dark:text-foreground";
 
-/** Free (board 8): the plan named, an example on sample data, one way up. */
-export function PlanLocked({ upgradeTo }: { upgradeTo: string | null }) {
+/** One example the locked panel shows, on sample words (AF 11). */
+function Example({ ask, children }: { ask: string; children: ReactNode }) {
+    return (
+        <div className="flex flex-col gap-1.5 rounded-xl border border-border bg-card px-3 py-3.5">
+            <p className="m-0 text-[12.5px] text-neutral-700 dark:text-foreground">
+                &ldquo;{ask}&rdquo;
+            </p>
+            {children}
+        </div>
+    );
+}
+
+/**
+ * Free (AF 11): what Ask AI does that no screen does, as three examples
+ * on sample words, then the plans or who can change them, and Not now.
+ */
+export function PlanLocked({
+    upgradeTo,
+    businessName,
+    onNotNow,
+}: {
+    upgradeTo: string | null;
+    businessName: string;
+    onNotNow?: () => void;
+}) {
     const canChangePlan = useCanChangePlan();
     return (
-        <LockCard
-            icon={<Gem />}
-            title={`Ask AI comes with ${planName(upgradeTo)}`}
-        >
-            <p data-ph-unmask="" className={body}>
-                Ask about your bookings, payments and customers in plain words,
-                and add or change things by asking.
-            </p>
-            <div
-                aria-label="Example, sample data"
-                className="flex w-full flex-col gap-2.5 rounded-xl border border-border bg-background p-3"
-            >
-                <span
+        <div className="flex flex-col gap-3.5">
+            <div>
+                <h3 className="m-0 flex items-center gap-2 font-display text-[21px] font-semibold tracking-[-0.01em]">
+                    <Lock className="size-[18px] shrink-0" aria-hidden />
+                    Ask AI comes with {planName(upgradeTo)}
+                </h3>
+                <p
                     data-ph-unmask=""
-                    className="inline-flex h-[22px] items-center self-start rounded-full bg-muted px-2 text-xs font-semibold text-neutral-700 dark:text-foreground"
+                    className="m-0 mt-1 text-[13.5px] text-neutral-700 dark:text-foreground"
                 >
-                    Example · sample data, not yours
-                </span>
-                <Question>Who hasn&apos;t paid this week?</Question>
-                <p data-ph-unmask="" className="m-0 text-[15px] font-semibold">
-                    4 bookings aren&apos;t paid yet.
+                    What it does that no screen in Saroh does:
                 </p>
             </div>
-            {canChangePlan ? (
-                plansShown() ? (
-                    <Button asChild>
-                        <Link href={upgradeHref()}>See plans</Link>
+            <div
+                aria-label="Examples, sample words"
+                className="flex flex-col gap-3"
+            >
+                <Example ask="How did November go vs October?">
+                    <p data-ph-unmask="" className="m-0 text-sm font-semibold">
+                        Up 20%. The bun box did most of it.
+                    </p>
+                </Example>
+                <Example ask="Move Kavya's tasting to Tuesday 4 pm">
+                    <p className="m-0 text-[13.5px]">
+                        <s className="text-muted-foreground">Mon 4:00 pm</s> Tue
+                        17 Nov, 4:00 pm · Kavya gets a message
+                    </p>
+                    {/* A picture of the card, not a control: nothing here acts. */}
+                    <p aria-hidden className="m-0 flex items-center gap-2.5">
+                        <span
+                            data-ph-unmask=""
+                            className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-[13.5px] font-semibold text-primary-foreground"
+                        >
+                            Move booking
+                        </span>
+                        <span data-ph-unmask="" className="text-[12.5px]">
+                            Undo all day
+                        </span>
+                    </p>
+                </Example>
+                <Example ask="Regulars who haven't been back?">
+                    <p data-ph-unmask="" className="m-0 text-sm font-semibold">
+                        5 people · Call · Order again
+                    </p>
+                </Example>
+            </div>
+            <p
+                data-ph-unmask=""
+                className="m-0 text-[12.5px] text-neutral-700 dark:text-foreground"
+            >
+                Examples, not {businessName}&apos;s own.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+                {canChangePlan ? (
+                    plansShown() ? (
+                        <Button asChild className="h-11">
+                            <Link href={upgradeHref()}>See plans</Link>
+                        </Button>
+                    ) : null
+                ) : (
+                    <p className={body}>{WHO_CAN_CHANGE_PLAN}</p>
+                )}
+                {onNotNow ? (
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11"
+                        onClick={onNotNow}
+                    >
+                        Not now
                     </Button>
-                ) : null
-            ) : (
-                <p className={body}>{WHO_CAN_CHANGE_PLAN}</p>
-            )}
-        </LockCard>
+                ) : null}
+            </div>
+        </div>
     );
 }
 
@@ -148,23 +211,28 @@ function groupOf(at: string, zone: string, now: Date): Group {
         : "Earlier";
 }
 
-/** The person's own conversations, newest first (board 9). */
+/** The person's own conversations, newest first, each with where it began (AF 9). */
 export function ConversationList({
     conversations,
+    businessName,
     zone,
     phone,
-    line = HISTORY_LINE,
+    line,
     grouped = true,
+    searching = false,
     current = null,
     onOpen,
     now = new Date(),
 }: {
     conversations: AskAiConversationSummary[];
+    businessName: string;
     zone: string;
     phone: boolean;
     line?: string;
     grouped?: boolean;
-    /** The conversation open beside the list (the full page). */
+    /** A search is narrowing the list: none found says so. */
+    searching?: boolean;
+    /** The conversation open now. */
     current?: string | null;
     onOpen: (id: string) => void;
     now?: Date;
@@ -174,11 +242,20 @@ export function ConversationList({
     );
     return (
         <div className="flex flex-col">
-            <p className="m-0 mb-1 text-[12.5px] leading-[1.4] text-muted-foreground">
-                {line}
-            </p>
+            {line ? (
+                <p className="m-0 mb-1 text-[12.5px] leading-[1.4] text-muted-foreground">
+                    {line}
+                </p>
+            ) : null}
             {conversations.length === 0 ? (
-                <EmptyState size="inline" title="No conversations yet" />
+                <EmptyState
+                    size="inline"
+                    title={
+                        searching
+                            ? "No conversation has those words"
+                            : "No conversations yet"
+                    }
+                />
             ) : null}
             {conversations.map((c, i) => {
                 const group = groups[i];
@@ -187,28 +264,59 @@ export function ConversationList({
                 return (
                     <div key={c.id} className="contents">
                         {head ? (
-                            <h3 className="label mx-3 mb-1 mt-3">{group}</h3>
+                            <h3 className="mx-3 mb-1.5 mt-3.5 text-xs font-semibold text-neutral-700 first:mt-1 dark:text-foreground">
+                                {group}
+                            </h3>
                         ) : null}
                         <button
                             type="button"
                             aria-current={on ? "true" : undefined}
                             onClick={() => onOpen(c.id)}
                             className={cn(
-                                "flex flex-col gap-0.5 rounded-[9px] px-3 py-2.5 text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                                phone && "min-h-11",
-                                on && "bg-muted",
+                                "flex min-h-[74px] flex-col justify-center gap-1 rounded-[9px] px-3 py-2 text-left hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                phone && "min-h-[74px]",
+                                on &&
+                                    "bg-card shadow-[inset_3px_0_0_hsl(var(--ask))]",
                             )}
                         >
-                            <b
-                                className={cn(
-                                    "truncate text-[13.5px] font-medium",
-                                    on && "font-semibold",
-                                )}
-                            >
+                            <b className="truncate text-[14.5px] font-medium">
                                 {c.title ?? "Untitled conversation"}
                             </b>
-                            <span className="text-xs text-muted-foreground">
-                                {formatRecent(c.lastMessageAt, zone, now)}
+                            <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                                {c.about ? (
+                                    <span className="inline-flex min-w-0 items-center gap-1 text-ask-subtle-foreground">
+                                        <Sparkles
+                                            className="size-3 shrink-0"
+                                            aria-hidden
+                                        />
+                                        <span className="truncate">
+                                            {c.about.label}
+                                        </span>
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex min-w-0 items-center gap-1">
+                                        <Info
+                                            className="size-3 shrink-0"
+                                            aria-hidden
+                                        />
+                                        <span className="truncate">
+                                            All of {businessName}
+                                        </span>
+                                    </span>
+                                )}
+                                <span aria-hidden>·</span>
+                                <span className="shrink-0">
+                                    {formatRecent(c.lastMessageAt, zone, now)}
+                                </span>
+                                {c.done ? (
+                                    // What was done from it (AF 9).
+                                    <>
+                                        <span aria-hidden>·</span>
+                                        <span className="truncate">
+                                            {c.done}
+                                        </span>
+                                    </>
+                                ) : null}
                             </span>
                         </button>
                     </div>

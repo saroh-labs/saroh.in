@@ -1,7 +1,8 @@
 "use client";
 
 import { formatClock } from "@/lib/format/datetime";
-import { Chip } from "@saroh/ui/chip";
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { cn } from "@saroh/ui/lib/utils";
 
 const HOURS = Array.from({ length: 12 }, (_, i) => i + 1);
@@ -12,8 +13,11 @@ export const FIELD_ROW =
     "flex min-h-[52px] w-full items-center gap-3 border-b border-border bg-card px-3.5 text-left text-[15px] text-foreground last:border-b-0";
 
 /** The picker's buttons: 44px, squarer than a chip, the numbers aligned. */
-const PICK =
-    "h-11 w-full justify-center rounded-[10px] px-0 text-[14px] tabular-nums";
+const pick = (on: boolean) =>
+    chipClass(
+        on,
+        "h-11 w-full justify-center rounded-[10px] px-0 text-[14px] tabular-nums",
+    );
 
 /**
  * A time of day as a row of the sheet it is in ("Opens · 9:00 am"), as the
@@ -84,60 +88,45 @@ export function ClockRow({
                     aria-label={`Pick a time for ${label}`}
                     className="border-b border-border bg-muted/40 px-3 pb-3 pt-2.5 last:border-b-0"
                 >
-                    <div
-                        role="radiogroup"
-                        aria-label="Hour"
+                    <ChoiceGroup
+                        label="Hour"
                         className="grid grid-cols-6 gap-1.5"
-                    >
-                        {HOURS.map((h) => (
-                            <Chip
-                                key={h}
-                                on={h === h12}
-                                aria-label={`${h} o'clock`}
-                                className={PICK}
-                                onClick={() => onPick(make(h, mins, pm))}
-                            >
-                                {h}
-                            </Chip>
-                        ))}
-                    </div>
+                        value={String(h12)}
+                        onChange={(h) => onPick(make(Number(h), mins, pm))}
+                        choices={HOURS.map((h) => ({
+                            value: String(h),
+                            label: h,
+                            ariaLabel: `${h} o'clock`,
+                        }))}
+                        itemClassName={pick}
+                    />
                     <div className="mt-1.5 grid grid-cols-[repeat(4,1fr)_8px_repeat(2,1fr)] gap-1.5">
-                        <div
-                            role="radiogroup"
-                            aria-label="Minutes"
+                        <ChoiceGroup
+                            label="Minutes"
                             className="col-span-4 grid grid-cols-4 gap-1.5"
-                        >
-                            {MINUTES.map((m) => (
-                                <Chip
-                                    key={m}
-                                    on={m === mins}
-                                    aria-label={`${m} minutes past`}
-                                    className={PICK}
-                                    onClick={() => onPick(make(h12, m, pm))}
-                                >
-                                    :{String(m).padStart(2, "0")}
-                                </Chip>
-                            ))}
-                        </div>
+                            value={String(mins)}
+                            onChange={(m) => onPick(make(h12, Number(m), pm))}
+                            choices={MINUTES.map((m) => ({
+                                value: String(m),
+                                label: `:${String(m).padStart(2, "0")}`,
+                                ariaLabel: `${m} minutes past`,
+                            }))}
+                            itemClassName={pick}
+                        />
                         <span aria-hidden />
-                        <div
-                            role="radiogroup"
-                            aria-label="am or pm"
+                        <ChoiceGroup
+                            label="am or pm"
                             className="col-span-2 grid grid-cols-2 gap-1.5"
-                        >
-                            {(["am", "pm"] as const).map((p) => (
-                                <Chip
-                                    key={p}
-                                    on={(p === "pm") === pm}
-                                    className={PICK}
-                                    onClick={() =>
-                                        onPick(make(h12, mins, p === "pm"))
-                                    }
-                                >
-                                    {p}
-                                </Chip>
-                            ))}
-                        </div>
+                            value={pm ? "pm" : "am"}
+                            onChange={(p) =>
+                                onPick(make(h12, mins, p === "pm"))
+                            }
+                            choices={[
+                                { value: "am", label: "am" },
+                                { value: "pm", label: "pm" },
+                            ]}
+                            itemClassName={pick}
+                        />
                     </div>
                 </div>
             ) : null}

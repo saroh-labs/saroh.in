@@ -56,6 +56,7 @@ describe("U12 tool definitions", () => {
                 "get_order",
                 "create_order",
                 "update_order_status",
+                "update_orders_status",
                 "list_customers",
                 "get_customer",
                 "create_customer",

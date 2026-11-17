@@ -30,6 +30,8 @@ export interface PhoneFigure {
     value: string | null;
     /** What the dash means, to a screen reader. */
     absent?: "Not known" | "None";
+    /** "bad": the word under it reads in the late colour ("to pack, late"). */
+    tone?: "bad";
     href: string;
 }
 
@@ -101,7 +103,16 @@ function figure(
         case "toPack": {
             const p = tiles.toPack;
             if (!p) break;
-            return { key, label, value: String(p.count), href: p.href };
+            // Late leads the figures, in its colour (HPHomePhone).
+            return p.late > 0
+                ? {
+                      key,
+                      label: `${label}, late`,
+                      value: String(p.count),
+                      tone: "bad",
+                      href: p.href,
+                  }
+                : { key, label, value: String(p.count), href: p.href };
         }
         case "came": {
             const c = tiles.came;
@@ -140,8 +151,9 @@ function figure(
 }
 
 /**
- * The phone's figures (A1): Money in today, Bookings and To pack for
- * someone who reads money; Bookings, Came and To pack for anyone else.
+ * The phone's figures (A1, HPHomePhone): To pack, Bookings and Money in
+ * today for someone who reads money; To pack, Bookings and Came for
+ * anyone else. The work leads.
  * A figure whose module is off isn't drawn; one whose read failed is a
  * dash, never 0. Money is only ever sent with `payment:read` (DEC-098),
  * so its tile being there (or having failed) is the test.
@@ -157,8 +169,8 @@ export function phoneFigures({
     const money =
         tiles.moneyIn !== undefined || failedPart("moneyIn", unavailable);
     const keys: PhoneFigureKey[] = money
-        ? ["moneyIn", "bookings", "toPack"]
-        : ["bookings", "came", "toPack"];
+        ? ["toPack", "bookings", "moneyIn"]
+        : ["toPack", "bookings", "came"];
     return keys
         .map((key) => figure(key, tiles, unavailable))
         .filter((f): f is PhoneFigure => f !== null);

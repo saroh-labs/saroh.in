@@ -1,10 +1,11 @@
 "use client";
 
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { Input } from "@saroh/ui/input";
 import { useEffect, useRef, useState } from "react";
 
-import { Chip } from "@/components/shared/lists/chip";
 import { findCustomers, readCustomerAttention } from "@/lib/customers/actions";
 import type {
     CustomerPick,
@@ -26,6 +27,7 @@ import type { PeekAttention } from "@/lib/services/peek";
 import { attentionText } from "@/lib/services/peek";
 
 import { Notice } from "@saroh/ui/notice";
+import { chosenChip, PICKED, WALK_IN } from "./customer-choice";
 import { DuplicateWarning, NewCustomerForm, WalkInForm } from "./picker-forms";
 
 /** How long typing settles before the search runs. */
@@ -261,48 +263,61 @@ export function CustomerPicker({
                 </p>
             ) : null}
             <div
-                role="radiogroup"
-                aria-labelledby={labelledBy}
-                aria-label={labelledBy ? undefined : "Customer"}
                 aria-busy={canSearch && !forbidden && !settled}
                 className="mb-3 flex flex-wrap gap-1.5"
             >
-                {results.map((r) => (
-                    <Chip
-                        key={r.id}
-                        on={pickedId === r.id}
-                        onClick={() => pick(pickOf(r))}
-                        className={PERSON_CHIP}
-                    >
-                        {resultLabel(r)}
-                    </Chip>
-                ))}
-                {pickedShown ? (
-                    <Chip
-                        on
-                        onClick={() => pick(pickedShown)}
-                        className={PERSON_CHIP}
-                    >
-                        {pickName(pickedShown)}
-                        {pickedShown.kind === "new"
-                            ? " · new"
-                            : pickedShown.kind === "walk-in" &&
-                                !pickedShown.phone.trim()
-                              ? " · walk-in"
-                              : ""}
-                    </Chip>
-                ) : null}
-                {allowWalkIn && value?.kind !== "walk-in" ? (
-                    <Chip
-                        on={walkIn}
-                        onClick={() => {
+                <ChoiceGroup
+                    labelledBy={labelledBy}
+                    label="Customer"
+                    className="flex min-w-0 flex-wrap gap-1.5"
+                    value={chosenChip(
+                        value,
+                        results.map((r) => r.id),
+                        walkIn,
+                    )}
+                    onChange={(key) => {
+                        if (key === WALK_IN) {
                             setAdding(null);
                             setWalkIn(true);
-                        }}
-                    >
-                        Walk-in
-                    </Chip>
-                ) : null}
+                            return;
+                        }
+                        setWalkIn(false);
+                        const hit = results.find((r) => r.id === key);
+                        if (hit) pick(pickOf(hit));
+                        else if (pickedShown) pick(pickedShown);
+                    }}
+                    choices={[
+                        ...results.map((r) => ({
+                            value: r.id,
+                            label: resultLabel(r),
+                        })),
+                        ...(pickedShown
+                            ? [
+                                  {
+                                      value: PICKED,
+                                      label: `${pickName(pickedShown)}${
+                                          pickedShown.kind === "new"
+                                              ? " · new"
+                                              : pickedShown.kind ===
+                                                      "walk-in" &&
+                                                  !pickedShown.phone.trim()
+                                                ? " · walk-in"
+                                                : ""
+                                      }`,
+                                  },
+                              ]
+                            : []),
+                        ...(allowWalkIn && value?.kind !== "walk-in"
+                            ? [{ value: WALK_IN, label: "Walk-in" }]
+                            : []),
+                    ]}
+                    itemClassName={(on, c) =>
+                        chipClass(
+                            on,
+                            c.value === WALK_IN ? undefined : PERSON_CHIP,
+                        )
+                    }
+                />
                 {showAdd ? (
                     <button
                         type="button"

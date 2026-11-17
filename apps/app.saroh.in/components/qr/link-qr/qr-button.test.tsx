@@ -66,17 +66,16 @@ vi.mock("@saroh/ui/popover", () => ({
         const at = useContext(Open);
         return cloneElement(children, { onClick: () => at.set(!at.open) });
     },
+    // A dialog, as Radix's popover content is.
     PopoverContent: ({
         children,
-        role,
         "aria-label": label,
     }: {
         children?: ReactNode;
-        role?: string;
         "aria-label"?: string;
     }) =>
         useContext(Open).open ? (
-            <div role={role} aria-label={label}>
+            <div role="dialog" aria-label={label}>
                 {children}
             </div>
         ) : null,

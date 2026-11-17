@@ -33,8 +33,8 @@ import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
 
-/** Grow › Social: Create post, while Share is switched on (DEC-217). */
-export const SOCIAL_HREF = "/social/new";
+/** Grow › Social: Your posts and Create post, while Share is switched on (DEC-217). */
+export const SOCIAL_HREF = "/social";
 
 /**
  * Single source of truth for the primary navigation, shared by the desktop
@@ -651,8 +651,8 @@ export const NAV_GROUPS: NavGroup[] = [
                 icon: BarChart3,
                 moduleKey: "INSIGHTS",
             },
-            // Create post (#1378, DEC-217). Saroh Social will add its posts
-            // and calendar here; until then the row lands on Create post.
+            // Social (#1378, DEC-217): Your posts, then Create post. Saroh
+            // Social will add its channels and calendar layer later.
             // Website until the Social module exists, as the API gates it.
             {
                 href: SOCIAL_HREF,

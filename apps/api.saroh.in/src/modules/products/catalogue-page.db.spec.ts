@@ -196,6 +196,54 @@ describe("Catalogue page (DB)", () => {
         expect(second.nextCursor).toBeNull();
     });
 
+    it("sorts by name, and by stock to sell with what isn't counted last, a page at a time", async () => {
+        const byName = await page({ sort: "name", page: 1, size: 10 });
+        expect(byName.items.map((i) => i.id)).toEqual([
+            bun,
+            draft,
+            mug,
+            rye,
+            sourdough,
+        ]);
+        const zToA = await page({ sort: "-name", page: 1, size: 10 });
+        expect(zToA.items.map((i) => i.id)).toEqual([
+            sourdough,
+            rye,
+            mug,
+            draft,
+            bun,
+        ]);
+        // Every price is ₹120 here: equal prices fall back to the name.
+        const byPrice = await page({ sort: "price", page: 1, size: 10 });
+        expect(byPrice.items.map((i) => i.id)).toEqual(
+            byName.items.map((i) => i.id),
+        );
+
+        const lowFirst = await page({ sort: "stock", page: 1, size: 10 });
+        expect(lowFirst.items.map((i) => i.id)).toEqual([
+            draft,
+            rye,
+            bun,
+            sourdough,
+            mug,
+        ]);
+        const highFirst = await page({ sort: "-stock", page: 1, size: 10 });
+        expect(highFirst.items.map((i) => i.id)).toEqual([
+            sourdough,
+            bun,
+            draft,
+            rye,
+            mug,
+        ]);
+        // Paged by number, the order holds across pages.
+        const second = await page({ sort: "stock", page: 2, size: 2 });
+        expect(second.items.map((i) => i.id)).toEqual([bun, sourdough]);
+        expect(second.total).toBe(5);
+        await expect(page({ sort: "name", cursor: draft })).rejects.toThrow(
+            BadRequestException,
+        );
+    });
+
     it("refuses a cursor and a page number together", async () => {
         await expect(page({ cursor: draft, page: 2 })).rejects.toThrow(
             BadRequestException,

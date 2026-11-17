@@ -1,17 +1,17 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { useId, useState } from "react";
 
-import { Chip } from "@/components/shared/lists/chip";
 import type { CashChange, NewOrderPay } from "@/lib/orders/new-order";
 
 import { CheckRow } from "@saroh/ui/check-row";
 import { Field } from "@saroh/ui/field";
 import { MoneyInput } from "@saroh/ui/money-input";
-import { Tip } from "@saroh/ui/tooltip";
 import { FIELD, StepCard } from "./parts";
 
 /**
@@ -62,24 +62,26 @@ export function PayStep({
     const [discounting, setDiscounting] = useState(discount !== "");
     return (
         <StepCard title="Payment">
-            <div
-                role="radiogroup"
-                aria-label="Payment"
+            <ChoiceGroup
+                label="Payment"
                 className="flex flex-wrap gap-1.5"
-            >
-                {options.map((o) => (
-                    <Tip key={o.key} label={o.off ?? undefined}>
-                        <Chip
-                            on={pay === o.key}
-                            disabled={o.off !== null}
-                            onClick={() => onPay(o.key)}
-                            className="cursor-pointer active:scale-[0.97] disabled:cursor-not-allowed"
-                        >
-                            {o.label}
-                        </Chip>
-                    </Tip>
-                ))}
-            </div>
+                value={pay}
+                onChange={onPay}
+                choices={options.map((o) => ({
+                    value: o.key,
+                    label: o.label,
+                    disabled: o.off !== null,
+                    tip: o.off ?? undefined,
+                }))}
+                itemClassName={(on, o) =>
+                    chipClass(
+                        on,
+                        o.disabled && !on
+                            ? "border-border bg-disabled text-disabled-foreground hover:border-border hover:bg-disabled"
+                            : "active:scale-[0.97]",
+                    )
+                }
+            />
             {pay === "CASH" ? (
                 <div className="mt-2.5 flex flex-wrap items-end gap-2.5">
                     <Field label="Cash given" className="flex-[1_1_140px]">

@@ -66,7 +66,7 @@ test.describe("Home A at a desk", () => {
             "Bookings today",
             "To pack or hand over",
             "Money in today",
-            "Came",
+            "Showed up",
         ]) {
             await expect(list).toContainText(label);
         }

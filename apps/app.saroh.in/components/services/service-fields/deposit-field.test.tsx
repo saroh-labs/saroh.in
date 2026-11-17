@@ -40,7 +40,7 @@ function chips(html: string): [string, boolean][] {
         const attrs = part.slice(0, end);
         if (!attrs.includes('role="radio"')) continue;
         const text = part.slice(end + 1, part.indexOf("</button>"));
-        out.push([text, /\sdisabled=""/.test(attrs)]);
+        out.push([text, /\saria-disabled="true"/.test(attrs)]);
     }
     return out;
 }

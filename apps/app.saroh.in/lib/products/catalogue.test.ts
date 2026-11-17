@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { CatalogueRow } from "./catalogue";
-import { catalogueRows, rowFacts, stockWords } from "./catalogue";
+import { catalogueRows, rowFacts, stockWhere, stockWords } from "./catalogue";
 import { catalogueProduct } from "./catalogue.fixture";
 import type { NeedDetail } from "./needs-you";
 
@@ -210,7 +210,36 @@ describe("stockWords — what can be sold, and the worst shelf", () => {
                     places: ["Online"],
                 }),
             ),
-        ).toEqual({ text: "Out at Online", tone: "danger" });
+        ).toEqual({ text: "Out at Online", tone: "danger", named: true });
+    });
+
+    it("groups big numbers, and says where the stock is under it", () => {
+        const big = at(20000);
+        expect(stockWords(big).text).toBe("20,000 to sell");
+        const one = { stock: 5, places: [{ storeId: "a", storeName: "A" }] };
+        const two = {
+            stock: 5,
+            places: [
+                { storeId: "a", storeName: "A" },
+                { storeId: "b", storeName: "B" },
+            ],
+        };
+        expect(stockWhere(one as never, { tone: "plain" })).toBe(
+            "at 1 location",
+        );
+        expect(stockWhere(two as never, { tone: "plain" })).toBe(
+            "across 2 locations",
+        );
+        expect(stockWhere(one as never, { tone: "warn" })).toBe(
+            "low · at 1 location",
+        );
+        // The figure already names the place: nothing more.
+        expect(stockWhere(one as never, { tone: "danger", named: true })).toBe(
+            "",
+        );
+        expect(stockWhere({ stock: null, places: [] }, { tone: "muted" })).toBe(
+            "",
+        );
     });
 
     it("takes the accent at its warning level, from Needs you", () => {

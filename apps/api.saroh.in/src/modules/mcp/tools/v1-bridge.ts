@@ -58,14 +58,20 @@ export const toMinor = (price: number) => Math.round(price * 100);
 export const money = (m: Money) => moneyWordsMinor(m.amountMinor, m.currency);
 
 /** An instant in a time zone, as a person reads it: "Thu 14 Nov, 15:30". */
-export function when(at: string | Date, timezone: string): string {
+export function when(
+    at: string | Date,
+    timezone: string,
+    /** "h12" for what a person reads on a card ("Tue 17 Nov, 9:00 am"). */
+    clock: "h23" | "h12" = "h23",
+): string {
     const opts: Intl.DateTimeFormatOptions = {
         weekday: "short",
         day: "numeric",
         month: "short",
-        hour: "2-digit",
         minute: "2-digit",
-        hourCycle: "h23",
+        ...(clock === "h12"
+            ? { hour: "numeric", hour12: true }
+            : { hour: "2-digit", hourCycle: "h23" }),
     };
     try {
         return new Intl.DateTimeFormat("en-GB", {

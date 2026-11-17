@@ -1,6 +1,10 @@
+// @vitest-environment jsdom
+import { act, useState } from "react";
+import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import type { NewOrderPay } from "@/lib/orders/new-order";
 import { canHandOver } from "@/lib/orders/new-order";
 
 import { PayStep } from "./pay-step";
@@ -48,5 +52,67 @@ describe("handed over now (UX-059)", () => {
 
     it("isn't offered where it doesn't apply", () => {
         expect(render(null)).not.toContain("Handed over now");
+    });
+});
+
+/** The payment chips are one radio group: one tab stop, arrows choose. */
+describe("payment chips by keyboard", () => {
+    function Host() {
+        const [pay, setPay] = useState<NewOrderPay>("CASH");
+        return (
+            <PayStep
+                options={[
+                    { key: "CASH", label: "Cash", off: null },
+                    { key: "LINK", label: "Payment link", off: "No provider" },
+                    { key: "UPI", label: "UPI", off: null },
+                ]}
+                pay={pay}
+                currency="INR"
+                onPay={setPay}
+                given=""
+                onGiven={() => undefined}
+                change={{ kind: "none" }}
+                total="₹100"
+                note="Paid now."
+                format={(c) => `₹${c / 100}`}
+                discount=""
+                onDiscount={() => undefined}
+            />
+        );
+    }
+
+    it("moves the choice with the arrows, past a chip that is off", () => {
+        (
+            globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
+        ).IS_REACT_ACT_ENVIRONMENT = true;
+        const host = document.createElement("div");
+        document.body.append(host);
+        const root = createRoot(host);
+        act(() => root.render(<Host />));
+        const radio = (name: string) =>
+            Array.from(
+                host.querySelectorAll<HTMLButtonElement>('[role="radio"]'),
+            ).find((b) => b.textContent === name);
+        expect(
+            Array.from(host.querySelectorAll('[role="radio"]')).map((b) =>
+                b.getAttribute("tabindex"),
+            ),
+        ).toEqual(["0", "-1", "-1"]);
+        act(() => {
+            radio("Cash")?.focus();
+            radio("Cash")?.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: "ArrowRight",
+                    bubbles: true,
+                }),
+            );
+        });
+        expect(radio("UPI")?.getAttribute("aria-checked")).toBe("true");
+        expect(document.activeElement).toBe(radio("UPI"));
+        expect(radio("Payment link")?.getAttribute("aria-disabled")).toBe(
+            "true",
+        );
+        act(() => root.unmount());
+        host.remove();
     });
 });

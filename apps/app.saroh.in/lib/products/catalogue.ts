@@ -1,5 +1,6 @@
 import type { PausedCut } from "@/lib/billing/paused";
 import { pausedByCut } from "@/lib/billing/paused";
+import { formatNumber } from "@/lib/format/money";
 import { count } from "@/lib/format/plural";
 
 import type { NeedDetail } from "./needs-you";
@@ -54,6 +55,8 @@ export interface CatalogueRow {
     soldOut: boolean;
     updatedAt: string;
     categoryId: string | null;
+    /** Its category's name, for the list's Category column. */
+    categoryName: string | null;
     /** Where it is sold; empty when no storefront sells it just now. */
     places: CataloguePlace[];
     /**
@@ -88,6 +91,7 @@ export function catalogueRows(
             soldOut: !inv && p.soldOut === true,
             updatedAt: p.updatedAt,
             categoryId: p.categoryId,
+            categoryName: p.category?.name ?? null,
             places: p.listings,
             paused: pausedByCut(p, pausedCut),
         };
@@ -154,16 +158,17 @@ export type StockTone = "plain" | "warn" | "danger" | "muted";
 export function stockWords(
     row: Pick<CatalogueRow, "stock" | "canSell" | "promised" | "soldOut">,
     need: NeedDetail | null = null,
-): { text: string; tone: StockTone } {
+): { text: string; tone: StockTone; named?: true } {
     if (row.stock === null || row.canSell === null) {
         return row.soldOut
             ? { text: "Sold out", tone: "danger" }
             : { text: "Not tracked", tone: "muted" };
     }
-    const toSell = `${row.canSell} to sell`;
+    // Grouped, as money is: "20,000 to sell" (HPProductsNotes).
+    const toSell = `${formatNumber(row.canSell)} to sell`;
     const nothing =
         row.promised > 0
-            ? `0 to sell · ${row.promised} promised`
+            ? `0 to sell · ${formatNumber(row.promised)} promised`
             : "Out of stock";
     if (!need) {
         return row.canSell > 0
@@ -190,10 +195,31 @@ export function stockWords(
         return {
             text: `${need.kind === "out" ? "Out" : "Low"} at ${at}`,
             tone,
+            named: true,
         };
     }
     if (need.kind === "out") return { text: nothing, tone };
     return { text: toSell, tone };
+}
+
+/**
+ * Where the stock is, under its figure (HPProductsDesk): "at 1 location",
+ * "across 2 locations", or the one place by name ("at Online") when
+ * the figure names where it is out or low. Low reads "low · at 1
+ * location". Empty for a product that doesn't count stock or sells
+ * nowhere just now.
+ */
+export function stockWhere(
+    row: Pick<CatalogueRow, "stock" | "places">,
+    words: { tone: StockTone; named?: true },
+): string {
+    if (row.stock === null || row.places.length === 0 || words.named) {
+        return "";
+    }
+    const tone = words.tone;
+    const n = row.places.length;
+    const where = n === 1 ? "at 1 location" : `across ${n} locations`;
+    return tone === "warn" ? `low · ${where}` : where;
 }
 
 /** Two letters from the product's words: "Rye & caraway loaf" → "RC". */

@@ -42,7 +42,11 @@ export function PhoneFigures({ figures }: { figures: readonly PhoneFigure[] }) {
                         </span>
                         <span
                             data-ph-unmask=""
-                            className="text-[12.5px] text-muted-foreground"
+                            className={cn(
+                                "text-[12.5px] text-muted-foreground",
+                                f.tone === "bad" &&
+                                    "font-semibold text-destructive-subtle-foreground",
+                            )}
                         >
                             {f.label}
                         </span>

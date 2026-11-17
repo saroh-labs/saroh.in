@@ -6,6 +6,7 @@ import localFont from "next/font/local";
 import { NIGHT, PAPER } from "@/lib/pwa/manifest";
 
 import { Providers } from "./providers";
+import "./ui-sdk.css";
 import "./workspace.css";
 
 // The brand's product faces, self-hosted (latin subset, variable) so the

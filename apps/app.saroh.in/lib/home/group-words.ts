@@ -138,8 +138,25 @@ export function groupTitle(group: HomeNeedGroup): string {
  * The line under the title: the oldest for orders and bills ("Oldest
  * placed 23 Sep · Aditya Shetty, ₹1,020"), the first rows for the rest.
  */
-export function groupSub(group: HomeNeedGroup, now: Date): string | null {
+export function groupSub(
+    group: HomeNeedGroup,
+    now: Date,
+    inProgress = 0,
+): string | null {
     const oldest = group.oldest;
+    // Every one late (HPHomeDesk): the tile names the oldest already, so
+    // the line says what that means and what else is moving.
+    if (
+        group.kind === "ORDERS" &&
+        group.late > 0 &&
+        group.late >= group.count
+    ) {
+        const moving =
+            inProgress > 0
+                ? ` · ${inProgress} more ${inProgress === 1 ? "is" : "are"} already on ${inProgress === 1 ? "its" : "their"} way`
+                : "";
+        return `All past their ready-by day${moving}`;
+    }
     if (group.kind === "ORDERS" && oldest?.at) {
         const amount =
             oldest.amountMinor !== null
@@ -203,10 +220,11 @@ export function groupLine(
     group: HomeNeedGroup,
     now: Date,
     dueToday = 0,
+    inProgress = 0,
 ): GroupLine {
     return {
         title: groupTitle(group),
-        sub: groupSub(group, now),
+        sub: groupSub(group, now, inProgress),
         tag: groupTag(group, dueToday),
     };
 }
@@ -218,7 +236,9 @@ export function groupLine(
 export function groupsCountLabel(total: number, partial: boolean): string {
     if (total <= 0) return "";
     const things = count(total, "thing");
-    return partial ? `${things} we could check` : things;
+    return partial
+        ? `${things} we could check`
+        : `${things}, most urgent first`;
 }
 
 /** "and 1 order on its way": open orders due later, beside the count. */

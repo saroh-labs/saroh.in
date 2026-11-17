@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { AskAiPanel } from "@/components/ask-ai/ask-ai-panel";
+import { AskAiFullPage } from "@/components/ask-ai/ask-ai-full-page";
 import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import {
     getAskAiConversation,
@@ -38,12 +38,10 @@ export default async function AskPage({
     ]);
 
     return (
-        <AskAiPanel
-            layout="page"
+        <AskAiFullPage
             state={state}
             businessName={organization.name}
             zone={businessZone(organization)}
-            phone={false}
             conversation={conversation}
             conversations={list?.data ?? null}
         />

@@ -1,6 +1,7 @@
 "use client";
 
 import { AbsentOr } from "@saroh/ui/absent-value";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Field, FieldError } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
@@ -34,7 +35,7 @@ import { NOT_ASKED } from "@/lib/gst/item-words";
 import { itemModeInput, itemModeValue } from "@/lib/gst/price-mode";
 import { rateOption } from "@/lib/invoices/gst";
 import { CheckRow } from "@saroh/ui/check-row";
-import { HELP, LABEL, PackChip, PackSection } from "./parts";
+import { HELP, LABEL, PackSection } from "./parts";
 import { ValidityChips } from "./validity-chips";
 
 /*
@@ -113,34 +114,24 @@ export function Details({
             <div data-ph-unmask="" id={ids.kind} className={cn(LABEL, "mt-3")}>
                 Credits are for
             </div>
-            <div
-                role="radiogroup"
-                aria-labelledby={ids.kind}
-                aria-describedby={
+            <ChipGroup
+                labelledBy={ids.kind}
+                describedBy={
                     errors.kind
                         ? `${ids.kindNote} ${ids.kindErr}`
                         : ids.kindNote
                 }
-                className="mt-1.5 flex flex-wrap gap-1.5"
-            >
-                {KIND_OPTIONS.map((o) => {
-                    const on = values.kind === o.value;
-                    return (
-                        <PackChip
-                            key={o.value}
-                            on={on}
-                            // The kind it was sold as stays pressable-looking
-                            // but inert; the other one is off, with the reason
-                            // said under them.
-                            disabled={locked && !on}
-                            aria-disabled={locked ? true : undefined}
-                            onClick={() => pick(o.value)}
-                        >
-                            {o.label}
-                        </PackChip>
-                    );
-                })}
-            </div>
+                className="mt-1.5"
+                value={values.kind}
+                onChange={pick}
+                // The kind it was sold as stays chosen, a press on it does
+                // nothing; the other one is off, with the reason said under
+                // them.
+                choices={KIND_OPTIONS.map((o) => ({
+                    ...o,
+                    disabled: locked && values.kind !== o.value,
+                }))}
+            />
             <p id={ids.kindNote} className={HELP}>
                 {kindNote(live, sold)}
             </p>

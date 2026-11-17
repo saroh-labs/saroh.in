@@ -155,7 +155,7 @@ describe("pickRows (SGPick*)", () => {
         expect(offer.line).toContain("code BUNS20");
         expect(cardsFor(itemOf(offer))).toEqual(["offer", "simple", "colour"]);
         const book = byKey("book:page");
-        expect(cardsFor(itemOf(book))).toEqual(["colour", "photo", "simple"]);
+        expect(cardsFor(itemOf(book))).toEqual(["colour", "simple"]);
     });
 
     it("keeps drafts, greyed with nothing to share", () => {
@@ -176,6 +176,19 @@ describe("pickRows (SGPick*)", () => {
         expect(keys[0]).toBe("book:page");
         expect(keys.indexOf("product:p2")).toBeLessThan(
             keys.indexOf("product:p1"),
+        );
+    });
+
+    it("calls a published product's state its shop's, never Draft", () => {
+        const rows = pickRows({
+            ...SOURCES,
+            links: { ...LINKS, shop: null },
+        });
+        const p1 = rows.find((r) => r.key === "product:p1");
+        expect(p1?.item).toBeNull();
+        expect(p1?.line).toBe("Product · your shop isn't live");
+        expect(rows.find((r) => r.key === "product:p2")?.line).toBe(
+            "Product · not published",
         );
     });
 

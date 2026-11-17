@@ -2,7 +2,6 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
-import { cn } from "@saroh/ui/lib/utils";
 import { Lock, Sparkles } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -35,28 +34,26 @@ export function AskAiButton({
     const name = locked ? `Ask AI, on ${planName(upgradeTo)}` : "Ask AI";
     return (
         <>
+            {/* AF boards: one dark Ask button, with its key, on every page. */}
             <Button
                 type="button"
-                variant={on ? "default" : "outline"}
                 size="sm"
                 aria-expanded={open}
                 aria-current={here ? "page" : undefined}
                 aria-label={locked ? name : undefined}
+                aria-keyshortcuts="Meta+J Control+J"
+                data-on={on ? "" : undefined}
                 onClick={openAskAi}
-                className={cn(
-                    "hidden h-9 gap-[7px] rounded-[9px] px-3 text-[13.5px] min-[760px]:inline-flex",
-                    locked && !on && "text-neutral-700 dark:text-foreground",
-                )}
+                className="hidden h-9 gap-[7px] rounded-[9px] px-3 text-[13.5px] min-[760px]:inline-flex"
             >
-                {locked ? (
-                    <Lock
-                        className="size-[15px] text-muted-foreground"
-                        aria-hidden
-                    />
-                ) : (
-                    <Sparkles className="size-4" aria-hidden />
-                )}
+                <Sparkles className="size-4" aria-hidden />
                 Ask AI
+                <kbd
+                    aria-hidden
+                    className="ml-0.5 font-sans text-[11px] font-medium text-primary-foreground/70"
+                >
+                    ⌘J
+                </kbd>
             </Button>
             <IconButton
                 label={name}

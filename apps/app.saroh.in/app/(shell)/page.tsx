@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import type { HomeSetup } from "@/components/home/dashboard/home-dashboard";
 import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
 import { ReviewerHome } from "@/components/home/dashboard/reviewer-home";
@@ -14,6 +15,7 @@ import {
 import { Moment } from "@/components/shared/notices/moment";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+import { businessPage } from "@/lib/ask-ai/page-hints";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
 import { getHome } from "@/lib/home/service";
@@ -146,17 +148,20 @@ export default async function Home() {
             allModules.some(
                 (m) => m.key === "INSIGHTS" && m.readiness !== "DISABLED",
             ));
-    // The first order or booking, in its first day (wave G), said once.
-    // Else one new feature (release visibility U14), only while nothing
-    // else holds the slot: a part that couldn't load, or Finish setup
-    // while it leads. One message at a time, never stacked.
-    const moment = home.hasAnyModule
-        ? ((await homeMoment(home, business)) ??
-          (home.unavailable.length === 0 &&
-          !(setup && firstStepsLead(setup.first))
-              ? await homeNewFeature(business)
-              : null))
-        : null;
+    // The first order or booking, in its first day (wave G), said once,
+    // above the work. Else one new feature (release visibility U14), only
+    // while nothing else holds the slot: a part that couldn't load, or
+    // Finish setup while it leads. It sits under the work as one line
+    // (HPHomeDesk) and waits while an order is over 3 days late. One
+    // message at a time, never stacked.
+    const moment = home.hasAnyModule ? await homeMoment(home, business) : null;
+    const news =
+        home.hasAnyModule &&
+        !moment &&
+        home.unavailable.length === 0 &&
+        !(setup && firstStepsLead(setup.first))
+            ? await homeNewFeature(business)
+            : null;
 
     return (
         // A dashboard, so the width matches the other data screens rather than
@@ -182,6 +187,14 @@ export default async function Home() {
                 // The phone Home says it in the day sheet (U17).
                 sinceOnPhone={!home.hasAnyModule}
             />
+            {/* What Ask AI offers here, from Home's own figures (AF 1). */}
+            <AskAiPageIs
+                page={businessPage({
+                    today: home.lastDay?.date,
+                    dueToday: home.tiles?.toPack?.dueToday,
+                    bookings: !!home.tiles?.bookingsToday,
+                })}
+            />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">
                 <HomeDashboard
@@ -192,6 +205,7 @@ export default async function Home() {
                     kind={kind}
                     invoicing={invoicing}
                     insights={insights}
+                    news={news}
                 />
             </div>
             {newMenu.items.length > 0 ? <NewSpace /> : null}

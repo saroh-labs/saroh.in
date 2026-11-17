@@ -5,9 +5,13 @@ import { NoProductAccess } from "@/components/commerce/product-editor-v2/no-acce
 import { activeCut, pausedByCut } from "@/lib/billing/paused";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { loadEditorContext } from "@/lib/products/editor-data";
+import { elsewhereShelves } from "@/lib/products/editor-stock";
 import { getProductAt } from "@/lib/products/overview";
 import { pausedOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
+import { readWebAddressLinks } from "@/lib/sites/share-links-read";
+import { productStock } from "@/lib/stock/product-stock";
+import { getStockLevels } from "@/lib/stock/service";
 import { readBusinessStores } from "@/lib/stores/service";
 import { getStorefront } from "@/lib/stores/storefronts";
 
@@ -58,10 +62,18 @@ export default async function EditProductPage({
         stores.find((s) => s.id === product.storeId) ??
         (await locationOf(product.storeId));
 
-    const [context, paused] = await Promise.all([
+    const [context, paused, levels, web] = await Promise.all([
         loadEditorContext(store, product, stores.length ? stores : [store]),
         // Past the plan's products limit (#800): read-only, and why.
         pausedOrNull(),
+        // Its shelves everywhere, so Stock counts every location and says
+        // the product page's total (HPEditDesk). Optional: without them it
+        // counts this location alone, as it did.
+        stores.length > 1
+            ? getStockLevels({ product: product.id }).catch(() => null)
+            : Promise.resolve(null),
+        // Whether the online shop is live: Visibility's sentence (UX-082).
+        readWebAddressLinks(),
     ]);
     const isPaused = pausedByCut(product, activeCut(paused, "products"));
     return (
@@ -73,6 +85,11 @@ export default async function EditProductPage({
             canWrite={context.canWrite && !isPaused}
             paused={isPaused}
             product={product}
+            shopLive={web ? Boolean(web.links.shop) : null}
+            elsewhere={elsewhereShelves(
+                levels ? productStock(levels, product.id) : null,
+                product.storeId,
+            )}
         />
     );
 }

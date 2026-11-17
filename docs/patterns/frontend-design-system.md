@@ -206,6 +206,14 @@
   E21 — as the design draws them, kept on dark), with `--layer-foreground` for the count written on them.
   Which layer takes which is `lib/calendar/layers.ts`; the class strings sit
   in `components/calendar/tones.ts` because Tailwind does not scan `lib/`.
+- **Current** (16 Nov 2026) — **`--ask`, `--ask-subtle` and
+  `--ask-subtle-foreground` are Ask AI's plum** (Tailwind `ask`,
+  `bg-ask-subtle`, `text-ask-subtle-foreground`): the "About: …" page label,
+  the hint pills on suggestions, where a conversation started in the history
+  list and the open conversation's left bar. Light values are the AF boards'
+  `#7B3F75`, `#EEE6F0` and `#4F2A4B` (9.7:1 on the subtle ground; the HSL tokens round to within one step of each); dark has
+  its own. Plum sits apart from the status hues and from Saffron, so it never
+  reads as a state or a brand mark; use it only for Ask AI.
 - **Current** — **`--accent` is a shadcn neutral** with about 32 component
   usages, not a brand accent. Don't rename it.
 - **Adopted** — **Never an arbitrary value, a hex literal or a raw palette class
@@ -254,7 +262,7 @@
     | `Chip`, `chipClass`                                                         | `@saroh/ui/chip` (also `components/shared/lists/chip.tsx`)                 | A choice among a few (radio) or a filter (`as="toggle"`). One size.                                                                                                                                                                                                                                                    |
     | `ListToolbar`, `ListFilter`, `MoreFilters`, `AttentionToggle`, `ListPaging` | `@saroh/ui/list-toolbar` (also `components/shared/lists/list-toolbar.tsx`) | The one toolbar of a list, in one row (slots `tabs`, `search`, `filters`, `more`, `attention`, `onClear`, `end`, `count`). Every filter is a `ListFilter` dropdown, at most three in the row and the rest behind `MoreFilters`. One `AttentionToggle` at most. `ListPaging` is how a paged list ends.                  |
     | `listTable`, `ListTable`, `ListTableHead`                                   | `@saroh/ui/list-table` (also `components/shared/lists/list-toolbar.tsx`)   | The one table look for a list a screen draws itself: the card, the tinted head band, rows ruled edge to edge, figures, a time that never wraps. `DataView` draws the same.                                                                                                                                             |
-    | `ChipGroup`, `RadioCards`, `ChoiceGroup`                                    | `@saroh/ui/choice-group`                                                   | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`).                                                                                                                                                                                 |
+    | `ChipGroup`, `RadioCards`, `ChoiceGroup`                                    | `@saroh/ui/choice-group`                                                   | One of several: pills, rows with a radio dot, or the screen's own drawing. One tab stop, arrows move the choice (`frontend-forms.md`). A screen never writes `role="radiogroup"` (`pnpm run check:choices`).                                                                                                           |
     | `CheckRow`, `SwitchRow`                                                     | `@saroh/ui/check-row`                                                      | A tick or a switch with its words: the shared `Checkbox` or `Switch`, the words take the press, 44px on touch.                                                                                                                                                                                                         |
     | `ListSearch`                                                                | `@saroh/ui/list-search`                                                    | "Search {things}" (required), icon, 38px, ONE width (320px, full width on a phone: a call site never sets one), `describe` for what it looks through, 180ms, Escape clears, "/" focuses, "Searching…" while the list is read. First in `ListToolbar`'s row. DataView draws it.                                         |
     | `StatusBadge`, `Badge`                                                      | `components/shared/lists/status-badge.tsx`, `@saroh/ui/badge`              | Sentence case, words always, never pressed. `size="sm"` is 11px, `dot` adds a dot.                                                                                                                                                                                                                                     |
@@ -385,7 +393,7 @@
   `?section=`, which deep links and Search settings use.
 - **Current** — **Overlays come in fixed sizes and one head and foot**
   (UX audit, 10 Oct), baked into `@saroh/ui/dialog`, `sheet` and
-  `alert-dialog` so no caller patches them: `DialogContent size="sm" |
+  `alert-dialog`, so a caller never has to redo them: `DialogContent size="sm" |
 "md" | "lg"` (420, 460, 560px), the title in `font-display` at 18px, a
   30px close target that is 44px on a touch pointer, and a footer that
   stacks on a phone with `gap-2` and the main button on top. Never pass a
@@ -398,6 +406,21 @@
   size to a dialog; a dialog needs no `useNarrow` swap to be a sheet.
   The search palette alone opens full screen on a phone
   (`phone="full"`).
+  An app never builds its own: no `role="dialog"` or `aria-modal` in
+  `apps/*/components` or `apps/*/app` (`pnpm run check:overlays`); state
+  that must outlive a close lives in a hook above the overlay
+  (`ask-ai/use-ask-ai.ts`), not in a panel kept mounted and hidden.
+  **The shared overlay is the base; a screen styles it for its place**
+  (owner, 17 Nov 2026). A screen may set, on its own `SheetContent` or
+  `DialogContent` only: the width, height, background and padding its
+  design needs, and `closeButton={false}` when the design puts Close in
+  the screen's own header row (Ask AI: 480px on Paper, Close beside the
+  header's buttons, `ask-ai/ask-ai-host.tsx`). What stays fixed: the
+  component itself in `packages/ui` is never edited for one screen; the
+  focus trap, Esc, the overlay, the motion and the title/description
+  are never rebuilt; the shared title type, footer stacking and the
+  phone bottom-sheet behaviour of dialogs are not overridden. Custom
+  styling on a caller is intended, not a mistake to undo.
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu

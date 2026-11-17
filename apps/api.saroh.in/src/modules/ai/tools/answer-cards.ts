@@ -1,7 +1,9 @@
 import type {
     AskAiInfoCard,
     AskAiProductsCard,
+    AskAiSlotsCard,
     AskAiTableCard,
+    findFreeSlotsTool,
     findLapsedCustomersTool,
     getClassFillTool,
     getProductTool,
@@ -117,6 +119,50 @@ function day(iso: string | null): string {
     return at.isValid ? at.toFormat("d LLL") : iso;
 }
 
+/** "12:00 pm", "4:15 pm": the business's clock. */
+const clock = (at: DateTime) => at.toFormat("h:mm a").toLowerCase();
+
+/**
+ * Free starts as one row a day (AF 3): the day, its first and last free
+ * start ("12:00 to 4:15 pm"), and the first, which Book here books. In
+ * the service's own zone.
+ */
+export function slotsCard(
+    d: Out<typeof findFreeSlotsTool>,
+): AskAiSlotsCard | null {
+    const days = new Map<string, DateTime[]>();
+    for (const slot of d.slots) {
+        const at = DateTime.fromISO(slot.starts_at, { zone: d.timezone });
+        if (!at.isValid) continue;
+        const key = at.toISODate() ?? "";
+        days.set(key, [...(days.get(key) ?? []), at]);
+    }
+    if (!days.size) return null;
+    const rows = [...days.values()].map((starts) => {
+        const first = starts[0];
+        const last = starts[starts.length - 1];
+        const sameHalf = first.toFormat("a") === last.toFormat("a");
+        return {
+            label: first.toFormat("ccc d LLL"),
+            range:
+                starts.length === 1
+                    ? clock(first)
+                    : `${sameHalf ? first.toFormat("h:mm") : clock(first)} to ${clock(last)}`,
+            startsAt: first.toISO() ?? "",
+        };
+    });
+    const { shown, more } = capped(rows);
+    return {
+        title: `${d.service_name} is free`,
+        serviceId: d.service_id,
+        serviceName: d.service_name,
+        days: shown,
+        ...withMore(more),
+        // find_free_slots stops at a page; say so, so the card never looks whole.
+        ...(d.more ? { later: true } : {}),
+    };
+}
+
 const capped = <T>(rows: readonly T[], total = rows.length) => ({
     shown: rows.slice(0, ASK_AI_CARD_ITEMS),
     more: Math.max(0, total - Math.min(rows.length, ASK_AI_CARD_ITEMS)),
@@ -187,6 +233,10 @@ export function answerCard(
     const fact = (id: string) => facts.get(id);
     const image = (id: string) => ownMediaUrl(fact(id)?.image, mediaBase);
     switch (tool) {
+        case "find_free_slots": {
+            const card = slotsCard(data as Out<typeof findFreeSlotsTool>);
+            return card ? { kind: "slots", data: card } : null;
+        }
         case "get_whats_selling": {
             const d = data as Out<typeof getWhatsSellingTool>;
             return products(

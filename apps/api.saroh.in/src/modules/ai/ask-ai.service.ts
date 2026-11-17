@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import type {
+    AskAiAbout,
     AskAiConversationList,
     AskAiEvent,
     AskAiLanguage,
@@ -40,6 +41,8 @@ export interface BegunTurn {
     conversationId: string | null;
     /** Set when a new conversation was refused before it began. */
     refusal: AskAiRefusal | null;
+    /** The page it is asked about (AF 2, 5). */
+    about?: AskAiAbout;
 }
 
 /** An event as written on the stream: the turn's own, plus `turn` first. */
@@ -75,7 +78,11 @@ export class AskAiService {
         if (body.language) await this.store.setLanguage(ctx, body.language);
         if (body.conversationId) {
             await this.conversations.assertOwn(ctx, body.conversationId);
-            return { conversationId: body.conversationId, refusal: null };
+            return {
+                conversationId: body.conversationId,
+                refusal: null,
+                about: body.about,
+            };
         }
         const entry = await this.access.entry(ctx);
         if (!entry.ok) return { conversationId: null, refusal: entry.refusal };
@@ -84,8 +91,9 @@ export class AskAiService {
                 ctx,
                 ASK_AI_AGENT.key,
                 body.question,
+                body.about,
             );
-            return { conversationId: c.id, refusal: null };
+            return { conversationId: c.id, refusal: null, about: body.about };
         } catch (error) {
             if (!(error instanceof AiSettingNotConfiguredError)) throw error;
             return { conversationId: null, refusal: { reason: "unavailable" } };
@@ -122,6 +130,7 @@ export class AskAiService {
                 question,
                 turnId,
                 signal,
+                ...(begun.about ? { about: begun.about } : {}),
             });
         } finally {
             this.registry.end(turnId);

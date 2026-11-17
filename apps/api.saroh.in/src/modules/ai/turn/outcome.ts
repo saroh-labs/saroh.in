@@ -1,3 +1,4 @@
+import { isAskAiStarter } from "@saroh/api-contract";
 import type { AiTurnOutcome } from "@saroh/database";
 
 /**
@@ -26,3 +27,11 @@ export const OUTCOME_COUNTED: Readonly<Record<AiTurnOutcome, boolean>> = {
 };
 
 export const isCounted = (outcome: AiTurnOutcome) => OUTCOME_COUNTED[outcome];
+
+/**
+ * A common question the panel offers, asked as written, doesn't use one of
+ * the month's questions (owner, 15 Nov); any other counts by its outcome.
+ * Told by its words alone (`ASK_AI_STARTERS`), never by the browser's say-so.
+ */
+export const countsFor = (outcome: AiTurnOutcome, question: string) =>
+    isCounted(outcome) && !isAskAiStarter(question);

@@ -973,6 +973,8 @@ bg_step shared-data pnpm run check:shared-data
 bg_step edition-branches pnpm run check:edition-branches
 bg_step date-inputs pnpm run check:date-inputs
 bg_step native-selects pnpm run check:native-selects
+bg_step overlays pnpm run check:overlays
+bg_step choices pnpm run check:choices
 bg_step history-state pnpm run check:history-state
 bg_step e2e-signed-in-request pnpm run check:e2e-signed-in-request
 bg_step client-calls pnpm run check:client-calls

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { needsShown, needsSummary, needWords, optionWord } from "./needs-you";
+import { needsHeadline, needsShown, needWords, optionWord } from "./needs-you";
 import type { CatalogueNeed } from "./service";
 
 const need = (
@@ -47,27 +47,47 @@ describe("Needs you (#519)", () => {
         });
     });
 
-    it("sums them up, leaving out what isn't there", () => {
+    it("folds to what its headline counts, and opens to every one", () => {
+        const mixed = [
+            need("a", "out"),
+            need("b", "short", { short: 2 }),
+            need("c", "low", { canSell: 3 }),
+        ];
+        expect(needsShown(mixed, false).map((l) => l.name)).toEqual(["a", "b"]);
+        expect(needsShown(mixed, true)).toHaveLength(3);
+        // Nothing short or out: the low ones are what it lists.
         expect(
-            needsSummary([
+            needsShown([need("c", "low", { canSell: 3 })], false),
+        ).toHaveLength(1);
+        // Up to 8 folded.
+        const many = Array.from({ length: 12 }, (_, i) => need(`p${i}`, "out"));
+        expect(needsShown(many, false)).toHaveLength(8);
+        expect(needsShown(many, true)).toHaveLength(12);
+    });
+
+    it("says what it lists, then the rest", () => {
+        expect(
+            needsHeadline([
                 need("a", "out"),
                 need("b", "out"),
                 need("c", "low", { canSell: 2 }),
             ]),
-        ).toBe("2 out · 1 low");
-        expect(needsSummary([need("a", "short", { short: 1 })])).toBe(
-            "1 short",
-        );
-        expect(needsSummary([])).toBe("");
-    });
-
-    it("folds to the worst two, and opens to every one", () => {
-        const many = Array.from({ length: 8 }, (_, i) => need(`p${i}`, "out"));
-        expect(needsShown(many, false).map((l) => l.name)).toEqual([
-            "p0",
-            "p1",
-        ]);
-        expect(needsShown(many, true)).toHaveLength(8);
+        ).toEqual({
+            lead: "2 out of stock",
+            rest: "and 1 running low",
+            phone: "2 out of stock, 1 low",
+        });
+        expect(
+            needsHeadline([need("a", "short", { short: 1 }), need("b", "out")]),
+        ).toMatchObject({
+            lead: "1 short for orders · 1 out of stock",
+            rest: "",
+        });
+        expect(needsHeadline([need("c", "low", { canSell: 2 })])).toEqual({
+            lead: "1 running low",
+            rest: "",
+            phone: "1 running low",
+        });
     });
 
     it("says the option's own word", () => {

@@ -1,11 +1,12 @@
 "use client";
 
+import { chipClass } from "@saroh/ui/chip";
+import { ChoiceGroup } from "@saroh/ui/choice-group";
 import { FailedRead } from "@saroh/ui/failed-read";
 import { Input } from "@saroh/ui/input";
 
 import { useIndiaAddress } from "@/components/shared/fields/business-country";
 import { DeliveryPlaceFields } from "@/components/shared/fields/delivery-place-fields";
-import { Chip } from "@/components/shared/lists/chip";
 import type { AddressDraft, NewOrderWay } from "@/lib/orders/new-order";
 import { goesToAddress } from "@/lib/orders/new-order";
 
@@ -58,24 +59,22 @@ export function LeavesStep({
                     out, or turn a way on in the location&apos;s settings.
                 </p>
             ) : (
-                <div
-                    role="radiogroup"
-                    aria-label="How it leaves"
-                    aria-busy={loading}
-                    className="flex flex-wrap gap-1.5"
-                >
-                    {ways.map((w) => (
-                        <Chip
-                            key={w.type}
-                            on={way === w.type}
-                            onClick={() => onWay(w.type)}
-                            className="cursor-pointer active:scale-[0.97]"
-                        >
-                            {w.fee
+                <div aria-busy={loading}>
+                    <ChoiceGroup
+                        label="How it leaves"
+                        className="flex flex-wrap gap-1.5"
+                        value={way}
+                        onChange={onWay}
+                        choices={ways.map((w) => ({
+                            value: w.type,
+                            label: w.fee
                                 ? `${w.label} · ${format(Math.round(Number(w.fee) * 100))}`
-                                : w.label}
-                        </Chip>
-                    ))}
+                                : w.label,
+                        }))}
+                        itemClassName={(on) =>
+                            chipClass(on, "active:scale-[0.97]")
+                        }
+                    />
                 </div>
             )}
             {goesToAddress(way) ? (

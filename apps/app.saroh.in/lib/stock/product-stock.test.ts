@@ -119,8 +119,8 @@ describe("productStock", () => {
             short: 0,
         });
         expect(stock.byStore).toEqual([
-            { storeId: "hill", name: "Hill Road", canSell: 10 },
-            { storeId: "online", name: "Online", canSell: 15 },
+            { storeId: "hill", name: "Hill Road", onHand: 14, canSell: 10 },
+            { storeId: "online", name: "Online", onHand: 16, canSell: 15 },
         ]);
         expect(warnsAt(stock.sizes[0], stock.split)).toBe(
             "Warns at 4 per shop",

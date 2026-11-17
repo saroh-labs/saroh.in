@@ -4,6 +4,7 @@ import { Card } from "@saroh/ui/card";
 import { cn } from "@saroh/ui/lib/utils";
 import Link from "next/link";
 
+import { formatMoneyMajor } from "@/lib/format/money";
 import type { ProductTab } from "@/lib/products/links";
 import type { ProductOverview } from "@/lib/products/overview";
 import { stockCounts } from "@/lib/products/overview-rules";
@@ -97,37 +98,80 @@ export function AvailabilityCard({
                 first={first}
             />
         ) : null;
+    // Each place's shelf, adding up to the figure (HPProductDesk): the
+    // same 440 the editor's All locations row says.
+    const places = stock && !archived ? stock.byStore : [];
+    // Each size counted on its own, at its own price (HPProductVariantsDesk):
+    // the card is the sizes' table, and the Variants card isn't drawn.
+    const sizes = sizeRows(overview, stock, archived);
+    const table = places.length > 0 || sizes.length > 0;
     return (
         <Card
             role={a.short ? "alert" : "group"}
             aria-label={a.short ? undefined : a.label}
             className={cn(
-                "rounded-[12px] px-[15px] py-[13px]",
+                "rounded-[12px] px-4 py-3.5",
                 a.short &&
                     "border-destructive-subtle-foreground bg-destructive-subtle",
             )}
         >
-            <p
-                className={cn(
-                    "text-[11.5px]",
-                    a.short
-                        ? "text-destructive-subtle-foreground"
-                        : "text-muted-foreground",
-                )}
-            >
-                {a.label}
+            <div className="flex flex-wrap items-center gap-2">
+                <p
+                    className={cn(
+                        "mr-auto text-[14px] font-semibold",
+                        a.short && "text-destructive-subtle-foreground",
+                    )}
+                >
+                    {sizes.length > 0 && !a.short
+                        ? `${optionTitle(product.option?.name)} and stock`
+                        : a.label}
+                </p>
+                {table && !a.short ? (
+                    <>
+                        <Button asChild size="sm" variant="outline">
+                            <Link href={href("stock")} scroll={false}>
+                                Count stock
+                            </Link>
+                        </Button>
+                        {overview.canStock ? (
+                            <StockSheetButton
+                                overview={overview}
+                                storeId={storeId}
+                                stock={stock}
+                                counts
+                                label="Add stock"
+                                size="sm"
+                                variant="default"
+                            />
+                        ) : null}
+                    </>
+                ) : null}
+            </div>
+            <p className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span
+                    className={cn(
+                        "font-display tabular-nums leading-tight",
+                        table
+                            ? "text-[40px] font-semibold tracking-[-0.03em]"
+                            : "text-[22px] font-semibold",
+                        a.short && "text-destructive-subtle-foreground",
+                    )}
+                >
+                    {a.figure}
+                </span>
+                {table && !a.short ? (
+                    <span className="text-[13px] text-muted-foreground">
+                        {sizes.length > 0
+                            ? `to sell · counted for each ${optionNoun(product.option?.name, 1)}`
+                            : `of ${totals.onHand} on hand`}
+                    </span>
+                ) : null}
             </p>
-            <p
-                className={cn(
-                    "mt-1 font-display text-[22px] font-semibold tabular-nums leading-tight",
-                    a.short && "text-destructive-subtle-foreground",
-                )}
-            >
-                {a.figure}
-            </p>
-            <p className="mt-0.5 text-pretty text-[11.5px] text-muted-foreground">
-                {a.note}
-            </p>
+            {table && !a.short ? null : (
+                <p className="mt-0.5 text-pretty text-[11.5px] text-muted-foreground">
+                    {a.note}
+                </p>
+            )}
             {held && seesOrders ? (
                 <Link
                     href={href("orders")}
@@ -167,9 +211,175 @@ export function AvailabilityCard({
                     ) : null}
                 </div>
             ) : null}
+            {sizes.length > 0 ? (
+                <SizesTable
+                    option={optionTitle(product.option?.name)}
+                    rows={sizes}
+                />
+            ) : places.length > 0 ? (
+                <div
+                    role="table"
+                    aria-label="Stock by location"
+                    className="mt-3 text-[13.5px]"
+                >
+                    <div
+                        role="row"
+                        data-ph-unmask=""
+                        className="label grid grid-cols-[minmax(0,1fr)_72px_64px] py-1.5 text-muted-foreground sm:grid-cols-[minmax(0,1fr)_96px_80px]"
+                    >
+                        <span role="columnheader">Location</span>
+                        <span role="columnheader" className="text-right">
+                            On hand
+                        </span>
+                        <span role="columnheader" className="text-right">
+                            To sell
+                        </span>
+                    </div>
+                    {places.map((p) => (
+                        <div
+                            role="row"
+                            key={p.storeId}
+                            className="grid grid-cols-[minmax(0,1fr)_72px_64px] border-t border-border py-2.5 sm:grid-cols-[minmax(0,1fr)_96px_80px]"
+                        >
+                            <span role="cell">{p.name}</span>
+                            <span
+                                role="cell"
+                                className="text-right tabular-nums"
+                            >
+                                {p.onHand}
+                            </span>
+                            <span
+                                role="cell"
+                                className="text-right font-semibold tabular-nums"
+                            >
+                                {p.canSell}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : null}
         </Card>
     );
 }
+
+/** "Size", "Shade", "Variant": the option's own word, for a heading. */
+function optionTitle(option: string | null | undefined): string {
+    const w = optionNoun(option, 1);
+    return w.charAt(0).toUpperCase() + w.slice(1);
+}
+
+interface SizeRow {
+    id: string;
+    title: string;
+    sku: string;
+    price: string;
+    canSell: number;
+    flag: "low" | "out" | null;
+}
+
+/**
+ * A row per size when each is counted on its own and there are several
+ * (HPProductVariantsDesk): its name, SKU, price and what it can sell, with
+ * low or out said in the late colour. None otherwise.
+ */
+export function sizeRows(
+    overview: ProductOverview,
+    stock: ProductStock | null,
+    archived: boolean,
+): SizeRow[] {
+    const { product } = overview;
+    if (!stock || archived || stock.mode !== "variant") return [];
+    if (stock.sizes.length < 2) return [];
+    const money = (amount: string) =>
+        formatMoneyMajor(amount, product.currency);
+    return stock.sizes.flatMap((size) => {
+        const v = product.variants.find((x) => x.id === size.variantId);
+        if (!v) return [];
+        return [
+            {
+                id: v.id,
+                title: v.title,
+                sku: v.sku,
+                price: money(v.price ?? product.price),
+                canSell: size.canSell,
+                flag:
+                    size.canSell <= 0
+                        ? "out"
+                        : size.warnAt > 0 && size.canSell <= size.warnAt
+                          ? "low"
+                          : null,
+            },
+        ];
+    });
+}
+
+function SizesTable({
+    option,
+    rows,
+}: {
+    option: string;
+    rows: readonly SizeRow[];
+}) {
+    const cols =
+        "grid grid-cols-[minmax(0,1fr)_72px_64px_72px] sm:grid-cols-[minmax(0,1fr)_96px_72px_88px]";
+    return (
+        <div
+            role="table"
+            aria-label={`${option}s and stock`}
+            className="mt-3 text-[13.5px]"
+        >
+            <div
+                role="row"
+                data-ph-unmask=""
+                className={cn("label py-1.5 text-muted-foreground", cols)}
+            >
+                <span role="columnheader">{option}</span>
+                <span role="columnheader" className="text-right">
+                    SKU
+                </span>
+                <span role="columnheader" className="text-right">
+                    Price
+                </span>
+                <span role="columnheader" className="text-right">
+                    To sell
+                </span>
+            </div>
+            {rows.map((r) => (
+                <div
+                    role="row"
+                    key={r.id}
+                    className={cn("border-t border-border py-2.5", cols)}
+                >
+                    <span role="cell" className="truncate font-semibold">
+                        {r.title}
+                    </span>
+                    <span
+                        role="cell"
+                        className="truncate text-right font-mono text-[12px] text-muted-foreground"
+                    >
+                        {r.sku}
+                    </span>
+                    <span role="cell" className="text-right tabular-nums">
+                        {r.price}
+                    </span>
+                    <span
+                        role="cell"
+                        className={cn(
+                            "text-right font-semibold tabular-nums",
+                            r.flag && "text-destructive-subtle-foreground",
+                        )}
+                    >
+                        {r.canSell}
+                        {r.flag ? ` · ${r.flag}` : ""}
+                    </span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
+/** Variants listed on the card before "N more". */
+const VARIANTS_SHOWN = 6;
 
 /** "Variants · 28 shades · ₹420 each · 1 out". */
 export function VariantsStat({
@@ -204,8 +414,6 @@ export function VariantsStat({
                 product.variants.length
                     ? variantsLine(
                           {
-                              count: product.variants.length,
-                              optionName: product.option?.name,
                               min: at(Math.min(...nums)),
                               max: at(Math.max(...nums)),
                               out:
@@ -217,7 +425,35 @@ export function VariantsStat({
                       )
                     : `Sold as itself at ${money(product.price)}`
             }
-        />
+        >
+            {/* Each by name, SKU and price (HPProductDesk). */}
+            {product.variants.length > 0 ? (
+                <ul className="mt-2.5 grid">
+                    {product.variants.slice(0, VARIANTS_SHOWN).map((v) => (
+                        <li
+                            key={v.id}
+                            className="flex items-baseline gap-2 border-t border-border py-2 text-[13.5px]"
+                        >
+                            <span className="truncate font-semibold">
+                                {v.title}
+                            </span>
+                            <span className="truncate font-mono text-[12px] text-muted-foreground">
+                                {v.sku}
+                            </span>
+                            <span className="ml-auto tabular-nums">
+                                {money(v.price ?? product.price)}
+                            </span>
+                        </li>
+                    ))}
+                    {product.variants.length > VARIANTS_SHOWN ? (
+                        <li className="border-t border-border pt-2 text-[12.5px] text-muted-foreground">
+                            {product.variants.length - VARIANTS_SHOWN} more on
+                            the Variants tab
+                        </li>
+                    ) : null}
+                </ul>
+            ) : null}
+        </ProductStat>
     );
     if (!href) return stat;
     return (

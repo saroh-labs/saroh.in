@@ -48,6 +48,21 @@ export type CatalogueView = (typeof CATALOGUE_VIEWS)[number];
 const DEFAULT_PAGE = 50;
 
 /** The sizes a list with numbered pages offers; any other is refused. */
+/**
+ * How the list is sorted (owner, 15 Nov): newest first (the default), by
+ * name, by price, or by stock to sell, lowest first or highest first.
+ */
+export const CATALOGUE_SORTS = [
+    "newest",
+    "name",
+    "-name",
+    "price",
+    "-price",
+    "stock",
+    "-stock",
+] as const;
+export type CatalogueSort = (typeof CATALOGUE_SORTS)[number];
+
 export const CATALOGUE_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 /** `?category=none`: the products with no category (Uncategorized). */
@@ -112,6 +127,11 @@ export class CatalogueQueryDto {
     @Min(1)
     @Max(100_000)
     page?: number;
+
+    /** How the rows are sorted; newest first without. */
+    @IsOptional()
+    @IsIn(CATALOGUE_SORTS, { message: "Unknown sort" })
+    sort?: CatalogueSort;
 
     /** Rows per page, for a list with numbered pages: 10, 25, 50 or 100. */
     @IsOptional()
@@ -191,12 +211,82 @@ export function searchWhere(q: string): Prisma.ProductWhereInput {
     };
 }
 
+/**
+ * The Prisma order for a sort that the database can read off the row;
+ * null for newest (the default) and for stock, which is a sum
+ * (`stockOrderedIds`). The id last, so equal names never swap pages.
+ */
+export function catalogueOrder(
+    sort: CatalogueSort | undefined,
+): Prisma.ProductOrderByWithRelationInput[] | null {
+    switch (sort) {
+        case "name":
+        case "-name":
+            return [{ name: sort === "name" ? "asc" : "desc" }, { id: "asc" }];
+        case "price":
+        case "-price":
+            return [
+                { price: sort === "price" ? "asc" : "desc" },
+                { name: "asc" },
+                { id: "asc" },
+            ];
+        default:
+            return null;
+    }
+}
+
+/**
+ * Every product matching `where`, by stock to sell (on hand less what is
+ * promised, at the open stores), lowest first for "stock". A product that
+ * doesn't count stock has no figure and goes last either way, then by name.
+ */
+async function stockOrderedIds(
+    where: Prisma.ProductWhereInput,
+    stores: readonly string[],
+    sort: "stock" | "-stock",
+): Promise<string[]> {
+    const rows = await prisma.product.findMany({
+        where,
+        select: {
+            id: true,
+            name: true,
+            stockTracked: true,
+            stockLevels: {
+                where: { storeId: { in: [...stores] }, ...COUNTING_ROWS },
+                select: { onHand: true, promised: true },
+            },
+        },
+    });
+    const sign = sort === "stock" ? 1 : -1;
+    const toSell = (r: (typeof rows)[number]) =>
+        r.stockTracked && r.stockLevels.length > 0
+            ? r.stockLevels.reduce((n, l) => n + l.onHand - l.promised, 0)
+            : null;
+    return rows
+        .map((r) => ({ id: r.id, name: r.name, n: toSell(r) }))
+        .sort(
+            (a, b) =>
+                (a.n === null ? 1 : 0) - (b.n === null ? 1 : 0) ||
+                (a.n !== null && b.n !== null ? sign * (a.n - b.n) : 0) ||
+                a.name.localeCompare(b.name) ||
+                a.id.localeCompare(b.id),
+        )
+        .map((r) => r.id);
+}
+
 export async function cataloguePage(
     products: ProductsService,
     organizationId: string,
     query: CatalogueQueryDto,
 ): Promise<CataloguePageDto> {
     const { status, storefront } = query;
+    const sorted = query.sort && query.sort !== "newest";
+    if (query.cursor && sorted) {
+        throw new BadRequestException({
+            message: "A sorted list pages by number, not by a cursor.",
+            details: { field: "sort" },
+        });
+    }
     if (query.cursor && query.page) {
         throw new BadRequestException({
             message: "Page by a cursor or a page number, not both.",
@@ -298,16 +388,32 @@ export async function cataloguePage(
 
     const take = query.size ?? query.limit ?? DEFAULT_PAGE;
     const skip = query.page ? (query.page - 1) * take : 0;
-    const [page, total, all, inColl, inv, everywhere, listed] =
+    const order = catalogueOrder(query.sort);
+    // By stock: the order is a sum, worked out over every match, then the
+    // page is cut from it (`take + 1` to know if there is more).
+    const byStock =
+        query.sort === "stock" || query.sort === "-stock"
+            ? (
+                  await stockOrderedIds(
+                      { AND: [base, where] },
+                      stores.map((s) => s.id),
+                      query.sort,
+                  )
+              ).slice(skip, skip + take + 1)
+            : null;
+    const [found, total, all, inColl, inv, everywhere, listed] =
         await Promise.all([
             products.catalogue(
                 organizationId,
                 { status, storefront },
-                {
-                    where: after ? { AND: [where, after] } : where,
-                    take: take + 1,
-                    ...(skip > 0 ? { skip } : {}),
-                },
+                byStock
+                    ? { where: { id: { in: byStock } } }
+                    : {
+                          where: after ? { AND: [where, after] } : where,
+                          take: take + 1,
+                          ...(skip > 0 ? { skip } : {}),
+                          ...(order ? { orderBy: order } : {}),
+                      },
             ),
             prisma.product.count({ where: { AND: [base, where] } }),
             prisma.product.count({ where: base }),
@@ -326,6 +432,9 @@ export async function cataloguePage(
                 _count: { _all: true },
             }),
         ]);
+    const page = byStock
+        ? byStock.flatMap((id) => found.filter((p) => p.id === id))
+        : found;
     const perStore = new Map(listed.map((l) => [l.storeId, l._count._all]));
     const more = page.length > take;
     const items = more ? page.slice(0, take) : page;

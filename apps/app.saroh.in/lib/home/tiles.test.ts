@@ -67,25 +67,48 @@ describe("tileViews", () => {
             views(BUSY).map((t) => [t.label, t.value, t.sub, t.href]),
         ).toEqual([
             [
+                "To pack or hand over",
+                "7 orders",
+                "3 late · 3 due today",
+                "/commerce/orders",
+            ],
+            [
                 "Bookings today",
                 "6",
                 "Next at 11:30 am, Sourdough basics",
                 "/calendar",
             ],
-            [
-                "To pack or hand over",
-                "7 orders",
-                "3 due today",
-                "/commerce/orders",
-            ],
+            ["Showed up", "3 of 6", "Kavya is next, at 12:00 pm", "/bookings"],
             [
                 "Money in today",
                 "₹8,240",
                 "14 payments so far today",
                 "/billing/invoices?since=x",
             ],
-            ["Came", "3 of 6", "Kavya is next, at 12:00 pm", "/bookings"],
         ]);
+    });
+
+    it("says one count of late, with the oldest, when every order is late (HPHomeDesk)", () => {
+        const tiles = tileViews({
+            tiles: {
+                toPack: {
+                    count: 29,
+                    dueToday: 0,
+                    late: 29,
+                    inProgress: 25,
+                    href: "/commerce/orders",
+                },
+            },
+            unavailable: [],
+            today: TODAY,
+            fresh: false,
+            oldestLate: 24,
+        });
+        expect(tiles[0]).toMatchObject({
+            value: "29 orders",
+            sub: "All late · oldest 24 days",
+            tone: "bad",
+        });
     });
 
     it("says a quiet day in words, never 0 (board `HAQuietD`)", () => {
@@ -116,13 +139,13 @@ describe("tileViews", () => {
         };
         const tiles = views(quiet);
         expect(tiles.map((t) => [t.value, t.sub])).toEqual([
-            ["None", "Next: Wed 21 Oct, 10:00 am, Sourdough basics"],
             ["Nothing", "All orders are on their way"],
-            ["Nothing", "No payments yet today"],
+            ["None", "Next: Wed 21 Oct, 10:00 am, Sourdough basics"],
             // Bookings were read and nobody is booked one to one: the dash.
             [null, "No bookings to mark today"],
+            ["Nothing", "No payments yet today"],
         ]);
-        expect(tiles[3].absent).toBe("None");
+        expect(tiles[2].absent).toBe("None");
     });
 
     it("says a Monday's first booking is the first (board `HAMondayD`)", () => {
@@ -159,7 +182,7 @@ describe("tileViews", () => {
     it("leaves money out for a role without it: three tiles (board `HAMemberD`)", () => {
         const { moneyIn: _money, ...member } = BUSY;
         const tiles = views(member);
-        expect(tiles.map((t) => t.key)).toEqual(["bookings", "toPack", "came"]);
+        expect(tiles.map((t) => t.key)).toEqual(["toPack", "bookings", "came"]);
         expect(tiles.some((t) => t.value?.includes("₹"))).toBe(false);
     });
 
@@ -184,10 +207,10 @@ describe("tileViews", () => {
         });
         // Still in the board's order.
         expect(tiles.map((t) => t.key)).toEqual([
-            "bookings",
             "toPack",
-            "moneyIn",
+            "bookings",
             "came",
+            "moneyIn",
         ]);
     });
 
@@ -211,10 +234,10 @@ describe("tileViews", () => {
         expect(
             views(fresh, { fresh: true }).map((t) => [t.value, t.sub]),
         ).toEqual([
-            ["None yet", "Share your booking page to get the first"],
             ["None yet", "Orders show here as they come in"],
-            ["Nothing yet", "Payments show here as they come in"],
+            ["None yet", "Share your booking page to get the first"],
             [null, "Shows once people book"],
+            ["Nothing yet", "Payments show here as they come in"],
         ]);
     });
 

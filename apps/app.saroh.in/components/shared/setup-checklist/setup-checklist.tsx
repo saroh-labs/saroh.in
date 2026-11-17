@@ -61,6 +61,7 @@ export function SetupChecklist({
     foldKey,
     doneView,
     compact = false,
+    lineVariant = "card",
     children,
     className,
 }: {
@@ -101,6 +102,11 @@ export function SetupChecklist({
      * steps" to open the rest (`setup-line.tsx`).
      */
     compact?: boolean;
+    /**
+     * The one line's look: its own card, or a group inside a list of
+     * groups (Home's Needs you, HPHomeDesk). Only with `compact`.
+     */
+    lineVariant?: "card" | "group";
     /** Under the rows: what is listed beside the steps and never counted. */
     children?: ReactNode;
     className?: string;
@@ -136,6 +142,7 @@ export function SetupChecklist({
                 rows={rows}
                 hide={hide}
                 className={className}
+                variant={lineVariant}
             >
                 {children}
             </SetupLine>

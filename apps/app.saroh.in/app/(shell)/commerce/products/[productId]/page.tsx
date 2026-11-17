@@ -245,6 +245,8 @@ export default async function ProductPage({
                       ),
                       url: shopUrl,
                       offerId: offer?.id ?? null,
+                      // Photo and Price tag need its own photo (cardsFor).
+                      hasPhoto: overview.product.images.length > 0,
                   },
               }
             : null;
@@ -275,6 +277,7 @@ export default async function ProductPage({
                 paused={isPaused}
                 view={view}
                 shopUrl={shopUrl}
+                shopLive={shopLive}
                 share={share}
             />
             {isPaused ? (
@@ -332,7 +335,9 @@ export default async function ProductPage({
                                 tracking={tracking}
                                 stock={stock}
                                 onShop={shopUrl !== null}
+                                shopUrl={shopUrl}
                                 shopLive={shopLive}
+                                paused={isPaused}
                                 sellsFood={(allergens?.length ?? 0) > 0}
                                 priceHistory={priceHistory}
                             />

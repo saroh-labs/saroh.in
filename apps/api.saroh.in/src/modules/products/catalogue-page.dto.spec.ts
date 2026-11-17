@@ -36,6 +36,23 @@ describe("the catalogue page's query", () => {
         }
     });
 
+    it("reads a sort the list offers, and no other", async () => {
+        for (const sort of [
+            "newest",
+            "name",
+            "-name",
+            "price",
+            "-price",
+            "stock",
+            "-stock",
+        ]) {
+            expect((await read({ sort })).sort).toBe(sort);
+        }
+        await expect(read({ sort: "colour" })).rejects.toThrow(
+            BadRequestException,
+        );
+    });
+
     it("refuses a page that is not a whole number from 1", async () => {
         for (const page of ["0", "-1", "1.5", "two"]) {
             await expect(read({ page })).rejects.toThrow(BadRequestException);
