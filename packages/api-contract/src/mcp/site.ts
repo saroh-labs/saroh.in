@@ -428,6 +428,9 @@ export const restoreSiteDraftTool = {
  * a DRAFT post only. Nothing here publishes; the person publishes it from
  * the editor after reading it.
  */
+/** A post's title, everywhere it is set (editor, API, AI drafts): a headline, not a paragraph. */
+export const POST_TITLE_MAX = 100;
+
 export const draftBlogPostTool = {
     input: z
         .object({
@@ -440,7 +443,7 @@ export const draftBlogPostTool = {
             site_id: siteId
                 .optional()
                 .describe("Leave out when the business has one website."),
-            title: z.string().trim().min(1).max(120),
+            title: z.string().trim().min(1).max(POST_TITLE_MAX),
             body: z
                 .string()
                 .trim()
