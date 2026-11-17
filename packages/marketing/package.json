@@ -95,7 +95,7 @@
         "@types/react-dom": "catalog:react19",
         "eslint": "catalog:",
         "jsdom": "^25.0.1",
-        "next": "^16.4.2",
+        "next": "catalog:next16",
         "react": "catalog:react19",
         "react-dom": "catalog:react19",
         "typescript": "catalog:",
