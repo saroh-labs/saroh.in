@@ -35,11 +35,11 @@ export function globalDevConfig(config, dir, domain) {
                 DEV_ACCESS_COOKIE_DOMAIN: `.${domain}`,
                 NEXT_PUBLIC_EDITION: "GLOBAL",
                 // What Global gets at its launch (plan 2026-11-13-002, U16),
-                // on here to check before then. Ask AI and Developers wait
-                // for Global's paid plans, so stay off.
+                // on here to check before then. Ask AI, Developers and the
+                // website templates wait for Global's paid plans, so stay
+                // off (DEC-225: the templates' sample sites show a team).
                 NEXT_PUBLIC_AI_APPS: "on",
                 NEXT_PUBLIC_SOCIAL: "on",
-                NEXT_PUBLIC_TEMPLATES: "on",
             },
         };
     }
