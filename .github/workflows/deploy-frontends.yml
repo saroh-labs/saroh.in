@@ -119,7 +119,7 @@ concurrency:
 jobs:
     plan:
         name: What to deploy
-        runs-on: ubuntu-latest
+        runs-on: [self-hosted, saroh]
         permissions:
             contents: read
         outputs:
@@ -186,7 +186,7 @@ jobs:
         name: Deploy ${{ matrix.app || matrix.pkg }} (${{ matrix.env }})
         needs: plan
         if: needs.plan.outputs.matrix != '[]'
-        runs-on: ubuntu-latest
+        runs-on: [self-hosted, saroh]
         permissions:
             contents: read
         environment: cloudflare-${{ matrix.env }}

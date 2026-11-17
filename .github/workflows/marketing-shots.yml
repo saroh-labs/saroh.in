@@ -33,7 +33,7 @@ concurrency:
 jobs:
   shots:
     name: Capture both editions' shots
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     timeout-minutes: 75
 
     services:

@@ -62,7 +62,7 @@ jobs:
   # is gone (a force-push) checks everything.
   changes:
     name: What changed
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     outputs:
       full: ${{ steps.scan.outputs.full }}
       code: ${{ steps.scan.outputs.code }}
@@ -121,7 +121,7 @@ jobs:
 
   static:
     name: Lint, typecheck and repo checks
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.code == 'true'
     # Placeholder build/runtime env. The apps validate env at build time via the
@@ -324,7 +324,7 @@ jobs:
 
   unit:
     name: Unit tests
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.code == 'true'
     env:
@@ -386,7 +386,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.code == 'true'
     env:
@@ -451,7 +451,7 @@ jobs:
   #           (apps/api.saroh.in/test/rls-mode.ts).
   integration:
     name: Integration (${{ matrix.mode }}, shard ${{ matrix.shard }}/4)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.api == 'true'
     strategy:
@@ -525,7 +525,7 @@ jobs:
   # make "Cloudflare runtime (accounts sign-in)" a required check.
   cf-runtime:
     name: Cloudflare runtime (accounts sign-in)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.cfruntime == 'true'
     steps:
@@ -542,7 +542,7 @@ jobs:
   # when every job above passed. A skipped or cancelled job counts as a fail.
   ci:
     name: Lint, typecheck, test & build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: [changes, static, unit, build, integration]
     if: always()
     steps:
@@ -567,7 +567,7 @@ jobs:
   # whole chain in order, then a diff against schema.prisma that must be empty.
   migration-replay:
     name: Migration replay from empty
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.db == 'true'
 
@@ -642,7 +642,7 @@ jobs:
   #     to 6 minutes on the account's concurrent-job limit.
   browser-e2e-shard:
     name: Browser E2E (shard ${{ matrix.shard }}/4)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     strategy:
@@ -996,7 +996,7 @@ jobs:
   # The old check's name, passing only when every shard passed.
   browser-e2e:
     name: Browser E2E (seeded stack)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: [changes, browser-e2e-shard]
     if: always()
     steps:
@@ -1021,7 +1021,7 @@ jobs:
   # redacts, and redaction is exactly what these tests are about.
   permissions-e2e:
     name: Permission states (production build)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
 
@@ -1069,7 +1069,7 @@ jobs:
   # Reviewed false positives live in .gitleaksignore, keyed by fingerprint.
   secret-scan:
     name: Secret scan (gitleaks)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, saroh]
     env:
       GITLEAKS_VERSION: 8.30.1
       GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb

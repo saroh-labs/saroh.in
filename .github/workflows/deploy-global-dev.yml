@@ -14,7 +14,7 @@ permissions:
 jobs:
     deploy:
         name: Deploy ${{ matrix.dir }}
-        runs-on: ubuntu-latest
+        runs-on: [self-hosted, saroh]
         environment: cloudflare-development
         concurrency:
             group: deploy-global-dev-${{ matrix.dir }}
