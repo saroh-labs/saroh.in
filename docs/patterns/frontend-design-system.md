@@ -347,7 +347,7 @@
   `?section=`, which deep links and Search settings use.
 - **Current** — **Overlays come in fixed sizes and one head and foot**
   (UX audit, 10 Oct), baked into `@saroh/ui/dialog`, `sheet` and
-  `alert-dialog` so no caller patches them: `DialogContent size="sm" |
+  `alert-dialog`, so a caller never has to redo them: `DialogContent size="sm" |
 "md" | "lg"` (420, 460, 560px), the title in `font-display` at 18px, a
   30px close target that is 44px on a touch pointer, and a footer that
   stacks on a phone with `gap-2` and the main button on top. Never pass a
@@ -364,11 +364,17 @@
   `apps/*/components` or `apps/*/app` (`pnpm run check:overlays`); state
   that must outlive a close lives in a hook above the overlay
   (`ask-ai/use-ask-ai.ts`), not in a panel kept mounted and hidden.
-  The shared overlay is the base, and a caller styles it for its place
-  (owner, 17 Nov 2026): its own width, background and padding on
-  `SheetContent`, and `closeButton={false}` when the design puts Close in
-  its own header row (Ask AI: 480px on Paper, Close beside the header's
-  buttons). It never rebuilds the focus trap, Esc or the overlay.
+  **The shared overlay is the base; a screen styles it for its place**
+  (owner, 17 Nov 2026). A screen may set, on its own `SheetContent` or
+  `DialogContent` only: the width, height, background and padding its
+  design needs, and `closeButton={false}` when the design puts Close in
+  the screen's own header row (Ask AI: 480px on Paper, Close beside the
+  header's buttons, `ask-ai/ask-ai-host.tsx`). What stays fixed: the
+  component itself in `packages/ui` is never edited for one screen; the
+  focus trap, Esc, the overlay, the motion and the title/description
+  are never rebuilt; the shared title type, footer stacking and the
+  phone bottom-sheet behaviour of dialogs are not overridden. Custom
+  styling on a caller is intended, not a mistake to undo.
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu
