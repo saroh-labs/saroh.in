@@ -364,6 +364,11 @@
   `apps/*/components` or `apps/*/app` (`pnpm run check:overlays`); state
   that must outlive a close lives in a hook above the overlay
   (`ask-ai/use-ask-ai.ts`), not in a panel kept mounted and hidden.
+  The shared overlay is the base, and a caller styles it for its place
+  (owner, 17 Nov 2026): its own width, background and padding on
+  `SheetContent`, and `closeButton={false}` when the design puts Close in
+  its own header row (Ask AI: 480px on Paper, Close beside the header's
+  buttons). It never rebuilds the focus trap, Esc or the overlay.
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu
