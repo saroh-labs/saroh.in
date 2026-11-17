@@ -239,8 +239,6 @@ export const RAW_ALLOWED = {
     "components/shared/fields/media-picker.tsx": ["input"],
     // button: a row or card that is one button, an option in a list
     "components/sites/pages/pages-panel.tsx": ["button"],
-    // input: a field its screen draws itself
-    "components/sites/posts/post-editor.tsx": ["input"],
     // button: a colour swatch in the toolbar; input: a field its screen draws itself
     "components/sites/rich-text/rich-text-editor.tsx": ["button", "input"],
     // input: a slider
