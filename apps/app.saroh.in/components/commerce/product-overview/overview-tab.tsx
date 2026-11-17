@@ -260,12 +260,15 @@ function WebsiteCard({
                     </Badge>
                 ) : null}
             </div>
-            <p
-                data-ph-unmask=""
-                className="text-pretty text-[13px] text-foreground"
-            >
-                {visibilityLine(product.status, shopLive, paused)}
-            </p>
+            {/* Online, the header already says it; the card lists where. */}
+            {onShop ? null : (
+                <p
+                    data-ph-unmask=""
+                    className="text-pretty text-[13px] text-foreground"
+                >
+                    {visibilityLine(product.status, shopLive, paused)}
+                </p>
+            )}
             {web ? (
                 <LinkedLines
                     lines={onShop ? [web.headline, ...web.lines] : web.lines}

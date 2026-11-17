@@ -137,13 +137,11 @@ export function stockException(
 }
 
 /**
- * The Variants card: "28 shades · ₹420 each · 1 out", "6 jars · ₹420 to
+ * Under the Variants card's count: "₹420 each · 1 out", "₹420 to
  * ₹490". The out count only for a product that counts each one.
  */
 export function variantsLine(
     v: {
-        count: number;
-        optionName: string | null | undefined;
         min: string;
         max: string;
         /** Variants out at the page's storefront; null when not counted. */
@@ -155,13 +153,8 @@ export function variantsLine(
         v.min === v.max
             ? `${money(v.min)} each`
             : `${money(v.min)} to ${money(v.max)}`;
-    return [
-        `${v.count} ${optionNoun(v.optionName, v.count)}`,
-        price,
-        v.out ? `${v.out} out` : null,
-    ]
-        .filter(Boolean)
-        .join(" · ");
+    // The card's figure and label already say how many and of what.
+    return [price, v.out ? `${v.out} out` : null].filter(Boolean).join(" · ");
 }
 
 /** "10 at Hill Road, 15 online" — only when there is more than one. */

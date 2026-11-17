@@ -173,9 +173,13 @@ export function NeedGroups({
     // The setup group's things join the checklist while it is a group
     // here, every one of them sent (none folded into "3 more").
     const setupGroup = groups.find((g) => g.kind === "SETUP");
+    // A thing the checklist already has (same place to go) isn't said twice.
+    const known = new Set(setup?.list.steps.map((step) => step.href) ?? []);
     const steps =
         setupPlace === "late" && setupGroup?.more === 0
-            ? setupSteps(setupGroup)
+            ? setupSteps(setupGroup).filter(
+                  (step) => !known.has(step.action?.href ?? ""),
+              )
             : null;
     const merged = steps !== null;
     const shownGroups = merged

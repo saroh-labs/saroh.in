@@ -577,6 +577,25 @@ describe("NeedGroups: Finish setting up, said once (HPHomeDesk)", () => {
         expect(group?.textContent).not.toContain("Step address");
     });
 
+    it("says a thing once when the checklist already has it", () => {
+        const same: HomeNeedGroup = {
+            ...SETUP,
+            rows: [
+                {
+                    ...SETUP.rows[0]!,
+                    title: "Choose where your online shop sells from",
+                    link: { label: "Choose", href: "/settings/trade" },
+                },
+            ],
+        };
+        draw({ groups: [ORDERS, same], total: 8, setup });
+        const group = host.querySelector('[data-setup-checklist="home"]');
+        expect(group?.textContent).toContain("Step trade");
+        expect(group?.textContent).not.toContain(
+            "Choose where your online shop sells from",
+        );
+    });
+
     it("keeps the setup group when some of its things weren't sent", () => {
         draw({ groups: [ORDERS, { ...SETUP, count: 4, more: 3 }], setup });
         expect(groupEl("SETUP")).not.toBeNull();

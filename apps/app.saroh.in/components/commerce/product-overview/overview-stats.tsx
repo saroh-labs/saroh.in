@@ -414,8 +414,6 @@ export function VariantsStat({
                 product.variants.length
                     ? variantsLine(
                           {
-                              count: product.variants.length,
-                              optionName: product.option?.name,
                               min: at(Math.min(...nums)),
                               max: at(Math.max(...nums)),
                               out:
