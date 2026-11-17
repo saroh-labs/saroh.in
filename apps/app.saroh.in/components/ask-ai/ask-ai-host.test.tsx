@@ -163,17 +163,18 @@ it("⌘J opens and shuts it", async () => {
     expect(document.activeElement).toBe(opener);
 });
 
-it("the reply language is one select, labelled, in the panel", async () => {
+it("the header holds the menu and Close; the foot says nothing about the provider", async () => {
     act(() => {
         window.dispatchEvent(new Event(OPEN_ASK_AI));
     });
     await settle();
-    const select = dialog()?.querySelector<HTMLElement>('[role="combobox"]');
-    const label = select?.getAttribute("aria-labelledby");
-    expect(label && document.getElementById(label)?.textContent).toBe(
-        "Reply language",
-    );
-    expect(select?.textContent).toContain("Match my question");
-    // No second menu or sheet holds it.
-    expect(dialog()?.textContent).not.toContain("More, language");
+    const named = (name: string) =>
+        dialog()?.querySelector<HTMLElement>(`button[aria-label="${name}"]`);
+    // The reply language lives in ⋯, for everyone (board 17).
+    expect(named("More, language and settings")).toBeTruthy();
+    expect(dialog()?.querySelector('[role="combobox"]')).toBeNull();
+    expect(dialog()?.textContent).not.toContain("Anthropic");
+    act(() => named("Close Ask AI")?.click());
+    await settle();
+    expect(dialog()).toBeNull();
 });

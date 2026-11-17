@@ -22,10 +22,8 @@ import type { ReactNode, Ref } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import { businessPage } from "@/lib/ask-ai/page-hints";
-import { MARKETING_URL } from "@/lib/help/links";
 import { AboutLabel } from "./about-label";
 import { Composer } from "./composer";
-import { LanguageSelect } from "./language-select";
 import { MoreMenu } from "./more-menu";
 import {
     ConversationList,
@@ -42,7 +40,6 @@ import {
     FOLLOW_UP,
     HISTORY_LINE,
     PAUSED,
-    PRIVACY_LINE,
     UNAVAILABLE,
     atLimit,
     meterOf,
@@ -56,8 +53,6 @@ import {
  * actions come in as `ai` (`use-ask-ai.ts`). The same body in the shell's
  * sheet (`ask-ai-host.tsx`, desk and phone) and on the full page, `/ask`.
  */
-
-const PRIVACY_HREF = `${MARKETING_URL}/privacy`;
 
 export interface AskAiPanelProps {
     ai: AskAi;
@@ -165,7 +160,24 @@ export function AskAiPanel({
             onClick={toPage}
         />
     );
-    const more = state?.canSwitch ? <MoreMenu className={ib} /> : null;
+    const more = state ? (
+        <MoreMenu
+            language={state.language}
+            onLanguage={(l) => void ai.setLanguage(l)}
+            canSwitch={state.canSwitch}
+            className={ib}
+        />
+    ) : null;
+    // The sheet's own close is off: Close sits in the header row (board 17).
+    const closeButton = onClose ? (
+        <IconButton
+            label="Close Ask AI"
+            icon={<X />}
+            size="md"
+            className={ib}
+            onClick={onClose}
+        />
+    ) : null;
     const back = (
         <IconButton
             label="Back to the conversation"
@@ -176,19 +188,19 @@ export function AskAiPanel({
         />
     );
 
-    // The sheet's own close sits at the top right: the header clears it.
     const header =
         view === "history" ? (
             // AF 9: back, the list's name, and the full page.
-            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border pr-10">
+            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border">
                 {back}
                 <h2 className="m-0 ml-1 flex-1 font-display text-base font-semibold">
                     {title}
                 </h2>
                 {expandButton}
+                {closeButton}
             </div>
         ) : (
-            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border pr-10">
+            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border">
                 <Sparkles className="size-[18px] shrink-0" aria-hidden />
                 <h2 className="m-0 ml-2 flex-1 font-display text-base font-semibold">
                     {title}
@@ -201,6 +213,7 @@ export function AskAiPanel({
                         {expandButton}
                     </>
                 ) : null}
+                {closeButton}
             </div>
         );
 
@@ -434,7 +447,6 @@ export function AskAiPanel({
         );
     }
 
-    const first = turns.length === 0;
     const usage = state?.usage ?? null;
     const reset = usage ? resetDay(usage.resetsAt, zone) : null;
     const meterLine =
@@ -459,17 +471,6 @@ export function AskAiPanel({
                 <span className="truncate tabular-nums">{meter.words}</span>
             </>
         ) : null;
-    const privacyLink = (
-        <a
-            data-ph-unmask=""
-            href={PRIVACY_HREF}
-            target="_blank"
-            rel="noreferrer"
-            className="ml-auto inline-flex items-center text-foreground underline decoration-border-strong underline-offset-[3px] coarse:min-h-11"
-        >
-            How your data is used
-        </a>
-    );
     const pageHeader = (
         // Under 760px the list beside the page is hidden: open it here.
         <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border pl-4 pr-2 min-[760px]:hidden">
@@ -553,23 +554,10 @@ export function AskAiPanel({
                                     : businessPage().placeholder
                         }
                     />
-                    {first && (page || view === "thread") && !paused ? (
-                        // Kept from the first panel: where a question goes,
-                        // said before the first one is asked.
-                        <p className="m-0 text-[12.5px] leading-[1.5] text-neutral-700 dark:text-foreground">
-                            {PRIVACY_LINE} {privacyLink}
-                        </p>
-                    ) : (
+                    {meterLine ? (
                         <div className="flex items-center gap-2.5 whitespace-nowrap text-[12.5px] text-neutral-700 dark:text-foreground">
                             {meterLine}
-                            {privacyLink}
                         </div>
-                    )}
-                    {state ? (
-                        <LanguageSelect
-                            language={state.language}
-                            onLanguage={(l) => void ai.setLanguage(l)}
-                        />
                     ) : null}
                 </div>
             ) : null}

@@ -464,15 +464,13 @@ describe("the panel's states", () => {
         expect(text()).toContain("19 questions left · resets 14 Dec");
     });
 
-    it("opens on the whole business with the privacy line", () => {
+    it("opens on the whole business; the provider line is in ⋯'s data link, not the foot", () => {
         render();
         expect(host.querySelector("textarea")?.placeholder).toBe(
             "Ask, or say what to do",
         );
         expect(text()).toContain("Ask about Kesar Salon");
-        expect(text()).toContain(
-            "go to Anthropic, our AI provider, outside India",
-        );
+        expect(text()).not.toContain("Anthropic");
     });
 
     it("off for the business: Turn on for an Owner, conversations listed", async () => {

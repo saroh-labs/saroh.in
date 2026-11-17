@@ -89,6 +89,15 @@ export function AskAiHost({
         <Sheet open={open} onOpenChange={setOpen}>
             <SheetContent
                 side={desk ? "right" : "bottom"}
+                // Close lives in the panel's header row (board 17).
+                closeButton={false}
+                // Ask AI's own size on the shared sheet: 480 wide at the
+                // desk, the whole screen on a phone; the panel pads itself.
+                className={
+                    desk
+                        ? "w-full gap-0 bg-neutral-50 px-4 pb-4 pt-0 dark:bg-background sm:max-w-[480px]"
+                        : "h-dvh max-h-none gap-0 rounded-none border-t-0 bg-neutral-50 px-4 pb-3 pt-[env(safe-area-inset-top)] dark:bg-background"
+                }
                 // The question box, when there is one (locked and off have none).
                 onOpenAutoFocus={(e) => {
                     if (!box.current) return;
@@ -105,13 +114,7 @@ export function AskAiHost({
                 <SheetDescription className="sr-only">
                     Ask about the business in plain words.
                 </SheetDescription>
-                <div
-                    className={
-                        desk
-                            ? "flex h-full min-h-0 flex-col"
-                            : "flex h-[80dvh] min-h-0 flex-col"
-                    }
-                >
+                <div className="flex h-full min-h-0 flex-col">
                     <AskAiPanel
                         ai={ai}
                         businessName={businessName}

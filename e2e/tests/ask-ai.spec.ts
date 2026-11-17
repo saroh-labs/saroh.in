@@ -12,7 +12,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
  *
  * The way in and out: the top bar's button (a spark beside Search on a
  * phone) opens the panel, the shared sheet (from the right on a desk, from
- * the foot on a phone), ⌘J toggles it, Esc and the sheet's Close shut it
+ * the foot on a phone), ⌘J toggles it, Esc and the header's Close shut it
  * and give the keyboard back; on a phone it is as wide as the screen and
  * its controls are 44px.
  *
@@ -50,14 +50,14 @@ test.describe("Ask AI: the way in and out", () => {
     }) => {
         const { entry, panel } = await openPanel(page, isMobile);
         await expect(
-            panel.getByRole("button", { name: "Close", exact: true }),
+            panel.getByRole("button", { name: "Close Ask AI" }),
         ).toBeVisible();
         if (!isMobile) {
             // Pressed, the desk button stays dark while the panel is open.
             await expect(entry).toHaveAttribute("aria-expanded", "true");
         }
 
-        await panel.getByRole("button", { name: "Close", exact: true }).click();
+        await panel.getByRole("button", { name: "Close Ask AI" }).click();
         await expect(panel).toBeHidden();
         await expect(entry).toBeFocused();
 

@@ -29,8 +29,6 @@ export const UNAVAILABLE = "Ask AI isn't available right now.";
 export const DAILY_LIMIT =
     "You've reached today's Ask AI limit. It resets tomorrow.";
 export const REPORTED = "Thanks. Saroh will look at it.";
-export const PRIVACY_LINE =
-    "Your question and the business details needed to answer it go to Anthropic, our AI provider, outside India. Ask AI only sees what you can see.";
 export const HISTORY_LINE =
     "Only you see these. Each is kept for 90 days, then deleted.";
 
