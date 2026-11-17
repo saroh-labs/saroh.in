@@ -44,6 +44,10 @@ export interface ReadContext {
 export type UndoPlan =
     | { tool: string; input: Record<string, unknown> }
     | { orderStage: true }
+    /** Each order's step back, for several moved at once (AF 8). */
+    | { orderStages: true }
+    /** A booking made from Ask AI, cancelled the app's way (AF 4). */
+    | { bookingCancel: true }
     | { cannot: string };
 
 export interface DraftSpec {
@@ -81,6 +85,7 @@ const LABELS: Record<string, string> = {
     service: "Service",
     when: "When",
     customer: "Customer",
+    customer_id: "Who",
     items: "Items",
     total: "Total",
     notes: "Note",
@@ -262,6 +267,26 @@ async function readOrder(
     };
 }
 
+/** Several orders as one card (AF 8): `ids` is their ids, comma-joined. */
+export async function readOrders(
+    r: ReadContext,
+    ids: string,
+): Promise<TargetState | null> {
+    const states = await Promise.all(
+        ids.split(",").map((id) => readOrder(r, id)),
+    );
+    const all = states.filter((o): o is TargetState => !!o);
+    if (all.length !== states.length || all.length === 0) return null;
+    return {
+        name: all.map((o) => o.name.replace(/^Order /, "")).join(", "),
+        updatedAt: all.map((o) => o.updatedAt).join(","),
+        fields: {
+            stage: [...new Set(all.map((o) => o.fields.stage))].join(", "),
+            status: [...new Set(all.map((o) => o.fields.status))].join(", "),
+        },
+    };
+}
+
 async function readCustomer(
     r: ReadContext,
     id: string,
@@ -407,6 +432,10 @@ export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
         madeOf: madeIn("booking", "booking_id"),
         read: readBooking,
         note: TELLS_CUSTOMER,
+        // A booking can be called off the same day, the app's way (AF 4).
+        undo: () => ({ bookingCancel: true }),
+        undoNote:
+            "Cancelled. They're told it's off, as when you cancel in the app.",
     },
     move_booking: {
         kind: "booking",
@@ -431,6 +460,13 @@ export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
         read: readOrder,
         note: "The customer may be told the order's new step.",
         undo: () => ({ orderStage: true }),
+    },
+    update_orders_status: {
+        kind: "order",
+        targetOf: (input) => (input.order_ids as string[]).join(","),
+        read: readOrders,
+        note: "Customers may be told their order's new step.",
+        undo: () => ({ orderStages: true }),
     },
     create_customer: {
         kind: "customer",

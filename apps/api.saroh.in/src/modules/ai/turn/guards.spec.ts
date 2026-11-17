@@ -9,7 +9,7 @@ import {
     NO_TOKENS,
     trimHistory,
 } from "./guards";
-import { isCounted, OUTCOME_COUNTED } from "./outcome";
+import { countsFor, isCounted, OUTCOME_COUNTED } from "./outcome";
 
 describe("outcome table (spec §3.3)", () => {
     const rows: [AiTurnOutcome, boolean][] = [
@@ -30,6 +30,15 @@ describe("outcome table (spec §3.3)", () => {
         expect(Object.keys(OUTCOME_COUNTED).sort()).toEqual(
             rows.map(([o]) => o).sort(),
         );
+    });
+    it("a common question asked as written never counts (owner, 15 Nov)", () => {
+        expect(countsFor("ANSWERED", "What's my busiest day this week?")).toBe(
+            false,
+        );
+        expect(countsFor("ANSWERED", "What's my busiest day this year?")).toBe(
+            true,
+        );
+        expect(countsFor("FAILED", "Anything")).toBe(false);
     });
 });
 

@@ -2974,3 +2974,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - A quality test of real questions with fixed pass marks must pass before the merchant screens are built, and again before any model or instruction change reaches businesses.
 - Consequences: one module, one event stream and one tool registry serve every later agent; switching a provider later touches only the module. Prices, allowances and cost limits live in the plan catalogue and admin settings, not in the code.
 - Supersedes: DEC-015.
+
+## DEC-224 Ask AI knows the page, and its common questions are free
+
+**Status: Accepted — 2026-11-16** · owner (design rounds 15–16 Nov, "Ask AI: final" boards AF 1–12)
+
+- One Ask button in the top bar, on every page. The panel knows the page it was opened on: an "About: …" label (a week of the Calendar, a customer) that can be cleared to ask about the whole business and brought back. The page travels with the question as a pointer for the model, never as an instruction; the tools still check what the person may read.
+- Opening the panel never runs anything. Its suggestions carry hints counted from what the page already read, with no model call; hints tease, never fully answer.
+- The panel's common questions don't use one of the month's questions. The API tells them by their exact words (`ASK_AI_STARTERS`), never by the browser's say-so; daily and business limits still apply, and at the month's limit they are refused like any question.
+- Starters that change something ("Move a booking…", "Mark today's orders ready…") fill the box; nothing is asked until the person sends it.
+- Every answer ends in an action: a draft to confirm, Book here on free times, or next steps that fill the box. Next steps are chosen from what the answer read and are only drafts the person's Ask AI can make.
+- History lives in the panel (the clock), desk and phone, and on `/ask`; each conversation shows where it started and what was done from it ("booked 1", "3 marked ready").
+- Amends DEC-220's "no cancels": a booking Ask AI made can be undone the same business day, and that Undo cancels it through the app's own cancel, with its refund and notice rules. Ask AI still never drafts a cancel, delete or refund of its own.

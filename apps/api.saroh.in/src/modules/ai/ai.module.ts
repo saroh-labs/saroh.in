@@ -3,6 +3,7 @@ import { Module } from "@nestjs/common";
 
 import { declaredNodeEnv, env } from "../../env";
 import { BillingModule } from "../billing/billing.module";
+import { BookingsModule } from "../bookings/bookings.module";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
@@ -54,6 +55,7 @@ const CHAIN_CHECK_MS = 6 * 60 * 60 * 1000;
         FeatureFlagModule,
         McpModule,
         OrdersModule,
+        BookingsModule,
         BillingModule,
     ],
     controllers: [

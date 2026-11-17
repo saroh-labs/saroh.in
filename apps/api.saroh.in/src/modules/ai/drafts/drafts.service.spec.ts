@@ -218,6 +218,8 @@ describe("a draft lasts until the end of the business's day", () => {
     });
 });
 
+const EMPTY = { name: "", updatedAt: null, fields: {} };
+
 describe("each write tool's draft", () => {
     it("covers exactly Ask AI's draft tools", () => {
         expect(Object.keys(DRAFT_SPECS).sort()).toEqual(
@@ -225,14 +227,30 @@ describe("each write tool's draft", () => {
         );
     });
 
-    it("creates have no Undo; edits name their record", () => {
+    it("creates have no Undo but a booking's; edits name their record", () => {
         for (const [name, spec] of Object.entries(DRAFT_SPECS)) {
             const create =
                 name.startsWith("create_") || name === "draft_blog_post";
             expect(!spec.targetOf).toBe(create);
             expect(!!spec.madeOf).toBe(create);
-            if (create) expect(spec.undo).toBeUndefined();
+            // A booking made from Ask AI is called off the app's way (AF 4).
+            if (create && name !== "create_booking") {
+                expect(spec.undo).toBeUndefined();
+            }
         }
+        expect(DRAFT_SPECS.create_booking.undo?.("b1", EMPTY, EMPTY)).toEqual({
+            bookingCancel: true,
+        });
+    });
+
+    it("several orders are one draft: their ids are its record, and each step comes back on Undo", () => {
+        const spec = DRAFT_SPECS.update_orders_status;
+        expect(
+            spec.targetOf?.({ order_ids: ["o1", "o2"], stage: "ready" }),
+        ).toBe("o1,o2");
+        expect(spec.undo?.("o1,o2", EMPTY, EMPTY)).toEqual({
+            orderStages: true,
+        });
     });
 
     it("a blog post shows a plain-text preview, cut at 400 characters", () => {

@@ -1,7 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { HttpException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+    ForbiddenException,
+    HttpException,
+    Injectable,
+    NotFoundException,
+} from "@nestjs/common";
 import type {
+    AskAiBookBody,
     AskAiConfirmBody,
     AskAiDraftCard,
     AskAiDraftContent,
@@ -19,6 +25,7 @@ import {
     MODULE_LOCKED,
     PLAN_LIMIT_REACHED,
 } from "../../billing/plan-limit-errors";
+import { BookingsService } from "../../bookings/bookings.service";
 import { businessTimezone } from "../../bookings/staff-availability";
 import { McpActivityService } from "../../mcp/activity.service";
 import type { McpCall, McpTool } from "../../mcp/tool-registry";
@@ -31,6 +38,7 @@ import {
 } from "../../mcp/tool-registry";
 import { markdownToHtml } from "../../mcp/tools/blog.tools";
 import { siteIdOf } from "../../mcp/tools/site.tools";
+import { when } from "../../mcp/tools/v1-bridge";
 import { OrderKitchenService } from "../../orders/order-kitchen.service";
 import { assertWorkspaceWrite } from "../../organizations/organization-lifecycle.gate";
 import { sanitizeRichHtml } from "../../sites/sanitize";
@@ -60,6 +68,8 @@ interface DraftBody {
     applied?: TargetState | null;
     /** After Confirm of an order step: the step Undo names. */
     eventId?: string;
+    /** After Confirm of several orders' steps: each order's step, by order. */
+    eventIds?: Record<string, string>;
 }
 
 const asBusiness = <T>(organizationId: string, fn: () => Promise<T>) =>
@@ -113,7 +123,78 @@ export class DraftsService {
         private readonly access: AskAiAccess,
         private readonly kitchen: OrderKitchenService,
         private readonly activity: McpActivityService,
+        private readonly bookings: BookingsService,
     ) {}
+
+    /**
+     * Book here (AF 4): a booking drafted from a free-times card, without
+     * the model and without using a question. The service and time come
+     * from the card; who it is for is asked on the draft card itself. Every
+     * check a turn's draft makes is made here too, and nothing is saved.
+     */
+    async book(
+        ctx: OrganizationContext,
+        body: AskAiBookBody,
+    ): Promise<AskAiDraftCard> {
+        const org = ctx.organizationId;
+        const mine = await asBusiness(org, () =>
+            prisma.aiConversation.findFirst({
+                where: {
+                    id: body.conversationId,
+                    organizationId: org,
+                    userId: ctx.userId,
+                },
+                select: { id: true },
+            }),
+        );
+        if (!mine) throw new NotFoundException("That conversation isn't here");
+        const tool = this.registry.get("create_booking");
+        const spec = DRAFT_SPECS.create_booking as DraftSpec | undefined;
+        if (!tool || !spec) throw new NotFoundException("Booking isn't here");
+        const gate = await this.gate(ctx, tool);
+        if (typeof gate === "string") throw new ForbiddenException(gate);
+        const service = await asBusiness(org, () =>
+            prisma.service.findFirst({
+                where: {
+                    id: body.serviceId,
+                    organizationId: org,
+                    deletedAt: null,
+                },
+                select: { name: true, timezone: true },
+            }),
+        );
+        if (!service) throw new NotFoundException("That service isn't here");
+        const run = await this.keep({
+            id: randomUUID(),
+            asker: gate,
+            tool,
+            spec,
+            turn: { conversationId: mine.id, turnId: `book:${randomUUID()}` },
+            input: {
+                service_id: body.serviceId,
+                starts_at: body.startsAt,
+                request_id: DRAFTING,
+            },
+            previous: null,
+            after: { name: service.name, updatedAt: null, fields: {} },
+            fields: [
+                {
+                    field: "service",
+                    label: labelOf("service"),
+                    old: null,
+                    new: service.name,
+                },
+                {
+                    field: "when",
+                    label: labelOf("when"),
+                    old: null,
+                    new: when(new Date(body.startsAt), service.timezone),
+                },
+            ],
+            missing: ["customer_id"],
+        });
+        return run.card?.data as AskAiDraftCard;
+    }
 
     /**
      * A write tool's call in a turn: a draft card for the person, or a
@@ -317,6 +398,10 @@ export class DraftsService {
             row.tool === "update_order_status" && madeId
                 ? await this.lastStep(org, madeId)
                 : undefined;
+        const eventIds =
+            row.tool === "update_orders_status" && madeId
+                ? await this.lastSteps(org, madeId.split(","))
+                : undefined;
         const card: AskAiDraftCard = {
             ...kept.card,
             status: "confirmed",
@@ -337,6 +422,7 @@ export class DraftsService {
                         card,
                         applied,
                         ...(eventId ? { eventId } : {}),
+                        ...(eventIds ? { eventIds } : {}),
                     }),
                 },
             }),
@@ -345,11 +431,15 @@ export class DraftsService {
             outcome: create ? "added" : "done",
             card,
             words: create
-                ? [`Added ${card.targetName}.`, spec.addedNote]
+                ? [
+                      `${row.tool === "create_booking" ? "Booked" : "Added"} ${card.targetName}.`,
+                      spec.addedNote,
+                  ]
                       .filter(Boolean)
                       .join(" ")
                 : "Done.",
-            canUndo: !create && !!spec.undo,
+            // A create has no Undo, but a booking, which can be called off (AF 4).
+            canUndo: !!spec.undo,
             open: create && madeId ? { kind: spec.kind, id: madeId } : null,
         };
     }
@@ -365,7 +455,8 @@ export class DraftsService {
             row.status !== "CONFIRMED" ||
             !spec.undo ||
             !row.targetId ||
-            !kept.previous ||
+            // A create has nothing before it; an edit puts its before back.
+            (spec.targetOf && !kept.previous) ||
             !kept.applied
         ) {
             return refusedResult(
@@ -400,7 +491,11 @@ export class DraftsService {
                 "changed",
             );
         }
-        const plan = spec.undo(targetId, kept.previous, kept.applied);
+        const plan = spec.undo(
+            targetId,
+            kept.previous ?? kept.applied,
+            kept.applied,
+        );
         if ("cannot" in plan) {
             return refusedResult(
                 kept.card,
@@ -436,6 +531,44 @@ export class DraftsService {
                 words = back.told
                     ? "Put back. They've already been told."
                     : "Put back.";
+            } else if ("orderStages" in plan) {
+                const eventIds = kept.eventIds ?? {};
+                const ids = targetId.split(",");
+                if (ids.some((id) => !eventIds[id])) {
+                    throw new ToolError("No step to undo.");
+                }
+                const told = await runInOrgContext(org, async () => {
+                    await assertWorkspaceWrite(org, "wind-down");
+                    let anyTold = false;
+                    for (const id of ids) {
+                        const back = await this.kitchen.undoStage(
+                            asker.ctx,
+                            id,
+                            eventIds[id],
+                        );
+                        anyTold = anyTold || back.told;
+                    }
+                    await this.activity.record(asker, {
+                        tool: "update_orders_status",
+                        target: `order:${targetId}`,
+                        summary: `Undid ${ids.length} orders' steps.`,
+                    });
+                    return anyTold;
+                });
+                words = told
+                    ? "Put back. Some customers were already told."
+                    : "Put back.";
+            } else if ("bookingCancel" in plan) {
+                // The app's own cancel: its refund and notice rules apply.
+                await runInOrgContext(org, async () => {
+                    await assertWorkspaceWrite(org, "wind-down");
+                    await this.bookings.cancelBooking(asker.ctx, targetId);
+                    await this.activity.record(asker, {
+                        tool: "create_booking",
+                        target: `booking:${targetId}`,
+                        summary: `Undid a booking made from Ask AI: cancelled booking ${targetId}.`,
+                    });
+                });
             } else {
                 const inverse = this.registry.get(plan.tool) ?? tool;
                 const result = await this.registry.callInProcess(
@@ -821,6 +954,19 @@ export class DraftsService {
             words,
             reason,
         );
+    }
+
+    /** Each order's last kitchen step, for an Undo of several (AF 8). */
+    private async lastSteps(
+        org: string,
+        orderIds: string[],
+    ): Promise<Record<string, string> | undefined> {
+        const steps: Record<string, string> = {};
+        for (const id of orderIds) {
+            const step = await this.lastStep(org, id);
+            if (step) steps[id] = step;
+        }
+        return Object.keys(steps).length ? steps : undefined;
     }
 
     /** The order's last kitchen step: what an Undo of a confirmed step names. */

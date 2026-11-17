@@ -9931,6 +9931,12 @@ model AiConversation {
   titleIv         String?
   titleAuthTag    String?
 
+  // The page it was started on ({ kind, label }, AF 9), sealed: a label can
+  // be a customer's name. None: about the whole business.
+  aboutCiphertext String?
+  aboutIv         String?
+  aboutAuthTag    String?
+
   lastMessageAt DateTime @default(now())
   createdAt     DateTime @default(now())
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import { CoursesPanel } from "@/components/contacts/courses-panel";
 import { EnquiriesPanel } from "@/components/contacts/enquiries-panel";
 import { LeadsPanel } from "@/components/contacts/leads-panel";
@@ -13,6 +14,7 @@ import type { PackSale } from "@/components/customers/detail/packs-tab";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
+import { customerPage } from "@/lib/ask-ai/page-hints";
 import { canSellPacks, canWritePacks } from "@/lib/class-packs/access";
 import { loadContactHoldings } from "@/lib/contacts/holdings";
 import { contactPanels, moduleOn, sellPacksOnly } from "@/lib/contacts/panels";
@@ -317,6 +319,15 @@ export default async function PersonPage({
 
     return (
         <PageContainer width="full" className="space-y-0 p-0 sm:p-0">
+            {/* What Ask AI offers on this person, from this read (AF 5). */}
+            <AskAiPageIs
+                page={customerPage(detail.contact, {
+                    zone: detail.timezone,
+                    total: detail.stats.orders,
+                    orders: detail.orders?.rows,
+                    visits: detail.bookings?.past.map((b) => b.startAt),
+                })}
+            />
             <CustomerDetailScreen
                 d={detail}
                 initialTab={tabFromQuery(query.tab, tabs)}

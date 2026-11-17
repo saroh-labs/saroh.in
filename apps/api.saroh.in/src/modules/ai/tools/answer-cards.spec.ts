@@ -1001,3 +1001,64 @@ describe("every link a card can carry", () => {
         expect(appLink("order", {}, "a/b")).toBe("/commerce/orders/a%2Fb");
     });
 });
+
+describe("free times card (AF 3)", () => {
+    const at = (iso: string) => ({ starts_at: iso, when: iso });
+    it("one row a day, first to last start, Book here on the first", () => {
+        const card = answerCard(
+            "find_free_slots",
+            {
+                service_id: "s1",
+                service_name: "Cake tasting",
+                timezone: "Asia/Kolkata",
+                slots: [
+                    at("2026-11-17T06:30:00.000Z"),
+                    at("2026-11-17T07:15:00.000Z"),
+                    at("2026-11-17T10:45:00.000Z"),
+                    at("2026-11-18T09:30:00.000Z"),
+                ],
+                more: false,
+            },
+            new Map(),
+            undefined,
+        );
+        expect(askAiInfoCard.safeParse(card).success).toBe(true);
+        expect(card).toEqual({
+            kind: "slots",
+            data: {
+                title: "Cake tasting is free",
+                serviceId: "s1",
+                serviceName: "Cake tasting",
+                days: [
+                    {
+                        label: "Tue 17 Nov",
+                        range: "12:00 to 4:15 pm",
+                        startsAt: "2026-11-17T12:00:00.000+05:30",
+                    },
+                    {
+                        label: "Wed 18 Nov",
+                        range: "3:00 pm",
+                        startsAt: "2026-11-18T15:00:00.000+05:30",
+                    },
+                ],
+            },
+        });
+    });
+
+    it("none when nothing is free", () => {
+        expect(
+            answerCard(
+                "find_free_slots",
+                {
+                    service_id: "s1",
+                    service_name: "x",
+                    timezone: "Asia/Kolkata",
+                    slots: [],
+                    more: false,
+                },
+                new Map(),
+                undefined,
+            ),
+        ).toBeNull();
+    });
+});

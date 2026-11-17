@@ -11,7 +11,7 @@ import {
 } from "react";
 
 import { AskAiPanel } from "./ask-ai-panel";
-import { OPEN_ASK_AI, onAskPage, sayAskAiShown } from "./open";
+import { OPEN_ASK_AI, keepTabInside, onAskPage, sayAskAiShown } from "./open";
 
 /**
  * Where Ask AI's panel lives (plan 2026-11-13-001 U10): one host in the
@@ -130,15 +130,23 @@ export function AskAiHost({
         );
     }
     return (
+        // A dialog over the page (AF boards): focus goes in on open, Tab
+        // stays inside it, Esc closes it and focus goes back to the opener.
         <aside
             ref={aside}
             tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
             aria-label="Ask AI"
             hidden={!open}
             onKeyDown={(e) => {
                 if (e.key === "Escape" && !e.defaultPrevented) {
                     e.stopPropagation();
                     show(false);
+                    return;
+                }
+                if (e.key === "Tab" && aside.current) {
+                    keepTabInside(e, aside.current);
                 }
             }}
             className={`fixed bottom-0 right-0 top-[61px] z-40 ${open ? "flex" : "hidden"} w-[440px] max-w-full flex-col border-l border-border bg-neutral-50 shadow-[-12px_0_32px_rgba(0,0,0,0.10)] outline-none dark:bg-background print:hidden`}

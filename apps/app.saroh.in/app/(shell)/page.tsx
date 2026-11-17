@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import type { HomeSetup } from "@/components/home/dashboard/home-dashboard";
 import { HomeDashboard } from "@/components/home/dashboard/home-dashboard";
 import { ReviewerHome } from "@/components/home/dashboard/reviewer-home";
@@ -14,6 +15,7 @@ import {
 import { Moment } from "@/components/shared/notices/moment";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { ACTIVE_ORG_COOKIE } from "@/lib/api/http";
+import { businessPage } from "@/lib/ask-ai/page-hints";
 import type { InvoiceJobFacts } from "@/lib/home/first-run";
 import { mayWriteInvoices } from "@/lib/home/first-run";
 import { getHome } from "@/lib/home/service";
@@ -184,6 +186,14 @@ export default async function Home() {
                 newMenu={newMenu}
                 // The phone Home says it in the day sheet (U17).
                 sinceOnPhone={!home.hasAnyModule}
+            />
+            {/* What Ask AI offers here, from Home's own figures (AF 1). */}
+            <AskAiPageIs
+                page={businessPage({
+                    today: home.lastDay?.date,
+                    dueToday: home.tiles?.toPack?.dueToday,
+                    bookings: !!home.tiles?.bookingsToday,
+                })}
             />
             {moment ? <Moment moment={moment} className="mt-5" /> : null}
             <div className="mt-5">

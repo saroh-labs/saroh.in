@@ -5,6 +5,8 @@ import {
     askAiEvent,
     askAiInfoCard,
     askAiMessage,
+    askAiTurnBody,
+    isAskAiStarter,
 } from "./ask-ai";
 
 const table = {
@@ -68,5 +70,28 @@ describe("Ask AI's answer cards", () => {
                 },
             }).success,
         ).toBe(false);
+    });
+});
+
+describe("Ask AI's page and common questions", () => {
+    it("takes a question about a page, and refuses an unknown kind", () => {
+        const about = { kind: "customer", id: "c1", label: "Kavya Menon" };
+        expect(askAiTurnBody.parse({ question: "Hi", about }).about).toEqual(
+            about,
+        );
+        expect(
+            askAiTurnBody.safeParse({
+                question: "Hi",
+                about: { kind: "admin", label: "x" },
+            }).success,
+        ).toBe(false);
+    });
+
+    it("tells a common question by its words alone", () => {
+        expect(isAskAiStarter("What's my busiest day this week?")).toBe(true);
+        expect(isAskAiStarter("  What's my busiest day this week? ")).toBe(
+            true,
+        );
+        expect(isAskAiStarter("What's my busiest day this year?")).toBe(false);
     });
 });

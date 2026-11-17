@@ -92,7 +92,7 @@ export function SafeText({
                                 "m-0",
                                 i === 0 &&
                                     lead &&
-                                    "text-[17px] font-semibold leading-[1.35] tracking-[-0.01em]",
+                                    "font-display text-[17px] font-semibold leading-[1.35] tracking-[-0.01em]",
                             )}
                         >
                             {block.lines.map((line, j) => (

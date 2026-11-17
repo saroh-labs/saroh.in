@@ -19,6 +19,11 @@ const actions = vi.hoisted(() => ({
     handOffDraft: vi.fn(),
 }));
 vi.mock("@/lib/ask-ai/panel-actions", () => actions);
+const people = vi.hoisted(() => ({
+    findCustomers: vi.fn(),
+    readCustomerAttention: vi.fn(),
+}));
+vi.mock("@/lib/customers/actions", () => people);
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("next/link", () => ({
@@ -373,4 +378,82 @@ it("draws values as text, never markup", () => {
     });
     expect(host.querySelector("img")).toBeNull();
     expect(text()).toContain('<img src="https://evil.example/x">');
+});
+
+describe("a booking from a free time (AF 4)", () => {
+    const BOOK: AskAiDraftCard = {
+        ...EDIT,
+        draftId: "d9",
+        tool: "create_booking",
+        kind: "booking",
+        action: "create",
+        targetId: null,
+        targetName: "Cake tasting",
+        fields: [
+            {
+                field: "service",
+                label: "Service",
+                old: null,
+                new: "Cake tasting",
+            },
+            {
+                field: "when",
+                label: "When",
+                old: null,
+                new: "Tue 17 Nov, 12:00 pm",
+            },
+        ],
+        missing: [{ field: "customer_id", label: "Who" }],
+        note: "The customer is told when you confirm.",
+    };
+
+    it("asks who with the customer picker; Book it waits for a pick", async () => {
+        people.findCustomers.mockResolvedValue({ ok: true, results: [] });
+        render(BOOK);
+        await settle();
+        expect(text()).toContain("Pick who it's for.");
+        expect(button("Book it")?.disabled).toBe(true);
+        expect(host.querySelector("input")).not.toBeNull();
+    });
+
+    it("Booked with Undo; Undo calls it off", async () => {
+        actions.confirmDraft.mockResolvedValue(
+            result(
+                { ...BOOK, status: "confirmed", targetId: "b1", missing: [] },
+                {
+                    outcome: "added",
+                    words: "Booked Cake tasting, Kavya Iyer.",
+                    canUndo: true,
+                    open: { kind: "booking", id: "b1" },
+                },
+            ),
+        );
+        render({ ...BOOK, missing: [] });
+        act(() => button("Book it")?.click());
+        await settle();
+        expect(actions.confirmDraft).toHaveBeenCalledWith("d9", undefined);
+        expect(text()).toContain("Booked · Cake tasting");
+        expect(button("Undo")).toBeDefined();
+    });
+});
+
+describe("several orders at once (AF 8)", () => {
+    const MANY: AskAiDraftCard = {
+        ...EDIT,
+        draftId: "d8",
+        tool: "update_orders_status",
+        kind: "order",
+        targetId: "o1,o2,o3",
+        targetName: "ORD-118, ORD-121, ORD-124",
+        fields: [
+            { field: "stage", label: "Step", old: "preparing", new: "ready" },
+        ],
+    };
+
+    it("names the orders and says Mark 3 ready", () => {
+        render(MANY);
+        expect(text()).toContain("Change 3 orders");
+        expect(text()).toContain("OrdersORD-118, ORD-121, ORD-124");
+        expect(button("Mark 3 ready")).toBeDefined();
+    });
 });

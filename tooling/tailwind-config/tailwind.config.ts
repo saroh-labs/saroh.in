@@ -235,6 +235,12 @@ const config = {
                     subtle: "hsl(var(--info-subtle))",
                     "subtle-foreground": "hsl(var(--info-subtle-foreground))",
                 },
+                // Ask AI's page label, hints and history tags (AF boards).
+                ask: {
+                    DEFAULT: "hsl(var(--ask))",
+                    subtle: "hsl(var(--ask-subtle))",
+                    "subtle-foreground": "hsl(var(--ask-subtle-foreground))",
+                },
                 // The ring and dot each workspace role wears (Team screen).
                 role: {
                     owner: "hsl(var(--role-owner))",

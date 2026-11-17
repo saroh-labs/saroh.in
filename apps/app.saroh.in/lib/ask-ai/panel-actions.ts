@@ -1,17 +1,23 @@
 "use server";
 
 import type {
+    AskAiBookBody,
     AskAiConversation,
     AskAiConversationList,
     AskAiLanguage,
     AskAiState,
 } from "@saroh/api-contract";
-import { askAiConfirmBody, askAiLanguage } from "@saroh/api-contract";
+import {
+    askAiBookBody,
+    askAiConfirmBody,
+    askAiLanguage,
+} from "@saroh/api-contract";
 
 import type { CrmResult } from "@/lib/api/http";
 import type { AskAiReportBody } from "./panel-service";
 import {
     askAiReportBody,
+    bookAskAiDraft,
     confirmAskAiDraft,
     handOffAskAiDraft,
     redraftAskAiDraft,
@@ -80,6 +86,13 @@ export async function sendAskAiReport(
     const parsed = askAiReportBody.safeParse(body);
     if (!parsed.success) return INVALID;
     return reportAskAiAnswer(parsed.data);
+}
+
+/** Book here (AF 4): checked here before it reaches the API. */
+export async function bookFromAnswer(body: AskAiBookBody) {
+    const parsed = askAiBookBody.safeParse(body);
+    if (!parsed.success) return INVALID;
+    return bookAskAiDraft(parsed.data);
 }
 
 export async function confirmDraft(

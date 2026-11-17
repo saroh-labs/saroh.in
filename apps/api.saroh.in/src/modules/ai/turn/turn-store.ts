@@ -34,6 +34,8 @@ export interface TurnFinish {
     card?: { kind: string; data: Record<string, unknown> };
     /** Reads' cards shown under the answer, kept with it. */
     cards?: { kind: string; data: Record<string, unknown> }[];
+    /** The next steps under the answer, kept with it. */
+    next?: { label: string; text: string }[];
     outcome: AiTurnOutcome;
     counted: boolean;
     stopped: boolean;
@@ -79,8 +81,21 @@ export class TurnStore {
         ctx: OrganizationContext,
         data: Omit<TurnConversation, "id" | "organizationId">,
         firstQuestion?: string,
+        /** The page it was started on (AF 9), sealed: a label can be a name. */
+        about?: { kind: string; label: string },
     ): Promise<TurnConversation> {
         const id = randomUUID();
+        const where = {
+            organizationId: ctx.organizationId,
+            conversationId: id,
+            rowId: id,
+        };
+        const sealedAbout = about
+            ? sealAiText(
+                  JSON.stringify({ kind: about.kind, label: about.label }),
+                  { ...where, field: "about" },
+              )
+            : null;
         const title = firstQuestion ? conversationTitle(firstQuestion) : "";
         const sealed = title
             ? sealAiText(title, {
@@ -102,6 +117,13 @@ export class TurnStore {
                               titleCiphertext: sealed.ciphertext,
                               titleIv: sealed.iv,
                               titleAuthTag: sealed.authTag,
+                          }
+                        : {}),
+                    ...(sealedAbout
+                        ? {
+                              aboutCiphertext: sealedAbout.ciphertext,
+                              aboutIv: sealedAbout.iv,
+                              aboutAuthTag: sealedAbout.authTag,
                           }
                         : {}),
                 },
@@ -301,6 +323,7 @@ export class TurnStore {
                     text: f.text,
                     ...(f.card ? { card: f.card } : {}),
                     ...(f.cards?.length ? { cards: f.cards } : {}),
+                    ...(f.next?.length ? { next: f.next } : {}),
                 },
                 {
                     organizationId: ctx.organizationId,

@@ -9,12 +9,14 @@ import {
     UseGuards,
 } from "@nestjs/common";
 import type {
+    AskAiBookBody,
     AskAiConfirmBody,
+    AskAiDraftCard,
     AskAiDraftContent,
     AskAiDraftResult,
     AskAiHandOff,
 } from "@saroh/api-contract";
-import { askAiConfirmBody } from "@saroh/api-contract";
+import { askAiBookBody, askAiConfirmBody } from "@saroh/api-contract";
 
 import { LifecycleWrite } from "../../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../../common/decorators/org-context.decorator";
@@ -41,6 +43,21 @@ import { DraftsService } from "./drafts.service";
 @UseGuards(BetterAuthGuard, OrganizationGuard)
 export class AskAiDraftsController {
     constructor(private readonly drafts: DraftsService) {}
+
+    /**
+     * Book here (AF 4): a booking drafted from a free-times card, to confirm
+     * on its card once who it is for is picked. Saves nothing.
+     */
+    @Post("book")
+    @HttpCode(200)
+    book(
+        @Headers(ACCESS_SESSION_HEADER) session: string | undefined,
+        @OrgContext() ctx: OrganizationContext,
+        @Body(new ZodContractPipe(askAiBookBody)) body: AskAiBookBody,
+    ): Promise<AskAiDraftCard> {
+        refuseStaff(session);
+        return this.drafts.book(ctx, body);
+    }
 
     /** Saves the draft; the body holds only the fields the card asked for. */
     @Post(":draftId/confirm")

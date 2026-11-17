@@ -281,6 +281,10 @@ async function ask(app: TestingModule, args: AskArgs): Promise<number> {
                 process.stdout.write(
                     `\n${TAG} not asked: ${JSON.stringify(event.refusal)}\n`,
                 );
+            } else if (event.type === "next") {
+                process.stdout.write(
+                    `\n${TAG} next: ${event.items.map((i) => i.label).join(" | ")}\n`,
+                );
             } else {
                 process.stdout.write(
                     `\n\n${TAG} outcome ${event.outcome}, counted ${event.counted}, rounds ${event.usage.rounds}\n`,

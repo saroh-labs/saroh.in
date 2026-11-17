@@ -1,6 +1,7 @@
 "use client";
 
 import type {
+    AskAiAbout,
     AskAiConversation,
     AskAiConversationSummary,
     AskAiEvent,
@@ -24,6 +25,7 @@ import {
     DropdownMenuTrigger,
 } from "@saroh/ui/dropdown-menu";
 import { IconButton } from "@saroh/ui/icon-button";
+import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
@@ -36,16 +38,20 @@ import {
 } from "@saroh/ui/sheet";
 import { Textarea } from "@saroh/ui/textarea";
 import {
-    ArrowLeft,
     ArrowUp,
+    ChevronLeft,
+    ChevronRight,
     Ellipsis,
     History,
+    Info,
     Maximize2,
+    Pencil,
     Power,
+    Search,
     Settings,
     Sparkles,
     Square,
-    SquarePen,
+    Undo2,
     X,
 } from "lucide-react";
 import Link from "next/link";
@@ -55,7 +61,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { runAction } from "@/lib/api/run-action";
+import type { AskAiPage, AskAiSuggestion } from "@/lib/ask-ai/page-hints";
+import { businessPage } from "@/lib/ask-ai/page-hints";
 import {
+    bookFromAnswer,
     changeAskAiLanguage,
     readAskAiConversation,
     readAskAiConversations,
@@ -63,6 +72,7 @@ import {
     turnOnAskAi,
 } from "@/lib/ask-ai/panel-actions";
 import { MARKETING_URL } from "@/lib/help/links";
+import { useAskAiPage } from "./ask-ai-page";
 import {
     ConversationList,
     OffCard,
@@ -71,15 +81,16 @@ import {
 } from "./panel-states";
 import { readAskAiEvents } from "./stream";
 import type { Turn, TurnContext } from "./thread";
-import { One, TurnView } from "./thread";
+import { One, RefusalMessage, TurnView } from "./thread";
 import {
     FOLLOW_UP,
+    HISTORY_LINE,
     PAUSED,
-    PLACEHOLDER,
     PRIVACY_LINE,
     UNAVAILABLE,
     atLimit,
     meterOf,
+    resetDay,
 } from "./words";
 
 /**
@@ -89,18 +100,6 @@ import {
  * (a panel at the right) and a phone (a full-screen sheet); the host
  * decides which.
  */
-
-/** Ready-made questions (board 2). */
-// shortcut: sent as ordinary questions, so they count; answered without AI
-// (and labelled "these don't count") once the API has that path.
-const CHIPS = [
-    "Bookings this week",
-    "Who hasn't paid",
-    "Top products this month",
-    "Add a product",
-    "Today's bookings",
-    "New enquiries",
-];
 
 const SETTINGS_HREF = "/settings/developers/ask-ai";
 const PRIVACY_HREF = `${MARKETING_URL}/privacy`;
@@ -151,11 +150,26 @@ export function turnsOf(conversation: AskAiConversation): Turn[] {
             text: m.text,
             cards: card.success ? [card.data] : [],
             infoCards: infoCardsOf(m.cards),
+            next: m.next,
             outcome: m.outcome ?? "ANSWERED",
             messageId: m.id,
         });
     }
     return turns;
+}
+
+/**
+ * The saved turn for a question just asked, once the API has written its
+ * answer: the last time it was asked in the conversation. Null while the
+ * answer isn't saved yet.
+ */
+export function savedTurn(
+    conversation: AskAiConversation,
+    question: string,
+): Turn | null {
+    const turns = turnsOf(conversation);
+    const turn = turns.findLast((t) => t.question === question) ?? turns.at(-1);
+    return turn?.messageId ? turn : null;
 }
 
 /** The full page, `/ask` (board AI 9): the list beside the conversation. */
@@ -200,13 +214,30 @@ export function AskAiPanel({
     const [conversationId, setConversationId] = useState<string | null>(
         conversation?.id ?? null,
     );
-    const [view, setView] = useState<"thread" | "history">("thread");
+    // The full page opens on its list on a phone, unless a conversation is named.
+    const [view, setView] = useState<"thread" | "history">(
+        page && !conversation ? "history" : "thread",
+    );
     const [history, setHistory] = useState<
         AskAiConversationSummary[] | null | "failed"
     >(page ? (conversations ?? "failed") : null);
     const [draft, setDraft] = useState("");
     const [busy, setBusy] = useState(false);
     const [langOpen, setLangOpen] = useState(false);
+    // The page it was opened on (AF 1, 2, 5), and whether its label was
+    // cleared to ask about the whole business (AF 7). A new page brings
+    // its own label back.
+    const here: AskAiPage = useAskAiPage() ?? businessPage();
+    const hereKey = here.about?.label ?? null;
+    const [cleared, setCleared] = useState(false);
+    const [seenKey, setSeenKey] = useState(hereKey);
+    if (seenKey !== hereKey) {
+        setSeenKey(hereKey);
+        setCleared(false);
+    }
+    // The full page is about no page: its conversations say where they began.
+    const about: AskAiAbout | null = page || cleared ? null : here.about;
+    const [query, setQuery] = useState("");
     const stopWanted = useRef(false);
     const live = useRef<{ key: string; turnId?: string } | null>(null);
     const end = useRef<HTMLDivElement>(null);
@@ -289,7 +320,20 @@ export function AskAiPanel({
                 if (stopWanted.current) sendStop(event.turnId);
                 return;
             case "status":
-                patch(key, { status: event.words });
+                setTurns((all) =>
+                    all.map((t) =>
+                        t.key === key
+                            ? {
+                                  ...t,
+                                  status: event.words,
+                                  tools:
+                                      event.tool === "start"
+                                          ? t.tools
+                                          : [...(t.tools ?? []), event.tool],
+                              }
+                            : t,
+                    ),
+                );
                 return;
             case "text-delta":
                 setTurns((all) =>
@@ -299,7 +343,11 @@ export function AskAiPanel({
                 );
                 return;
             case "card": {
-                if (event.kind === "products" || event.kind === "table") {
+                if (
+                    event.kind === "products" ||
+                    event.kind === "table" ||
+                    event.kind === "slots"
+                ) {
                     const info = infoCardsOf([event]);
                     if (!info.length) return;
                     setTurns((all) =>
@@ -331,11 +379,18 @@ export function AskAiPanel({
             case "refused":
                 patch(key, { refusal: event.refusal });
                 return;
+            case "next":
+                patch(key, { next: event.items });
+                return;
             case "error":
                 patch(key, { error: event.reason });
                 return;
             case "done":
-                patch(key, { outcome: event.outcome, running: false });
+                patch(key, {
+                    outcome: event.outcome,
+                    counted: event.counted,
+                    running: false,
+                });
                 return;
         }
     };
@@ -361,6 +416,7 @@ export function AskAiPanel({
                 body: JSON.stringify({
                     question: q,
                     ...(conversationId ? { conversationId } : {}),
+                    ...(about ? { about } : {}),
                 }),
             });
             if (!res.ok || !res.body) {
@@ -372,10 +428,12 @@ export function AskAiPanel({
                 if (event.type === "done") outcome = event.outcome;
             }
         } catch {
-            // The connection dropped: what arrived stays, said as cut off.
+            // The connection dropped: what arrived stays, said as lost.
             outcome = undefined;
         } finally {
             live.current = null;
+            // No `done`: the API may still have answered (it reads a turn
+            // to its end), so this never says whether a question was used.
             setTurns((all) =>
                 all.map((t) =>
                     t.key === key && t.running
@@ -383,22 +441,29 @@ export function AskAiPanel({
                               ...t,
                               running: false,
                               outcome: t.text ? "CUT_OFF" : "FAILED",
+                              lost: true,
                           }
                         : t,
                 ),
             );
         }
-        // The saved answer's id, for Report; and this period's count again.
+        // The saved answer: its id, for Report; or, when the connection
+        // dropped, the answer itself. And this period's count again.
         const [saved, fresh] = await Promise.all([
-            convo.id && (outcome === "ANSWERED" || outcome === "DRAFT")
+            convo.id &&
+            (outcome === "ANSWERED" ||
+                outcome === "DRAFT" ||
+                outcome === undefined)
                 ? readAskAiConversation(convo.id).catch(() => null)
                 : null,
             readAskAiState().catch(() => null),
         ]);
-        const answer = saved?.messages
-            .filter((m) => m.role === "ASSISTANT")
-            .at(-1);
-        if (answer) patch(key, { messageId: answer.id });
+        const kept = saved ? savedTurn(saved, q) : null;
+        if (kept && outcome === undefined && kept.question === q) {
+            patch(key, { ...kept, key, running: false, lost: false });
+        } else if (kept?.messageId) {
+            patch(key, { messageId: kept.messageId });
+        }
         if (fresh) setState(fresh);
         // A new conversation, or this one moved to the top; and the page read
         // again, so Back from a card's link shows this turn and its card.
@@ -455,8 +520,30 @@ export function AskAiPanel({
         businessName,
         zone,
         phone,
-        onEdit: (q) => setDraft(q),
+        onEdit: (q) => {
+            setDraft(q);
+            document
+                .querySelector<HTMLTextAreaElement>("[data-ask-ai-box]")
+                ?.focus();
+        },
         onAgain: (q) => void ask(q),
+        // Book here (AF 4): the booking is drafted under the answer, to pick who.
+        onBook: async (key, serviceId, startsAt) => {
+            if (!conversationId) return;
+            const res = await runAction(() =>
+                bookFromAnswer({ conversationId, serviceId, startsAt }),
+            );
+            if (!res) return;
+            if (!res.ok) {
+                reportFailure(res);
+                return;
+            }
+            setTurns((all) =>
+                all.map((t) =>
+                    t.key === key ? { ...t, cards: [...t.cards, res.data] } : t,
+                ),
+            );
+        },
     };
 
     const locked =
@@ -468,29 +555,35 @@ export function AskAiPanel({
 
     // — header —
     const title = view === "history" ? "Your conversations" : "Ask AI";
-    const ib = phone ? "size-11" : "size-10";
+    const ib = "size-11";
+    const showHistory = () => {
+        setQuery("");
+        setView("history");
+        setHistory(null);
+        void loadHistory();
+    };
     const newButton = (
         <IconButton
             label="New conversation"
-            icon={<SquarePen />}
+            icon={<Pencil />}
             size="md"
             className={ib}
             onClick={startNew}
             disabled={running}
         />
     );
-    // On a desk the list is the full page (board AI 9); a phone keeps it here.
     const toPage = () => {
         router.push(askPageHref(conversationId));
         onClose?.();
     };
+    // History lives in the panel, desk and phone alike (AF 9).
     const historyButton = (
         <IconButton
             label="Your conversations"
             icon={<History />}
             size="md"
             className={ib}
-            onClick={phone ? () => setView("history") : toPage}
+            onClick={showHistory}
         />
     );
     const expandButton = phone ? null : (
@@ -525,7 +618,7 @@ export function AskAiPanel({
     const back = (
         <IconButton
             label="Back to the conversation"
-            icon={<ArrowLeft />}
+            icon={<ChevronLeft />}
             size="md"
             className={ib}
             onClick={() => setView("thread")}
@@ -533,47 +626,77 @@ export function AskAiPanel({
     );
     const Title = phone ? SheetTitle : "h2";
 
-    const header = phone ? (
-        <div className="flex h-14 shrink-0 items-center gap-0.5 border-b border-border px-1">
-            {view === "history" ? back : close}
-            <Title className="m-0 flex flex-1 items-center gap-[7px] text-base font-semibold">
-                {view === "thread" ? (
-                    <Sparkles className="size-[17px]" aria-hidden />
+    const header =
+        view === "history" ? (
+            // AF 9: back, the list's name, and the full page.
+            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border pl-1.5 pr-1.5">
+                {back}
+                <Title className="m-0 ml-1 flex-1 font-display text-base font-semibold">
+                    {title}
+                </Title>
+                {expandButton}
+                {phone ? close : null}
+            </div>
+        ) : phone ? (
+            // AF phone: close at the left, then the clock and ⋯.
+            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border px-1">
+                {close}
+                <Title className="m-0 flex flex-1 items-center gap-2 font-display text-base font-semibold">
+                    <Sparkles className="size-[18px]" aria-hidden />
+                    {title}
+                </Title>
+                {tools ? (
+                    <>
+                        {historyButton}
+                        {more}
+                    </>
                 ) : null}
-                {title}
-            </Title>
-            {tools ? (
-                <>
-                    {newButton}
-                    {view === "thread" ? historyButton : null}
-                    {view === "thread" ? more : null}
-                </>
-            ) : null}
-        </div>
-    ) : (
-        <div className="flex h-14 shrink-0 items-center gap-0.5 border-b border-border pl-4 pr-1.5">
-            {view === "history" ? (
-                <span className="-ml-2.5">{back}</span>
-            ) : (
+            </div>
+        ) : (
+            <div className="flex h-[60px] shrink-0 items-center gap-0.5 border-b border-border pl-4 pr-1.5">
                 <Sparkles className="size-[18px]" aria-hidden />
-            )}
-            <Title className="m-0 ml-2 flex-1 text-base font-semibold">
-                {title}
-            </Title>
-            {tools ? (
-                <>
-                    {newButton}
-                    {view === "thread" ? historyButton : null}
-                    {view === "thread" ? more : null}
-                    {view === "thread" ? expandButton : null}
-                </>
-            ) : null}
-            {close}
-        </div>
-    );
+                <Title className="m-0 ml-2 flex-1 font-display text-base font-semibold">
+                    {title}
+                </Title>
+                {tools ? (
+                    <>
+                        {newButton}
+                        {historyButton}
+                        {more}
+                        {expandButton}
+                    </>
+                ) : null}
+                {close}
+            </div>
+        );
 
+    const listed = Array.isArray(history)
+        ? history.filter((c) =>
+              (c.title ?? "")
+                  .toLowerCase()
+                  .includes(query.trim().toLowerCase()),
+          )
+        : history;
+    const search =
+        Array.isArray(history) && history.length > 0 ? (
+            <div className="relative shrink-0">
+                <Search
+                    aria-hidden
+                    className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                    type="search"
+                    aria-label="Search your conversations"
+                    placeholder="Search your conversations"
+                    autoComplete="off"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    className="h-[46px] rounded-xl border-border bg-card pl-10 text-sm"
+                />
+            </div>
+        ) : null;
     const historyList =
-        history === "failed" ? (
+        listed === "failed" ? (
             <Notice
                 tone="error"
                 action={
@@ -592,7 +715,7 @@ export function AskAiPanel({
             >
                 Your conversations didn&apos;t load.
             </Notice>
-        ) : history === null ? (
+        ) : listed === null ? (
             <p
                 data-ph-unmask=""
                 role="status"
@@ -602,11 +725,13 @@ export function AskAiPanel({
             </p>
         ) : (
             <ConversationList
-                conversations={history}
+                conversations={listed}
+                businessName={businessName}
                 zone={zone}
                 phone={phone}
                 grouped={page || !offLike}
-                current={page ? conversationId : null}
+                current={conversationId}
+                searching={!!query.trim()}
                 line={
                     offLike && !page
                         ? "Still readable, each until 90 days after its last message."
@@ -617,6 +742,38 @@ export function AskAiPanel({
         );
 
     // — body —
+    // The label: the page it is about, or, once cleared, the whole
+    // business with a way back (AF 7). The full page shows where the open
+    // conversation began.
+    const openSummary = Array.isArray(history)
+        ? history.find((c) => c.id === conversationId)
+        : null;
+    const label = page ? (
+        openSummary?.about ? (
+            <AboutLabel words={`About: ${openSummary.about.label}`} />
+        ) : null
+    ) : about ? (
+        <AboutLabel
+            words={`${phone ? "" : "About: "}${about.label}`}
+            action={{
+                label: `Ask about all of ${businessName} instead`,
+                icon: <X />,
+                onClick: () => setCleared(true),
+            }}
+        />
+    ) : cleared && here.about ? (
+        <AboutLabel
+            plain
+            words={`All of ${businessName}`}
+            action={{
+                label: `Ask about ${here.about.label} again`,
+                icon: <Undo2 />,
+                onClick: () => setCleared(false),
+            }}
+        />
+    ) : null;
+    const offered = about ? here : businessPage();
+
     let content: React.ReactNode;
     let composer = true;
     if (!state) {
@@ -641,12 +798,18 @@ export function AskAiPanel({
         );
     } else if (state.reason === "locked") {
         composer = false;
-        content = <PlanLocked upgradeTo={state.upgradeTo} />;
+        content = (
+            <PlanLocked
+                upgradeTo={state.upgradeTo}
+                businessName={businessName}
+                onNotNow={onClose}
+            />
+        );
     } else if (state.reason === "no-permission") {
         composer = false;
         content = <RoleLocked />;
-    } else if (view === "history" || offLike) {
-        composer = !offLike;
+    } else if ((view === "history" && !page) || offLike) {
+        composer = !offLike && (page || view !== "history");
         content = (
             <>
                 {state.reason === "business-off" ? (
@@ -667,99 +830,163 @@ export function AskAiPanel({
                         Your conversations
                     </h3>
                 ) : null}
-                {page ? null : historyList}
+                {page ? null : (
+                    <>
+                        {search}
+                        {historyList}
+                    </>
+                )}
             </>
         );
     } else if (turns.length === 0) {
         content = (
             <>
-                <div className="flex flex-col gap-1.5 pt-7">
-                    <span
-                        aria-hidden
-                        className="mb-1.5 inline-flex size-10 items-center justify-center rounded-xl bg-primary text-primary-foreground"
-                    >
-                        <Sparkles className="size-5" />
-                    </span>
-                    <h3 className="m-0 text-[21px] font-semibold tracking-[-0.02em]">
-                        Ask about {businessName}
-                    </h3>
-                    <p
-                        data-ph-unmask=""
-                        className="m-0 text-sm leading-[1.5] text-neutral-700 dark:text-foreground"
-                    >
-                        Bookings, payments, customers and products. Add or
-                        change things by asking. English or Hinglish.
-                    </p>
-                </div>
-                <div className="mt-2 flex flex-col gap-2">
-                    <h4 data-ph-unmask="" className="label m-0">
-                        Common questions
-                    </h4>
-                    <Chips
-                        chips={CHIPS}
-                        phone={phone}
-                        disabled={paused || running}
-                        onPick={(q) => void ask(q)}
+                {label ? <div>{label}</div> : null}
+                {paused && state.usage ? (
+                    // AF 12: at the limit on opening, said at once, with Request more.
+                    <RefusalMessage
+                        refusal={{
+                            reason: "allowance",
+                            limit: state.usage.limit,
+                            resetsAt: state.usage.resetsAt,
+                            requestMore: state.requestMore,
+                            askName: state.ownerName,
+                        }}
+                        ctx={ctx}
                     />
-                </div>
+                ) : null}
+                {about ? (
+                    <p className="m-0 text-sm leading-[1.5] text-neutral-700 dark:text-foreground">
+                        {offered.intro}
+                    </p>
+                ) : (
+                    <div>
+                        <h3 className="m-0 font-display text-[21px] font-semibold tracking-[-0.01em]">
+                            Ask about {businessName}
+                        </h3>
+                        <p
+                            data-ph-unmask=""
+                            className="m-0 mt-1.5 text-[13.5px] leading-[1.5] text-neutral-700 dark:text-foreground"
+                        >
+                            Answers come with the rows behind them. Changes wait
+                            for your OK, and Undo works all day.
+                        </p>
+                    </div>
+                )}
+                <Suggestions
+                    suggestions={offered.suggestions}
+                    disabled={paused || running}
+                    onAsk={(q) => void ask(q)}
+                    onFill={(words) => {
+                        setDraft(words);
+                        document
+                            .querySelector<HTMLTextAreaElement>(
+                                "[data-ask-ai-box]",
+                            )
+                            ?.focus();
+                    }}
+                />
+                <p
+                    data-ph-unmask=""
+                    className="m-0 flex items-start gap-1.5 text-xs leading-[1.6] text-muted-foreground"
+                >
+                    <Info
+                        className="mt-[3px] size-[13px] shrink-0"
+                        aria-hidden
+                    />
+                    Hints are counted from{" "}
+                    {about ? "this page" : "your business"}. Tapping one asks.
+                    Nothing runs until you do.
+                </p>
             </>
         );
     } else {
-        content = turns.map((turn) => (
-            <div key={turn.key} className="contents">
-                <TurnView turn={turn} ctx={ctx} />
-            </div>
-        ));
+        content = (
+            <>
+                {label ? <div>{label}</div> : null}
+                {turns.map((turn) => (
+                    <div key={turn.key} className="contents">
+                        <TurnView turn={turn} ctx={ctx} />
+                    </div>
+                ))}
+            </>
+        );
     }
 
     const first = turns.length === 0;
-    const openTitle =
-        (Array.isArray(history)
-            ? history.find((c) => c.id === conversationId)?.title
-            : null) ??
-        conversation?.title ??
-        turns.at(0)?.question ??
-        "New conversation";
+    const usage = state?.usage ?? null;
+    const reset = usage ? resetDay(usage.resetsAt, zone) : null;
+    const meterLine =
+        paused && usage?.limit != null ? (
+            // AF 12: none left, said in the warning colour, and when they're back.
+            <span className="truncate font-semibold tabular-nums text-warning-subtle-foreground">
+                0 of {usage.limit} left{reset ? ` · back ${reset}` : ""}
+            </span>
+        ) : meter ? (
+            <>
+                <span
+                    aria-hidden
+                    className="h-[5px] w-14 shrink-0 overflow-hidden rounded-sm bg-neutral-200 dark:bg-muted"
+                >
+                    <i
+                        className="block h-full bg-muted-foreground"
+                        style={{
+                            width: `${Math.round(meter.share * 100)}%`,
+                        }}
+                    />
+                </span>
+                <span className="truncate tabular-nums">{meter.words}</span>
+            </>
+        ) : null;
+    const privacyLink = (
+        <a
+            data-ph-unmask=""
+            href={PRIVACY_HREF}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto inline-flex items-center text-foreground underline decoration-border-strong underline-offset-[3px] coarse:min-h-11"
+        >
+            How your data is used
+        </a>
+    );
     const pageHeader = (
-        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border pl-6 pr-4">
-            {tools ? (
-                <h2 className="m-0 flex-1 truncate text-base font-semibold">
-                    {openTitle}
-                </h2>
-            ) : (
-                <h1 className="m-0 flex flex-1 items-center gap-2 text-base font-semibold">
-                    <Sparkles className="size-[18px]" aria-hidden />
-                    Ask AI
-                </h1>
-            )}
-            {tools ? (
-                // Under 760px the list beside the page is hidden: open it here.
-                <IconButton
-                    label="Your conversations"
-                    icon={<History />}
-                    size="md"
-                    className="size-10 min-[760px]:hidden"
-                    onClick={() => setView("history")}
-                />
-            ) : null}
+        // Under 760px the list beside the page is hidden: open it here.
+        <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border pl-4 pr-2 min-[760px]:hidden">
+            <IconButton
+                label="Your conversations"
+                icon={<ChevronLeft />}
+                size="md"
+                className="size-11"
+                onClick={() => setView("history")}
+            />
+            <h1 className="m-0 flex flex-1 items-center gap-2 font-display text-base font-semibold">
+                Ask AI
+            </h1>
             {tools ? more : null}
         </div>
     );
     const conversationView = (
         <>
-            {page ? pageHeader : header}
+            {page ? (tools ? pageHeader : null) : header}
             <div
                 className={cn(
-                    "flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain",
-                    phone
-                        ? "px-3.5 pb-2.5 pt-4"
-                        : page
-                          ? "px-6 pb-3 pt-[18px]"
-                          : "px-[18px] pb-3 pt-[18px]",
+                    "flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain [&>*]:shrink-0 [&>.contents>*]:shrink-0",
+                    page ? "px-6 pb-3 pt-6" : "px-4 pb-3 pt-[18px]",
                 )}
             >
                 {page ? (
-                    <div className="mx-auto flex w-full max-w-[680px] flex-col gap-3.5">
+                    <div className="mx-auto flex w-full max-w-[662px] flex-col gap-3.5">
+                        <h2 className="sr-only">
+                            {openSummary?.title ??
+                                conversation?.title ??
+                                turns.at(0)?.question ??
+                                "New conversation"}
+                        </h2>
+                        {tools ? (
+                            <div className="hidden justify-end min-[760px]:flex">
+                                {more}
+                            </div>
+                        ) : null}
                         {content}
                     </div>
                 ) : (
@@ -778,11 +1005,14 @@ export function AskAiPanel({
             ) : composer ? (
                 <div
                     className={cn(
-                        "flex shrink-0 flex-col gap-2 border-t border-border",
-                        page && "mx-auto w-[calc(100%-48px)] max-w-[680px]",
-                        phone
-                            ? "px-3 pb-[calc(14px+env(safe-area-inset-bottom))] pt-2.5"
-                            : "px-4 pb-3 pt-2.5",
+                        "flex shrink-0 flex-col gap-2 pt-2.5",
+                        page
+                            ? "mx-auto w-[calc(100%-48px)] max-w-[662px] pb-4"
+                            : "border-t border-border px-4",
+                        !page &&
+                            (phone
+                                ? "pb-[calc(12px+env(safe-area-inset-bottom))]"
+                                : "pb-3"),
                     )}
                 >
                     <Composer
@@ -793,59 +1023,51 @@ export function AskAiPanel({
                         onStop={stop}
                         running={running}
                         paused={paused}
-                        phone={phone}
                         placeholder={
                             paused
-                                ? PAUSED
+                                ? reset
+                                    ? `Paused until ${reset}`
+                                    : PAUSED
                                 : turns.length
                                   ? FOLLOW_UP
-                                  : PLACEHOLDER
+                                  : about
+                                    ? here.placeholder
+                                    : businessPage().placeholder
                         }
                     />
-                    {first && view === "thread" ? (
+                    {first && (page || view === "thread") && !paused ? (
+                        // Kept from the first panel: where a question goes,
+                        // said before the first one is asked.
                         <p className="m-0 text-[12.5px] leading-[1.5] text-neutral-700 dark:text-foreground">
-                            {PRIVACY_LINE}{" "}
-                            <a
-                                data-ph-unmask=""
-                                href={PRIVACY_HREF}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px]"
-                            >
-                                See how your data is used
-                            </a>
+                            {PRIVACY_LINE} {privacyLink}
                         </p>
                     ) : (
-                        <div className="flex items-center gap-2.5 whitespace-nowrap text-xs text-muted-foreground">
-                            {meter ? (
-                                <>
-                                    <span
-                                        aria-hidden
-                                        className="h-1 w-14 shrink-0 overflow-hidden rounded-sm bg-neutral-200 dark:bg-muted"
-                                    >
-                                        <i
-                                            className="block h-full bg-muted-foreground"
-                                            style={{
-                                                width: `${Math.round(meter.share * 100)}%`,
-                                            }}
-                                        />
-                                    </span>
-                                    <span className="truncate tabular-nums">
-                                        {meter.words}
-                                    </span>
-                                </>
-                            ) : null}
-                            <a
-                                data-ph-unmask=""
-                                href={PRIVACY_HREF}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="ml-auto inline-flex items-center text-neutral-700 underline decoration-border-strong underline-offset-[3px] coarse:min-h-11 dark:text-foreground"
-                            >
-                                How your data is used
-                            </a>
+                        <div className="flex items-center gap-2.5 whitespace-nowrap text-[12.5px] text-neutral-700 dark:text-foreground">
+                            {meterLine}
+                            {privacyLink}
                         </div>
                     )}
+                </div>
+            ) : null}
+            {!page && view === "history" && tools ? (
+                // AF 9: a new conversation from the list's foot.
+                <div
+                    className={cn(
+                        "shrink-0 border-t border-border px-4 pt-3",
+                        phone
+                            ? "pb-[calc(12px+env(safe-area-inset-bottom))]"
+                            : "pb-3",
+                    )}
+                >
+                    <Button
+                        type="button"
+                        className="h-11 w-full"
+                        onClick={startNew}
+                        disabled={running}
+                    >
+                        <Pencil aria-hidden />
+                        New conversation
+                    </Button>
                 </div>
             ) : null}
             {phone && state ? (
@@ -868,26 +1090,31 @@ export function AskAiPanel({
                 <nav
                     aria-label="Your conversations"
                     className={cn(
-                        "w-full shrink-0 flex-col overflow-y-auto border-r border-border bg-neutral-50 px-2.5 py-4 dark:bg-background min-[760px]:flex min-[760px]:w-[320px]",
+                        "w-full shrink-0 flex-col border-r border-border px-4 pb-4 pt-[18px] min-[760px]:flex min-[760px]:w-[330px]",
                         view === "history" ? "flex" : "hidden",
                     )}
                 >
-                    <div className="flex items-center gap-2 pl-1.5 pr-1">
-                        <h1 className="m-0 flex flex-1 items-center gap-2 text-xl font-semibold tracking-[-0.02em]">
-                            <Sparkles className="size-[19px]" aria-hidden />
+                    <div className="flex items-center gap-2">
+                        <h1 className="m-0 flex-1 font-display text-[22px] font-semibold tracking-[-0.02em]">
                             Ask AI
                         </h1>
                         <Button
                             type="button"
-                            size="sm"
+                            className="h-10"
                             onClick={startNew}
                             disabled={running}
                         >
-                            <SquarePen aria-hidden />
+                            <Pencil aria-hidden />
                             New
                         </Button>
                     </div>
-                    <div className="mt-3.5 px-1">{historyList}</div>
+                    <div className="mt-3">{search}</div>
+                    <div className="-mx-1 mt-2 min-h-0 flex-1 overflow-y-auto px-1">
+                        {historyList}
+                    </div>
+                    <p className="m-0 mt-3 text-[12.5px] leading-[1.4] text-muted-foreground">
+                        {HISTORY_LINE}
+                    </p>
                 </nav>
             ) : null}
             <section
@@ -895,7 +1122,7 @@ export function AskAiPanel({
                 aria-label="Ask AI"
                 className={cn(
                     "min-w-0 flex-1 flex-col min-[760px]:flex",
-                    view === "history" ? "hidden" : "flex",
+                    view === "history" && tools ? "hidden" : "flex",
                 )}
             >
                 {conversationView}
@@ -904,35 +1131,96 @@ export function AskAiPanel({
     );
 }
 
-function Chips({
-    chips,
-    phone,
-    disabled,
-    onPick,
+/** The page a question is about, as a plum label (AF 2, 7). */
+function AboutLabel({
+    words,
+    plain = false,
+    action,
 }: {
-    chips: string[];
-    phone: boolean;
-    disabled: boolean;
-    onPick: (q: string) => void;
+    words: string;
+    /** The whole business: a neutral label (AF 7). */
+    plain?: boolean;
+    action?: { label: string; icon: React.ReactNode; onClick: () => void };
 }) {
     return (
-        <div className="flex flex-wrap gap-1.5">
-            {chips.map((c) => (
-                <Button
-                    key={c}
+        <span
+            className={cn(
+                "inline-flex h-7 max-w-full items-center gap-1 rounded-full pl-2.5 text-[12.5px] font-semibold",
+                action ? "pr-0.5" : "pr-2.5",
+                plain
+                    ? "bg-muted text-neutral-700 dark:text-foreground"
+                    : "bg-ask-subtle text-ask-subtle-foreground",
+            )}
+        >
+            <span className="truncate">{words}</span>
+            {action ? (
+                <button
                     type="button"
-                    variant="outline"
-                    disabled={disabled}
-                    onClick={() => onPick(c)}
-                    className={cn(
-                        "rounded-full px-[13px] text-[13.5px] font-medium",
-                        phone ? "h-11 px-[15px]" : "h-9",
-                    )}
+                    aria-label={action.label}
+                    title={action.label}
+                    onClick={action.onClick}
+                    className="inline-flex size-6 shrink-0 items-center justify-center rounded-full hover:bg-background/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring coarse:-my-2 coarse:size-11 [&_svg]:size-3.5"
                 >
-                    {c}
-                </Button>
+                    {action.icon}
+                </button>
+            ) : null}
+        </span>
+    );
+}
+
+/**
+ * The page's suggestions with their hints (AF 1, 2, 5): a question asks
+ * at once (and doesn't use a question); a pencil one, dashed, only puts
+ * its words in the box.
+ */
+function Suggestions({
+    suggestions,
+    disabled,
+    onAsk,
+    onFill,
+}: {
+    suggestions: AskAiSuggestion[];
+    disabled: boolean;
+    onAsk: (question: string) => void;
+    onFill: (words: string) => void;
+}) {
+    return (
+        <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+            {suggestions.map((s) => (
+                <li key={s.label}>
+                    <button
+                        type="button"
+                        disabled={disabled && !s.fill}
+                        onClick={() =>
+                            s.fill ? onFill(s.question) : onAsk(s.question)
+                        }
+                        className={cn(
+                            "flex min-h-[68px] w-full items-center gap-2.5 rounded-xl border border-border bg-card py-2 pl-3.5 pr-3 text-left text-sm hover:border-border-strong hover:bg-neutral-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground dark:hover:bg-muted",
+                            s.fill && "border-dashed border-border-strong",
+                        )}
+                    >
+                        {s.fill ? (
+                            <Pencil
+                                className="size-3.5 shrink-0 text-neutral-700 dark:text-foreground"
+                                aria-hidden
+                            />
+                        ) : null}
+                        <span className="min-w-0 flex-1 leading-[1.45]">
+                            {s.label}
+                        </span>
+                        {s.hint ? (
+                            <span className="h-6 max-w-[48%] truncate whitespace-nowrap rounded-full bg-ask-subtle px-[9px] text-xs font-semibold leading-6 text-ask-subtle-foreground">
+                                {s.hint}
+                            </span>
+                        ) : null}
+                        <ChevronRight
+                            className="size-3.5 shrink-0 text-neutral-700 dark:text-foreground"
+                            aria-hidden
+                        />
+                    </button>
+                </li>
             ))}
-        </div>
+        </ul>
     );
 }
 
@@ -944,7 +1232,6 @@ function Composer({
     onStop,
     running,
     paused,
-    phone,
     placeholder,
 }: {
     boxRef?: Ref<HTMLTextAreaElement>;
@@ -954,19 +1241,19 @@ function Composer({
     onStop: () => void;
     running: boolean;
     paused: boolean;
-    phone: boolean;
     placeholder: string;
 }) {
     return (
         <div
             className={cn(
-                "flex min-h-[52px] items-end gap-2 rounded-xl border border-input bg-field py-2 pl-3 pr-2 focus-within:ring-2 focus-within:ring-ring",
-                paused && "border-border bg-background",
+                "flex min-h-[78px] items-end gap-2 rounded-[14px] border border-border-strong bg-field py-1.5 pl-3.5 pr-1.5 focus-within:ring-2 focus-within:ring-ring",
+                paused && "border-border bg-muted",
             )}
         >
             <Textarea
                 ref={boxRef}
-                aria-label="Ask a question"
+                data-ask-ai-box=""
+                aria-label="Ask a question or say what to do"
                 rows={1}
                 value={value}
                 maxLength={ASK_AI_QUESTION_MAX}
@@ -983,7 +1270,7 @@ function Composer({
                         if (!running) onSend();
                     }
                 }}
-                className="max-h-40 min-h-[34px] flex-1 resize-none rounded-none border-none bg-transparent px-0 py-1.5 leading-[1.45] ring-0 [field-sizing:content] focus-visible:ring-0 focus-visible:ring-offset-0 disabled:bg-transparent"
+                className="max-h-40 min-h-[44px] flex-1 resize-none self-stretch rounded-none border-none bg-transparent px-0 py-2.5 text-[14.5px] leading-[1.4] ring-0 [field-sizing:content] focus-visible:ring-0 focus-visible:ring-offset-0 disabled:bg-transparent"
             />
             {running ? (
                 <Button
@@ -991,12 +1278,7 @@ function Composer({
                     variant="outline"
                     onClick={onStop}
                     aria-label="Stop the answer"
-                    className={cn(
-                        "shrink-0 border-foreground px-3",
-                        phone
-                            ? "h-11 rounded-[11px] px-3.5"
-                            : "h-9 rounded-[9px]",
-                    )}
+                    className="h-11 shrink-0 rounded-[11px] border-[1.5px] border-foreground px-3.5"
                 >
                     <Square className="size-4 fill-current" aria-hidden />
                     Stop
@@ -1009,12 +1291,7 @@ function Composer({
                     tooltip={false}
                     onClick={onSend}
                     disabled={paused || !value.trim()}
-                    className={cn(
-                        "shrink-0 [&_svg]:size-[18px]",
-                        phone
-                            ? "size-11 rounded-[11px]"
-                            : "size-9 rounded-[9px]",
-                    )}
+                    className="size-11 shrink-0 rounded-[11px] [&_svg]:size-[18px]"
                 />
             )}
         </div>

@@ -4,6 +4,7 @@ import type {
     AskAiDraftCard,
     AskAiEvent,
     AskAiInfoCard,
+    AskAiNext,
     AskAiOutcome,
     AskAiRefusal,
 } from "@saroh/api-contract";
@@ -15,9 +16,9 @@ import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
 import {
     Check,
+    CircleAlert,
     Clock,
     Copy,
-    Gauge,
     Gem,
     Lock,
     Pencil,
@@ -45,6 +46,7 @@ import {
     CUT_OFF,
     DAILY_LIMIT,
     DIDNT_USE,
+    LOST,
     STOPPED_AFTER,
     STOPPED_BEFORE,
     UNAVAILABLE,
@@ -69,6 +71,14 @@ export interface Turn {
     running: boolean;
     /** The answer's id, for Report this answer, once it is saved. */
     messageId?: string;
+    /** The tools it read, for "Checked … just now" (AF 3). */
+    tools?: string[];
+    /** Whether it used one of the month's questions, as the API said. */
+    counted?: boolean;
+    /** The connection dropped before the API said how it ended. */
+    lost?: boolean;
+    /** Next steps for the box under the answer (AF 3). */
+    next?: AskAiNext[];
 }
 
 export interface TurnContext {
@@ -77,6 +87,12 @@ export interface TurnContext {
     phone: boolean;
     onEdit: (question: string) => void;
     onAgain: (question: string) => void;
+    /** Book here on a free-times card: drafts the booking under this turn. */
+    onBook?: (
+        turnKey: string,
+        serviceId: string,
+        startsAt: string,
+    ) => Promise<void>;
 }
 
 /** A message in the conversation, not an error box (board 6, 19). */
@@ -134,7 +150,12 @@ export function Question({ children }: { children: ReactNode }) {
 export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
     const waiting =
         turn.running && !turn.text && !turn.refusal && !turn.cards.length;
-    const finished = turn.outcome === "ANSWERED" || turn.outcome === "DRAFT";
+    // What the API counted is an answer, whatever else it was (NO_ACCESS).
+    const finished =
+        turn.outcome === "ANSWERED" ||
+        turn.outcome === "DRAFT" ||
+        turn.counted === true;
+    const checked = turn.running ? null : checkedWords(turn.tools);
     const big = ctx.phone ? "h-11" : "";
     const again = (
         <Button
@@ -178,6 +199,12 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
                     <span>{turn.status ?? ""}</span>
                 </p>
             ) : null}
+            {checked && turn.text ? (
+                <p className="m-0 flex items-center gap-1.5 text-[12.5px] text-neutral-700 dark:text-foreground">
+                    <Check className="size-3.5 shrink-0" aria-hidden />
+                    {checked}
+                </p>
+            ) : null}
             {turn.text ? (
                 <div
                     aria-live="polite"
@@ -188,14 +215,33 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
                 </div>
             ) : null}
             {turn.infoCards?.map((card, i) => (
-                <AnswerCard key={i} card={card} />
+                <AnswerCard
+                    key={i}
+                    card={card}
+                    phone={ctx.phone}
+                    onBook={
+                        ctx.onBook
+                            ? (serviceId, startsAt) =>
+                                  // `onBook` is checked just above.
+                                  ctx.onBook?.(turn.key, serviceId, startsAt) ??
+                                  Promise.resolve()
+                            : undefined
+                    }
+                />
             ))}
             {turn.cards.map((card) => (
                 <DraftCard key={card.draftId} card={card} phone={ctx.phone} />
             ))}
             {turn.refusal ? (
                 <RefusalMessage refusal={turn.refusal} ctx={ctx} />
-            ) : turn.running ? null : turn.error === "unavailable" ? (
+            ) : turn.running ? null : turn.lost ? (
+                <>
+                    <Line icon={<TriangleAlert />} alert>
+                        {LOST}
+                    </Line>
+                    <div className="-mt-1 flex gap-1.5">{again}</div>
+                </>
+            ) : turn.error === "unavailable" ? (
                 <One icon={<TriangleAlert />}>
                     <p className="m-0">{UNAVAILABLE}</p>
                     <small className={small}>{DIDNT_USE}</small>
@@ -221,7 +267,16 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
                     <div className="-mt-1 flex gap-1.5">{again}</div>
                 </>
             ) : finished ? (
-                <AnswerActions turn={turn} phone={ctx.phone} />
+                <>
+                    <AnswerActions turn={turn} phone={ctx.phone} />
+                    {turn.next?.length ? (
+                        <NextSteps
+                            steps={turn.next}
+                            phone={ctx.phone}
+                            onPick={ctx.onEdit}
+                        />
+                    ) : null}
+                </>
             ) : (
                 <One icon={<TriangleAlert />} alert>
                     <p className="m-0">{COULDNT_ANSWER}</p>
@@ -231,6 +286,76 @@ export function TurnView({ turn, ctx }: { turn: Turn; ctx: TurnContext }) {
             )}
         </>
     );
+}
+
+/**
+ * The next steps under an answer (AF 3, 6, 8): each puts its words in the
+ * box to finish and send; nothing runs and no question is used until then.
+ */
+function NextSteps({
+    steps,
+    phone,
+    onPick,
+}: {
+    steps: readonly AskAiNext[];
+    phone: boolean;
+    onPick: (text: string) => void;
+}) {
+    return (
+        <div className="flex flex-wrap gap-2">
+            {steps.map((s) => (
+                <Button
+                    key={s.label}
+                    type="button"
+                    variant="outline"
+                    onClick={() => onPick(s.text)}
+                    className={cn(
+                        "rounded-full px-3.5 text-[13.5px] font-medium",
+                        phone ? "h-11" : "h-10",
+                    )}
+                >
+                    <Pencil className="size-3.5" aria-hidden />
+                    {s.label}
+                </Button>
+            ))}
+        </div>
+    );
+}
+
+/** What each read looked at, for the line over an answer (AF 3). */
+const READS: Record<string, string> = {
+    list_bookings: "Bookings",
+    get_booking: "Bookings",
+    summarise_bookings: "Bookings",
+    find_free_slots: "Calendar",
+    get_hours: "Calendar",
+    list_orders: "Orders",
+    get_order: "Orders",
+    summarise_orders: "Orders",
+    list_customers: "Customers",
+    get_customer: "Customers",
+    find_lapsed_customers: "Customers",
+    list_products: "Products",
+    get_product: "Products",
+    get_whats_selling: "Products",
+    summarise_stock: "Stock",
+    list_unpaid_bills: "Invoices",
+    summarise_invoices: "Invoices",
+    list_enquiries: "Enquiries",
+    get_enquiry: "Enquiries",
+};
+
+/** "Checked your Orders and Bookings just now"; null when nothing was read. */
+export function checkedWords(tools: readonly string[] | undefined) {
+    const seen = Array.from(
+        new Set((tools ?? []).flatMap((t) => READS[t] ?? [])),
+    );
+    if (!seen.length) return null;
+    const list =
+        seen.length === 1
+            ? seen[0]
+            : `${seen.slice(0, -1).join(", ")} and ${seen.at(-1)}`;
+    return `Checked your ${list} just now`;
 }
 
 /** Copy and Report, under a finished answer only (board 12, 21). */
@@ -365,7 +490,10 @@ function LockedLine({ upgradeTo }: { upgradeTo: string }) {
     );
 }
 
-/** At the period's limit (board 19b): the reset day, and Request more or who can. */
+/**
+ * At the month's limit (AF 12): a warning card in the conversation with
+ * when they come back, Request more (or who can), and the plans.
+ */
 function AtLimit({
     refusal,
     ctx,
@@ -374,11 +502,13 @@ function AtLimit({
         askName?: string | null;
         resetsAt?: string;
         requestMore?: boolean;
+        limit?: number | null;
     };
     ctx: Pick<TurnContext, "zone" | "phone">;
 }) {
     const [busy, setBusy] = useState(false);
     const [sent, setSent] = useState(false);
+    const canChangePlan = useCanChangePlan();
     const reset = refusal.resetsAt
         ? resetDay(refusal.resetsAt, ctx.zone)
         : null;
@@ -391,39 +521,62 @@ function AtLimit({
         }
         setSent(true);
     };
+    const plans =
+        canChangePlan && plansShown() ? (
+            <Button asChild variant="outline" className="h-11">
+                <Link href={upgradeHref()}>See plans</Link>
+            </Button>
+        ) : null;
     return (
-        <One icon={<Gauge />}>
-            <p className="m-0">
-                <b>You&apos;ve used all of this period&apos;s questions.</b>
-                {reset ? ` They reset on ${reset}.` : ""}
-            </p>
-            {refusal.requestMore ? (
-                sent ? (
-                    <p className="m-0 flex items-center gap-2">
-                        <Check className="size-3.5" aria-hidden />
-                        Request sent. Saroh will look at it.
-                    </p>
-                ) : (
-                    <div>
-                        <Button
-                            type="button"
-                            size="sm"
-                            className={ctx.phone ? "h-11" : ""}
-                            onClick={ask}
-                            disabled={busy}
-                            aria-busy={busy}
-                        >
-                            Request more
-                        </Button>
-                    </div>
-                )
-            ) : (
-                <p className="m-0">
-                    {refusal.askName
-                        ? `${refusal.askName} can request more.`
-                        : "Ask your business owner for more."}
+        <Notice
+            tone="warning"
+            role="status"
+            icon={<CircleAlert />}
+            className="rounded-xl px-3.5 py-3 text-sm"
+        >
+            <div className="flex min-w-0 flex-col gap-1">
+                <p className="m-0 font-semibold">
+                    This month&apos;s{" "}
+                    {typeof refusal.limit === "number"
+                        ? `${refusal.limit} questions are`
+                        : "questions are"}{" "}
+                    used.
                 </p>
-            )}
-        </One>
+                <p className="m-0 text-[13px] text-neutral-700 dark:text-foreground">
+                    {reset ? `They come back on ${reset}. ` : ""}
+                    {DIDNT_USE}
+                </p>
+                {refusal.requestMore ? (
+                    sent ? (
+                        <p className="m-0 mt-1 flex items-center gap-2">
+                            <Check className="size-3.5" aria-hidden />
+                            Request sent. Saroh will look at it.
+                        </p>
+                    ) : (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            <Button
+                                type="button"
+                                className="h-11"
+                                onClick={ask}
+                                disabled={busy}
+                                aria-busy={busy}
+                            >
+                                Request more
+                            </Button>
+                            {plans}
+                        </div>
+                    )
+                ) : (
+                    <>
+                        <p className="m-0 text-[13px]">
+                            {refusal.askName
+                                ? `${refusal.askName} can request more.`
+                                : "Ask your business owner for more."}
+                        </p>
+                        {plans ? <div className="mt-2">{plans}</div> : null}
+                    </>
+                )}
+            </div>
+        </Notice>
     );
 }

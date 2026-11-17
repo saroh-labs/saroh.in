@@ -206,6 +206,14 @@
   E21 — as the design draws them, kept on dark), with `--layer-foreground` for the count written on them.
   Which layer takes which is `lib/calendar/layers.ts`; the class strings sit
   in `components/calendar/tones.ts` because Tailwind does not scan `lib/`.
+- **Current** (16 Nov 2026) — **`--ask`, `--ask-subtle` and
+  `--ask-subtle-foreground` are Ask AI's plum** (Tailwind `ask`,
+  `bg-ask-subtle`, `text-ask-subtle-foreground`): the "About: …" page label,
+  the hint pills on suggestions, where a conversation started in the history
+  list and the open conversation's left bar. Light values are the AF boards'
+  `#7B3F75`, `#EEE6F0` and `#4F2A4B` (9.7:1 on the subtle ground; the HSL tokens round to within one step of each); dark has
+  its own. Plum sits apart from the status hues and from Saffron, so it never
+  reads as a state or a brand mark; use it only for Ask AI.
 - **Current** — **`--accent` is a shadcn neutral** with about 32 component
   usages, not a brand accent. Don't rename it.
 - **Adopted** — **Never an arbitrary value, a hex literal or a raw palette class

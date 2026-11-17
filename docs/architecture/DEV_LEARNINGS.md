@@ -6768,3 +6768,11 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a page already dated today passes (`scripts/check-content-dates.mjs`, `CONTENT_DATES_TODAY` for its test); a test covers it.
 - **Rule:** a freshness check accepts "already today" as fresh.
 - **Category:** tooling · content
+
+## Ask AI said "This didn't use a question" for one it used (16 Nov 2026)
+
+- **Symptom:** after a question ended with "This didn't use a question.", the month's count went from 1 to 2. Common questions, which the owner decided don't count, counted too, and on a phone the clock's list never loaded.
+- **Cause:** the panel chose its words from its own view of how a turn ended, not the API's `done.counted`. A connection that dropped was drawn as cut off ("didn't use"), while the API reads every turn to its end and counted the answer; a `NO_ACCESS` answer (counted) fell into the "couldn't answer" branch. The API had no notion of a common question. The phone's clock set the view without reading the list.
+- **Fix:** the panel keeps `counted` from `done`; a turn without `done` says the connection dropped and adopts the saved answer once it is there (`savedTurn`); a counted answer is drawn as an answer. The API counts by `countsFor(outcome, question)`: the panel's common questions (`ASK_AI_STARTERS`), asked as written, never count. History opens through `showHistory`, which reads the list, desk and phone alike.
+- **Rule:** a screen that says what something cost repeats the server's verdict, never its own guess; a view switch that needs data reads it in the same handler.
+- **Category:** frontend · api · ask-ai

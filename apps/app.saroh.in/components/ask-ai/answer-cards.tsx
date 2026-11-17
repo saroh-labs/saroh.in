@@ -1,14 +1,17 @@
 import type {
     AskAiInfoCard,
     AskAiProductsCard,
+    AskAiSlotsCard,
     AskAiTableCard,
 } from "@saroh/api-contract";
 import { MEDIA } from "@saroh/auth/security-headers";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListTable, listTable, ListTableHead } from "@saroh/ui/list-table";
 import { Info } from "lucide-react";
 import Link from "next/link";
 import type * as React from "react";
+import { useState } from "react";
 
 import { initials } from "@/lib/products/catalogue";
 
@@ -38,11 +41,95 @@ const appHref = (href: string | undefined) =>
     // A backslash or a second slash would leave the app ("/\\evil.com").
     href && /^\/(?![/\\])[^\s\\]*$/.test(href) ? href : null;
 
-export function AnswerCard({ card }: { card: AskAiInfoCard }) {
-    return card.kind === "products" ? (
-        <ProductsCard card={card.data} />
-    ) : (
-        <TableCard card={card.data} />
+export function AnswerCard({
+    card,
+    onBook,
+    phone = false,
+}: {
+    card: AskAiInfoCard;
+    /** Book here on a free-times card (AF 4); absent, the card has none. */
+    onBook?: (serviceId: string, startsAt: string) => Promise<void>;
+    phone?: boolean;
+}) {
+    switch (card.kind) {
+        case "products":
+            return <ProductsCard card={card.data} />;
+        case "slots":
+            return <SlotsCard card={card.data} onBook={onBook} phone={phone} />;
+        default:
+            return <TableCard card={card.data} />;
+    }
+}
+
+/**
+ * Free times (AF 3): one row a day with Book here, which drafts that
+ * day's first free start (AF 4). The Calendar's week draws no hours, so
+ * the times are listed here and the card says the Calendar isn't marked.
+ */
+function SlotsCard({
+    card,
+    onBook,
+    phone,
+}: {
+    card: AskAiSlotsCard;
+    onBook?: (serviceId: string, startsAt: string) => Promise<void>;
+    phone: boolean;
+}) {
+    const [busy, setBusy] = useState<string | null>(null);
+    return (
+        <section aria-label={card.title} className="flex flex-col gap-2">
+            <ul className="m-0 list-none overflow-hidden rounded-xl border border-border bg-card p-0">
+                {card.days.map((d) => (
+                    <li
+                        key={d.startsAt}
+                        className="flex min-h-[68px] items-center gap-3 border-t border-muted px-3 py-2 first:border-t-0"
+                    >
+                        <div className="min-w-0 flex-1">
+                            <b className="block text-sm font-semibold">
+                                {d.label}
+                            </b>
+                            <span className="block text-[13px] text-neutral-700 dark:text-foreground">
+                                {d.range}
+                            </span>
+                        </div>
+                        {onBook ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                className={cn(
+                                    "shrink-0",
+                                    phone ? "h-11" : "h-10",
+                                )}
+                                aria-label={`Book ${card.serviceName} here, ${d.label}`}
+                                disabled={busy !== null}
+                                aria-busy={busy === d.startsAt}
+                                onClick={async () => {
+                                    setBusy(d.startsAt);
+                                    try {
+                                        await onBook(
+                                            card.serviceId,
+                                            d.startsAt,
+                                        );
+                                    } finally {
+                                        setBusy(null);
+                                    }
+                                }}
+                            >
+                                Book here
+                            </Button>
+                        ) : null}
+                    </li>
+                ))}
+            </ul>
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[12.5px] text-muted-foreground">
+                <Info className="size-3.5 shrink-0" aria-hidden />
+                <span>
+                    {card.serviceName}&apos;s free starts. Your Calendar
+                    isn&apos;t marked with them.
+                    {card.more ? ` +${card.more} more days.` : ""}
+                </span>
+            </div>
+        </section>
     );
 }
 

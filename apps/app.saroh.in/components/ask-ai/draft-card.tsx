@@ -12,6 +12,7 @@ import { useState } from "react";
 
 import { reportFailure } from "@/components/billing/plan-refusal";
 import { useCanChangePlan } from "@/components/billing/plan-way";
+import { CustomerPicker } from "@/components/commerce/new-order/customer-picker";
 import { runAction } from "@/lib/api/run-action";
 import {
     confirmDraft,
@@ -20,6 +21,7 @@ import {
     undoDraft,
 } from "@/lib/ask-ai/panel-actions";
 import { upgradeHref } from "@/lib/billing/access";
+import type { CustomerPick } from "@/lib/customers/picker";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
 import { draftWords, editorHref, recordHref, valueText } from "./words";
@@ -52,6 +54,7 @@ export function DraftCard({
     const [card, setCard] = useState(first);
     const [result, setResult] = useState<AskAiDraftResult | null>(null);
     const [typed, setTyped] = useState<Record<string, string>>({});
+    const [who, setWho] = useState<CustomerPick | null>(null);
     const [cancelled, setCancelled] = useState(false);
     const [busy, setBusy] = useState(false);
     const router = useRouter();
@@ -122,9 +125,11 @@ export function DraftCard({
         const create = card.action === "create";
         // A blog post's preview is long: its card says it is a draft instead.
         const post = card.kind === "blog_post";
+        // A booking made here can be called off the same day (AF 4).
+        const undoable = !create || card.tool === "create_booking";
         const canUndo = result
             ? result.canUndo
-            : !create && now().getTime() < Date.parse(card.expiresAt);
+            : undoable && now().getTime() < Date.parse(card.expiresAt);
         const openId = result?.open?.id ?? card.targetId;
         const openKind = result?.open?.kind ?? card.kind;
         return (
@@ -135,7 +140,7 @@ export function DraftCard({
                     </span>
                     <div className="min-w-0">
                         <b className="block text-sm">
-                            {create ? "Added" : "Done"} · {card.targetName}
+                            {words.done} · {card.targetName}
                         </b>
                         {post ? null : (
                             <span className="mt-px block text-[13px] text-neutral-700 dark:text-foreground">
@@ -248,10 +253,22 @@ export function DraftCard({
                 </span>
             </div>
             <dl className="m-0 grid grid-cols-[104px_minmax(0,1fr)] gap-x-3 px-3.5 py-1">
+                {card.tool === "update_orders_status" ? (
+                    // AF 8: which orders, before the step they move to.
+                    <Row first label="Orders">
+                        {card.targetName}
+                    </Row>
+                ) : null}
                 {card.fields
                     .filter((f) => !missingIds.has(f.field))
                     .map((f, i) => (
-                        <Row key={f.field} first={i === 0} label={f.label}>
+                        <Row
+                            key={f.field}
+                            first={
+                                i === 0 && card.tool !== "update_orders_status"
+                            }
+                            label={f.label}
+                        >
                             {card.action === "edit" &&
                             valueText(f.old, f.field) ? (
                                 <>
@@ -274,31 +291,53 @@ export function DraftCard({
                               first={i === 0 && card.fields.length === 0}
                               label={m.label}
                           >
-                              <Input
-                                  aria-label={`${m.label}, needed`}
-                                  className={cn(
-                                      "h-[34px] rounded-lg border-[1.5px] border-foreground px-2.5 font-medium placeholder:font-normal placeholder:text-destructive-subtle-foreground",
-                                      phone && "h-11",
-                                  )}
-                                  inputMode={
-                                      NUMERIC.has(m.field)
-                                          ? "decimal"
-                                          : undefined
-                                  }
-                                  placeholder={`Type the ${m.label.toLowerCase()}`}
-                                  value={typed[m.field] ?? ""}
-                                  onChange={(e) =>
-                                      setTyped((t) => ({
-                                          ...t,
-                                          [m.field]: e.target.value,
-                                      }))
-                                  }
-                              />
+                              {m.field === "customer_id" ? (
+                                  // Who a booking is for (AF 4): one of the
+                                  // business's customers, picked by search.
+                                  <CustomerPicker
+                                      value={who}
+                                      allowAdd={false}
+                                      showAttention={false}
+                                      onPick={(pick) => {
+                                          setWho(pick);
+                                          setTyped((t) => ({
+                                              ...t,
+                                              customer_id:
+                                                  pick?.kind === "contact"
+                                                      ? pick.id
+                                                      : "",
+                                          }));
+                                      }}
+                                  />
+                              ) : (
+                                  <Input
+                                      aria-label={`${m.label}, needed`}
+                                      className={cn(
+                                          "h-[34px] rounded-lg border-[1.5px] border-foreground px-2.5 font-medium placeholder:font-normal placeholder:text-destructive-subtle-foreground",
+                                          phone && "h-11",
+                                      )}
+                                      inputMode={
+                                          NUMERIC.has(m.field)
+                                              ? "decimal"
+                                              : undefined
+                                      }
+                                      placeholder={`Type the ${m.label.toLowerCase()}`}
+                                      value={typed[m.field] ?? ""}
+                                      onChange={(e) =>
+                                          setTyped((t) => ({
+                                              ...t,
+                                              [m.field]: e.target.value,
+                                          }))
+                                      }
+                                  />
+                              )}
                               <span
                                   data-ph-unmask=""
                                   className="mt-1 block text-[12.5px] font-semibold text-destructive-subtle-foreground"
                               >
-                                  Needed to add it
+                                  {m.field === "customer_id"
+                                      ? "Needed to book it"
+                                      : "Needed to add it"}
                               </span>
                           </Row>
                       ))
@@ -310,8 +349,9 @@ export function DraftCard({
                     icon={<Info />}
                     className="mx-3.5 mb-3 px-[11px] py-[9px] text-[13px]"
                 >
-                    Type it on the card. Changes to this card don&apos;t use a
-                    question.
+                    {card.tool === "create_booking"
+                        ? "Pick who it's for. They get a confirmation. This card doesn't use a question."
+                        : "Type it on the card. Changes to this card don't use a question."}
                 </Notice>
             ) : null}
             {refused ? (
