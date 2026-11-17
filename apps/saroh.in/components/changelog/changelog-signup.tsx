@@ -59,7 +59,7 @@ export function ChangelogSignup() {
         return (
             <p
                 role="status"
-                className="m-0 max-w-[520px] rounded-[10px] border border-border bg-card px-4 py-3 text-[15px] leading-[1.55] text-foreground"
+                className="m-0 max-w-[520px] rounded-mk-crop border border-border bg-card px-4 py-3 text-[15px] leading-[1.55] text-foreground"
             >
                 {CHANGELOG.signupDone}
             </p>
@@ -98,13 +98,13 @@ export function ChangelogSignup() {
                     }
                     className={fieldClasses({
                         invalid: fieldError,
-                        className: "h-[46px] flex-[1_1_240px]",
+                        className: "h-12 flex-[1_1_240px]",
                     })}
                 />
                 <Button
                     type="submit"
-                    size="md"
-                    className="w-auto max-w-full px-[18px]"
+                    size="kit"
+                    className="max-w-full"
                     disabled={state.at === "sending"}
                 >
                     {state.at === "sending"

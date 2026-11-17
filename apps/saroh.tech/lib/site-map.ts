@@ -16,19 +16,35 @@ import {
 
 import { HELP } from "@/content/help";
 
+import { DEVELOPERS } from "@/content/developers";
 import { INTEGRATIONS } from "@/content/integrations";
+import {
+    galleryTemplates,
+    WEBSITE_TEMPLATES_PATH,
+    websiteTemplatesPage,
+} from "@/content/website-templates";
+import { featuresOff } from "@/lib/feature-switches";
 
 import { LEGAL_UPDATED } from "@/content/legal";
 
-import { PRICING } from "@/content/pricing";
-
 import { home, UPDATED as HOME_UPDATED } from "@/content/home";
+import {
+    UPDATED as HOW_IT_WORKS_UPDATED,
+    howItWorksWords,
+} from "@/content/how-it-works";
 
 import {
     solutionHref,
     solutionList,
     UPDATED as SOLUTIONS_UPDATED,
 } from "@/content/solutions";
+
+import { HUB_PATH, HUB_WORDS } from "@/content/solutions-hub";
+import { TRADE_PAGES, UPDATED as TRADES_UPDATED } from "@/content/trades";
+
+/** How it works' h1; it doesn't follow the paid-plans switch. */
+const { title: howTitle } = howItWorksWords(false);
+const HOW_TITLE = `${howTitle.before}${howTitle.mark}${howTitle.after}`;
 
 /**
  * Every page, as the site map and page-spec boards list them. Title,
@@ -39,12 +55,15 @@ import {
 export type PageType =
     | "home"
     | "feature"
+    | "features"
     | "solution"
+    | "solutions"
     | "pricing"
     | "changelog"
     | "about"
     | "contact"
     | "integrations"
+    | "developers"
     | "referral"
     | "help"
     | "legal"
@@ -52,6 +71,8 @@ export type PageType =
     | "tool"
     | "templates"
     | "template"
+    | "website-templates"
+    | "website-template"
     | "guides"
     | "guide"
     | "not-found";
@@ -172,8 +193,20 @@ export const PAGES: SitePage[] = [
         type: "home",
         title: `${home.seoTitle} | Saroh`,
         description: home.seoDescription,
-        h1: home.headlineLabel,
+        h1: home.titleLabel,
         updated: HOME_UPDATED,
+    },
+    // Features (DEC-221; "Features" in the nav, owner 17 Nov): How it works, drawn and indexed.
+    {
+        ...hub(
+            "/features",
+            "features",
+            "Features: how Saroh works | Saroh",
+            "How Saroh keeps your records, reaches your customers and answers your questions, and how the money moves.",
+            HOW_TITLE,
+            "Features",
+        ),
+        updated: HOW_IT_WORKS_UPDATED,
     },
     ...featureList.map((f): SitePage => ({
         path: featureHref(f.slug),
@@ -181,27 +214,52 @@ export const PAGES: SitePage[] = [
         title: `${f.seoTitle} | Saroh`,
         description: f.seoDescription,
         h1: f.headline,
-        crumb: [{ name: "Features", path: "/#features" }, { name: f.name }],
+        crumb: [{ name: "Features", path: "/features" }, { name: f.name }],
         unreviewed: true,
         updated: FEATURES_UPDATED,
     })),
+    // The Solutions hub (DEC-221): saroh.in's /for hub over saroh.tech's trades.
+    {
+        ...hub(
+            HUB_PATH,
+            "solutions",
+            "Software for your trade, from bakeries to plumbers | Saroh",
+            "Software for shops, salons, studios, clinics and trades: pick yours to see what Saroh does for a business like yours.",
+            `${HUB_WORDS.h1Before} ${HUB_WORDS.h1Mark}`,
+            HUB_WORDS.crumb,
+        ),
+        unreviewed: true,
+        updated: SOLUTIONS_UPDATED,
+    },
     ...solutionList.map((s): SitePage => ({
         path: solutionHref(s.slug),
         type: "solution",
         title: `${s.seoTitle} | Saroh`,
         description: s.seoDescription,
         h1: s.headline,
-        crumb: [{ name: "Solutions", path: "/#solutions" }, { name: s.name }],
+        crumb: [{ name: "Solutions", path: HUB_PATH }, { name: s.name }],
         unreviewed: true,
         updated: SOLUTIONS_UPDATED,
+    })),
+    // The other trades (owner, 16 Nov 2026), held until the owner reads them.
+    ...TRADE_PAGES.map((t): SitePage => ({
+        path: `/solutions/${t.slug}`,
+        type: "solution",
+        title: `${t.seoTitle} | Saroh`,
+        description: t.seoDescription,
+        h1: t.headline,
+        crumb: [{ name: "Solutions", path: HUB_PATH }, { name: t.name }],
+        unreviewed: true,
+        updated: TRADES_UPDATED,
     })),
     {
         ...hub(
             "/pricing",
             "pricing",
             "Pricing and plans | Saroh",
-            "Start free with no card. Free is the plan you can use today, and Grow and Pro are coming soon.",
-            PRICING.title,
+            // True whether or not paid plans are on sale; the page's own title follows the switch.
+            "Start free with no card, and see what each plan includes.",
+            "Start free.",
             "Pricing",
         ),
         unreviewed: true,
@@ -251,6 +309,55 @@ export const PAGES: SitePage[] = [
         unreviewed: true,
         updated: "2026-11-04",
     },
+    // The website templates gallery, only while templates are on (DEC-135),
+    // at /website-templates (/templates is the document templates).
+    ...(featuresOff().includes("templates")
+        ? []
+        : [
+              {
+                  ...hub(
+                      WEBSITE_TEMPLATES_PATH,
+                      "website-templates",
+                      "Website templates for small businesses | Saroh",
+                      websiteTemplatesPage.description,
+                      websiteTemplatesPage.title,
+                      websiteTemplatesPage.name,
+                  ),
+                  unreviewed: true,
+                  updated: "2026-11-16",
+              },
+              ...galleryTemplates().map((t): SitePage => ({
+                  path: t.href,
+                  type: "website-template",
+                  title: `${t.name} website template | Saroh`,
+                  description: t.description,
+                  h1: `${t.name}: ${t.idea}.`,
+                  crumb: under(
+                      websiteTemplatesPage.name,
+                      WEBSITE_TEMPLATES_PATH,
+                      t.name,
+                  ),
+                  unreviewed: true,
+                  updated: "2026-11-16",
+              })),
+          ]),
+    // Only while its switch is on: the page 404s without it (#13).
+    ...(featuresOff().includes("developers")
+        ? []
+        : [
+              {
+                  ...hub(
+                      "/developers",
+                      "developers",
+                      "Saroh API and webhooks for developers | Saroh",
+                      "The Saroh API and webhooks: read and change a business's products, bookings, orders and customers, show its catalogue on your site, and hear when an order is paid.",
+                      DEVELOPERS.headline,
+                      DEVELOPERS.name,
+                  ),
+                  unreviewed: true,
+                  updated: "2026-11-16",
+              },
+          ]),
     {
         ...hub(
             "/integrations",
@@ -402,8 +509,8 @@ export const PAGES: SitePage[] = [
             "templates",
             "Free invoice and quote templates: PDF, Word, Docs, Sheets | Saroh",
             "Free invoice, quote and receipt templates for your trade and country. Download them or fill them in online.",
-            "Free templates for every trade",
-            "Templates",
+            "Free document templates for every trade",
+            "Document templates",
         ),
         unreviewed: true,
         updated: "2026-11-02",

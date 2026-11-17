@@ -1,8 +1,13 @@
 import type {
+    ClaimEnv,
+    ClaimSwitch,
     ReleaseSwitch,
     SwitchEnv,
 } from "@saroh/marketing/feature-switches";
-import { switchedOffSet } from "@saroh/marketing/feature-switches";
+import {
+    claimsOffSet,
+    switchedOffSet,
+} from "@saroh/marketing/feature-switches";
 
 import { browserEnv } from "@/lib/browser/env";
 
@@ -16,3 +21,16 @@ import { browserEnv } from "@/lib/browser/env";
 export function featuresOff(from: SwitchEnv = browserEnv): ReleaseSwitch[] {
     return switchedOffSet(from);
 }
+
+/**
+ * The claim switches this build has off (DEC-221): a claim the product
+ * can't back yet is drawn only when it isn't in this list. Read at build,
+ * as `featuresOff`.
+ */
+export function claimsOff(from: ClaimEnv = browserEnv): ClaimSwitch[] {
+    return claimsOffSet(from);
+}
+
+/** Whether a claim is drawn in this build. */
+export const claimOn = (claim: ClaimSwitch, from?: ClaimEnv) =>
+    !claimsOff(from).includes(claim);

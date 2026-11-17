@@ -68,8 +68,16 @@ One commit on the batch branch, for one feature, after the owner's go:
 2. **The app's help links.** Drop `waitsFor` from that feature's entries in
    `HELP_ARTICLES` (`apps/app.saroh.in/lib/help/links.ts`), so the command
    menu links them.
-3. **Shots.** Capture every placeholder the check names
-   (`e2e/marketing-shots/`, `shots.config.ts`), then read each shot
+3. **Shots.** Every production release retakes all marketing shots for both
+   editions (`devops-tooling-and-deploy.md` → "Marketing screenshots are taken
+   fresh for every production release"): the `Marketing shots` workflow
+   (`.github/workflows/marketing-shots.yml`) runs on the release PR, or start
+   it by hand. Download its `marketing-shots` artifact, unzip it at the repo
+   root and commit the images on the release batch; the run's summary lists
+   each key's age, and `pnpm check:shots` must pass on that commit. A key it
+   names as not retaken is taken by hand. A feature release adds its new keys
+   to both lists (`shots.config.ts` and `shots.global.ts`, with India's crop),
+   or to saroh.tech's `PENDING_SHOTS` with a reason. Read each shot
    against its page's claims (DEV_LEARNINGS, 4 Nov):
     - feature pages: `AI_APPS_SHOTS` (consent, AI activity) and
       `SHARE_SHOTS` (Share sheet, button, card styles, phone, Create post);

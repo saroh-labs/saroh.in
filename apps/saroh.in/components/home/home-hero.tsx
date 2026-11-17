@@ -1,36 +1,25 @@
-import { HomeHero as Hero } from "@saroh/marketing/home-hero";
+import { HomeHero as Hero } from "@saroh/marketing/home/home-hero";
 
-import { home } from "@/content/home";
+import { CtaLink } from "@/components/shared/buttons/cta-link";
+import { DemoLink } from "@/components/shared/buttons/demo-link";
+import { home, TOUR_LABEL, TOUR_VIDEO } from "@/content/home";
+import { HOME_HERO_SCENES } from "@/content/world";
 import { demoHref } from "@/lib/demos";
 
-import { HeroActions } from "../shared/buttons/hero-actions";
-import { shotView } from "../shared/media/shot-view";
-
 /**
- * Home's opening, in this site's words. "See it in action · 2 min" shows only
- * once a tour video is configured (KTD-12, deviation D-3).
+ * The landing's opening, India's: the shared hero (`@saroh/marketing/home/
+ * home-hero`) with this site's words, world, start button and live demo.
  */
-export function HomeHero({ freeLine }: { freeLine: string }) {
+export function HomeHero() {
     return (
         <Hero
-            eyebrow={home.eyebrow}
-            headlineLabel={home.headlineLabel}
-            headline={home.headline}
-            sub={home.sub}
-            actions={
-                <HeroActions
-                    src="home-hero"
-                    demo={{
-                        href: demoHref("salon"),
-                        page: "home",
-                        trade: "salon",
-                    }}
-                    tourHref="#video"
-                />
+            words={home}
+            scenes={HOME_HERO_SCENES}
+            start={<CtaLink src="home-hero" size="kit" />}
+            extra={
+                <DemoLink href={demoHref("salon")} page="home" trade="salon" />
             }
-            freeLine={freeLine}
-            chips={home.chips}
-            shot={shotView(home.hero.shot)}
+            tour={TOUR_VIDEO ? TOUR_LABEL : null}
         />
     );
 }

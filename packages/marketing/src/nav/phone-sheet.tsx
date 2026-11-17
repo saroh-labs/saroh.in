@@ -49,6 +49,9 @@ export function PhoneSheet({
     allTemplates,
     aboutLinks,
     pricing,
+    featuresLabel = "Features",
+    templatesPage,
+    developers,
     actions,
     onClose,
 }: {
@@ -69,6 +72,12 @@ export function PhoneSheet({
     aboutLinks: MenuLink[];
     /** Whether the Pricing row shows. */
     pricing: boolean;
+    /** The features level's name: "How it works" in the redesign. */
+    featuresLabel?: string;
+    /** Templates as one page (no gallery menu), a row after How it works. */
+    templatesPage?: MenuLink;
+    /** Developers, a row after Pricing (the redesign's nav order). */
+    developers?: MenuLink;
     /** The sheet's foot: signing in, the start button, who is signed in. */
     actions: ReactNode;
     onClose: () => void;
@@ -94,7 +103,6 @@ export function PhoneSheet({
     }, [openId]);
 
     const levels: Level[] = [
-        { id: "features", label: "Features", items: featureItems },
         {
             id: "solutions",
             label: "Solutions",
@@ -103,6 +111,7 @@ export function PhoneSheet({
                 solutionItems.filter((i) => i.href !== allTrades?.href),
             seeAll: allTrades,
         },
+        { id: "features", label: featuresLabel, items: featureItems },
         {
             id: "resources",
             label: "Resources",
@@ -118,6 +127,20 @@ export function PhoneSheet({
         },
     ];
     const opened = levels.find((l) => l.id === openId);
+    /** A first-level row that is one page, not a level. */
+    const page = (link: MenuLink, of: NavSection) => (
+        <Link
+            key={link.href}
+            href={link.href}
+            onClick={onClose}
+            aria-current={pathname === link.href ? "page" : undefined}
+            className={ROW}
+        >
+            <span className={cn(of !== null && section === of && CURRENT)}>
+                {link.name}
+            </span>
+        </Link>
+    );
     const row = (level: Level) =>
         level.items.length > 0 ? (
             <button
@@ -247,36 +270,29 @@ export function PhoneSheet({
             ) : (
                 <>
                     <div className="min-h-0 flex-1 overflow-y-auto px-mk-nav">
+                        {/* The redesign's order: Solutions, How it works,
+                            Templates, Pricing, Developers; then the rest. */}
                         {levels
                             .filter(
                                 (l) =>
                                     l.id === "features" || l.id === "solutions",
                             )
                             .map(row)}
-                        {pricing ? (
-                            <Link
-                                href="/pricing"
-                                onClick={onClose}
-                                aria-current={
-                                    pathname === "/pricing" ? "page" : undefined
-                                }
-                                className={ROW}
-                            >
-                                <span
-                                    className={cn(
-                                        section === "pricing" && CURRENT,
-                                    )}
-                                >
-                                    Pricing
-                                </span>
-                            </Link>
-                        ) : null}
+                        {templatesPage
+                            ? page(templatesPage, "templates")
+                            : levels
+                                  .filter((l) => l.id === "templates")
+                                  .map(row)}
+                        {pricing
+                            ? page(
+                                  { name: "Pricing", href: "/pricing" },
+                                  "pricing",
+                              )
+                            : null}
+                        {developers ? page(developers, "developers") : null}
                         {levels
                             .filter(
-                                (l) =>
-                                    l.id === "resources" ||
-                                    l.id === "tools" ||
-                                    l.id === "templates",
+                                (l) => l.id === "resources" || l.id === "tools",
                             )
                             .map(row)}
                     </div>

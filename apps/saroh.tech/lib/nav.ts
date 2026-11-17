@@ -1,8 +1,11 @@
+import { featuresOff } from "@/lib/feature-switches";
+import { NEW_FEATURES } from "@saroh/marketing/feature-switches";
 import type { MenuLink, NavItem } from "@saroh/marketing/nav-types";
 
 import { featureHref, featureList } from "@/content/features";
-import { solutionHref, solutionList } from "@/content/solutions";
+import { ALL_TRADES, HUB_GROUPS, HUB_PATH } from "@/content/solutions-hub";
 import { COUNTRIES, DOCUMENTS, TRADES } from "@/content/templates";
+import { claimsOff } from "@/lib/feature-switches";
 
 /** The site's menus, worked out on the server and handed to the header. */
 export interface NavMenus {
@@ -10,9 +13,9 @@ export interface NavMenus {
     solutions: NavItem[];
     resources: NavItem[];
     tools: NavItem[];
-    templates: NavItem[];
     allTools: MenuLink;
-    allTemplates: MenuLink;
+    /** The top-level Website templates link, while templates are on (DEC-135). */
+    websiteTemplates?: MenuLink;
 }
 
 /** saroh.in's nine and four, in its order, in this site's words. */
@@ -20,13 +23,36 @@ export const FEATURES: NavItem[] = featureList.map((f) => ({
     name: f.name,
     line: f.navLine,
     href: featureHref(f.slug),
+    // The same "New" tags as saroh.in's (#23).
+    isNew: NEW_FEATURES.includes(f.slug),
 }));
 
-export const SOLUTIONS: NavItem[] = solutionList.map((s) => ({
-    name: s.name,
-    line: s.navLine,
-    href: solutionHref(s.slug),
+/**
+ * Every trade, in a column per hub group (owner, 16 Nov 2026). No line under
+ * a name: with every trade listed, the name says it all.
+ */
+export const SOLUTIONS: NavItem[] = ALL_TRADES.map((t) => ({
+    group: HUB_GROUPS.find((g) => g.id === t.group)?.title,
+    name: t.name,
+    line: "",
+    href: t.href,
 }));
+
+/** The footer's trades: a group per hub group, the last ending on the hub. */
+/**
+ * One Solutions column, as saroh.in's footer has (owner, 16 Nov 2026, #6,
+ * #17): each family's first trade, then all of them on /solutions. Six
+ * columns of every trade made the footer about 1,430px tall.
+ */
+const SOLUTIONS_COLUMN = {
+    title: "Solutions",
+    links: [
+        ...HUB_GROUPS.flatMap((g) =>
+            SOLUTIONS.filter((s) => s.group === g.title).slice(0, 1),
+        ),
+        { name: "See all trades", href: HUB_PATH },
+    ],
+};
 
 const LEARN = "Learn";
 const SAROH = "Saroh";
@@ -50,6 +76,25 @@ export const RESOURCES: NavItem[] = [
         line: "What's new in Saroh",
         href: "/changelog",
     },
+    // Document templates sit in Resources on both sites; Website templates is
+    // the top-level entry (owner, 16 Nov 2026).
+    {
+        group: LEARN,
+        name: "Document templates",
+        line: "Invoices, quotes and receipts, free",
+        href: "/templates",
+    },
+    // The API and webhooks, while their switch is on (owner, 16 Nov 2026, #13).
+    ...(featuresOff().includes("developers")
+        ? []
+        : [
+              {
+                  group: LEARN,
+                  name: "Developers",
+                  line: "The Saroh API and webhooks",
+                  href: "/developers",
+              },
+          ]),
     {
         group: SAROH,
         name: "Integrations",
@@ -126,7 +171,10 @@ export const TOOLS: NavItem[] = [
     },
 ];
 
-export const ALL_TOOLS: MenuLink = { name: "All tools", href: "/tools" };
+export const ALL_TOOLS: MenuLink = {
+    name: "See all free tools",
+    href: "/tools",
+};
 
 /** The first six are the gallery's most asked-for trades. */
 const POPULAR_TRADES = TRADES.slice(0, 6);
@@ -153,32 +201,110 @@ export const TEMPLATES: NavItem[] = [
 ];
 
 export const ALL_TEMPLATES: MenuLink = {
-    name: "All templates",
+    name: "All document templates",
     href: "/templates",
 };
+
+/** The website templates gallery, while templates are on (DEC-135). */
+const WEBSITE_TEMPLATES: MenuLink | undefined = featuresOff().includes(
+    "templates",
+)
+    ? undefined
+    : { name: "Templates", href: "/website-templates" };
 
 export const MENUS: NavMenus = {
     features: FEATURES,
     solutions: SOLUTIONS,
     resources: RESOURCES,
     tools: TOOLS,
-    templates: TEMPLATES,
     allTools: ALL_TOOLS,
-    allTemplates: ALL_TEMPLATES,
+    ...(WEBSITE_TEMPLATES ? { websiteTemplates: WEBSITE_TEMPLATES } : {}),
 };
 
-/** The footer's columns, in the menus' order, with the Saroh column's own. */
+/** The nav's own words (the redesign, DEC-221). */
+export const NAV_WORDS = {
+    solutions: "Solutions",
+    /** The Solutions menu's see-all: the /solutions hub. */
+    allTrades: "See all trades",
+    /** The nav entry for /features (owner, 17 Nov 2026: "Features"). */
+    howItWorks: "Features",
+    // "Templates" is the website templates, on top; Document templates are in
+    // Resources, on both sites (owner, 16 Nov 2026).
+    templates: "Templates",
+    pricing: "Pricing",
+    resources: "Resources",
+    tools: "Tools",
+    signIn: "Sign in",
+} as const;
+
+/** The Features menu's see-all: the /features page. */
+export const HOW_IT_WORKS_ALL: MenuLink = {
+    name: "All features",
+    href: "/features",
+};
+
+/**
+ * The footer's Product group, in the LOCKED order (WORLD.md), each only when
+ * its page is shown here: no API page on Global yet, and Saroh Social only
+ * while its claim is on (DEC-221).
+ */
+const PRODUCT_ORDER = [
+    { name: "Website builder", slug: "website" },
+    { name: "Orders", slug: "orders" },
+    { name: "Bookings", slug: "bookings" },
+    { name: "Billing", slug: "billing" },
+    { name: "Share and posts", slug: "social" },
+    { name: "Saroh Social", slug: "social", claim: "social-posting" },
+    { name: "Ask AI", slug: "ask-ai" },
+    { name: "AI apps", slug: "ai-apps" },
+] as const;
+
+const shownSlugs = new Set<string>(featureList.map((f) => f.slug));
+const claimsHidden = claimsOff();
+
+export const PRODUCT: MenuLink[] = [
+    ...PRODUCT_ORDER.filter(
+        (p) =>
+            shownSlugs.has(p.slug) &&
+            !("claim" in p && claimsHidden.includes(p.claim)),
+    ).map((p) => ({
+        name: p.name,
+        href: `${featureHref(p.slug)}${"claim" in p ? "#saroh-social" : ""}`,
+    })),
+    // Last in the LOCKED order, as on saroh.in: API and webhooks.
+    ...(featuresOff().includes("developers")
+        ? []
+        : [{ name: "API and webhooks", href: "/developers" }]),
+];
+
+/**
+ * The footer's groups: Product first, then everything else this site links
+ * (the features Product doesn't name, the trades by group, tools,
+ * templates, resources and Saroh's own pages), folded on a phone.
+ */
 export const FOOTER_COLUMNS: { title: string; links: MenuLink[] }[] = [
-    { title: "Features", links: FEATURES },
-    { title: "Solutions", links: SOLUTIONS },
-    { title: "Tools", links: [...TOOLS.slice(0, 5), ALL_TOOLS] },
+    { title: "Product", links: PRODUCT },
     {
-        title: "Templates",
-        links: [
-            ...TEMPLATES.filter((t) => t.group === "Documents").slice(0, 4),
-            ALL_TEMPLATES,
-        ],
+        title: "Also in Saroh",
+        links: FEATURES.filter((f) => !PRODUCT.some((p) => p.href === f.href)),
     },
+    SOLUTIONS_COLUMN,
+    { title: "Tools", links: [...TOOLS.slice(0, 5), ALL_TOOLS] },
+    // As saroh.in's footer: the gallery's first four, then all of them.
+    ...(WEBSITE_TEMPLATES
+        ? [
+              {
+                  title: NAV_WORDS.templates,
+                  links: [
+                      { name: "Bakery", href: "/website-templates/bakery" },
+                      { name: "Salon", href: "/website-templates/salon" },
+                      { name: "Gym", href: "/website-templates/gym" },
+                      { name: "Clinic", href: "/website-templates/clinic" },
+                      { name: "All templates", href: "/website-templates" },
+                  ],
+              },
+          ]
+        : []),
     {
         title: "Resources",
         links: RESOURCES.filter((r) => r.group === LEARN),

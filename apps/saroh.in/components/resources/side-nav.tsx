@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@saroh/marketing/cn";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
 import { ring } from "@saroh/marketing/ring";
 import { ChevronDown } from "lucide-react";
 import Link from "next/link";
@@ -72,9 +71,9 @@ export function SideNav({
             >
                 {groups.map((group) => (
                     <div key={group.title} className="grid gap-1">
-                        <Eyebrow as="span" tone="muted" size="sm">
+                        <span className="px-2.5 text-[13px] font-semibold text-foreground">
                             {group.title}
-                        </Eyebrow>
+                        </span>
                         <ul className="m-0 grid list-none gap-0.5 p-0">
                             {group.items.map((item) => (
                                 <li key={item.href}>

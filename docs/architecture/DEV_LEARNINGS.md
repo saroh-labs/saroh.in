@@ -6768,3 +6768,36 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a page already dated today passes (`scripts/check-content-dates.mjs`, `CONTENT_DATES_TODAY` for its test); a test covers it.
 - **Rule:** a freshness check accepts "already today" as fresh.
 - **Category:** tooling · content
+
+## A page's heading sat low beside its words, again (16 Nov 2026)
+
+- **Symptom:** on Ask AI, Website and Share (desk), the h1 sat at the bottom of its column while the lede and buttons sat at the top (bug #47), after the same thing had been fixed on Keep pages, Home's chapters and Features (#9, #26).
+- **Cause:** the "h1 left, words and buttons right" opening was written by hand in seven files, and each fix changed one copy (`items-end` to top). The shared Reach top (`feature-pages/reach/page-top.tsx`) was missed. Under it, `cn()` didn't know the kit sizes (`text-mk-kit-h1`, `-h2`, `-h3`, `-lead`), so a later colour class silently dropped them (and vice versa), the same trap as `text-mk-note`.
+- **Fix:** one `SplitHero` (`@saroh/marketing/split-hero`), top-aligned once, used by Keep pages, the Reach top (Website, Share, Ask AI), AI apps, trade pages, the Solutions hub and Home. `split-hero.test.tsx` scans the package and fails on a `grid … items-end` whose children hold an h1/h2. The kit sizes are in `cn.ts`'s font-size group.
+- **Rule:** fix a pattern in its shared component, then grep the pattern everywhere; before writing a section, find the component and pass values (`frontend-design-system.md` → shared pieces).
+- **Category:** frontend · marketing
+
+## 16 Nov 2026: Paper text on Saffron and white inside an Ink section
+
+- **Symptom:** on the Website page's dark sections the "Make a test release" button, the current stage's number and the approval chip had Paper text on Saffron or white (owner saw it).
+- **Cause:** `Section`'s `ink` tone rewrote every `.text-foreground` descendant to Paper, including buttons and light chips.
+- **Fix:** the rewrite now skips `a` and `button`; dark text on a light surface inside Ink uses `text-[hsl(var(--foreground))]`.
+- **Rule:** when a section flips colours for its descendants, check every light surface and every button inside it in the browser before calling it done.
+
+### A grid with no column template grows past a phone screen (16 Nov 2026)
+
+- **Symptom:** at a true 320px, the Ask AI hero rows, the Orders card, the saroh.tech features example and the AI apps connector card ran off their frame and were cut mid-word. The page's own width stayed 320, so the overflow check passed.
+- **Cause:** `grid` with no `grid-cols-*` makes one `auto` column, and an `auto` column is never narrower than its widest child's min-content (a `truncate` line, a no-wrap list). An `overflow-hidden` ancestor then hides the excess. Separately, a desktop Chrome window doesn't shrink below 500px, so earlier "320px" screenshots were really 500px wide.
+- **Fix:** `grid-cols-[minmax(0,1fr)]` on single-column grids that hold rows or cards; `flex-wrap` on step lists. Check phones with DevTools device emulation (`emulate` viewport `320x720x1,mobile`), not by resizing the window, and look for text cut by a clipping ancestor, not only for page scroll.
+
+### A white card on a dark band loses its words (16 Nov 2026, again)
+
+- **Symptom:** on the trade pages' night hour, ChatGPT's card and "Waiting for her in Saroh" drew light grey text on white.
+- **Cause:** the `lamp` and `ink` Section tones rewrite every `.text-foreground` and `.text-mk-copy` inside them, white cards included. Each earlier fix patched one card with an explicit colour.
+- **Fix:** the rewrite now skips anything marked `mk-paper` and its contents (`sections/section.tsx`); a white card on a dark band adds `mk-paper` (the trade moments' `CARD` does). New white cards on dark bands: add `mk-paper`, don't hand-pick colours.
+
+### CI's lint job dies with no log: the runner ran out of memory (17 Nov 2026)
+
+- **Symptom:** on #1424, "Lint, typecheck and repo checks" stopped about 50 minutes into "Lint and typecheck" on both attempts, with no log and the annotation "The hosted runner lost communication with the server". In the 80 runs before it, the step took 0.7 to 9.3 minutes and never hung. The same command on the same commit finished locally in 2.5 minutes.
+- **Cause:** turbo runs ten tasks at once by default; with nearly every package affected (a merge from development), several `tsc` and ESLint processes for the big apps at once starve the 16 GB hosted runner.
+- **Fix:** `--concurrency=4` on that step (`.github/workflows/ci.yml`), as the test step already caps itself. A job that dies with "lost communication" and no log is memory, not the code: cap the parallelism, don't re-run it again and again.

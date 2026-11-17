@@ -23,7 +23,7 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
     const typed = query.trim().length > 0;
     return (
         <div className="grid gap-3">
-            <label className="flex h-16 items-center gap-3.5 rounded-[14px] border border-border-strong bg-card px-[22px] transition-colors duration-fast ease-out focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500 focus-within:[outline-style:solid] hover:border-foreground/40">
+            <label className="flex h-16 items-center gap-3.5 rounded-mk-crop border border-border-strong bg-card px-5 transition-colors duration-fast ease-out focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-500 focus-within:[outline-style:solid] hover:border-foreground/40">
                 <Search
                     aria-hidden
                     strokeWidth={2}
@@ -47,7 +47,7 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
                 {!typed ? null : results.length > 0 ? (
                     <ul
                         aria-label="Results"
-                        className="m-0 list-none overflow-hidden rounded-[14px] border border-border bg-card p-0"
+                        className="m-0 list-none overflow-hidden rounded-mk-crop border border-border bg-card p-0"
                     >
                         {results.map((a) => (
                             <li
@@ -69,7 +69,7 @@ export function HelpSearch({ articles }: { articles: HelpSummary[] }) {
                         ))}
                     </ul>
                 ) : (
-                    <p className="m-0 rounded-[14px] border border-border bg-card px-5 py-3.5 text-mk-faq text-mk-copy">
+                    <p className="m-0 rounded-mk-crop border border-border bg-card px-5 py-3.5 text-mk-faq text-mk-copy">
                         Nothing matches that yet. Write to{" "}
                         <a
                             href={`mailto:${HELP_EMAIL}`}

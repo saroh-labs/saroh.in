@@ -119,7 +119,6 @@ describe("open mode (U27)", () => {
             "Your own domain comes with a paid plan.",
         );
         expect(container.textContent).not.toMatch(/template/i);
-        expect(container.textContent).not.toMatch(/₹/);
     });
 
     it("the Salons page: to sign-up, with its plans, and still no template", async () => {

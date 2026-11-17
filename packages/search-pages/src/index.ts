@@ -12,6 +12,7 @@
 // `./tool-checks` and the tool registry `./tools`, so the index reaches no
 // tool's code: a site imports only its build's tools (`./tools/<slug>`).
 export type { SearchPageCheck } from "./checks";
+export { AiAsks, NewMark } from "./components/ai-asks";
 export {
     AnswerBox,
     Byline,
@@ -38,6 +39,7 @@ export { ForHub } from "./components/for-hub";
 export type { ForHubProps } from "./components/for-hub";
 export { HubCards, HubChips, HubPage } from "./components/hub-page";
 export type { HubChip, HubGroup } from "./components/hub-page";
+export { AlsoSvg } from "./components/icons";
 export {
     ClosingBand,
     Crumbs,
@@ -45,7 +47,17 @@ export {
     StartButton,
 } from "./components/page-parts";
 export type { Crumb } from "./components/page-parts";
-export { PRESETS, smallKeys } from "./components/parts";
+export {
+    FrameDesk,
+    FramePhone,
+    PRESETS,
+    SmallPicture,
+    bigTile,
+    carouselLabels,
+    newAlso,
+    smallKeys,
+} from "./components/parts";
+export type { NewFeature, SmallKey } from "./components/parts";
 export { Prose } from "./components/prose";
 export { SearchPage, starterWords } from "./components/search-page";
 export type {

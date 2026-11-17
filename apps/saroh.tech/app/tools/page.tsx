@@ -1,11 +1,13 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { Arrow } from "@saroh/marketing/arrow";
+import { SwipeRow } from "@saroh/marketing/kit/swipe-row";
+import { PageHero } from "@saroh/marketing/page-hero";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
-import { Breadcrumb } from "@/components/shared/breadcrumb";
 import { ButtonLink } from "@/components/shared/button";
 import { CtaBand } from "@/components/shared/cta-band";
+import { HubPage } from "@/components/shared/hub-head";
 import { JsonLd } from "@/components/shared/json-ld";
-import { TextLink } from "@/components/shared/text-link";
 import { itemListSchema, pageSchema } from "@/lib/schema";
 import { pageMetadata } from "@/lib/seo";
 import { pageOf } from "@/lib/site-map";
@@ -81,41 +83,42 @@ const live = GROUPS.flatMap((g) =>
 );
 
 const CARD =
-    "box-border flex min-h-[128px] flex-col gap-2 rounded-mk-card p-[22px]";
+    "box-border flex h-full min-h-[128px] flex-col gap-2 rounded-mk-card p-[22px]";
 const NAME =
-    "flex items-center justify-between gap-3 font-display text-xl font-bold tracking-[-0.03em]";
+    "flex items-center justify-between gap-3 font-display text-mk-kit-h3 font-bold";
 const LINE = "m-0 text-[15px] leading-normal text-mk-copy";
 
 export default function ToolsHubPage() {
     return (
-        <div
-            data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-9 px-mk-gutter pt-4 md:gap-[52px] md:pt-10"
-        >
+        <HubPage page={page}>
             <JsonLd
                 data={[...pageSchema(page), itemListSchema(page.h1, live)]}
             />
-            <div className="flex max-w-[860px] flex-col items-start gap-4">
-                {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                <PageTitle size="page">{page.h1}</PageTitle>
-                <p className="m-0 text-[16.5px] leading-normal text-mk-copy md:text-[19px] md:leading-[1.55]">
-                    They run in your browser. No account, no watermark, nothing
-                    sent to us. Start with the invoice generator.
-                </p>
-                <ButtonLink
-                    href="/tools/invoice-generator"
-                    data-cta="open-invoice-generator"
-                >
-                    Open the invoice generator
-                </ButtonLink>
-            </div>
+            <PageHero
+                crumbs={page.crumb?.map((c) => ({
+                    name: c.name,
+                    href: c.path,
+                }))}
+                title={page.h1}
+                lead="They run in your browser. No account, no watermark, nothing sent to us. Start with the invoice generator."
+                className="px-0 pb-0 min-[760px]:pb-0"
+            >
+                <div className="flex flex-wrap gap-3">
+                    <ButtonLink
+                        href="/tools/invoice-generator"
+                        data-cta="open-invoice-generator"
+                    >
+                        Open the invoice generator
+                    </ButtonLink>
+                </div>
+            </PageHero>
 
             {GROUPS.map((group) => (
-                <section key={group.title} className="flex flex-col gap-[18px]">
-                    <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+                <section key={group.title} className="flex flex-col gap-6">
+                    <h2 className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]">
                         {group.title}
                     </h2>
-                    <div className="grid gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-4">
+                    <SwipeRow label={group.title}>
                         {group.tools.map((t) => (
                             <Link
                                 key={t.name}
@@ -130,7 +133,7 @@ export default function ToolsHubPage() {
                                 <p className={LINE}>{t.line}</p>
                             </Link>
                         ))}
-                    </div>
+                    </SwipeRow>
                 </section>
             ))}
 
@@ -139,9 +142,17 @@ export default function ToolsHubPage() {
                     Looking for a ready-made file instead? Invoices, quotes and
                     receipts in PDF, Word, Google Docs and Sheets.
                 </p>
-                <TextLink href="/templates" className="shrink-0">
-                    Browse templates →
-                </TextLink>
+                <Link
+                    prefetch={false}
+                    href="/templates"
+                    className={textLinkClasses({
+                        tone: "ink",
+                        className: "shrink-0 text-[17px]",
+                    })}
+                >
+                    Browse templates
+                    <Arrow />
+                </Link>
             </section>
 
             <CtaBand
@@ -151,6 +162,6 @@ export default function ToolsHubPage() {
                 href={signupHref(page.type)}
                 from="start-free-band"
             />
-        </div>
+        </HubPage>
     );
 }

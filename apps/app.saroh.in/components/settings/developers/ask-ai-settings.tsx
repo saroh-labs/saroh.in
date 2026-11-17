@@ -15,6 +15,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useOptimistic, useTransition } from "react";
 
+import { PROVIDER_WHERE } from "@/components/ask-ai/words";
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { runAction } from "@/lib/api/run-action";
 import { MARKETING_URL } from "@/lib/help/links";
@@ -146,7 +147,7 @@ export function AskAiSettingsView({
                     className="order-5 text-pretty text-[12.5px] leading-normal text-foreground/80"
                 >
                     Questions and the business details needed to answer them are
-                    processed by Anthropic, outside India.{" "}
+                    processed by Anthropic{PROVIDER_WHERE}.{" "}
                     <a
                         href={`${MARKETING_URL}/privacy`}
                         target="_blank"

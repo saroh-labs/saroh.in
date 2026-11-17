@@ -25,6 +25,10 @@ const OFFSETS: ReadonlyMap<string, number> = new Map([
 ]);
 
 function offsetOf(timezone: string): number {
+    // The Global seed's fixed-offset zones (`morning-zone.ts`); Etc/GMT's sign
+    // is the opposite of its offset.
+    const etc = /^Etc\/GMT([+-]\d{1,2})?$/.exec(timezone);
+    if (etc) return -Number(etc[1] || "0") * 3_600_000;
     const offset = OFFSETS.get(timezone);
     if (offset === undefined) {
         throw new Error(

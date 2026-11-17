@@ -16,13 +16,12 @@ import { helpArticles } from "@/lib/help-docs";
 import { helpLive } from "@/lib/help-live";
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
-import { Container } from "@saroh/marketing/container";
-import { Eyebrow } from "@saroh/marketing/eyebrow";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { PageHero } from "@saroh/marketing/page-hero";
 import { textLinkClasses } from "@saroh/marketing/text-link";
 
 /** A link inside a sentence: underlined, not told apart by colour alone. */
-const RUNNING_TEXT = "underline underline-offset-[3px]";
+const RUNNING_TEXT =
+    "text-foreground underline decoration-border-strong underline-offset-[3px] hover:decoration-foreground";
 
 export const metadata: Metadata = pageMetadata({
     title: helpHome.seo.title,
@@ -46,41 +45,40 @@ export default function HelpPage() {
     const groups = groupsWithArticles(articles);
     return (
         <>
-            <Container
-                as="header"
-                width="list"
-                className="mx-0 grid gap-[22px] pt-20"
-            >
-                <PageTitle size="page">{helpHome.title}</PageTitle>
-                <HelpSearch articles={articles} />
-            </Container>
+            <PageHero title={helpHome.title} mark="help">
+                <div className="max-w-[640px]">
+                    <HelpSearch articles={articles} />
+                </div>
+            </PageHero>
             {groups.length > 0 ? (
-                <section aria-labelledby="tasks" className="pt-20">
-                    <Eyebrow
+                <section
+                    aria-labelledby="tasks"
+                    className="mx-auto max-w-mk-page px-mk-gutter pt-6 min-[760px]:pt-10"
+                >
+                    <h2
                         id="tasks"
-                        className="px-mk-gutter"
-                        role="heading"
-                        aria-level={2}
+                        className="m-0 font-display text-mk-kit-h2 font-bold [text-wrap:balance]"
                     >
                         {helpHome.groupsTitle}
-                    </Eyebrow>
-                    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-14 px-mk-gutter pt-6">
+                    </h2>
+                    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-x-14 pt-8">
                         {groups.map(({ group, articles: list }) => (
                             <div
                                 key={group}
                                 className="grid content-start gap-2.5 border-t border-border py-7"
                             >
-                                <h3 className="m-0 font-display text-[24px] font-bold tracking-[-0.02em]">
+                                <h3 className="m-0 font-display text-mk-kit-h3 font-bold">
                                     {group}
                                 </h3>
-                                <ul className="m-0 grid list-none gap-1.5 p-0 text-mk-faq">
+                                <ul className="m-0 grid list-none gap-0.5 p-0 text-[16px]">
                                     {list.map((a) => (
                                         <li key={a.slug}>
                                             <Link
                                                 href={helpHref(a.slug)}
                                                 className={textLinkClasses({
                                                     tone: "copy",
-                                                    className: "w-fit",
+                                                    className:
+                                                        "inline-flex min-h-11 w-fit items-center py-1",
                                                 })}
                                             >
                                                 {a.title}
@@ -93,8 +91,8 @@ export default function HelpPage() {
                     </div>
                 </section>
             ) : null}
-            <div className="px-mk-gutter pt-16">
-                <div className="flex flex-wrap gap-x-10 gap-y-4 border-t border-border pt-6 text-[15px] leading-[1.6] text-mk-copy">
+            <div className="mx-auto max-w-mk-page px-mk-gutter pb-[72px] pt-16 min-[760px]:pb-[120px]">
+                <div className="flex flex-wrap gap-x-10 gap-y-4 border-t border-border pt-6 text-[16px] leading-[1.6] text-mk-copy">
                     <span className="max-w-[46ch]">
                         <strong className="font-semibold text-foreground">
                             Can&apos;t find it?

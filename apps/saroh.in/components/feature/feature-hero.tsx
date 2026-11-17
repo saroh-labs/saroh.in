@@ -56,7 +56,7 @@ export function FeatureHero({
     const start = <HeroActions src={`feature-${feature.slug}`} />;
     return (
         <ProductHero
-            section={{ name: "Features", href: "/#features" }}
+            section={{ name: "Features", href: "/features" }}
             name={feature.name}
             headline={feature.headline}
             sub={feature.sub}

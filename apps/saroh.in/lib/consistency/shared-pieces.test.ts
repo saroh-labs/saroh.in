@@ -122,8 +122,32 @@ const RULES: Rule[] = [
     {
         name: "a question list is Faq (V3)",
         pattern: /<details\b/,
-        home: [`${MK}/sections/faq.tsx`],
-        allow: {},
+        // The redesign's folds (DEC-221): a cropped card's "See the whole …"
+        // and the footer's phone groups keep their content in the HTML.
+        home: [
+            `${MK}/sections/faq.tsx`,
+            `${MK}/kit/cropped-card.tsx`,
+            `${MK}/kit/phone-fold.tsx`,
+            `${MK}/nav/marketing-footer.tsx`,
+        ],
+        allow: {
+            "packages/marketing/src/home/fold.tsx":
+                "the landing's phone folds (DEC-221): CroppedCard's fold with no screen to crop; the questions themselves are FaqItems",
+            "packages/marketing/src/how-it-works/how-it-works-page.tsx":
+                "keep: How it works' phone folds (PHONE.md): the yours rows and the feature index, in the HTML, open from 760px",
+            "packages/marketing/src/how-it-works/chapter.tsx":
+                "keep: a chapter's Read more links, folded on a phone, open from 760px",
+            "packages/marketing/src/feature-pages/keep-page.tsx":
+                "keep: the Keep template's folded points and its questions (FOPhone2), every answer in the HTML",
+            "packages/marketing/src/solutions/moments/moments.tsx":
+                "keep (DEC-221): a moment's second picture folds on a phone, kept in the HTML",
+            "packages/marketing/src/solutions/trade-page.tsx":
+                "keep (DEC-221): a problem's answer and a day trade's other parts fold, kept in the HTML",
+            "packages/marketing/src/solutions/hub-finder.tsx":
+                "keep (DEC-221): the phone's closed A to Z list of every trade",
+            [`${MK}/feature-pages/reach/fold.tsx`]:
+                "keep: the Reach and Ask pages' phone folds and crop toggles (FWPhone2, FSPhone2, FAPhone2, FMPhone2), content in the HTML",
+        },
         files: SITE,
     },
     {
@@ -137,10 +161,7 @@ const RULES: Rule[] = [
         name: "the Ink closing band is CtaBand (V4, A10)",
         pattern: both("\\brounded-mk-band\\b", "\\bbg-foreground\\b"),
         home: [`${MK}/sections/cta-band.tsx`],
-        allow: {
-            "components/about/about-page.tsx":
-                "step 6 (V4): About's closing band (its 56px title, no body) becomes CtaBand; its सह name band is its own Ink block and stays",
-        },
+        allow: {},
         files: SITE,
     },
     {
@@ -218,14 +239,7 @@ const RULES: Rule[] = [
         name: "a page title is PageTitle, its size a token (V6, A7)",
         pattern: /text-\[clamp\(/,
         home: [`${MK}/sections/page-title.tsx`],
-        allow: {
-            "app/(standalone)/waitlist/page.tsx":
-                "keep: the waitlist's 68px opening line is a paragraph of its own design, not a page title",
-            "components/about/about-page.tsx":
-                "keep: About's 'Where' H2 (30-40px) is its own; its closing band title waits on V4 (CtaBand), not in step 6's picks",
-            "components/tools/link-preview/saroh-share-preview.tsx":
-                "keep: the 'Share Saroh' card's H2 (30-38px) is a card title, not a page title",
-        },
+        allow: {},
         files: SITE,
     },
     {
@@ -255,14 +269,15 @@ const RULES: Rule[] = [
     {
         name: "a choice chip is ChoiceChip (V9, A13)",
         pattern: both("\\bh-9\\b", "\\brounded-full\\b"),
-        home: [`${MK}/fields/choice-chip.tsx`],
+        // The redesign's chip (DEC-221: filter, chapter, source, plan).
+        home: [`${MK}/fields/choice-chip.tsx`, `${MK}/kit/chip.tsx`],
         allow: {},
         files: SITE,
     },
     {
         name: "a text field is fieldClasses() (V11, A15)",
         pattern: /placeholder:text-/,
-        home: ["components/shared/fields/"],
+        home: ["components/shared/fields/", `${MK}/fields/field-classes.ts`],
         allow: {},
         files: SITE,
     },
@@ -276,7 +291,7 @@ const RULES: Rule[] = [
     {
         name: "a value read once in the browser is useBrowserValue() (B7)",
         pattern: /=\s*\(\)\s*=>\s*\(\)\s*=>\s*undefined\b/,
-        home: ["lib/use-browser-value.ts"],
+        home: [`${MK}/use-browser-value.ts`],
         allow: {},
         files: SITE,
     },

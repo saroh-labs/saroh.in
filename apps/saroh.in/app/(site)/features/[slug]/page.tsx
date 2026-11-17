@@ -1,45 +1,27 @@
-import { AppList } from "@saroh/marketing/app-list";
 import type { SlugPageProps as Props } from "@saroh/marketing/content-types";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { FeatureHero } from "@/components/feature/feature-hero";
-import {
-    FeaturePoints,
-    FeatureUsedBy,
-    FeatureWorksWith,
-} from "@/components/feature/feature-related";
-import { FeatureSteps } from "@/components/feature/feature-steps";
-import { FeatureTemplates } from "@/components/feature/feature-templates";
+import { KeepPage } from "@/components/feature-pages/keep-page";
+import { BESPOKE } from "@/components/feature-pages/registry";
 import { JsonLd } from "@/components/shared/layout/json-ld";
-import { CtaBand } from "@/components/shared/sections/cta-band";
-import { featureHelpLinks } from "@/content/feature-help";
+import type { KeepSlug } from "@/content/feature-keep";
+import { KEEP, KEEP_SLUGS } from "@/content/feature-keep";
 import {
     featureHref,
     featureList,
     features,
     isFeatureSlug,
 } from "@/content/features";
-import { summarise } from "@/content/help";
-import { shownIntegrations } from "@/content/integrations";
-import { helpArticles } from "@/lib/help-docs";
-import { LAUNCH_MODE } from "@/lib/links";
-import { readLivePricing } from "@/lib/pricing";
-import { resourcesContext } from "@/lib/resources-context";
+import { HOW_IT_WORKS } from "@/content/how-it-works";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd } from "@/lib/structured-data";
 
 /**
- * The feature pages (plan U22): ONE template, the Features design, and a
- * data set each in `content/features.ts`. Built at build time; any
- * other slug is a 404. The "How to …" links to Help (plan U7) follow the
- * publish date: they are drawn by the first deploy made on or after the day
- * Help opens (`app/layout.tsx`; nothing rebuilds the site on a schedule).
- * The hero's plan line reads the pricing catalogue once the launch
- * switch is open (KTD-10); before that it is the line with no plan details
- * (`heroPlanLine`, Gate W). Website's templates section follows
- * `NEXT_PUBLIC_TEMPLATES` (DEC-135, DEC-216). AI apps' "Apps you can use"
- * lists the Integrations cards this build shows as live (plan U3, U7).
+ * The feature pages, by kind (DEC-221): a record feature is a Keep page
+ * (`KeepPage`, the Orders template); Website, Share, Ask AI and AI apps each
+ * draw their own (`components/feature-pages/registry.ts`). Built at build
+ * time, the shown features only; any other slug is a 404.
  */
 export const dynamicParams = false;
 
@@ -62,43 +44,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     });
 }
 
+const isKeep = (slug: string): slug is KeepSlug =>
+    (KEEP_SLUGS as readonly string[]).includes(slug);
+
 export default async function FeaturePage({ params }: Props) {
     const { slug } = await params;
     if (!isFeatureSlug(slug)) notFound();
-    const feature = features[slug];
-    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
-    const context = resourcesContext();
-    const help = featureHelpLinks(slug, helpArticles().map(summarise), context);
+    // Called, not rendered, so the page is one async component (and testable).
+    const body = isKeep(slug)
+        ? await KeepPage({ slug })
+        : await BESPOKE[slug]();
     return (
         <>
-            {/* The trail the hero draws: Features / {name}. */}
+            {/* The trail the hero draws: How it works / {name}. */}
             <JsonLd
                 data={breadcrumbLd([
-                    { name: "Features", path: "/#features" },
-                    { name: feature.name, path: featureHref(slug) },
+                    { name: KEEP.crumb, path: HOW_IT_WORKS.href },
+                    { name: features[slug].name, path: featureHref(slug) },
                 ])}
             />
-            <FeatureHero feature={feature} catalog={catalog} />
-            <FeatureSteps feature={feature} help={help} />
-            {feature.templates && !context.off?.includes("templates") ? (
-                <FeatureTemplates words={feature.templates} />
-            ) : null}
-            <FeaturePoints feature={feature} mode={LAUNCH_MODE} />
-            {feature.apps ? (
-                <AppList
-                    words={feature.apps}
-                    apps={shownIntegrations(context.off ?? []).filter(
-                        (c) => c.category === "AI apps",
-                    )}
-                />
-            ) : null}
-            <FeatureWorksWith feature={feature} />
-            <FeatureUsedBy feature={feature} />
-            <CtaBand
-                title={feature.closer}
-                src={`feature-${slug}-band`}
-                className="pt-[120px]"
-            />
+            {body}
         </>
     );
 }

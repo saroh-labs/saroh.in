@@ -267,6 +267,7 @@
     | `ProgressBar`, `doneOf`                                                     | `@saroh/ui/progress-bar`                                                   | `value`, `max`, `size`, `tone`, `label` (required). A checklist's count is "2 of 4 done".                                                                                                                                                                                                                              |
     | `.label`                                                                    | `packages/ui/src/globals.css`                                              | 11px, 600, uppercase at 0.1em: every table and list header and eyebrow. The only `uppercase` in the app (code fields excepted).                                                                                                                                                                                        |
 
+- **Current** — **The marketing redesign kit (DEC-221).** saroh.in and saroh.tech draw redesigned pages with the kit in `packages/marketing/src/kit/` (Chip, CroppedCard, SwipeRow, MomentCard, PlanLine, StickyBar, ClosingCTA, TradeSwitcher, HourStrip, DayScene, MoneyPath, frames, SiteDrawing, Claim), `MarketingNav` and `MarketingFooter`, fed by each edition's `content/world.ts`. The system and every component's rules: `apps/saroh.in/DESIGN.md`; the kit sheet: `/dev/kit` under `next dev`.
 - **Adopted** (27 Oct 2026, DEC-195) — **Shared pieces on saroh.in: reuse
   the component, never redraw it.** Before drawing a card, heading, band,
   link, chip, field or button, find the one that exists and pass it data; a
@@ -316,6 +317,51 @@
     | Email check, days, lists, arrows, body    | `isEmailShape()`, `lib/format/`, `nextIndex()`, `readPosted()`, `useBrowserValue()`   | an email regex, `Intl`/`toLocale…`, `.slice(0,-1).join(", ")`, `req.json()`   |
     | Clipboard, file download                  | `copyText` (`@saroh/ui`), `saveFile()` (`@saroh/search-pages/download`)               | `navigator.clipboard`, `URL.createObjectURL`                                  |
     | Package crumb, FAQ, band, start button    | `packages/search-pages/src/components/page-parts.tsx`                                 | `sp-*` / `tp-*` copies; a literal "Start free" (the label comes from `cta()`) |
+
+    **Which component for which pattern** (`@saroh/marketing`, the redesign).
+    Before writing a section, look here and in `packages/marketing/package.json`'s
+    exports for the one that exists and pass it values; a page that needs it
+    different adds a prop there. Fix a pattern in the shared component, then
+    grep the pattern everywhere (a two-column head was fixed one copy at a time
+    and came back three times, #47; DEV_LEARNINGS 16 Nov).
+
+    - A page's opening (crumbs, h1 with one `Mark`, lede, plan note, Start
+      free + second button, foot note, picture below or beside, centred
+      Home): `SplitHero` (`/split-hero`; `layout` split, stacked, beside,
+      center). Top-aligned (`items-start`); `split-hero.test.tsx` fails on a
+      bottom-aligned heading grid.
+    - A plain page head (about, help, legal, tools): `PageHero`.
+    - "How it works" as numbered steps beside one large picture (Share;
+      board "Steps A", #42/#51): `StepsShowcase`
+      (`/steps-showcase`), through `ReachSteps` on a Reach page. Every
+      step's picture is in the HTML; a phone shows each under its step.
+    - "How it works" as one story the visitor moves through one panel
+      (Ask AI, board "overdrive", #49): `StepsPlayer`
+      (`sections/steps-player.tsx`) with a `panel(view)` drawn in a client
+      piece (`AskSteps`, its words from `reachSteps()`). Nothing autoplays
+      (owner 16 Nov: it reads as a recording): the visitor's tap in the
+      panel (`view.go`, `view.confirm`) or a picked step moves it on. The
+      server draws the finished story; with script it starts at step 1;
+      reduced motion skips the beats.
+    - A story that plays by itself on an Ink band (Website, board
+      R2WebsiteOverdrive "V1 overdrive, dark", owner 16 Nov: the one
+      exception to "nothing autoplays"): `Journey` (draft to live) and
+      `BrandStudio` (colour sets over Desktop, Tablet, Phone) in
+      `feature-pages/website/`, on `Section tone="ink"`, timed by
+      `useAutoplay` (`website/autoplay.ts`): plays while 40% in view and
+      the tab is shown, the visitor's first pick stops it for good, reduced
+      motion never plays. The server draws the finished state with every
+      stage's words in the HTML.
+    - "Paste one address" (AI apps, R2Apps2 variant I, owner 16 Nov): the
+      MCP address large in mono between Ink rules with Copy, Saffron
+      numbered steps, "Step-by-step for" guide pills with the apps' marks
+      (`public/logos/`): `ConnectSteps` (`/connect-steps`). It replaced
+      AI apps' Steps A and its "Apps you can use" cards.
+    - A section's heading, eyebrow and lead: `SectionHeading` / `Section`.
+    - The closing band: `ClosingCTA` (`kit/closing-cta`).
+    - The plan line under a feature: `PlanLine` (`kit/plan-line`).
+    - A phone's sticky start bar: `StickyBar`, watching the hero CTA's id.
+    - Questions: `Faq` / `FaqItems`; chapter chips: `Chip variant="chapter"`.
 
 - **Current** (10 Oct 2026) — **"Draft" and "Live" for every kind of
   thing.** Whether customers can get a product, plan, course, pack, post,

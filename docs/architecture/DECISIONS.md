@@ -2974,3 +2974,50 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - A quality test of real questions with fixed pass marks must pass before the merchant screens are built, and again before any model or instruction change reaches businesses.
 - Consequences: one module, one event stream and one tool registry serve every later agent; switching a provider later touches only the module. Prices, allowances and cost limits live in the plan catalogue and admin settings, not in the code.
 - Supersedes: DEC-015.
+
+## DEC-221 The marketing redesign: one shared system for saroh.in and saroh.tech, unlive claims behind switches, and story ownership
+
+**Status: Accepted — 2026-11-17** · owner
+
+- Context: the owner finalised the marketing redesign boards (landing, /for hub and trade days, How it works, the Orders, Website, Share, Ask AI and AI apps pages) and asked for them to be built. The design draws every feature as live, both editions must look the same, and nothing on today's sites may be lost.
+- Decision:
+    - **One system, two editions.** saroh.in and saroh.tech share one kit (`packages/marketing`: tokens, components, the nav and footer), the same layouts and the same kind of screenshot in each slot; only words, money and the example world differ. Each edition's world file (`content/world.ts`: India from WORLD.md's LOCKED table, Global from `db:seed:global`) feeds every drawing. `apps/saroh.in/DESIGN.md` is the system; `apps/saroh.tech/DESIGN.md` lists Global's differences.
+    - **No content is removed.** Content may be reworded or moved, never dropped: guides, tools, GST pages, templates, help, changelog, downloads and integrations stay, restyled. The nav is Solutions · How it works · Templates · Pricing · Developers; links it no longer names fold into How it works' strip, the phone sheet's levels and the footer's groups. The footer's Product group comes first in the LOCKED order.
+    - **Unlive claims go behind switches** (decision 1). A claim the product can't back in production renders only while its claim switch is on (`CLAIM_SWITCHES`, `NEXT_PUBLIC_CLAIM_*`): Saroh Social posting and scheduling for you, Share free on every plan, Ask AI reading Stock, the Website or posts, Ask AI in Hinglish or Hindi, and a plan named beside Ask AI or AI apps. DEC-135's rule: on only when it says `on`, unset is on only under `next dev`, and a claim is off with its feature's release switch. Off, the page shows nothing or "Not available yet", never the claim.
+    - **Trade pages** (decision 2). All 34 /for pages move to the new trade-page layout and keep every word they have (problems, features, FAQ, template). The day section appears only where a trade has a written day (`home-bakers` and `florists` now); others gain theirs through the publish review.
+    - **Story ownership** (decision 3). Landing: what Saroh is, and doors. Solutions (/for): a day per trade. How it works (/features): the ownership chapters, how money moves and the full feature index, grouped as Your records, Reaching customers, and Asking and connecting. Feature pages come in three kinds: Keep (the Orders template, for every record feature), Reach (Website and Share, each around its own signature) and Ask and connect (Ask AI and AI apps).
+    - **Google indexes the phone page.** Content moved behind a tap stays in the HTML (closed `<details>`, swipe rows); desk and phone share one h1.
+    - **Screenshots are one type in both editions and retaken fresh for every production release** (owner, 17 Nov 2026). The same slot uses the same shot key, crop and frame on saroh.in and saroh.tech; both editions' shots are captured again from their demo seeds before each production release (`docs/patterns/devops-tooling-and-deploy.md`). A Global key with no capture yet stays on `PENDING_SHOTS` and draws India's fallback kind.
+- Consequences: a page is words plus a world plus kit components, so the two editions can't drift apart. Each unlive claim is a switch to turn on at its release, with a test. Every release retakes both editions' shots. Built on `batch-2026-11-15-4`; the kit sheet is `/dev/kit` under `next dev`.
+
+## DEC-222 A feature that isn't live yet is shown with a tag, not hidden, and saroh.tech's plan words follow one switch
+
+**Status: Accepted — 2026-11-16** · owner · amends DEC-221's "unlive claims behind switches"
+
+- Context (owner, 16 Nov 2026, web-redesign bugs #34 and #45): "show features on the marketing site as paid or coming soon if they're not published, because if we think something will be added later, we might miss it". And saroh.tech still said "Tell me when" with paid plans switched on locally: "changing them from one place changes everywhere".
+- Decision:
+    - **Shown with a tag, not hidden.** A feature that is built but not released, or planned, is drawn on saroh.in and saroh.tech with a "Coming soon" tag, or with its plan ("On Grow and Pro", "On paid plans"), not left out. Only a claim that isn't true is left out: DEC-221's claim switches still hide a sentence the product can't back.
+    - **Tags only.** A tag is a few words beside the feature's name or on its page. Never a locked panel, an upgrade wall, a used-up screen or an internal limit; no prices or limits in the words.
+    - **No dates.** "Coming soon" and "Coming next" carry no day, month or quarter.
+    - **saroh.tech's plan words follow one switch.** Every line that changes when Global's paid plans go on sale (the plan lines, Tell me when, "Free for now", the pricing title and cards, own-domain lines, the legal "Paying for Saroh", the paid-plan tag) is a pair in `apps/saroh.tech/content/plan-words.ts`. Pages read the API's `offered` (`GET /public/pricing`, `SAROH_BILLING_GLOBAL` on and a paid plan published, DEC-211) once per build (`paidPlansOn`) and take the pair's wording; no other file carries the Free-only words (`lib/plan-words.test.ts`). On, the paid cards start to sign-up and the plan lines name Grow and Pro with Compare plans.
+    - **Applied first to Subscriptions on saroh.tech:** its page is tagged "On paid plans" while paid plans aren't on sale, and drawn as any other feature once they are, in place of "Not available yet" on every line.
+- Consequences: flipping `SAROH_BILLING_GLOBAL` changes all of saroh.tech at the next build. A new hard-coded "Free for now" fails the test. Each other unreleased feature gets its tag (Coming soon, or its plan) as it's next touched; the claim and release switch machinery is unchanged.
+
+## DEC-223 AI apps (MCP) is on every plan, Free included, with limits per plan
+
+**Status: Accepted — 2026-11-16** · owner
+
+- Context (owner, 16 Nov 2026, web-redesign bug #55): saroh.in's AI apps page said "AI apps comes with Grow and Pro" while saroh.tech said "on every plan, Free included", and the API's MCP module has no plan check. The owner first said "MCP only for paid users", then the same day: "let's add the MCP to the free ones too, but we will implement the limits on that."
+- Decision:
+    - **AI apps (connecting Claude, ChatGPT or another app over MCP) is on every plan, Free included,** on both editions.
+    - **Each plan has its own limits,** set in the pricing catalogue (an AI apps row per plan), never in the repo or in marketing copy (DEC-207 rule: no internal limits on the sites). The marketing says it is on every plan; the plan table shows each plan's row from the catalogue.
+    - **Product (to build):** the API reads the AI apps row and enforces it on MCP calls, the way API keys are gated; when a business reaches its plan's limit the app says so and offers a bigger plan, and nothing is cut off mid-change.
+- Consequences: saroh.in's plan line drops "comes with Grow and Pro"; saroh.tech keeps "AI apps is on every plan, Free included". The per-plan numbers and the load test that sets them live in saroh-internal.
+
+## DEC-225 saroh.tech's website templates wait for Global's paid plans
+
+**Status: Accepted — 2026-11-17** · owner
+
+- Context (release #1425, 17 Nov 2026): Global's development deploy turned `NEXT_PUBLIC_TEMPLATES` on for saroh.tech, and the build's claims check (`ONE_PERSON`, DEC-155, DEC-203) stopped on `/website-templates/salon`: the shared gallery's salon sample site has a team of stylists. Global launches Free-only, so nothing on saroh.tech may need a second person. Production already leaves the switch off.
+- Decision (owner chose A of three): **saroh.tech's `/website-templates` stays off, on Global development and production, until Global's paid plans are on sale**, with Ask AI and Developers. Not the alternatives: drawing the salon template without its team section, or letting the gallery past the claims check.
+- Consequences: `scripts/cf-global-dev.mjs` no longer sets `NEXT_PUBLIC_TEMPLATES` for saroh.tech, and `apps/saroh.tech/wrangler.jsonc`'s launch note moves it beside Ask AI and Developers. saroh.in's `/templates` is unchanged (DEC-135).

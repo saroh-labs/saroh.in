@@ -73,7 +73,9 @@ function jsonLd(container: HTMLElement): Record<string, unknown>[] {
 
 /** The questions and answers the page draws, in order. */
 function drawnFaq(container: HTMLElement) {
-    return Array.from(container.querySelectorAll("#faq details")).map((d) => ({
+    return Array.from(
+        container.querySelectorAll("#faq details:not([data-more])"),
+    ).map((d) => ({
         q: d.querySelector("summary")?.textContent,
         a: d.querySelector("p")?.textContent,
     }));
@@ -106,7 +108,9 @@ describe("/features/website, before launch", () => {
         );
         const crumb = screen.getByRole("navigation", { name: "Breadcrumb" });
         expect(
-            within(crumb).getByText("Website").getAttribute("aria-current"),
+            within(crumb)
+                .getByText("Website builder")
+                .getAttribute("aria-current"),
         ).toBe("page");
         expect(words(container).toLowerCase()).toContain("website builder");
     });
@@ -132,7 +136,12 @@ describe("/features/website, before launch", () => {
             points: features.website.points.map(({ openNote: _, ...p }) => p),
         });
         expect(own).not.toMatch(PLAN_WORDS);
-        expect(container.querySelector('a[href^="/pricing"]')).toBeNull();
+        // The redesign's PlanLine links Compare plans, as every feature page
+        // does; before launch its sentence names no plan. Merchant prices on
+        // the drawings are the example world's, not Saroh's (DESIGN.md).
+        expect(said).not.toMatch(
+            /paid plan|\bGrow\b|\bPro\b|Free plan|upgrade|per month|a month|every plan/i,
+        );
     });
 
     it("says nothing about a template, in either mode's words (DEC-135)", async () => {
@@ -246,7 +255,7 @@ describe("Home and the waitlist", () => {
         render(await HomePage());
         const homeH1 = screen.getAllByRole("heading", { level: 1 });
         expect(homeH1).toHaveLength(1);
-        expect(homeH1[0].getAttribute("aria-label")).toBe(home.headlineLabel);
+        expect(homeH1[0].textContent).toBe(home.titleLabel);
         cleanup();
 
         const { default: WaitlistPage } =
@@ -255,7 +264,7 @@ describe("Home and the waitlist", () => {
         const waitlistH1 = screen.getAllByRole("heading", { level: 1 });
         expect(waitlistH1).toHaveLength(1);
         expect(waitlistH1[0].textContent).toBe(WAITLIST_PAGE.h1);
-        expect(waitlistH1[0].textContent).not.toBe(home.headlineLabel);
+        expect(waitlistH1[0].textContent).not.toBe(home.titleLabel);
         // The acronym line is still drawn, as the design has it.
         expect(
             screen.getByText(
@@ -266,7 +275,7 @@ describe("Home and the waitlist", () => {
         ).toBeTruthy();
     });
 
-    it("Home says its category above the headline", async () => {
+    it("Home says its category in the first screen", async () => {
         const { default: HomePage } = await import("./page");
         const { container } = render(await HomePage());
         expect(words(container)).toContain("Small business software");

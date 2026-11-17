@@ -1,6 +1,6 @@
 import type { ToolPageEntry } from "../schema";
 import { TOOL_GROUPS } from "../tool-schema";
-import { ClosingBand, Crumbs } from "./page-parts";
+import { ClosingBand, Crumbs, Marked } from "./page-parts";
 
 export interface ToolsHubProps {
     /** The tools to list: on saroh.in those this build has, in admin all of them. */
@@ -35,7 +35,7 @@ export function ToolsHub({
         tools: tools.filter((t) => t.group === g),
     })).filter((g) => g.tools.length);
     return (
-        <div className="sp tp">
+        <div className="sp sp-kit tp">
             <div className="tp-wrap">
                 <section className="tp-intro">
                     <Crumbs
@@ -45,7 +45,7 @@ export function ToolsHub({
                         ]}
                     />
                     <h1 className="tp-h1 tp-hub-h1">
-                        Free tools for small businesses in India
+                        <Marked text="Free tools for small businesses in India" />
                     </h1>
                     <p className="tp-lead tp-hub-lead">
                         Each one works in your browser. The ones that make a

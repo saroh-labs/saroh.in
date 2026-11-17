@@ -1,4 +1,4 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { markTitle } from "@saroh/marketing/page-hero";
 import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -22,11 +22,10 @@ import {
 import type { SitePage } from "@/lib/site-map";
 import { formatDate } from "@/lib/tools/dates";
 
-const LABEL =
-    "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground";
+const LABEL = "text-[13px] font-semibold text-muted-foreground";
 const COPY = "m-0 text-[17px] leading-[1.7] text-mk-prose md:text-lg";
 const H2 =
-    "m-0 mb-3 mt-9 scroll-mt-[calc(var(--mk-nav-h)+16px)] font-display text-mk-h2-article font-bold md:mt-11 [text-wrap:balance]";
+    "m-0 mb-3 mt-9 scroll-mt-[calc(var(--mk-nav-h)+16px)] font-display text-[30px] font-bold leading-[1.1] tracking-[-0.035em] md:mt-11 [text-wrap:balance]";
 
 function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
     switch (block.kind) {
@@ -173,9 +172,9 @@ function Block({ block, guide }: { block: GuideBlock; guide: Guide }) {
             );
         case "tool":
             return (
-                <div className="my-8 flex flex-col gap-5 rounded-[18px] bg-foreground px-7 py-[26px] text-background md:flex-row md:items-center md:justify-between md:gap-6">
+                <div className="my-8 flex flex-col gap-5 rounded-mk-card bg-foreground px-7 py-[26px] text-background md:flex-row md:items-center md:justify-between md:gap-6">
                     <div>
-                        <b className="font-display text-xl tracking-[-0.02em]">
+                        <b className="font-display text-mk-kit-h3 font-bold">
                             {block.title}
                         </b>
                         <p className="m-0 mt-1.5 text-base text-mk-on-ink">
@@ -205,7 +204,7 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto max-w-mk-page px-mk-gutter pt-4 md:pt-10"
+            className="mx-auto max-w-mk-page px-mk-gutter pt-8 min-[760px]:pt-10"
         >
             <JsonLd
                 data={[
@@ -240,9 +239,10 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
 
                 <article className="min-w-0">
                     {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-                    <PageTitle size="article" className="mb-4 mt-3.5">
-                        {page.h1}
-                    </PageTitle>
+                    {/* A reading page's h1: the kit's h1 at its phone size on every screen, so a full search title keeps to a few lines. */}
+                    <h1 className="mb-5 mt-5 max-w-[22ch] font-display text-[42px] font-bold leading-[1.06] tracking-[-0.04em] [text-wrap:balance]">
+                        {markTitle(page.h1)}
+                    </h1>
                     <div className="mb-7 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                         <span
                             aria-hidden="true"
@@ -303,7 +303,9 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                                 href={`/guides/${slug}`}
                                 className="flex flex-col rounded-mk-card border border-border bg-card p-4 no-underline transition-colors duration-150 hover:border-border-strong"
                             >
-                                <b>{title}</b>
+                                <b className="font-display text-[17px] font-bold">
+                                    {title}
+                                </b>
                                 <span className="text-sm text-muted-foreground">
                                     {line}
                                 </span>
@@ -313,15 +315,13 @@ export function GuidePage({ page, guide }: { page: SitePage; guide: Guide }) {
                 </aside>
             </div>
 
-            <div className="pt-10 md:pt-[72px]">
-                <CtaBand
-                    title={guide.band.title}
-                    line={guide.band.line}
-                    action={`Try the ${guide.tool.name}`}
-                    href={guide.tool.href}
-                    from="guide-tool-band"
-                />
-            </div>
+            <CtaBand
+                title={guide.band.title}
+                line={guide.band.line}
+                action={`Try the ${guide.tool.name}`}
+                href={guide.tool.href}
+                from="guide-tool-band"
+            />
         </div>
     );
 }

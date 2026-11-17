@@ -30,7 +30,7 @@ export function ContentLayout({
 }) {
     const Main = layout === "rail" || layout === "solo" ? "article" : "div";
     return (
-        <div className="sp">
+        <div className="sp sp-kit">
             <div className={`sp-cl sp-cl-${layout}`}>
                 {draft ? (
                     <p className="sp-draft sp-cl-draft">

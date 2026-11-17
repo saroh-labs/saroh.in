@@ -1,13 +1,16 @@
 "use client";
 
+import { ButtonLink } from "@saroh/marketing/button";
 import { cn } from "@saroh/marketing/cn";
-import { Wordmark } from "@saroh/ui/wordmark";
-import { ChevronDown } from "lucide-react";
-import Link from "next/link";
+import { STICKY_HIDES } from "@saroh/marketing/kit/sticky-bar";
+import type { NavEntry } from "@saroh/marketing/marketing-nav";
+import { MarketingNav, NAV_TOP } from "@saroh/marketing/marketing-nav";
+import { moveWithArrows } from "@saroh/marketing/menu-panel";
+import { ring } from "@saroh/marketing/ring";
 import { usePathname } from "next/navigation";
-import type { ComponentProps, RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
+import { NAV_WORDS } from "@/content/nav";
 import type { Visitor } from "@/lib/browser/session";
 import { useVisitor } from "@/lib/browser/session";
 import {
@@ -16,59 +19,37 @@ import {
     LAUNCH_MODE,
     SIGN_IN_URL,
 } from "@/lib/links";
-import { ring } from "@saroh/marketing/ring";
 
-import { ButtonLink } from "@saroh/marketing/button";
-import { IntentLink } from "@saroh/marketing/intent-link";
-import { MenuPanel, moveWithArrows } from "@saroh/marketing/menu-panel";
 import { CtaLink } from "../buttons/cta-link";
 import { MobileMenu } from "./mobile-menu";
 import type { NavMenus, NavSection } from "./nav-section";
-import { ABOUT_LINKS, sectionOf } from "./nav-section";
+import { ABOUT_LINKS, sectionOf, splitResources } from "./nav-section";
 
-type MenuId = "features" | "solutions" | "resources" | "tools" | "account";
-
-/** A top-level control: 36px, 9px corners, Paper-dark on hover. */
-const TOP = `flex h-9 cursor-pointer items-center rounded-mk-control px-3 text-foreground no-underline transition-colors duration-fast ease-out hover:bg-mk-hover hover:text-foreground ${ring({ offset: 1 })}`;
-
-/** A menu's panel, under its button (the nav's menus and the account menu). */
+/** A menu's panel, under its button (the account menu). */
 const PANEL =
     "absolute top-[calc(100%+10px)] grid gap-0.5 rounded-mk-card border border-border bg-card p-2.5 shadow-mk-menu";
 
-/** The current section: underlined in Saffron, 8px below the word. */
-const CURRENT =
-    "underline decoration-brand-500 decoration-2 underline-offset-8";
-
 /**
- * The site's nav (Nav design, plan U19). From 760px: the logo, Features
- * (a two-column menu with lines), Solutions, Pricing (once the site's launch
- * switch is open; before that it would only bounce to the waitlist),
- * Resources (plan U1; only when some Resources page is live), Tools (the
- * free tools, when one is live), then Sign in
- * (once the launch switch is open; until then accounts.saroh.in is closed)
- * and the start button. Below 760px: the logo, the start button and a Menu
- * button that opens `MobileMenu`.
+ * saroh.in's nav, on the redesign's shared `MarketingNav` (DEC-221): from
+ * 1240px, the wordmark, then Solutions (every trade, by family, and "See all
+ * trades"), Features (every shown feature and "All features" to
+ * /features), Website templates, Pricing (once the launch switch is open;
+ * before that it would only bounce to the waitlist), Resources (Developers
+ * among them, once live; owner, 16 Nov 2026) and Tools, then Sign in (also once open) and the start button. Below
+ * 1240px: the start button and Menu, whose sheet keeps every level,
+ * Resources and Tools included.
  *
- * `resources` is the Resources menu: the server decides which pages are
- * published and built (`content/resources.ts`) and passes them in, so the
- * browser never judges a date.
+ * Resources and Tools stay their own desk menus after Developers (owner,
+ * 17 Nov 2026), as before the redesign: the guides and free tools are how
+ * people find Saroh, so they aren't folded into How it works.
  *
- * It stays at the top of the window as the page scrolls (owner, 1 Nov), and
- * `--mk-nav-h` is its height, for whatever else sticks below it.
+ * `resources` and `tools` are worked out by the server (published and
+ * built, `content/resources.ts`), so the browser never judges a date.
  *
- * A desk menu opens across the nav (owner, 1 Nov): columns ruled apart, under
- * family or group headings where the items have them, and a strip below with
- * the "see all" and the quieter links.
- *
- * The section the page is in is underlined in Saffron, and the page itself
- * carries `aria-current="page"` in its menu. A menu closes on Escape (focus
- * returns to its button), on a click outside, and when focus leaves the nav;
- * arrow keys move within it.
- *
- * Signed in (owner, 1 Nov; `useVisitor`, asked once the page is idle), Sign
- * in and the start button become the visitor's initial, which opens their
- * name, email, Account and Sign out, and "Open dashboard". The page's HTML is
- * always the signed-out nav; the swap happens in the browser.
+ * Signed in (`useVisitor`, asked once the page is idle), Sign in and the
+ * start button become the visitor's initial, which opens their name, email,
+ * Account and Sign out, and "Open dashboard". The page's HTML is always the
+ * signed-out nav; the swap happens in the browser.
  */
 export function SiteNav({
     features,
@@ -81,256 +62,129 @@ export function SiteNav({
 }: NavMenus) {
     const pathname = usePathname();
     const section = sectionOf(pathname, features, solutions, resources, tools);
-    const [open, setOpen] = useState<MenuId | null>(null);
-    const nav = useRef<HTMLElement>(null);
-    const featuresButton = useRef<HTMLButtonElement>(null);
-    const solutionsButton = useRef<HTMLButtonElement>(null);
-    const resourcesButton = useRef<HTMLButtonElement>(null);
-    const toolsButton = useRef<HTMLButtonElement>(null);
-    const accountButton = useRef<HTMLButtonElement>(null);
     const { visitor, signOut } = useVisitor();
-
-    // A new page closes whatever menu was open (state adjusted while
-    // rendering, not in an effect: https://react.dev/learn/you-might-not-need-an-effect).
-    const [shownFor, setShownFor] = useState(pathname);
-    if (shownFor !== pathname) {
-        setShownFor(pathname);
-        setOpen(null);
-    }
-
-    useEffect(() => {
-        if (!open) return;
-        const onClick = (e: MouseEvent) => {
-            if (nav.current && !nav.current.contains(e.target as Node)) {
-                setOpen(null);
-            }
-        };
-        const onKey = (e: globalThis.KeyboardEvent) => {
-            if (e.key !== "Escape") return;
-            const button = {
-                features: featuresButton,
-                solutions: solutionsButton,
-                resources: resourcesButton,
-                tools: toolsButton,
-                account: accountButton,
-            }[open];
-            setOpen(null);
-            button.current?.focus();
-        };
-        document.addEventListener("click", onClick);
-        document.addEventListener("keydown", onKey);
-        return () => {
-            document.removeEventListener("click", onClick);
-            document.removeEventListener("keydown", onKey);
-        };
-    }, [open]);
+    const split = splitResources(resources);
+    const entries: NavEntry[] = [
+        {
+            id: "solutions",
+            label: NAV_WORDS.solutions,
+            menu: {
+                items:
+                    solutionMenu ??
+                    solutions.filter((i) => i.href !== allTrades?.href),
+                columns: 2,
+                seeAll: allTrades,
+            },
+        },
+        {
+            id: "features",
+            label: NAV_WORDS.howItWorks,
+            menu: {
+                items: features,
+                columns: 3,
+                seeAll: { name: NAV_WORDS.howItWorksAll, href: "/features" },
+            },
+        },
+        ...(split.templates
+            ? [
+                  {
+                      id: "templates",
+                      label: split.templates.name,
+                      href: split.templates.href,
+                  },
+              ]
+            : []),
+        ...(LAUNCH_MODE === "open"
+            ? [{ id: "pricing", label: NAV_WORDS.pricing, href: "/pricing" }]
+            : []),
+        // Resources and Tools keep their own desk menus (owner, 17 Nov 2026):
+        // the guides and the free tools are how people find Saroh.
+        ...(split.rest.length > 0
+            ? [
+                  {
+                      id: "resources",
+                      label: NAV_WORDS.resources,
+                      menu: {
+                          items: split.rest,
+                          columns: 3,
+                          links: ABOUT_LINKS,
+                      },
+                  },
+              ]
+            : []),
+        ...(tools.length > 0
+            ? [
+                  {
+                      id: "tools",
+                      label: NAV_WORDS.tools,
+                      menu: {
+                          items: tools,
+                          columns: 2,
+                          ...(allTools ? { seeAll: allTools } : {}),
+                      },
+                  },
+              ]
+            : []),
+    ];
 
     return (
-        <nav
-            ref={nav}
-            aria-label="Main"
-            onBlur={(e) => {
-                if (open && !nav.current?.contains(e.relatedTarget)) {
-                    setOpen(null);
-                }
-            }}
-            className="sticky top-0 z-30 flex items-center gap-6 border-b border-border bg-background px-mk-nav py-5 font-sans max-[399px]:gap-3"
-        >
-            <IntentLink
-                href="/"
-                aria-label="Saroh home"
-                className={`flex shrink-0 rounded-lg text-foreground no-underline ${ring({ offset: 3 })}`}
-            >
-                <Wordmark aria-hidden style={{ fontSize: 22 }} />
-            </IntentLink>
-
-            {/* From 760px wide. */}
-            <div className="hidden items-center gap-1 text-mk-nav min-[760px]:flex">
-                <Menu
-                    id="features"
-                    label="Features"
-                    items={features}
-                    columns={3}
-                    current={section === "features"}
+        <MarketingNav
+            entries={entries}
+            current={section}
+            pathname={pathname}
+            end={(control) =>
+                visitor ? (
+                    <>
+                        <AccountMenu
+                            visitor={visitor}
+                            open={control.open === "account"}
+                            onToggle={() => control.toggle("account")}
+                            onSignOut={() => {
+                                control.close();
+                                void signOut();
+                            }}
+                        />
+                        <ButtonLink href={DASHBOARD_URL} size="kit">
+                            Open dashboard
+                        </ButtonLink>
+                    </>
+                ) : (
+                    <>
+                        {/* Sign in waits for early access, as Pricing does:
+                            until then accounts.saroh.in is closed to anyone
+                            without the key. */}
+                        {LAUNCH_MODE === "open" ? (
+                            <a
+                                href={SIGN_IN_URL}
+                                className={cn(
+                                    NAV_TOP,
+                                    "font-semibold text-foreground",
+                                )}
+                            >
+                                {NAV_WORDS.signIn}
+                            </a>
+                        ) : null}
+                        <CtaLink src="nav" size="kit" />
+                    </>
+                )
+            }
+            phone={() => (
+                <MobileMenu
+                    section={section}
                     pathname={pathname}
-                    open={open === "features"}
-                    onToggle={() =>
-                        setOpen(open === "features" ? null : "features")
-                    }
-                    buttonRef={featuresButton}
-                />
-                <Menu
-                    id="solutions"
-                    label="Solutions"
-                    items={
-                        solutionMenu ??
-                        solutions.filter((i) => i.href !== allTrades?.href)
-                    }
-                    columns={2}
-                    seeAll={allTrades}
-                    current={section === "solutions"}
-                    pathname={pathname}
-                    open={open === "solutions"}
-                    onToggle={() =>
-                        setOpen(open === "solutions" ? null : "solutions")
-                    }
-                    buttonRef={solutionsButton}
-                />
-                {LAUNCH_MODE === "open" ? (
-                    <Link
-                        href="/pricing"
-                        aria-current={
-                            section === "pricing" ? "page" : undefined
-                        }
-                        className={cn(TOP, section === "pricing" && CURRENT)}
-                    >
-                        Pricing
-                    </Link>
-                ) : null}
-                {resources.length > 0 ? (
-                    <Menu
-                        id="resources"
-                        label="Resources"
-                        items={resources}
-                        columns={3}
-                        links={ABOUT_LINKS}
-                        current={section === "resources"}
-                        pathname={pathname}
-                        open={open === "resources"}
-                        onToggle={() =>
-                            setOpen(open === "resources" ? null : "resources")
-                        }
-                        buttonRef={resourcesButton}
-                    />
-                ) : null}
-                {tools.length > 0 ? (
-                    <Menu
-                        id="tools"
-                        label="Tools"
-                        items={tools}
-                        columns={2}
-                        seeAll={allTools}
-                        current={section === "tools"}
-                        pathname={pathname}
-                        open={open === "tools"}
-                        onToggle={() =>
-                            setOpen(open === "tools" ? null : "tools")
-                        }
-                        buttonRef={toolsButton}
-                    />
-                ) : null}
-            </div>
-            {visitor ? (
-                <>
-                    <AccountMenu
-                        visitor={visitor}
-                        open={open === "account"}
-                        onToggle={() =>
-                            setOpen(open === "account" ? null : "account")
-                        }
-                        onSignOut={() => {
-                            setOpen(null);
-                            void signOut();
-                        }}
-                        buttonRef={accountButton}
-                    />
-                    <ButtonLink
-                        href={DASHBOARD_URL}
-                        size="sm"
-                        className="hidden min-[760px]:inline-flex"
-                    >
-                        Open dashboard
-                    </ButtonLink>
-                </>
-            ) : null}
-            {/* Sign in waits for early access, as Pricing does: until then
-                accounts.saroh.in is closed to anyone without the key. */}
-            {!visitor && LAUNCH_MODE === "open" ? (
-                <a
-                    href={SIGN_IN_URL}
-                    className={cn(
-                        TOP,
-                        "ml-auto hidden text-mk-nav min-[760px]:flex",
-                    )}
-                >
-                    Sign in
-                </a>
-            ) : null}
-            {visitor ? null : (
-                <CtaLink
-                    src="nav"
-                    size="sm"
-                    className={cn(
-                        "hidden min-[760px]:inline-flex",
-                        LAUNCH_MODE !== "open" && "ml-auto",
-                    )}
+                    resources={resources}
+                    features={features}
+                    solutions={solutions}
+                    solutionMenu={solutionMenu}
+                    allTrades={allTrades}
+                    allTools={allTools}
+                    tools={tools}
+                    visitor={visitor}
+                    onSignOut={signOut}
+                    startClassName={STICKY_HIDES}
                 />
             )}
-
-            {/* Below 760px wide. */}
-            <MobileMenu
-                section={section}
-                pathname={pathname}
-                resources={resources}
-                features={features}
-                solutions={solutions}
-                solutionMenu={solutionMenu}
-                allTrades={allTrades}
-                allTools={allTools}
-                tools={tools}
-                visitor={visitor}
-                onSignOut={signOut}
-                className="ml-auto min-[760px]:hidden"
-            />
-        </nav>
-    );
-}
-
-function Menu({
-    id,
-    label,
-    current,
-    open,
-    onToggle,
-    buttonRef,
-    ...panel
-}: Omit<ComponentProps<typeof MenuPanel>, "id"> & {
-    id: MenuId;
-    current: boolean;
-    open: boolean;
-    onToggle: () => void;
-    buttonRef: RefObject<HTMLButtonElement | null>;
-}) {
-    return (
-        <div>
-            <button
-                ref={buttonRef}
-                type="button"
-                aria-haspopup="true"
-                aria-expanded={open}
-                // Only while the menu is in the page: a closed one isn't.
-                aria-controls={open ? `nav-menu-${id}` : undefined}
-                onClick={onToggle}
-                className={cn(
-                    TOP,
-                    "gap-1.5 border-none bg-transparent",
-                    open && "bg-mk-hover",
-                    current && CURRENT,
-                )}
-            >
-                {label}
-                <ChevronDown
-                    aria-hidden
-                    data-chevron
-                    strokeWidth={2.25}
-                    className={cn(
-                        "size-3.5 transition-transform duration-fast ease-out motion-reduce:transition-none",
-                        open && "rotate-180",
-                    )}
-                />
-            </button>
-            {open ? <MenuPanel id={id} label={label} {...panel} /> : null}
-        </div>
+        />
     );
 }
 
@@ -343,13 +197,11 @@ function AccountMenu({
     open,
     onToggle,
     onSignOut,
-    buttonRef,
 }: {
     visitor: Visitor;
     open: boolean;
     onToggle: () => void;
     onSignOut: () => void;
-    buttonRef: RefObject<HTMLButtonElement | null>;
 }) {
     const menu = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -361,12 +213,8 @@ function AccountMenu({
     const item = `flex h-11 w-full cursor-pointer items-center rounded-[10px] border-none bg-transparent px-3.5 text-left text-[15px] font-semibold text-foreground no-underline transition-colors duration-fast ease-out hover:bg-background hover:text-foreground focus-visible:bg-background ${ring({ offset: "inset" })}`;
 
     return (
-        <div
-            data-ph-mask=""
-            className="relative ml-auto hidden min-[760px]:block"
-        >
+        <div data-ph-mask="" className="relative">
             <button
-                ref={buttonRef}
                 type="button"
                 aria-label="Your account"
                 aria-haspopup="true"

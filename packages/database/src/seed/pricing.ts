@@ -14,11 +14,16 @@
  * This file is the only place in the seed that names the catalogue.
  */
 import type { Edition } from "@prisma/client";
-import { freeOnlyCatalog, planRows } from "@saroh/pricing-catalog";
+import {
+    freeOnlyCatalog,
+    parseCatalog,
+    planRows,
+} from "@saroh/pricing-catalog";
 import { SEED_CATALOG, SEED_NOTE } from "@saroh/pricing-catalog/seed";
 
 import {
     liveCataloguePlanRow,
+    liveCatalogueVersion,
     writeCatalogueVersion,
 } from "../pricing-catalogue";
 import type { Db } from "./helpers";
@@ -117,4 +122,53 @@ export async function seedPlanId(
         );
     }
     return row.id;
+}
+
+/**
+ * On a throwaway database (local, CI, the release's screenshot run) whose
+ * live Global catalogue has no paid plans: the SAMPLE catalogue with its
+ * paid plans, in dollars with no tax, as the next Global version. So the
+ * Global demo businesses go on Grow and Pro everywhere their shots are taken
+ * (owner, 16 Nov 2026), with made-up prices: a database with a real
+ * catalogue imported (`catalogue:import`) keeps it.
+ */
+export async function ensureSampleGlobalPaidPlans(prisma: Db): Promise<void> {
+    const now = new Date();
+    const live = await liveCatalogueVersion(prisma, "GLOBAL", now);
+    if (
+        live &&
+        (await liveCataloguePlanRow(prisma, "GLOBAL", "pro", "month", now))
+    )
+        return;
+    const newest = await prisma.pricingCatalogVersion.findFirst({
+        orderBy: { version: "desc" },
+        select: { version: true },
+    });
+    const version = (newest?.version ?? 0) + 1;
+    const free = freeOnlyCatalog(SEED_CATALOG, {
+        currency: "USD",
+        tax: "none",
+    });
+    const catalog = parseCatalog({
+        ...SEED_CATALOG,
+        currency: free.currency,
+        tax: free.tax,
+        plans: SEED_CATALOG.plans.filter((p) => !p.retired),
+        yearly: { ...SEED_CATALOG.yearly, on: false },
+        addons: [],
+        messagePrices: undefined,
+        messagePacks: undefined,
+    });
+    await writeCatalogueVersion(prisma, {
+        version,
+        edition: "GLOBAL",
+        catalog,
+        // Live now, after whatever was live before it.
+        goLiveAt: new Date(now.getTime() - 60_000),
+        policy: "keep",
+        note: SEED_NOTE,
+        changes: [],
+        publishedByUserId: null,
+        planRows: planRows(catalog, version),
+    });
 }

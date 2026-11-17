@@ -54,6 +54,18 @@ import { BOOK_HEADLINE, shareHeadlineOf } from "./dto";
  * - **Limited per visitor:** each picture is real work.
  */
 
+/**
+ * The address a card draws. A local or test stack's own host
+ * (`rye.saroh.app.localhost`, `rye.localhost:3005`) is drawn the way
+ * production names it (`rye.saroh.app`), so a card made there, and the
+ * marketing shots taken from one, never show a machine-only address. A
+ * production host never ends in `.localhost`, so it is drawn as it is.
+ */
+export function drawnHost(host: string): string {
+    const local = /^([^.]+)\..*localhost(:\d+)?$/.exec(host);
+    return local ? `${local[1]}.saroh.app` : host;
+}
+
 /** Pictures per visitor per minute: a share sheet asks a handful. */
 const RENDERS_PER_WINDOW = 60;
 const RENDER_WINDOW_MS = 60_000;
@@ -290,7 +302,7 @@ export class PublicShareService {
             look: s.look,
             socialImage: social ?? text(s.socialImageUrl),
             iconUrl: view.icon?.url ?? null,
-            address: view.primaryHost ?? "",
+            address: drawnHost(view.primaryHost ?? ""),
         };
     }
 

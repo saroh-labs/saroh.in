@@ -526,10 +526,15 @@ pnpm --filter @saroh/database db:seed:global   # base seed, then four Global bus
 
 Thistlewick Bakery, Larkspur & Vane (pounds, VAT), Ironvale Fitness and
 Wrenfield Dental (`seed/global/`), owned by `demo@saroh.dev`: `edition: GLOBAL`,
-on Free, no payment provider, sample data only, rewritten whole each run. Each
-is what a Free business can have: setup's modules, plus the Insights (the
+no payment provider, sample data only, rewritten whole each run. They sit on
+paid plans (Thistlewick and Ironvale on Pro, the salon and clinic on Grow) so
+the shots show what a paying business gets (owner, 16 Nov 2026): the live
+Global catalogue's, a local copy of dev's when imported, else on a throwaway
+database the sample's paid plans in dollars (`ensureSampleGlobalPaidPlans`).
+The data is still what a small business has after setup: setup's modules, plus the Insights (the
 bakery), Courses (the gym) and Sell (the salon and clinic, for a treatment over
-several visits) switches Free offers, no Payments or class packs, one person
+several visits) switches, Payments for the gym's and bakery's memberships
+(`billing.ts`), Ask AI on for the bakery, no class packs, one person
 (a diary person with no login would take a seat), a quiet diary
 (`BOOKINGS_A_MONTH`, asserted), plan limits enforced for these four. Local
 addresses have no edition (`editionOfHost` returns null), so the seed sets it
@@ -537,6 +542,12 @@ on the business, and app and accounts need `NEXT_PUBLIC_EDITION=GLOBAL` to list
 them and read money their way. Their zone is one where it's mid-morning when
 seeded (`morning-zone.ts`), so a capture at any hour shows a working day. Keep
 them on their own database.
+
+Both this seed and the showcase write the Ask AI conversations the shots open
+(Thistlewick's in `seed/global/ask-ai.ts`, Rye & Co.'s in
+`seed/showcase/rye-ask-ai.ts`), sealed with `AI_TEXT_ENC_KEY`: run the seed
+with the API's key in the environment (it is in `apps/api.saroh.in/.env.local`,
+which the seed doesn't read), or none are written. No model key is needed.
 
 For Free's real rows, import dev's catalogue (above), then seed again so they
 sit on it. Set `SAROH_RAZORPAY_KEY_ID`, `SAROH_RAZORPAY_KEY_SECRET` and
@@ -546,6 +557,26 @@ Then:
 `SHOTS_ZONE=<the zone the seed logged> pnpm --filter @saroh/e2e shots --edition=global`
 (`marketing-shots/shots.global.ts`) and `pnpm --filter tech shots:sizes --force`. If the app reloads itself in a
 loop in a capture, restart its `next dev`.
+
+### saroh.tech with dev's prices, locally
+
+saroh.tech reads its plans from the API at `API_URL`, and the API picks the
+edition from the address it was called at: every local address is India's.
+To see the Global plans dev shows (owner, 16 Nov 2026):
+
+1. Import dev's Global catalogue as above (Admin › Plans on the Global dev
+   console, Download catalogue; the file goes in `.local/`, never the repo).
+   The import reads the edition from the file's currency.
+2. Run the API (and app and accounts, for Global sign-up) with
+   `GLOBAL_DEV_DOMAIN=saroh-tech.localhost`, and give the API that edition's
+   name: `portless alias api.saroh-tech <the API's port>` (`portless list`).
+   `https://api.saroh-tech.localhost/public/pricing` then answers in dollars.
+3. Run saroh.tech with `API_URL=https://api.saroh-tech.localhost` and
+   `NODE_EXTRA_CA_CERTS=~/.portless/ca.pem` (its server must trust portless's
+   certificate).
+
+The pricing page shows the prices and, as in production, "Not available yet"
+with Tell me when on a paid plan until Global's paid plans open (DEC-211).
 
 ## Databases
 

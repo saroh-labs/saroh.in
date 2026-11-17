@@ -1,4 +1,6 @@
-import { PageTitle } from "@saroh/marketing/page-title";
+import { markTitle } from "@saroh/marketing/page-hero";
+import { SectionHeading } from "@saroh/marketing/section-heading";
+import { textLinkClasses } from "@saroh/marketing/text-link";
 import Link from "next/link";
 
 import { Breadcrumb } from "@/components/shared/breadcrumb";
@@ -20,7 +22,12 @@ function Sentence({ text }: { text: string }) {
     ) : (
         <>
             {before}
-            <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+            <a
+                href={`mailto:${SUPPORT_EMAIL}`}
+                className={textLinkClasses({ tone: "prose" })}
+            >
+                {SUPPORT_EMAIL}
+            </a>
             {rest.join(SUPPORT_EMAIL)}
         </>
     );
@@ -30,7 +37,7 @@ function Section({ section }: { section: LegalSection }) {
     const { title, paragraphs, items, table, links } = section;
     return (
         <section className="flex flex-col gap-3">
-            <h2 className="m-0 font-display text-mk-h2-xs font-bold [text-wrap:balance]">
+            <h2 className="m-0 font-display text-mk-kit-h3 font-bold [text-wrap:balance]">
                 {title}
             </h2>
             {paragraphs?.map((text) => (
@@ -81,7 +88,10 @@ function Section({ section }: { section: LegalSection }) {
                     key={l.href}
                     prefetch={false}
                     href={l.href}
-                    className="inline-flex min-h-11 items-center self-start text-[17px] md:min-h-0"
+                    className={textLinkClasses({
+                        tone: "ink",
+                        className: "self-start text-[17px]",
+                    })}
                 >
                     {l.name}
                 </Link>
@@ -101,11 +111,15 @@ export function LegalPage({
     return (
         <div
             data-page-type={page.type}
-            className="mx-auto flex max-w-mk-page flex-col gap-6 px-mk-gutter pt-6 md:pt-7"
+            className="mx-auto flex max-w-mk-page flex-col gap-6 px-mk-gutter pt-8 min-[760px]:pt-10"
         >
             {page.crumb ? <Breadcrumb crumbs={page.crumb} /> : null}
-            <div className="flex flex-col gap-2.5">
-                <PageTitle size="article">{page.h1}</PageTitle>
+            <div className="flex flex-col gap-4">
+                <SectionHeading
+                    as="h1"
+                    size="kit-h1"
+                    title={markTitle(page.h1)}
+                />
                 <p className="m-0 text-[15px] text-muted-foreground">
                     Last updated: {formatDate(LEGAL_UPDATED)}
                 </p>

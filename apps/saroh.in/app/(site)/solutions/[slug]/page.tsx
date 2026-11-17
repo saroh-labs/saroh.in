@@ -13,6 +13,7 @@ import { LAUNCH_MODE } from "@/lib/links";
 import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
 import { readLivePricing } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
+import { solutionsHub } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, faqPageLd } from "@/lib/structured-data";
 import { Faq } from "@saroh/marketing/faq";
@@ -65,7 +66,7 @@ export default async function SolutionPage({ params }: Props) {
             <JsonLd
                 data={[
                     breadcrumbLd([
-                        { name: "Solutions", path: "/#solutions" },
+                        { name: "Solutions", path: solutionsHub() },
                         { name: s.name, path: solutionHref(slug) },
                     ]),
                     faqPageLd(faq),

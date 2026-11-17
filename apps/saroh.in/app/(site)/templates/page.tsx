@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { CtaBand } from "@/components/shared/sections/cta-band";
-import { TemplatesGallery } from "@/components/templates/templates-gallery";
+import { CtaLink } from "@/components/shared/buttons/cta-link";
 import {
     earlyAccessOpen,
-    galleryChips,
     galleryTemplates,
     templatesPage as page,
     TEMPLATES_PATH,
@@ -13,8 +11,7 @@ import {
 import { resourcesContext } from "@/lib/resources-context";
 import { pageMetadata } from "@/lib/seo";
 import { templatesLive } from "@/lib/templates-live";
-import { Container } from "@saroh/marketing/container";
-import { PageTitle } from "@saroh/marketing/page-title";
+import { TemplatesIndex } from "@saroh/marketing/templates/templates-index";
 
 export const metadata: Metadata = pageMetadata({
     title: page.seo.title,
@@ -42,35 +39,11 @@ export default function TemplatesPage() {
     const open = earlyAccessOpen(ctx.now);
     return (
         <>
-            <Container
-                as="header"
-                className="grid justify-items-center gap-4 pt-16 text-center"
-            >
-                <PageTitle size="page" className="max-w-[18ch]">
-                    {page.title}
-                </PageTitle>
-                <p className="m-0 max-w-[58ch] text-mk-band-body text-mk-copy [text-wrap:pretty]">
-                    {page.intro(templates)}
-                </p>
-            </Container>
-
-            <Container className="pt-10">
-                <TemplatesGallery
-                    templates={templates}
-                    chips={galleryChips(templates)}
-                    allLabel={page.allChip}
-                    previewLabel={page.preview}
-                />
-                <p className="m-0 pt-8 text-center text-mk-note text-muted-foreground">
-                    {page.sampleNote}
-                </p>
-            </Container>
-
-            <CtaBand
-                title={open ? page.band.after : page.band.before}
-                body={page.band.body}
-                src="templates-band"
-                note={null}
+            <TemplatesIndex
+                words={page}
+                templates={templates}
+                bandTitle={open ? page.band.after : page.band.before}
+                start={<CtaLink src="templates-band" size="kit" />}
             />
         </>
     );
