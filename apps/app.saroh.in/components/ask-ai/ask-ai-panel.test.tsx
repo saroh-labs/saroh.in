@@ -53,7 +53,28 @@ vi.mock("next/link", () => ({
 
 import { customerPage } from "@/lib/ask-ai/page-hints";
 import { AskAiPageIs } from "./ask-ai-page";
-import { AskAiPanel, turnsOf } from "./ask-ai-panel";
+import type { AskAiPanelProps } from "./ask-ai-panel";
+import { AskAiPanel } from "./ask-ai-panel";
+import { turnsOf } from "./turns";
+import type { UseAskAiOptions } from "./use-ask-ai";
+import { useAskAi } from "./use-ask-ai";
+
+/** The panel as the host and the full page draw it: the hook, then the drawing. */
+function Panel({
+    state,
+    conversation,
+    conversations,
+    layout,
+    ...rest
+}: Omit<AskAiPanelProps, "ai"> & UseAskAiOptions) {
+    const ai = useAskAi({
+        state,
+        page: layout === "page",
+        conversation,
+        conversations,
+    });
+    return <AskAiPanel ai={ai} layout={layout} {...rest} />;
+}
 
 const STATE: AskAiState = {
     available: true,
@@ -105,7 +126,7 @@ async function settle() {
 function render(state: AskAiState | null = STATE) {
     act(() =>
         root.render(
-            <AskAiPanel
+            <Panel
                 state={state}
                 businessName="Kesar Salon"
                 zone="Asia/Kolkata"
@@ -483,7 +504,7 @@ describe("the full page, /ask (board AI 9)", () => {
         const onClose = vi.fn();
         act(() =>
             root.render(
-                <AskAiPanel
+                <Panel
                     state={STATE}
                     businessName="Kesar Salon"
                     zone="Asia/Kolkata"
@@ -504,7 +525,7 @@ describe("the full page, /ask (board AI 9)", () => {
     function renderPage(state: AskAiState = STATE) {
         act(() =>
             root.render(
-                <AskAiPanel
+                <Panel
                     layout="page"
                     state={state}
                     businessName="Kesar Salon"
@@ -545,7 +566,7 @@ describe("the full page, /ask (board AI 9)", () => {
         window.history.replaceState(null, "", "/ask?c=c1");
         act(() =>
             root.render(
-                <AskAiPanel
+                <Panel
                     layout="page"
                     state={STATE}
                     businessName="Kesar Salon"
@@ -661,7 +682,7 @@ describe("knows the page (AF 1–9)", () => {
             root.render(
                 <>
                     <AskAiPageIs page={KAVYA} />
-                    <AskAiPanel
+                    <Panel
                         state={STATE}
                         businessName="Kesar Salon"
                         zone="Asia/Kolkata"
@@ -688,7 +709,7 @@ describe("knows the page (AF 1–9)", () => {
             root.render(
                 <>
                     <AskAiPageIs page={KAVYA} />
-                    <AskAiPanel
+                    <Panel
                         state={STATE}
                         businessName="Kesar Salon"
                         zone="Asia/Kolkata"
@@ -711,7 +732,7 @@ describe("knows the page (AF 1–9)", () => {
             root.render(
                 <>
                     <AskAiPageIs page={KAVYA} />
-                    <AskAiPanel
+                    <Panel
                         state={STATE}
                         businessName="Kesar Salon"
                         zone="Asia/Kolkata"

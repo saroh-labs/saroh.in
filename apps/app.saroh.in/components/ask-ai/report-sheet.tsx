@@ -1,16 +1,18 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@saroh/ui/dialog";
 import { Label } from "@saroh/ui/label";
 import { cn } from "@saroh/ui/lib/utils";
-import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@saroh/ui/radio-group";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetTitle,
-} from "@saroh/ui/sheet";
 import { Textarea } from "@saroh/ui/textarea";
 import { Check, Flag } from "lucide-react";
 import { useId, useState } from "react";
@@ -23,8 +25,9 @@ import { REPORTED } from "./words";
 /**
  * Report this answer (board 21): under every finished answer. One reason,
  * an optional note, and a plain line saying exactly what is sent; only
- * this question and answer go to Saroh. A small card over the panel on a
- * desk, a sheet from the foot on a phone. Reporting doesn't use a question.
+ * this question and answer go to Saroh. The shared small dialog, which is
+ * a sheet from the foot on a phone (DEC-202). Reporting doesn't use a
+ * question.
  */
 
 const REASONS = [
@@ -68,7 +71,6 @@ export function ReportAnswer({
                 "ml-1 min-h-9 gap-1.5 px-2 text-[12.5px] font-medium text-neutral-700 underline decoration-border-strong underline-offset-[3px] dark:text-foreground",
                 phone && "min-h-11",
             )}
-            onClick={phone ? () => setOpen(true) : undefined}
         >
             <Flag className="size-3.5 text-muted-foreground" aria-hidden />
             Report this answer
@@ -86,38 +88,11 @@ export function ReportAnswer({
         />
     );
 
-    if (phone) {
-        return (
-            <>
-                {trigger}
-                <Sheet open={open} onOpenChange={setOpen}>
-                    <SheetContent
-                        side="bottom"
-                        closeButton={false}
-                        className="rounded-t-2xl px-3.5 pb-[calc(18px+env(safe-area-inset-bottom))] pt-1.5"
-                    >
-                        <span
-                            aria-hidden
-                            className="mx-auto mb-2 mt-1 block h-1 w-9 rounded-sm bg-border-strong"
-                        />
-                        {form}
-                    </SheetContent>
-                </Sheet>
-            </>
-        );
-    }
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-            <PopoverContent
-                align="end"
-                className="w-[380px] max-w-[calc(100vw-32px)] rounded-xl p-3.5"
-                role="dialog"
-                aria-label="Report this answer"
-            >
-                {form}
-            </PopoverContent>
-        </Popover>
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>{trigger}</DialogTrigger>
+            <DialogContent size="sm">{form}</DialogContent>
+        </Dialog>
     );
 }
 
@@ -137,8 +112,6 @@ function ReportForm({
     const [note, setNote] = useState("");
     const [busy, setBusy] = useState(false);
     const big = phone ? "h-11" : "";
-    const Title = phone ? SheetTitle : "h3";
-    const Said = phone ? SheetDescription : "p";
 
     const send = async () => {
         const res = await runAction(
@@ -160,9 +133,9 @@ function ReportForm({
 
     return (
         <div className="flex flex-col gap-2">
-            <Title className="m-0 text-[15px] font-semibold">
-                Report this answer
-            </Title>
+            <DialogHeader>
+                <DialogTitle>Report this answer</DialogTitle>
+            </DialogHeader>
             <span data-ph-unmask="" id={`${id}-q`} className="label">
                 What&apos;s wrong?
             </span>
@@ -200,10 +173,16 @@ function ReportForm({
                 placeholder="What should it have said?"
                 className="min-h-16 resize-none"
             />
-            <Said className="m-0 text-[12.5px] leading-[1.5] text-neutral-700 dark:text-foreground">
-                {REPORT_CONSENT}
-            </Said>
-            <div className="flex items-center gap-2">
+            <DialogDescription>{REPORT_CONSENT}</DialogDescription>
+            <DialogFooter>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className={big}
+                    onClick={onCancel}
+                >
+                    Cancel
+                </Button>
                 <Button
                     type="button"
                     className={big}
@@ -213,15 +192,7 @@ function ReportForm({
                 >
                     Send report
                 </Button>
-                <Button
-                    type="button"
-                    variant="outline"
-                    className={big}
-                    onClick={onCancel}
-                >
-                    Cancel
-                </Button>
-            </div>
+            </DialogFooter>
         </div>
     );
 }

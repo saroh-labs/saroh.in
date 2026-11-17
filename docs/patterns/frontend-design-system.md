@@ -360,6 +360,10 @@
   size to a dialog; a dialog needs no `useNarrow` swap to be a sheet.
   The search palette alone opens full screen on a phone
   (`phone="full"`).
+  An app never builds its own: no `role="dialog"` or `aria-modal` in
+  `apps/*/components` or `apps/*/app` (`pnpm run check:overlays`); state
+  that must outlive a close lives in a hook above the overlay
+  (`ask-ai/use-ask-ai.ts`), not in a panel kept mounted and hidden.
 - **Current** — **Border-first elevation.** `Card` is `rounded-xl` (14px) with
   no shadow, and `Button` and `Input` carry none. Shadows are Ink at low alpha,
   never black, and are for overlays that float above content: raised 8%, menu

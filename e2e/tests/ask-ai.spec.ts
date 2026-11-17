@@ -11,9 +11,10 @@ import { NORTHWIND_ORG } from "../playwright.config";
  * Ask AI's panel (plan 2026-11-13-001 U10), desk and phone.
  *
  * The way in and out: the top bar's button (a spark beside Search on a
- * phone) opens the panel over the page, ⌘J toggles it, Esc and Close shut
- * it and give the keyboard back; on a phone it is a full-screen sheet
- * whose controls are 44px.
+ * phone) opens the panel, the shared sheet (from the right on a desk, from
+ * the foot on a phone), ⌘J toggles it, Esc and the sheet's Close shut it
+ * and give the keyboard back; on a phone it is as wide as the screen and
+ * its controls are 44px.
  *
  * Asking: the stack's API answers from a script, never a model
  * (`AI_PROVIDER_FAKE`, `apps/api.saroh.in/src/modules/ai/providers/
@@ -37,9 +38,7 @@ async function openPanel(
     const entry = page
         .getByRole("button", { name: /^Ask AI/ })
         .filter({ visible: true });
-    const panel = isMobile
-        ? page.getByRole("dialog", { name: "Ask AI" })
-        : page.getByRole("complementary", { name: "Ask AI" });
+    const panel = page.getByRole("dialog", { name: "Ask AI" });
     await pressUntil(entry, panel);
     return { entry, panel };
 }
@@ -51,14 +50,14 @@ test.describe("Ask AI: the way in and out", () => {
     }) => {
         const { entry, panel } = await openPanel(page, isMobile);
         await expect(
-            panel.getByRole("button", { name: "Close Ask AI" }),
+            panel.getByRole("button", { name: "Close", exact: true }),
         ).toBeVisible();
         if (!isMobile) {
             // Pressed, the desk button stays dark while the panel is open.
             await expect(entry).toHaveAttribute("aria-expanded", "true");
         }
 
-        await panel.getByRole("button", { name: "Close Ask AI" }).click();
+        await panel.getByRole("button", { name: "Close", exact: true }).click();
         await expect(panel).toBeHidden();
         await expect(entry).toBeFocused();
 
@@ -72,7 +71,7 @@ test.describe("Ask AI: the way in and out", () => {
         test.skip(isMobile, "A keyboard shortcut: desk only.");
         await useSession(page);
         await page.goto(`/open/${NORTHWIND_ORG}`);
-        const panel = page.getByRole("complementary", { name: "Ask AI" });
+        const panel = page.getByRole("dialog", { name: "Ask AI" });
         await expect(async () => {
             await page.keyboard.press("ControlOrMeta+j");
             await expect(panel).toBeVisible({ timeout: 2_000 });
@@ -81,7 +80,7 @@ test.describe("Ask AI: the way in and out", () => {
         await expect(panel).toBeHidden();
     });
 
-    test("on a phone it is full-screen, every control 44px", async ({
+    test("on a phone it is as wide as the screen, every control 44px", async ({
         page,
         isMobile,
     }) => {
@@ -107,7 +106,7 @@ test.describe("Ask AI: the way in and out", () => {
 
 async function ask(panel: Locator, question: string) {
     await panel.getByRole("textbox", { name: "Ask a question" }).fill(question);
-    // Exact: "Close Ask AI" also contains "Ask".
+    // Exact: "Ask about …" suggestions also contain "Ask".
     await panel.getByRole("button", { name: "Ask", exact: true }).click();
 }
 

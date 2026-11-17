@@ -26,27 +26,3 @@ export function openAskAi() {
 export function sayAskAiShown(open: boolean) {
     window.dispatchEvent(new CustomEvent(ASK_AI_SHOWN, { detail: open }));
 }
-
-const FOCUSABLE =
-    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-/** Tab from the last control goes to the first, Shift+Tab the other way. */
-export function keepTabInside(
-    e: { shiftKey: boolean; preventDefault: () => void },
-    root: HTMLElement,
-) {
-    const all = Array.from(
-        root.querySelectorAll<HTMLElement>(FOCUSABLE),
-    ).filter((el) => !el.closest("[hidden]"));
-    const first = all.at(0);
-    const last = all.at(-1);
-    if (!first || !last) return;
-    const at = document.activeElement;
-    if (e.shiftKey && (at === first || at === root)) {
-        e.preventDefault();
-        last.focus();
-    } else if (!e.shiftKey && at === last) {
-        e.preventDefault();
-        first.focus();
-    }
-}

@@ -21,7 +21,8 @@ export const RAW_ALLOWED = {
     // button: a conversation row in Ask AI's list, pressed to open it (U10)
     "components/ask-ai/panel-states.tsx": ["button"],
     // button: a suggestion row, and the page label's clear and undo (AF boards)
-    "components/ask-ai/ask-ai-panel.tsx": ["button"],
+    "components/ask-ai/about-label.tsx": ["button"],
+    "components/ask-ai/suggestions.tsx": ["button"],
     // button: a template's row in its preview's list, pressed to show it (DEC-216)
     "components/sites/templates/template-preview.tsx": ["button"],
     // button: a connection, key or address row that is one button, opening its sheet (U14)
