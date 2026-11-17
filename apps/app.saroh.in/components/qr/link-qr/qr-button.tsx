@@ -111,7 +111,7 @@ export function QrButton({
             <PopoverTrigger asChild>{trigger}</PopoverTrigger>
             <PopoverContent
                 align="end"
-                role="dialog"
+                // The shared popover is a dialog already; it is named here.
                 aria-label={title}
                 className="w-[320px] max-w-[calc(100vw-2rem)]"
             >

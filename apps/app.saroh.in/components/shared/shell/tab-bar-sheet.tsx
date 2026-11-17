@@ -1,7 +1,13 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
 import { cn } from "@saroh/ui/lib/utils";
+import {
+    Sheet,
+    SheetClose,
+    SheetContent,
+    SheetTitle,
+    SheetTrigger,
+} from "@saroh/ui/sheet";
 import { X } from "lucide-react";
 import Link from "next/link";
 import { useId, useRef, useState } from "react";
@@ -21,7 +27,8 @@ import { CountBadge } from "@saroh/ui/count-badge";
  * A modal dialog: focus goes to Close when it opens (not the first row, so a
  * screen reader starts at the top of the sheet), Tab stays inside it, Escape
  * closes it, and focus returns to More on the way out. Radix's dialog gives
- * the trap, the Escape and the return; the rest is set here.
+ * the trap, the Escape and the return through the shared sheet
+ * (`@saroh/ui/sheet`, DEC-195); its size and Close are set here.
  */
 export function TabBarSheet({
     groups,
@@ -37,59 +44,50 @@ export function TabBarSheet({
     const closeRef = useRef<HTMLButtonElement>(null);
 
     return (
-        <Dialog.Root open={open} onOpenChange={setOpen}>
-            <Dialog.Trigger asChild>{trigger(open)}</Dialog.Trigger>
-            <Dialog.Portal>
-                <Dialog.Overlay
-                    className={cn(
-                        // The app's scrim: Ink at 45%, as every sheet's.
-                        "fixed inset-0 z-50 bg-[hsl(var(--shadow-color)/0.45)]",
-                        "duration-base ease-out data-[state=closed]:duration-fast data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-                    )}
-                />
-                <Dialog.Content
-                    aria-modal="true"
-                    // The rest of the navigation: Saroh's own words, which
-                    // a session recording may read.
-                    data-ph-unmask=""
-                    aria-describedby={undefined}
-                    onOpenAutoFocus={(event) => {
-                        event.preventDefault();
-                        closeRef.current?.focus();
-                    }}
-                    className={cn(
-                        "fixed inset-x-0 bottom-0 z-50 max-h-[76%] overflow-y-auto overscroll-contain rounded-t-2xl bg-card text-card-foreground outline-none",
-                        "shadow-[0_-8px_30px_hsl(var(--shadow-color)/0.24)]",
-                        "ease-out data-[state=closed]:duration-base data-[state=open]:duration-slow data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-                    )}
-                >
-                    <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-[18px] pb-2.5 pt-3.5">
-                        <Dialog.Title className="flex-1 font-display text-[17px] font-semibold tracking-[-0.02em]">
-                            Everything else
-                        </Dialog.Title>
-                        <Dialog.Close
-                            ref={closeRef}
-                            aria-label="Close"
-                            className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border-0 bg-muted text-foreground/75 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card coarse:size-11"
-                        >
-                            <X aria-hidden className="size-4" />
-                        </Dialog.Close>
-                    </div>
-                    <div className="px-2.5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-2">
-                        {groups.map((group) => (
-                            <SheetGroup
-                                key={group.label}
-                                group={group}
-                                onGo={() => setOpen(false)}
-                            />
-                        ))}
-                        <p className="text-pretty px-2.5 pt-3 text-[11.5px] leading-[1.5] text-muted-foreground">
-                            {note}
-                        </p>
-                    </div>
-                </Dialog.Content>
-            </Dialog.Portal>
-        </Dialog.Root>
+        <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>{trigger(open)}</SheetTrigger>
+            <SheetContent
+                side="bottom"
+                // Close is in the sheet's own header row (the board's).
+                closeButton={false}
+                // The rest of the navigation: Saroh's own words, which
+                // a session recording may read.
+                data-ph-unmask=""
+                aria-describedby={undefined}
+                onOpenAutoFocus={(event) => {
+                    event.preventDefault();
+                    closeRef.current?.focus();
+                }}
+                // The design's sheet on the shared one: 76% tall at most and
+                // scrolling as one, no edge or padding (the head pads itself).
+                className="max-h-[76%] overflow-y-auto overscroll-contain rounded-t-2xl border-t-0 p-0 shadow-[0_-8px_30px_hsl(var(--shadow-color)/0.24)] outline-none"
+            >
+                <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-card px-[18px] pb-2.5 pt-3.5">
+                    <SheetTitle className="flex-1 font-display text-[17px] font-semibold tracking-[-0.02em]">
+                        Everything else
+                    </SheetTitle>
+                    <SheetClose
+                        ref={closeRef}
+                        aria-label="Close"
+                        className="grid size-[34px] shrink-0 place-items-center rounded-[9px] border-0 bg-muted text-foreground/75 transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card coarse:size-11"
+                    >
+                        <X aria-hidden className="size-4" />
+                    </SheetClose>
+                </div>
+                <div className="px-2.5 pb-[calc(20px+env(safe-area-inset-bottom))] pt-2">
+                    {groups.map((group) => (
+                        <SheetGroup
+                            key={group.label}
+                            group={group}
+                            onGo={() => setOpen(false)}
+                        />
+                    ))}
+                    <p className="text-pretty px-2.5 pt-3 text-[11.5px] leading-[1.5] text-muted-foreground">
+                        {note}
+                    </p>
+                </div>
+            </SheetContent>
+        </Sheet>
     );
 }
 

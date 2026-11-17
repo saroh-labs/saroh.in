@@ -108,7 +108,7 @@ export function HeaderOverlay({
         <Popover open={open} onOpenChange={onOpenChange} modal>
             <PopoverTrigger asChild>{trigger}</PopoverTrigger>
             <PopoverContent
-                role="dialog"
+                // The shared popover is a dialog already; it is named here.
                 aria-label={title}
                 align={align}
                 sideOffset={6}

@@ -14,23 +14,14 @@ const SKIP = /(^|\/)(node_modules|\.next|\.open-next|out|dist|\.turbo)(\/|$)/;
 const TESTS = /(\.test\.tsx|test-kit\.tsx)$/;
 const HAND_BUILT = /role=\{?["'`]dialog["'`]\}?|aria-modal/;
 
-const EXISTING =
-    "existing; moves to @saroh/ui overlays when next changed (DEC-183 rule)";
 /** Files that had it before this check: each leaves the list when moved. */
 const ALLOWED = new Map([
     [
-        "apps/app.saroh.in/components/bookings/calendar/header/header-overlay.tsx",
-        EXISTING,
+        "apps/app.saroh.in/components/sites/editor/editor-sheet.tsx",
+        // Portalled into the editor's body so its scrim covers only the page
+        // under the top bar; the shared SheetContent has no portal container.
+        "needs a portal container the shared Sheet does not take (17 Nov 2026)",
     ],
-    ["apps/app.saroh.in/components/home/header/new-sheet.tsx", EXISTING],
-    ["apps/app.saroh.in/components/home/phone/home-sheet.tsx", EXISTING],
-    [
-        "apps/app.saroh.in/components/insights/overview/period-control.tsx",
-        EXISTING,
-    ],
-    ["apps/app.saroh.in/components/qr/link-qr/qr-button.tsx", EXISTING],
-    ["apps/app.saroh.in/components/shared/shell/tab-bar-sheet.tsx", EXISTING],
-    ["apps/app.saroh.in/components/sites/editor/editor-sheet.tsx", EXISTING],
 ]);
 
 const apps = readdirSync(join(root, "apps"));
