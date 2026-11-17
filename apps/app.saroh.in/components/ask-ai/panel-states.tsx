@@ -91,7 +91,7 @@ export function PlanLocked({
                 className="flex flex-col gap-3"
             >
                 <Example ask="How did November go vs October?">
-                    <p className="m-0 text-sm font-semibold">
+                    <p data-ph-unmask="" className="m-0 text-sm font-semibold">
                         Up 20%. The bun box did most of it.
                     </p>
                 </Example>
@@ -102,14 +102,19 @@ export function PlanLocked({
                     </p>
                     {/* A picture of the card, not a control: nothing here acts. */}
                     <p aria-hidden className="m-0 flex items-center gap-2.5">
-                        <span className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-[13.5px] font-semibold text-primary-foreground">
+                        <span
+                            data-ph-unmask=""
+                            className="inline-flex h-9 items-center rounded-lg bg-primary px-3 text-[13.5px] font-semibold text-primary-foreground"
+                        >
                             Move booking
                         </span>
-                        <span className="text-[12.5px]">Undo all day</span>
+                        <span data-ph-unmask="" className="text-[12.5px]">
+                            Undo all day
+                        </span>
                     </p>
                 </Example>
                 <Example ask="Regulars who haven't been back?">
-                    <p className="m-0 text-sm font-semibold">
+                    <p data-ph-unmask="" className="m-0 text-sm font-semibold">
                         5 people · Call · Order again
                     </p>
                 </Example>

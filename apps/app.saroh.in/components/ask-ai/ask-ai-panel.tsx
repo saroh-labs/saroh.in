@@ -2,8 +2,9 @@
 
 import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
-import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
+import { ListSearch } from "@saroh/ui/list-search";
+import { ListToolbar } from "@saroh/ui/list-toolbar";
 import { Notice } from "@saroh/ui/notice";
 import {
     ChevronLeft,
@@ -12,7 +13,6 @@ import {
     Maximize2,
     Pencil,
     Power,
-    Search,
     Sparkles,
     Undo2,
     X,
@@ -220,21 +220,15 @@ export function AskAiPanel({
     const listed = Array.isArray(history) ? matching(history, query) : history;
     const search =
         Array.isArray(history) && history.length > 0 ? (
-            <div className="relative shrink-0">
-                <Search
-                    aria-hidden
-                    className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                />
-                <Input
-                    type="search"
-                    aria-label="Search your conversations"
-                    placeholder="Search your conversations"
-                    autoComplete="off"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    className="h-[46px] rounded-xl border-border bg-card pl-10 text-sm"
-                />
-            </div>
+            <ListToolbar
+                search={
+                    <ListSearch
+                        placeholder="Search conversations"
+                        defaultValue={query}
+                        onSearch={setQuery}
+                    />
+                }
+            />
         ) : null;
     const historyList =
         listed === "failed" ? (
@@ -481,7 +475,10 @@ export function AskAiPanel({
                 className="size-11"
                 onClick={() => ai.setView("history")}
             />
-            <h1 className="m-0 flex flex-1 items-center gap-2 font-display text-base font-semibold">
+            <h1
+                data-ph-unmask=""
+                className="m-0 flex flex-1 items-center gap-2 font-display text-base font-semibold"
+            >
                 Ask AI
             </h1>
             {tools ? more : null}
@@ -596,7 +593,10 @@ export function AskAiPanel({
                     )}
                 >
                     <div className="flex items-center gap-2">
-                        <h1 className="m-0 flex-1 font-display text-[22px] font-semibold tracking-[-0.02em]">
+                        <h1
+                            data-ph-unmask=""
+                            className="m-0 flex-1 font-display text-[22px] font-semibold tracking-[-0.02em]"
+                        >
                             Ask AI
                         </h1>
                         <Button
