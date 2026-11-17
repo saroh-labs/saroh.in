@@ -64,7 +64,9 @@ export default defineConfig({
             cwd: root,
             url: `${appURL}/favicon.ico`,
             ignoreHTTPSErrors: true,
-            timeout: 180_000,
+            // The cold `next build` alone took ~2.2 min on a runner by mid-Nov
+            // 2026 and grows with the app; 3 min ran out (CI run 44103127941).
+            timeout: 420_000,
             gracefulShutdown: { signal: "SIGTERM", timeout: 5_000 },
             env: {
                 SKIP_ENV_VALIDATION: "1",
