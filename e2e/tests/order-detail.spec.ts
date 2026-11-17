@@ -652,8 +652,12 @@ test.describe("change and cancel on order detail (B9)", () => {
         const id = await freshOrder(page, "PICKUP", { paid: false });
         await page.goto(`/commerce/orders/${id}`);
 
-        await page.getByRole("button", { name: "Cancel order…" }).click();
         const sheet = page.getByRole("dialog", { name: /^Cancel #/ });
+        // A press before hydration is lost on a slow runner.
+        await pressUntil(
+            page.getByRole("button", { name: "Cancel order…" }),
+            sheet,
+        );
         await expect(
             sheet.getByText(/It stays on record as cancelled, never deleted/),
         ).toBeVisible();

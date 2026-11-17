@@ -406,6 +406,9 @@ async function focusWithoutIndicator(page: Page, from: "top" | "main") {
 }
 
 async function audit(page: Page, screen: string, testInfo: TestInfo) {
+    // Next streams a dynamic page's <title> after its shell; axe run before
+    // it lands reads an empty one. A screen with no title still fails here.
+    await expect(page).toHaveTitle(/\S/);
     // Every entrance has finished: a row caught mid-fade measures as low
     // contrast, and a ring caught mid-transition as no ring at all.
     await page.evaluate(() =>

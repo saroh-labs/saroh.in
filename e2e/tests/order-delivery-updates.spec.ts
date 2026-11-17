@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { makeOrder, northwind } from "../fixtures/own-data";
+import { pressUntil } from "../fixtures/press";
 import { useSession } from "../fixtures/sessions";
 
 /**
@@ -136,10 +137,11 @@ test.describe("delivery updates on order detail (U16)", () => {
         const read = await readOf(page, id);
         await page.goto(`/commerce/orders/${id}`);
 
-        await page
-            .getByRole("button", { name: "Mark delivered", exact: true })
-            .click();
-        await expect(shown(page, "Delivered.")).toBeVisible();
+        // A press before hydration is lost on a slow runner.
+        await pressUntil(
+            page.getByRole("button", { name: "Mark delivered", exact: true }),
+            shown(page, "Delivered."),
+        );
         if (read.deliveryUpdates === false) {
             await expect(
                 shown(page, /isn't told: delivery updates are off\./),

@@ -54,7 +54,12 @@ test.describe("Ask AI: the way in and out", () => {
         ).toBeVisible();
         if (!isMobile) {
             // Pressed, the desk button stays dark while the panel is open.
-            await expect(entry).toHaveAttribute("aria-expanded", "true");
+            // The sheet is modal, so the page behind it is out of the
+            // accessibility tree: the button is found by its shortcut, not
+            // its role.
+            await expect(
+                page.locator('button[aria-keyshortcuts="Meta+J Control+J"]'),
+            ).toHaveAttribute("aria-expanded", "true");
         }
 
         await panel.getByRole("button", { name: "Close Ask AI" }).click();
