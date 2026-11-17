@@ -1,7 +1,7 @@
 name: CI
 
-# Gates every PR (and pushes to the long-lived branches) on the same checks a
-# developer runs locally: lint, typecheck, unit tests, build, integration tests
+# Gates every PR into the long-lived branches on the same checks a developer
+# runs locally: lint, typecheck, unit tests, build, integration tests
 # (plain and under RLS), the migration replay and the browser suites. See
 # ticket S0-002. The independent gates run as parallel jobs and the slow suites
 # are sharded, and a run checks only what its change can reach (the `changes`
@@ -14,10 +14,12 @@ name: CI
 # protection rules for `main` and `development` (Settings → Branches). That
 # cannot be configured from a workflow file.
 
+# Pull requests only (17 Nov 2026): the repo went private and CI moved to two
+# self-hosted laptop runners, so a merge is not checked a second time. What
+# lands on main or development is exactly a PR that passed here; the deploy
+# workflows keep their own push triggers.
 on:
   pull_request:
-    branches: [main, development]
-  push:
     branches: [main, development]
   # Everything, regardless of what changed: by hand from the Actions tab, and
   # weekly as a safety net for anything the path rules below might miss.
@@ -31,10 +33,20 @@ on:
 permissions:
   contents: read
 
+# Each laptop runner gets 4 CPUs and about 4 GB of one 8 GB slice, but Node's
+# os.cpus() and turbo see all 12 of the laptop's: sized to them, a Next build
+# and an E2E shard's setup at once took both runners down ("lost
+# communication", 17 Nov 2026). Turbo calls pass --concurrency=2, test
+# runners --maxWorkers=2, Playwright PW_WORKERS=2; these two cover Next's
+# build workers (experimental.cpus in each next.config) and any one Node
+# process, which now fails with a heap error instead of taking the runner.
+env:
+  NEXT_BUILD_CPUS: "2"
+  NODE_OPTIONS: --max-old-space-size=3072
+
 # Cancel superseded runs on an open PR (a new commit or a force-push) so CI does
-# not pile up on stale commits. Never on main or development: each push there
-# is checked against the commit before it, so a cancelled run would leave that
-# push's own changes unchecked.
+# not pile up on stale commits; with two runners a stale run holds one of
+# them. A manual or the weekly run is never cancelled.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -44,22 +56,21 @@ jobs:
   # unit tests, build, then the integration suite twice (plain and under RLS),
   # about 18 minutes end to end. They are independent, so they now run side by
   # side: static checks, unit tests and the build each in their own job, and
-  # the integration suite split into 4 shards per mode, each against its own
+  # the integration suite split into 2 shards per mode, each against its own
   # Postgres.
   # `ci` at the end waits for all of them and keeps the old check's name, so a
   # branch rule that requires "Lint, typecheck, test & build" still means
   # every one of these passed.
 
   # What this change touches, so a run checks only what it can reach. The
-  # base is the PR's merge base, or on a push the commit the branch pointed
-  # at before it (a merged PR is then exactly that PR's diff):
+  # base is the PR's merge base:
   #   - a change to CI, the root manifests, the lockfile or tooling/ runs
   #     everything (it can affect any package);
   #   - otherwise each gate runs when a path it depends on changed, and lint,
   #     typecheck, unit tests and build cover only the packages that changed
   #     plus everything that depends on them (turbo's `...[base]` filter).
-  # A manual or scheduled run, a new branch, or a push whose previous commit
-  # is gone (a force-push) checks everything.
+  # A manual or scheduled run checks everything. `reason` says why, in words,
+  # for the run summary.
   changes:
     name: What changed
     runs-on: [self-hosted, saroh]
@@ -71,6 +82,7 @@ jobs:
       e2e: ${{ steps.scan.outputs.e2e }}
       cfruntime: ${{ steps.scan.outputs.cfruntime }}
       base: ${{ steps.scan.outputs.base }}
+      reason: ${{ steps.scan.outputs.reason }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,20 +91,14 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
           # Written to the step's outputs only; nothing is printed to the log.
           put() { echo "$1=$2" >> "$GITHUB_OUTPUT"; }
-          everything() { for k in full code api db e2e cfruntime; do put "$k" true; done; put base ""; exit 0; }
+          everything() { for k in full code api db e2e cfruntime; do put "$k" true; done; put base ""; put reason "$1"; exit 0; }
           case "$EVENT" in
             pull_request) base=$(git merge-base "$PR_BASE" HEAD) ;;
-            push)
-              # All zeros on a new branch; missing after a force-push.
-              if [ -z "$PUSH_BEFORE" ] || [ "$PUSH_BEFORE" = "0000000000000000000000000000000000000000" ] \
-                || ! git cat-file -e "$PUSH_BEFORE^{commit}" 2>/dev/null; then everything; fi
-              base="$PUSH_BEFORE" ;;
-            *) everything ;;
+            *) everything "full run: $EVENT" ;;
           esac
           put base "$base"
           # Anything but docs and Markdown counts as code, and only code decides
@@ -107,10 +113,12 @@ jobs:
           # pipe holds, and under pipefail that read as "no match". A batch
           # of 2,000 files so ran no integration and no browser shard.
           has() { grep -E "$1" <<<"$files" >/dev/null; }
-          if has '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)'; then
-            everything
+          wide=$(grep -E '^(\.github/|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|turbo\.json$|\.nvmrc$|tooling/)' <<<"$files" || true)
+          if [ -n "$wide" ]; then
+            everything "full run: $(cut -d/ -f1 <<<"$wide" | sort -u | head -3 | paste -sd, - | sed 's/,/, /g') changed"
           fi
           put full false
+          put reason "only what the change reaches"
           if [ -n "$files" ]; then put code true; else put code false; fi
           if has '^(apps/api\.saroh\.in/|packages/)'; then put api true; else put api false; fi
           if has '^packages/database/'; then put db true; else put db false; fi
@@ -156,15 +164,17 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           turbo-cache: static
 
       # One turbo run, so lint and typecheck share the task graph and run in
       # parallel across packages. Package-boundary enforcement (frontends must
       # not import Prisma directly) is part of `lint` via the shared nextjs
-      # ESLint config. Four at a time: turbo's default of ten starved the
-      # runner of memory twice on #1424 ("lost communication", no log).
+      # ESLint config. Two at a time: turbo's default of ten starved the
+      # runner of memory twice on #1424 ("lost communication", no log), and a
+      # laptop runner has 4 CPUs.
       - name: Lint and typecheck
-        run: pnpm turbo run lint typecheck $AFFECTED --concurrency=4
+        run: pnpm turbo run lint typecheck $AFFECTED --concurrency=2
 
       # Circular-dependency detection across all workspaces.
       - name: Circular dependency check
@@ -349,17 +359,18 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           turbo-cache: unit
 
       # The api's specs import its workspace packages (auth, block-contract,
       # …) as built; the single job used to have them from typecheck.
       - name: Build what the api imports
         if: needs.changes.outputs.api == 'true'
-        run: pnpm turbo run build --filter=@saroh/api^...
+        run: pnpm turbo run build --filter=@saroh/api^... --concurrency=2
 
       - name: Unit tests (api, no database)
         if: needs.changes.outputs.api == 'true'
-        run: pnpm --filter @saroh/api test:unit
+        run: pnpm --filter @saroh/api test:unit --maxWorkers=2
 
       # Everything else with a `test` script: the packages and the workspace
       # app (#287). `@saroh/api` is excluded: its bare `test` script is `jest`,
@@ -381,7 +392,7 @@ jobs:
       # package builds nothing above, and the sweeps run on every PR (#1338).
       - name: Seed sweeps
         run: |
-          pnpm turbo run build --filter=@saroh/database^...
+          pnpm turbo run build --filter=@saroh/database^... --concurrency=2
           pnpm --filter @saroh/database exec vitest run src/seed/showcase/clinic.test.ts src/seed/showcase/bakery-any-day.test.ts
 
   build:
@@ -411,11 +422,13 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           turbo-cache: build
           next-cache: "true"
 
+      # Two apps at a time, each with two Next workers (NEXT_BUILD_CPUS).
       - name: Build
-        run: pnpm turbo run build $AFFECTED
+        run: pnpm turbo run build $AFFECTED --concurrency=2
 
       # Tolerant of the registry being unreachable: the audit endpoint timed
       # out from the runner on two consecutive runs in one morning. A CRITICAL
@@ -442,7 +455,9 @@ jobs:
   # The integration suite runs serially (maxWorkers 1: the between-suite
   # TRUNCATE is only race-free on one connection), so the way to make it
   # faster is to split the specs across jobs, each with its own Postgres.
-  # Every spec still runs, in both modes:
+  # Every spec still runs, in both modes. Two shards a mode: on hosted runners
+  # (run 44029918932) a mode's tests took 26 to 30 minutes in all, so a shard
+  # is about 15 minutes of tests plus a minute of setup:
   #   plain — the schema from `prisma db push`, the service's own connection;
   #   rls   — the way production runs once RLS is switched on (#53): the
   #           schema from the migrations (where the policies live), a
@@ -450,7 +465,7 @@ jobs:
   #           every service call made inside its RLS context
   #           (apps/api.saroh.in/test/rls-mode.ts).
   integration:
-    name: Integration (${{ matrix.mode }}, shard ${{ matrix.shard }}/4)
+    name: Integration (${{ matrix.mode }}, shard ${{ matrix.shard }}/2)
     runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.api == 'true'
@@ -458,7 +473,7 @@ jobs:
       fail-fast: false
       matrix:
         mode: [plain, rls]
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
     env:
       SKIP_ENV_VALIDATION: "1"
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/saroh_ci_dummy
@@ -500,20 +515,22 @@ jobs:
       # the client generated here and pnpm on PATH. The suite itself runs
       # through jest directly, so the only Turbo work is the build below, and
       # the shards READ the unit job's cache for it (same packages, same env,
-      # so the same hashes) without writing one of their own.
+      # so the same hashes) without writing one of their own (on /cache all
+      # jobs share one Turbo cache anyway).
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           turbo-cache: unit
           turbo-save: "false"
 
       # The api's workspace dependencies (auth, block-contract, …) are consumed
       # built, as `pnpm run build` would leave them.
       - name: Build what the api imports
-        run: pnpm turbo run build --filter=@saroh/api^...
+        run: pnpm turbo run build --filter=@saroh/api^... --concurrency=2
 
       - name: Integration tests
         working-directory: apps/api.saroh.in
-        run: pnpm exec jest -c jest.integration.config.js --shard=${{ matrix.shard }}/4
+        run: pnpm exec jest -c jest.integration.config.js --shard=${{ matrix.shard }}/2
 
   # `next build`, the unit tests and the browser specs all run Next under
   # Node; only the Workers runtime runs what OpenNext built. Next 16.4.2 on
@@ -532,6 +549,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           prisma: "false"
           turbo-cache: cf-runtime
           next-cache: "true"
@@ -593,6 +611,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           prisma: "false"
 
       - name: Replay migrations and check for drift
@@ -625,10 +644,11 @@ jobs:
   # no portless proxy on a runner, so the URLs are passed in explicitly and the
   # trusted-origin list is set to match. That list is exactly why the local
   # names exist — see docs/architecture/LOCAL_DEV.md.
-  # Split four ways by spec file, each shard with its own Postgres and its
-  # own freshly seeded stack, so the specs still run one at a time against
-  # data only they touch (the config keeps workers: 1). About 11 minutes of
-  # tests become 2.2 to 3.5 per shard.
+  # Split two ways, each shard with its own Postgres and its own freshly
+  # seeded stack. Two, not four, since the laptop runners (17 Nov 2026): every
+  # shard repeats ~9 minutes of seed and builds, and two runners run two jobs
+  # at once. Run 44029918932 had ~52 minutes of tests over four hosted
+  # shards, so a shard is now ~26 minutes of tests plus its setup.
   #
   # This is the longest job, so it sets the run's wall clock. Two things that
   # look faster and are not (measured 2026-09-29):
@@ -641,14 +661,14 @@ jobs:
   #     at the same time (a push to development and its PR) queued jobs by up
   #     to 6 minutes on the account's concurrent-job limit.
   browser-e2e-shard:
-    name: Browser E2E (shard ${{ matrix.shard }}/4)
+    name: Browser E2E (shard ${{ matrix.shard }}/2)
     runs-on: [self-hosted, saroh]
     needs: changes
     if: needs.changes.outputs.e2e == 'true'
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2]
 
     services:
       postgres:
@@ -797,7 +817,9 @@ jobs:
       # The Turbo cache lets an unchanged app's build replay instead of
       # rebuilding in every shard.
       - uses: ./.github/actions/setup
+        id: setup
         with:
+          runner-cache: "true"
           turbo-cache: e2e
           next-cache: "true"
           playwright: "true"
@@ -810,33 +832,53 @@ jobs:
       # moment it runs, so a dump is reused within one four-hour window of an
       # Indian day and never after. No restore-keys: a near match is a stale
       # database. On a miss the shards migrate and seed as before (below) and
-      # one of them saves the dump. `scripts/prepush.sh --e2e` does the same
-      # locally with a template database.
+      # save the dump. `scripts/prepush.sh --e2e` does the same locally with a
+      # template database. On the laptop runners the dump is a file in
+      # /cache/e2e-seed named by the same key, written under a temporary name
+      # and moved into place, so a shard never reads half a dump; elsewhere it
+      # is actions/cache. Pull requests write it either way (CI runs on pull
+      # requests only since 17 Nov 2026).
       #
       # pg_dump and pg_restore run inside the service container, so their
       # version is the server's, whatever the runner image ships.
       - name: Key the seeded database
         id: seed-key
+        env:
+          INPUTS: ${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'packages/pricing-catalog/src/**', 'pnpm-lock.yaml') }}
         run: |
           hour=$(TZ=Asia/Kolkata date +%-H)
-          echo "window=$(TZ=Asia/Kolkata date +%F)-$(( hour / 4 ))" >> "$GITHUB_OUTPUT"
+          echo "key=e2e-seed-v1-$(TZ=Asia/Kolkata date +%F)-$(( hour / 4 ))-$INPUTS" >> "$GITHUB_OUTPUT"
+      - name: Restore the seeded database dump (runner cache)
+        id: seed-runner
+        if: steps.setup.outputs.runner-cache != ''
+        env:
+          KEY: ${{ steps.seed-key.outputs.key }}
+        run: |
+          if [ -f "/cache/e2e-seed/$KEY.dump" ]; then
+            cp "/cache/e2e-seed/$KEY.dump" "$RUNNER_TEMP/e2e-seed.dump"
+            echo "cache-hit=true" >> "$GITHUB_OUTPUT"
+          fi
       - name: Restore the seeded database dump
         id: seed-dump
+        if: steps.setup.outputs.runner-cache == ''
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/e2e-seed.dump
-          key: e2e-seed-v1-${{ steps.seed-key.outputs.window }}-${{ hashFiles('packages/database/prisma/**', 'packages/database/src/**', 'packages/database/package.json', 'packages/block-contract/src/**', 'packages/pricing-catalog/src/**', 'pnpm-lock.yaml') }}
+          path: ${{ runner.temp }}/e2e-seed.dump
+          key: ${{ steps.seed-key.outputs.key }}
+      - name: Was the dump there
+        id: seed
+        run: echo "hit=${{ steps.seed-runner.outputs.cache-hit == 'true' || steps.seed-dump.outputs.cache-hit == 'true' }}" >> "$GITHUB_OUTPUT"
       - name: Load the seeded database from the dump
-        if: steps.seed-dump.outputs.cache-hit == 'true'
+        if: steps.seed.outputs.hit == 'true'
         run: >-
           docker exec -i ${{ job.services.postgres.id }}
           pg_restore -U postgres -d saroh_e2e_test --no-owner --exit-on-error
-          < /tmp/e2e-seed.dump
+          < "$RUNNER_TEMP/e2e-seed.dump"
 
       # Migrations, not `db push`: this stack is the one place CI exercises the
       # app end to end, so it is built the way a real environment is.
       - name: Apply migrations
-        if: steps.seed-dump.outputs.cache-hit != 'true'
+        if: steps.seed.outputs.hit != 'true'
         run: pnpm --filter @saroh/database db:migrate:deploy
 
       # The seed and the build in ONE turbo run, so they overlap: the seed
@@ -859,16 +901,16 @@ jobs:
       # specs failed on a 404 or a sign-in that never landed. The showcase runs
       # the base seed first, so Northwind is still there for everything else.
       - name: Seed the demo Organizations (showcase) and build the apps under test
-        if: steps.seed-dump.outputs.cache-hit != 'true'
+        if: steps.seed.outputs.hit != 'true'
         run: >-
-          pnpm turbo run db:seed:showcase build --log-order=grouped
+          pnpm turbo run db:seed:showcase build --log-order=grouped --concurrency=2
           --filter=@saroh/database --filter=@saroh/api --filter=auth
           --filter=application --filter=sites --filter=web
           --filter=admin
       - name: Build the apps under test (the database came from the dump)
-        if: steps.seed-dump.outputs.cache-hit == 'true'
+        if: steps.seed.outputs.hit == 'true'
         run: >-
-          pnpm turbo run build --log-order=grouped
+          pnpm turbo run build --log-order=grouped --concurrency=2
           --filter=@saroh/database --filter=@saroh/api --filter=auth
           --filter=application --filter=sites --filter=web
           --filter=admin
@@ -882,23 +924,37 @@ jobs:
           NEXT_PUBLIC_APP_URL: http://localhost:3007
           NEXT_PUBLIC_ACCOUNTS_URL: http://localhost:3008
         run: >-
-          pnpm turbo run build:global --log-order=grouped
+          pnpm turbo run build:global --log-order=grouped --concurrency=2
           --filter=application --filter=auth
       # Before the stack starts: the specs write to it.
       - name: Dump the seeded database for the next run
-        if: steps.seed-dump.outputs.cache-hit != 'true'
+        if: steps.seed.outputs.hit != 'true'
         run: >-
           docker exec ${{ job.services.postgres.id }}
-          pg_dump -U postgres -Fc saroh_e2e_test > /tmp/e2e-seed.dump
-      # Four shards miss together; the first to finish saves, and the others'
-      # "cache already exists" is not a failure.
+          pg_dump -U postgres -Fc saroh_e2e_test > "$RUNNER_TEMP/e2e-seed.dump"
+      # Both shards miss together; each moves its own copy into place (the
+      # same data), and dumps from an earlier window go after a day.
+      - name: Save the seeded database dump (runner cache)
+        if: steps.seed.outputs.hit != 'true' && steps.setup.outputs.runner-cache != ''
+        continue-on-error: true
+        env:
+          KEY: ${{ steps.seed-key.outputs.key }}
+        run: |
+          set -euo pipefail
+          mkdir -p /cache/e2e-seed
+          tmp=$(mktemp /cache/e2e-seed/.partial.XXXXXX)
+          cp "$RUNNER_TEMP/e2e-seed.dump" "$tmp"
+          mv "$tmp" "/cache/e2e-seed/$KEY.dump"
+          find /cache/e2e-seed -type f -mmin +1440 -delete
+      # The first shard to finish saves; the other's "cache already exists"
+      # is not a failure.
       - name: Save the seeded database dump
-        if: steps.seed-dump.outputs.cache-hit != 'true'
+        if: steps.seed.outputs.hit != 'true' && steps.setup.outputs.runner-cache == ''
         continue-on-error: true
         uses: actions/cache/save@v4
         with:
-          path: /tmp/e2e-seed.dump
-          key: ${{ steps.seed-dump.outputs.cache-primary-key }}
+          path: ${{ runner.temp }}/e2e-seed.dump
+          key: ${{ steps.seed-key.outputs.key }}
 
       # Started detached and polled, rather than trusting a fixed sleep: a cold
       # Next server on a runner is not reliably up in any particular number of
@@ -974,13 +1030,13 @@ jobs:
           retention-days: 3
 
       # e2e/run.mjs: sign in once, then desk and phone fullyParallel — so a
-      # shard is a quarter of the TESTS, not of the files, and the four come
-      # out even — then this shard's `@serial` tests one at a time. Two
-      # workers: the stack under test shares the runner's two vCPUs.
+      # shard is half the TESTS, not of the files, and the two come out
+      # even — then this shard's `@serial` tests one at a time. Two workers:
+      # the stack under test shares the runner's four CPUs.
       - name: Run browser tests
         env:
           PW_WORKERS: "2"
-        run: pnpm --filter @saroh/e2e test:e2e --shard=${{ matrix.shard }}/4
+        run: pnpm --filter @saroh/e2e test:e2e --shard=${{ matrix.shard }}/2
 
       # The trace and screenshots are the whole point of a failed browser run:
       # without them a red build says "something looked wrong" and nothing else.
@@ -1036,6 +1092,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
+          runner-cache: "true"
           prisma: "false"
           playwright: "true"
 
@@ -1093,3 +1150,90 @@ jobs:
       # reprinting the secret into a public build log.
       - name: Run gitleaks
         run: gitleaks git . --redact --no-banner --exit-code 1
+
+  # What ran, what was skipped and why, and how long each job took, as a
+  # table on the run's page. Last, so every job has finished; not a gate (its
+  # own failure fails nothing that is required). The one job allowed to read
+  # the run's jobs, for their times.
+  summary:
+    name: Run summary
+    runs-on: [self-hosted, saroh]
+    needs:
+      [
+        changes,
+        static,
+        unit,
+        build,
+        integration,
+        cf-runtime,
+        ci,
+        migration-replay,
+        browser-e2e-shard,
+        browser-e2e,
+        permissions-e2e,
+        secret-scan,
+      ]
+    if: always()
+    permissions:
+      actions: read
+    steps:
+      - name: Write the summary
+        uses: actions/github-script@v7
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        with:
+          script: |
+            const needs = JSON.parse(process.env.NEEDS);
+            const out = needs.changes.outputs || {};
+            const full = out.reason || "the change scan did not finish";
+            // Each gate's job id, its name on the run page, and the
+            // `changes` output that decides whether it runs.
+            const gates = [
+              ["secret-scan", "Secret scan (gitleaks)", null, ""],
+              ["static", "Lint, typecheck and repo checks", "code", "only docs or Markdown changed"],
+              ["unit", "Unit tests", "code", "only docs or Markdown changed"],
+              ["build", "Build", "code", "only docs or Markdown changed"],
+              ["integration", "Integration", "api", "API and packages untouched: integration skipped"],
+              ["migration-replay", "Migration replay from empty", "db", "packages/database untouched: replay skipped"],
+              ["cf-runtime", "Cloudflare runtime (accounts sign-in)", "cfruntime", "no lockfile or app Next, OpenNext or wrangler config changed"],
+              ["browser-e2e-shard", "Browser E2E (shard", "e2e", "no app, package, e2e or script changed: browser suites skipped"],
+              ["permissions-e2e", "Permission states (production build)", "e2e", "no app, package, e2e or script changed: browser suites skipped"],
+              ["ci", "Lint, typecheck, test & build", null, ""],
+              ["browser-e2e", "Browser E2E (seeded stack)", null, ""],
+            ];
+            // Times, when the API answers; the table stands without them.
+            let jobs = [];
+            try {
+              jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRunAttempt, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+                attempt_number: Number(process.env.GITHUB_RUN_ATTEMPT) || 1,
+                per_page: 100,
+              });
+            } catch (e) {
+              core.warning(`Job times unavailable: ${e.message}`);
+            }
+            const mins = (j) =>
+              j.started_at && j.completed_at
+                ? `${((new Date(j.completed_at) - new Date(j.started_at)) / 60000).toFixed(1)} min`
+                : "";
+            const rows = [];
+            for (const [id, name, flag, why] of gates) {
+              const result = needs[id]?.result ?? "unknown";
+              const skippedWhy = result === "skipped" ? (flag && out[flag] === "false" ? why : "the change scan did not finish") : "";
+              const ran = jobs.filter((j) => j.name.startsWith(name) && j.conclusion !== "skipped");
+              if (ran.length > 1) {
+                for (const j of ran) rows.push([j.name, j.conclusion ?? result, mins(j), ""]);
+              } else {
+                rows.push([name.replace(/ \($/, ""), result, ran[0] ? mins(ran[0]) : "", skippedWhy]);
+              }
+            }
+            await core.summary
+              .addHeading("CI run", 3)
+              .addRaw(`Scope: ${full}${out.base ? ` (base ${out.base.slice(0, 9)})` : ""}\n\n`)
+              .addTable([
+                [{ data: "Gate", header: true }, { data: "Result", header: true }, { data: "Time", header: true }, { data: "Why skipped", header: true }],
+                ...rows,
+              ])
+              .write();

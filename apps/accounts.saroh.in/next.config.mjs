@@ -69,6 +69,12 @@ const PAGE_POLICIES = pageSecurityHeaders({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     // The browser stack's Global copy builds and starts from `.next-global`
     // (`build:global`, CI's browser shards), beside India's `.next`.
     distDir: process.env.NEXT_DIST_DIR || ".next",

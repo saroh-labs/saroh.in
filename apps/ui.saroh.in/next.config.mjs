@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     // @saroh/ui is consumed as source (no built dist); Next must transpile it
     // for a webpack `next build`. @saroh/auth and @saroh/site-blocks likewise
     // ship as source.

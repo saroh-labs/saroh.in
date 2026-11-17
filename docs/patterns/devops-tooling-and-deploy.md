@@ -83,20 +83,58 @@ Lint, cycles, routes, blocks, typecheck, API unit tests, build, and a dependency
 audit that blocks on critical advisories; plus integration tests,
 `migration-replay`, and gitleaks over the full history.
 
-**Layout.** Every job starts in parallel after `What changed` (a few
-seconds). Shared setup is `.github/actions/setup`.
+**Layout.** Every job starts after `What changed` (a few seconds) and takes
+the next free runner. Shared setup is `.github/actions/setup`. Times are a
+full run on hosted 4-vCPU runners (run 44029918932, 17 Nov 2026), resized to
+the new shard counts; the laptop runners have not been timed yet.
 
-| Job                                      | Runs when                       | Typical time             |
+| Job                                      | Runs when                       | Full-run time            |
 | ---------------------------------------- | ------------------------------- | ------------------------ |
-| What changed, Secret scan (gitleaks)     | always                          | 10s                      |
-| Lint, typecheck and repo checks          | code changed                    | 2–3 min                  |
-| Unit tests                               | code changed                    | 2–2.5 min                |
-| Build (+ critical-only dependency audit) | code changed                    | 1.5 min warm, 4 min cold |
-| Integration (plain, rls) × 4 shards      | api or `packages/` changed      | 3–4 min, one up to 5     |
+| What changed, Secret scan (gitleaks)     | always                          | under 1 min              |
+| Lint, typecheck and repo checks          | code changed                    | about 12 min             |
+| Unit tests                               | code changed                    | about 10 min             |
+| Build (+ critical-only dependency audit) | code changed                    | about 7 min              |
+| Integration (plain, rls) × 2 shards      | api or `packages/` changed      | about 15–17 min          |
 | Migration replay from empty              | `packages/database` changed     | 1 min                    |
-| Browser E2E × 4 shards                   | `apps/ packages/ e2e/ scripts/` | 5–7 min (the long pole)  |
-| Permission states (production build)     | as E2E                          | 3 min                    |
-| Cloudflare runtime (accounts sign-in)    | lockfile, app deps or config    | about 2 min              |
+| Browser E2E × 2 shards                   | `apps/ packages/ e2e/ scripts/` | about 35 min (long pole) |
+| Permission states (production build)     | as E2E                          | 4 min                    |
+| Cloudflare runtime (accounts sign-in)    | lockfile, app deps or config    | about 2.5 min            |
+| Run summary                              | always, last                    | seconds                  |
+
+- **Current** (2026-11-17) — **CI runs on pull requests only**, plus the
+  weekly run and a manual run (both full). The repo went private and CI moved
+  to two self-hosted runners on the owner's laptop (`runs-on: [self-hosted,
+saroh]`, saroh-laptop-1 and -2, each its own container and Docker engine,
+  4 CPUs each, one 8 GB slice for both). A merge into main or development is
+  the PR that passed; it is not checked again. The deploy workflows keep their
+  push triggers.
+- **Current** (2026-11-17) — **Caches live on the runner.** Both runners mount
+  one directory at `/cache`. When it is there, the setup action uses it and no
+  actions/cache: `TURBO_CACHE_DIR=/cache/turbo` (one Turbo cache for every
+  job, entries older than a week pruned), `pnpm install --store-dir
+/cache/pnpm-store`, `PLAYWRIGHT_BROWSERS_PATH=/cache/ms-playwright`, each
+  app's `.next/cache` a link into `/cache/next/<runner>/<job>-<lockfile hash>`
+  (per runner, as Next's cache is not safe for two writers), and the browser
+  shards' seeded dump at `/cache/e2e-seed/<key>.dump` with the actions/cache
+  key's name, written under a temporary name and moved into place. Pull
+  requests write all of them, so only CI opts in (`runner-cache: "true"`):
+  the deploys and the marketing shots keep actions/cache, which GitHub scopes
+  by branch, and never read what a pull request left. Without `/cache` (a job
+  sent back to `ubuntu-latest`) the setup action falls back to actions/cache
+  as below.
+- **Current** (2026-11-17) — **Every tool is capped for 4 CPUs.** Node's
+  `os.cpus()` and turbo see the laptop's 12 CPUs, not the container's 4.
+  Turbo calls pass `--concurrency=2`; Jest and Vitest `--maxWorkers=2`
+  (integration stays at 1); Playwright `PW_WORKERS=2`; Next's build workers
+  come from `NEXT_BUILD_CPUS=2` (ci.yml's env, read as `experimental.cpus` in
+  every app's `next.config`, passed through by turbo.json); and
+  `NODE_OPTIONS=--max-old-space-size=3072`, so one process that runs away
+  fails with a heap error instead of taking both runners down.
+- **Current** (2026-11-17) — **The run summary.** The last job, `Run summary`,
+  writes a table to the run's page: each gate, its result, its time (from the
+  jobs API; the only job with `actions: read`) and, when skipped, why (from
+  `What changed`: docs only, API untouched, no app changed; or "full run:
+  .github, tooling changed"). It is not a gate.
 
 - **Current** — **Required checks keep their names.** The aggregates
   `Lint, typecheck, test & build` (`ci`) and `Browser E2E (seeded stack)`
@@ -107,16 +145,16 @@ seconds). Shared setup is `.github/actions/setup`.
   secret scan and the two aggregates, which report green. A change to CI, the
   root manifests, the lockfile or `tooling/` runs everything, and so do the
   weekly run and a manual run.
-- **Current** — **Only non-PR runs write the build caches.** Turbo and Next
-  caches are saved by pushes to main and development, the weekly run and
-  manual runs. A PR restores the newest of its base branch's caches and writes
+- **Current** — **Without `/cache`, only non-PR runs write the build
+  caches.** Turbo and Next caches are saved by the weekly run and manual runs
+  (pushes no longer run CI). A PR restores the newest of its base branch's caches and writes
   nothing. The repository has 10 GB of Actions cache. When every PR push saved
   about 1.3 GB, GitHub evicted the pnpm store and Playwright's Chromium, and
   every job downloaded them again. See DEV_LEARNINGS. A saving run drops Turbo
   entries older than a week. Playwright's browser is keyed on its version.
 - **Current** — **The integration shards read the unit job's Turbo cache**
   for the api's workspace packages. The env is the same, so the hashes match,
-  and the shards write no cache of their own.
+  and the shards write no cache of their own (on `/cache` every job shares one).
 - **Current** — **A browser shard that must seed (no cached dump, below)
   seeds and builds in one turbo run**, so
   the seed (~40s) overlaps the build. `db:seed:showcase` waits for
@@ -131,18 +169,19 @@ seconds). Shared setup is `.github/actions/setup`.
   A hit runs `pg_restore` inside the Postgres service container (its version
   is the server's) and then `turbo run build`; a miss migrates, seeds and
   builds in one turbo run as before, dumps the database before the stack
-  starts, and saves it (`continue-on-error`, since four shards race to save
-  one key). Saves ~40s per shard on a hit.
+  starts, and saves it (`continue-on-error`, since both shards race to save
+  one key; on `/cache` each moves its own copy into place). Saves ~40s per
+  shard on a hit.
 - **Current** (2026-09-29) — **Specs sign in once per person.** The
   Playwright `setup` project runs in every shard and signs the four seeded
   people in; the specs reuse the sessions (browser-tests skill).
 - **Current** (2026-09-29) — **Browser shards run the suite in parallel.**
-  Each shard runs `pnpm --filter @saroh/e2e test:e2e --shard=N/4`
+  Each shard runs `pnpm --filter @saroh/e2e test:e2e --shard=N/2`
   (`e2e/run.mjs`): `setup` once, then `desk` and `phone` `fullyParallel` on
-  `PW_WORKERS=2` (the stack shares the runner's two vCPUs), then that
+  `PW_WORKERS=2` (the stack shares the runner's CPUs), then that
   shard's `@serial` tests on one worker. With `fullyParallel` Playwright
-  shards by test, not by file: 88–89 parallel and 8–9 serial tests a shard,
-  and the local timings put the four within ~20% of each other (was 135s
+  shards by test, not by file (counts below are from four shards): 88–89
+  parallel and 8–9 serial tests a shard, and the local timings put the four within ~20% of each other (was 135s
   on shards 1 and 3 against 195s on 2 and 4, where desk and phone split
   by file). Each phase keeps its traces under `e2e/test-results/<phase>/`,
   all uploaded on failure. Every spec owns its data
@@ -158,7 +197,7 @@ seconds). Shared setup is `.github/actions/setup`.
   edition is the business's, set once when it is made (the spec makes it
   through Global's API host, as `makeBusiness` does), and a bare-port host
   belongs to no edition. Every shard builds it, as it builds India's, so
-  whichever shard saves the run's turbo cache holds both; an unchanged app
+  the run's turbo cache holds both; an unchanged app
   replays in seconds, a changed one adds a cold build of the two (about
   2 min on a runner, Next's cache in `.next-global/cache` helping after the
   first). India's stack is unchanged but for 3007 and 3008 in
@@ -179,19 +218,21 @@ seconds). Shared setup is `.github/actions/setup`.
   `open-next.config` or `wrangler` config changed; `pnpm prepush` runs it on
   the same paths (step `cf-runtime`). It is outside `ci`; a repo admin can
   make it a required check.
-- **Current** — **Superseded PR runs are cancelled.** Runs on main and
-  development never are, because each push there is checked against the one
-  before it.
+- **Current** — **Superseded PR runs are cancelled**, which also frees a
+  runner. A manual or weekly run never is.
 - **Rejected** (2026-09-29) — **Building the browser stack once and passing
   it to the shards.** The shards build with their own env
   (`NEXT_PUBLIC_ROOT_DOMAIN=localhost`), so the Build job's output does not
   fit. A build job in front of the shards puts ~3 min in series with the
   tests. **More browser shards** were also rejected: a run already starts 19
   jobs, and overlapping runs queued for up to 6 min on the account's
-  concurrent-job limit.
-- **Adopted** — Check the cache before tuning jobs when CI slows down:
-  `gh api repos/saroh-labs/saroh.in/actions/cache/usage`. Close to 10 GB means
-  entries are being evicted.
+  concurrent-job limit. Since 17 Nov 2026 there are two runners and every
+  shard repeats ~9 min of setup, so the shards went from four to two and the
+  integration shards from four a mode to two.
+- **Adopted** — Check the cache before tuning jobs when CI slows down: on the
+  laptop runners `du -sh /cache/*`; on hosted runners
+  `gh api repos/saroh-labs/saroh.in/actions/cache/usage` (close to 10 GB means
+  entries are being evicted).
 
 ## Tests
 
@@ -229,7 +270,7 @@ seconds). Shared setup is `.github/actions/setup`.
 
 ## Branches, batches and pull requests — **Adopted** (2026-09-29)
 
-Every pushed PR is a full CI run, about twenty minutes, and a merge into
+Every pushed PR is a full CI run (on two laptop runners a full run is over an hour), and a merge into
 `development` or `main` deploys the Workers whose build changed. The rule
 began on Vercel (retired 9 Oct 2026, DEC-107), where pushing one branch per
 unit used up the deploy quota ("Resource is limited — try again in 24 hours")

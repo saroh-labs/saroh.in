@@ -79,6 +79,12 @@ const HTML_LIMITED_BOTS = new RegExp(
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     htmlLimitedBots: HTML_LIMITED_BOTS,
     // Development logs every server action's arguments by default, and some
     // carry secrets: provider keys, sign-in codes (UX-005, 7 Oct). Production

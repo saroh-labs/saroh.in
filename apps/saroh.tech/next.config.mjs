@@ -11,6 +11,12 @@ const productionHosts = process.env.GLOBAL_PRODUCTION_HOSTS;
 
 /** @type {import("next").NextConfig} */
 export default {
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     output: "export",
     trailingSlash: false,
     images: { unoptimized: true },

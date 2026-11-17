@@ -4,6 +4,12 @@ import nextra from "nextra";
 const withNextra = nextra({});
 
 export default withNextra({
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     reactStrictMode: true,
     // Consume the canonical @saroh/ui <Wordmark> as source (webpack build).
     transpilePackages: ["@saroh/ui"],

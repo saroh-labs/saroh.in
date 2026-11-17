@@ -26,6 +26,14 @@ inputs:
     description: Install Chromium for Playwright, from a cache when the version is unchanged.
     required: false
     default: "false"
+  runner-cache:
+    description: >-
+      "true" uses the runner's own /cache when it has one (CI). Off by
+      default: /cache is written by pull request runs, and a deploy or any
+      job holding secrets must not read what a pull request left there, so
+      those keep actions/cache, which GitHub scopes by branch.
+    required: false
+    default: "false"
   next-cache:
     description: >-
       Keep the Next apps' incremental build cache (.next/cache) between runs of
@@ -34,6 +42,26 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  runner-cache:
+    description: >-
+      "/cache" when the runner keeps a cache directory of its own (the
+      self-hosted laptop runners), empty on a hosted runner.
+    value: ${{ steps.runner-cache.outputs.dir }}
+
+# The laptop runners (saroh-laptop-1 and -2) both mount one persistent
+# directory at /cache. When it is there and the job opts in (runner-cache,
+# CI only), every cache below lives in it and
+# nothing goes through actions/cache, which on those runners meant uploading
+# and downloading over a home connection on every job. Only stores that take
+# two jobs at once go there: the pnpm store and Turbo's cache are content
+# addressed, Playwright locks its browser folder, and the Next cache is one
+# folder per runner (a runner runs one job at a time). Every run writes, pull
+# requests too: nothing here counts against GitHub's 10 GB.
+#
+# Without /cache (a job routed back to ubuntu-latest) it is actions/cache, as
+# follows.
+#
 # Who writes the build caches. The repository has 10 GB of Actions cache, and
 # a run used to write about 1.3 GB of Turbo and Next caches (per job, per
 # commit) from every push to every PR. Past 10 GB GitHub evicts the least
@@ -53,15 +81,32 @@ runs:
       with:
         version: 9.9.0
 
+    - name: Runner cache
+      id: runner-cache
+      shell: bash
+      env:
+        WANT: ${{ inputs.runner-cache }}
+      run: |
+        if [ "$WANT" = "true" ] && [ -d /cache ] && [ -w /cache ]; then
+          mkdir -p /cache/turbo /cache/pnpm-store /cache/ms-playwright /cache/next
+          echo "dir=/cache" >> "$GITHUB_OUTPUT"
+          # Absolute, so every turbo call in the job reads and writes it.
+          echo "TURBO_CACHE_DIR=/cache/turbo" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_BROWSERS_PATH=/cache/ms-playwright" >> "$GITHUB_ENV"
+        fi
+
     - name: Setup Node
       uses: actions/setup-node@v4
       with:
         node-version-file: .nvmrc
-        cache: pnpm
+        # The store on /cache needs no round trip.
+        cache: ${{ steps.runner-cache.outputs.dir == '' && 'pnpm' || '' }}
 
     - name: Install dependencies
       shell: bash
-      run: pnpm install --frozen-lockfile
+      env:
+        STORE: ${{ steps.runner-cache.outputs.dir != '' && '/cache/pnpm-store' || '' }}
+      run: pnpm install --frozen-lockfile ${STORE:+--store-dir "$STORE"}
 
     - name: Prisma generate
       if: inputs.prisma == 'true'
@@ -72,8 +117,15 @@ runs:
     # of the same job and, on a saving run, saved under this commit, so an
     # unchanged package's lint, typecheck, test or build is replayed from cache
     # rather than run again.
+    # On /cache: one Turbo cache for every job (the hashes keep jobs apart),
+    # pruned the same way. Without: the per-job actions/cache below.
+    - name: Turbo cache (runner)
+      if: inputs.turbo-cache != '' && steps.runner-cache.outputs.dir != ''
+      shell: bash
+      run: find /cache/turbo -type f -mtime +7 -delete
+
     - name: Turbo cache
-      if: inputs.turbo-cache != '' && inputs.turbo-save != 'false' && github.event_name != 'pull_request'
+      if: inputs.turbo-cache != '' && steps.runner-cache.outputs.dir == '' && inputs.turbo-save != 'false' && github.event_name != 'pull_request'
       uses: actions/cache@v4
       with:
         path: .turbo/cache
@@ -82,7 +134,7 @@ runs:
           turbo-${{ runner.os }}-${{ inputs.turbo-cache }}-
 
     - name: Turbo cache (restore only)
-      if: inputs.turbo-cache != '' && (inputs.turbo-save == 'false' || github.event_name == 'pull_request')
+      if: inputs.turbo-cache != '' && steps.runner-cache.outputs.dir == '' && (inputs.turbo-save == 'false' || github.event_name == 'pull_request')
       uses: actions/cache/restore@v4
       with:
         path: .turbo/cache
@@ -95,7 +147,7 @@ runs:
     # are dropped before this run adds its own; one still in use is rebuilt
     # once and cached again.
     - name: Prune the Turbo cache
-      if: inputs.turbo-cache != '' && inputs.turbo-save != 'false' && github.event_name != 'pull_request'
+      if: inputs.turbo-cache != '' && steps.runner-cache.outputs.dir == '' && inputs.turbo-save != 'false' && github.event_name != 'pull_request'
       shell: bash
       run: |
         if [ -d .turbo/cache ]; then
@@ -104,8 +156,30 @@ runs:
 
     # Turbo replays a build whose inputs are unchanged; when they did change,
     # Next's own cache still skips recompiling the modules that didn't.
+    #
+    # On /cache each app's .next/cache (and .next-global/cache) is a link into
+    # this runner's own folder, per job name and lockfile, so two runners never
+    # write one Next cache at once. `next build` keeps `cache` when it cleans
+    # its folder, and checkout's clean removes only the link.
+    - name: Next build cache (runner)
+      if: inputs.next-cache == 'true' && steps.runner-cache.outputs.dir != ''
+      shell: bash
+      env:
+        DIR: /cache/next/${{ runner.name }}/${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}
+      run: |
+        set -euo pipefail
+        find "/cache/next/$RUNNER_NAME" -mindepth 1 -maxdepth 1 -type d -mtime +7 -exec rm -rf {} + 2>/dev/null || true
+        for config in apps/*/next.config.*; do
+          app=$(basename "$(dirname "$config")")
+          for dist in .next .next-global; do
+            mkdir -p "$DIR/$app/$dist" "apps/$app/$dist"
+            ln -sfn "$DIR/$app/$dist" "apps/$app/$dist/cache"
+          done
+        done
+        touch "$DIR"
+
     - name: Next build cache
-      if: inputs.next-cache == 'true' && github.event_name != 'pull_request'
+      if: inputs.next-cache == 'true' && steps.runner-cache.outputs.dir == '' && github.event_name != 'pull_request'
       uses: actions/cache@v4
       with:
         path: |
@@ -116,7 +190,7 @@ runs:
           next-${{ runner.os }}-${{ inputs.turbo-cache }}-${{ hashFiles('pnpm-lock.yaml') }}-
 
     - name: Next build cache (restore only)
-      if: inputs.next-cache == 'true' && github.event_name == 'pull_request'
+      if: inputs.next-cache == 'true' && steps.runner-cache.outputs.dir == '' && github.event_name == 'pull_request'
       uses: actions/cache/restore@v4
       with:
         path: |
@@ -141,13 +215,15 @@ runs:
         echo "version=${version}" >> "$GITHUB_OUTPUT"
 
     - name: Playwright browser cache
-      if: inputs.playwright == 'true'
+      if: inputs.playwright == 'true' && steps.runner-cache.outputs.dir == ''
       id: playwright-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
 
+    # On /cache the install finds the browser already there (or adds the new
+    # version beside the old) and only the system libraries are checked.
     - name: Install Playwright browser
       if: inputs.playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash

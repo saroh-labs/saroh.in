@@ -7,6 +7,12 @@ const withNextra = nextra({});
 // A static export (out/), served as Workers static assets behind
 // worker/index.js: no Next server, so no redirects or headers here.
 export default withNextra({
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     output: "export",
     images: { unoptimized: true },
     poweredByHeader: false,

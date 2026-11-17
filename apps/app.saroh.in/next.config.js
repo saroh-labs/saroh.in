@@ -122,6 +122,10 @@ const nextConfig = {
     // experimental in Next 16.3; see docs/architecture/DEV_LEARNINGS.md.
     experimental: {
         authInterrupts: true,
+        // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
     },
     /*
      * Sell's Storefronts became Locations (DEC-069, L9). The screens moved to

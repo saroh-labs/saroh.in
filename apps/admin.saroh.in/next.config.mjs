@@ -76,6 +76,12 @@ const PAGE_POLICIES = pageSecurityHeaders({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+    // CI caps Next's build workers: os.cpus() ignores a runner's CPU limit (ci.yml).
+    experimental: {
+        ...(process.env.NEXT_BUILD_CPUS && {
+            cpus: Number(process.env.NEXT_BUILD_CPUS),
+        }),
+    },
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
     poweredByHeader: false,
     async headers() {
