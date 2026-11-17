@@ -161,9 +161,10 @@ jobs:
       # One turbo run, so lint and typecheck share the task graph and run in
       # parallel across packages. Package-boundary enforcement (frontends must
       # not import Prisma directly) is part of `lint` via the shared nextjs
-      # ESLint config.
+      # ESLint config. Four at a time: turbo's default of ten starved the
+      # runner of memory twice on #1424 ("lost communication", no log).
       - name: Lint and typecheck
-        run: pnpm turbo run lint typecheck $AFFECTED
+        run: pnpm turbo run lint typecheck $AFFECTED --concurrency=4
 
       # Circular-dependency detection across all workspaces.
       - name: Circular dependency check

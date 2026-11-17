@@ -6795,3 +6795,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Symptom:** on the trade pages' night hour, ChatGPT's card and "Waiting for her in Saroh" drew light grey text on white.
 - **Cause:** the `lamp` and `ink` Section tones rewrite every `.text-foreground` and `.text-mk-copy` inside them, white cards included. Each earlier fix patched one card with an explicit colour.
 - **Fix:** the rewrite now skips anything marked `mk-paper` and its contents (`sections/section.tsx`); a white card on a dark band adds `mk-paper` (the trade moments' `CARD` does). New white cards on dark bands: add `mk-paper`, don't hand-pick colours.
+
+### CI's lint job dies with no log: the runner ran out of memory (17 Nov 2026)
+
+- **Symptom:** on #1424, "Lint, typecheck and repo checks" stopped about 50 minutes into "Lint and typecheck" on both attempts, with no log and the annotation "The hosted runner lost communication with the server". In the 80 runs before it, the step took 0.7 to 9.3 minutes and never hung. The same command on the same commit finished locally in 2.5 minutes.
+- **Cause:** turbo runs ten tasks at once by default; with nearly every package affected (a merge from development), several `tsc` and ESLint processes for the big apps at once starve the 16 GB hosted runner.
+- **Fix:** `--concurrency=4` on that step (`.github/workflows/ci.yml`), as the test step already caps itself. A job that dies with "lost communication" and no log is memory, not the code: cap the parallelism, don't re-run it again and again.
