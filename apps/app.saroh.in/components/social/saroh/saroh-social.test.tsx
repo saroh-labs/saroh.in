@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
     SocialAccess,
     SocialChannel,
+    SocialParams,
     SocialPost,
 } from "@/lib/social/saroh-social-types";
 import type { SocialCompose } from "@/lib/social/use-social-post";
@@ -26,7 +27,6 @@ import { SocialPostPanel } from "./composer/social-post-panel";
 import { PostSheet } from "./post-sheet";
 import { PostsView } from "./posts-view";
 import { SocialLocked } from "./social-locked";
-import type { SocialParams } from "./social-page";
 
 const router = vi.hoisted(() => ({
     push: vi.fn(),

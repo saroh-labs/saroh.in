@@ -12,6 +12,7 @@ import type {
     Read,
     SocialAccess,
     SocialChannel,
+    SocialParams,
     SocialPost,
 } from "@/lib/social/saroh-social-types";
 import { connectedLine } from "@/lib/social/saroh-social-view";
@@ -21,14 +22,6 @@ import { ChannelsView } from "./channels/channels-view";
 import { UsageMeter } from "./meter";
 import { PostSheet } from "./post-sheet";
 import { PostsView } from "./posts-view";
-
-export interface SocialParams {
-    tab: "posts" | "channels";
-    channel: string | null;
-    result: string | null;
-    choice: string | null;
-    post: string | null;
-}
 
 /**
  * Social with Saroh Social on (board BSocialHomeSocialDesk; research S2,

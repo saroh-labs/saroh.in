@@ -132,3 +132,12 @@ export const UNAVAILABLE: SocialAccess = {
     usage: null,
     goodTimes: [],
 };
+
+/** Where Social is, from its address (`?tab=`, `?channel=`, `?result=`, `?choice=`, `?post=`). */
+export interface SocialParams {
+    tab: "posts" | "channels";
+    channel: string | null;
+    result: string | null;
+    choice: string | null;
+    post: string | null;
+}

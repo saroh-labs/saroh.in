@@ -1,5 +1,3 @@
-import "server-only";
-
 import { unstable_rethrow } from "next/navigation";
 import { cache } from "react";
 

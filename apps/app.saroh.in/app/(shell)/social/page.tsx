@@ -8,7 +8,6 @@ import { notFound } from "next/navigation";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { SocialHome } from "@/components/social/home/social-home";
 import { SocialLocked } from "@/components/social/saroh/social-locked";
-import type { SocialParams } from "@/components/social/saroh/social-page";
 import { SarohSocialPage } from "@/components/social/saroh/social-page";
 import { requireCan } from "@/lib/access/require-can";
 import { requireSession } from "@/lib/session";
@@ -24,6 +23,7 @@ import {
     readPageChoices,
     readSocialAccess,
 } from "@/lib/social/saroh-social";
+import type { SocialParams } from "@/lib/social/saroh-social-types";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
 import { POST_WORDS } from "@/lib/social/words";
 

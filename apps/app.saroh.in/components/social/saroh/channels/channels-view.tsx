@@ -19,6 +19,7 @@ import type {
     PageChoice,
     Read,
     SocialChannel,
+    SocialParams,
 } from "@/lib/social/saroh-social-types";
 import { CHANNEL_KINDS } from "@/lib/social/saroh-social-types";
 import {
@@ -28,7 +29,6 @@ import {
     SOCIAL_WORDS,
 } from "@/lib/social/saroh-social-words";
 
-import type { SocialParams } from "../social-page";
 import { ChannelIcon } from "./channel-icon";
 import { ConnectButton } from "./connect-sheet";
 import { PagePicker } from "./page-picker";
