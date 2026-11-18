@@ -5,6 +5,7 @@ import {
     HttpStatus,
     Injectable,
     Logger,
+    Optional,
     ServiceUnavailableException,
     UnprocessableEntityException,
 } from "@nestjs/common";
@@ -17,16 +18,18 @@ import { auth } from "../../common/auth/auth";
 import { hashClientIp } from "../../common/client-ip";
 import type { PhoneNoticeKind } from "../../common/email";
 import { sendAccountPhoneNotice } from "../../common/email";
-import { isBootstrapAdmin } from "../../common/guards/platform-admin.guard";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { indianPhoneE164 } from "../messaging/verification.service";
-import { ChallengeVerifier } from "../site-accounts/challenge";
+import {
+    challengeUnavailable,
+    ChallengeVerifier,
+} from "../site-accounts/challenge";
 import type { CodeCheck } from "./phone-codes";
-import { checkCode, CODE_MINUTES, newCode, saveCode } from "./phone-codes";
+import { checkCode, newCode, saveCode } from "./phone-codes";
 import { phoneFresh } from "./phone-freshness";
 import type { LimitVerdict } from "./phone-limits";
 import {
@@ -34,6 +37,8 @@ import {
     claimStart,
     START_COOLDOWN_SECONDS,
 } from "./phone-limits";
+import { isSarohStaff } from "./saroh-staff";
+import { WhatsappCeiling } from "./whatsapp-ceiling";
 
 /** How the code reaches the phone. WhatsApp is the default (owner, 28 Oct). */
 export type PhoneChannel = "whatsapp" | "sms";
@@ -107,6 +112,9 @@ export class AccountPhoneService {
         private readonly messaging: MessagingService,
         private readonly challenge: ChallengeVerifier,
         private readonly flags: FeatureFlagService,
+        // Not a DI provider: a per-instance default tests can replace.
+        @Optional()
+        private readonly ceiling: WhatsappCeiling = new WhatsappCeiling(),
     ) {}
 
     async options(): Promise<PhoneOptions> {
@@ -165,8 +173,12 @@ export class AccountPhoneService {
                 details: { code: "CHALLENGE" },
             });
         }
-        // Checked and recorded in one locked step (pentest 28 Oct, H1).
-        const verdict = await claimStart(keys);
+        // Checked and recorded in one locked step (pentest 28 Oct, H1). A
+        // signed-in person adding a phone is counted too (03-M1).
+        const verdict = await claimStart({
+            ...keys,
+            userId: input.purpose === "add" ? input.userId : undefined,
+        });
         if (!verdict.allowed) {
             this.blocked("start", verdict.reason, keys);
             throw tooMany(verdict);
@@ -409,9 +421,10 @@ export class AccountPhoneService {
     }
 
     /**
-     * Turnstile, when it is on. A resend from the code step carries no
-     * token: it passes when this number, from this address, passed the
-     * challenge within the code's lifetime. The start limits still apply.
+     * Turnstile, when it is on, for every start: a resend from the code step
+     * solves it again (03-M4). One solve used to buy all ten sends to a
+     * number for as long as resends kept coming. Not set up: in production
+     * every start is refused (03-H2); elsewhere it goes, said at ERROR.
      */
     private async challenged(
         input: { turnstileToken?: string; ip?: string },
@@ -423,25 +436,17 @@ export class AccountPhoneService {
             if (Date.now() - challengeWarnedAt > 3_600_000) {
                 challengeWarnedAt = Date.now();
                 this.logger.error(
-                    "account_phone_challenge_not_configured: phone codes are sent with no bot check; set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY",
+                    "account_phone_challenge_not_configured: phone codes need a bot check; set TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY",
                 );
+            }
+            if (this.challenge.failsClosed) {
+                this.blocked("start", "challenge_unconfigured", keys);
+                throw challengeUnavailable();
             }
             return true;
         }
-        if (input.turnstileToken) {
-            return this.challenge.verify(input.turnstileToken, input.ip ?? "");
-        }
-        if (!keys.ipHash) return false;
-        const recent = await prisma.accountPhoneEvent.findFirst({
-            where: {
-                kind: "START",
-                phoneHash: keys.phoneHash,
-                ipHash: keys.ipHash,
-                createdAt: { gt: new Date(Date.now() - CODE_MINUTES * 60_000) },
-            },
-            select: { id: true },
-        });
-        return recent !== null;
+        if (!input.turnstileToken) return false;
+        return this.challenge.verify(input.turnstileToken, input.ip ?? "");
     }
 
     /**
@@ -454,6 +459,14 @@ export class AccountPhoneService {
         keys: Keys,
         eventId: string,
     ): Promise<PhoneStart> {
+        if (!(await this.ceiling.allows())) {
+            this.blocked("start", "whatsapp_ceiling", keys);
+            await releaseStart(eventId, "whatsapp_ceiling");
+            throw new UnprocessableEntityException({
+                message: "Couldn't send on WhatsApp. Try SMS instead.",
+                details: { code: "WHATSAPP_FAILED" },
+            });
+        }
         const code = newCode();
         let reason: string;
         try {
@@ -584,23 +597,6 @@ function tooMany(
         },
         HttpStatus.TOO_MANY_REQUESTS,
     );
-}
-
-/**
- * Saroh staff (DEC-198): a `PlatformAdmin` grant not revoked, or the
- * break-glass `ADMIN_ALLOWLIST`, as `PlatformAdminGuard` decides. Stricter
- * than the guard: a grant with no live role still counts.
- */
-async function isSarohStaff(user: {
-    id: string;
-    email: string;
-}): Promise<boolean> {
-    if (isBootstrapAdmin(user.email)) return true;
-    const grant = await prisma.platformAdmin.findUnique({
-        where: { userId: user.id },
-        select: { revokedAt: true },
-    });
-    return grant !== null && grant.revokedAt === null;
 }
 
 /**

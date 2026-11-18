@@ -1,3 +1,4 @@
+import type { AuthFailure } from "./auth-error-copy";
 import type { PhoneAnswer, PhoneProof, PhoneStart } from "./phone-sign-in";
 
 /**
@@ -22,9 +23,24 @@ export interface OtpSender {
     /** Whether the provider's captcha has to be solved before a send. */
     captcha: boolean;
     send(): Promise<void>;
-    retry(): Promise<void>;
+    /**
+     * Send again. WhatsApp: the API's start, which asks the bot check every
+     * time (03-M4), so the code step passes the check's token after a
+     * `CHALLENGE`; a refusal throws {@link ResendRefused} with the API's answer.
+     */
+    retry(turnstileToken?: string | null): Promise<void>;
     /** What the API checks for this code. */
     verify(code: string): Promise<PhoneProof>;
+}
+
+/** The API refused a WhatsApp resend: its answer, for the code step to show. */
+export class ResendRefused extends Error {
+    constructor(
+        readonly failure: AuthFailure,
+        readonly retryAfter: number | null,
+    ) {
+        super("resend refused");
+    }
 }
 
 /** The element the widget's captcha is drawn in. */
@@ -74,7 +90,9 @@ export function tokenOf(data: unknown): string | null {
 export async function otpSender(
     start: PhoneStart,
     phoneE164: string,
-    again: () => Promise<PhoneAnswer<PhoneStart>> = () =>
+    again: (
+        turnstileToken?: string | null,
+    ) => Promise<PhoneAnswer<PhoneStart>> = () =>
         Promise.reject(new Error("no resend")),
 ): Promise<OtpSender> {
     if ("whatsapp" in start) {
@@ -82,9 +100,11 @@ export async function otpSender(
             channel: "whatsapp",
             captcha: false,
             send: () => Promise.resolve(),
-            retry: async () => {
-                const answer = await again();
-                if (answer.error) throw new Error("resend refused");
+            retry: async (turnstileToken) => {
+                const answer = await again(turnstileToken);
+                if (answer.error) {
+                    throw new ResendRefused(answer.error, answer.retryAfter);
+                }
             },
             verify: (code) => Promise.resolve({ code }),
         };

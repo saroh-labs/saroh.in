@@ -8,6 +8,8 @@ import { AdminRole } from "../../admin/admin-permissions";
 export interface OwnerAlert {
     subject: string;
     lines: string[];
+    /** The admin console page the email links to; unset, Ask AI's. */
+    path?: string;
 }
 
 /**

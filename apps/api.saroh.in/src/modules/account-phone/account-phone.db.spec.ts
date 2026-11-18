@@ -49,14 +49,18 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { FakeMessagingProvider } from "../messaging/providers/fake-messaging-provider";
+import { FixedWindowRateLimiter } from "../rate-limits/fixed-window";
 import { ChallengeVerifier } from "../site-accounts/challenge";
 import { AccountPhoneService, PHONE_STALE } from "./account-phone.service";
 import { renewPhoneOnEmailSignIn } from "./phone-freshness";
 import {
     FAILS_PER_ADDRESS_PER_DAY,
     FAILS_PER_PHONE_PER_DAY,
+    STARTS_PER_PHONE_PER_BURST,
     STARTS_PER_PHONE_PER_DAY,
+    STARTS_PER_USER_PER_DAY,
 } from "./phone-limits";
+import { WhatsappCeiling } from "./whatsapp-ceiling";
 
 /**
  * Phone sign-in for Saroh accounts (DEC-196) against a real database, with
@@ -68,8 +72,12 @@ import {
 class TestChallenge extends ChallengeVerifier {
     on = false;
     pass = true;
+    production = false;
     override get configured(): boolean {
         return this.on;
+    }
+    override get failsClosed(): boolean {
+        return this.production && !this.on;
     }
     override get siteKey(): string | null {
         return this.on ? "test-site-key" : null;
@@ -626,7 +634,9 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         await expect(startWa(p)).rejects.toMatchObject({ status: 429 });
     });
 
-    it("lets a resend skip Turnstile only from the same address that passed it", async () => {
+    // 03-M4: one solved challenge used to buy every resend to a number
+    // from the same address for as long as resends kept coming.
+    it("asks Turnstile again for every resend, from any address", async () => {
         challenge.on = true;
         const p = phone();
         await expect(startWa(p)).rejects.toMatchObject({
@@ -638,10 +648,118 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
             where: { phoneHash: numberHash(p) },
             data: { createdAt: new Date(Date.now() - 60_000) },
         });
-        await expect(startWa(p, { ip: "198.51.100.4" })).rejects.toMatchObject({
+        await expect(startWa(p)).rejects.toMatchObject({
             response: { details: { code: "CHALLENGE" } },
         });
-        await expect(startWa(p)).resolves.toHaveProperty("whatsapp");
+        await expect(
+            startWa(p, { turnstileToken: "ok" }),
+        ).resolves.toHaveProperty("whatsapp");
+    });
+
+    // 03-H2: production with Turnstile unset used to send with no bot check.
+    it("in production with Turnstile not set up, refuses every start with 503 and counts none", async () => {
+        challenge.production = true;
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => {});
+        const p = phone();
+        await expect(startWa(p)).rejects.toMatchObject({
+            status: 503,
+            response: { details: { code: "UNAVAILABLE" } },
+        });
+        await expect(events("START", p)).resolves.toBe(0);
+        expect(fake.sends.filter((x) => x.toE164 === p)).toHaveLength(0);
+        error.mockRestore();
+    });
+
+    // 03-M4: resends to one number space out past the first few.
+    it("caps resends to one number in a short window", async () => {
+        const p = phone();
+        const twoMinutesAgo = new Date(Date.now() - 2 * 60_000);
+        await prisma.accountPhoneEvent.createMany({
+            data: Array.from({ length: STARTS_PER_PHONE_PER_BURST }, () => ({
+                kind: "START" as const,
+                phoneHash: numberHash(p),
+                createdAt: twoMinutesAgo,
+            })),
+        });
+        await expect(startWa(p)).rejects.toMatchObject({ status: 429 });
+        expect(lastWarning(p)).toContain("reason=phone_burst");
+    });
+
+    // 03-M1: one free account could add number after number.
+    it("caps the numbers one signed-in person starts adding in a day", async () => {
+        const me = await person();
+        // Each from its own address, so only the person's own cap is met.
+        for (let i = 0; i < STARTS_PER_USER_PER_DAY; i++) {
+            await expect(
+                startWa(phone(), {
+                    purpose: "add",
+                    userId: me.id,
+                    ip: `198.51.100.${40 + i}`,
+                }),
+            ).resolves.toHaveProperty("whatsapp");
+        }
+        const p = phone();
+        await expect(
+            startWa(p, {
+                purpose: "add",
+                userId: me.id,
+                ip: "198.51.100.23",
+            }),
+        ).rejects.toMatchObject({ status: 429 });
+        expect(lastWarning(p)).toContain("reason=user_daily");
+        // Someone else is not held up.
+        const other = await person();
+        await expect(
+            startWa(phone(), {
+                purpose: "add",
+                userId: other.id,
+                ip: "198.51.100.60",
+            }),
+        ).resolves.toHaveProperty("whatsapp");
+    });
+
+    // 03-H1: no ceiling on the total Saroh pays for.
+    it("stops WhatsApp codes at the platform ceiling, says try SMS, and SMS still starts", async () => {
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => {});
+        const send = jest.fn().mockResolvedValue(0);
+        service = new AccountPhoneService(
+            new MessagingService(fake),
+            challenge,
+            new FeatureFlagService(),
+            new WhatsappCeiling(
+                2,
+                100,
+                new FixedWindowRateLimiter(2, 60 * 60_000),
+                new FixedWindowRateLimiter(100, 24 * 60 * 60_000),
+                { send },
+            ),
+        );
+        await startWa(phone(), { ip: "198.51.100.31" });
+        await startWa(phone(), { ip: "198.51.100.32" });
+        const p = phone();
+        await expect(startWa(p, { ip: "198.51.100.33" })).rejects.toMatchObject(
+            {
+                status: 422,
+                response: { details: { code: "WHATSAPP_FAILED" } },
+            },
+        );
+        expect(fake.sends.filter((x) => x.toE164 === p)).toHaveLength(0);
+        expect(lastWarning(p)).toContain("reason=whatsapp_ceiling");
+        expect(send).toHaveBeenCalledTimes(1);
+        // The refused start doesn't hold the cooldown: SMS goes at once.
+        await expect(
+            service.start({
+                phoneE164: p,
+                channel: "sms",
+                purpose: "sign-in",
+                ip: "198.51.100.33",
+            }),
+        ).resolves.toHaveProperty("standIn");
+        error.mockRestore();
     });
 
     it("the SMS widget's token still signs in", async () => {

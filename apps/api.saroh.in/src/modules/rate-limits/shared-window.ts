@@ -65,12 +65,6 @@ export class SharedRateLimiter implements WindowLimiter {
     ) {
         this.memory = new FixedWindowRateLimiter(limit, windowMs);
         this.redis = redis === undefined ? sharedRedis() : redis;
-        if (!this.redis && !warnedNoRedis) {
-            warnedNoRedis = true;
-            logger.warn(
-                "rate_limit_open reason=no_redis: REDIS_URL is unset, so public limits are kept in process on each replica and reset on deploy",
-            );
-        }
     }
 
     /** Record a hit for `key`: `true` within the limit, `false` past it (429). */
@@ -87,6 +81,11 @@ export class SharedRateLimiter implements WindowLimiter {
             } catch (error) {
                 fellBack(error, now);
             }
+        } else if (!warnedNoRedis) {
+            warnedNoRedis = true;
+            logger.warn(
+                "rate_limit_open reason=no_redis: REDIS_URL is unset, so public limits are kept in process on each replica and reset on deploy",
+            );
         }
         return this.memory.take(key, now);
     }

@@ -17,7 +17,7 @@ import type { WindowLimiter } from "../rate-limits/shared-window";
 import { SharedRateLimiter } from "../rate-limits/shared-window";
 import type { SignInIdentity } from "./account-linking.service";
 import { AccountLinkingService } from "./account-linking.service";
-import { ChallengeVerifier } from "./challenge";
+import { challengeUnavailable, ChallengeVerifier } from "./challenge";
 import { SiteCodeAlerts, SiteCodeDelivery } from "./code-delivery";
 import {
     ceilingsFor,
@@ -415,8 +415,10 @@ export class SignInCodesService {
         token: string | undefined,
     ): Promise<void> {
         if (!this.challenge.configured) {
-            // Never strand a customer on a widget the site can't show.
             this.alerts.challengeUnconfigured(site.organizationId);
+            // Production fails closed (03-H2); elsewhere never strand a
+            // customer on a widget the site can't show.
+            if (this.challenge.failsClosed) throw challengeUnavailable();
             return;
         }
         if (!(await this.challenge.verify(token, relay.address))) {
