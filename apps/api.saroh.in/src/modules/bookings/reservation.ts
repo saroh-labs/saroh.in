@@ -11,6 +11,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { ActivationEvents } from "../analytics/activation-events";
 import { planMeter } from "../billing/metering.service";
 import { bookingsPaused } from "../billing/plan-limit-errors";
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { isReservedContactEmail } from "../contacts/contact-email";
 import { phoneToFill } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
@@ -734,6 +735,12 @@ export async function reserveInTx(
                 eventId: booked.id,
             },
         },
+    });
+    // And copied to the Google Calendar of whoever takes it (#1047).
+    await queueCalendarSyncInTx(tx, {
+        organizationId,
+        bookingId: booking.id,
+        staffId: booking.staffId,
     });
 
     return booking;

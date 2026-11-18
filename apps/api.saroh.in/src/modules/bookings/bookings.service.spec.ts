@@ -46,6 +46,9 @@ jest.mock("@saroh/database", () => {
         },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
+        // Google Calendar (#1047): nobody here is connected.
+        googleCalendarEvent: { count: jest.fn().mockResolvedValue(0) },
+        googleCalendarConnection: { count: jest.fn().mockResolvedValue(0) },
         site: { findUnique: jest.fn(), findFirst: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
         // A storefront to sell treatments from (E10) unless a test says not.

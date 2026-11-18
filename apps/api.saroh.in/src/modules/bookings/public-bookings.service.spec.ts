@@ -45,6 +45,9 @@ jest.mock("@saroh/database", () => {
         invoice: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
         bookingEvent: { create: jest.fn().mockResolvedValue({ id: "ev_1" }) },
         job: { create: jest.fn() },
+        // Google Calendar (#1047): nobody here is connected.
+        googleCalendarEvent: { count: jest.fn().mockResolvedValue(0) },
+        googleCalendarConnection: { count: jest.fn().mockResolvedValue(0) },
         site: { findUnique: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
         courseSession: { findMany: jest.fn().mockResolvedValue([]) },

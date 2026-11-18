@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { retrySerializable } from "../../common/serializable-retry";
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { emitWebhook } from "../outbound-webhooks/emitter";
 import { guarded, guardMinutes, isValidSlotStart } from "./availability";
 import { BookingEventType } from "./booking-event-type";
@@ -373,6 +374,13 @@ export async function moveFoundBooking(
                             },
                         },
                         select: { id: true },
+                    });
+                    // Google follows: the event moves, or goes from one
+                    // person's calendar to the other's (#1047).
+                    await queueCalendarSyncInTx(tx, {
+                        organizationId: actor.organizationId,
+                        bookingId: booking.id,
+                        staffId: moved.staffId,
                     });
                     return moved;
                 },
