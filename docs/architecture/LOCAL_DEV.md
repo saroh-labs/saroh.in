@@ -578,6 +578,39 @@ To see the Global plans dev shows (owner, 16 Nov 2026):
 The pricing page shows the prices and, as in production, "Not available yet"
 with Tell me when on a paid plan until Global's paid plans open (DEC-211).
 
+## Google sign-in and Google Calendar, locally
+
+Both use one Google OAuth client per stage (the owner keeps a development
+client for local and saroh.io; its values live on the owner's machine,
+never in the repo). In `apps/api.saroh.in/.env`, by name:
+
+- `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`: the client. With both set, the
+  Google button appears on accounts (`sign-in-options.ts`); with either
+  missing, it doesn't, and the calendar connection answers 503.
+- `CALENDAR_ENC_KEY`: any 32-byte key you make yourself
+  (`openssl rand -base64 32`), local only.
+- `API_PUBLIC_URL`: the API's own address, which the calendar callback is
+  built from.
+
+The client's redirect addresses: sign-in comes back to
+`<api>/api/auth/callback/google`, the calendar connection to
+`<api>/integrations/google-calendar/callback`. Google may refuse
+`https://api.saroh.localhost` as a redirect (it wants a real public
+suffix); if it does, register `http://localhost:<api port>/…` for both
+and set `API_PUBLIC_URL` and `BETTER_AUTH_URL` to it for that session.
+The spike (`apps/api.saroh.in/src/cli/google-calendar-spike.ts`) answers
+which one Google takes.
+
+While the consent screen is in Testing, only the test users listed on it
+can connect a calendar (up to 100), and their calendar access expires
+after 7 days: the connection then reads "Reconnect Google Calendar".
+Sign-in itself asks only for name, email and photo, so it works for
+anyone. The `GOOGLE_CALENDAR` flag must be on for your business (the
+admin console's flags, or an override for it).
+
+For tests with no Google at all, `GOOGLE_CALENDAR_FAKE=1` (with `CI` set
+or `NODE_ENV=test`) runs an in-memory Google.
+
 ## Databases
 
 `packages/database/src/database-target.ts` refuses to migrate or seed a
