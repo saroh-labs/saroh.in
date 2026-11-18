@@ -5,7 +5,7 @@
  * it, so they can't disagree about where a thing lives.
  *
  * A screen not built yet links to where that capability lives today (Look
- * and colours in the editor, Your own web address in Settings › Address,
+ * and colours in the editor, Your own web address in Settings › Web address,
  * Teammates in the business's Team), so nothing is lost before its batch.
  * One with no home today (Photos and files, Customers who sign in, From
  * your business) is left out until it is built (RULES §5), never drawn
@@ -53,10 +53,12 @@ export interface SiteAccess {
     mayTeam: boolean;
 }
 
-/** Settings' in-page groups that now belong to Reach (`?section=`). */
+/**
+ * Settings' in-page groups that now belong to Reach (`?section=`). Search
+ * and sharing stays under Settings: Links and sharing is its own screen.
+ */
 const SETTINGS_IN_REACH: Partial<Record<string, SiteSectionId>> = {
     address: "address",
-    "search-and-sharing": "links",
     contact: "social",
 };
 
@@ -146,7 +148,7 @@ export function siteGroups(siteId: string, access: SiteAccess): SiteGroup[] {
                       {
                           id: "links",
                           label: "Links and sharing",
-                          href: settings("search-and-sharing"),
+                          href: `${base}/reach/links`,
                       },
                       {
                           id: "address",
@@ -215,6 +217,9 @@ export function currentSection(
         id = rest;
     } else if (rest === "posts") {
         id = "writing";
+    } else if (rest === "reach") {
+        const [, child] = pathname.slice(base.length + 1).split("/");
+        if (child === "links") id = "links";
     }
     for (const g of groups) {
         if (g.sections.some((s) => s.id === id)) {
@@ -225,7 +230,7 @@ export function currentSection(
 }
 
 /** The screens a switch to another site keeps you on. */
-const KEPT = ["overview", "pages", "writing", "forms", "settings"];
+const KEPT = ["overview", "pages", "writing", "forms", "settings", "reach"];
 
 /**
  * The same screen on another site (`/sites/a/pages` → `/sites/b/pages`).
@@ -244,6 +249,8 @@ export function switchHref(
         : [];
     const [first] = parts;
     if (!first || !KEPT.includes(first)) return overviewHref(toId);
+    // Reach's screens are one level down (`reach/links`), never one site's.
+    if (first === "reach") return `/sites/${toId}/${parts.join("/")}`;
     if (parts.length > 1) return `/sites/${toId}/${first}`;
     const query =
         first === "settings" && search ? `?${search.replace(/^\?/, "")}` : "";

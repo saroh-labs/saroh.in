@@ -106,7 +106,7 @@ const shown = () =>
 describe("the settings' side list", () => {
     it("opens on Address, and on the tab the address names", () => {
         render();
-        expect(selected()).toBe("Address");
+        expect(selected()).toBe("Web address");
         expect(shown()).toEqual(["settings-panel-address"]);
         act(() => root.unmount());
 

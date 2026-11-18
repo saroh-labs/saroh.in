@@ -144,6 +144,7 @@ import {
     resolveSiteNavigation,
     withInPageNavigation,
 } from "./site-navigation";
+import { siteCardExtras } from "./site-overview";
 import { snapshotRedirects } from "./site-redirects";
 import { dropRedirectsAt, followPageMove } from "./site-redirects.service";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
@@ -935,7 +936,9 @@ export class SitesService {
                 currentPublicationId: true,
                 createdAt: true,
                 updatedAt: true,
-                currentPublication: { select: { publishedAt: true } },
+                currentPublication: {
+                    select: { publishedAt: true, publishedByUserId: true },
+                },
                 // A claim that is not VERIFIED is the case worth surfacing: the
                 // merchant thinks they have connected a domain and nothing
                 // routes to it yet.
@@ -949,11 +952,13 @@ export class SitesService {
          * bare "has changes". One extra query for the whole page — sites per org
          * are a handful, not a feed.
          */
-        const pending = await this.pendingSectionChanges(
-            sites.map((s) => s.id),
-        );
+        const [pending, extras] = await Promise.all([
+            this.pendingSectionChanges(sites.map((s) => s.id)),
+            // All sites' visits and last edit or publish (website area U4).
+            siteCardExtras(ctx, sites),
+        ]);
 
-        return sites.map(({ claimedDomains, ...site }) => {
+        return sites.map(({ claimedDomains, currentPublication, ...site }) => {
             /*
              * Null before the first publish: unpublished work only means
              * something once there is something to compare against, and until
@@ -964,6 +969,11 @@ export class SitesService {
             const pendingSiteChanges = changes?.site ?? null;
             return {
                 ...site,
+                currentPublication: currentPublication
+                    ? { publishedAt: currentPublication.publishedAt }
+                    : null,
+                visitsLast7Days: extras.get(site.id)?.visitsLast7Days ?? null,
+                lastActivity: extras.get(site.id)?.lastActivity ?? null,
                 pendingSectionChanges,
                 pendingSiteChanges,
                 /*

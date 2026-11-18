@@ -372,7 +372,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
         expect(words(html)).toContain("Section");
         expect(html).toMatch(/<button[^>]*role="combobox"/);
         expect(tabsOf(html)).toEqual([
-            ["Address", "true"],
+            ["Web address", "true"],
             ["Search and sharing", "false"],
             ["Menu and footer", "false"],
             ["Contact and social", "false"],
@@ -419,7 +419,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
         expect(html).not.toContain('data-settings-group="shop"');
         expect(html).not.toContain('data-settings-group="advanced"');
         expect(tabsOf(html).map(([name]) => name)).toEqual([
-            "Address",
+            "Web address",
             "Search and sharing",
             "Menu and footer",
             "Contact and social",

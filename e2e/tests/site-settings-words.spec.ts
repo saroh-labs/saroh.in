@@ -77,7 +77,7 @@ test("the site's settings say web address, posts path and your online shop", asy
     await expect(
         page.getByRole("tablist").filter({ visible: true }),
     ).toHaveCount(wide ? 1 : 0);
-    await isOpen("Address");
+    await isOpen("Web address");
 
     await expect(
         page
@@ -107,7 +107,7 @@ test("the site's settings say web address, posts path and your online shop", asy
             .filter({ visible: true }),
     ).not.toHaveCount(0);
     await page.goBack();
-    await isOpen("Address");
+    await isOpen("Web address");
 
     // A link opens its group.
     const sellsFrom = read.sellsFrom?.storefront?.name;

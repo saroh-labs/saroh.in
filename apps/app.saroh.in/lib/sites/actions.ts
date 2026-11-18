@@ -30,6 +30,7 @@ import {
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
+    createSiteRedirect as createSiteRedirectApi,
     deleteComment as deleteCommentApi,
     deletePage as deletePageApi,
     fillDetails as fillDetailsApi,
@@ -40,6 +41,7 @@ import {
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
     recordPageView as recordPageViewApi,
+    removeSiteRedirect as removeSiteRedirectApi,
     requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
@@ -277,6 +279,18 @@ export async function createPreviewLink(
 
 export async function revokePreviewLink(siteId: string, linkId: string) {
     return revokePreviewLinkApi(siteId, linkId);
+}
+
+/** Links and sharing: forward an old link of the merchant's to a page. */
+export async function createSiteRedirect(
+    siteId: string,
+    input: { fromPath: string; toPath: string },
+) {
+    return createSiteRedirectApi(siteId, input);
+}
+
+export async function removeSiteRedirect(siteId: string, redirectId: string) {
+    return removeSiteRedirectApi(siteId, redirectId);
 }
 
 /**

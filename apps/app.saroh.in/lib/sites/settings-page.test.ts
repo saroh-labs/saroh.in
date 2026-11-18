@@ -47,7 +47,7 @@ describe("the seven groups", () => {
         expect(
             settingsGroups({ shop: true, advanced: true }).map((g) => g.label),
         ).toEqual([
-            "Address",
+            "Web address",
             "Search and sharing",
             "Menu and footer",
             "Contact and social",

@@ -27,6 +27,8 @@ import { QrCodesService } from "./qr-codes.service";
 import { QrPrintService } from "./qr-print.service";
 import { SiteIconController } from "./site-icon.controller";
 import { SiteIconService } from "./site-icon.service";
+import { SiteOverviewService } from "./site-overview";
+import { SiteOverviewController } from "./site-overview.controller";
 import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SiteRedirectsController } from "./site-redirects.controller";
 import { SiteRedirectsService } from "./site-redirects.service";
@@ -72,6 +74,8 @@ import { TestReleasesService } from "./test-releases.service";
         QrCodesController,
         // Old page links that forward (KTD-3).
         SiteRedirectsController,
+        // A site's Overview (website area U4).
+        SiteOverviewController,
         PublicSitesController,
         PublicQrController,
         // "Your booking page" in Bookings (DEC-175).
@@ -93,6 +97,7 @@ import { TestReleasesService } from "./test-releases.service";
         PublicHeadService,
         QrCodesService,
         SiteRedirectsService,
+        SiteOverviewService,
         QrPrintService,
         PublicQrService,
         GoLiveHandler,

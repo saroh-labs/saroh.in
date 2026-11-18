@@ -16,7 +16,7 @@ import { notPublished } from "@saroh/ui/lib/state-copy";
 
 /** The groups, in the order they appear and the in-page list names them. */
 export const SETTINGS_GROUPS = [
-    { id: "address", label: "Address" },
+    { id: "address", label: "Web address" },
     { id: "search-and-sharing", label: "Search and sharing" },
     { id: "menu-and-footer", label: "Menu and footer" },
     { id: "contact", label: "Contact and social" },

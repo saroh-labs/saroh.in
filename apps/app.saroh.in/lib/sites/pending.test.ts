@@ -8,6 +8,10 @@ describe("what is waiting to go live", () => {
             "2 sections, the style and the footer",
         );
         expect(describePendingChanges(0, [])).toBeNull();
+        // A page link changed: its old link forwards (website area U1).
+        expect(describePendingChanges(0, ["pages", "redirects"])).toBe(
+            "the page list and the old links that forward",
+        );
     });
 
     it("says it in a short list for the editor's pill", () => {

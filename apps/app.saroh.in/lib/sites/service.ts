@@ -1076,6 +1076,56 @@ export async function getSite(siteId: string): Promise<SiteDetail | null> {
     return getJson<SiteDetail>(`${base}/${siteId}`);
 }
 
+/**
+ * A site's Overview (plan 2026-11-18-001 U4), `GET …/sites/:id/overview`:
+ * the last 7 days' results (null for someone who can't read Insights; a
+ * part is null when its module is off), what needs doing, and activity.
+ */
+export interface SiteOverview {
+    results: {
+        from: string;
+        to: string;
+        days: { date: string; visits: number }[];
+        visits: number;
+        questions: number;
+        started: number | null;
+        paid: number | null;
+        sells: { bookings: boolean; shop: boolean };
+    } | null;
+    needsDoing: {
+        pageId: string;
+        title: string;
+        path: string;
+        issues: ("googleText" | "shareImage" | "brokenLink")[];
+    }[];
+    activity: {
+        kind:
+            | "published"
+            | "restored"
+            | "test_link_live"
+            | "post_published"
+            | "page_settings"
+            | "saved"
+            | "approval_on"
+            | "approval_off"
+            | "look_updated"
+            | "draft_rolled_back";
+        at: string;
+        by: string | null;
+        subject: string | null;
+    }[];
+    lastPublished: { at: string; by: string | null } | null;
+}
+
+/** Null on a 404 / no active org; throws on a real failure. */
+export async function getSiteOverview(
+    siteId: string,
+): Promise<SiteOverview | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    return getJson<SiteOverview>(`${base}/${siteId}/overview`);
+}
+
 /** The current editable draft for a page (the API creates one if none). Null on
  * a 404 / no active org; throws on a real failure. */
 export async function getPageDraft(
@@ -2493,4 +2543,72 @@ export async function revokePreviewLink(
         ok: false,
         ...readError(data, "Couldn't turn this link off."),
     };
+}
+
+/**
+ * An old page link that forwards to a page (website area KTD-3): made for
+ * the merchant when a published page's link changes (AUTO), or added by
+ * them for a link printed somewhere else (OWN). Mirrors the API's
+ * `SiteRedirectView`.
+ */
+export interface SiteRedirect {
+    id: string;
+    fromPath: string;
+    toPath: string;
+    /** The page it opens; null when that page is gone. */
+    toTitle: string | null;
+    source: "AUTO" | "OWN";
+    /** The live site forwards it already; else it waits for Publish. */
+    live: boolean;
+    createdAt: string;
+}
+
+/** The site's old links that forward, or null when they couldn't be read. */
+export async function listSiteRedirects(
+    siteId: string,
+): Promise<SiteRedirect[] | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}/${siteId}/redirects`);
+    if (!res.ok) return null;
+    return (await res.json()) as SiteRedirect[];
+}
+
+export async function createSiteRedirect(
+    siteId: string,
+    input: { fromPath: string; toPath: string },
+): Promise<SitesResult<SiteRedirect>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/redirects`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SiteRedirect> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SiteRedirect };
+    return { ok: false, ...readError(data, "Couldn't add the old link.") };
+}
+
+/** Stop forwarding one of the merchant's own old links (OWN only). */
+export async function removeSiteRedirect(
+    siteId: string,
+    redirectId: string,
+): Promise<SitesResult<{ removed: true }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/redirects/${redirectId}`, {
+        method: "DELETE",
+    });
+    if (res.ok) return { ok: true, data: { removed: true } };
+    const data: unknown = await res.json().catch(() => null);
+    return { ok: false, ...readError(data, "Couldn't remove the old link.") };
 }

@@ -44,11 +44,11 @@ describe("the Website area's four groups (RULES §3)", () => {
         expect(all).toContain("/settings/people");
     });
 
-    it("keeps every Settings group reachable, three of them from Reach", () => {
+    it("keeps every Settings group reachable, two of them from Reach", () => {
         const all = hrefs(owner);
         const reach = siteGroups("s1", owner).find((g) => g.id === "reach");
         expect(reach?.sections.map((s) => s.href)).toEqual([
-            "/sites/s1/settings?section=search-and-sharing",
+            "/sites/s1/reach/links",
             "/sites/s1/settings?section=address",
             "/sites/s1/settings?section=contact",
         ]);
@@ -104,6 +104,14 @@ describe("currentSection", () => {
             group: "people-and-settings",
             section: "settings",
         });
+        expect(at("/sites/s1/reach/links")).toEqual({
+            group: "reach",
+            section: "links",
+        });
+        // Search and sharing stays in Settings beside its own screen.
+        expect(
+            at("/sites/s1/settings", "section=search-and-sharing").section,
+        ).toBe("settings");
     });
 
     it("is nowhere on a place a section leads to", () => {
@@ -119,6 +127,9 @@ describe("switchHref (the switcher keeps the screen)", () => {
         expect(
             switchHref("/sites/a/settings", "?section=contact", "a", "b"),
         ).toBe("/sites/b/settings?section=contact");
+        expect(switchHref("/sites/a/reach/links", "", "a", "b")).toBe(
+            "/sites/b/reach/links",
+        );
     });
 
     it("drops what belongs to one site alone", () => {

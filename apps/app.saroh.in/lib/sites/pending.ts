@@ -21,6 +21,7 @@ export const SITE_CHANGE_KINDS = [
     "footer",
     "menu",
     "pages",
+    "redirects",
 ] as const;
 export type SiteChangeKind = (typeof SITE_CHANGE_KINDS)[number];
 
@@ -34,6 +35,7 @@ const LABELS: Record<SiteChangeKind, string> = {
     footer: "the footer",
     menu: "the menu",
     pages: "the page list",
+    redirects: "the old links that forward",
 };
 
 function isKind(value: string): value is SiteChangeKind {
@@ -79,6 +81,7 @@ const SHORT_LABELS: Record<SiteChangeKind, string> = {
     footer: "footer",
     menu: "menu",
     pages: "pages",
+    redirects: "old links",
 };
 
 /**
@@ -120,6 +123,7 @@ const AREA_ROWS: Record<SiteChangeKind, { area: string; detail: string }> = {
     footer: { area: "Footer", detail: "Changed" },
     menu: { area: "Menu", detail: "Changed" },
     pages: { area: "Pages", detail: "Added, removed or renamed" },
+    redirects: { area: "Old links that forward", detail: "Added or removed" },
 };
 
 /**
