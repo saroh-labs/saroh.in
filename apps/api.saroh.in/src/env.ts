@@ -250,6 +250,27 @@ const envSchema = z.object({
     META_WA_TEMPLATE_LANG: z.string().optional(),
     // TEST ONLY in practice: where Graph API calls go, version included.
     META_GRAPH_BASE_URL: z.url().optional(),
+    // Saroh Social (plan saroh-social 2026-11-18-001): one Meta app, three
+    // logins. Facebook Login for Business needs the app's id, its secret
+    // (META_APP_SECRET, above) and the login configuration's id; Instagram
+    // Login and Threads each have their own app id and secret inside the
+    // same Meta app. Each is read when used: a missing one makes connecting
+    // that channel answer 503, never a failed boot. Secrets never logged.
+    META_APP_ID: z.string().optional(),
+    META_FB_LOGIN_CONFIG_ID: z.string().optional(),
+    INSTAGRAM_APP_ID: z.string().optional(),
+    INSTAGRAM_APP_SECRET: z.string().optional(),
+    THREADS_APP_ID: z.string().optional(),
+    THREADS_APP_SECRET: z.string().optional(),
+    // Seals a connected channel's token to its row (DEC-214 ring, like the
+    // keys below). Checked at use; never logged, never in an example file
+    // with a value.
+    SOCIAL_ENC_KEY: z.string().optional(),
+    // TEST ONLY. `1`: Saroh Social talks to an in-memory Meta (the browser
+    // specs): connecting returns at once with a made-up account, and posts
+    // are kept in memory. Refused at boot under NODE_ENV=production, and
+    // honoured only in a test run (`social/meta/provider.ts`).
+    SOCIAL_FAKE: z.enum(["1"]).optional(),
     // A 32-byte AES-256-GCM key (base64 or 64-hex) sealing a queued
     // WhatsApp send's number and words until the provider accepts it (a
     // retry). Its own key, never the payments one. Development and test
@@ -464,6 +485,7 @@ const TEST_ONLY = [
     "DOMAIN_HOSTING_FAKE",
     "STRIPE_FAKE",
     "AI_PROVIDER_FAKE",
+    "SOCIAL_FAKE",
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
