@@ -10,6 +10,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
 import { BookingEventType } from "../bookings/booking-event-type";
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { enquiryEntriesFor } from "../forms/enquiry-entries";
 import { realOrderWhere } from "../orders/open-orders";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -671,13 +672,23 @@ export class ContactsService {
                         { courseEnrollment: { contactId, status: "ACTIVE" } },
                     ],
                 },
-                select: { id: true, startAt: true },
+                select: { id: true, startAt: true, staffId: true },
             });
             if (paidWithPack.length > 0) {
                 await tx.booking.updateMany({
                     where: { id: { in: paidWithPack.map((b) => b.id) } },
                     data: { status: "CANCELLED", cancelledAt: now },
                 });
+                // Off the person's Google Calendar too (GC-09), with no
+                // email: the customer is being deleted, not told.
+                for (const b of paidWithPack) {
+                    await queueCalendarSyncInTx(tx, {
+                        organizationId: ctx.organizationId,
+                        bookingId: b.id,
+                        staffId: b.staffId,
+                        quiet: true,
+                    });
+                }
                 await tx.bookingEvent.createMany({
                     data: paidWithPack.map((b) => ({
                         bookingId: b.id,
