@@ -448,6 +448,12 @@ e2e_stack() {
     # the text key is a throwaway for this stack's test conversations.
     export AI_PROVIDER_FAKE=1
     export AI_TEXT_ENC_KEY=fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
+    # Saroh Social on an in-memory Meta (the social spec), as CI: connecting
+    # comes straight back with a made-up account and posts are kept in
+    # memory. Test only. Its key is a throwaway that seals only this
+    # stack's test channels.
+    export SOCIAL_FAKE=1
+    export SOCIAL_ENC_KEY=0011223344556677889900aabbccddeeff0011223344556677889900aabbccdd # gitleaks:allow (test key, this stack only)
 
     # The run's database is a copy of a seeded template, "<name>-template",
     # when the template was seeded from the same migrations, schema and seed

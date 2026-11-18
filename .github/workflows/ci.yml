@@ -799,6 +799,12 @@ jobs:
       # key is a throwaway too: it seals only this stack's test conversations.
       AI_PROVIDER_FAKE: "1"
       AI_TEXT_ENC_KEY: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210 # gitleaks:allow (test key, this stack only)
+      # Saroh Social on an in-memory Meta (the social spec): connecting
+      # comes straight back with a made-up account, posts are kept in
+      # memory, nothing calls Meta. Test only, as above. Its key is a
+      # throwaway too: it seals only this stack's test channels.
+      SOCIAL_FAKE: "1"
+      SOCIAL_ENC_KEY: 0011223344556677889900aabbccddeeff0011223344556677889900aabbccdd # gitleaks:allow (test key, this stack only)
 
     steps:
       - uses: actions/checkout@v4
