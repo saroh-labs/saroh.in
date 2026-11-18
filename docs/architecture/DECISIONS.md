@@ -3041,3 +3041,44 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context (Website redesign boards, 17 Nov 2026): DEC-103 says a teammate's site edits wait for "an owner's or admin's approval", so the boards drew the reviewer leaving Feedback only and sending approval to the owner. The owner: "the reviewer can approve, we should give them the button, the admin, and owner can also approve."
 - Decision: when "Publishing needs approval" is on, **any one of a reviewer, an admin or the owner can approve** a waiting change (a site's changes or one post). The reviewer gets an Approve button in the read-only editor (DEC-200), beside Ask for changes and the Feedback tab. Approving doesn't let a reviewer edit or publish anything else.
 - Consequences: the approval check accepts the reviewer role as well as admin and owner, and the approval record names who approved. Still Pro only (DEC-103). Whether approving changes how a reviewer counts against seats (DEC-105, DEC-155) is checked against the pricing catalogue before building.
+
+## DEC-227 Merchant sites get component styles: free on every plan, set per kind of component, kept when the look changes
+
+**Status: Accepted — 2026-11-17, to design then build** · owner · extends DEC-172 (looks) and DEC-177 (which styles are paid)
+
+- Context (style system boards on Saroh App Designs 3, page "Site style system", 17 Nov 2026): a site is built tokens → components → blocks → templates. Today a merchant changes the look, colours and fonts; the owner asked that they can also change one kind of component without changing the whole look.
+- Decision:
+    - **Component styles** (buttons, cards, images, headings, spacing, slots and tags, links) are a layer under the look, set per kind of component, never per single instance, from a short list of options. They sit one level down in the Brand panel ("Customise components") with "Reset to <look>".
+    - **Free on every plan.** Unlike looks, colourways and fonts (DEC-177), no component style is paid.
+    - **Switching look keeps the merchant's changes by default**, and offers the new look's own defaults as the other choice.
+    - **Card corners, spacing and image corners are each the merchant's own choice.** Each look keeps today's defaults (Live's 24px photo corners, Folio's spacing); the merchant can change them.
+    - Guardrails: every option keeps 4.5:1 text and 44px targets, custom colours go through `deriveSafeColours`, no option hides a capability (Book stays), and changes wait for Publish like any edit.
+- **The services list has three layouts, all offered: List (today), Cards and Menu.** Every layout keeps Book, price and duration. Chosen per section like other block variants.
+- **Different text on phone** (owner, 17 Nov): a text can be "Same on phone" or "Shorter on phone"; an empty phone text falls back to the desktop one. Buttons may differ freely; body text may differ with a hint that search engines read the phone version; **the page's main heading (h1) and the page title never get a phone version**, they offer "Shorten it for both", because Google indexes the phone page and a page has one h1.
+- Consequences: `SiteStyle` gains a component-styles field (absent when nothing is changed, like `look` and `fontPair`, so untouched sites report no change); blocks draw shared components that read it; DEC-177's paid check ignores it.
+
+## DEC-228 A public site library on saroh.in, built on a 17-block catalogue
+
+**Status: Accepted — 2026-11-17, to design then build** · owner · follows DEC-227 · block map `~/.saroh-design-drafts/templates/BLOCK-MAP.md` (private drafts)
+
+- Context: the owner wants a library where merchants try out what their website can be made of (looks, components, blocks, templates) and that brings visitors to Saroh. `ui.saroh.in` today shows Saroh's own app UI and a rough block index.
+- Decision:
+    - **The public library lives on saroh.in** (better for search than a subdomain) and shows **only the merchant site system**: foundations and looks, components, blocks and templates, drawn live from the same code that renders merchant sites, never screenshots, never in Saroh's brand. Saroh's own app UI is not shown publicly; any internal showcase waits.
+    - **One registry** generated from the code feeds the library, the editor's Add panel, the template gallery and Ask AI / MCP.
+    - **Every page is server-rendered and indexable**, phone first. A toolbar tries looks, colourways, component styles, desk or phone and states. "Try it on your business" shows a block or template with a visitor's own name and town, saving nothing. "Use on my site" opens the editor's Add panel or sign-up. Pages follow DEC-222 (not-live features tagged) and DEC-225.
+    - **The catalogue is 17 blocks with about 45 layouts.** Contact and Hours merge into Visit us, and Packs into Plans; their old names stay in the Add panel and open the merged block. The hero gains an Answer panel (Today, Next free, Same-day call, Consultation, Pickup): a clinic's reads "Same-day? Call the desk", never a promise of emergency care. Subscribe is the one new block, held until the subscriber list ships with the Newsletter collection (sent by the business's own provider, DEC-174). "Places left" shows from a number the merchant sets, default 5. Pre-order and "Before you book" notes start as words the merchant types; the data comes with DEC-172's later gaps. Search pages are the real block-and-trade pairings, not one page per trade-named block.
+- Consequences: the existing `ui.saroh.in` stays as it is for now; the library's pages, registry and live preview are a build plan after the boards.
+- Owner picks, 2026-11-18 (accepted as recommended):
+    - Subscribe confirms by email before the address is added (double opt-in). The enquiry form gets an optional "Send me news" box, unticked by default.
+    - Menu groups in the Services Menu layout are typed on the block for now; service categories come later.
+    - "Label above" is hidden for new sections and kept where a section already uses it. The plans badge keeps "Most chosen". A Lookbook photo linked to a product reads "See the product".
+    - Visit us shows the shop photo, or no map, until a map provider exists. "Places left" takes a number from 1 to 10.
+    - The library lives at `saroh.in/website-library` with a menu entry; templates stay at `saroh.in/templates`. Per-block routes come later; the first build is one library page. "Try it" carries name, trade and colour into sign-up.
+
+## DEC-229 A customer's account on a merchant's site is one design that takes the site's theme
+
+**Status: Accepted — 2026-11-17** · owner · extends DEC-037, DEC-172 and DEC-227
+
+- Decision: the signed-in account on a merchant's site (home, bookings, orders, plan, messages, details, receipts, sign-in) has **one layout for every business, trade, template and look**. It matches the site through tokens only: the site's colours or colourway, fonts, the look's corners, type and motion, and the merchant's component styles (DEC-227). No template or look gets its own account screens.
+- Consequences: keeps today's approach (`packages/site-blocks/src/account/look-account-rules.ts`: one set of parts restyled by the look, held by `looks-account.test.tsx`). New account features are drawn once.
+- Owner picks, 2026-11-18: a GST number can be saved on the customer's account (needs an API field). Book again and Order again are built with DEC-172's later phases, not now.
