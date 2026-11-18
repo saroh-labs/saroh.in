@@ -130,7 +130,7 @@ export function JournalArchiveByYear({
                                 <a
                                     href={row.href}
                                     className={cn(
-                                        "text-site-fg group grid grid-cols-[4.125rem_minmax(0,1fr)] gap-x-4",
+                                        "text-site-fg coarse:min-h-11 group grid grid-cols-[4.125rem_minmax(0,1fr)] gap-x-4",
                                         focusRing,
                                     )}
                                 >

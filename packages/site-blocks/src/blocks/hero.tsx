@@ -5,6 +5,7 @@ import type { PublicVisit } from "../lib/public-visit";
 import type { LookProps } from "../look-context";
 import { AnswerRow, VisitStamp } from "./answer-row";
 import { HeroByline } from "./byline";
+import type { PanelService } from "./hero-answer-panel";
 import AnswerHero from "./hero-answer-panel";
 import FullBleedHero from "./hero-full-bleed";
 import { HeroHeading } from "./hero-heading";
@@ -81,6 +82,8 @@ type HeroProps = LookProps & {
     visit?: PublicVisit;
     /** A day to draw On today from instead of reading (fixtures). */
     today?: PublicToday;
+    /** A service to draw the Consultation panel from instead of reading (fixtures). */
+    service?: PanelService;
     /** The moment "Open now" is worked out for (fixtures, tests). */
     now?: Date;
     /**
@@ -135,6 +138,7 @@ export default function HeroSection(props: HeroProps) {
                 bookHref={bookHref}
                 visit={visit}
                 today={today}
+                service={props.service}
                 now={now}
                 fallback={centered}
             />

@@ -292,7 +292,8 @@ export default function ServicesListSection({
                                     key={service.id}
                                     className="border-site-border flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b py-5"
                                 >
-                                    <div className="min-w-0 flex-1">
+                                    {/* A floor, so on a phone the length, price and Book wrap below the words instead of squeezing them to a column. */}
+                                    <div className="min-w-[min(100%,14rem)] flex-1">
                                         <h3 className="font-site-heading text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
                                             {service.name}
                                         </h3>
@@ -327,7 +328,7 @@ export default function ServicesListSection({
                                                         : `Book ${service.name}`
                                                 }
                                                 className={cn(
-                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70 max-[699px]:min-h-11",
+                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center justify-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70 max-[699px]:min-h-11 max-[699px]:min-w-11",
                                                     focusRing,
                                                 )}
                                             >

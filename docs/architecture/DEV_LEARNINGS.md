@@ -6825,3 +6825,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Symptom:** on #1424, "Lint, typecheck and repo checks" stopped about 50 minutes into "Lint and typecheck" on both attempts, with no log and the annotation "The hosted runner lost communication with the server". In the 80 runs before it, the step took 0.7 to 9.3 minutes and never hung. The same command on the same commit finished locally in 2.5 minutes.
 - **Cause:** turbo runs ten tasks at once by default; with nearly every package affected (a merge from development), several `tsc` and ESLint processes for the big apps at once starve the 16 GB hosted runner.
 - **Fix:** `--concurrency=4` on that step (`.github/workflows/ci.yml`), as the test step already caps itself. A job that dies with "lost communication" and no log is memory, not the code: cap the parallelism, don't re-run it again and again.
+
+### A regex in a site-blocks test broke every merchant page's CSS (18 Nov 2026)
+
+- **Symptom:** on batch-2026-11-18-2 every saroh.app page answered 500 in `next dev`; unit tests, lint and typecheck all passed.
+- **Cause:** Tailwind scans every file under `packages/site-blocks/src`, tests included, for class names. A lookahead `(?!-visible\))` in `component-theme.test.tsx` read as an arbitrary-value class and crashed the CSS build.
+- **Fix:** written `(?![-]visible\))`. The quick gate builds no CSS, so this only shows in a page render or CI's build: after a change to site-blocks, open one template render (or let CI build) before calling it done.

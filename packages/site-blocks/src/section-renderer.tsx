@@ -252,6 +252,7 @@ export default function SectionRenderer({
                     siteId={siteId}
                     visit={fixtures?.visit}
                     today={fixtures?.today}
+                    service={fixtures?.services?.[0]}
                     now={now}
                     priority={first}
                     level={heroLevel}
@@ -430,6 +431,7 @@ export default function SectionRenderer({
                     bookHref={bookHref}
                     reach={reach}
                     askHref={askHref}
+                    slots={fixtures?.slots}
                 />
             );
         default:

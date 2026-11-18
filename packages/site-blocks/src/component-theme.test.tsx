@@ -152,7 +152,8 @@ describe("every combination keeps the floor (R2)", () => {
         // No control is made shorter than its 44px touch floor.
         expect(out).not.toMatch(/(^|[^-])(min-)?height\s*:/m);
         // A ring is never drawn over or taken away.
-        expect(out).not.toMatch(/outline|ring|:focus(?!-visible\))/);
+        // `[-]`, not a bare hyphen: Tailwind scans this file, and the bare form crashes its candidate parser.
+        expect(out).not.toMatch(/outline|ring|:focus(?![-]visible\))/);
         // The only colours written are the palette's held roles.
         const colours = out.match(/hsl\([^;]*/g) ?? [];
         for (const c of colours) expect(c).toMatch(HELD);
