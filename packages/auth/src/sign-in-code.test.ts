@@ -455,10 +455,12 @@ describe("sign up and sign in with an emailed code", () => {
         // could flood a stranger's mailbox from Saroh's sending domain.
         it("a sign-up and a password sign-in ask the per-address cap too, naming the path", async () => {
             const paths: string[] = [];
+            const hosts: (string | null)[] = [];
             const s = stack({
                 hooks: {
-                    mayMailCode: (_email, { path }) => {
+                    mayMailCode: (_email, { path, host }) => {
                         paths.push(path);
+                        hosts.push(host);
                         return Promise.resolve({ retryAfterSeconds: 60 });
                     },
                 },
@@ -477,6 +479,8 @@ describe("sign up and sign in with an emailed code", () => {
             });
             expect(signIn.status).toBe(429);
             expect(paths).toEqual(["/sign-up/email", "/sign-in/email"]);
+            // The API address asked, whose edition's Turnstile check it is.
+            expect(hosts).toEqual([new URL(BASE).host, new URL(BASE).host]);
         });
 
         it("the screen's Resend wait lets one resend through", () => {

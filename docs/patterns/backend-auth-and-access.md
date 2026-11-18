@@ -699,6 +699,27 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   as `apiFetch` and `adminFetch` do. A new server-side client that forgets it
   gets a 403 on every write. So does a Playwright test that writes through
   `request`: put `origin: urls.APP_URL` in its headers.
+- **Current** — **A Saroh account code goes only where it can be used, and
+  only from accounts** (owner, 18 Nov 2026). A phone sign-in code on WhatsApp
+  goes only to a number already verified on an account; any other number
+  (no account, a phone saved without a verify, Saroh staff) gets nothing and
+  the same answer, after the same limits, ceiling and one lookup. The send
+  runs after the answer (`AccountPhoneService.start`, `settled()` in specs),
+  so neither timing nor a failed send tells the two apart. New people sign
+  up with email and add the phone in Account (`account/phone/start`, a
+  code to any new Indian number for the signed-in person, 5 a day); no path
+  makes an account or a session from a phone alone. The SMS widget is handed
+  out either way: its id is public and it sends from the browser, so its
+  stop stays the provider's own caps. The phone start routes
+  (`AccountsOriginGuard`) and Better Auth's code-mailing routes
+  (`refusedCodeMail`, all of `CODE_MAIL_PATHS` but the password sign-in)
+  refuse with 403 an `Origin`, or `Referer` without one, that isn't an
+  accounts site (`common/accounts-origins.ts`, from env), and a request with
+  neither. That is a cheap filter, not authentication: scripts set any
+  header. Turnstile for these sends is asked with the accounts hostnames,
+  so a token solved on a merchant site or saroh.tech (one key serves all
+  three) is refused. Merchant-site customer codes (`site-accounts/`) are a
+  different path and keep their own rules.
 - **Current** — **Frontend session reads keep "signed out" and "could not check"
   apart.** Edge middleware checks cookie presence only
   (`@saroh/auth/middleware`); Server Components use `requireSession()`, and only

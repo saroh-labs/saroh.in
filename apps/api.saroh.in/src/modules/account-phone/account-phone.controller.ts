@@ -20,6 +20,7 @@ import type { Request, Response } from "express";
 
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { AccountsOriginGuard } from "../../common/guards/accounts-origin.guard";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
 import type {
@@ -55,8 +56,13 @@ export class PhoneSignInController {
         return this.phones.options();
     }
 
-    /** Turnstile and the limits, then a WhatsApp code sent, or the SMS widget's config. */
+    /**
+     * Turnstile and the limits, then a WhatsApp code sent, or the SMS
+     * widget's config. Only to a number on an account, with the same answer
+     * either way (owner, 18 Nov); only from an accounts site.
+     */
     @Post("start")
+    @UseGuards(AccountsOriginGuard)
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
     start(
@@ -71,6 +77,7 @@ export class PhoneSignInController {
             purpose: "sign-in",
             turnstileToken: dto.turnstileToken,
             ip,
+            apiHost: host,
         });
     }
 
@@ -103,8 +110,9 @@ export class PhoneSignInController {
 export class AccountPhoneController {
     constructor(private readonly phones: AccountPhoneService) {}
 
-    /** A code for the new number, bound to this person. */
+    /** A code for the new number, bound to this person; only from an accounts site. */
     @Post("start")
+    @UseGuards(AccountsOriginGuard)
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
     start(
@@ -121,6 +129,7 @@ export class AccountPhoneController {
             userId: user.id,
             turnstileToken: dto.turnstileToken,
             ip,
+            apiHost: host,
         });
     }
 

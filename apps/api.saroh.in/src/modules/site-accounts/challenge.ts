@@ -51,8 +51,17 @@ export class ChallengeVerifier {
         return this.configured ? (this.siteKeyValue ?? null) : null;
     }
 
-    /** Whether Turnstile accepts the token. Any failure to ask is a no. */
-    async verify(token: string | undefined, address: string): Promise<boolean> {
+    /**
+     * Whether Turnstile accepts the token. Any failure to ask is a no. With
+     * `hostnames`, the page that solved it must be one of them too: one
+     * Turnstile key serves merchant sites and saroh.tech as well, and a
+     * token solved there must not buy a Saroh account's code (owner, 18 Nov).
+     */
+    async verify(
+        token: string | undefined,
+        address: string,
+        hostnames?: readonly string[],
+    ): Promise<boolean> {
         if (!this.secretKey || !token || token.length > MAX_TOKEN_LENGTH) {
             return false;
         }
@@ -67,8 +76,16 @@ export class ChallengeVerifier {
                 signal: AbortSignal.timeout(5_000),
             });
             if (!response.ok) return false;
-            const body = (await response.json()) as { success?: unknown };
-            return body.success === true;
+            const body = (await response.json()) as {
+                success?: unknown;
+                hostname?: unknown;
+            };
+            if (body.success !== true) return false;
+            return (
+                !hostnames ||
+                (typeof body.hostname === "string" &&
+                    hostnames.includes(body.hostname.toLowerCase()))
+            );
         } catch {
             return false;
         }

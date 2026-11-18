@@ -70,7 +70,10 @@ const envSchema = z.object({
     RENDERER_URL: z.url().optional(),
     // The sign-in app's own address (accounts), for links someone opens to
     // create their account — waitlist invitations. Unset: the local accounts
-    // app in development, and no invitation link anywhere else.
+    // app in development, and no invitation link anywhere else. Also who may
+    // ask for a code, with every edition's accounts in its environment
+    // (`common/accounts-origins.ts`); unset, that environment comes from
+    // BETTER_AUTH_URL.
     ACCOUNTS_URL: z.url().optional(),
     // The admin console's own address, for links staff open from an email —
     // a manager's daily list of quiet businesses. Unset: the local admin app

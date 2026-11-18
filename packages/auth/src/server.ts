@@ -222,7 +222,12 @@ export interface CreateAuthOptions {
      */
     mayMailCode?: (
         email: string,
-        challenge: { turnstileToken: string | null; path: string },
+        challenge: {
+            turnstileToken: string | null;
+            path: string;
+            /** The API address asked (`Host`), for whose edition's check it is. */
+            host: string | null;
+        },
     ) => Promise<{ retryAfterSeconds: number } | { challenge: true } | null>;
     /**
      * This instance's GitHub OAuth app. GitHub allows one callback address
@@ -530,6 +535,7 @@ function codeMailHook(
         const verdict = await mayMailCode(email.trim().toLowerCase(), {
             turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
             path: ctx.path,
+            host: ctx.headers?.get("host") ?? new URL(ctx.request.url).host,
         });
         if (!verdict) return;
         if ("challenge" in verdict) {

@@ -26,6 +26,7 @@ import {
     otherAuthAddress,
 } from "./auth-address";
 import { claimCodeMail, mailsOnPasswordSignIn } from "./code-mail-limits";
+import { refusedCodeMail } from "./code-mail-origin";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
@@ -71,10 +72,10 @@ const authServices: Parameters<typeof createAuth>[0] = {
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
     // A password sign-in mails only an unproven account (03-M9): any other
     // sign-in is not a code mail and is never counted or refused here.
-    mayMailCode: async (email, { turnstileToken, path }) =>
+    mayMailCode: async (email, { turnstileToken, path, host }) =>
         path === "/sign-in/email" && !(await mailsOnPasswordSignIn(email))
             ? null
-            : claimCodeMail(email, turnstileToken),
+            : claimCodeMail(email, turnstileToken, undefined, undefined, host),
 };
 
 const githubWarned = new Set<Edition>();
@@ -170,6 +171,7 @@ export function authOfEdition(edition: Edition | null | undefined): Auth {
 export const mountedAuth: Auth = {
     ...auth,
     handler: async (request) =>
+        refusedCodeMail(request) ??
         (await oauthGate(request)) ??
         authFor(request.headers.get("host")).handler(request),
 };

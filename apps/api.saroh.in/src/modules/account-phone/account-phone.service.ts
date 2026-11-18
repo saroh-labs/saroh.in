@@ -14,6 +14,7 @@ import type { AccountPhoneEventKind } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
+import { accountsHostnames } from "../../common/accounts-origins";
 import { auth } from "../../common/auth/auth";
 import { hashClientIp } from "../../common/client-ip";
 import type { PhoneNoticeKind } from "../../common/email";
@@ -107,6 +108,8 @@ export const PHONE_STALE = "Sign in with your email to keep using this phone.";
 @Injectable()
 export class AccountPhoneService {
     private readonly logger = new Logger(AccountPhoneService.name);
+    /** Sign-in sends under way after their answer ({@link settled}). */
+    private readonly sending = new Set<Promise<void>>();
 
     constructor(
         private readonly messaging: MessagingService,
@@ -144,8 +147,17 @@ export class AccountPhoneService {
     /**
      * The bot challenge, then the start limits. WhatsApp: make the code and
      * send it from here. SMS: hand back the widget, which sends from the
-     * browser. The answer is the same whether or not the phone has an
-     * account.
+     * browser.
+     *
+     * Signing in, a WhatsApp code goes only to a number already verified on
+     * an account (owner, 18 Nov): a new person signs up with email and adds
+     * the phone in Account first. The answer is the same either way, and so
+     * is the work done before it: the limits, the ceiling and one lookup.
+     * The code is made and sent after the answer, never awaited by it, so a
+     * known number takes no longer to answer than an unknown one and a
+     * failed send says nothing about which it was. SMS hands out the widget
+     * either way: what the widget sends can't be held back here without
+     * saying the number has an account, and its id is public anyway.
      *
      * These limits are NOT the cost stop for SMS: the widget's id and token
      * are static and public once handed out, so anyone can drive the widget
@@ -162,6 +174,8 @@ export class AccountPhoneService {
         userId?: string;
         turnstileToken?: string;
         ip?: string;
+        /** The API address asked: whose edition's accounts Turnstile must name. */
+        apiHost?: string;
     }): Promise<PhoneStart> {
         // India only, before anything is sent or counted (pentest 28 Oct, L2).
         input = { ...input, phoneE164: indianPhoneE164(input.phoneE164) };
@@ -185,7 +199,19 @@ export class AccountPhoneService {
         }
         const { eventId } = verdict;
         if (input.channel === "whatsapp") {
-            return this.sendWhatsapp(input, keys, eventId);
+            await this.underCeiling(keys, eventId);
+            if (input.purpose === "add") {
+                return this.sendWhatsapp(input, keys, eventId);
+            }
+            const account = await accountOf(input.phoneE164);
+            if (account) {
+                this.inBackground(
+                    this.sendWhatsapp(input, keys, eventId, account),
+                );
+            } else {
+                this.blocked("start", "no_account", keys);
+            }
+            return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
 
         const token = this.messaging.standInOtpToken(input.phoneE164);
@@ -427,7 +453,7 @@ export class AccountPhoneService {
      * every start is refused (03-H2); elsewhere it goes, said at ERROR.
      */
     private async challenged(
-        input: { turnstileToken?: string; ip?: string },
+        input: { turnstileToken?: string; ip?: string; apiHost?: string },
         keys: Keys,
     ): Promise<boolean> {
         if (!this.challenge.configured) {
@@ -446,26 +472,62 @@ export class AccountPhoneService {
             return true;
         }
         if (!input.turnstileToken) return false;
-        return this.challenge.verify(input.turnstileToken, input.ip ?? "");
+        // A token solved on a merchant site or saroh.tech buys nothing here.
+        return this.challenge.verify(
+            input.turnstileToken,
+            input.ip ?? "",
+            accountsHostnames(input.apiHost),
+        );
+    }
+
+    /** The platform-wide WhatsApp ceiling, asked for every start alike. */
+    private async underCeiling(keys: Keys, eventId: string): Promise<void> {
+        if (await this.ceiling.allows()) return;
+        this.blocked("start", "whatsapp_ceiling", keys);
+        await releaseStart(eventId, "whatsapp_ceiling");
+        throw new UnprocessableEntityException({
+            message: "Couldn't send on WhatsApp. Try SMS instead.",
+            details: { code: "WHATSAPP_FAILED" },
+        });
+    }
+
+    /** A sign-in send, after its answer: failures are logged, never thrown. */
+    private inBackground(send: Promise<unknown>): void {
+        const running = send.then(
+            () => undefined,
+            (error: unknown) => {
+                // A refused send was logged where it was refused.
+                if (!(error instanceof HttpException)) {
+                    this.logger.error(
+                        `account_phone_send_failed: ${error instanceof Error ? error.message : "unknown"}`,
+                    );
+                }
+            },
+        );
+        this.sending.add(running);
+        void running.finally(() => this.sending.delete(running));
+    }
+
+    /** Every sign-in send still going has finished (specs wait on it). */
+    async settled(): Promise<void> {
+        await Promise.all([...this.sending]);
     }
 
     /**
      * Make a code, send it from Saroh's number, keep its hash. A send that
      * fails is still a start for the daily and address caps, but not for
      * the 30-second cooldown: it was our failure, not the person's.
+     * Signing in (`account` given), Saroh staff get nothing (DEC-198).
      */
     private async sendWhatsapp(
         input: { phoneE164: string; purpose: PhonePurpose; userId?: string },
         keys: Keys,
         eventId: string,
+        account?: { id: string; email: string },
     ): Promise<PhoneStart> {
-        if (!(await this.ceiling.allows())) {
-            this.blocked("start", "whatsapp_ceiling", keys);
-            await releaseStart(eventId, "whatsapp_ceiling");
-            throw new UnprocessableEntityException({
-                message: "Couldn't send on WhatsApp. Try SMS instead.",
-                details: { code: "WHATSAPP_FAILED" },
-            });
+        if (account && (await isSarohStaff(account))) {
+            this.blocked("start", "staff", keys);
+            return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
         const code = newCode();
         let reason: string;
@@ -518,6 +580,14 @@ export class AccountPhoneService {
 }
 
 let challengeWarnedAt = 0;
+
+/** The account a sign-in code may go to: one whose phone is verified. */
+function accountOf(phoneE164: string) {
+    return prisma.user.findFirst({
+        where: { phoneE164, phoneVerifiedAt: { not: null } },
+        select: { id: true, email: true },
+    });
+}
 
 interface Keys {
     phoneHash: string;

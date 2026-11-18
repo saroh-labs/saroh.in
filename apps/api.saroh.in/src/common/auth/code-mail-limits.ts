@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 
 import { visitorHashSecret } from "../../modules/analytics/visitor-hash";
 import { ChallengeVerifier } from "../../modules/site-accounts/challenge";
+import { accountsHostnames } from "../accounts-origins";
 
 /**
  * The per-address cap on the codes and links Saroh's sign-in mails
@@ -58,11 +59,13 @@ export async function claimCodeMail(
         ChallengeVerifier,
         "configured" | "failsClosed" | "verify"
     > = challenge,
+    /** The API address asked: the token must come from its edition's accounts. */
+    apiHost: string | null = null,
 ): Promise<CodeMailVerdict> {
     const hash = emailHash(email);
     // Asked before the lock: a token is only sent after a `challenge` answer.
     const passed = turnstileToken
-        ? await verifier.verify(turnstileToken, "")
+        ? await verifier.verify(turnstileToken, "", accountsHostnames(apiHost))
         : false;
     return prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`account-email:${hash}`}))`;

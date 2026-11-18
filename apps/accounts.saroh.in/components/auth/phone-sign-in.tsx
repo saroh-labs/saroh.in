@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
 import { CodeStep } from "@/components/auth/code-step";
 import {
     AuthAlt,
     AuthError,
+    AuthFooter,
     AuthHeading,
     AuthPhoneField,
     AuthSubmit,
@@ -25,6 +27,29 @@ export const STALE_WORDS = {
     action: "Sign in with email",
 } as const;
 
+/**
+ * A code only reaches a number already on an account (owner, 18 Nov): a
+ * new person signs up with email and adds the phone in Account after. The
+ * code step never says whether the number had one.
+ */
+export const PHONE_SIGN_IN_WORDS = {
+    whatsapp:
+        "The code only reaches a number already added to a Saroh account. We send it on WhatsApp.",
+    // The SMS widget sends whatever the number: say only who it is for.
+    sms: "For a number already added to a Saroh account. We send it a one-time code by SMS.",
+    note: "No phone on your account yet? Sign in with your email, then add one in Account.",
+    newHere: "New to Saroh?",
+    signUp: "Sign up with email",
+} as const;
+
+/**
+ * "If +91 98450 12345 is on a Saroh account, a 6-digit code is on its way
+ * on WhatsApp." SMS keeps "We sent": the widget sends whatever the number.
+ */
+export function whatsappSignInLead(phone: string): string {
+    return `If ${phone} is on a Saroh account, a 6-digit code is on its way on WhatsApp. It lasts 10 minutes.`;
+}
+
 export const PHONE_SEND_WORDS = {
     whatsapp: "Send code on WhatsApp",
     sms: "Send me a code",
@@ -34,7 +59,7 @@ export const PHONE_SEND_WORDS = {
 /**
  * "Use phone instead" on Sign in (DEC-196). A phone is a second way in for
  * an account that added one; it never makes an account, so the page says
- * so before anything is sent. The number, the bot challenge, then the code
+ * so before anything is sent, and offers sign-up by email beside it. The number, the bot challenge, then the code
  * step every sign-in uses, in its phone words. The code comes on WhatsApp
  * from Saroh (owner, 28 Oct); "Get the code by SMS instead" opens the SMS
  * widget. The API checks the code, or the widget's token with the
@@ -46,6 +71,7 @@ export function PhoneSignIn({
     turnstileSiteKey,
     next,
     doneLine,
+    signUpHref = "/signup",
     onDone,
     onUseEmail,
 }: {
@@ -56,6 +82,8 @@ export function PhoneSignIn({
     turnstileSiteKey: string | null;
     next?: string;
     doneLine: string;
+    /** Where "Sign up with email" goes, carrying the return-to. */
+    signUpHref?: string;
     onDone: () => void;
     onUseEmail: () => void;
 }) {
@@ -93,6 +121,9 @@ export function PhoneSignIn({
         return (
             <CodeStep
                 email={flow.shownPhone}
+                lead={
+                    onWhatsapp ? whatsappSignInLead(flow.shownPhone) : undefined
+                }
                 next={next}
                 doneLine={doneLine}
                 resendAfterSeconds={30}
@@ -110,8 +141,8 @@ export function PhoneSignIn({
                 title="Sign in with your phone"
                 blurb={
                     onWhatsapp
-                        ? "For an account that has a phone added. We send a one-time code to it on WhatsApp."
-                        : "For an account that has a phone added. We send a one-time code to it by SMS."
+                        ? PHONE_SIGN_IN_WORDS.whatsapp
+                        : PHONE_SIGN_IN_WORDS.sms
                 }
             />
             <form
@@ -126,7 +157,7 @@ export function PhoneSignIn({
                 ) : null}
                 <AuthPhoneField
                     label="Indian mobile number"
-                    note="No phone on your account yet? Sign in with your email, then add one in Account."
+                    note={PHONE_SIGN_IN_WORDS.note}
                     value={flow.phone}
                     onValueChange={flow.setPhone}
                     disabled={flow.busy || captcha}
@@ -155,6 +186,15 @@ export function PhoneSignIn({
             >
                 Use email instead
             </AuthAlt>
+            <AuthFooter>
+                {PHONE_SIGN_IN_WORDS.newHere}{" "}
+                <Link
+                    href={signUpHref}
+                    className="text-foreground decoration-border-strong hover:decoration-foreground active:text-muted-foreground underline underline-offset-4 transition-colors"
+                >
+                    {PHONE_SIGN_IN_WORDS.signUp}
+                </Link>
+            </AuthFooter>
         </div>
     );
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@saroh/database";
 
+import { env } from "../../env";
 import {
     claimCodeMail,
     CODE_MAIL_COOLDOWN_SECONDS,
@@ -17,7 +18,10 @@ describe("claimCodeMail", () => {
     const verifier = {
         configured: true,
         failsClosed: false,
-        verify: jest.fn((token: string) => Promise.resolve(token === "good")),
+        verify: jest.fn(
+            (token: string, _ip?: string, _hostnames?: readonly string[]) =>
+                Promise.resolve(token === "good"),
+        ),
     };
     const claim = (email: string, now: Date, token: string | null = null) =>
         claimCodeMail(email, token, now, verifier);
@@ -99,6 +103,50 @@ describe("claimCodeMail", () => {
         const verdict = await claim("asha@example.com", late);
         expect(verdict).toEqual({ retryAfterSeconds: 60 * 60 - 5 * 60 });
         expect(verifier.verify).not.toHaveBeenCalled();
+    });
+
+    // Owner, 18 Nov: a token solved on a merchant site or saroh.tech
+    // (one Turnstile key serves them all) buys no Saroh account code.
+    it("asks Turnstile for a token solved on this API's accounts site only", async () => {
+        const before = env.ACCOUNTS_URL;
+        env.ACCOUNTS_URL = "https://accounts.example.test";
+        verifier.verify.mockImplementation(
+            (token: string, _ip?: string, hostnames?: readonly string[]) =>
+                Promise.resolve(
+                    token === "good" &&
+                        (hostnames ?? []).includes("accounts.example.test"),
+                ),
+        );
+        try {
+            const late = await fillTheHour("asha@example.com");
+            expect(
+                await claimCodeMail(
+                    "asha@example.com",
+                    "good",
+                    late,
+                    verifier,
+                    "localhost:3333",
+                ),
+            ).toBeNull();
+            expect(verifier.verify).toHaveBeenLastCalledWith("good", "", [
+                "accounts.example.test",
+            ]);
+            // Elsewhere: the same token solved on another site is refused.
+            env.ACCOUNTS_URL = "https://other.example.test";
+            expect(
+                await claimCodeMail(
+                    "asha@example.com",
+                    "good",
+                    new Date(late.getTime() + 60_000),
+                    verifier,
+                ),
+            ).toEqual({ challenge: true });
+        } finally {
+            env.ACCOUNTS_URL = before;
+            verifier.verify.mockImplementation((token: string) =>
+                Promise.resolve(token === "good"),
+            );
+        }
     });
 
     it("a burst at once passes one, and keeps only the hash", async () => {
