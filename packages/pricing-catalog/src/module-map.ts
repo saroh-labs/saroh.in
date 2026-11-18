@@ -243,10 +243,8 @@ export const RETIRED_MODULE_IDS: ReadonlySet<string> = new Set([
  * only for a plan with a price, so a version published before the row was
  * added never gives it to Free. Every other module with no row is open.
  */
-export const PAID_ONLY_REGISTRY: ReadonlySet<RegistryModuleKey> = new Set([
-    "COURSES",
-    "CLASS_PACKS",
-]);
+export const PAID_ONLY_REGISTRY: ReadonlySet<RegistryModuleKey> =
+    new Set<RegistryModuleKey>(["COURSES", "CLASS_PACKS"]);
 
 /**
  * The catalogue rows that sit under one registry module, in `MODULE_MAP`'s

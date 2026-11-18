@@ -85,8 +85,8 @@ export class BetterAuthGuard implements CanActivate {
         const wait = await this.limiter.retryAfterSeconds(userId);
         context
             .switchToHttp()
-            .getResponse?.<Response>()
-            ?.setHeader("Retry-After", String(wait));
+            .getResponse<Response>()
+            .setHeader("Retry-After", String(wait));
         throw new HttpException(
             "Too many requests. Wait a moment, then try again.",
             HttpStatus.TOO_MANY_REQUESTS,

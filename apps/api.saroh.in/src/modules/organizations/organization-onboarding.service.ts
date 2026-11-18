@@ -110,11 +110,12 @@ export class OrganizationOnboardingService {
         // country must belong there (DEC-204). An address of neither is India.
         const edition = editionOfHost(owner?.host ?? "") ?? "INDIA";
         refuseCountryOutsideEdition(edition, dto.profile?.country);
+        const profile = editionProfile(edition);
         // PHONE_REQUIRED_FOR_ACCOUNTS, held here too (03-M5): skipping the
         // accounts step by opening the workspace directly no longer sets a
-        // business up. Phone sign-in is India's (DEC-204).
+        // business up. Only where phone sign-in exists (DEC-204).
         if (
-            edition === "INDIA" &&
+            profile.phoneSignIn &&
             owner &&
             (await this.phone?.missing({ id: userId, email: owner.email }))
         ) {
@@ -124,7 +125,6 @@ export class OrganizationOnboardingService {
                 details: { code: "PHONE_REQUIRED" },
             });
         }
-        const profile = editionProfile(edition);
         const currency =
             profile.businessCountry === "asked-at-setup"
                 ? (dto.currency ??
