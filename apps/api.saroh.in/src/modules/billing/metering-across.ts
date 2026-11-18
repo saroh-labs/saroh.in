@@ -4,12 +4,14 @@
  * says what each key counts), one query per window start for the monthly
  * keys (DEC-219: a billing period's, else the calendar month's).
  */
+import { addMonthsUtc } from "@saroh/pricing-catalog";
 import { IANAZone } from "luxon";
 
 import { fallbackZone } from "../bookings/staff-availability";
 import type { MeterDb, MeteredLimitKey } from "./metering";
 import {
     bytesToGb,
+    countedPosts,
     countedQuestions,
     countSeats,
     firstDayOf,
@@ -369,6 +371,31 @@ export async function countUsageAcross(
                         where: {
                             organizationId: { in: orgs },
                             ...countedQuestions(new Date(at)),
+                        },
+                        _count: { _all: true },
+                    }),
+                    "organizationId",
+                    out,
+                );
+            }
+            return out;
+        }
+        case "socialPostsPerMonth": {
+            const byStart = await groupByWindow(db, ids, now, (w) => w.start);
+            const out = new Map<string, number>();
+            for (const [at, orgs] of byStart) {
+                const start = new Date(at);
+                tally(
+                    await db.socialPost.groupBy({
+                        by: ["organizationId"],
+                        where: {
+                            organizationId: { in: orgs },
+                            // shortcut: a month from the window's start in UTC;
+                            // exact per business in `countUsage`.
+                            ...countedPosts({
+                                start,
+                                end: addMonthsUtc(start, 1),
+                            }),
                         },
                         _count: { _all: true },
                     }),

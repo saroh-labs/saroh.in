@@ -36,6 +36,8 @@ export const ALERT_EVENTS = [
     // 2026-11-12 #1–3): to whoever may read leads, or messages.
     "enquiry",
     "message",
+    // Saroh Social: a channel to reconnect, a post that didn't go out.
+    "social",
 ] as const;
 export type AlertEvent = (typeof ALERT_EVENTS)[number];
 
@@ -77,7 +79,9 @@ export function defaultOn(event: AlertEvent, channel: AlertChannel): boolean {
             // Someone is waiting for an answer: emailed by default, as
             // before these became rows (UX-042).
             event === "enquiry" ||
-            event === "message"
+            event === "message" ||
+            // Posts are waiting on someone: told once, by email too.
+            event === "social"
         );
     }
     return false;
@@ -106,6 +110,7 @@ export const ALERT_READS: Record<AlertEvent, readonly OrgAction[]> = {
     // read it on its own screen.
     enquiry: ["lead:read"],
     message: ["message:read"],
+    social: ["social:read"],
 };
 
 /**
@@ -127,6 +132,9 @@ export const ALERT_MODULE: Record<AlertEvent, string | null> = {
     // A form and a customer's account write these whichever modules are on.
     enquiry: null,
     message: null,
+    // Not a registry module: the row follows MODULE_SOCIAL
+    // (`notification-preferences.service.ts`).
+    social: null,
 };
 
 /** The inbox notice types each row covers. */
@@ -185,6 +193,7 @@ export const ALERT_NOTIFICATION_TYPES: Record<AlertEvent, readonly string[]> = {
     member: ["member.cancelled", "member.paused", "member.autopay_off"],
     enquiry: ["enquiry.new"],
     message: ["message.new"],
+    social: ["social.attention", "social.failed"],
 };
 
 /**

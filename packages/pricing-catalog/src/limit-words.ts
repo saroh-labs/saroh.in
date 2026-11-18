@@ -161,6 +161,13 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         paused: "You've used all of this period's Ask AI questions. Ready-made questions and drafts you already have still work.",
         monthly: true,
     },
+    // Saroh Social: one post to several channels counts once.
+    socialPostsPerMonth: {
+        what: "posts a month",
+        one: "post a month",
+        paused: "You've used this month's posts. Posts already scheduled still go out.",
+        monthly: true,
+    },
 };
 
 /**

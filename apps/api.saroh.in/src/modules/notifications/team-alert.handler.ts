@@ -29,6 +29,7 @@ import { noticeHeadOf, noticeOf } from "./notice-target";
 import { wordProvider } from "./provider-alerts";
 import { wordRefund } from "./refund-alerts";
 import { wordReview } from "./review-alerts";
+import { wordSocial } from "./social-alerts";
 import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
 import { TEAM_ALERT_TYPE } from "./team-alerts";
 import { putOffUntilDue, wordUncollected } from "./uncollected-alert";
@@ -88,6 +89,7 @@ const ROW_LABEL: Record<AlertEvent, string> = {
     member: "Members",
     enquiry: "New enquiry",
     message: "Customer messages",
+    social: "Saroh Social",
 };
 
 const BUILT_IN_LABEL: Partial<Record<string, string>> = {
@@ -470,6 +472,8 @@ export async function wordAlert(
             return wordUncollected(tx, organizationId, payload, now);
         case "provider":
             return wordProvider(tx, organizationId, payload);
+        case "social":
+            return wordSocial(tx, organizationId, payload);
         case "review":
             return wordReview(tx, organizationId, payload);
         case "domain":
@@ -789,6 +793,13 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
                 : null;
         case "request":
             return str("requestId") ? (p as TeamAlertPayload) : null;
+        case "social":
+            return (p.about === "channel" &&
+                str("channelId") &&
+                str("since")) ||
+                (p.about === "post" && str("postId") && str("at"))
+                ? (p as TeamAlertPayload)
+                : null;
         case "webhook":
             return str("webhookEventId") ? (p as TeamAlertPayload) : null;
         case "member":

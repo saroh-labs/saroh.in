@@ -24,7 +24,8 @@ import { SharePostsService } from "./share-posts.service";
 /**
  * Create post's own posts (#1378): the business's own headline or photo,
  * saved for its share picture. The Social permissions in the service
- * (`social:read`, `social:post`); the module gate is Website for now.
+ * (`social:read`, `social:post`); the module gate is Website, so it
+ * stays free on every plan.
  */
 @Controller("organizations/:organizationId/share-posts")
 @UseGuards(
@@ -33,7 +34,8 @@ import { SharePostsService } from "./share-posts.service";
     OrganizationGuard,
     ModuleEnforcementGuard,
 )
-// Becomes SOCIAL when the Social module exists.
+// Free Share, on every plan: stays under Website. Saroh Social (paid)
+// has its own gate (`social/access/social-access.ts`).
 @RequireModule("WEBSITE")
 export class SharePostsController {
     constructor(private readonly posts: SharePostsService) {}
