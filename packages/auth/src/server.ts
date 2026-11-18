@@ -232,6 +232,17 @@ export interface CreateAuthOptions {
      * provider.
      */
     github?: { clientId: string; clientSecret: string } | null;
+    /**
+     * Where the sign-in rate limit counts, shared by every API replica and
+     * kept across deploys (the host's Redis, 03-M7). Unset: Better Auth's
+     * own memory store, per process.
+     */
+    rateLimitStorage?: {
+        consume: (
+            key: string,
+            rule: { window: number; max: number },
+        ) => Promise<{ allowed: boolean; retryAfter: number | null }>;
+    };
 }
 
 /**
@@ -606,6 +617,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         // `jwt()` (AI apps' sign-in) adds a session-to-JWT `/token`: nothing
         // here hands a session out as a bearer token.
         disabledPaths: ["/token"],
+        ...(opts.rateLimitStorage
+            ? { rateLimit: { customStorage: opts.rateLimitStorage } }
+            : {}),
         trustedOrigins: getTrustedOrigins(),
         database: prismaAdapter(prisma, {
             provider: "postgresql",

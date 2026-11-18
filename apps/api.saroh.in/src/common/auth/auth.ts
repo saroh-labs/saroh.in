@@ -10,6 +10,8 @@ import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-fresh
 import { signedUp } from "../../modules/analytics/product-milestones";
 import { noticeProfilesOfDeletedOwnerInTx } from "../../modules/billing/billing-profile-owner";
 import { oauthGate } from "../../modules/mcp/oauth-gate";
+import { authLimitStorage } from "../../modules/rate-limits/auth-limit-storage";
+import { sharedRedis } from "../../modules/rate-limits/redis-client";
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
@@ -63,6 +65,8 @@ const authServices: Parameters<typeof createAuth>[0] = {
     onServerError: reportAuthServerError,
     // The sign-in rate limit counts the same client the API's `req.ip` does.
     trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
+    // ...and counts it in Redis, across replicas and deploys (03-M7).
+    rateLimitStorage: authLimitStorage(sharedRedis()),
     // Per address too, not only per caller: many callers can't flood one
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
     // A password sign-in mails only an unproven account (03-M9): any other
