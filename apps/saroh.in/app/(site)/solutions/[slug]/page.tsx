@@ -11,7 +11,7 @@ import { isSolutionSlug, solutionHref, solutions } from "@/content/solutions";
 import { SOLUTION_SLUGS } from "@/content/types";
 import { LAUNCH_MODE } from "@/lib/links";
 import { faqWithPlans, freePlanLine } from "@/lib/plan-teasers";
-import { readLivePricing } from "@/lib/pricing";
+import { readLivePricingVersion } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { solutionsHub } from "@/lib/search-pages";
 import { pageMetadata, pageTitle } from "@/lib/seo";
@@ -56,7 +56,8 @@ export default async function SolutionPage({ params }: Props) {
     const s = solutions[slug];
     // Not read before the launch switch opens (DEC-136), as on a feature
     // page: the line under the hero then names no plan's contents.
-    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
+    const read = LAUNCH_MODE === "open" ? await readLivePricingVersion() : null;
+    const catalog = read?.catalog ?? null;
     const faq = faqWithPlans(catalog, solutionFaq(s.faq));
 
     return (
@@ -83,7 +84,7 @@ export default async function SolutionPage({ params }: Props) {
                     title={s.pricing.title}
                     model={
                         catalog
-                            ? pricingPageModel(catalog)
+                            ? pricingPageModel(catalog, read?.offers)
                             : placeholderPricingModel()
                     }
                     src={`solutions-${slug}-pricing`}

@@ -11,6 +11,7 @@ import {
 import type {
     CompareRow,
     PlanCardView,
+    PlanOffer,
     PricingPageModel,
     PricingPlaceholder,
     PricingSite,
@@ -35,6 +36,7 @@ function planViews(
     yearly: boolean,
     withTax: boolean,
     site: PricingSite,
+    offers: readonly PlanOffer[],
 ): PlanCardView[] {
     const { money, tax } = site;
     const taxed = (p: number) => (withTax && tax ? tax.add(p) : p);
@@ -57,6 +59,9 @@ function planViews(
         const trialOn = paid && !year && p.trial?.on === true;
         const first = trialOn ? trialFirstPaise(p) : 0;
         const cl = cardLines(catalog, p.id);
+        const offer = paid
+            ? offers.find((o) => o.planId === p.id && o.discountPaise > 0)
+            : undefined;
         return {
             id: p.id,
             name: p.name,
@@ -73,14 +78,47 @@ function planViews(
                 cycle: year ? "year" : "month",
             },
             lead: cl.lead,
-            trial: !trialOn
-                ? ""
-                : first > 0
-                  ? `First month ${money(taxed(first))}${after ?? ""}`
-                  : `Try it free for ${p.trial?.days} days`,
+            trial: offer
+                ? offerLine(offer, year ? charge : null, taxed, money, after)
+                : !trialOn
+                  ? ""
+                  : first > 0
+                    ? `First month ${money(taxed(first))}${after ?? ""}`
+                    : `Try it free for ${p.trial?.days} days`,
             lines: cl.lines,
         };
     });
+}
+
+/**
+ * A plan's automatic discount in words, as checkout takes it off: each
+ * month's charge for its months, or that many months' worth off the first
+ * yearly charge (`yearCharge`, taxed as shown), never more than it. A
+ * percent says its percent on a month; on a year, the amount, since
+ * checkout takes a percent of the monthly price, not of the year's.
+ */
+function offerLine(
+    offer: PlanOffer,
+    yearCharge: number | null,
+    taxed: (p: number) => number,
+    money: (minor: number) => string,
+    after = "",
+): string {
+    if (yearCharge !== null) {
+        const off = Math.min(
+            taxed(offer.discountPaise * offer.months),
+            yearCharge,
+        );
+        return `${money(off)}${after} off your first year`;
+    }
+    if (offer.percentOff) {
+        const first = offer.months === 1 ? "month" : `${offer.months} months`;
+        return `${offer.percentOff}% off your first ${first}`;
+    }
+    const each = `${money(taxed(offer.discountPaise))}${after}`;
+    return offer.months === 1
+        ? `${each} off your first month`
+        : `${each} off a month for your first ${offer.months} months`;
 }
 
 function compareRows(catalog: Catalog): CompareRow[] {
@@ -157,6 +195,8 @@ export function pricingPageModel(
     site: PricingSite,
     /** The release switches that are off: their rows aren't drawn. */
     off: readonly string[] = [],
+    /** Each plan's automatic discount (`GET /public/pricing`). */
+    offers: readonly PlanOffer[] = [],
 ): PricingPageModel {
     const catalog = withoutSwitchedOff(whole, off);
     const yearlyOn = catalog.yearly.on;
@@ -165,7 +205,7 @@ export function pricingPageModel(
         for (const withTax of [false, true]) {
             const y = yearly && yearlyOn;
             views[viewKey(yearly, withTax)] = {
-                plans: planViews(catalog, y, withTax, site),
+                plans: planViews(catalog, y, withTax, site, offers),
                 usage: usageView(catalog, withTax, site),
                 footnote: footnote(catalog, y, withTax, site),
             };

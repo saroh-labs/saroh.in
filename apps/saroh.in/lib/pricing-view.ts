@@ -7,6 +7,7 @@ import {
 } from "@saroh/pricing-catalog";
 
 import type {
+    PlanOffer,
     PricingPageModel,
     PricingSite,
 } from "@saroh/marketing/pricing-model";
@@ -53,9 +54,11 @@ export const PRICING_SITE: PricingSite = {
 /** The pricing page for a catalogue, in this site's money and words. */
 export function pricingPageModel(
     catalog: Catalog,
+    /** Each plan's automatic discount (`PricingRead.offers`). */
+    offers: readonly PlanOffer[] = [],
     off: readonly string[] = featuresOff(),
 ): PricingPageModel {
-    return pageModel(catalog, PRICING_SITE, off);
+    return pageModel(catalog, PRICING_SITE, off, offers);
 }
 
 /**

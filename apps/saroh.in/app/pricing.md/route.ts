@@ -1,5 +1,5 @@
 import { LAUNCH_MODE } from "@/lib/links";
-import { readLivePricing } from "@/lib/pricing";
+import { readLivePricingVersion } from "@/lib/pricing";
 import { pricingMarkdown } from "@/lib/pricing-md";
 import { SITE_URL } from "@/lib/seo";
 
@@ -12,8 +12,11 @@ import { SITE_URL } from "@/lib/seo";
 export const dynamic = "force-static";
 
 export async function GET(): Promise<Response> {
-    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
-    return new Response(pricingMarkdown(SITE_URL, catalog), {
-        headers: { "Content-Type": "text/markdown; charset=utf-8" },
-    });
+    const read = LAUNCH_MODE === "open" ? await readLivePricingVersion() : null;
+    return new Response(
+        pricingMarkdown(SITE_URL, read?.catalog ?? null, read?.offers),
+        {
+            headers: { "Content-Type": "text/markdown; charset=utf-8" },
+        },
+    );
 }

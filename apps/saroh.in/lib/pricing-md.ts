@@ -2,7 +2,7 @@ import type { Catalog } from "@saroh/pricing-catalog";
 
 import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
 
-import type { PlanCardView } from "@saroh/marketing/pricing-model";
+import type { PlanCardView, PlanOffer } from "@saroh/marketing/pricing-model";
 import { NOT_INCLUDED } from "@saroh/marketing/pricing-model";
 
 import { pricingPageModel } from "./pricing-view";
@@ -27,7 +27,11 @@ export const cell = (t: string) =>
 const priceLine = (p: PlanCardView) => `**${p.price}** ${p.per} (${p.sub})`;
 
 /** The file's text, its links absolute on `base` (`SITE_URL`). */
-export function pricingMarkdown(base: string, catalog: Catalog | null): string {
+export function pricingMarkdown(
+    base: string,
+    catalog: Catalog | null,
+    offers: readonly PlanOffer[] = [],
+): string {
     const out: string[] = [
         "# Saroh pricing",
         "",
@@ -41,7 +45,7 @@ export function pricingMarkdown(base: string, catalog: Catalog | null): string {
         return `${out.join("\n")}\n`;
     }
 
-    const model = pricingPageModel(catalog);
+    const model = pricingPageModel(catalog, offers);
     const monthly = model.views["month-excl"];
     const yearly = model.yearly ? model.views["year-excl"] : null;
     out.push(

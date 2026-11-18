@@ -113,3 +113,78 @@ describe("placeholderPricingModel", () => {
         expect(JSON.stringify(model)).not.toMatch(/\d/);
     });
 });
+
+describe("pricingPageModel with an automatic discount", () => {
+    const TAXED: PricingSite = {
+        ...NO_TAX,
+        tax: {
+            add: (m) => m * 2,
+            subExcl: "",
+            subIncl: "",
+            afterExcl: " + T",
+            afterIncl: " incl. T",
+            footnoteExcl: "",
+            footnoteIncl: "",
+            noteExcl: "",
+            noteIncl: "",
+        },
+    };
+    const offers = [{ planId: "b", discountPaise: 300, months: 3 }];
+
+    it("says each month's discount and its months in place of the trial, taxed as the view is", () => {
+        const c = catalog();
+        c.plans[1].trial = { on: true, days: 30, firstPaise: 700 };
+        const model = pricingPageModel(c, TAXED, [], offers);
+        expect(model.views["month-excl"].plans[1].trial).toBe(
+            "XX300 + T off a month for your first 3 months",
+        );
+        expect(model.views["month-incl"].plans[1].trial).toBe(
+            "XX600 incl. T off a month for your first 3 months",
+        );
+        // Yearly: the months' worth off the one charge.
+        expect(model.views["year-excl"].plans[1].trial).toBe(
+            "XX900 + T off your first year",
+        );
+        // A free plan never carries one.
+        expect(model.views["month-excl"].plans[0].trial).toBe("");
+    });
+
+    it("one month reads as the first month; no offer keeps the plain card", () => {
+        const one = pricingPageModel(
+            catalog(),
+            NO_TAX,
+            [],
+            [{ planId: "b", discountPaise: 300, months: 1 }],
+        );
+        expect(one.views["month-excl"].plans[1].trial).toBe(
+            "XX300 off your first month",
+        );
+        const none = pricingPageModel(catalog(), NO_TAX);
+        expect(none.views["month-excl"].plans[1].trial).toBe("");
+    });
+
+    it("a percent says its percent on a month, with or without tax; on a year, the amount checkout takes", () => {
+        const pct = [
+            { planId: "b", discountPaise: 300, months: 3, percentOff: 7 },
+        ];
+        const model = pricingPageModel(catalog(), TAXED, [], pct);
+        expect(model.views["month-excl"].plans[1].trial).toBe(
+            "7% off your first 3 months",
+        );
+        expect(model.views["month-incl"].plans[1].trial).toBe(
+            "7% off your first 3 months",
+        );
+        expect(model.views["year-excl"].plans[1].trial).toBe(
+            "XX900 + T off your first year",
+        );
+        const one = pricingPageModel(
+            catalog(),
+            NO_TAX,
+            [],
+            [{ ...pct[0], months: 1 }],
+        );
+        expect(one.views["month-excl"].plans[1].trial).toBe(
+            "7% off your first month",
+        );
+    });
+});
