@@ -4,7 +4,7 @@ import { isRlsTestMode } from "../../../test/rls-mode";
 
 /**
  * Row-level security on the Google Calendar tables (#1047, migration
- * `20270217120000_google_calendar`), over a NOBYPASSRLS role: one business
+ * `20270218120000_google_calendar`), over a NOBYPASSRLS role: one business
  * reads none of another's connections, chosen calendars, events or busy
  * times. And the keys the model leans on: one connection per person per
  * business, one calendar to write to per connection.
