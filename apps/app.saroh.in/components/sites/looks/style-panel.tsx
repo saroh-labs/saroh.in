@@ -17,6 +17,7 @@ import { BrandInline } from "./brand-picker";
 import type { ColourPart } from "./brand-sheet-parts";
 import { PhoneColours, ResetStyle, useSavedNow } from "./brand-sheet-parts";
 import { Chip, ColourRow, SwatchGrid, unreadableWords } from "./colour-picker";
+import { ComponentStyleList, ComponentStylesRow } from "./component-styles";
 import type { LookChoices } from "./look-picker";
 import { lookChoices, lookName, LookPicker } from "./look-picker";
 import { PaidRefusal } from "./paid-refusal";
@@ -120,7 +121,7 @@ export function StylePanel({
     /** The page's hero draws in the text colour: the Hero row moves nothing. */
     heroInText?: boolean;
     /**
-     * The phone's Brand sheet (DEC-185): Template · Look · Type · Colour · Spacing as
+     * The phone's Brand sheet (DEC-185): Template · Look · Type · Colour · Components · Spacing as
      * tabs, each showing its options; Saved and Reset are in the sheet's
      * head (`BrandSheetActions`).
      */
@@ -232,7 +233,7 @@ export function StylePanel({
 
     const savedNow = useSavedNow(saving, dirty);
     const [tab, setTab] = useState<
-        "template" | "look" | "type" | "colour" | "spacing"
+        "template" | "look" | "type" | "colour" | "components" | "spacing"
     >("look");
 
     /*
@@ -398,12 +399,13 @@ export function StylePanel({
                 {...looks}
                 rules={rules}
                 refused={refusedOf("look")}
-                onChoose={(look: LookId | null) => {
+                onChoose={(look: LookId | null, keepComponents?: boolean) => {
                     if (look && !allowed("look", look, lookName(look))) {
                         return;
                     }
                     if (!look) setRefused(null);
-                    looks.onChoose(look);
+                    if (keepComponents === false) looks.onChoose(look, false);
+                    else looks.onChoose(look);
                 }}
             />
         ) : null;
@@ -485,6 +487,7 @@ export function StylePanel({
             ...(lookPart ? [{ key: "look" as const, label: "Look" }] : []),
             ...(typePart ? [{ key: "type" as const, label: "Type" }] : []),
             { key: "colour" as const, label: "Colour" },
+            { key: "components" as const, label: "Components" },
             { key: "spacing" as const, label: "Spacing" },
         ];
         const shown = tabs.some((t) => t.key === tab) ? tab : tabs[0].key;
@@ -511,6 +514,12 @@ export function StylePanel({
                                 {paletteLine}
                                 <PhoneColours parts={parts} />
                             </>
+                        ) : null}
+                        {shown === "components" ? (
+                            <ComponentStyleList
+                                style={style}
+                                onChange={onChange}
+                            />
                         ) : null}
                         {shown === "spacing" ? spacingPart : null}
                     </div>
@@ -554,6 +563,7 @@ export function StylePanel({
                         </div>
                     ))}
                 </section>
+                <ComponentStylesRow style={style} onChange={onChange} />
                 {spacingPart}
             </div>
 

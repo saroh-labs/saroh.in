@@ -370,3 +370,61 @@ describe("a look (DEC-172)", () => {
         expect(quiet["--site-radius"]).toBe(classic["--site-radius"]);
     });
 });
+
+describe("component styles (DEC-227, KD1)", () => {
+    function refusal(style: unknown): unknown {
+        try {
+            parseSiteStyle(style);
+        } catch (e) {
+            expect(e).toBeInstanceOf(BadRequestException);
+            return (e as BadRequestException).getResponse();
+        }
+        throw new Error("expected a refusal");
+    }
+
+    it("keeps listed choices, even one equal to the look's default", () => {
+        // Classic's cards are Bordered: the key stays so the choice survives
+        // Classic → Quiet → Classic.
+        expect(
+            parseSiteStyle({
+                components: { cards: "bordered", buttons: "pill" },
+            }).components,
+        ).toEqual({ cards: "bordered", buttons: "pill" });
+        expect(
+            parseSiteStyle({ look: "quiet", components: { cards: "flat" } })
+                .components,
+        ).toEqual({ cards: "flat" });
+    });
+
+    it("reads an empty object, null or absent as no choices, writing nothing", () => {
+        for (const components of [{}, null, undefined]) {
+            expect(parseSiteStyle({ components })).not.toHaveProperty(
+                "components",
+            );
+        }
+        expect(parseSiteStyle({ components: {} })).toEqual(defaultSiteStyle());
+    });
+
+    it("refuses an unknown option, naming the field", () => {
+        expect(refusal({ components: { buttons: "wobbly" } })).toMatchObject({
+            details: { field: "components.buttons" },
+        });
+        expect(refusal({ components: { images: 3 } })).toMatchObject({
+            details: { field: "components.images" },
+        });
+    });
+
+    it("refuses an unknown component, naming it", () => {
+        expect(refusal({ components: { shadows: "deep" } })).toMatchObject({
+            details: { field: "components.shadows" },
+        });
+    });
+
+    it("refuses components that are not an object", () => {
+        for (const components of ["pill", ["pill"], 1]) {
+            expect(refusal({ components })).toMatchObject({
+                details: { field: "components" },
+            });
+        }
+    });
+});

@@ -123,10 +123,19 @@ export function useEditorStyle({
         return () => clearTimeout(id);
     }, [style, savedStyleJson, savedLook, siteId, styleSaving, onSaved]);
 
-    /** Choose a look, or Classic for null (U16): a draft change. */
-    function chooseLook(look: LookId | null) {
+    /**
+     * Choose a look, or Classic for null (U16): a draft change. The
+     * component choices go with it unless the owner asked for the new
+     * look's own ("Use <look>'s styles", DEC-227 KD3).
+     */
+    function chooseLook(look: LookId | null, keepComponents = true) {
         setLookError(null);
-        setStyle((now) => inLook(now, look));
+        setStyle((now) => {
+            const next = inLook(now, look);
+            if (keepComponents) return next;
+            const { components: _dropped, ...rest } = next;
+            return rest;
+        });
     }
 
     function resetStyle() {
@@ -140,8 +149,11 @@ export function useEditorStyle({
         // Reset is colours, type and spacing: the look stays as chosen
         // (U16), since Classic is its own choice in the Look row.
         const look = style.look ?? null;
+        // Component choices have their own "Reset to <look>" (DEC-227).
+        const keep = (next: SiteStyle): SiteStyle =>
+            style.components ? { ...next, components: style.components } : next;
         if (start) {
-            setStyle(inLook(start.style, look));
+            setStyle(keep(inLook(start.style, look)));
             return;
         }
         const defaults: SiteStyle = {
@@ -152,7 +164,7 @@ export function useEditorStyle({
                 styleOptions.scalars.map((sc) => [sc.key, sc.default]),
             ),
         };
-        setStyle(inLook(defaults, look));
+        setStyle(keep(inLook(defaults, look)));
     }
 
     // The style the server holds: its own choices stay open to the site

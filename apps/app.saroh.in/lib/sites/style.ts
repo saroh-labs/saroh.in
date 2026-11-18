@@ -8,8 +8,17 @@
  * use it.
  */
 
-import type { LookId, SitePalette, SiteTypeScale } from "@saroh/block-contract";
+import type {
+    ComponentKind,
+    ComponentStyles,
+    LookId,
+    SitePalette,
+    SiteTypeScale,
+} from "@saroh/block-contract";
 import {
+    COMPONENT_KINDS,
+    componentDefaults,
+    componentStyleVariables,
     fontPairVariables,
     paletteVariables,
     typeScaleVariables,
@@ -82,6 +91,12 @@ export interface SiteStyle {
      * and Classic is saved by leaving it out, as the API keeps it.
      */
     look?: LookId;
+    /**
+     * Component styles (DEC-227, KD1): only the components the owner
+     * changed. Absent until they change one; a key equal to the look's
+     * default is kept, and only "Reset to <look>" removes the object.
+     */
+    components?: ComponentStyles;
 }
 
 /**
@@ -92,6 +107,28 @@ export interface SiteStyle {
 export function inLook(style: SiteStyle, look: LookId | null): SiteStyle {
     const { look: _previous, ...rest } = style;
     return look ? { ...rest, look } : rest;
+}
+
+/**
+ * The components whose choice differs from the look's own (DEC-227): what
+ * "N changed" counts. A key equal to the look's default is kept (KD1) but
+ * is not a change.
+ */
+export function changedComponents(style: SiteStyle): ComponentKind[] {
+    const defaults = componentDefaults(style.look);
+    return COMPONENT_KINDS.filter((kind) => {
+        const value = style.components?.[kind];
+        return value !== undefined && value !== defaults[kind];
+    });
+}
+
+/** The style with these component choices; none leaves the key out. */
+export function withComponents(
+    style: SiteStyle,
+    components: ComponentStyles,
+): SiteStyle {
+    const { components: _previous, ...rest } = style;
+    return Object.keys(components).length > 0 ? { ...rest, components } : rest;
 }
 
 /**
@@ -266,6 +303,8 @@ export function resolveStyleVariables(
     // one rule, as the API's resolver applies them.
     if (style.palette) Object.assign(vars, paletteVariables(style.palette));
     Object.assign(vars, typeScaleVariables(style.type));
+    // Component choices, by word (DEC-227), as the API's resolver emits them.
+    Object.assign(vars, componentStyleVariables(style.components));
     // A look draws in safe colours, by the contract's one rule, as
     // publishing does (DEC-172, KD4). Classic's variables are unchanged.
     return withLookColours(style, vars);

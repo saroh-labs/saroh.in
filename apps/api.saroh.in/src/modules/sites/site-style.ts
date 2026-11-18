@@ -1,4 +1,10 @@
 import { BadRequestException } from "@nestjs/common";
+import type { ComponentStyles } from "@saroh/block-contract";
+import {
+    COMPONENT_KINDS,
+    COMPONENT_LABELS,
+    isComponentOption,
+} from "@saroh/block-contract";
 import type { SiteStyle, StyleRow, StyleScalar } from "@saroh/templates";
 import {
     DEFAULT_FONT_PAIR,
@@ -65,6 +71,7 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         palette?: unknown;
         type?: unknown;
         look?: unknown;
+        components?: unknown;
     };
 
     if (raw.colours !== undefined) {
@@ -150,7 +157,47 @@ export function parseSiteStyle(input: unknown): SiteStyle {
     }
     if (look.look) base.look = look.look;
 
+    const components = parseComponents(raw.components);
+    if (components) base.components = components;
+
     return base;
+}
+
+/**
+ * Component styles (DEC-227, KD1): refused, not coerced, like a look. A
+ * key equal to the look's default is KEPT (the choice survives a look
+ * switch); an empty object or null is "no choices", stored as absent.
+ */
+function parseComponents(input: unknown): ComponentStyles | undefined {
+    if (input === undefined || input === null) return undefined;
+    if (typeof input !== "object" || Array.isArray(input)) {
+        throw new BadRequestException({
+            message: "style.components must be an object",
+            details: { field: "components" },
+        });
+    }
+    const raw = input as Record<string, unknown>;
+    for (const key of Object.keys(raw)) {
+        if (!(COMPONENT_KINDS as string[]).includes(key)) {
+            throw new BadRequestException({
+                message: `"${key}" is not a component you can style`,
+                details: { field: `components.${key}` },
+            });
+        }
+    }
+    const out: Record<string, string> = {};
+    for (const kind of COMPONENT_KINDS) {
+        const value = raw[kind];
+        if (value === undefined) continue;
+        if (!isComponentOption(kind, value)) {
+            throw new BadRequestException({
+                message: `Choose one of the ${COMPONENT_LABELS[kind]} options`,
+                details: { field: `components.${kind}` },
+            });
+        }
+        out[kind] = value;
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**

@@ -229,3 +229,45 @@ describe("choosing a look", () => {
         expect(seen.current?.style.look).toBe("quiet");
     });
 });
+
+describe("component styles and the look (DEC-227)", () => {
+    const customised: SiteStyle = {
+        ...classic,
+        look: "folio",
+        components: { buttons: "rounded" },
+    };
+
+    it("keeps the choices through a look switch, and through Reset style", () => {
+        render(customised);
+        act(() => seen.current?.chooseLook("live"));
+        expect(seen.current?.style).toMatchObject({
+            look: "live",
+            components: { buttons: "rounded" },
+        });
+        act(() => seen.current?.resetStyle());
+        expect(seen.current?.style.components).toEqual({ buttons: "rounded" });
+    });
+
+    it("drops them for the new look's own", () => {
+        render(customised);
+        act(() => seen.current?.chooseLook("quiet", false));
+        expect(seen.current?.style.look).toBe("quiet");
+        expect(seen.current?.style).not.toHaveProperty("components");
+    });
+
+    it("saves a choice to the draft", async () => {
+        updateSiteStyle.mockResolvedValue({ ok: true, data: { id: "site-1" } });
+        render();
+        act(() =>
+            seen.current?.setStyle({
+                ...classic,
+                components: { cards: "flat" },
+            }),
+        );
+        await settle();
+        expect(updateSiteStyle).toHaveBeenCalledWith(
+            "site-1",
+            expect.objectContaining({ components: { cards: "flat" } }),
+        );
+    });
+});

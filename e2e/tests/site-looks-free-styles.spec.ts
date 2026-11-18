@@ -24,7 +24,9 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  *   is saved, and the API refuses the same save;
  * - a typeface the catalogue doesn't make free is refused the same way;
  * - with `themes` granted to Northwind (a module override, as staff give
- *   it on its admin page, ended after), Quiet is taken and saved.
+ *   it on its admin page, ended after), Quiet is taken and saved;
+ * - component styles (DEC-227) are free on every plan: Cards → Flat saves
+ *   on a plan without `themes`, with no refusal.
  *
  * Which styles are free is the live catalogue's (`freeStyles`), and
  * whether the plan opens the rest is Northwind's plan: the spec reads both
@@ -36,7 +38,11 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  */
 
 interface SiteView {
-    style: { look?: string; fontPair?: string };
+    style: {
+        look?: string;
+        fontPair?: string;
+        components?: Record<string, string>;
+    };
     styleOptions: { fontPairs?: { key: string; name: string }[] };
     styleAccess?: {
         free: { looks: string[]; fontPairs: string[] };
@@ -275,6 +281,51 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
                 .toBe("quiet");
         } finally {
             await themes.restore();
+            await enforced.restore();
+            await look.restore();
+        }
+    });
+
+    test("saves a component style on any plan (DEC-227)", async ({
+        browser,
+        page,
+    }, testInfo) => {
+        test.setTimeout(150_000);
+        const phone = testInfo.project.name.startsWith("phone");
+        const look = await setNorthwindLook(browser, null, testInfo);
+        const enforced = await overrideNorthwindFlag(
+            browser,
+            "PLAN_ENFORCEMENT",
+            testInfo,
+        );
+        try {
+            await openEditor(page, look.siteId, phone);
+            if (phone) {
+                await page.getByRole("tab", { name: "Components" }).click();
+            } else {
+                await page.locator("[data-components-open]").click();
+            }
+            const cards = page.locator('[data-component-row="cards"]');
+            await expect(cards).toContainText("Cards");
+            await cards.locator('[data-component-option="flat"]').click();
+            await expect(
+                cards.locator('[data-component-option="flat"]'),
+            ).toHaveAttribute("aria-checked", "true");
+            await expect(cards).toContainText("Changed from Classic");
+            await expect(page.locator("[data-paid-refusal]")).toHaveCount(0);
+            await page.clock.runFor(1_000);
+            await expect
+                .poll(
+                    async () =>
+                        (
+                            await look.owner.get<SiteView>(
+                                `/sites/${look.siteId}`,
+                            )
+                        ).style.components,
+                    { timeout: 15_000 },
+                )
+                .toEqual({ cards: "flat" });
+        } finally {
             await enforced.restore();
             await look.restore();
         }

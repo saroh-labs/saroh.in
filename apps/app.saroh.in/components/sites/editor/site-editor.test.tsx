@@ -1857,7 +1857,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
             ) ?? [],
         ).map((t) => t.textContent);
         // No look to offer here, so no Look tab.
-        expect(tabs).toEqual(["Type", "Colour", "Spacing"]);
+        expect(tabs).toEqual(["Type", "Colour", "Components", "Spacing"]);
         // Type: each face itself, a tap is the choice; no search on a phone.
         expect(sheet()?.textContent).toContain("Newsreader");
         expect(

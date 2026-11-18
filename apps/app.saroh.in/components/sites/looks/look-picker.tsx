@@ -4,6 +4,7 @@ import type { LookId } from "@saroh/block-contract";
 import { LOOKS, lookSuggestion } from "@saroh/block-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
+import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { cn } from "@saroh/ui/lib/utils";
 import { showSuccess } from "@saroh/ui/toast";
 import { ChevronDown, Eye } from "lucide-react";
@@ -12,9 +13,10 @@ import { useContext, useId, useRef, useState } from "react";
 
 import { lookThumbnail } from "@/lib/sites/look-thumbnails";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
+import { changedComponents } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
 import { ALL_FREE } from "@/lib/sites/style-access";
-import { ChoiceGroup } from "@saroh/ui/choice-group";
+import { ChoiceGroup, RadioCards } from "@saroh/ui/choice-group";
 import {
     BrandInline,
     BrandPicker,
@@ -111,7 +113,12 @@ export interface LookChoices {
     templateId: string | null;
     /** Why the last choice didn't save; the previous look is back. */
     error: string | null;
-    onChoose: (look: LookId | null) => void;
+    /**
+     * `keepComponents` false: the new look's own component styles, the
+     * owner's choices dropped ("Use <look>'s styles", DEC-227). Absent or
+     * true keeps them.
+     */
+    onChoose: (look: LookId | null, keepComponents?: boolean) => void;
     /**
      * Each look's Preview (DEC-177): its showcase template, and its starter
      * content when offered (DEC-182). Absent draws no Preview buttons.
@@ -171,6 +178,9 @@ export function LookPicker({
     // The Preview button that opened it, for the keyboard on the way back.
     const opener = useRef<HTMLElement | null>(null);
     const changeRef = useRef<HTMLButtonElement | null>(null);
+    // A look asked about first: the owner changed components (DEC-227).
+    const [switching, setSwitching] = useState<LookChoice | null>(null);
+    const [keep, setKeep] = useState<"keep" | "use">("keep");
     const draftLook = style.look ?? null;
     const choices = lookChoices({ available, draftLook, liveLook });
     if (choices.length === 0) return null;
@@ -198,14 +208,35 @@ export function LookPicker({
         if (!inSheet) setPicking(false);
     }
 
+    const changed = changedComponents(style).length;
+
     function pick(choice: LookChoice) {
         const look = choice === "classic" ? null : choice;
-        onChoose(look);
+        const refusedHere = look !== null && rules.refuses("look", look);
+        // Components the owner changed: keep them or take the new look's
+        // (SBSwitchLook). A refused look is refused as before.
+        if (changed > 0 && look !== draftLook && !refusedHere) {
+            setPicking(false);
+            setKeep("keep");
+            setSwitching(choice);
+            return;
+        }
+        take(look, true);
+    }
+
+    function take(look: LookId | null, keepComponents: boolean) {
+        if (keepComponents) onChoose(look);
+        else onChoose(look, false);
         // Refused: the gallery stays open, its foot saying why.
         if (look !== null && rules.refuses("look", look)) return;
         setPicking(false);
         if (look !== draftLook) showSuccess(lookTakenWords(lookName(look)));
     }
+
+    const switchName = lookName(
+        switching === null || switching === "classic" ? null : switching,
+    );
+    const changes = `${changed} ${changed === 1 ? "change" : "changes"}`;
 
     const previewButton = (choice: LookChoice, className: string) =>
         preview ? (
@@ -442,6 +473,43 @@ export function LookPicker({
                     {status.text}
                 </p>
             ) : null}
+            <ConfirmDialog
+                open={switching !== null}
+                onOpenChange={(open) => {
+                    if (!open) setSwitching(null);
+                }}
+                tone="neutral"
+                title={`Switch to ${switchName}?`}
+                description={`You changed ${changed} ${changed === 1 ? "component" : "components"} from ${lookName(draftLook)}. ${switchName} brings its own fonts, spacing and shapes. Your colours, logo, pages and words stay yours either way.`}
+                confirmLabel={`Switch to ${switchName}`}
+                keepLabel="Cancel"
+                returnFocusTo={changeRef}
+                onConfirm={() => {
+                    if (switching === null) return;
+                    take(
+                        switching === "classic" ? null : switching,
+                        keep === "keep",
+                    );
+                }}
+            >
+                <RadioCards
+                    label="Component styles"
+                    value={keep}
+                    onChange={setKeep}
+                    options={[
+                        {
+                            value: "keep",
+                            label: `Keep my ${changes}`,
+                            note: `Everything else follows ${switchName}.`,
+                        },
+                        {
+                            value: "use",
+                            label: `Use ${switchName}’s styles`,
+                            note: `${switchName}’s own buttons, cards, headings and spacing.`,
+                        },
+                    ]}
+                />
+            </ConfirmDialog>
             {preview?.starter ? (
                 <DraftTools starter={preview.starter} lookName={lookName} />
             ) : null}

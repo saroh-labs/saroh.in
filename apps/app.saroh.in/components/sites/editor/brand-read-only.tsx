@@ -1,5 +1,6 @@
 "use client";
 
+import { ComponentStyleList } from "@/components/sites/looks/component-styles";
 import { lookName } from "@/components/sites/looks/look-picker";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway } from "@/lib/sites/style";
@@ -103,9 +104,20 @@ export function BrandReadOnly({
                         </dl>
                     </section>
                 ))}
+            <section aria-label="Components">
+                <h3 className="label pb-1">Components</h3>
+                {/* The owner's choices, drawn off (DEC-200, DEC-227). */}
+                <ComponentStyleList
+                    style={style}
+                    onChange={noChange}
+                    disabled
+                />
+            </section>
             <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
                 You can see the look. Owners and admins change it.
             </p>
         </div>
     );
 }
+
+const noChange = () => undefined;

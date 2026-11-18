@@ -264,7 +264,52 @@ describe("StylePanel on a phone", () => {
             host.querySelectorAll<HTMLElement>('[role="tab"]'),
         ).map((t) => t.textContent.trim());
         // No look to offer: no Look tab, and the sheet opens on Template.
-        expect(tabs).toEqual(["Template", "Colour", "Spacing"]);
+        expect(tabs).toEqual(["Template", "Colour", "Components", "Spacing"]);
         expect(host.querySelector("[data-row]")).not.toBeNull();
+    });
+});
+
+describe("Customise components (DEC-227)", () => {
+    it("opens the list from its row on a desk and saves a pick", () => {
+        const onChange = renderPanel({ ...GREEN.style, look: "folio" });
+        const open = host.querySelector<HTMLElement>("[data-components-open]");
+        expect(open?.textContent).toContain(
+            "Folio’s defaults · Free on every plan",
+        );
+        act(() => open?.click());
+        const pick = document.querySelector<HTMLElement>(
+            '[data-brand-picker][data-state="open"] [data-component-row="cards"] [data-component-option="raised"]',
+        );
+        act(() => pick?.click());
+        const next = onChange.mock.calls[0][0] as SiteStyle;
+        expect(next.components).toEqual({ cards: "raised" });
+        expect(next.look).toBe("folio");
+    });
+
+    it("is a tab of its own in a phone's Brand sheet", () => {
+        act(() =>
+            root.render(
+                <StylePanel
+                    style={GREEN.style}
+                    options={options}
+                    onChange={vi.fn()}
+                    onReset={vi.fn()}
+                    saving={false}
+                    phoneTabs
+                />,
+            ),
+        );
+        const tab = Array.from(
+            host.querySelectorAll<HTMLElement>('[role="tab"]'),
+        ).find((t) => t.textContent === "Components");
+        expect(tab).toBeDefined();
+        act(() => {
+            tab?.dispatchEvent(
+                new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+            );
+            tab?.click();
+        });
+        expect(host.querySelector("[data-component-list]")).not.toBeNull();
+        expect(host.querySelector("[data-components-open]")).toBeNull();
     });
 });

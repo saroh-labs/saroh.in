@@ -377,3 +377,59 @@ describe("the preview's colours under a look", () => {
         expect(inLook(styled, "folio")).toEqual({ ...styled, look: "folio" });
     });
 });
+
+describe("switching look after customising components (DEC-227)", () => {
+    const customised: SiteStyle = {
+        ...inLook(classic, "folio"),
+        components: { buttons: "rounded", cards: "raised" },
+    };
+    const dialog = () =>
+        document.querySelector<HTMLElement>('[role="alertdialog"]');
+    const inDialog = (selector: string) =>
+        Array.from(dialog()?.querySelectorAll<HTMLElement>(selector) ?? []);
+    const press = async (words: string) => {
+        const el = inDialog("button").find((b) => b.textContent === words);
+        if (!el) throw new Error(`No "${words}"`);
+        await act(async () => {
+            el.click();
+            await Promise.resolve();
+        });
+    };
+
+    it("asks, Keep my changes chosen first, and keeps them", async () => {
+        const onChoose = renderPicker(customised);
+        const live = choice("live");
+        act(() => live.click());
+        expect(onChoose).not.toHaveBeenCalled();
+        expect(dialog()?.textContent).toContain(
+            "You changed 2 components from Folio.",
+        );
+        const keep = inDialog('[role="radio"]');
+        expect(keep[0]?.getAttribute("aria-checked")).toBe("true");
+        expect(dialog()?.textContent).toContain("Keep my 2 changes");
+        expect(dialog()?.textContent).toContain("Use Live’s styles");
+        await press("Switch to Live");
+        expect(onChoose).toHaveBeenCalledWith("live");
+    });
+
+    it("takes the new look's own with Use <look>'s styles", async () => {
+        const onChoose = renderPicker(customised);
+        const quiet = choice("quiet");
+        act(() => quiet.click());
+        const use = inDialog('[role="radio"]')[1];
+        act(() => use.click());
+        await press("Switch to Quiet");
+        expect(onChoose).toHaveBeenCalledWith("quiet", false);
+    });
+
+    it("asks nothing when no component differs from the look's own", () => {
+        const onChoose = renderPicker({
+            ...inLook(classic, "folio"),
+            components: { buttons: "square" },
+        });
+        const live = choice("live");
+        act(() => live.click());
+        expect(dialog()).toBeNull();
+        expect(onChoose).toHaveBeenCalledWith("live");
+    });
+});
