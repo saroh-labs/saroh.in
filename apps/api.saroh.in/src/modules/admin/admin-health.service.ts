@@ -247,8 +247,8 @@ export class AdminHealthService {
     }
 
     /**
-     * Businesses with no subscription row read as legacy `no-plan`, and plan
-     * rules skip them (#839). Once a version is live, every business that
+     * Businesses with no subscription row read as Free (04-F2), so one
+     * that should be grandfathered meets Free's caps until it is (#839). Once a version is live, every business that
      * joined after the catalogue existed gets its Free row (at sign-up or the
      * go-live job); one that joined before waits for the grandfather step.
      */

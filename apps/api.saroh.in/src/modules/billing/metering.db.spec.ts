@@ -790,10 +790,14 @@ describe("enforcement behind PLAN_ENFORCEMENT (DB, U13)", () => {
         ).resolves.toBeUndefined();
     });
 
-    it("never refuses a business the catalogue doesn't reach yet", async () => {
+    it("holds a business with no plan row to Free's cap, never unlimited (04-F2)", async () => {
         const { orgId } = await business(null);
-        for (let i = 0; i < 4; i++) await product(orgId);
-        await expect(add(orgId, "products")).resolves.toBeNull();
+        for (let i = 0; i < 3; i++) await product(orgId);
+        expect(await refusal(add(orgId, "products"))).toMatchObject({
+            code: "PLAN_LIMIT_REACHED",
+            limit: 3,
+            used: 3,
+        });
     });
 
     it("lets the last one in, then refuses with the catalogue's words", async () => {

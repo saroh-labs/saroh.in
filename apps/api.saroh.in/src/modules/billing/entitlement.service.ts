@@ -32,8 +32,8 @@ export type { LivePlanOverride } from "./catalogue-access.service";
  * U5 — then remove, grant, limit, raise) and its add-ons, turned into one
  * key → value map (`entitlementMapFor`): every catalogue row by id, each
  * row's legacy key, and the keys no row sells (`sites`, `storefronts`,
- * `customDomain`). A business the catalogue doesn't reach yet (no
- * subscription row, no plan override) reads `FREE_ENTITLEMENTS`.
+ * `customDomain`). With no live catalogue version it reads
+ * `FREE_ENTITLEMENTS`; with one, a business with no row reads Free (04-F2).
  *
  * `check` enforces a numeric cap (throws `ForbiddenException` at or over the
  * limit); `can` reflects a boolean (or a row being on). Reads ONLY billing

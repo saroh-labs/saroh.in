@@ -298,12 +298,13 @@ describe("grandfathering (DB, U5)", () => {
             const revoked = await org("Revoked");
             await planOverride(revoked.id, "grow", { revokedAt: new Date() });
 
-            expect(await service.getEntitlements(ended.id)).toEqual(
-                FREE_ENTITLEMENTS,
-            );
-            expect(await service.getEntitlements(revoked.id)).toEqual(
-                FREE_ENTITLEMENTS,
-            );
+            // Back on the catalogue's Free, with no row of its own (04-F2).
+            expect(await service.getEntitlements(ended.id)).toMatchObject({
+                products: 11,
+            });
+            expect(await service.getEntitlements(revoked.id)).toMatchObject({
+                products: 11,
+            });
             expect(await service.livePlanOverride(ended.id)).toBeNull();
         });
 
