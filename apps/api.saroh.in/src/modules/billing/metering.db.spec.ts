@@ -739,6 +739,7 @@ describe("what each limit counts (DB, U13)", () => {
             "storageGb",
             "visitsPerMonth",
             "aiQuestionsPerMonth",
+            "socialPostsPerMonth",
         ];
         for (const key of keys) {
             const across = await countUsageAcross(prisma, key, ids);
@@ -766,6 +767,7 @@ describe("what each limit counts (DB, U13)", () => {
                 "products",
                 "locations",
                 "sites",
+                "social",
                 "storage",
                 "visits",
             ].sort(),

@@ -129,6 +129,8 @@ function build(views: View[], fixture: Fixture = {}) {
         },
         // B9's failed refunds: none.
         paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
+        socialChannel: { findMany: jest.fn().mockResolvedValue([]) },
+        socialPost: { findMany: jest.fn().mockResolvedValue([]) },
         site: {
             count: jest.fn().mockResolvedValue(0),
             findMany: jest.fn().mockResolvedValue([]),

@@ -69,6 +69,7 @@ const SOURCE_ORDER = [
     "PAYMENTS_FAILED_RENEWALS",
     "PAYMENTS_BUSINESS_DETAILS",
     "WEBSITE_NOT_LIVE",
+    "SOCIAL_NEEDS_YOU",
     "COMMUNICATIONS_NO_EMAIL",
     "COMMERCE_LOW_STAR_REVIEWS",
     "COMMUNICATIONS_NO_EMAIL_PLAN",
@@ -280,6 +281,17 @@ const ROWERS: Partial<Record<string, Rower>> = {
         }),
         more: (n) =>
             `${n} more note${n === 1 ? "" : "s"} from the booking page`,
+    },
+    // Saroh Social (U7): a channel to reconnect, a post that didn't go out.
+    SOCIAL_NEEDS_YOU: {
+        rank: () => 1,
+        row: (action, ev) => ({
+            ...fromEvidence(action, ev),
+            title: ev.headline ?? ev.title,
+            sub: ev.detail ?? null,
+            amountIn: null,
+        }),
+        more: (n) => `${n} more in Social`,
     },
     // F2: someone who wrote in and hasn't heard back.
     CRM_UNANSWERED_MESSAGES: {

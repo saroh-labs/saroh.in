@@ -44,6 +44,9 @@ const EXEMPT = [
     "POST public/webhooks/:provider/:organizationId",
     "POST public/webhooks/msg91",
     "POST public/webhooks/meta",
+    // Saroh Social: Meta's deauthorize and data deletion, per login.
+    "POST public/webhooks/meta/deauthorize/:kind",
+    "POST public/webhooks/meta/data-deletion/:kind",
 ];
 
 /** Refused from a test host with 409 TEST_RELEASE. */

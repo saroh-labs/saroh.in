@@ -33,7 +33,8 @@ export type NoticeKind =
     | "products"
     | "customer-request"
     | "member"
-    | "developers";
+    | "developers"
+    | "social";
 
 export interface NoticeTarget {
     kind: NoticeKind;
@@ -93,6 +94,9 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
     member: (id) => (id ? personHref(id, "sub") : "/billing/subscriptions"),
     // A webhook endpoint Saroh switched off after repeated failures (U13).
     developers: () => "/settings/developers/webhooks",
+    // Saroh Social: a channel to reconnect, or a post that didn't go out.
+    social: (_id, type) =>
+        type === "social.attention" ? "/social?tab=channels" : "/social",
 };
 
 function isKind(kind: string): kind is NoticeKind {
@@ -112,6 +116,7 @@ const KIND_OF_PREFIX: Partial<Record<string, NoticeKind>> = {
     plan: "plan",
     catalogue: "products",
     member: "member",
+    social: "social",
 };
 
 /** The kind and record a notification opens, however the API said it. */

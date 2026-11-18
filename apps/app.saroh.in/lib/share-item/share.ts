@@ -43,12 +43,16 @@ export interface ShareItem {
 }
 
 /**
- * The locked Schedule (Saroh Social isn't built, so no business has it):
- * Free is pointed at the plans, Grow at the add-on, with its price only
- * when the catalogue has one.
+ * Saroh Social beside Share: locked (Free is pointed at the plans, Grow at
+ * the add-on, with its price only when the catalogue has one), or `on`,
+ * where Share points at posting it with Saroh Social instead.
  */
 export type ScheduleLock =
-    { tier: "free" } | { tier: "grow"; price: string | null };
+    { tier: "free" } | { tier: "grow"; price: string | null } | { tier: "on" };
+
+/** Create post opened on one item, as Share names it (S9). */
+export const postItHref = (item: Pick<ShareItem, "kind" | "ref">) =>
+    `/social/new?kind=${encodeURIComponent(item.kind)}&ref=${encodeURIComponent(item.ref)}`;
 
 /** The business's live site and its plan, read once on the server. */
 export interface ShareSetup {

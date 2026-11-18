@@ -164,6 +164,9 @@ export const SHARE_WORDS = {
         "Post straight to Instagram, Facebook and Threads, now or later, with Saroh Social.",
     postsItForYou: "Saroh Social posts it for you.",
     scheduleWith: "Schedule with Saroh Social.",
+    postWithSocial:
+        "Saroh can post this to your channels, now or at a good time.",
+    postIt: "Post it with Saroh Social",
     postTo: "Post to",
     sizeAndColours: "Size and colours",
     look: "Look",

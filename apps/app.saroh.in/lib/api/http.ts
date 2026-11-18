@@ -300,6 +300,18 @@ export async function getJson<T>(path: string): Promise<T | null> {
 }
 
 /**
+ * GET one of the API's public answers, asked with no session and no
+ * business (Saroh Social's data deletion status, U8): a 404 is `null`,
+ * any other failure throws to the segment boundary, as {@link getJson}.
+ */
+export async function getPublicJson<T>(path: string): Promise<T | null> {
+    const res = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+    if (res.status === 404) return null;
+    if (!res.ok) throw new ApiError(res.status, `GET ${path}`);
+    return (await res.json()) as T;
+}
+
+/**
  * GET a collection: like {@link getJson} but 404/absent → `[]`. A 5xx or
  * network failure THROWS (never a silent empty list), so an outage renders the
  * error boundary instead of an indistinguishable "no items yet" empty state.

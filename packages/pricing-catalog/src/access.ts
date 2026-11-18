@@ -124,6 +124,39 @@ export function resolveAccess(
           }
         : { ...base, inc: false, off: cell.off };
 
+    const offered = offeredPlans(catalog);
+    const at = offered.findIndex((p) => p.id === planId);
+    const up = offered
+        .slice(Math.max(at + 1, 0))
+        .find((p) => cellOf(mod, p.id).inc);
+    const upCell = up ? cellOf(mod, up.id) : null;
+
+    // The plan it is billed on, where it was bought; not a plan override.
+    const bought = (input.addons ?? [])
+        .map((b) => ({
+            n: Math.max(0, Math.trunc(b.quantity)),
+            a: catalog.addons.find((x) => x.id === b.addonId),
+        }))
+        .filter(
+            (b): b is { n: number; a: NonNullable<typeof b.a> } =>
+                b.n > 0 && !!b.a && addonOfferedOn(b.a, input.planId),
+        );
+
+    // A module add-on first, so staff overrides (a limit, a raise, a
+    // removal) act on what it switched on rather than being undone by it.
+    for (const { a } of bought) {
+        if (a.kind === "module" && a.module === moduleId && !r.inc) {
+            r.inc = true;
+            r.text = "Add-on";
+            // The row as the next plan up has it: an add-on never gives
+            // more than the plan that includes it (Saroh Social's posts a
+            // month). Uncapped there, uncapped here.
+            r.limit = upCell?.inc ? upCell.limit : null;
+            r.per = upCell?.inc ? upCell.per : "";
+            r.override = "Bought as an add-on";
+        }
+    }
+
     for (const o of orderOverrides(overrides, now)) {
         if (moduleOf(o) !== moduleId) continue;
         switch (o.kind) {
@@ -164,20 +197,13 @@ export function resolveAccess(
         }
     }
 
-    for (const bought of input.addons ?? []) {
-        const n = Math.max(0, Math.trunc(bought.quantity));
-        if (!n) continue;
-        const a = catalog.addons.find((x) => x.id === bought.addonId);
-        // The plan it is billed on, where it was bought; not a plan override.
-        if (!a || !addonOfferedOn(a, input.planId)) continue;
-        if (a.kind === "module") {
-            if (a.module === moduleId && !r.inc) {
-                r.inc = true;
-                r.text = "Add-on";
-                r.limit = null;
-                r.override = "Bought as an add-on";
-            }
-        } else if (a.kind === moduleId && r.inc && r.limit !== null) {
+    for (const { a, n } of bought) {
+        if (
+            a.kind !== "module" &&
+            a.kind === moduleId &&
+            r.inc &&
+            r.limit !== null
+        ) {
             r.limit += n * (a.mode === "unit" ? 1 : a.qty);
             r.override = r.override || "Raised by an add-on";
         }
@@ -185,16 +211,10 @@ export function resolveAccess(
 
     r.state = r.inc ? "on" : r.off;
 
-    const offered = offeredPlans(catalog);
-    const at = offered.findIndex((p) => p.id === planId);
-    const up = offered
-        .slice(Math.max(at + 1, 0))
-        .find((p) => cellOf(mod, p.id).inc);
-    if (up) {
+    if (up && upCell) {
         r.upgradeTo = up.name;
         r.upgradePlanId = up.id;
         r.upgradePricePaise = up.pricePaise;
-        const upCell = cellOf(mod, up.id);
         r.upgradeUncapped = upCell.inc && upCell.limit === null;
     }
     return r;

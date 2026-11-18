@@ -35,7 +35,8 @@ import { SharePostsSwitchGuard } from "./share-posts-switch";
     OrganizationGuard,
     ModuleEnforcementGuard,
 )
-// Becomes SOCIAL when the Social module exists.
+// Free Share, on every plan: stays under Website. Saroh Social (paid)
+// has its own gate (`social/access/social-access.ts`).
 @RequireModule("WEBSITE")
 export class ShareCardsController {
     constructor(private readonly share: PublicShareService) {}

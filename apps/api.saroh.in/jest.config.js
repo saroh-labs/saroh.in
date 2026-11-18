@@ -51,6 +51,10 @@ module.exports = {
         // Internal control plane: fixed staff permissions, admin read models,
         // and services with mocked Prisma. Never touch a DB.
         "<rootDir>/src/modules/admin/**/*.spec.ts",
+        // Saroh Social: access, Meta's clients and fake, captions, the
+        // connect state and sealing, pure or with a mocked Prisma. The rows
+        // are in its *.db.spec.ts (integration).
+        "<rootDir>/src/modules/social/**/*.spec.ts",
         // Saroh's own leads (U20): the rules, pure. The rows are in
         // saroh-leads.db.spec.ts (integration).
         "<rootDir>/src/modules/saroh-leads/**/*.spec.ts",

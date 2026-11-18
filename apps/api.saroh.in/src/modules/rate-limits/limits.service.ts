@@ -47,7 +47,13 @@ export class LimitsService implements OnModuleDestroy {
 
     async take(
         // `webhook-test` / `webhook-resend`: "Send a test" and Resend, per webhook address.
-        scope: LimitScope | "webhook-test" | "webhook-resend",
+        // `social-member` / `social-business`: Saroh Social's writes, per person and per business.
+        scope:
+            | LimitScope
+            | "webhook-test"
+            | "webhook-resend"
+            | "social-member"
+            | "social-business",
         id: string,
         cap: number,
         now: number = Date.now(),

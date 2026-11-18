@@ -4,6 +4,7 @@ import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { deleteOldContactMessages } from "../contact-messages/contact-retention";
+import { deleteExpiredSocialChoices } from "../social/channels/choice-retention";
 import {
     LINK_PREVIEW_SOURCE,
     QR_MAKER_SOURCE,
@@ -65,6 +66,19 @@ export class WaitlistRetentionHandler {
         } catch (error) {
             this.logger.error(
                 `Contact message retention failed: ${String(error)}`,
+            );
+        }
+        try {
+            // Saroh Social's Page choices past their 10 minutes (S-09).
+            const choices = await deleteExpiredSocialChoices(now);
+            if (choices > 0) {
+                this.logger.log(
+                    `social: expired page choices deleted ${choices}`,
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `Social page choice retention failed: ${String(error)}`,
             );
         }
         const next = new Date(Date.now() + WAITLIST_RETENTION_EVERY_MS);

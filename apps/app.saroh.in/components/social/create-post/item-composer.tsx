@@ -2,9 +2,11 @@
 
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
+import { TextLink } from "@saroh/ui/text-link";
 import { ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import {
     LookDots,
     PictureFailed,
@@ -30,13 +32,31 @@ import {
     ShareExtras,
     useShareState,
 } from "@/components/shared/share-item/use-share-state";
+import {
+    PreviewOn,
+    previewTail,
+    SocialPostPanel,
+} from "@/components/social/saroh/composer/social-post-panel";
 import type { ShareSetup } from "@/lib/share-item/share";
 import { cardImageUrl, firstStyle, markColour } from "@/lib/share-item/share";
 import { SHARE_WORDS } from "@/lib/share-item/words";
 import type { PickRow } from "@/lib/social/pick";
+import type { ChannelKind } from "@/lib/social/saroh-social-types";
+import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
+import type { SocialCompose } from "@/lib/social/use-social-post";
+import { NO_SOCIAL, useSocialPost } from "@/lib/social/use-social-post";
 import { POST_WORDS } from "@/lib/social/words";
 
 const CARD = "rounded-xl border border-border bg-card px-4 py-3.5";
+
+/** An item's live address, as the path its post links to. */
+const pathOf = (url: string) => {
+    try {
+        return new URL(url).pathname || "/";
+    } catch {
+        return "/";
+    }
+};
 
 /**
  * A post about one live thing, finished (boards BPost*, BCaption*,
@@ -44,6 +64,10 @@ const CARD = "rounded-xl border border-border bg-card px-4 py-3.5";
  * Try another look, the caption folded to one line with Edit, and the
  * channels Saroh Social will add, locked. After a share, Ready for
  * Instagram. Keyed by the row at the caller.
+ *
+ * With Saroh Social on (`social`, board BSocialDesk): Post to and When in
+ * place of Ready to share, the preview per channel, and "Or share it
+ * yourself" back to Ready to share.
  */
 export function ItemComposer({
     row,
@@ -53,6 +77,7 @@ export function ItemComposer({
     onChange,
     onAnother,
     onDone,
+    social = null,
 }: {
     row: PickRow & { item: NonNullable<PickRow["item"]> };
     setup: ShareSetup;
@@ -62,9 +87,34 @@ export function ItemComposer({
     onAnother: () => void;
     /** Whether the page shows Ready for Instagram, for its header. */
     onDone?: (done: boolean) => void;
+    /** Saroh Social, when it is on for the business. */
+    social?: SocialCompose | null;
 }) {
     const { item } = row;
     const share = useShareState(item, setup, narrow);
+    const zone = useBusinessZone();
+    // "Or share it yourself": Ready to share, as without Saroh Social.
+    const [manual, setManual] = useState(false);
+    const posting = social !== null && !manual;
+    const sp = useSocialPost({
+        social: social ?? NO_SOCIAL,
+        base: () => ({
+            sourceKind: item.kind,
+            sourceRef: item.ref,
+            title: row.name,
+            picture: "card",
+            cardStyle: share.style,
+            size: share.size === "square" ? "square" : "post",
+            ...(item.kind === "book" ? { headline: share.headline } : {}),
+            caption: share.text,
+            linkPath: pathOf(item.url),
+        }),
+        text: share.text,
+        link: item.url,
+        zone,
+    });
+    const [view, setView] = useState<ChannelKind>("INSTAGRAM");
+    const shownOn = sp.on.includes(view) ? view : (sp.on[0] ?? "INSTAGRAM");
     const [editing, setEditing] = useState(false);
     const [look, setLook] = useState(false);
     const [done, setDoneState] = useState<Shared | null>(null);
@@ -135,12 +185,22 @@ export function ItemComposer({
         <InstaFrame
             business={business}
             colour={colour}
-            words={share.text}
+            words={posting ? (sp.captions[shownOn] ?? share.text) : share.text}
+            tail={posting ? previewTail(shownOn, item.url) : undefined}
             clamp={narrow}
             picture={picture}
             className="w-full max-w-[400px]"
         />
     );
+    const panel = social ? (
+        <SocialPostPanel
+            social={social}
+            post={sp}
+            text={share.text}
+            storySize={share.size === "story"}
+            onShareYourself={() => setManual(true)}
+        />
+    ) : null;
 
     if (narrow) {
         return (
@@ -191,18 +251,34 @@ export function ItemComposer({
                         </div>
                     ) : null}
                 </div>
-                <PhoneFoot>
-                    <div className="flex items-center gap-2">
-                        <ShareNowButton {...share.parts} onShared={setDone} />
-                        <DownloadIconButton
-                            image={share.image}
-                            fileName={share.parts.fileName}
+                {posting ? (
+                    <>
+                        <PreviewOn
+                            kinds={sp.on}
+                            value={shownOn}
+                            onValue={setView}
+                            className="justify-self-center"
                         />
-                    </div>
-                    <p className="text-center text-[12.5px] text-muted-foreground">
-                        {SHARE_WORDS.copiesFirst}
-                    </p>
-                </PhoneFoot>
+                        {panel}
+                    </>
+                ) : null}
+                {posting ? null : (
+                    <PhoneFoot>
+                        <div className="flex items-center gap-2">
+                            <ShareNowButton
+                                {...share.parts}
+                                onShared={setDone}
+                            />
+                            <DownloadIconButton
+                                image={share.image}
+                                fileName={share.parts.fileName}
+                            />
+                        </div>
+                        <p className="text-center text-[12.5px] text-muted-foreground">
+                            {SHARE_WORDS.copiesFirst}
+                        </p>
+                    </PhoneFoot>
+                )}
             </div>
         );
     }
@@ -214,11 +290,19 @@ export function ItemComposer({
         >
             <div className="flex flex-col items-center gap-2.5 rounded-2xl bg-muted p-[26px]">
                 {frame}
-                <p className="text-center text-[12.5px] text-muted-foreground">
-                    {editing
-                        ? SHARE_WORDS.previewTyping
-                        : SHARE_WORDS.previewNote}
-                </p>
+                {posting ? (
+                    <PreviewOn
+                        kinds={sp.on}
+                        value={shownOn}
+                        onValue={setView}
+                    />
+                ) : (
+                    <p className="text-center text-[12.5px] text-muted-foreground">
+                        {editing
+                            ? SHARE_WORDS.previewTyping
+                            : SHARE_WORDS.previewNote}
+                    </p>
+                )}
             </div>
             <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3.5">
                 <div className="flex items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5">
@@ -265,12 +349,22 @@ export function ItemComposer({
                         onDone={() => setEditing(false)}
                         className={CARD}
                     />
+                ) : posting ? (
+                    panel
                 ) : (
                     <div className="grid gap-3">
                         <h2 className="mt-1.5 text-[20px] font-semibold tracking-[-0.01em]">
                             {SHARE_WORDS.ready}
                         </h2>
                         <ReadyActions {...share.parts} onShared={setDone} />
+                        {social ? (
+                            <TextLink
+                                onClick={() => setManual(false)}
+                                className="w-fit font-semibold"
+                            >
+                                {SOCIAL_WORDS.backToSchedule}
+                            </TextLink>
+                        ) : null}
                     </div>
                 )}
                 <LookPicker
@@ -303,7 +397,9 @@ export function ItemComposer({
                         </Button>
                     </div>
                 )}
-                {editing ? null : <PostToLocked lock={setup.schedule} />}
+                {editing || social ? null : (
+                    <PostToLocked lock={setup.schedule} />
+                )}
             </div>
         </div>
     );

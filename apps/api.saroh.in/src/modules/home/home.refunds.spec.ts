@@ -57,6 +57,8 @@ function build(rows: Owed[], count = rows.length, attempts: unknown[] = []) {
         // Captures taken at the wrong amount (PAY-06): none, unless given.
         paymentAttempt: { findMany: jest.fn().mockResolvedValue(attempts) },
         paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
+        socialChannel: { findMany: jest.fn().mockResolvedValue([]) },
+        socialPost: { findMany: jest.fn().mockResolvedValue([]) },
         // Failed renewals and overdue invoices (F1) read here too: none.
         invoice: {
             count: jest.fn().mockResolvedValue(0),
