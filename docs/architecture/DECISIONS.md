@@ -3082,3 +3082,11 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Decision: the signed-in account on a merchant's site (home, bookings, orders, plan, messages, details, receipts, sign-in) has **one layout for every business, trade, template and look**. It matches the site through tokens only: the site's colours or colourway, fonts, the look's corners, type and motion, and the merchant's component styles (DEC-227). No template or look gets its own account screens.
 - Consequences: keeps today's approach (`packages/site-blocks/src/account/look-account-rules.ts`: one set of parts restyled by the look, held by `looks-account.test.tsx`). New account features are drawn once.
 - Owner picks, 2026-11-18: a GST number can be saved on the customer's account (needs an API field). Book again and Order again are built with DEC-172's later phases, not now.
+
+## DEC-230 One web address per business for now; more sites later choose a default
+
+**Status: Accepted — 2026-11-18** · owner · shapes the Website area redesign (plan website-area 2026-11-18, batch 6)
+
+- Context: the redesigned Website area draws a web address per site and an All sites list, but the code keeps one web address per business, and how a business will add more sites is planned but not settled.
+- Decision: for now the Website area shows **one web address: the business's default**, the one it selected. The All sites list and site switcher show one site until adding sites ships. When a business can add more sites, it **chooses which site keeps the default address**, and the other sites get addresses of their own.
+- Consequences: no per-site address field yet; the web address screen edits the business's default address. The site header, Overview and Links read that one address. Per-site addresses and "make this the default" are designed and built with the multi-site work.
