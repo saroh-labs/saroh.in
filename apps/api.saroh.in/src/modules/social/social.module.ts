@@ -18,6 +18,10 @@ import {
     SOCIAL_REFRESH_TYPE,
     SocialRefreshHandler,
 } from "./channels/social-refresh.handler";
+import {
+    MetaCallbacksController,
+    MetaCallbacksService,
+} from "./meta/meta-callbacks.controller";
 import { socialMetaProvider } from "./meta/provider";
 import { SocialPostsController } from "./posts/posts.controller";
 import { SocialPostsService } from "./posts/posts.service";
@@ -43,6 +47,7 @@ import {
         SocialController,
         SocialCallbackController,
         SocialPostsController,
+        MetaCallbacksController,
     ],
     providers: [
         socialMetaProvider,
@@ -51,6 +56,7 @@ import {
         SocialPostsService,
         SocialPublishHandler,
         SocialRefreshHandler,
+        MetaCallbacksService,
         OrganizationGuard,
     ],
 })
