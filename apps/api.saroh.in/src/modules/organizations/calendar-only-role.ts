@@ -29,6 +29,8 @@ export const CALENDAR_ONLY_ACTIONS: readonly OrgAction[] = [
     "service:read",
     // Their own alerts (DEC-170, #1038), never the business's.
     "notification:read-own",
+    // Their own Google Calendar (#1047), when they have a login.
+    "calendar:connect-own",
 ];
 
 /** Whether a role key is the Calendar only role. */

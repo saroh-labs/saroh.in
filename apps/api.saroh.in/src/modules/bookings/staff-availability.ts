@@ -23,7 +23,16 @@ type Db = Pick<
     | "booking"
     | "staffMember"
     | "bookingRules"
+    | "googleCalendarBusy"
 >;
+
+/**
+ * Busy times read from Google older than this are ignored (#1047, KTD7):
+ * a Google that stopped answering never blocks slots for long, and booking
+ * goes on on Saroh's own times. The same two hours the connection's status
+ * reads as behind.
+ */
+export const GOOGLE_BUSY_FRESH_MS = 2 * 60 * 60_000;
 
 /**
  * Where no business has said otherwise: its edition's default zone (India's
@@ -141,7 +150,8 @@ export async function loadPeople(
     if (staffIds.length === 0) return [];
     const padFrom = new Date(from.getTime() - 2 * DAY);
     const padTo = new Date(to.getTime() + 2 * DAY);
-    const [hours, extra, off, busy, closed, gaps] = await Promise.all([
+    const freshSince = new Date(Date.now() - GOOGLE_BUSY_FRESH_MS);
+    const [hours, extra, off, busy, closed, gaps, google] = await Promise.all([
         db.staffHours.findMany({
             where: { staffId: { in: staffIds } },
             select: {
@@ -183,6 +193,24 @@ export async function loadPeople(
         }),
         loadClosures(db, organizationId, from, to),
         loadGaps(db, organizationId, staffIds),
+        // Busy in their own Google Calendar (#1047): time off, so the gap
+        // between bookings isn't kept around it. Only what is fresh, from
+        // a connection that still works. Known gap, accepted (U6): the
+        // clash check inside a booking's lock counts Saroh's bookings only,
+        // so a time made busy in Google seconds before can still be taken.
+        db.googleCalendarBusy.findMany({
+            where: {
+                organizationId,
+                staffId: { in: staffIds },
+                startAt: { lt: padTo },
+                endAt: { gt: padFrom },
+                connection: {
+                    status: "CONNECTED",
+                    busyRefreshedAt: { gte: freshSince },
+                },
+            },
+            select: { staffId: true, startAt: true, endAt: true },
+        }),
     ]);
     const pick = <T extends { staffId: string | null }>(
         rows: T[],
@@ -204,7 +232,11 @@ export async function loadPeople(
             startMinute: r.startMinute,
             endMinute: r.endMinute,
         })),
-        timeOff: [...pick(off, id).map(interval), ...closed.map(interval)],
+        timeOff: [
+            ...pick(off, id).map(interval),
+            ...closed.map(interval),
+            ...pick(google, id).map(interval),
+        ],
         busy: pick(busy, id).map(interval),
         gapMinutes: gaps.get(id) ?? 0,
     }));

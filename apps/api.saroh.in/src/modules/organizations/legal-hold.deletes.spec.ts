@@ -50,6 +50,10 @@ const NOT_TENANT_DATA: Record<string, string> = {
         "Saroh's billing state for a subscription's add-ons, cleared on a move to or from Free; the charges themselves are kept (DROPPED), and a held business's plan doesn't change.",
     "data-export/data-export.handler.ts":
         "The export's zip, deleted 7 days after it was made: a copy. Every record in it stays where it is, and no new export is made while the business is held.",
+    "calendar-sync/calendar-busy.handler.ts":
+        "Busy times copied from a person's Google Calendar (#1047), replaced whole on each read; Google keeps the calendar, and no business record is in them.",
+    "calendar-sync/calendar-sync.handler.ts":
+        "Saroh's pointer to the event it made in a person's Google Calendar (#1047), dropped when the booking leaves that calendar; the booking and its history stay, and Google keeps the event.",
     "mcp/ai-connections-sweep.job.ts":
         "AI apps' sign-in grants (Better Auth's auth-owned tables) unused for 90 days, and apps nobody connected: a person's access, not the business's records; the audit trail keeps the end.",
 };

@@ -26,6 +26,24 @@ describe("configuredProviders", () => {
         ).toEqual(["google", "github"]);
     });
 
+    it("offers Google only with both of its keys (#1047: the same client calendar sync uses)", () => {
+        expect(configuredProviders({ AUTH_GOOGLE_ID: "c" })).toEqual([]);
+        expect(configuredProviders({ AUTH_GOOGLE_SECRET: "d" })).toEqual([]);
+        expect(
+            configuredProviders({
+                AUTH_GOOGLE_ID: "c",
+                AUTH_GOOGLE_SECRET: "d",
+            }),
+        ).toEqual(["google"]);
+        // Global signs in with Google on the same pair: one client per stage.
+        expect(
+            configuredProviders(
+                { AUTH_GOOGLE_ID: "c", AUTH_GOOGLE_SECRET: "d" },
+                "GLOBAL",
+            ),
+        ).toEqual(["google"]);
+    });
+
     it("gives Global its own GitHub pair, and no GitHub without it (KTD5)", () => {
         const india = {
             AUTH_GITHUB_ID: "a",

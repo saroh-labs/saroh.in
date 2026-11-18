@@ -42,6 +42,9 @@ const NAMES = [
     // Ask AI's text (DEC-220): nothing sealed here; its own re-seal is in
     // `modules/ai/ai.db.spec.ts`. Set so every target reads its ring.
     "AI_TEXT_ENC_KEY",
+    // Google Calendar tokens: nothing sealed here; its own sealing is in
+    // `modules/calendar-sync/*.db.spec.ts`.
+    "CALENDAR_ENC_KEY",
 ] as const;
 const mutableEnv = env as Partial<Record<(typeof NAMES)[number], string>>;
 const before = { ...mutableEnv };

@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { BookingEventType } from "./booking-event-type";
 import { lockBookingInTx } from "./booking-hold";
 import { retirePayLinkInTx } from "./booking-pay-link";
@@ -72,6 +73,12 @@ export async function cancelTreatmentVisitsInTx(
                 fromStartAt: booking.startAt,
             },
             select: { id: true },
+        });
+        // A visit on someone's Google Calendar leaves it (#1047).
+        await queueCalendarSyncInTx(tx, {
+            organizationId: input.organizationId,
+            bookingId: booking.id,
+            staffId: null,
         });
         cancelled += 1;
     }

@@ -2,6 +2,7 @@ import { ConflictException, Logger } from "@nestjs/common";
 import type { Booking, Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { reversePackInTx } from "../class-packs/redeem-pack";
 import {
     bookingPaymentInTx,
@@ -325,6 +326,12 @@ export async function cancelFoundBooking(
                 select: { id: true },
             });
         }
+        // Its event in Google goes, which tells the customer (#1047).
+        await queueCalendarSyncInTx(tx, {
+            organizationId,
+            bookingId: booking.id,
+            staffId: null,
+        });
         const money: CancelMoney = {
             refund: reserved
                 ? {

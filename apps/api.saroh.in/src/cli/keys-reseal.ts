@@ -5,6 +5,7 @@ import { newestKeyId, resealWithKey, storedKeyId } from "../common/crypto";
 import { staffPiiKey } from "../modules/admin/staff-profile";
 import { aiTextKey } from "../modules/ai/history/sealing";
 import { apiKeyEncKey, isUsable } from "../modules/api-keys/api-keys.service";
+import { calendarKey } from "../modules/calendar-sync/sealing";
 import { MESSAGE_SEND_TYPE } from "../modules/communications/message-send.handler";
 import { messagingKey } from "../modules/messaging/messaging-records";
 import { webhookSecretKey } from "../modules/outbound-webhooks/endpoints.service";
@@ -291,6 +292,36 @@ export const RESEAL_TARGETS: AnyTarget[] = [
                         bodyCiphertext: must(next).ciphertext,
                         bodyIv: must(next).iv,
                         bodyAuthTag: must(next).authTag,
+                    },
+                })
+            ).count === 1,
+    }),
+    target({
+        // The envelope is moved whole, so its binding to the row stays.
+        label: "Google Calendar tokens",
+        key: calendarKey,
+        page: (cursor) =>
+            prisma.googleCalendarConnection.findMany({
+                ...page,
+                where: { ...after(cursor), tokenCiphertext: { not: null } },
+                select: {
+                    id: true,
+                    tokenCiphertext: true,
+                    tokenIv: true,
+                    tokenAuthTag: true,
+                    updatedAt: true,
+                },
+            }),
+        values: (r) => [sealed(r.tokenCiphertext, r.tokenIv, r.tokenAuthTag)],
+        write: async (r, [next]) =>
+            (
+                await prisma.googleCalendarConnection.updateMany({
+                    where: { id: r.id, tokenCiphertext: r.tokenCiphertext },
+                    data: {
+                        tokenCiphertext: must(next).ciphertext,
+                        tokenIv: must(next).iv,
+                        tokenAuthTag: must(next).authTag,
+                        updatedAt: r.updatedAt,
                     },
                 })
             ).count === 1,

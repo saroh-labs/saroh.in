@@ -36,6 +36,13 @@ export type ServiceStatus = (typeof SERVICE_STATUSES)[number];
  * nothing is in person.
  */
 export const LOCATION_TYPES = ["IN_PERSON", "ONLINE", "EITHER"] as const;
+/**
+ * Where an online booking's link comes from (#1048): the typed link, or a
+ * Google Meet made for each booking on the Google Calendar of whoever
+ * takes it.
+ */
+export const MEETING_LINKS = ["MANUAL", "GOOGLE_MEET"] as const;
+export type MeetingLink = (typeof MEETING_LINKS)[number];
 export type LocationType = (typeof LOCATION_TYPES)[number];
 
 /** Where one booking happens (`Booking.locationType`): never EITHER. */
@@ -210,6 +217,15 @@ export class CreateServiceDto {
     meetingUrl?: string | null;
 
     /**
+     * MANUAL: the typed `meetingUrl`. GOOGLE_MEET: a Meet link per booking
+     * (#1048), the typed link kept as the fallback for anyone not
+     * connected. Checked in the service.
+     */
+    @IsOptional()
+    @IsIn(MEETING_LINKS)
+    meetingLink?: MeetingLink;
+
+    /**
      * How many visits one booking of it is, 1 to 12 (E1). More than one
      * makes it a treatment, sold as one order (E9/E10).
      */
@@ -339,6 +355,15 @@ export class UpdateServiceDto {
     @IsString()
     @MaxLength(500)
     meetingUrl?: string | null;
+
+    /**
+     * MANUAL: the typed `meetingUrl`. GOOGLE_MEET: a Meet link per booking
+     * (#1048), the typed link kept as the fallback for anyone not
+     * connected. Checked in the service.
+     */
+    @IsOptional()
+    @IsIn(MEETING_LINKS)
+    meetingLink?: MeetingLink;
 
     /**
      * How many visits one booking of it is, 1 to 12 (E1). More than one

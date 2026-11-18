@@ -13,6 +13,7 @@ import { AutomationsModule } from "./modules/automations/automations.module";
 import { BillingModule } from "./modules/billing/billing.module";
 import { BookingsModule } from "./modules/bookings/bookings.module";
 import { BusinessReportsModule } from "./modules/business-reports/business-reports.module";
+import { CalendarSyncModule } from "./modules/calendar-sync/calendar-sync.module";
 import { CalendarModule } from "./modules/calendar/calendar.module";
 import { CapabilitiesModule } from "./modules/capabilities/capabilities.module";
 import { CatalogueModule } from "./modules/catalogue/catalogue.module";
@@ -144,6 +145,8 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         SharePostsModule,
         // Ask AI's layer (DEC-220): settings, history, retention.
         AiModule,
+        // Google Calendar sync and Meet links (#1047, #1048).
+        CalendarSyncModule,
         // Its alarms, halt, reports and Request more's end (U8).
         AiOpsModule,
         SiteAccountsModule,

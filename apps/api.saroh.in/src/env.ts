@@ -191,6 +191,12 @@ const envSchema = z.object({
     // Refused at boot under NODE_ENV=production (below), and honoured only in
     // a test run, as STRIPE_FAKE is (`ai/providers/fake-script.ts`).
     AI_PROVIDER_FAKE: z.enum(["1"]).optional(),
+    // TEST ONLY. `1`: Google Calendar sync runs on an in-memory fake Google
+    // (#1047): consent, tokens, events, busy times and Meet links are made
+    // up; nothing calls Google. Refused at boot under NODE_ENV=production
+    // (below), and honoured only in a test run, as STRIPE_FAKE is
+    // (`calendar-sync/google/google-calendar.provider.ts`).
+    GOOGLE_CALENDAR_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -335,6 +341,10 @@ const envSchema = z.object({
     // Ask AI (DEC-220): seals conversation and report text. Its own 32-byte
     // key or ring, checked at use like the keys above; never logged.
     AI_TEXT_ENC_KEY: z.string().optional(),
+    // Google Calendar (#1047): seals each person's Google refresh token. Its
+    // own 32-byte key or ring, checked at use like the keys above; never
+    // logged. The Google client itself is AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET.
+    CALENDAR_ENC_KEY: z.string().optional(),
     // Ask AI's provider (DEC-220): Anthropic's API key. Optional at boot;
     // read only by `modules/ai/providers/ai-sdk.adapter.ts`, which refuses
     // a call without it. Never logged, never in an example file with a value.
@@ -464,6 +474,7 @@ const TEST_ONLY = [
     "DOMAIN_HOSTING_FAKE",
     "STRIPE_FAKE",
     "AI_PROVIDER_FAKE",
+    "GOOGLE_CALENDAR_FAKE",
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {
