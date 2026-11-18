@@ -6,6 +6,7 @@ import {
     blankCoupon,
     checkCoupon,
     couponChanges,
+    percentText,
     refusedField,
 } from "./coupons";
 import { paiseToRupees, rupeesToPaise } from "./money";
@@ -299,10 +300,12 @@ describe("coupons", () => {
             id: "c1",
             code: "OLD",
             discountPaise: 100,
+            percentOff: null,
             months: 1,
             planIds: ["b"],
             razorpayOfferId: null,
             active: true,
+            automatic: false,
             maxRedemptions: 5,
             expiresAt: "2026-09-01T00:00:00.000Z",
             uses: 3,
@@ -311,12 +314,14 @@ describe("coupons", () => {
         };
         const form = {
             code: "OLD",
+            kind: "amount" as const,
             off: "1",
             months: "1",
             planIds: ["b"],
             maxUses: "2",
             expires: new Date(coupon.expiresAt),
             offerId: "",
+            automatic: false,
         };
         const r = checkCoupon(form, {
             isNew: false,
@@ -374,10 +379,12 @@ describe("coupons", () => {
             id: "c1",
             code: "OLD",
             discountPaise: 100,
+            percentOff: null,
             months: 1,
             planIds: ["b"],
             razorpayOfferId: "offer_ABCDEFGHIJKLMN",
             active: true,
+            automatic: false,
             maxRedemptions: 5,
             expiresAt: null,
             uses: 0,
@@ -407,6 +414,78 @@ describe("coupons", () => {
         expect(
             couponChanges(coupon, { ...input, razorpayOfferId: null }),
         ).toEqual({ razorpayOfferId: null });
+    });
+
+    it("takes a whole percent from 1 to 90 in place of an amount, never capped by a price", () => {
+        const form = {
+            ...blankCoupon(plans),
+            code: "PCT-1",
+            kind: "percent" as const,
+            maxUses: "5",
+        };
+        for (const off of ["0", "91", "7.5", ""]) {
+            const r = checkCoupon(
+                { ...form, off },
+                { isNew: true, plans, now },
+            );
+            expect(r.input).toBeNull();
+            expect(r.errors.percentOff).toMatch(/1 to 90/);
+        }
+        expect(
+            checkCoupon({ ...form, off: "90" }, { isNew: true, plans, now })
+                .input,
+        ).toMatchObject({ discountPaise: 0, percentOff: 90 });
+    });
+
+    it("sends the amount and the percent together when the kind or the number changes", () => {
+        const coupon = {
+            id: "c1",
+            code: "OLD",
+            discountPaise: 100,
+            percentOff: null,
+            months: 3,
+            planIds: ["b"],
+            razorpayOfferId: null,
+            active: true,
+            automatic: false,
+            maxRedemptions: 5,
+            expiresAt: null,
+            uses: 0,
+            createdAt: "",
+            updatedAt: "",
+        };
+        const input = {
+            code: "OLD",
+            months: 3,
+            planIds: ["b"],
+            maxRedemptions: 5,
+            expiresAt: null,
+            razorpayOfferId: null,
+        };
+        expect(
+            couponChanges(coupon, {
+                ...input,
+                discountPaise: 0,
+                percentOff: 7,
+            }),
+        ).toEqual({ discountPaise: 0, percentOff: 7 });
+        expect(
+            couponChanges(
+                { ...coupon, discountPaise: 0, percentOff: 7 },
+                { ...input, discountPaise: 100, percentOff: null },
+            ),
+        ).toEqual({ discountPaise: 100, percentOff: null });
+        expect(
+            couponChanges(coupon, {
+                ...input,
+                discountPaise: 100,
+                percentOff: null,
+            }),
+        ).toEqual({});
+        expect(
+            percentText({ ...coupon, discountPaise: 0, percentOff: 7 }),
+        ).toBe("7% off · 3 months");
+        expect(percentText(coupon)).toBe("");
     });
 
     it("reads the field a refusal names", () => {

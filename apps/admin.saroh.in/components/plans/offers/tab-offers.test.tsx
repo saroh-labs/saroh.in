@@ -40,10 +40,12 @@ function coupon(over: Partial<AdminCoupon> = {}): AdminCoupon {
         id: "c1",
         code: "HELLO",
         discountPaise: 1_000,
+        percentOff: null,
         months: 1,
         planIds: ["b"],
         razorpayOfferId: null,
         active: true,
+        automatic: false,
         maxRedemptions: 10,
         expiresAt: null,
         uses: 0,
@@ -328,6 +330,45 @@ describe("coupons", () => {
         );
     });
 
+    it("takes a whole percent off in place of an amount", async () => {
+        actions.createCouponAction.mockResolvedValue({
+            ok: true,
+            data: coupon({ code: "FAKE-PCT", discountPaise: 0, percentOff: 7 }),
+        });
+        draw();
+        fireEvent.click(screen.getByRole("button", { name: "New coupon" }));
+        fireEvent.change(screen.getByLabelText("Code"), {
+            target: { value: "fake-pct" },
+        });
+        fireEvent.click(screen.getByRole("radio", { name: "Percent off" }));
+        const field = screen.getByLabelText("% off");
+        fireEvent.change(field, { target: { value: "91" } });
+        expect(field.getAttribute("aria-invalid")).toBe("true");
+        fireEvent.change(field, { target: { value: "7" } });
+        expect(field.getAttribute("aria-invalid")).toBe("false");
+        fireEvent.change(screen.getByLabelText("Max uses"), {
+            target: { value: "5" },
+        });
+        fireEvent.click(screen.getByRole("button", { name: "Create coupon" }));
+        await confirmWithReason("Create coupon");
+
+        expect(actions.createCouponAction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                code: "FAKE-PCT",
+                discountPaise: 0,
+                percentOff: 7,
+            }),
+        );
+    });
+
+    it("lists a percent coupon as its percent and months", () => {
+        draw({
+            coupons: [coupon({ discountPaise: 0, percentOff: 7, months: 3 })],
+        });
+        expect(screen.getByText(/7% off · 3 months/)).toBeTruthy();
+        expect(screen.getByLabelText("% off")).toHaveProperty("value", "7");
+    });
+
     it("asks before deleting one that has been used, and says it was archived", async () => {
         actions.deleteCouponAction.mockResolvedValue({
             ok: true,
@@ -398,7 +439,7 @@ describe("coupons", () => {
             (field.getAttribute("aria-describedby") ?? "").split(" ")[0] ?? "",
         );
         expect(hint?.textContent).toBe(
-            "Make the offer in your Razorpay Dashboard, then paste its ID here.",
+            "Razorpay's Offer is made in the Razorpay Dashboard. If you change the discount, months or plans here, change the Offer to match.",
         );
 
         fireEvent.change(field, { target: { value: "offer_short" } });
