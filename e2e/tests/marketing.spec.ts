@@ -1,5 +1,6 @@
 // @covers web:/ web:/features web:/solutions web:/pricing web:/pricing/draft web:/pricing/preview web:/waitlist web:/api/waitlist web:/api/revalidate api:waitlist api:pricing
 // @covers web:/integrations pkg:integrations
+// @covers web:/website-library
 // @covers web:/about web:/contact web:/api/contact api:contact-messages
 import { createRequire } from "node:module";
 
@@ -122,6 +123,8 @@ const RESOURCE_PREFIXES = [
     "/templates",
     // API keys and webhooks, a Resources page behind NEXT_PUBLIC_DEVELOPERS (on in CI).
     "/developers",
+    // The website library (DEC-228), behind NEXT_PUBLIC_WEBSITE_LIBRARY (on in CI).
+    "/website-library",
 ];
 
 /**
@@ -134,6 +137,11 @@ const INTEGRATIONS = ["razorpay", "cashfree", "email"];
 const PAGES = [
     ...INDEXED,
     "/pricing/draft",
+    // Its own root layout split from the previews' (KD11): every check here
+    // runs on it while its switch is on, as CI and `pnpm prepush --e2e` set it.
+    ...(process.env.NEXT_PUBLIC_WEBSITE_LIBRARY === "on"
+        ? ["/website-library"]
+        : []),
     ...[
         "/integrations",
         ...INTEGRATIONS.map((s) => `/integrations/${s}`),

@@ -120,7 +120,7 @@
             "lines": 10,
             "files": [
                 "apps/accounts.saroh.in/app/layout.tsx",
-                "apps/saroh.in/app/layout.tsx"
+                "apps/saroh.in/app/saroh-document.tsx"
             ],
             "windows": [
                 "fe5f6147d9aa",
@@ -384,7 +384,7 @@
                 "apps/accounts.saroh.in/app/error.tsx",
                 "apps/accounts.saroh.in/app/global-error.tsx",
                 "apps/saroh.in/app/(site)/error.tsx",
-                "apps/saroh.in/app/error.tsx",
+                "apps/saroh.in/app/(standalone)/error.tsx",
                 "apps/saroh.in/app/global-error.tsx"
             ],
             "windows": [
@@ -397,7 +397,7 @@
             "files": [
                 "apps/accounts.saroh.in/app/error.tsx",
                 "apps/saroh.in/app/(site)/error.tsx",
-                "apps/saroh.in/app/error.tsx"
+                "apps/saroh.in/app/(standalone)/error.tsx"
             ],
             "windows": [
                 "26e06a642a80",
@@ -549,7 +549,7 @@
         {
             "lines": 6,
             "files": [
-                "apps/saroh.in/app/layout.tsx",
+                "apps/saroh.in/app/saroh-document.tsx",
                 "apps/saroh.tech/app/layout.tsx"
             ],
             "windows": [

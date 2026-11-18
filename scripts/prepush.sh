@@ -395,6 +395,7 @@ e2e_stack() {
     # saroh.in's release switches on, as CI (plan 2026-11-13-002).
     export NEXT_PUBLIC_AI_APPS=on NEXT_PUBLIC_ASK_AI=on NEXT_PUBLIC_SOCIAL=on
     export NEXT_PUBLIC_DEVELOPERS=on NEXT_PUBLIC_DOCS=on
+    export NEXT_PUBLIC_WEBSITE_LIBRARY=on
     # Settings › API and AI apps on, as CI: the role specs list its tab.
     export NEXT_PUBLIC_API_AREA=on
     # Share as a post and Create post on, as CI (DEC-217): app and API.

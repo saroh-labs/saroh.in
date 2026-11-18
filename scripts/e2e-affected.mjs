@@ -173,6 +173,7 @@ const LAYOUTISH = new Set([
     "not-found",
     "default",
     "global-error",
+    "global-not-found",
     "forbidden",
     "unauthorized",
     "providers",

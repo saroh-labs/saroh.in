@@ -13,7 +13,7 @@
  * there is nothing left for a tag to read, whichever way it looks.
  *
  * - **One allow-list**, {@link mayStay}: the page's own choices (`plan`,
- *   `src`, `template`) and campaign data (`utm_…`, and the ad platforms' own
+ *   `src`, `template`, the website library's toolbar) and campaign data (`utm_…`, and the ad platforms' own
  *   click ids). Everything else goes, a parameter nobody has thought about
  *   included.
  * - **The page reads first.** What is cut is kept for this tab, by page, and
@@ -35,8 +35,33 @@ const KEPT = new Set([
     "fbclid",
 ]);
 
+/**
+ * The website library's toolbar (DEC-228, U11): which look, colourway,
+ * layout, state and desk or phone, and one key per kind of component
+ * (`COMPONENT_KINDS`, held equal by the test). Choices from a list, never
+ * about a person or a business, so each value must be a short id.
+ */
+export const LIBRARY_KEYS: ReadonlySet<string> = new Set([
+    "look",
+    "palette",
+    "variant",
+    "state",
+    "view",
+    "buttons",
+    "secondButton",
+    "cards",
+    "cardCorners",
+    "images",
+    "headings",
+    "spacing",
+    "tags",
+    "links",
+]);
+
 /** Whether a query parameter may stay in an address a tag can read. */
 export function mayStay(name: string, value = ""): boolean {
+    if (LIBRARY_KEYS.has(name))
+        return /^[a-zA-Z][a-zA-Z0-9-]{0,23}$/.test(value);
     if (!KEPT.has(name) && !/^utm_[a-z]+$/.test(name)) return false;
     // Campaign data never holds an address someone can be written to.
     return !value.includes("@");

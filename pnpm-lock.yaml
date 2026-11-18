@@ -1047,6 +1047,9 @@ importers:
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@saroh/block-contract':
+        specifier: workspace:*
+        version: link:../../packages/block-contract
       '@saroh/error-tracking':
         specifier: workspace:*
         version: link:../../packages/error-tracking

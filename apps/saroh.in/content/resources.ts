@@ -48,7 +48,7 @@ export interface ResourcePage {
     children?: readonly (string | { href: string; waitsFor: string })[];
 }
 
-/** In the plan's order: Help, Integrations, Changelog, Templates, Developers, then the Tools menu's free tools (Link preview, QR code maker). */
+/** In the plan's order: Help, Integrations, Changelog, Templates, Website library, Developers, then the Tools menu's free tools (Link preview, QR code maker). */
 export const RESOURCE_PAGES: readonly ResourcePage[] = [
     {
         id: "help",
@@ -89,6 +89,15 @@ export const RESOURCE_PAGES: readonly ResourcePage[] = [
         href: "/templates",
         // With early access, as Help (industry templates plan U13).
         publishOn: "2026-10-17",
+    },
+    {
+        // The merchant site library (DEC-228, plan 2026-11-18-001 U11):
+        // shown only while `NEXT_PUBLIC_WEBSITE_LIBRARY` is on.
+        id: "website-library",
+        name: "Website library",
+        line: "Every block and look a Saroh website is made of, drawn live.",
+        href: "/website-library",
+        publishOn: "2026-11-18",
     },
     {
         // The API and webhooks (plan 2026-11-13-002, U6): shown only while
@@ -179,7 +188,7 @@ export function dayStartsAt(day: IsoDay): Date {
  * Whether a page dated `publishOn` is live at `now`: from midnight in India
  * on that day (KTD-2). One rule for every Resources page, entry and legal
  * page, so they all appear together: with the first deploy made on or after
- * the day, since the site is built at deploy time (`app/layout.tsx`).
+ * the day, since the site is built at deploy time (`app/saroh-document.tsx`).
  */
 export function isPublished(publishOn: IsoDay, now: Date): boolean {
     return now.getTime() >= dayStartsAt(publishOn).getTime();

@@ -70,7 +70,7 @@ const fontWordmark = localFont({
 // another's address.
 const FALLBACK_TITLE = pageTitle(home.seoTitle);
 
-export const metadata: Metadata = {
+export const sarohMetadata: Metadata = {
     // The site is served at www (saroh.in redirects there), so every
     // canonical and share link names www: one host for search engines.
     metadataBase: new URL(SITE_URL),
@@ -105,20 +105,22 @@ export const metadata: Metadata = {
  */
 
 /**
- * The shell every page shares: fonts, the tags and the recorder behind the
- * cookie notice (`site-tags.tsx`), the referral code a visitor arrived with
- * (`referral-keeper.tsx`) and the light-only scheme. Pages bring their own chrome
- * through route groups: `(site)` the Marketing Site V2 pages, `(standalone)`
- * the waitlist and the sign-up hand-off, `(preview)` the pricing draft.
+ * The document every Saroh page shares: fonts, the tags and the recorder
+ * behind the cookie notice (`site-tags.tsx`), the referral code a visitor
+ * arrived with (`referral-keeper.tsx`) and the light-only scheme.
+ *
+ * It is not `app/layout.tsx` (plan 2026-11-18-001 KD11): each route group
+ * is its own root layout and draws this, so the website library's block
+ * previews (`(library-preview)`) can be a merchant's bare page with no
+ * Saroh tokens, fonts or tags. The groups: `(site)` the Marketing Site V2
+ * pages, `(standalone)` the waitlist and the sign-up hand-off, `(preview)`
+ * the pricing draft; `global-not-found.tsx` draws it for an address with no
+ * page. Each layout exports {@link sarohMetadata} as its `metadata`.
  *
  * Light only (owner, 2026-10-03): no theme provider, no dark class, no
  * toggle; `color-scheme: light` is set here and in site.css.
  */
-export default function RootLayout({
-    children,
-}: {
-    children: React.ReactNode;
-}) {
+export function SarohDocument({ children }: { children: React.ReactNode }) {
     const privacy = shownLegal(resourcesContext()).find(
         (p) => p.id === "privacy",
     );

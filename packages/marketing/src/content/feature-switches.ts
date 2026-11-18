@@ -21,6 +21,8 @@ export const RELEASE_SWITCHES = {
     developers: "NEXT_PUBLIC_DEVELOPERS",
     /** docs.saroh.in answers: the owner turns it on after the docs deploy. */
     docs: "NEXT_PUBLIC_DOCS",
+    /** saroh.in's /website-library (DEC-228, plan 2026-11-18-001 U11). */
+    "website-library": "NEXT_PUBLIC_WEBSITE_LIBRARY",
 } as const;
 export type ReleaseSwitch = keyof typeof RELEASE_SWITCHES;
 

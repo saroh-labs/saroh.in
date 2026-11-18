@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 /* eslint-disable @typescript-eslint/unbound-method -- the tests swap the
    browser's own storage and history functions and compare them by identity. */
+import { COMPONENT_KINDS } from "@saroh/block-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
     cleanUrl,
     guardHistory,
+    LIBRARY_KEYS,
     mayStay,
     readAddress,
     resetAddress,
@@ -67,6 +69,29 @@ describe("the allow-list", () => {
         "",
     ])("cuts %s: about someone else, or nobody has allowed it", (name) => {
         expect(mayStay(name, "value")).toBe(false);
+    });
+
+    it("keeps the website library's toolbar, one key per kind of component, ids only", () => {
+        expect([...LIBRARY_KEYS].sort()).toEqual(
+            [
+                "look",
+                "palette",
+                "variant",
+                "state",
+                "view",
+                ...COMPONENT_KINDS,
+            ].sort(),
+        );
+        expect(mayStay("look", "folio")).toBe(true);
+        expect(mayStay("secondButton", "outline")).toBe(true);
+        expect(splitSearch("?look=live&cards=flat&ref=abc")).toEqual({
+            kept: "look=live&cards=flat",
+            cut: "ref=abc",
+        });
+        // A choice is an id: never a name, an address or anything long.
+        expect(mayStay("palette", "Asha Rao")).toBe(false);
+        expect(mayStay("look", "asha@example.com")).toBe(false);
+        expect(mayStay("view", "x".repeat(25))).toBe(false);
     });
 
     it("cuts an allowed parameter that holds an email address", () => {

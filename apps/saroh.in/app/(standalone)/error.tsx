@@ -6,8 +6,9 @@ import { Wordmark } from "@saroh/ui/wordmark";
 import { useEffect } from "react";
 
 /**
- * saroh.in's root error boundary, for the pages outside the V2 chrome (the
- * waitlist, the pricing draft) and anything the `(site)` boundary can't catch.
+ * saroh.in's error boundary for the pages outside the V2 chrome (the
+ * waitlist, and the pricing draft through `(preview)/error.tsx`). A root
+ * layout's own failure is `global-error.tsx`'s.
  * The site is static, so this mostly meets a page whose script failed in the
  * browser. It has no chrome to sit in, so the wordmark says where you are.
  */

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
-import type { AnchorHTMLAttributes, ReactNode } from "react";
+import type { AnchorHTMLAttributes } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import NotFoundPage from "./not-found";
@@ -15,11 +15,6 @@ vi.mock("next/link", () => ({
         <a href={href} {...props}>
             {children}
         </a>
-    ),
-}));
-vi.mock("@/components/shared/layout/site-chrome", () => ({
-    SiteChrome: ({ children }: { children: ReactNode }) => (
-        <main>{children}</main>
     ),
 }));
 vi.mock("@/lib/resources-context", () => ({

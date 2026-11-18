@@ -117,6 +117,10 @@ const nextConfig = {
     // No `X-Powered-By: Next.js`: it only tells scanners what to try.
     poweredByHeader: false,
 
+    // Each route group is its own root layout (plan 2026-11-18-001 KD11), so
+    // an address no route answers gets `app/global-not-found.tsx`.
+    experimental: { globalNotFound: true },
+
     /*
      * Every response gets SECURITY_HEADERS. A pricing draft preview (plans
      * catalogue U24, KTD-10) is never cached, indexed or passed on as a
@@ -133,6 +137,12 @@ const nextConfig = {
             { source: "/:path*", headers: PAGE_POLICIES },
             { source: "/pricing/draft", headers: preview },
             { source: "/pricing/preview", headers: preview },
+            // The website library's block previews: a merchant's page in a
+            // frame, never a page of its own in search.
+            {
+                source: "/library-preview/:path*",
+                headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+            },
         ];
     },
 
