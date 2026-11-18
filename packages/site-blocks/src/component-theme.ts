@@ -88,7 +88,8 @@ function radius(at: string, name: string, value: string, selector: string) {
             }`;
 }
 
-const RULES: { [K in ComponentKind]: Record<string, Rule> } = {
+// Partial: an option that keeps the look's own value (e.g. "soft") has no rule.
+const RULES: Record<ComponentKind, Partial<Record<string, Rule>>> = {
     buttons: Object.fromEntries(
         Object.entries(COMPONENT_VALUES.buttonRadius).map(([id, n]) => [
             id,
@@ -255,7 +256,7 @@ export function changedComponents(
         COMPONENT_KINDS.filter(
             (kind) => choices[kind] && choices[kind] !== defaults[kind],
         ).map((kind) => [kind, choices[kind]]),
-    ) as ComponentStyles;
+    );
 }
 
 /**

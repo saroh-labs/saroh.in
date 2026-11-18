@@ -1,6 +1,3 @@
-import type { LookId } from "./looks";
-import { LOOKS } from "./looks";
-
 /**
  * Component styles (DEC-227, plan U1 KD1–KD4): how each kind of component
  * on a merchant's site is drawn, chosen per site from a few curated
@@ -88,13 +85,6 @@ export const CLASSIC_COMPONENTS: ComponentDefaults = {
     links: "underlined",
 };
 
-/** The defaults a site in `look` starts from (absent: Classic). */
-export function componentDefaults(
-    look: LookId | null | undefined,
-): ComponentDefaults {
-    return look ? LOOKS[look].components : CLASSIC_COMPONENTS;
-}
-
 /**
  * The fixed values behind the options that are not a look's own. A
  * corner is px (999 a pill); spacing is a factor of the look's own section
@@ -135,7 +125,7 @@ export function pickComponentStyles(
         const value = (input as Record<string, unknown>)[kind];
         if (isComponentOption(kind, value)) out[kind] = value;
     }
-    return Object.keys(out).length > 0 ? (out as ComponentStyles) : undefined;
+    return Object.keys(out).length > 0 ? out : undefined;
 }
 
 /**
@@ -170,5 +160,5 @@ export function componentStylesOf(
         const value = variables?.[componentVariable(kind)];
         if (isComponentOption(kind, value)) out[kind] = value;
     }
-    return out as ComponentStyles;
+    return out;
 }

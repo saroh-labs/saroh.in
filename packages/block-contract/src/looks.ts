@@ -1,4 +1,5 @@
 import type { ComponentDefaults } from "./component-styles";
+import { CLASSIC_COMPONENTS } from "./component-styles";
 import type { FontPairKey } from "./fonts";
 import type { SectionType } from "./section-contract";
 import type { SiteTypeScale } from "./type-scale";
@@ -332,4 +333,11 @@ export function lookSuggestion(templateId: string | null | undefined): {
             ? TEMPLATE_INDUSTRIES[templateId]
             : null;
     return { look: defaultLookForTemplate(templateId), industry };
+}
+
+/** The defaults a site in `look` starts from (absent: Classic). */
+export function componentDefaults(
+    look: LookId | null | undefined,
+): ComponentDefaults {
+    return look ? LOOKS[look].components : CLASSIC_COMPONENTS;
 }

@@ -22,7 +22,7 @@ export function phoneVersion(
     phone: string | null | undefined,
     desk: string,
 ): string | null {
-    if (!phone || phone.replace(/<[^>]*>/g, "").trim() === "") return null;
+    if (!phone || phone.replace(/<[^>]*>/g, " ").trim() === "") return null;
     return phone.trim() === desk.trim() ? null : phone;
 }
 

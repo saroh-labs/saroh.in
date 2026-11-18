@@ -6,13 +6,12 @@ import {
     COMPONENT_LABELS,
     COMPONENT_OPTION_LABELS,
     COMPONENT_STYLE_OPTIONS,
-    componentDefaults,
     componentStylesOf,
     componentStyleVariables,
     componentVariable,
     pickComponentStyles,
 } from "./component-styles";
-import { LOOK_IDS, LOOKS } from "./looks";
+import { componentDefaults, LOOK_IDS, LOOKS } from "./looks";
 import {
     defaultSiteStyle,
     presetSiteStyle,

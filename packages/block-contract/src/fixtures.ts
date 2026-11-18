@@ -285,7 +285,7 @@ export const BLOCK_META = {
                     action: { kind: "page" },
                     phoneLabel: "Book",
                 },
-                panel: { kind: "sameDayCall", phone: "+91 00000 01001" },
+                panel: { kind: "sameDayCall", phone: "00000 01001" },
                 byline: { name: "Dr Meera Rao", role: "Dentist" },
                 phoneLine: "Check-ups and same-day care.",
             },
@@ -429,7 +429,7 @@ export const BLOCK_META = {
                     {
                         ...GALLERY_IMAGES[0],
                         name: "Sourdough, whole",
-                        fromPrice: "From ₹180",
+                        fromPrice: "From 180",
                         link: {
                             kind: "product",
                             productId: "sample-sourdough",
