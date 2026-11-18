@@ -484,15 +484,21 @@ describe("coupons (DB, U4)", () => {
                     percentOff: 7,
                 })),
             );
-            // Back to an amount: the percent goes with it.
+            // Back to an amount: the percent goes with it. New terms need a
+            // new Offer, or the Offer-terms lock refuses the change.
             await expect(
                 controller.updateCoupon(me(), made.id, {
                     discountPaise: 111,
                     percentOff: null,
+                    razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
                     reason: "fake",
                     idempotencyKey: key(),
                 } as never),
-            ).resolves.toMatchObject({ discountPaise: 111, percentOff: null });
+            ).resolves.toMatchObject({
+                discountPaise: 111,
+                percentOff: null,
+                razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+            });
         });
 
         it("an amount or a percent, never both or neither, and the percent 1 to 90", async () => {
