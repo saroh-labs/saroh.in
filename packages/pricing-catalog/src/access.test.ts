@@ -363,6 +363,42 @@ describe("resolveAccess", () => {
             expect(r).toMatchObject({ state: "on", limit: 5, per: "month" });
         });
 
+        it("lets staff limit, raise or remove what a module add-on switched on", () => {
+            const catalog = edit(fixture(), (c) => {
+                const row = c.modules.find((m) => m.id === "invoicing");
+                if (row) {
+                    row.cells.b = {
+                        inc: true,
+                        text: "5 a month",
+                        card: "",
+                        limit: 5,
+                        per: "month",
+                        soft: false,
+                    };
+                }
+            });
+            const addon = [{ addonId: "invoices-alone", quantity: 1 }];
+            const with_ = (o: Override) =>
+                resolveAccess({ ...on("a", [o], addon), catalog }, "invoicing");
+            const base = {
+                key: "invoicing",
+                moduleKey: "invoicing",
+                createdAt: t(1),
+            };
+            expect(with_({ ...base, kind: "raise", value: 500 })).toMatchObject(
+                { state: "on", limit: 500 },
+            );
+            expect(with_({ ...base, kind: "limit", value: 2 })).toMatchObject({
+                state: "on",
+                limit: 2,
+                override: "Limit set by Saroh",
+            });
+            expect(with_({ ...base, kind: "remove" })).toMatchObject({
+                state: "hidden",
+                override: "Removed by Saroh",
+            });
+        });
+
         it("counts an add-on only on a plan it is offered on (DEC-157)", () => {
             const held = [{ addonId: "one-person", quantity: 2 }];
             expect(resolveAccess(on("b", [], held), "members").limit).toBe(5);
