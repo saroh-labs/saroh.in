@@ -351,7 +351,7 @@ export async function checkCouponAction(
             return {
                 ok: true,
                 data: {
-                    code: res.data.coupon.code,
+                    code: res.data.coupon.code ?? c,
                     planName: res.data.plan.name,
                     discountPaise: res.data.coupon.discountPaise,
                     charges: res.data.coupon.charges,

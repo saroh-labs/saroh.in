@@ -97,6 +97,12 @@ import {
     periodEnd,
     quoteChange,
 } from "./checkout-quote";
+import {
+    couponCheckoutExpiresAt,
+    CouponNotTaken,
+    couponOfferRefused,
+    takeCouponPlaceInTx,
+} from "./coupon-checkout";
 import type { AddonChargeLine } from "./offers";
 import {
     catalogueOfVersion,
@@ -203,9 +209,15 @@ export interface ChangePlanQuoteView {
     firstMonth: FirstMonthMove | null;
     /**
      * The coupon (U16): its code, what it takes off each of the first
-     * `charges` charges before GST, and that first charge after it.
+     * `charges` charges before GST, and that first charge after it. The
+     * code is null for the plan's automatic coupon: nobody typed it, and
+     * it isn't handed out (F12).
      */
-    coupon: { code: string; discountPaise: number; charges: number } | null;
+    coupon: {
+        code: string | null;
+        discountPaise: number;
+        charges: number;
+    } | null;
     firstChargePaise: number;
     firstChargeGstPaise: number;
     firstChargeTotalPaise: number;
@@ -425,7 +437,14 @@ export class CheckoutService {
         const party = await this.partyFor(ctx.organizationId, quote.kind);
         const details = billingDetailsView(party);
         return {
-            ...this.quoteView(target, quote, coupon, addonsEnding, monthAddons),
+            ...this.quoteView(
+                target,
+                quote,
+                coupon,
+                addonsEnding,
+                monthAddons,
+                !input.coupon?.trim(),
+            ),
             ...details,
             // A profile is its owner's (R2): only those who change what the
             // business pays are told which one bills it.
@@ -661,22 +680,26 @@ export class CheckoutService {
         await assertSarohKeeps(ctx, now);
         const billTo = checkoutBillTo(input);
         this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
-        const {
-            target,
-            quote,
-            subscription,
-            coupon,
-            addonsEnding,
-            monthAddons,
-        } = await this.resolve(
+        const typed = Boolean(input.coupon?.trim());
+        const resolved = await this.resolve(
             ctx.organizationId,
             input,
             now,
             ctx.edition ?? "INDIA",
         );
+        const { target, quote, subscription, coupon } = resolved;
         const party = await this.partyFor(ctx.organizationId, quote.kind);
+        const viewOf = (r: typeof resolved) =>
+            this.quoteView(
+                r.target,
+                r.quote,
+                r.coupon,
+                r.addonsEnding,
+                r.monthAddons,
+                !typed,
+            );
         const view = {
-            ...this.quoteView(target, quote, coupon, addonsEnding, monthAddons),
+            ...viewOf(resolved),
             ...billingDetailsView(party),
         };
         if (quote.kind === "NONE") {
@@ -747,16 +770,47 @@ export class CheckoutService {
             missing: [],
             phone: view.billingDetails.phone || Boolean(details.profile.phone),
         };
-        return this.checkout(
-            ctx,
-            target,
-            quote,
-            view,
-            now,
-            { ...billTo, billingProfileId: profileId },
-            coupon,
-            subscription ? { id: subscription.id, lines: monthAddons } : null,
-        );
+        const start = (r: typeof resolved) =>
+            this.checkout(
+                ctx,
+                r.target,
+                r.quote,
+                { ...view, ...viewOf(r) },
+                now,
+                { ...billTo, billingProfileId: profileId },
+                r.coupon,
+                subscription
+                    ? { id: subscription.id, lines: r.monthAddons }
+                    : null,
+            );
+        try {
+            return await start(resolved);
+        } catch (error) {
+            // The automatic coupon never blocks a plan (owner, 18 Nov 2026;
+            // review F1): refused by the provider, or its last place gone
+            // first, the checkout starts again at the full price. A typed
+            // code says why instead ("Try without it").
+            if (!(error instanceof CouponNotTaken) || typed || !coupon) {
+                throw error;
+            }
+            if (error.why === "refused") {
+                await couponOfferRefused(
+                    this.logger,
+                    coupon,
+                    ctx.organizationId,
+                    error.said,
+                );
+            }
+            return start(
+                await this.resolve(
+                    ctx.organizationId,
+                    input,
+                    now,
+                    ctx.edition ?? "INDIA",
+                    false,
+                ),
+            );
+        }
     }
 
     /**
@@ -968,6 +1022,8 @@ export class CheckoutService {
         input: { plan: string; cycle: BillingCycle; coupon?: string | null },
         now: Date,
         edition: Edition,
+        /** False: no automatic coupon, the full price (F1's fallback). */
+        automatic = true,
     ) {
         let target = await this.plans.resolveCatalogue(
             edition,
@@ -1057,6 +1113,7 @@ export class CheckoutService {
             }
             coupon = await findUsableCoupon({ ...couponAsk, code });
         } else if (
+            automatic &&
             target.priceCents > 0 &&
             COUPON_KINDS.includes(quoteChange(asked).kind)
         ) {
@@ -1186,6 +1243,8 @@ export class CheckoutService {
         coupon: PricingCoupon | null = null,
         addonsEnding: EndingAddon[] = [],
         monthAddons: AddonChargeLine[] = [],
+        /** No code was typed: the coupon is the automatic one. */
+        automatic = false,
     ): Omit<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
         return {
             plan: {
@@ -1208,7 +1267,7 @@ export class CheckoutService {
             coupon:
                 coupon && quote.discountCharges > 0
                     ? {
-                          code: coupon.code,
+                          code: automatic ? null : coupon.code,
                           discountPaise: quote.discountPaise,
                           charges: quote.discountCharges,
                       }
@@ -1408,7 +1467,11 @@ export class CheckoutService {
         }
 
         const id = randomUUID();
-        const expiresAt = checkoutExpiresAt(stored, quote.startAt, now);
+        const expiresAt = couponCheckoutExpiresAt(
+            checkoutExpiresAt(stored, quote.startAt, now),
+            discounted ? coupon : null,
+            now,
+        );
         const provider = this.providers.get(CATALOGUE_BILLING_PROVIDER);
         const customer = await this.billingCustomer(ctx, billTo);
         // Every checkout's order or subscription is linked to the customer
@@ -1509,11 +1572,11 @@ export class CheckoutService {
                 error instanceof BillingProviderError &&
                 error.kind === "REFUSED"
             ) {
-                throw new ConflictException({
-                    message:
-                        "That coupon can't be used with payments right now. Try without it.",
-                    details: { field: "coupon" },
-                });
+                throw new CouponNotTaken(
+                    "refused",
+                    "That coupon can't be used with payments right now. Try without it.",
+                    error.said,
+                );
             }
             if (error instanceof BillingProviderError) {
                 throw new ServiceUnavailableException(
@@ -1557,6 +1620,14 @@ export class CheckoutService {
         try {
             row = await prisma.$transaction(async (tx) => {
                 await assertBillingMayStart(tx, ctx.organizationId);
+                if (discounted && coupon) {
+                    await takeCouponPlaceInTx(
+                        tx,
+                        coupon,
+                        ctx.organizationId,
+                        now,
+                    );
+                }
                 await this.dropOpenCheckout(tx, ctx.organizationId);
                 // The profile's customer brought up to date with what it
                 // has now, details given here included.

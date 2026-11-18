@@ -32,6 +32,10 @@ import { giveBillingDetails } from "../../../test/business-details";
 import { fakeCatalog } from "../../../test/fixtures/pricing-catalog";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditService } from "../audit/audit.service";
+import {
+    AUTOMATIC_COUPON_HOLD_MS,
+    automaticOffers,
+} from "../pricing/coupons.service";
 import { AddonsSyncHandler, BILLING_ADDONS_SYNC_TYPE } from "./addon-charges";
 import { AddonsService } from "./addons.service";
 import { BILLING_EMAIL_TYPE } from "./billing-email.job";
@@ -97,6 +101,7 @@ beforeEach(async () => {
 
 async function wipe() {
     await prisma.job.deleteMany({});
+    await prisma.billingAction.deleteMany({});
     await prisma.subscriptionAddonCharge.deleteMany({});
     await prisma.subscriptionAddon.deleteMany({});
     await prisma.pricingCouponRedemption.deleteMany({});
@@ -166,7 +171,12 @@ let evt = 0;
 async function deliver(
     providerSubscriptionId: string,
     phase: BillingEventPhase,
-    over: { currentPeriodEnd?: Date | null; now?: Date } = {},
+    over: {
+        currentPeriodEnd?: Date | null;
+        now?: Date;
+        providerPaymentId?: string;
+        paymentAmountPaise?: number;
+    } = {},
 ) {
     evt += 1;
     const status = (
@@ -189,6 +199,12 @@ async function deliver(
             status,
             phase,
             eventAt: new Date(Date.now() + evt).toISOString(),
+            ...(over.providerPaymentId
+                ? {
+                      providerPaymentId: over.providerPaymentId,
+                      paymentAmountPaise: over.paymentAmountPaise,
+                  }
+                : {}),
             ...(over.currentPeriodEnd !== undefined
                 ? {
                       currentPeriodEnd:
@@ -1103,7 +1119,8 @@ describe("automatic coupons (owner, 18 Nov 2026)", () => {
         const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
         expect(q).toMatchObject({
             kind: "NEW",
-            coupon: { code: "AUTO-OFF", discountPaise: 111, charges: 2 },
+            // Applied, never typed: its code isn't handed out (F12).
+            coupon: { code: null, discountPaise: 111, charges: 2 },
             firstChargePaise: c.priceCents - 111,
         });
         const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
@@ -1143,7 +1160,7 @@ describe("automatic coupons (owner, 18 Nov 2026)", () => {
             expect(
                 await checkout.quote(ctx, { plan, cycle: "month" }),
             ).toMatchObject({
-                coupon: { code: "AUTO-PCT", discountPaise: off, charges: 3 },
+                coupon: { code: null, discountPaise: off, charges: 3 },
                 firstChargePaise: price - off,
             });
         }
@@ -1244,6 +1261,296 @@ describe("automatic coupons (owner, 18 Nov 2026)", () => {
         });
         expect(
             (await checkout.quote(ctx, { plan: "c", cycle: "month" })).coupon,
-        ).toMatchObject({ code: "AUTO-ONE" });
+        ).toMatchObject({ code: null, discountPaise: 111 });
+    });
+});
+
+describe("coupon abuse refused (review 18 Nov 2026)", () => {
+    const automatic = (code: string, over: Parameters<typeof coupon>[1] = {}) =>
+        coupon(code, over).then((c) =>
+            prisma.pricingCoupon.update({
+                where: { id: c.id },
+                data: { automatic: true },
+            }),
+        );
+    const HOUR = 60 * 60 * 1000;
+
+    it("F1: Razorpay refusing the automatic coupon's Offer starts the plan at the full price and alerts the team once", async () => {
+        await install();
+        const made = await automatic("AUTO-GONE", { planIds: ["c"] });
+        for (const ctx of [await business(), await business()]) {
+            fake.failNextCreate = new BillingProviderError(
+                "REFUSED",
+                "Razorpay subscription creation failed (HTTP 400)",
+                "offer_id: made-up offer words",
+            );
+            const r = await checkout.changePlan(ctx, {
+                plan: "c",
+                cycle: "month",
+            });
+            if (r.kind === "TO_FREE") throw new Error("unreachable");
+            expect(r.quote.coupon).toBeNull();
+            expect(r.quote.firstChargePaise).toBe((await row("c")).priceCents);
+            expect(
+                await prisma.billingCheckout.findUniqueOrThrow({
+                    where: { id: r.checkout.id },
+                }),
+            ).toMatchObject({ couponId: null, discountPaise: 0 });
+        }
+        // The refused tries were never made; both made ones are full price.
+        expect(fake.createCalls).toHaveLength(2);
+        expect(fake.createCalls.every((c) => !c.discount)).toBe(true);
+        const alerts = await prisma.billingAction.findMany({
+            where: { code: "billing_coupon_offer_refused" },
+        });
+        expect(alerts).toHaveLength(1);
+        expect(alerts[0]).toMatchObject({
+            organizationId: null,
+            refs: { coupon: made.code, offer: OFFER_ID },
+        });
+    });
+
+    it('F1: a typed code, the automatic coupon\'s own included, keeps "Try without it"', async () => {
+        await install();
+        const ctx = await business();
+        await automatic("AUTO-TYPED", { planIds: ["c"] });
+        fake.failNextCreate = new BillingProviderError("REFUSED", "refused");
+        await expect(
+            checkout.changePlan(ctx, {
+                plan: "c",
+                cycle: "month",
+                coupon: "AUTO-TYPED",
+            }),
+        ).rejects.toMatchObject({
+            status: 409,
+            response: { details: { field: "coupon" } },
+        });
+        expect(await prisma.billingCheckout.count()).toBe(0);
+        expect(
+            await prisma.billingAction.count({
+                where: { code: "billing_coupon_offer_refused" },
+            }),
+        ).toBe(0);
+    });
+
+    it("F3: a trial with the coupon holds its place until its first charge redeems it", async () => {
+        await install();
+        const a = await business();
+        const b = await business();
+        await coupon("ONE-TRIAL", { maxRedemptions: 1 });
+        const r = await checkout.changePlan(a, {
+            plan: "b",
+            cycle: "month",
+            coupon: "ONE-TRIAL",
+        });
+        if (r.kind !== "TRIAL") throw new Error("expected a trial");
+        await deliver(`fake_sub_${r.checkout.id}`, "authenticated");
+        expect(
+            (
+                await prisma.billingCheckout.findUniqueOrThrow({
+                    where: { id: r.checkout.id },
+                })
+            ).status,
+        ).toBe("COMPLETED");
+        expect(await prisma.pricingCouponRedemption.count()).toBe(0);
+        await expect(
+            checkout.quote(b, {
+                plan: "b",
+                cycle: "month",
+                coupon: "ONE-TRIAL",
+            }),
+        ).rejects.toMatchObject({
+            message: "Coupon ONE-TRIAL has been used up.",
+        });
+    });
+
+    it("F3: two businesses at once can't both take a coupon's last place", async () => {
+        await install();
+        const [a, b] = [await business(), await business()];
+        const last = await coupon("LAST-PLACE", { maxRedemptions: 1 });
+        const results = await Promise.allSettled(
+            [a, b].map((ctx) =>
+                checkout.changePlan(ctx, {
+                    plan: "c",
+                    cycle: "month",
+                    coupon: "LAST-PLACE",
+                }),
+            ),
+        );
+        expect(results.filter((x) => x.status === "fulfilled")).toHaveLength(1);
+        const refused = results.find((x) => x.status === "rejected");
+        expect(refused?.reason).toMatchObject({
+            response: { details: { field: "coupon" } },
+        });
+        expect(
+            await prisma.billingCheckout.count({
+                where: { couponId: last.id },
+            }),
+        ).toBe(1);
+    });
+
+    it("F3: the automatic coupon's last place gone first, the other business starts at the full price", async () => {
+        await install();
+        const [a, b] = [await business(), await business()];
+        const last = await automatic("AUTO-LAST", {
+            planIds: ["c"],
+            maxRedemptions: 1,
+        });
+        const results = await Promise.all(
+            [a, b].map((ctx) =>
+                checkout.changePlan(ctx, { plan: "c", cycle: "month" }),
+            ),
+        );
+        expect(results.every((r) => r.kind === "NEW")).toBe(true);
+        expect(
+            await prisma.billingCheckout.count({
+                where: { couponId: last.id },
+            }),
+        ).toBe(1);
+        expect(await prisma.billingCheckout.count()).toBe(2);
+    });
+
+    it("F4: an unpaid checkout holds the automatic coupon an hour, not a day, and the public offer says so", async () => {
+        await install();
+        const [a, b] = [await business(), await business()];
+        await automatic("AUTO-HOLD", { planIds: ["c"], maxRedemptions: 1 });
+        const now = new Date();
+        const r = await checkout.changePlan(
+            a,
+            { plan: "c", cycle: "month" },
+            now,
+        );
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        const held = await prisma.billingCheckout.findUniqueOrThrow({
+            where: { id: r.checkout.id },
+        });
+        expect(held.expiresAt.getTime()).toBe(
+            now.getTime() + AUTOMATIC_COUPON_HOLD_MS,
+        );
+        expect(fake.createCalls[0]?.expireBy?.getTime()).toBe(
+            held.expiresAt.getTime(),
+        );
+        // Held: the other business pays the full price, and the pricing
+        // page doesn't offer what checkout won't give.
+        expect(
+            (await checkout.quote(b, { plan: "c", cycle: "month" }, now))
+                .coupon,
+        ).toBeNull();
+        expect(await automaticOffers("INDIA", now)).toEqual([]);
+        // An hour on, the unpaid checkout holds nothing.
+        const later = new Date(now.getTime() + HOUR + 1000);
+        expect(
+            (await checkout.quote(b, { plan: "c", cycle: "month" }, later))
+                .coupon,
+        ).toMatchObject({ discountPaise: 111 });
+        expect(await automaticOffers("INDIA", later)).toHaveLength(1);
+    });
+
+    it("F8: once per business across every automatic coupon, never after Free and back", async () => {
+        await install();
+        const ctx = await business();
+        await automatic("AUTO-C", { planIds: ["c"] });
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        expect(await prisma.pricingCouponRedemption.count()).toBe(1);
+        // Back on Free, then a second plan with its own automatic coupon.
+        await prisma.subscription.update({
+            where: { organizationId: ctx.organizationId },
+            data: { planId: (await row("free")).id, status: "ACTIVE" },
+        });
+        await automatic("AUTO-B", { planIds: ["b"] });
+        const q = await checkout.quote(ctx, { plan: "b", cycle: "month" });
+        expect(["NEW", "TRIAL"]).toContain(q.kind);
+        expect(q.coupon).toBeNull();
+        // Typing the automatic code doesn't get round it.
+        await expect(
+            checkout.quote(ctx, {
+                plan: "b",
+                cycle: "month",
+                coupon: "AUTO-B",
+            }),
+        ).rejects.toMatchObject({
+            status: 400,
+            response: { details: { field: "coupon" } },
+        });
+        // A business new to paid plans still gets it.
+        expect(
+            (
+                await checkout.quote(await business(), {
+                    plan: "b",
+                    cycle: "month",
+                })
+            ).coupon,
+        ).toMatchObject({ discountPaise: 111 });
+    });
+
+    it("F8: a business that paid the full price before, or whose renewal failed, doesn't get the launch offer", async () => {
+        await install();
+        const paid = await business();
+        await onPaidPlan(paid, "c");
+        expect(await prisma.sarohInvoice.count()).toBeGreaterThan(0);
+        await prisma.subscription.update({
+            where: { organizationId: paid.organizationId },
+            data: { planId: (await row("free")).id, status: "ACTIVE" },
+        });
+        await automatic("AUTO-LATE", { planIds: ["c"] });
+        const back = await checkout.quote(paid, { plan: "c", cycle: "month" });
+        expect(back.kind).toBe("NEW");
+        expect(back.coupon).toBeNull();
+
+        // A renewal that wasn't paid restarts as NEW: no launch offer.
+        const due = await business();
+        await prisma.subscription.update({
+            where: { organizationId: due.organizationId },
+            data: {
+                planId: (await row("c")).id,
+                status: "PAST_DUE",
+                paymentDueUntil: new Date(Date.now() + 3 * DAY),
+            },
+        });
+        const restart = await checkout.quote(due, {
+            plan: "c",
+            cycle: "month",
+        });
+        expect(restart.kind).toBe("NEW");
+        expect(restart.coupon).toBeNull();
+    });
+
+    it("F7: a discounted charge that differs from Saroh's invoice flags the coupon's Offer once", async () => {
+        await install();
+        const made = await coupon("WRONG-OFFER", { months: 1 });
+        for (const [i, ctx] of [await business(), await business()].entries()) {
+            const r = await checkout.changePlan(ctx, {
+                plan: "c",
+                cycle: "month",
+                coupon: "WRONG-OFFER",
+            });
+            if (r.kind === "TO_FREE") throw new Error("unreachable");
+            await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+                currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+                providerPaymentId: `pay_fake_${i}_${tag}`,
+                // Not what the quote said: the Offer took off another amount.
+                paymentAmountPaise: r.quote.payNowTotalPaise + 100,
+            });
+        }
+        expect(
+            await prisma.billingAction.count({
+                where: { code: "saroh_invoice_amount_mismatch" },
+            }),
+        ).toBe(2);
+        const flagged = await prisma.billingAction.findMany({
+            where: { code: "billing_coupon_offer_mismatch" },
+        });
+        expect(flagged).toHaveLength(1);
+        expect(flagged[0]).toMatchObject({
+            organizationId: null,
+            refs: expect.objectContaining({
+                coupon: made.code,
+                offer: OFFER_ID,
+            }),
+        });
     });
 });
