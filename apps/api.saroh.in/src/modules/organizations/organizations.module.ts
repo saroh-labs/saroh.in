@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 
+import { PhoneRequirementModule } from "../account-phone/phone-required";
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
 import { MediaModule } from "../media/media.module";
@@ -38,6 +39,8 @@ import { WebAddressService } from "./web-address.service";
         AnalyticsCoreModule,
         // The business logo is a library object (`MediaService.readyObject`).
         MediaModule,
+        // PHONE_REQUIRED_FOR_ACCOUNTS before a business is set up (03-M5).
+        PhoneRequirementModule,
     ],
     controllers: [
         OrganizationsController,
