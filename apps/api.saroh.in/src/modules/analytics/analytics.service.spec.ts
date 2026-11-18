@@ -7,6 +7,11 @@ jest.mock("@saroh/database", () => {
         prisma: {
             site: { findUnique: jest.fn() },
             siteLink: { findMany: jest.fn() },
+            socialPost: {
+                findMany: jest.fn(() =>
+                    Promise.resolve([{ ref: "social-abcdefghij" }]),
+                ),
+            },
             analyticsEvent: { create: jest.fn(), findFirst: jest.fn() },
             analyticsDailyAggregate: { findMany: jest.fn() },
         },
@@ -382,6 +387,21 @@ describe("AnalyticsService.ingestPublic — only the site's own links count as a
             },
             select: { label: true },
         });
+    });
+
+    it("keeps a Saroh Social post's ref as its business's label", async () => {
+        wireSite();
+        linkFindMany.mockResolvedValue([]);
+
+        expect(await stepWith("social-abcdefghij")).toEqual({
+            source: "instagram",
+            ref: "social-abcdefghij",
+        });
+        expect(prisma.socialPost.findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: expect.objectContaining({ organizationId: "org_SITE" }),
+            }),
+        );
     });
 
     it("counts any other label under its group, never refusing the step", async () => {

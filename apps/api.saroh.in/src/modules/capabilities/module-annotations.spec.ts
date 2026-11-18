@@ -470,6 +470,8 @@ const NEVER: Record<string, string> = {
     // Saroh Social (plan saroh-social 2026-11-18-001): not a registry module.
     "social/channels/channels.controller.ts":
         "Saroh Social's access, Channels and Meta's return — MODULE_SOCIAL, the plan's social row and social:* gate them in SocialAccess; disconnecting stays open",
+    "social/posts/posts.controller.ts":
+        "Saroh Social's posts — MODULE_SOCIAL, the plan's social row and social:* gate them in SocialAccess; cancelling and deleting stay open",
 };
 
 /** Controllers with a test of their own below, not a row above. */

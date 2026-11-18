@@ -5048,6 +5048,9 @@ model SocialPost {
   zone         String?
   // The waiting `social.publish` job: a run of any other is a no-op.
   publishJobId String?
+  // "Remove from Saroh" on a post that went out: hidden, still counted in
+  // its month (it was posted), never deleted from the platform.
+  removedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

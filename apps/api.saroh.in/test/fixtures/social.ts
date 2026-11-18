@@ -42,6 +42,8 @@ export interface SocialWorld {
     flag: boolean;
     planId: "free" | "grow" | "pro";
     addon: boolean;
+    /** The month's allowance in place of the sample catalogue's. */
+    limit?: number;
 }
 
 export function socialAccessFor(world: SocialWorld): SocialAccess {
@@ -60,7 +62,13 @@ export function socialAccessFor(world: SocialWorld): SocialAccess {
                         ? [{ addonId: "social-grow", quantity: 1 }]
                         : [],
                     now: new Date(),
-                }),
+                }).map((m) =>
+                    m.moduleId === "social" &&
+                    m.state === "on" &&
+                    world.limit !== undefined
+                        ? { ...m, limit: world.limit }
+                        : m,
+                ),
             }),
         ),
     } as unknown as CatalogueAccessService;

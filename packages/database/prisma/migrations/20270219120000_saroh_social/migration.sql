@@ -86,6 +86,7 @@ CREATE TABLE "SocialPost" (
     "publishAt" TIMESTAMP(3),
     "zone" TEXT,
     "publishJobId" TEXT,
+    "removedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

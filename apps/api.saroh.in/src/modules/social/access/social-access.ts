@@ -21,6 +21,7 @@ import {
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import type { OrgAction } from "../../organizations/organization-actions";
 import { allows, authorize } from "../../organizations/organization-policy";
+import { goodTimes } from "../posts/good-time";
 
 /** Saroh Social's row in the plans catalogue (`MODULE_MAP`), and its add-on's module. */
 export const SOCIAL_MODULE = "social";
@@ -50,6 +51,8 @@ export interface SocialAccessView {
         /** Request more was sent this month. */
         requested: boolean;
     } | null;
+    /** "Good time": the next few suggested instants (ISO), in the business's zone. */
+    goodTimes: string[];
 }
 
 /** A count of posts and its window. */
@@ -142,6 +145,7 @@ export class SocialAccess {
                 plan: null,
                 upgradeTo: null,
                 usage: null,
+                goodTimes: [],
             };
         }
         const row = await this.planRow(ctx.organizationId, now);
@@ -155,6 +159,7 @@ export class SocialAccess {
                     ? { planId: row.upgradePlanId, name: row.upgradeTo }
                     : null,
                 usage: null,
+                goodTimes: [],
             };
         }
         const room = await countRoom(prisma, ctx.organizationId, row, now);
@@ -175,6 +180,7 @@ export class SocialAccess {
                 resetsAt: room.end.toISOString(),
                 requested: requested > 0,
             },
+            goodTimes: goodTimes(now, room.zone).map((d) => d.toISOString()),
         };
     }
 }
