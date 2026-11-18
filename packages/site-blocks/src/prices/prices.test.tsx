@@ -308,7 +308,7 @@ describe("Join on the Plans block", () => {
         );
         expect(
             screen.getByRole("link", {
-                name: "Or call Pulse Fitness on +91 80 4000 1234",
+                name: "Call +91 80 4000 1234",
             }),
         ).toBeInTheDocument();
         expect(join).not.toHaveBeenCalled();

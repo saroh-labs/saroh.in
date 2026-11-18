@@ -12,6 +12,7 @@ import {
     LOOKS,
 } from "@saroh/block-contract";
 
+import { ACCOUNT_PARTS } from "./account/look-account-rules";
 import { LOOK_DESK_FROM } from "./look-theme";
 
 /**
@@ -41,13 +42,17 @@ import { LOOK_DESK_FROM } from "./look-theme";
  * as a ring, `site-craft.ts` as an outline) or a control's height.
  */
 
-/** Buttons: the shared `ctaClasses` and the look blocks' `rounded-site`. */
-const BUTTON =
-    ':is(a, button):is([class*="rounded-[var(--site-radius)"], [class~="rounded-site"])';
+/**
+ * Buttons: the shared `ctaClasses`, the look blocks' `rounded-site`, and
+ * the customer's account's (DEC-229: the account takes the same styles).
+ */
+const BUTTON = `:is(:is(a, button):is([class*="rounded-[var(--site-radius)"], [class~="rounded-site"]), ${ACCOUNT_PARTS.button})`;
 
-/** Cards: Classic's rounder-than-a-button boxes and the looks' card fills. */
-const CARD =
-    ':is([class*="rounded-[calc(var(--site-radius)*1.4)]"], [class*="rounded-[calc(var(--site-radius)*1.6)]"], .bg-site-surface.rounded-site-photo)';
+/**
+ * Cards: Classic's rounder-than-a-button boxes, the looks' card fills and
+ * the account's cards.
+ */
+const CARD = `:is([class*="rounded-[calc(var(--site-radius)*1.4)]"], [class*="rounded-[calc(var(--site-radius)*1.6)]"], .bg-site-surface.rounded-site-photo, ${ACCOUNT_PARTS.card})`;
 
 /** Photographs: Classic's and the looks', and a frame clipping one. */
 const IMAGE =
@@ -93,7 +98,14 @@ const RULES: Record<ComponentKind, Partial<Record<string, Rule>>> = {
     buttons: Object.fromEntries(
         Object.entries(COMPONENT_VALUES.buttonRadius).map(([id, n]) => [
             id,
-            (at) => radius(at, "--site-button-radius", px(n), BUTTON),
+            (at) =>
+                radius(at, "--site-button-radius", px(n), BUTTON) +
+                // A look's account rounds its buttons from the look's own
+                // radius (`accountLookRules`); the merchant's choice wins.
+                `
+            ${at} [data-account-look] :is(${ACCOUNT_PARTS.button}) {
+                border-radius: var(--site-button-radius);
+            }`,
         ]),
     ),
     secondButton: {

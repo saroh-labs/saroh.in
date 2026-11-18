@@ -191,7 +191,7 @@ function homePlan(plan: AccountPlan) {
         <AccountHome account={ACCOUNT} home={home(plan)} api={HOME_API} />,
     );
     return {
-        card: screen.getByRole("region", { name: "Membership" }),
+        card: screen.getByRole("region", { name: "Your plan" }),
         view,
     };
 }

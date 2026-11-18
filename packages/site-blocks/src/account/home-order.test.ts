@@ -6,7 +6,7 @@ import type {
     AccountWaitlistPlace,
 } from "./details-model";
 import type { HomeBlock } from "./home-order";
-import { homeLayout } from "./home-order";
+import { HOME_ORDER, homeLayout } from "./home-order";
 import type {
     AccountBooking,
     AccountHome,
@@ -17,10 +17,11 @@ import type {
 } from "./model";
 
 /**
- * Home's order (DEC-142): what the customer has in progress first, then
- * what is recent, then what else they can do — only for what the business
- * offers — and one welcome block when there is nothing at all. Every
- * combination of what a customer can have is walked, and held to the rules.
+ * Home's order (DEC-229, first DEC-142): one fixed order — waiting on you,
+ * what's next, new since your last visit, plan and packs, latest order —
+ * then what else they can do, only for what the business offers, and one
+ * welcome block when there is nothing at all. Every combination of what a
+ * customer can have is walked, and held to the rules.
  */
 
 const BOOKING: AccountBooking = {
@@ -127,13 +128,6 @@ const account = (unread = 0, tabs = TABS) => ({
 });
 const OPEN = { canBook: true, canShop: true };
 
-const PROGRESS: HomeBlock[] = [
-    "place-held",
-    "to-pay",
-    "booking",
-    "orders",
-    "messages",
-];
 const LAST: HomeBlock[] = ["offers", "welcome"];
 
 describe("Home's order: the cases the audit named", () => {
@@ -149,7 +143,7 @@ describe("Home's order: the cases the audit named", () => {
         expect(layout.offers).toEqual({ book: true, shop: false });
     });
 
-    it("something that changed leads, then what is in progress, in a fixed order", () => {
+    it("waiting on you leads, then what's next, what's new, plan and packs, the latest order", () => {
         const layout = homeLayout(
             account(3),
             home({
@@ -163,16 +157,18 @@ describe("Home's order: the cases the audit named", () => {
             OPEN,
         );
         expect(layout.blocks).toEqual([
-            "changes",
-            // A held place runs out within hours; money owed next.
+            // Waiting on you: a held place runs out within hours; money owed next.
             "place-held",
             "to-pay",
+            // What's next: the booking, then the line they wait in.
             "booking",
-            "orders",
-            "messages",
-            // Then what they hold, then the line they wait in.
-            "plan",
             "waiting",
+            // New since your last visit.
+            "changes",
+            "messages",
+            // Plan and packs, then the latest order.
+            "plan",
+            "orders",
         ]);
         // Nothing to offer: they have a booking and an order under way.
         expect(layout.offers).toEqual({ book: false, shop: false });
@@ -238,14 +234,14 @@ describe("Home's order: the cases the audit named", () => {
             OPEN,
         );
         expect(layout.blocks).toEqual([
-            "changes",
-            "booking",
-            "orders",
             "to-pay",
+            "booking",
+            "waiting",
+            "changes",
             "classes",
             "plan",
             "courses",
-            "waiting",
+            "orders",
             // Offered still: nothing says they have one under way.
             "offers",
         ]);
@@ -321,14 +317,18 @@ describe("Home's order: every combination", () => {
         // Each block once.
         if (new Set(blocks).size !== blocks.length) throw new Error(label);
 
-        // What changed leads.
-        if (at("changes") > 0) throw new Error(`changes not first: ${label}`);
-
         // Offers, or the welcome, come last, and never both.
         const last = blocks.filter((b) => LAST.includes(b));
         if (last.length > 1) throw new Error(`two endings: ${label}`);
         if (last.length === 1 && blocks.at(-1) !== last[0]) {
             throw new Error(`ending not last: ${label}`);
+        }
+
+        // Everything else in the one fixed order (DEC-229).
+        const rest = blocks.filter((b) => !LAST.includes(b));
+        const order = rest.map((b) => HOME_ORDER.indexOf(b));
+        if (order.some((i, n) => i === -1 || (n > 0 && i < order[n - 1]))) {
+            throw new Error(`out of order: ${label}`);
         }
 
         const booked = data.nextBooking?.ok === true && data.nextBooking.value;
@@ -340,38 +340,16 @@ describe("Home's order: every combination", () => {
         const due =
             data.invoicesDue?.ok === true && data.invoicesDue.value.length > 0;
 
-        // Everything in progress is there, before everything recent.
-        const inProgress: [HomeBlock, boolean][] = [
+        // What is waiting on them, or coming up, is always there.
+        const present: [HomeBlock, boolean][] = [
             ["place-held", held],
             ["to-pay", due],
             ["booking", Boolean(booked)],
             ["orders", orderOpen],
         ];
-        const progressAt = inProgress
-            .filter(([, on]) => on)
-            .map(([key]) => {
-                if (at(key) === -1) throw new Error(`${key} missing: ${label}`);
-                return at(key);
-            });
-        const recentAt = blocks
-            .map((b, i) => ({ b, i }))
-            .filter(
-                ({ b }) =>
-                    b !== "changes" &&
-                    !LAST.includes(b) &&
-                    !(
-                        PROGRESS.includes(b) &&
-                        (inProgress.find(([k]) => k === b)?.[1] ??
-                            b === "messages")
-                    ),
-            )
-            .map(({ i }) => i);
-        if (
-            progressAt.length > 0 &&
-            recentAt.length > 0 &&
-            Math.max(...progressAt) > Math.min(...recentAt)
-        ) {
-            throw new Error(`recent before in progress: ${label}`);
+        for (const [key, on] of present) {
+            if (on && at(key) === -1)
+                throw new Error(`${key} missing: ${label}`);
         }
 
         // A read that failed never vanishes.

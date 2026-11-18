@@ -2,22 +2,24 @@ import type { AccountChange } from "./details-model";
 import type { AccountHome, AccountView } from "./model";
 
 /**
- * What Home shows, and in what order (DEC-142): what this customer has in
- * progress first, then what is recent, then what else they can do here —
- * and only for what the business offers. With nothing at all, one welcome
- * block instead of a column of empty cards.
+ * What Home shows, and in what order (DEC-229, plan U13; first DEC-142).
+ * One fixed order for every business, trade and look, each block left out
+ * when it has nothing to say:
  *
- * Pure, so every combination is tested without drawing anything. The page
- * draws the keys in this order; the same order is the DOM's at every width.
+ * 1. **Waiting on you:** a place held for them in a class (it runs out
+ *    within hours), then a bill to pay.
+ * 2. **What's next:** a booking coming up, then a line they are waiting in.
+ * 3. **New since your last visit:** what changed, then a message they
+ *    haven't opened (unless the changes already say so).
+ * 4. **Plan and packs:** classes left, their plan, their courses.
+ * 5. **Latest order.**
+ * 6. "Book a time" and "Go to the shop", last, each only when the business
+ *    offers it and the customer has none of it under way. With nothing at
+ *    all, one welcome block that carries them instead.
  *
- * - **In progress:** a place held for them in a class (it runs out within
- *   hours), an invoice to pay, a booking coming up, an order on its way, a
- *   message they haven't opened.
- * - **Recent:** their latest orders once none is on its way, classes left,
- *   their plan, their courses, a line they are waiting in — and any block
- *   whose read failed, which says so there rather than vanish.
- * - **Offers:** "Book a time" and "Go to the shop", last, each only when
- *   the business offers it and the customer has none of it under way.
+ * A block whose read failed sits where it would have, and says so. Pure, so
+ * every combination is tested without drawing anything; the page draws the
+ * keys in this order, which is the DOM's at every width.
  */
 
 export type HomeBlock =
@@ -58,13 +60,32 @@ export interface HomeDoors {
     canShop: boolean;
 }
 
+/** The one order (DEC-229). */
+export const HOME_ORDER: readonly HomeBlock[] = [
+    "place-held",
+    "to-pay",
+    "booking",
+    "waiting",
+    "changes",
+    "messages",
+    "classes",
+    "plan",
+    "courses",
+    "orders",
+];
+
+/** The blocks Home groups as "Waiting on you". */
+export const WAITING_ON_YOU: ReadonlySet<HomeBlock> = new Set<HomeBlock>([
+    "place-held",
+    "to-pay",
+]);
+
 export function homeLayout(
     account: Pick<AccountView, "tabs" | "unreadMessages">,
     home: AccountHome,
     doors: HomeDoors,
 ): HomeLayout {
-    const progress: HomeBlock[] = [];
-    const recent: HomeBlock[] = [];
+    const shown = new Set<HomeBlock>();
 
     const messagesTab = account.tabs.some((t) => t.key === "messages");
     const changes = home.changes?.ok
@@ -73,64 +94,48 @@ export function homeLayout(
               (c) => c.kind !== "messages" || messagesTab,
           )
         : [];
+    if (changes.length > 0 || home.changes?.ok === false) shown.add("changes");
 
     // A place held for them, or a line they are waiting in.
     const waitlist = home.waitlist ?? null;
     if (waitlist) {
-        if (!waitlist.ok) recent.push("waiting");
+        if (!waitlist.ok) shown.add("waiting");
         else {
             if (waitlist.value.some((p) => p.status === "OFFERED")) {
-                progress.push("place-held");
+                shown.add("place-held");
             }
             if (waitlist.value.some((p) => p.status === "WAITING")) {
-                recent.push("waiting");
+                shown.add("waiting");
             }
         }
     }
 
     const invoices = home.invoicesDue;
-    if (invoices) {
-        if (!invoices.ok) recent.push("to-pay");
-        else if (invoices.value.length > 0) progress.push("to-pay");
+    if (invoices && (!invoices.ok || invoices.value.length > 0)) {
+        shown.add("to-pay");
     }
 
     const booked = home.nextBooking?.ok === true && home.nextBooking.value;
-    if (home.nextBooking && !home.nextBooking.ok) recent.push("booking");
-    else if (booked) progress.push("booking");
+    if ((home.nextBooking && !home.nextBooking.ok) || booked) {
+        shown.add("booking");
+    }
 
     const orders = home.orders;
     const orderOpen = orders?.ok === true && orders.value.some((o) => o.open);
-    if (orders) {
-        if (!orders.ok) recent.push("orders");
-        else if (orderOpen) progress.push("orders");
-        else if (orders.value.length > 0) recent.push("orders");
-    }
+    if (orders && (!orders.ok || orders.value.length > 0)) shown.add("orders");
 
     // Unread, unless "since you were last here" already says so.
     const unread = messagesTab && (account.unreadMessages ?? 0) > 0;
     if (unread && !changes.some((c) => c.kind === "messages")) {
-        progress.push("messages");
+        shown.add("messages");
     }
 
-    if (!home.classes.ok || home.classes.value) recent.push("classes");
-    if (!home.plan.ok || home.plan.value) recent.push("plan");
+    if (!home.classes.ok || home.classes.value) shown.add("classes");
+    if (!home.plan.ok || home.plan.value) shown.add("plan");
     const courses = home.courses;
     if (courses && (!courses.ok || courses.value.length > 0)) {
-        recent.push("courses");
+        shown.add("courses");
     }
-
-    // Recent keeps the page's reading order: orders, then what they hold,
-    // then what couldn't be read sits where it would have.
-    const RECENT_ORDER: HomeBlock[] = [
-        "booking",
-        "orders",
-        "to-pay",
-        "classes",
-        "plan",
-        "courses",
-        "waiting",
-    ];
-    recent.sort((a, b) => RECENT_ORDER.indexOf(a) - RECENT_ORDER.indexOf(b));
 
     const offers: HomeOffers = {
         // Offered only for what they have none of under way.
@@ -138,13 +143,8 @@ export function homeLayout(
         shop: doors.canShop && orders !== null && !orderOpen,
     };
 
-    const blocks: HomeBlock[] = [];
-    if (changes.length > 0 || home.changes?.ok === false)
-        blocks.push("changes");
-    blocks.push(...progress, ...recent);
-
-    const nothing = progress.length === 0 && recent.length === 0;
-    if (nothing && changes.length === 0) {
+    const blocks = HOME_ORDER.filter((key) => shown.has(key));
+    if (blocks.length === 0) {
         // One friendly block; it carries the offers itself.
         blocks.push("welcome");
     } else if (offers.book || offers.shop) {

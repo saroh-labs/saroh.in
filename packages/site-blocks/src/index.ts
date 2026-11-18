@@ -376,12 +376,7 @@ export type { PayInstructionsCardProps } from "./pay-instructions/pay-instructio
 
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.
-export {
-    UNAVAILABLE_TEXT,
-    callLine,
-    retryText,
-    sheetWays,
-} from "./account/api";
+export { UNAVAILABLE_TEXT, retryText, sheetWays } from "./account/api";
 export type {
     CodeRequestResult,
     SignInApi,

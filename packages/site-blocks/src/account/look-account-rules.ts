@@ -21,6 +21,12 @@ import type { LookId } from "@saroh/block-contract";
  * under Quiet, never a rounded box under Folio.
  *
  * Colours and faces are the business's (`--site-*` only, gate G2).
+ *
+ * COMPONENT STYLES (DEC-227, DEC-229): the merchant's button and card
+ * choices reach these same parts: `component-theme.ts` finds them by
+ * `ACCOUNT_PARTS`, and its button rule reaches past the look's account
+ * rules here. One set of parts for every look: this list only grows, and
+ * no look gets its own copy of a screen.
  */
 
 /** The parts, by the classes they carry. */

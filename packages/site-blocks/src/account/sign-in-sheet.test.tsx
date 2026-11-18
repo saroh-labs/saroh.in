@@ -15,7 +15,7 @@ import type {
     SignInOptions,
     VerifyResult,
 } from "./api";
-import { callLine, codeDigits, retryText } from "./api";
+import { codeDigits, retryText } from "./api";
 import { CODE_STEP_MS, parseSignInDraft } from "./sign-in-draft";
 import { resendDelayMs, resendWait, SignInSheet } from "./sign-in-sheet";
 
@@ -138,10 +138,11 @@ describe("SignInSheet: the email step", () => {
         await askForCode();
         const alert = screen.getByRole("alert");
         expect(alert).toHaveTextContent(
-            "We couldn't send your code. Try again in a few minutes",
+            "We couldn't send your code. Try again in a few minutes, or call Kavi Dental.",
         );
+        // The way out (DEC-229): Call, with the business's phone.
         const call = screen.getByRole("link", {
-            name: "Or call Kavi Dental on +91 80 4000 1234",
+            name: "Call +91 80 4000 1234",
         });
         expect(call).toHaveAttribute("href", "tel:+918040001234");
         // Still on the email step: nothing else happens.
@@ -152,7 +153,7 @@ describe("SignInSheet: the email step", () => {
         setup({ code: { ok: false, reason: "unavailable" } });
         await askForCode();
         expect(screen.getByRole("alert")).toHaveTextContent(
-            /^We couldn't send your code. Try again in a few minutes$/,
+            /^We couldn't send your code. Try again in a few minutes\.$/,
         );
         expect(screen.queryByRole("link")).toBeNull();
     });
@@ -468,14 +469,6 @@ describe("the sheet's words", () => {
         expect(retryText(40)).toBe("Try again in 40 seconds");
         expect(retryText(60)).toBe("Try again in 1 minute");
         expect(retryText(700)).toBe("Try again in 12 minutes");
-    });
-
-    it("gives the call line only with a phone", () => {
-        expect(callLine("Kavi Dental", "+91 80 4000 1234")).toBe(
-            "Or call Kavi Dental on +91 80 4000 1234",
-        );
-        expect(callLine("Kavi Dental", null)).toBe(null);
-        expect(callLine("Kavi Dental", "  ")).toBe(null);
     });
 
     it("keeps six digits of whatever was pasted", () => {

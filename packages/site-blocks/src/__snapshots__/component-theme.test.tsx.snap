@@ -1,5 +1,1083 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`a look's theme with no component styles is pinned > bakery in cardamom under folio 1`] = `
+"<style>
+            :root {
+                --site-bg: 0 0% 100%;
+                --site-surface: 0 0% 100%;
+                --site-fg: 24 10% 10%;
+                /* Body text: quieter than a heading, still readable. The
+                   Tailwind config has mapped site-body since S2-006 and
+                   nothing ever defined the variable, so every user of it —
+                   the layout root, the 404 page, checkout — fell back to
+                   near-black, which is invisible on a dark ground. */
+                --site-body: 24 6% 34%;
+                /* Declared in the site.* namespace since #252 and never
+                   given a default here, so text-site-muted and
+                   border-site-border resolved to hsl() of nothing — an invalid
+                   declaration the browser drops, leaving the text at its
+                   inherited colour and the border invisible. The publisher
+                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
+                   so live sites were fine and only this fallback was not: the
+                   tenant 404, the root error boundary, checkout, and every
+                   publication older than #189 — exactly the paths that render
+                   when something has already gone wrong.
+
+                   The values are the ones siteStyleVariables() derives for the
+                   default style, asserted in api's site-style.spec.ts, so a
+                   publication carrying no variables renders identically to one
+                   published today having chosen nothing. Picking a fresh pair
+                   here would have made "never styled" and "styled by default"
+                   two different-looking things. */
+                --site-muted: 24 4.9% 55.9%;
+                --site-border: 24 1.1% 90.1%;
+                --site-accent: 24 10% 10%;
+                --site-accent-fg: 0 0% 100%;
+                --site-hero-bg: 0 0% 100%;
+                --site-hero-fg: 24 10% 10%;
+                --site-cta-bg: 24 10% 10%;
+                --site-cta-fg: 0 0% 98%;
+                --site-footer-bg: 24 10% 10%;
+                --site-footer-fg: 0 0% 98%;
+                --site-page-margin: 38px;
+                --site-section-padding: 52px;
+                --site-grid-gap: 14px;
+                --site-radius: 2px;
+                --site-heading-scale: 1;
+                /* The merchant's type (H1). Every publication, old and new,
+                   is set in the neutral system stack until its merchant
+                   chooses fonts: no publication carries a font variable yet,
+                   so these are what every site renders with. Never one of
+                   Saroh's own faces (gate G7). */
+                --site-font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+            }
+            :root {
+                --site-bg: 44.21 54.29% 93.14%;
+                --site-surface: 45.52 43.28% 86.86%;
+                --site-fg: 81.43 24.14% 11.37%;
+                --site-body: 78.26 17.83% 25.29%;
+                --site-muted: 74.4 14.62% 33.53%;
+                --site-border: 45.88 33.33% 80%;
+                --site-accent: 93.6 38.46% 25.49%;
+                --site-accent-fg: 44.21 54.29% 93.14%;
+                --site-hero-bg: 44.21 54.29% 93.14%;
+                --site-cta-bg: 93.6 38.46% 25.49%;
+                --site-cta-fg: 44.21 54.29% 93.14%;
+                --site-footer-bg: 44.21 54.29% 93.14%;
+                --site-footer-fg: 81.43 24.14% 11.37%;
+                --site-hero-fg: 81.43 24.14% 11.37%;
+                --site-page-margin: 40px;
+                --site-section-padding: 76px;
+                --site-grid-gap: 30px;
+                --site-radius: 0px;
+                --site-heading-scale: 1;
+                --site-font-heading: "Fraunces", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
+                --site-font-body: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-status: 93.6 38.46% 25.49%;
+                --site-status-inverse: 78.53 50.75% 73.73%;
+                --site-display-size: 68px;
+                --site-body-size: 16.5px;
+                --site-measure: 58ch;
+                --site-content-width: 1240px;
+                --site-accent-text: 93.6 38.46% 25.49%;
+                --site-accent-soft: 57 25% 84.31%;
+                --site-rule: 54.78 9.39% 48.04%;
+                --site-footer-muted: 64.29 6.93% 39.61%;
+            }
+            :root {
+                --site-radius: 0px;
+                --site-radius-s: 0px;
+                --site-radius-photo: 0px;
+                --site-page-margin: 20px;
+                --site-section-padding: 72px;
+                --site-motion-fast: 100ms;
+                --site-motion-base: 140ms;
+                --site-motion-slow: 200ms;
+                --site-rise: 8px;
+                --site-display-size: 64px;
+                --site-body-size: 17px;
+                --site-measure: 64ch;
+                --site-content-width: initial;
+                --site-font-heading: "Newsreader", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
+                --site-font-body: "Hanken Grotesk", "Site Rupee", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-mono: initial;
+            }
+            @media (min-width: 768px) {
+                :root {
+                    --site-page-margin: 64px;
+                    --site-section-padding: 136px;
+                }
+            }
+            :root [class*="rounded-[calc(var(--site-radius)*1.4)]"],
+            :root [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
+                border-radius: var(--site-radius-s);
+            }
+            :root img[class*="rounded-[var(--site-radius)]"] {
+                border-radius: var(--site-radius-photo);
+            }
+            :root [data-site-section] ~ [data-site-section]:not(:empty):not([data-site-band]):not(:has(> [data-site-ground])) {
+                border-top: 1px solid hsl(var(--site-border));
+            }
+            :root[data-site-look],
+            :root [data-site-look] {
+                padding-bottom: var(--site-consent-offset, 0px);
+            }
+            @keyframes site-held {
+                from {
+                    visibility: hidden;
+                }
+            }
+            :root .animate-pulse {
+                animation: none;
+            }
+            :root :is(
+                    [aria-busy="true"]:not([data-live-fact]),
+                    [data-times-loading],
+                    [data-services-loading]
+                ) {
+                animation-name: site-held;
+                animation-duration: 1ms;
+                animation-fill-mode: both;
+                animation-delay: 300ms;
+            }
+            @font-face {
+                font-family: "Site Rupee";
+                src: local("Arial"), local("ArialMT"), local("Roboto"), local("Roboto-Regular"), local("Segoe UI"), local("Noto Sans"), local("NotoSans-Regular"), local("Liberation Sans"), local("DejaVu Sans");
+                font-weight: 100 500;
+                unicode-range: U+20B9;
+            }
+            @font-face {
+                font-family: "Site Rupee";
+                src: local("Arial Bold"), local("Arial-BoldMT"), local("Roboto Bold"), local("Roboto-Bold"), local("Segoe UI Bold"), local("Noto Sans Bold"), local("NotoSans-Bold"), local("Liberation Sans Bold"), local("DejaVu Sans Bold");
+                font-weight: 600 900;
+                unicode-range: U+20B9;
+            }
+            :root {
+                --site-band-paper: var(--site-bg);
+                --site-band-ink: var(--site-fg);
+                --site-band-card: var(--site-surface);
+                --site-band-accent: var(--site-accent);
+                --site-band-accent-fg: var(--site-accent-fg);
+                --site-band-status: var(--site-status);
+                --site-band-status-inverse: var(--site-status-inverse);
+            }
+            :root [data-site-band] {
+                background-color: hsl(var(--site-bg));
+                color: hsl(var(--site-body));
+            }
+            :root [data-site-band="surface"] {
+                --site-bg: var(--site-band-card);
+                --site-surface: var(--site-band-paper);
+            }
+            :root [data-site-band="inverse"] {
+                --site-bg: var(--site-band-ink);
+                --site-surface: var(--site-band-ink);
+                --site-fg: var(--site-band-paper);
+                --site-body: var(--site-band-paper);
+                --site-muted: var(--site-band-paper);
+                --site-border: var(--site-band-paper);
+                --site-accent: var(--site-band-paper);
+                --site-accent-fg: var(--site-band-ink);
+                --site-status: var(--site-band-status-inverse);
+                --site-status-inverse: var(--site-band-status);
+            }
+            :root [data-site-band="accent"] {
+                --site-bg: var(--site-band-accent);
+                --site-surface: var(--site-band-accent);
+                --site-fg: var(--site-band-accent-fg);
+                --site-body: var(--site-band-accent-fg);
+                --site-muted: var(--site-band-accent-fg);
+                --site-border: var(--site-band-accent-fg);
+                --site-accent: var(--site-band-accent-fg);
+                --site-accent-fg: var(--site-band-accent);
+                --site-status: initial;
+                --site-status-inverse: initial;
+            }
+            :root [data-site-section][id] {
+                scroll-margin-top: 4.5rem;
+            }
+            :root [data-site-section] .prose dt {
+                color: hsl(var(--site-fg));
+                font-family: var(--site-font-heading);
+            }
+            :root [data-site-section] .prose dd {
+                color: hsl(var(--site-fg) / 0.8);
+            }
+            :root [data-site-section] [data-site-facts="labels"] dt {
+                margin-top: 1.25em;
+                color: hsl(var(--site-muted));
+                font-family: var(--site-font-body);
+                font-size: 0.78rem;
+                font-weight: 500;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            :root [data-site-section] [data-site-facts="labels"] dd {
+                margin-top: 0.25em;
+                padding-inline-start: 0;
+                color: hsl(var(--site-fg));
+            }
+            :root {
+                --site-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+                --site-section-space: var(--site-section-padding);
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h1, h2, h3, h4) {
+                font-family: var(--site-font-heading);
+                text-wrap: balance;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h1 {
+                letter-spacing: -0.03em;
+                line-height: 1.05;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h2 {
+                letter-spacing: -0.02em;
+                line-height: 1.15;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h3, h4) {
+                letter-spacing: -0.01em;
+                line-height: 1.25;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) p {
+                text-wrap: pretty;
+            }
+            :root [data-site-section] .prose {
+                --tw-prose-body: hsl(var(--site-body));
+                --tw-prose-headings: hsl(var(--site-fg));
+                --tw-prose-lead: hsl(var(--site-fg));
+                --tw-prose-links: hsl(var(--site-accent));
+                --tw-prose-bold: hsl(var(--site-fg));
+                --tw-prose-counters: hsl(var(--site-muted));
+                --tw-prose-bullets: hsl(var(--site-muted));
+                --tw-prose-hr: hsl(var(--site-border));
+                --tw-prose-quotes: hsl(var(--site-fg));
+                --tw-prose-quote-borders: hsl(var(--site-accent));
+                --tw-prose-captions: hsl(var(--site-muted));
+                --tw-prose-code: hsl(var(--site-fg));
+                --tw-prose-th-borders: hsl(var(--site-border));
+                --tw-prose-td-borders: hsl(var(--site-border));
+            }
+            :root [data-site-section] .prose blockquote {
+                border-inline-start-width: 2px;
+                font-style: normal;
+                font-weight: 500;
+                quotes: none;
+            }
+            :root [data-site-section] .prose blockquote p::before,
+            :root [data-site-section] .prose blockquote p::after {
+                content: none;
+            }
+            :root [data-site-section] .prose a {
+                text-decoration-line: underline;
+                text-decoration-thickness: 1px;
+                text-underline-offset: 0.2em;
+            }
+            :root [data-site-section] .prose a:hover {
+                text-decoration-thickness: 2px;
+            }
+            :root ::selection {
+                background-color: hsl(var(--site-accent));
+                color: hsl(var(--site-accent-fg));
+            }
+            :root [data-site-ground="hero"] ::selection {
+                background-color: hsl(var(--site-hero-fg));
+                color: hsl(var(--site-hero-bg));
+            }
+            :root [data-site-ground="cta"] ::selection {
+                background-color: hsl(var(--site-cta-fg));
+                color: hsl(var(--site-cta-bg));
+            }
+            :root [data-site-footer] ::selection {
+                background-color: hsl(var(--site-footer-fg));
+                color: hsl(var(--site-footer-bg));
+            }
+            :root [data-site-section][data-site-band] {
+                --site-section-padding: calc(var(--site-section-space) * 1.2);
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-page])) :where(a, button, summary):focus-visible {
+                outline: 2px solid hsl(var(--site-fg));
+                outline-offset: 2px;
+            }
+            :where(:root [data-site-ground="hero"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-hero-fg));
+            }
+            :where(:root [data-site-ground="cta"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-cta-fg));
+            }
+            :where(:root [data-site-ground="photo"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-bg));
+            }
+            :where(:root [data-site-footer]) :where(a, button, summary):focus-visible {
+                outline: 2px solid hsl(var(--site-footer-fg));
+                outline-offset: 2px;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(button:disabled, [aria-disabled="true"]) {
+                cursor: default;
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
+                    transition: color 140ms var(--site-ease), background-color 140ms var(--site-ease), border-color 140ms var(--site-ease), opacity 140ms var(--site-ease), text-decoration-color 140ms var(--site-ease);
+                }
+            }
+            @keyframes site-rise {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+            }
+            @keyframes site-menu-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(-6px);
+                }
+            }
+            @keyframes site-fade-in {
+                from {
+                    opacity: 0;
+                }
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                :root [data-site-menu-panel] {
+                    animation: site-menu-in 200ms var(--site-ease) both;
+                }
+                :root [data-site-menu-scrim] {
+                    animation: site-fade-in 200ms var(--site-ease) both;
+                }
+                :root [data-site-rise] {
+                    animation: site-rise 200ms var(--site-ease) backwards;
+                }
+                :root [data-site-fade] {
+                    animation: site-fade-in 140ms var(--site-ease) backwards;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                :root :is([data-site-menu-panel], [data-site-menu-scrim]) {
+                    animation: site-fade-in 120ms var(--site-ease) both;
+                }
+                :root :is([data-site-rise], [data-site-fade]) {
+                    animation: site-fade-in 120ms var(--site-ease) backwards;
+                }
+            }
+        </style>"
+`;
+
+exports[`a look's theme with no component styles is pinned > bakery in cardamom under live 1`] = `
+"<style>
+            :root {
+                --site-bg: 0 0% 100%;
+                --site-surface: 0 0% 100%;
+                --site-fg: 24 10% 10%;
+                /* Body text: quieter than a heading, still readable. The
+                   Tailwind config has mapped site-body since S2-006 and
+                   nothing ever defined the variable, so every user of it —
+                   the layout root, the 404 page, checkout — fell back to
+                   near-black, which is invisible on a dark ground. */
+                --site-body: 24 6% 34%;
+                /* Declared in the site.* namespace since #252 and never
+                   given a default here, so text-site-muted and
+                   border-site-border resolved to hsl() of nothing — an invalid
+                   declaration the browser drops, leaving the text at its
+                   inherited colour and the border invisible. The publisher
+                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
+                   so live sites were fine and only this fallback was not: the
+                   tenant 404, the root error boundary, checkout, and every
+                   publication older than #189 — exactly the paths that render
+                   when something has already gone wrong.
+
+                   The values are the ones siteStyleVariables() derives for the
+                   default style, asserted in api's site-style.spec.ts, so a
+                   publication carrying no variables renders identically to one
+                   published today having chosen nothing. Picking a fresh pair
+                   here would have made "never styled" and "styled by default"
+                   two different-looking things. */
+                --site-muted: 24 4.9% 55.9%;
+                --site-border: 24 1.1% 90.1%;
+                --site-accent: 24 10% 10%;
+                --site-accent-fg: 0 0% 100%;
+                --site-hero-bg: 0 0% 100%;
+                --site-hero-fg: 24 10% 10%;
+                --site-cta-bg: 24 10% 10%;
+                --site-cta-fg: 0 0% 98%;
+                --site-footer-bg: 24 10% 10%;
+                --site-footer-fg: 0 0% 98%;
+                --site-page-margin: 38px;
+                --site-section-padding: 52px;
+                --site-grid-gap: 14px;
+                --site-radius: 2px;
+                --site-heading-scale: 1;
+                /* The merchant's type (H1). Every publication, old and new,
+                   is set in the neutral system stack until its merchant
+                   chooses fonts: no publication carries a font variable yet,
+                   so these are what every site renders with. Never one of
+                   Saroh's own faces (gate G7). */
+                --site-font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+            }
+            :root {
+                --site-bg: 44.21 54.29% 93.14%;
+                --site-surface: 45.52 43.28% 86.86%;
+                --site-fg: 81.43 24.14% 11.37%;
+                --site-body: 78.26 17.83% 25.29%;
+                --site-muted: 74.4 14.62% 33.53%;
+                --site-border: 45.88 33.33% 80%;
+                --site-accent: 93.6 38.46% 25.49%;
+                --site-accent-fg: 44.21 54.29% 93.14%;
+                --site-hero-bg: 44.21 54.29% 93.14%;
+                --site-cta-bg: 93.6 38.46% 25.49%;
+                --site-cta-fg: 44.21 54.29% 93.14%;
+                --site-footer-bg: 44.21 54.29% 93.14%;
+                --site-footer-fg: 81.43 24.14% 11.37%;
+                --site-hero-fg: 81.43 24.14% 11.37%;
+                --site-page-margin: 40px;
+                --site-section-padding: 76px;
+                --site-grid-gap: 30px;
+                --site-radius: 0px;
+                --site-heading-scale: 1;
+                --site-font-heading: "Fraunces", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
+                --site-font-body: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-status: 93.6 38.46% 25.49%;
+                --site-status-inverse: 78.53 50.75% 73.73%;
+                --site-display-size: 68px;
+                --site-body-size: 16.5px;
+                --site-measure: 58ch;
+                --site-content-width: 1240px;
+                --site-accent-text: 93.6 38.46% 25.49%;
+                --site-accent-soft: 57 25% 84.31%;
+                --site-rule: 54.78 9.39% 48.04%;
+                --site-footer-muted: 64.29 6.93% 39.61%;
+            }
+            :root {
+                --site-radius: 999px;
+                --site-radius-s: 16px;
+                --site-radius-photo: 24px;
+                --site-page-margin: 16px;
+                --site-section-padding: 28px;
+                --site-motion-fast: 100ms;
+                --site-motion-base: 140ms;
+                --site-motion-slow: 200ms;
+                --site-rise: 8px;
+                --site-display-size: 48px;
+                --site-body-size: 16px;
+                --site-measure: 68ch;
+                --site-content-width: initial;
+                --site-font-heading: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-body: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-mono: initial;
+            }
+            @media (min-width: 768px) {
+                :root {
+                    --site-page-margin: 40px;
+                    --site-section-padding: 40px;
+                }
+            }
+            :root [class*="rounded-[calc(var(--site-radius)*1.4)]"],
+            :root [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
+                border-radius: var(--site-radius-photo);
+            }
+            :root img[class*="rounded-[var(--site-radius)]"] {
+                border-radius: var(--site-radius-photo);
+            }
+            :root[data-site-look],
+            :root [data-site-look] {
+                padding-bottom: var(--site-consent-offset, 0px);
+            }
+            @keyframes site-held {
+                from {
+                    visibility: hidden;
+                }
+            }
+            :root .animate-pulse {
+                animation: none;
+            }
+            :root :is(
+                    [aria-busy="true"]:not([data-live-fact]),
+                    [data-times-loading],
+                    [data-services-loading]
+                ) {
+                animation-name: site-held;
+                animation-duration: 1ms;
+                animation-fill-mode: both;
+                animation-delay: 300ms;
+            }
+            :root {
+                --site-band-paper: var(--site-bg);
+                --site-band-ink: var(--site-fg);
+                --site-band-card: var(--site-surface);
+                --site-band-accent: var(--site-accent);
+                --site-band-accent-fg: var(--site-accent-fg);
+                --site-band-status: var(--site-status);
+                --site-band-status-inverse: var(--site-status-inverse);
+            }
+            :root [data-site-band] {
+                background-color: hsl(var(--site-bg));
+                color: hsl(var(--site-body));
+            }
+            :root [data-site-band="surface"] {
+                --site-bg: var(--site-band-card);
+                --site-surface: var(--site-band-paper);
+            }
+            :root [data-site-band="inverse"] {
+                --site-bg: var(--site-band-ink);
+                --site-surface: var(--site-band-ink);
+                --site-fg: var(--site-band-paper);
+                --site-body: var(--site-band-paper);
+                --site-muted: var(--site-band-paper);
+                --site-border: var(--site-band-paper);
+                --site-accent: var(--site-band-paper);
+                --site-accent-fg: var(--site-band-ink);
+                --site-status: var(--site-band-status-inverse);
+                --site-status-inverse: var(--site-band-status);
+            }
+            :root [data-site-band="accent"] {
+                --site-bg: var(--site-band-accent);
+                --site-surface: var(--site-band-accent);
+                --site-fg: var(--site-band-accent-fg);
+                --site-body: var(--site-band-accent-fg);
+                --site-muted: var(--site-band-accent-fg);
+                --site-border: var(--site-band-accent-fg);
+                --site-accent: var(--site-band-accent-fg);
+                --site-accent-fg: var(--site-band-accent);
+                --site-status: initial;
+                --site-status-inverse: initial;
+            }
+            :root [data-site-section][id] {
+                scroll-margin-top: 4.5rem;
+            }
+            :root [data-site-section] .prose dt {
+                color: hsl(var(--site-fg));
+                font-family: var(--site-font-heading);
+            }
+            :root [data-site-section] .prose dd {
+                color: hsl(var(--site-fg) / 0.8);
+            }
+            :root [data-site-section] [data-site-facts="labels"] dt {
+                margin-top: 1.25em;
+                color: hsl(var(--site-muted));
+                font-family: var(--site-font-body);
+                font-size: 0.78rem;
+                font-weight: 500;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            :root [data-site-section] [data-site-facts="labels"] dd {
+                margin-top: 0.25em;
+                padding-inline-start: 0;
+                color: hsl(var(--site-fg));
+            }
+            :root {
+                --site-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+                --site-section-space: var(--site-section-padding);
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h1, h2, h3, h4) {
+                font-family: var(--site-font-heading);
+                text-wrap: balance;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h1 {
+                letter-spacing: -0.03em;
+                line-height: 1.05;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h2 {
+                letter-spacing: -0.02em;
+                line-height: 1.15;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h3, h4) {
+                letter-spacing: -0.01em;
+                line-height: 1.25;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) p {
+                text-wrap: pretty;
+            }
+            :root [data-site-section] .prose {
+                --tw-prose-body: hsl(var(--site-body));
+                --tw-prose-headings: hsl(var(--site-fg));
+                --tw-prose-lead: hsl(var(--site-fg));
+                --tw-prose-links: hsl(var(--site-accent));
+                --tw-prose-bold: hsl(var(--site-fg));
+                --tw-prose-counters: hsl(var(--site-muted));
+                --tw-prose-bullets: hsl(var(--site-muted));
+                --tw-prose-hr: hsl(var(--site-border));
+                --tw-prose-quotes: hsl(var(--site-fg));
+                --tw-prose-quote-borders: hsl(var(--site-accent));
+                --tw-prose-captions: hsl(var(--site-muted));
+                --tw-prose-code: hsl(var(--site-fg));
+                --tw-prose-th-borders: hsl(var(--site-border));
+                --tw-prose-td-borders: hsl(var(--site-border));
+            }
+            :root [data-site-section] .prose blockquote {
+                border-inline-start-width: 2px;
+                font-style: normal;
+                font-weight: 500;
+                quotes: none;
+            }
+            :root [data-site-section] .prose blockquote p::before,
+            :root [data-site-section] .prose blockquote p::after {
+                content: none;
+            }
+            :root [data-site-section] .prose a {
+                text-decoration-line: underline;
+                text-decoration-thickness: 1px;
+                text-underline-offset: 0.2em;
+            }
+            :root [data-site-section] .prose a:hover {
+                text-decoration-thickness: 2px;
+            }
+            :root ::selection {
+                background-color: hsl(var(--site-accent));
+                color: hsl(var(--site-accent-fg));
+            }
+            :root [data-site-ground="hero"] ::selection {
+                background-color: hsl(var(--site-hero-fg));
+                color: hsl(var(--site-hero-bg));
+            }
+            :root [data-site-ground="cta"] ::selection {
+                background-color: hsl(var(--site-cta-fg));
+                color: hsl(var(--site-cta-bg));
+            }
+            :root [data-site-footer] ::selection {
+                background-color: hsl(var(--site-footer-fg));
+                color: hsl(var(--site-footer-bg));
+            }
+            :root [data-site-section][data-site-band] {
+                --site-section-padding: calc(var(--site-section-space) * 1.2);
+            }
+            :root [data-site-section]:not([data-site-band]):not(:empty):not(:has(> [data-site-ground])) + [data-site-section]:not([data-site-band]) > [class*="py-[var(--site-section-padding)]"]:not([data-site-ground]) {
+                padding-top: calc(var(--site-section-padding) * 0.5);
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-page])) :where(a, button, summary):focus-visible {
+                outline: 2px solid hsl(var(--site-fg));
+                outline-offset: 2px;
+            }
+            :where(:root [data-site-ground="hero"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-hero-fg));
+            }
+            :where(:root [data-site-ground="cta"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-cta-fg));
+            }
+            :where(:root [data-site-ground="photo"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-bg));
+            }
+            :where(:root [data-site-footer]) :where(a, button, summary):focus-visible {
+                outline: 2px solid hsl(var(--site-footer-fg));
+                outline-offset: 2px;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(button:disabled, [aria-disabled="true"]) {
+                cursor: default;
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
+                    transition: color 140ms var(--site-ease), background-color 140ms var(--site-ease), border-color 140ms var(--site-ease), opacity 140ms var(--site-ease), text-decoration-color 140ms var(--site-ease);
+                }
+            }
+            @keyframes site-rise {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+            }
+            @keyframes site-menu-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(-6px);
+                }
+            }
+            @keyframes site-fade-in {
+                from {
+                    opacity: 0;
+                }
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                :root [data-site-menu-panel] {
+                    animation: site-menu-in 200ms var(--site-ease) both;
+                }
+                :root [data-site-menu-scrim] {
+                    animation: site-fade-in 200ms var(--site-ease) both;
+                }
+                :root [data-site-rise] {
+                    animation: site-rise 200ms var(--site-ease) backwards;
+                }
+                :root [data-site-fade] {
+                    animation: site-fade-in 140ms var(--site-ease) backwards;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                :root :is([data-site-menu-panel], [data-site-menu-scrim]) {
+                    animation: site-fade-in 120ms var(--site-ease) both;
+                }
+                :root :is([data-site-rise], [data-site-fade]) {
+                    animation: site-fade-in 120ms var(--site-ease) backwards;
+                }
+            }
+        </style>"
+`;
+
+exports[`a look's theme with no component styles is pinned > bakery in cardamom under quiet 1`] = `
+"<style>
+            :root {
+                --site-bg: 0 0% 100%;
+                --site-surface: 0 0% 100%;
+                --site-fg: 24 10% 10%;
+                /* Body text: quieter than a heading, still readable. The
+                   Tailwind config has mapped site-body since S2-006 and
+                   nothing ever defined the variable, so every user of it —
+                   the layout root, the 404 page, checkout — fell back to
+                   near-black, which is invisible on a dark ground. */
+                --site-body: 24 6% 34%;
+                /* Declared in the site.* namespace since #252 and never
+                   given a default here, so text-site-muted and
+                   border-site-border resolved to hsl() of nothing — an invalid
+                   declaration the browser drops, leaving the text at its
+                   inherited colour and the border invisible. The publisher
+                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
+                   so live sites were fine and only this fallback was not: the
+                   tenant 404, the root error boundary, checkout, and every
+                   publication older than #189 — exactly the paths that render
+                   when something has already gone wrong.
+
+                   The values are the ones siteStyleVariables() derives for the
+                   default style, asserted in api's site-style.spec.ts, so a
+                   publication carrying no variables renders identically to one
+                   published today having chosen nothing. Picking a fresh pair
+                   here would have made "never styled" and "styled by default"
+                   two different-looking things. */
+                --site-muted: 24 4.9% 55.9%;
+                --site-border: 24 1.1% 90.1%;
+                --site-accent: 24 10% 10%;
+                --site-accent-fg: 0 0% 100%;
+                --site-hero-bg: 0 0% 100%;
+                --site-hero-fg: 24 10% 10%;
+                --site-cta-bg: 24 10% 10%;
+                --site-cta-fg: 0 0% 98%;
+                --site-footer-bg: 24 10% 10%;
+                --site-footer-fg: 0 0% 98%;
+                --site-page-margin: 38px;
+                --site-section-padding: 52px;
+                --site-grid-gap: 14px;
+                --site-radius: 2px;
+                --site-heading-scale: 1;
+                /* The merchant's type (H1). Every publication, old and new,
+                   is set in the neutral system stack until its merchant
+                   chooses fonts: no publication carries a font variable yet,
+                   so these are what every site renders with. Never one of
+                   Saroh's own faces (gate G7). */
+                --site-font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+            }
+            :root {
+                --site-bg: 44.21 54.29% 93.14%;
+                --site-surface: 45.52 43.28% 86.86%;
+                --site-fg: 81.43 24.14% 11.37%;
+                --site-body: 78.26 17.83% 25.29%;
+                --site-muted: 74.4 14.62% 33.53%;
+                --site-border: 45.88 33.33% 80%;
+                --site-accent: 93.6 38.46% 25.49%;
+                --site-accent-fg: 44.21 54.29% 93.14%;
+                --site-hero-bg: 44.21 54.29% 93.14%;
+                --site-cta-bg: 93.6 38.46% 25.49%;
+                --site-cta-fg: 44.21 54.29% 93.14%;
+                --site-footer-bg: 44.21 54.29% 93.14%;
+                --site-footer-fg: 81.43 24.14% 11.37%;
+                --site-hero-fg: 81.43 24.14% 11.37%;
+                --site-page-margin: 40px;
+                --site-section-padding: 76px;
+                --site-grid-gap: 30px;
+                --site-radius: 0px;
+                --site-heading-scale: 1;
+                --site-font-heading: "Fraunces", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
+                --site-font-body: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-status: 93.6 38.46% 25.49%;
+                --site-status-inverse: 78.53 50.75% 73.73%;
+                --site-display-size: 68px;
+                --site-body-size: 16.5px;
+                --site-measure: 58ch;
+                --site-content-width: 1240px;
+                --site-accent-text: 93.6 38.46% 25.49%;
+                --site-accent-soft: 57 25% 84.31%;
+                --site-rule: 54.78 9.39% 48.04%;
+                --site-footer-muted: 64.29 6.93% 39.61%;
+            }
+            :root {
+                --site-radius: 999px;
+                --site-radius-s: 14px;
+                --site-radius-photo: 4px;
+                --site-page-margin: 20px;
+                --site-section-padding: 72px;
+                --site-motion-fast: 100ms;
+                --site-motion-base: 140ms;
+                --site-motion-slow: 200ms;
+                --site-rise: 8px;
+                --site-display-size: 56px;
+                --site-body-size: 17px;
+                --site-measure: 60ch;
+                --site-content-width: initial;
+                --site-font-heading: "Cormorant Garamond", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
+                --site-font-body: "Jost", "Site Rupee", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+                --site-font-mono: initial;
+            }
+            @media (min-width: 768px) {
+                :root {
+                    --site-page-margin: 48px;
+                    --site-section-padding: 120px;
+                }
+            }
+            :root [class*="rounded-[calc(var(--site-radius)*1.4)]"],
+            :root [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
+                border-radius: var(--site-radius-s);
+            }
+            :root img[class*="rounded-[var(--site-radius)]"] {
+                border-radius: var(--site-radius-photo);
+            }
+            :root :is(.font-semibold, .font-bold, .font-extrabold),
+            :root [class*="aria-[current=page]:font-bold"][aria-current="page"] {
+                font-weight: 500;
+            }
+            :root [data-site-section] ~ [data-site-section] ~ [data-site-section]:not(:empty):not([data-site-band]):not(:has(> [data-site-ground])) {
+                border-top: 1px solid hsl(var(--site-border));
+            }
+            :root[data-site-look],
+            :root [data-site-look] {
+                padding-bottom: var(--site-consent-offset, 0px);
+            }
+            @keyframes site-held {
+                from {
+                    visibility: hidden;
+                }
+            }
+            :root .animate-pulse {
+                animation: none;
+            }
+            :root :is(
+                    [aria-busy="true"]:not([data-live-fact]),
+                    [data-times-loading],
+                    [data-services-loading]
+                ) {
+                animation-name: site-held;
+                animation-duration: 1ms;
+                animation-fill-mode: both;
+                animation-delay: 300ms;
+            }
+            @font-face {
+                font-family: "Site Rupee";
+                src: local("Arial"), local("ArialMT"), local("Roboto"), local("Roboto-Regular"), local("Segoe UI"), local("Noto Sans"), local("NotoSans-Regular"), local("Liberation Sans"), local("DejaVu Sans");
+                font-weight: 100 500;
+                unicode-range: U+20B9;
+            }
+            @font-face {
+                font-family: "Site Rupee";
+                src: local("Arial Bold"), local("Arial-BoldMT"), local("Roboto Bold"), local("Roboto-Bold"), local("Segoe UI Bold"), local("Noto Sans Bold"), local("NotoSans-Bold"), local("Liberation Sans Bold"), local("DejaVu Sans Bold");
+                font-weight: 600 900;
+                unicode-range: U+20B9;
+            }
+            :root {
+                --site-band-paper: var(--site-bg);
+                --site-band-ink: var(--site-fg);
+                --site-band-card: var(--site-surface);
+                --site-band-accent: var(--site-accent);
+                --site-band-accent-fg: var(--site-accent-fg);
+                --site-band-status: var(--site-status);
+                --site-band-status-inverse: var(--site-status-inverse);
+            }
+            :root [data-site-band] {
+                background-color: hsl(var(--site-bg));
+                color: hsl(var(--site-body));
+            }
+            :root [data-site-band="surface"] {
+                --site-bg: var(--site-band-card);
+                --site-surface: var(--site-band-paper);
+            }
+            :root [data-site-band="inverse"] {
+                --site-bg: var(--site-band-ink);
+                --site-surface: var(--site-band-ink);
+                --site-fg: var(--site-band-paper);
+                --site-body: var(--site-band-paper);
+                --site-muted: var(--site-band-paper);
+                --site-border: var(--site-band-paper);
+                --site-accent: var(--site-band-paper);
+                --site-accent-fg: var(--site-band-ink);
+                --site-status: var(--site-band-status-inverse);
+                --site-status-inverse: var(--site-band-status);
+            }
+            :root [data-site-band="accent"] {
+                --site-bg: var(--site-band-accent);
+                --site-surface: var(--site-band-accent);
+                --site-fg: var(--site-band-accent-fg);
+                --site-body: var(--site-band-accent-fg);
+                --site-muted: var(--site-band-accent-fg);
+                --site-border: var(--site-band-accent-fg);
+                --site-accent: var(--site-band-accent-fg);
+                --site-accent-fg: var(--site-band-accent);
+                --site-status: initial;
+                --site-status-inverse: initial;
+            }
+            :root [data-site-section][id] {
+                scroll-margin-top: 4.5rem;
+            }
+            :root [data-site-section] .prose dt {
+                color: hsl(var(--site-fg));
+                font-family: var(--site-font-heading);
+            }
+            :root [data-site-section] .prose dd {
+                color: hsl(var(--site-fg) / 0.8);
+            }
+            :root [data-site-section] [data-site-facts="labels"] dt {
+                margin-top: 1.25em;
+                color: hsl(var(--site-muted));
+                font-family: var(--site-font-body);
+                font-size: 0.78rem;
+                font-weight: 500;
+                letter-spacing: 0.1em;
+                text-transform: uppercase;
+            }
+            :root [data-site-section] [data-site-facts="labels"] dd {
+                margin-top: 0.25em;
+                padding-inline-start: 0;
+                color: hsl(var(--site-fg));
+            }
+            :root {
+                --site-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+                --site-section-space: var(--site-section-padding);
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h1, h2, h3, h4) {
+                font-family: var(--site-font-heading);
+                text-wrap: balance;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h1 {
+                letter-spacing: -0.03em;
+                line-height: 1.05;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h2 {
+                letter-spacing: -0.02em;
+                line-height: 1.15;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h3, h4) {
+                letter-spacing: -0.01em;
+                line-height: 1.25;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) p {
+                text-wrap: pretty;
+            }
+            :root [data-site-section] .prose {
+                --tw-prose-body: hsl(var(--site-body));
+                --tw-prose-headings: hsl(var(--site-fg));
+                --tw-prose-lead: hsl(var(--site-fg));
+                --tw-prose-links: hsl(var(--site-accent));
+                --tw-prose-bold: hsl(var(--site-fg));
+                --tw-prose-counters: hsl(var(--site-muted));
+                --tw-prose-bullets: hsl(var(--site-muted));
+                --tw-prose-hr: hsl(var(--site-border));
+                --tw-prose-quotes: hsl(var(--site-fg));
+                --tw-prose-quote-borders: hsl(var(--site-accent));
+                --tw-prose-captions: hsl(var(--site-muted));
+                --tw-prose-code: hsl(var(--site-fg));
+                --tw-prose-th-borders: hsl(var(--site-border));
+                --tw-prose-td-borders: hsl(var(--site-border));
+            }
+            :root [data-site-section] .prose blockquote {
+                border-inline-start-width: 2px;
+                font-style: normal;
+                font-weight: 500;
+                quotes: none;
+            }
+            :root [data-site-section] .prose blockquote p::before,
+            :root [data-site-section] .prose blockquote p::after {
+                content: none;
+            }
+            :root [data-site-section] .prose a {
+                text-decoration-line: underline;
+                text-decoration-thickness: 1px;
+                text-underline-offset: 0.2em;
+            }
+            :root [data-site-section] .prose a:hover {
+                text-decoration-thickness: 2px;
+            }
+            :root ::selection {
+                background-color: hsl(var(--site-accent));
+                color: hsl(var(--site-accent-fg));
+            }
+            :root [data-site-ground="hero"] ::selection {
+                background-color: hsl(var(--site-hero-fg));
+                color: hsl(var(--site-hero-bg));
+            }
+            :root [data-site-ground="cta"] ::selection {
+                background-color: hsl(var(--site-cta-fg));
+                color: hsl(var(--site-cta-bg));
+            }
+            :root [data-site-footer] ::selection {
+                background-color: hsl(var(--site-footer-fg));
+                color: hsl(var(--site-footer-bg));
+            }
+            :root [data-site-section][data-site-band] {
+                --site-section-padding: calc(var(--site-section-space) * 1.2);
+            }
+            :root [data-site-section]:not([data-site-band]):not(:empty):not(:has(> [data-site-ground])) + [data-site-section]:not([data-site-band]) > [class*="py-[var(--site-section-padding)]"]:not([data-site-ground]) {
+                padding-top: calc(var(--site-section-padding) * 0.5);
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-page])) :where(a, button, summary):focus-visible {
+                outline: 2px solid hsl(var(--site-fg));
+                outline-offset: 2px;
+            }
+            :where(:root [data-site-ground="hero"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-hero-fg));
+            }
+            :where(:root [data-site-ground="cta"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-cta-fg));
+            }
+            :where(:root [data-site-ground="photo"]) :where(a, button, summary):focus-visible {
+                outline-color: hsl(var(--site-bg));
+            }
+            :where(:root [data-site-footer]) :where(a, button, summary):focus-visible {
+                outline: 2px solid hsl(var(--site-footer-fg));
+                outline-offset: 2px;
+            }
+            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(button:disabled, [aria-disabled="true"]) {
+                cursor: default;
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
+                    transition: color 140ms var(--site-ease), background-color 140ms var(--site-ease), border-color 140ms var(--site-ease), opacity 140ms var(--site-ease), text-decoration-color 140ms var(--site-ease);
+                }
+            }
+            @keyframes site-rise {
+                from {
+                    opacity: 0;
+                    transform: translateY(8px);
+                }
+            }
+            @keyframes site-menu-in {
+                from {
+                    opacity: 0;
+                    transform: translateY(-6px);
+                }
+            }
+            @keyframes site-fade-in {
+                from {
+                    opacity: 0;
+                }
+            }
+            @media (prefers-reduced-motion: no-preference) {
+                :root [data-site-menu-panel] {
+                    animation: site-menu-in 200ms var(--site-ease) both;
+                }
+                :root [data-site-menu-scrim] {
+                    animation: site-fade-in 200ms var(--site-ease) both;
+                }
+                :root [data-site-rise] {
+                    animation: site-rise 200ms var(--site-ease) backwards;
+                }
+                :root [data-site-fade] {
+                    animation: site-fade-in 140ms var(--site-ease) backwards;
+                }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                :root :is([data-site-menu-panel], [data-site-menu-scrim]) {
+                    animation: site-fade-in 120ms var(--site-ease) both;
+                }
+                :root :is([data-site-rise], [data-site-fade]) {
+                    animation: site-fade-in 120ms var(--site-ease) backwards;
+                }
+            }
+        </style>"
+`;
+
 exports[`a look's theme with no component styles is pinned > bakery in crust under folio 1`] = `
 "<style>
             :root {
@@ -1078,1084 +2156,6 @@ exports[`a look's theme with no component styles is pinned > bakery in crust und
         </style>"
 `;
 
-exports[`a look's theme with no component styles is pinned > bakery in porcelain under folio 1`] = `
-"<style>
-            :root {
-                --site-bg: 0 0% 100%;
-                --site-surface: 0 0% 100%;
-                --site-fg: 24 10% 10%;
-                /* Body text: quieter than a heading, still readable. The
-                   Tailwind config has mapped site-body since S2-006 and
-                   nothing ever defined the variable, so every user of it —
-                   the layout root, the 404 page, checkout — fell back to
-                   near-black, which is invisible on a dark ground. */
-                --site-body: 24 6% 34%;
-                /* Declared in the site.* namespace since #252 and never
-                   given a default here, so text-site-muted and
-                   border-site-border resolved to hsl() of nothing — an invalid
-                   declaration the browser drops, leaving the text at its
-                   inherited colour and the border invisible. The publisher
-                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
-                   so live sites were fine and only this fallback was not: the
-                   tenant 404, the root error boundary, checkout, and every
-                   publication older than #189 — exactly the paths that render
-                   when something has already gone wrong.
-
-                   The values are the ones siteStyleVariables() derives for the
-                   default style, asserted in api's site-style.spec.ts, so a
-                   publication carrying no variables renders identically to one
-                   published today having chosen nothing. Picking a fresh pair
-                   here would have made "never styled" and "styled by default"
-                   two different-looking things. */
-                --site-muted: 24 4.9% 55.9%;
-                --site-border: 24 1.1% 90.1%;
-                --site-accent: 24 10% 10%;
-                --site-accent-fg: 0 0% 100%;
-                --site-hero-bg: 0 0% 100%;
-                --site-hero-fg: 24 10% 10%;
-                --site-cta-bg: 24 10% 10%;
-                --site-cta-fg: 0 0% 98%;
-                --site-footer-bg: 24 10% 10%;
-                --site-footer-fg: 0 0% 98%;
-                --site-page-margin: 38px;
-                --site-section-padding: 52px;
-                --site-grid-gap: 14px;
-                --site-radius: 2px;
-                --site-heading-scale: 1;
-                /* The merchant's type (H1). Every publication, old and new,
-                   is set in the neutral system stack until its merchant
-                   chooses fonts: no publication carries a font variable yet,
-                   so these are what every site renders with. Never one of
-                   Saroh's own faces (gate G7). */
-                --site-font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-            }
-            :root {
-                --site-bg: 210 42.86% 97.25%;
-                --site-surface: 218.18 24.44% 91.18%;
-                --site-fg: 220 28% 14.71%;
-                --site-body: 216.92 17.57% 29.02%;
-                --site-muted: 216.92 12.38% 41.18%;
-                --site-border: 218.57 25% 89.02%;
-                --site-accent: 322.5 45.57% 30.98%;
-                --site-accent-fg: 210 42.86% 97.25%;
-                --site-hero-bg: 210 42.86% 97.25%;
-                --site-cta-bg: 322.5 45.57% 30.98%;
-                --site-cta-fg: 210 42.86% 97.25%;
-                --site-footer-bg: 210 42.86% 97.25%;
-                --site-footer-fg: 220 28% 14.71%;
-                --site-hero-fg: 220 28% 14.71%;
-                --site-page-margin: 40px;
-                --site-section-padding: 76px;
-                --site-grid-gap: 30px;
-                --site-radius: 0px;
-                --site-heading-scale: 1;
-                --site-font-heading: "Fraunces", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
-                --site-font-body: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-status: 102.86 43.75% 37.65%;
-                --site-status-inverse: 97.67 48.31% 65.1%;
-                --site-display-size: 68px;
-                --site-body-size: 16.5px;
-                --site-measure: 58ch;
-                --site-content-width: 1240px;
-                --site-accent-text: 322.5 45.57% 30.98%;
-                --site-accent-soft: 285 14.29% 89.02%;
-                --site-rule: 218.82 6.94% 51.96%;
-                --site-footer-muted: 217.5 7.21% 43.53%;
-            }
-            :root {
-                --site-radius: 0px;
-                --site-radius-s: 0px;
-                --site-radius-photo: 0px;
-                --site-page-margin: 20px;
-                --site-section-padding: 72px;
-                --site-motion-fast: 100ms;
-                --site-motion-base: 140ms;
-                --site-motion-slow: 200ms;
-                --site-rise: 8px;
-                --site-display-size: 64px;
-                --site-body-size: 17px;
-                --site-measure: 64ch;
-                --site-content-width: initial;
-                --site-font-heading: "Newsreader", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
-                --site-font-body: "Hanken Grotesk", "Site Rupee", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-mono: initial;
-            }
-            @media (min-width: 768px) {
-                :root {
-                    --site-page-margin: 64px;
-                    --site-section-padding: 136px;
-                }
-            }
-            :root [class*="rounded-[calc(var(--site-radius)*1.4)]"],
-            :root [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
-                border-radius: var(--site-radius-s);
-            }
-            :root img[class*="rounded-[var(--site-radius)]"] {
-                border-radius: var(--site-radius-photo);
-            }
-            :root [data-site-section] ~ [data-site-section]:not(:empty):not([data-site-band]):not(:has(> [data-site-ground])) {
-                border-top: 1px solid hsl(var(--site-border));
-            }
-            :root[data-site-look],
-            :root [data-site-look] {
-                padding-bottom: var(--site-consent-offset, 0px);
-            }
-            @keyframes site-held {
-                from {
-                    visibility: hidden;
-                }
-            }
-            :root .animate-pulse {
-                animation: none;
-            }
-            :root :is(
-                    [aria-busy="true"]:not([data-live-fact]),
-                    [data-times-loading],
-                    [data-services-loading]
-                ) {
-                animation-name: site-held;
-                animation-duration: 1ms;
-                animation-fill-mode: both;
-                animation-delay: 300ms;
-            }
-            @font-face {
-                font-family: "Site Rupee";
-                src: local("Arial"), local("ArialMT"), local("Roboto"), local("Roboto-Regular"), local("Segoe UI"), local("Noto Sans"), local("NotoSans-Regular"), local("Liberation Sans"), local("DejaVu Sans");
-                font-weight: 100 500;
-                unicode-range: U+20B9;
-            }
-            @font-face {
-                font-family: "Site Rupee";
-                src: local("Arial Bold"), local("Arial-BoldMT"), local("Roboto Bold"), local("Roboto-Bold"), local("Segoe UI Bold"), local("Noto Sans Bold"), local("NotoSans-Bold"), local("Liberation Sans Bold"), local("DejaVu Sans Bold");
-                font-weight: 600 900;
-                unicode-range: U+20B9;
-            }
-            :root {
-                --site-band-paper: var(--site-bg);
-                --site-band-ink: var(--site-fg);
-                --site-band-card: var(--site-surface);
-                --site-band-accent: var(--site-accent);
-                --site-band-accent-fg: var(--site-accent-fg);
-                --site-band-status: var(--site-status);
-                --site-band-status-inverse: var(--site-status-inverse);
-            }
-            :root [data-site-band] {
-                background-color: hsl(var(--site-bg));
-                color: hsl(var(--site-body));
-            }
-            :root [data-site-band="surface"] {
-                --site-bg: var(--site-band-card);
-                --site-surface: var(--site-band-paper);
-            }
-            :root [data-site-band="inverse"] {
-                --site-bg: var(--site-band-ink);
-                --site-surface: var(--site-band-ink);
-                --site-fg: var(--site-band-paper);
-                --site-body: var(--site-band-paper);
-                --site-muted: var(--site-band-paper);
-                --site-border: var(--site-band-paper);
-                --site-accent: var(--site-band-paper);
-                --site-accent-fg: var(--site-band-ink);
-                --site-status: var(--site-band-status-inverse);
-                --site-status-inverse: var(--site-band-status);
-            }
-            :root [data-site-band="accent"] {
-                --site-bg: var(--site-band-accent);
-                --site-surface: var(--site-band-accent);
-                --site-fg: var(--site-band-accent-fg);
-                --site-body: var(--site-band-accent-fg);
-                --site-muted: var(--site-band-accent-fg);
-                --site-border: var(--site-band-accent-fg);
-                --site-accent: var(--site-band-accent-fg);
-                --site-accent-fg: var(--site-band-accent);
-                --site-status: initial;
-                --site-status-inverse: initial;
-            }
-            :root [data-site-section][id] {
-                scroll-margin-top: 4.5rem;
-            }
-            :root [data-site-section] .prose dt {
-                color: hsl(var(--site-fg));
-                font-family: var(--site-font-heading);
-            }
-            :root [data-site-section] .prose dd {
-                color: hsl(var(--site-fg) / 0.8);
-            }
-            :root [data-site-section] [data-site-facts="labels"] dt {
-                margin-top: 1.25em;
-                color: hsl(var(--site-muted));
-                font-family: var(--site-font-body);
-                font-size: 0.78rem;
-                font-weight: 500;
-                letter-spacing: 0.1em;
-                text-transform: uppercase;
-            }
-            :root [data-site-section] [data-site-facts="labels"] dd {
-                margin-top: 0.25em;
-                padding-inline-start: 0;
-                color: hsl(var(--site-fg));
-            }
-            :root {
-                --site-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-                --site-section-space: var(--site-section-padding);
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h1, h2, h3, h4) {
-                font-family: var(--site-font-heading);
-                text-wrap: balance;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h1 {
-                letter-spacing: -0.03em;
-                line-height: 1.05;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h2 {
-                letter-spacing: -0.02em;
-                line-height: 1.15;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h3, h4) {
-                letter-spacing: -0.01em;
-                line-height: 1.25;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) p {
-                text-wrap: pretty;
-            }
-            :root [data-site-section] .prose {
-                --tw-prose-body: hsl(var(--site-body));
-                --tw-prose-headings: hsl(var(--site-fg));
-                --tw-prose-lead: hsl(var(--site-fg));
-                --tw-prose-links: hsl(var(--site-accent));
-                --tw-prose-bold: hsl(var(--site-fg));
-                --tw-prose-counters: hsl(var(--site-muted));
-                --tw-prose-bullets: hsl(var(--site-muted));
-                --tw-prose-hr: hsl(var(--site-border));
-                --tw-prose-quotes: hsl(var(--site-fg));
-                --tw-prose-quote-borders: hsl(var(--site-accent));
-                --tw-prose-captions: hsl(var(--site-muted));
-                --tw-prose-code: hsl(var(--site-fg));
-                --tw-prose-th-borders: hsl(var(--site-border));
-                --tw-prose-td-borders: hsl(var(--site-border));
-            }
-            :root [data-site-section] .prose blockquote {
-                border-inline-start-width: 2px;
-                font-style: normal;
-                font-weight: 500;
-                quotes: none;
-            }
-            :root [data-site-section] .prose blockquote p::before,
-            :root [data-site-section] .prose blockquote p::after {
-                content: none;
-            }
-            :root [data-site-section] .prose a {
-                text-decoration-line: underline;
-                text-decoration-thickness: 1px;
-                text-underline-offset: 0.2em;
-            }
-            :root [data-site-section] .prose a:hover {
-                text-decoration-thickness: 2px;
-            }
-            :root ::selection {
-                background-color: hsl(var(--site-accent));
-                color: hsl(var(--site-accent-fg));
-            }
-            :root [data-site-ground="hero"] ::selection {
-                background-color: hsl(var(--site-hero-fg));
-                color: hsl(var(--site-hero-bg));
-            }
-            :root [data-site-ground="cta"] ::selection {
-                background-color: hsl(var(--site-cta-fg));
-                color: hsl(var(--site-cta-bg));
-            }
-            :root [data-site-footer] ::selection {
-                background-color: hsl(var(--site-footer-fg));
-                color: hsl(var(--site-footer-bg));
-            }
-            :root [data-site-section][data-site-band] {
-                --site-section-padding: calc(var(--site-section-space) * 1.2);
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-page])) :where(a, button, summary):focus-visible {
-                outline: 2px solid hsl(var(--site-fg));
-                outline-offset: 2px;
-            }
-            :where(:root [data-site-ground="hero"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-hero-fg));
-            }
-            :where(:root [data-site-ground="cta"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-cta-fg));
-            }
-            :where(:root [data-site-ground="photo"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-bg));
-            }
-            :where(:root [data-site-footer]) :where(a, button, summary):focus-visible {
-                outline: 2px solid hsl(var(--site-footer-fg));
-                outline-offset: 2px;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(button:disabled, [aria-disabled="true"]) {
-                cursor: default;
-            }
-            @media (prefers-reduced-motion: no-preference) {
-                :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
-                    transition: color 140ms var(--site-ease), background-color 140ms var(--site-ease), border-color 140ms var(--site-ease), opacity 140ms var(--site-ease), text-decoration-color 140ms var(--site-ease);
-                }
-            }
-            @keyframes site-rise {
-                from {
-                    opacity: 0;
-                    transform: translateY(8px);
-                }
-            }
-            @keyframes site-menu-in {
-                from {
-                    opacity: 0;
-                    transform: translateY(-6px);
-                }
-            }
-            @keyframes site-fade-in {
-                from {
-                    opacity: 0;
-                }
-            }
-            @media (prefers-reduced-motion: no-preference) {
-                :root [data-site-menu-panel] {
-                    animation: site-menu-in 200ms var(--site-ease) both;
-                }
-                :root [data-site-menu-scrim] {
-                    animation: site-fade-in 200ms var(--site-ease) both;
-                }
-                :root [data-site-rise] {
-                    animation: site-rise 200ms var(--site-ease) backwards;
-                }
-                :root [data-site-fade] {
-                    animation: site-fade-in 140ms var(--site-ease) backwards;
-                }
-            }
-            @media (prefers-reduced-motion: reduce) {
-                :root :is([data-site-menu-panel], [data-site-menu-scrim]) {
-                    animation: site-fade-in 120ms var(--site-ease) both;
-                }
-                :root :is([data-site-rise], [data-site-fade]) {
-                    animation: site-fade-in 120ms var(--site-ease) backwards;
-                }
-            }
-        </style>"
-`;
-
-exports[`a look's theme with no component styles is pinned > bakery in porcelain under live 1`] = `
-"<style>
-            :root {
-                --site-bg: 0 0% 100%;
-                --site-surface: 0 0% 100%;
-                --site-fg: 24 10% 10%;
-                /* Body text: quieter than a heading, still readable. The
-                   Tailwind config has mapped site-body since S2-006 and
-                   nothing ever defined the variable, so every user of it —
-                   the layout root, the 404 page, checkout — fell back to
-                   near-black, which is invisible on a dark ground. */
-                --site-body: 24 6% 34%;
-                /* Declared in the site.* namespace since #252 and never
-                   given a default here, so text-site-muted and
-                   border-site-border resolved to hsl() of nothing — an invalid
-                   declaration the browser drops, leaving the text at its
-                   inherited colour and the border invisible. The publisher
-                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
-                   so live sites were fine and only this fallback was not: the
-                   tenant 404, the root error boundary, checkout, and every
-                   publication older than #189 — exactly the paths that render
-                   when something has already gone wrong.
-
-                   The values are the ones siteStyleVariables() derives for the
-                   default style, asserted in api's site-style.spec.ts, so a
-                   publication carrying no variables renders identically to one
-                   published today having chosen nothing. Picking a fresh pair
-                   here would have made "never styled" and "styled by default"
-                   two different-looking things. */
-                --site-muted: 24 4.9% 55.9%;
-                --site-border: 24 1.1% 90.1%;
-                --site-accent: 24 10% 10%;
-                --site-accent-fg: 0 0% 100%;
-                --site-hero-bg: 0 0% 100%;
-                --site-hero-fg: 24 10% 10%;
-                --site-cta-bg: 24 10% 10%;
-                --site-cta-fg: 0 0% 98%;
-                --site-footer-bg: 24 10% 10%;
-                --site-footer-fg: 0 0% 98%;
-                --site-page-margin: 38px;
-                --site-section-padding: 52px;
-                --site-grid-gap: 14px;
-                --site-radius: 2px;
-                --site-heading-scale: 1;
-                /* The merchant's type (H1). Every publication, old and new,
-                   is set in the neutral system stack until its merchant
-                   chooses fonts: no publication carries a font variable yet,
-                   so these are what every site renders with. Never one of
-                   Saroh's own faces (gate G7). */
-                --site-font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-            }
-            :root {
-                --site-bg: 210 42.86% 97.25%;
-                --site-surface: 218.18 24.44% 91.18%;
-                --site-fg: 220 28% 14.71%;
-                --site-body: 216.92 17.57% 29.02%;
-                --site-muted: 216.92 12.38% 41.18%;
-                --site-border: 218.57 25% 89.02%;
-                --site-accent: 322.5 45.57% 30.98%;
-                --site-accent-fg: 210 42.86% 97.25%;
-                --site-hero-bg: 210 42.86% 97.25%;
-                --site-cta-bg: 322.5 45.57% 30.98%;
-                --site-cta-fg: 210 42.86% 97.25%;
-                --site-footer-bg: 210 42.86% 97.25%;
-                --site-footer-fg: 220 28% 14.71%;
-                --site-hero-fg: 220 28% 14.71%;
-                --site-page-margin: 40px;
-                --site-section-padding: 76px;
-                --site-grid-gap: 30px;
-                --site-radius: 0px;
-                --site-heading-scale: 1;
-                --site-font-heading: "Fraunces", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
-                --site-font-body: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-status: 102.86 43.75% 37.65%;
-                --site-status-inverse: 97.67 48.31% 65.1%;
-                --site-display-size: 68px;
-                --site-body-size: 16.5px;
-                --site-measure: 58ch;
-                --site-content-width: 1240px;
-                --site-accent-text: 322.5 45.57% 30.98%;
-                --site-accent-soft: 285 14.29% 89.02%;
-                --site-rule: 218.82 6.94% 51.96%;
-                --site-footer-muted: 217.5 7.21% 43.53%;
-            }
-            :root {
-                --site-radius: 999px;
-                --site-radius-s: 16px;
-                --site-radius-photo: 24px;
-                --site-page-margin: 16px;
-                --site-section-padding: 28px;
-                --site-motion-fast: 100ms;
-                --site-motion-base: 140ms;
-                --site-motion-slow: 200ms;
-                --site-rise: 8px;
-                --site-display-size: 48px;
-                --site-body-size: 16px;
-                --site-measure: 68ch;
-                --site-content-width: initial;
-                --site-font-heading: "Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-body: "Figtree", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-mono: initial;
-            }
-            @media (min-width: 768px) {
-                :root {
-                    --site-page-margin: 40px;
-                    --site-section-padding: 40px;
-                }
-            }
-            :root [class*="rounded-[calc(var(--site-radius)*1.4)]"],
-            :root [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
-                border-radius: var(--site-radius-photo);
-            }
-            :root img[class*="rounded-[var(--site-radius)]"] {
-                border-radius: var(--site-radius-photo);
-            }
-            :root[data-site-look],
-            :root [data-site-look] {
-                padding-bottom: var(--site-consent-offset, 0px);
-            }
-            @keyframes site-held {
-                from {
-                    visibility: hidden;
-                }
-            }
-            :root .animate-pulse {
-                animation: none;
-            }
-            :root :is(
-                    [aria-busy="true"]:not([data-live-fact]),
-                    [data-times-loading],
-                    [data-services-loading]
-                ) {
-                animation-name: site-held;
-                animation-duration: 1ms;
-                animation-fill-mode: both;
-                animation-delay: 300ms;
-            }
-            :root {
-                --site-band-paper: var(--site-bg);
-                --site-band-ink: var(--site-fg);
-                --site-band-card: var(--site-surface);
-                --site-band-accent: var(--site-accent);
-                --site-band-accent-fg: var(--site-accent-fg);
-                --site-band-status: var(--site-status);
-                --site-band-status-inverse: var(--site-status-inverse);
-            }
-            :root [data-site-band] {
-                background-color: hsl(var(--site-bg));
-                color: hsl(var(--site-body));
-            }
-            :root [data-site-band="surface"] {
-                --site-bg: var(--site-band-card);
-                --site-surface: var(--site-band-paper);
-            }
-            :root [data-site-band="inverse"] {
-                --site-bg: var(--site-band-ink);
-                --site-surface: var(--site-band-ink);
-                --site-fg: var(--site-band-paper);
-                --site-body: var(--site-band-paper);
-                --site-muted: var(--site-band-paper);
-                --site-border: var(--site-band-paper);
-                --site-accent: var(--site-band-paper);
-                --site-accent-fg: var(--site-band-ink);
-                --site-status: var(--site-band-status-inverse);
-                --site-status-inverse: var(--site-band-status);
-            }
-            :root [data-site-band="accent"] {
-                --site-bg: var(--site-band-accent);
-                --site-surface: var(--site-band-accent);
-                --site-fg: var(--site-band-accent-fg);
-                --site-body: var(--site-band-accent-fg);
-                --site-muted: var(--site-band-accent-fg);
-                --site-border: var(--site-band-accent-fg);
-                --site-accent: var(--site-band-accent-fg);
-                --site-accent-fg: var(--site-band-accent);
-                --site-status: initial;
-                --site-status-inverse: initial;
-            }
-            :root [data-site-section][id] {
-                scroll-margin-top: 4.5rem;
-            }
-            :root [data-site-section] .prose dt {
-                color: hsl(var(--site-fg));
-                font-family: var(--site-font-heading);
-            }
-            :root [data-site-section] .prose dd {
-                color: hsl(var(--site-fg) / 0.8);
-            }
-            :root [data-site-section] [data-site-facts="labels"] dt {
-                margin-top: 1.25em;
-                color: hsl(var(--site-muted));
-                font-family: var(--site-font-body);
-                font-size: 0.78rem;
-                font-weight: 500;
-                letter-spacing: 0.1em;
-                text-transform: uppercase;
-            }
-            :root [data-site-section] [data-site-facts="labels"] dd {
-                margin-top: 0.25em;
-                padding-inline-start: 0;
-                color: hsl(var(--site-fg));
-            }
-            :root {
-                --site-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-                --site-section-space: var(--site-section-padding);
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h1, h2, h3, h4) {
-                font-family: var(--site-font-heading);
-                text-wrap: balance;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h1 {
-                letter-spacing: -0.03em;
-                line-height: 1.05;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h2 {
-                letter-spacing: -0.02em;
-                line-height: 1.15;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h3, h4) {
-                letter-spacing: -0.01em;
-                line-height: 1.25;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) p {
-                text-wrap: pretty;
-            }
-            :root [data-site-section] .prose {
-                --tw-prose-body: hsl(var(--site-body));
-                --tw-prose-headings: hsl(var(--site-fg));
-                --tw-prose-lead: hsl(var(--site-fg));
-                --tw-prose-links: hsl(var(--site-accent));
-                --tw-prose-bold: hsl(var(--site-fg));
-                --tw-prose-counters: hsl(var(--site-muted));
-                --tw-prose-bullets: hsl(var(--site-muted));
-                --tw-prose-hr: hsl(var(--site-border));
-                --tw-prose-quotes: hsl(var(--site-fg));
-                --tw-prose-quote-borders: hsl(var(--site-accent));
-                --tw-prose-captions: hsl(var(--site-muted));
-                --tw-prose-code: hsl(var(--site-fg));
-                --tw-prose-th-borders: hsl(var(--site-border));
-                --tw-prose-td-borders: hsl(var(--site-border));
-            }
-            :root [data-site-section] .prose blockquote {
-                border-inline-start-width: 2px;
-                font-style: normal;
-                font-weight: 500;
-                quotes: none;
-            }
-            :root [data-site-section] .prose blockquote p::before,
-            :root [data-site-section] .prose blockquote p::after {
-                content: none;
-            }
-            :root [data-site-section] .prose a {
-                text-decoration-line: underline;
-                text-decoration-thickness: 1px;
-                text-underline-offset: 0.2em;
-            }
-            :root [data-site-section] .prose a:hover {
-                text-decoration-thickness: 2px;
-            }
-            :root ::selection {
-                background-color: hsl(var(--site-accent));
-                color: hsl(var(--site-accent-fg));
-            }
-            :root [data-site-ground="hero"] ::selection {
-                background-color: hsl(var(--site-hero-fg));
-                color: hsl(var(--site-hero-bg));
-            }
-            :root [data-site-ground="cta"] ::selection {
-                background-color: hsl(var(--site-cta-fg));
-                color: hsl(var(--site-cta-bg));
-            }
-            :root [data-site-footer] ::selection {
-                background-color: hsl(var(--site-footer-fg));
-                color: hsl(var(--site-footer-bg));
-            }
-            :root [data-site-section][data-site-band] {
-                --site-section-padding: calc(var(--site-section-space) * 1.2);
-            }
-            :root [data-site-section]:not([data-site-band]):not(:empty):not(:has(> [data-site-ground])) + [data-site-section]:not([data-site-band]) > [class*="py-[var(--site-section-padding)]"]:not([data-site-ground]) {
-                padding-top: calc(var(--site-section-padding) * 0.5);
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-page])) :where(a, button, summary):focus-visible {
-                outline: 2px solid hsl(var(--site-fg));
-                outline-offset: 2px;
-            }
-            :where(:root [data-site-ground="hero"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-hero-fg));
-            }
-            :where(:root [data-site-ground="cta"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-cta-fg));
-            }
-            :where(:root [data-site-ground="photo"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-bg));
-            }
-            :where(:root [data-site-footer]) :where(a, button, summary):focus-visible {
-                outline: 2px solid hsl(var(--site-footer-fg));
-                outline-offset: 2px;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(button:disabled, [aria-disabled="true"]) {
-                cursor: default;
-            }
-            @media (prefers-reduced-motion: no-preference) {
-                :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
-                    transition: color 140ms var(--site-ease), background-color 140ms var(--site-ease), border-color 140ms var(--site-ease), opacity 140ms var(--site-ease), text-decoration-color 140ms var(--site-ease);
-                }
-            }
-            @keyframes site-rise {
-                from {
-                    opacity: 0;
-                    transform: translateY(8px);
-                }
-            }
-            @keyframes site-menu-in {
-                from {
-                    opacity: 0;
-                    transform: translateY(-6px);
-                }
-            }
-            @keyframes site-fade-in {
-                from {
-                    opacity: 0;
-                }
-            }
-            @media (prefers-reduced-motion: no-preference) {
-                :root [data-site-menu-panel] {
-                    animation: site-menu-in 200ms var(--site-ease) both;
-                }
-                :root [data-site-menu-scrim] {
-                    animation: site-fade-in 200ms var(--site-ease) both;
-                }
-                :root [data-site-rise] {
-                    animation: site-rise 200ms var(--site-ease) backwards;
-                }
-                :root [data-site-fade] {
-                    animation: site-fade-in 140ms var(--site-ease) backwards;
-                }
-            }
-            @media (prefers-reduced-motion: reduce) {
-                :root :is([data-site-menu-panel], [data-site-menu-scrim]) {
-                    animation: site-fade-in 120ms var(--site-ease) both;
-                }
-                :root :is([data-site-rise], [data-site-fade]) {
-                    animation: site-fade-in 120ms var(--site-ease) backwards;
-                }
-            }
-        </style>"
-`;
-
-exports[`a look's theme with no component styles is pinned > bakery in porcelain under quiet 1`] = `
-"<style>
-            :root {
-                --site-bg: 0 0% 100%;
-                --site-surface: 0 0% 100%;
-                --site-fg: 24 10% 10%;
-                /* Body text: quieter than a heading, still readable. The
-                   Tailwind config has mapped site-body since S2-006 and
-                   nothing ever defined the variable, so every user of it —
-                   the layout root, the 404 page, checkout — fell back to
-                   near-black, which is invisible on a dark ground. */
-                --site-body: 24 6% 34%;
-                /* Declared in the site.* namespace since #252 and never
-                   given a default here, so text-site-muted and
-                   border-site-border resolved to hsl() of nothing — an invalid
-                   declaration the browser drops, leaving the text at its
-                   inherited colour and the border invisible. The publisher
-                   DERIVES both per publication (app.saroh.in/lib/sites/style.ts),
-                   so live sites were fine and only this fallback was not: the
-                   tenant 404, the root error boundary, checkout, and every
-                   publication older than #189 — exactly the paths that render
-                   when something has already gone wrong.
-
-                   The values are the ones siteStyleVariables() derives for the
-                   default style, asserted in api's site-style.spec.ts, so a
-                   publication carrying no variables renders identically to one
-                   published today having chosen nothing. Picking a fresh pair
-                   here would have made "never styled" and "styled by default"
-                   two different-looking things. */
-                --site-muted: 24 4.9% 55.9%;
-                --site-border: 24 1.1% 90.1%;
-                --site-accent: 24 10% 10%;
-                --site-accent-fg: 0 0% 100%;
-                --site-hero-bg: 0 0% 100%;
-                --site-hero-fg: 24 10% 10%;
-                --site-cta-bg: 24 10% 10%;
-                --site-cta-fg: 0 0% 98%;
-                --site-footer-bg: 24 10% 10%;
-                --site-footer-fg: 0 0% 98%;
-                --site-page-margin: 38px;
-                --site-section-padding: 52px;
-                --site-grid-gap: 14px;
-                --site-radius: 2px;
-                --site-heading-scale: 1;
-                /* The merchant's type (H1). Every publication, old and new,
-                   is set in the neutral system stack until its merchant
-                   chooses fonts: no publication carries a font variable yet,
-                   so these are what every site renders with. Never one of
-                   Saroh's own faces (gate G7). */
-                --site-font-heading: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-            }
-            :root {
-                --site-bg: 210 42.86% 97.25%;
-                --site-surface: 218.18 24.44% 91.18%;
-                --site-fg: 220 28% 14.71%;
-                --site-body: 216.92 17.57% 29.02%;
-                --site-muted: 216.92 12.38% 41.18%;
-                --site-border: 218.57 25% 89.02%;
-                --site-accent: 322.5 45.57% 30.98%;
-                --site-accent-fg: 210 42.86% 97.25%;
-                --site-hero-bg: 210 42.86% 97.25%;
-                --site-cta-bg: 322.5 45.57% 30.98%;
-                --site-cta-fg: 210 42.86% 97.25%;
-                --site-footer-bg: 210 42.86% 97.25%;
-                --site-footer-fg: 220 28% 14.71%;
-                --site-hero-fg: 220 28% 14.71%;
-                --site-page-margin: 40px;
-                --site-section-padding: 76px;
-                --site-grid-gap: 30px;
-                --site-radius: 0px;
-                --site-heading-scale: 1;
-                --site-font-heading: "Fraunces", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
-                --site-font-body: "Inter Tight", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-status: 102.86 43.75% 37.65%;
-                --site-status-inverse: 97.67 48.31% 65.1%;
-                --site-display-size: 68px;
-                --site-body-size: 16.5px;
-                --site-measure: 58ch;
-                --site-content-width: 1240px;
-                --site-accent-text: 322.5 45.57% 30.98%;
-                --site-accent-soft: 285 14.29% 89.02%;
-                --site-rule: 218.82 6.94% 51.96%;
-                --site-footer-muted: 217.5 7.21% 43.53%;
-            }
-            :root {
-                --site-radius: 999px;
-                --site-radius-s: 14px;
-                --site-radius-photo: 4px;
-                --site-page-margin: 20px;
-                --site-section-padding: 72px;
-                --site-motion-fast: 100ms;
-                --site-motion-base: 140ms;
-                --site-motion-slow: 200ms;
-                --site-rise: 8px;
-                --site-display-size: 56px;
-                --site-body-size: 17px;
-                --site-measure: 60ch;
-                --site-content-width: initial;
-                --site-font-heading: "Cormorant Garamond", Georgia, "Times New Roman", "Noto Serif", "Noto Serif Devanagari", serif;
-                --site-font-body: "Jost", "Site Rupee", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
-                --site-font-mono: initial;
-            }
-            @media (min-width: 768px) {
-                :root {
-                    --site-page-margin: 48px;
-                    --site-section-padding: 120px;
-                }
-            }
-            :root [class*="rounded-[calc(var(--site-radius)*1.4)]"],
-            :root [class*="rounded-[calc(var(--site-radius)*1.6)]"] {
-                border-radius: var(--site-radius-s);
-            }
-            :root img[class*="rounded-[var(--site-radius)]"] {
-                border-radius: var(--site-radius-photo);
-            }
-            :root :is(.font-semibold, .font-bold, .font-extrabold),
-            :root [class*="aria-[current=page]:font-bold"][aria-current="page"] {
-                font-weight: 500;
-            }
-            :root [data-site-section] ~ [data-site-section] ~ [data-site-section]:not(:empty):not([data-site-band]):not(:has(> [data-site-ground])) {
-                border-top: 1px solid hsl(var(--site-border));
-            }
-            :root[data-site-look],
-            :root [data-site-look] {
-                padding-bottom: var(--site-consent-offset, 0px);
-            }
-            @keyframes site-held {
-                from {
-                    visibility: hidden;
-                }
-            }
-            :root .animate-pulse {
-                animation: none;
-            }
-            :root :is(
-                    [aria-busy="true"]:not([data-live-fact]),
-                    [data-times-loading],
-                    [data-services-loading]
-                ) {
-                animation-name: site-held;
-                animation-duration: 1ms;
-                animation-fill-mode: both;
-                animation-delay: 300ms;
-            }
-            @font-face {
-                font-family: "Site Rupee";
-                src: local("Arial"), local("ArialMT"), local("Roboto"), local("Roboto-Regular"), local("Segoe UI"), local("Noto Sans"), local("NotoSans-Regular"), local("Liberation Sans"), local("DejaVu Sans");
-                font-weight: 100 500;
-                unicode-range: U+20B9;
-            }
-            @font-face {
-                font-family: "Site Rupee";
-                src: local("Arial Bold"), local("Arial-BoldMT"), local("Roboto Bold"), local("Roboto-Bold"), local("Segoe UI Bold"), local("Noto Sans Bold"), local("NotoSans-Bold"), local("Liberation Sans Bold"), local("DejaVu Sans Bold");
-                font-weight: 600 900;
-                unicode-range: U+20B9;
-            }
-            :root {
-                --site-band-paper: var(--site-bg);
-                --site-band-ink: var(--site-fg);
-                --site-band-card: var(--site-surface);
-                --site-band-accent: var(--site-accent);
-                --site-band-accent-fg: var(--site-accent-fg);
-                --site-band-status: var(--site-status);
-                --site-band-status-inverse: var(--site-status-inverse);
-            }
-            :root [data-site-band] {
-                background-color: hsl(var(--site-bg));
-                color: hsl(var(--site-body));
-            }
-            :root [data-site-band="surface"] {
-                --site-bg: var(--site-band-card);
-                --site-surface: var(--site-band-paper);
-            }
-            :root [data-site-band="inverse"] {
-                --site-bg: var(--site-band-ink);
-                --site-surface: var(--site-band-ink);
-                --site-fg: var(--site-band-paper);
-                --site-body: var(--site-band-paper);
-                --site-muted: var(--site-band-paper);
-                --site-border: var(--site-band-paper);
-                --site-accent: var(--site-band-paper);
-                --site-accent-fg: var(--site-band-ink);
-                --site-status: var(--site-band-status-inverse);
-                --site-status-inverse: var(--site-band-status);
-            }
-            :root [data-site-band="accent"] {
-                --site-bg: var(--site-band-accent);
-                --site-surface: var(--site-band-accent);
-                --site-fg: var(--site-band-accent-fg);
-                --site-body: var(--site-band-accent-fg);
-                --site-muted: var(--site-band-accent-fg);
-                --site-border: var(--site-band-accent-fg);
-                --site-accent: var(--site-band-accent-fg);
-                --site-accent-fg: var(--site-band-accent);
-                --site-status: initial;
-                --site-status-inverse: initial;
-            }
-            :root [data-site-section][id] {
-                scroll-margin-top: 4.5rem;
-            }
-            :root [data-site-section] .prose dt {
-                color: hsl(var(--site-fg));
-                font-family: var(--site-font-heading);
-            }
-            :root [data-site-section] .prose dd {
-                color: hsl(var(--site-fg) / 0.8);
-            }
-            :root [data-site-section] [data-site-facts="labels"] dt {
-                margin-top: 1.25em;
-                color: hsl(var(--site-muted));
-                font-family: var(--site-font-body);
-                font-size: 0.78rem;
-                font-weight: 500;
-                letter-spacing: 0.1em;
-                text-transform: uppercase;
-            }
-            :root [data-site-section] [data-site-facts="labels"] dd {
-                margin-top: 0.25em;
-                padding-inline-start: 0;
-                color: hsl(var(--site-fg));
-            }
-            :root {
-                --site-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-                --site-section-space: var(--site-section-padding);
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h1, h2, h3, h4) {
-                font-family: var(--site-font-heading);
-                text-wrap: balance;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h1 {
-                letter-spacing: -0.03em;
-                line-height: 1.05;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) h2 {
-                letter-spacing: -0.02em;
-                line-height: 1.15;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :is(h3, h4) {
-                letter-spacing: -0.01em;
-                line-height: 1.25;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) p {
-                text-wrap: pretty;
-            }
-            :root [data-site-section] .prose {
-                --tw-prose-body: hsl(var(--site-body));
-                --tw-prose-headings: hsl(var(--site-fg));
-                --tw-prose-lead: hsl(var(--site-fg));
-                --tw-prose-links: hsl(var(--site-accent));
-                --tw-prose-bold: hsl(var(--site-fg));
-                --tw-prose-counters: hsl(var(--site-muted));
-                --tw-prose-bullets: hsl(var(--site-muted));
-                --tw-prose-hr: hsl(var(--site-border));
-                --tw-prose-quotes: hsl(var(--site-fg));
-                --tw-prose-quote-borders: hsl(var(--site-accent));
-                --tw-prose-captions: hsl(var(--site-muted));
-                --tw-prose-code: hsl(var(--site-fg));
-                --tw-prose-th-borders: hsl(var(--site-border));
-                --tw-prose-td-borders: hsl(var(--site-border));
-            }
-            :root [data-site-section] .prose blockquote {
-                border-inline-start-width: 2px;
-                font-style: normal;
-                font-weight: 500;
-                quotes: none;
-            }
-            :root [data-site-section] .prose blockquote p::before,
-            :root [data-site-section] .prose blockquote p::after {
-                content: none;
-            }
-            :root [data-site-section] .prose a {
-                text-decoration-line: underline;
-                text-decoration-thickness: 1px;
-                text-underline-offset: 0.2em;
-            }
-            :root [data-site-section] .prose a:hover {
-                text-decoration-thickness: 2px;
-            }
-            :root ::selection {
-                background-color: hsl(var(--site-accent));
-                color: hsl(var(--site-accent-fg));
-            }
-            :root [data-site-ground="hero"] ::selection {
-                background-color: hsl(var(--site-hero-fg));
-                color: hsl(var(--site-hero-bg));
-            }
-            :root [data-site-ground="cta"] ::selection {
-                background-color: hsl(var(--site-cta-fg));
-                color: hsl(var(--site-cta-bg));
-            }
-            :root [data-site-footer] ::selection {
-                background-color: hsl(var(--site-footer-fg));
-                color: hsl(var(--site-footer-bg));
-            }
-            :root [data-site-section][data-site-band] {
-                --site-section-padding: calc(var(--site-section-space) * 1.2);
-            }
-            :root [data-site-section]:not([data-site-band]):not(:empty):not(:has(> [data-site-ground])) + [data-site-section]:not([data-site-band]) > [class*="py-[var(--site-section-padding)]"]:not([data-site-ground]) {
-                padding-top: calc(var(--site-section-padding) * 0.5);
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-page])) :where(a, button, summary):focus-visible {
-                outline: 2px solid hsl(var(--site-fg));
-                outline-offset: 2px;
-            }
-            :where(:root [data-site-ground="hero"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-hero-fg));
-            }
-            :where(:root [data-site-ground="cta"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-cta-fg));
-            }
-            :where(:root [data-site-ground="photo"]) :where(a, button, summary):focus-visible {
-                outline-color: hsl(var(--site-bg));
-            }
-            :where(:root [data-site-footer]) :where(a, button, summary):focus-visible {
-                outline: 2px solid hsl(var(--site-footer-fg));
-                outline-offset: 2px;
-            }
-            :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(button:disabled, [aria-disabled="true"]) {
-                cursor: default;
-            }
-            @media (prefers-reduced-motion: no-preference) {
-                :where(:root :is([data-site-section], [data-site-header], [data-site-footer], [data-site-page])) :where(a, button, summary) {
-                    transition: color 140ms var(--site-ease), background-color 140ms var(--site-ease), border-color 140ms var(--site-ease), opacity 140ms var(--site-ease), text-decoration-color 140ms var(--site-ease);
-                }
-            }
-            @keyframes site-rise {
-                from {
-                    opacity: 0;
-                    transform: translateY(8px);
-                }
-            }
-            @keyframes site-menu-in {
-                from {
-                    opacity: 0;
-                    transform: translateY(-6px);
-                }
-            }
-            @keyframes site-fade-in {
-                from {
-                    opacity: 0;
-                }
-            }
-            @media (prefers-reduced-motion: no-preference) {
-                :root [data-site-menu-panel] {
-                    animation: site-menu-in 200ms var(--site-ease) both;
-                }
-                :root [data-site-menu-scrim] {
-                    animation: site-fade-in 200ms var(--site-ease) both;
-                }
-                :root [data-site-rise] {
-                    animation: site-rise 200ms var(--site-ease) backwards;
-                }
-                :root [data-site-fade] {
-                    animation: site-fade-in 140ms var(--site-ease) backwards;
-                }
-            }
-            @media (prefers-reduced-motion: reduce) {
-                :root :is([data-site-menu-panel], [data-site-menu-scrim]) {
-                    animation: site-fade-in 120ms var(--site-ease) both;
-                }
-                :root :is([data-site-rise], [data-site-fade]) {
-                    animation: site-fade-in 120ms var(--site-ease) backwards;
-                }
-            }
-        </style>"
-`;
-
 exports[`a look's theme with no component styles is pinned > blogs in indigo under folio 1`] = `
 "<style>
             :root {
@@ -2209,20 +2209,20 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
             }
             :root {
-                --site-bg: 210 25% 98.43%;
-                --site-surface: 210 25% 98.43%;
-                --site-fg: 200 6.38% 9.22%;
-                --site-body: 216 4.59% 21.37%;
-                --site-muted: 205.71 3.74% 36.67%;
-                --site-border: 216 22.73% 91.37%;
+                --site-bg: 225 33.33% 97.65%;
+                --site-surface: 230 46.15% 94.9%;
+                --site-fg: 235 40% 17.65%;
+                --site-body: 232.17 18.4% 24.51%;
+                --site-muted: 230.4 12.56% 39.02%;
+                --site-border: 228.75 29.63% 89.41%;
                 --site-accent: 236.5 42.74% 47.25%;
                 --site-accent-fg: 0 0% 100%;
-                --site-hero-bg: 210 25% 98.43%;
+                --site-hero-bg: 225 33.33% 97.65%;
                 --site-cta-bg: 236.5 42.74% 47.25%;
                 --site-cta-fg: 0 0% 100%;
-                --site-footer-bg: 210 25% 98.43%;
-                --site-footer-fg: 200 6.38% 9.22%;
-                --site-hero-fg: 200 6.38% 9.22%;
+                --site-footer-bg: 235 40% 17.65%;
+                --site-footer-fg: 232.5 42.11% 92.55%;
+                --site-hero-fg: 235 40% 17.65%;
                 --site-page-margin: 40px;
                 --site-section-padding: 52px;
                 --site-grid-gap: 14px;
@@ -2235,9 +2235,9 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-measure: 76ch;
                 --site-content-width: 980px;
                 --site-accent-text: 236.5 42.74% 47.25%;
-                --site-accent-soft: 231.43 35% 92.16%;
-                --site-rule: 210 3.64% 56.86%;
-                --site-footer-muted: 210 0.97% 40.39%;
+                --site-accent-soft: 236.25 38.1% 91.76%;
+                --site-rule: 232.8 11.21% 56.27%;
+                --site-footer-muted: 234.78 13.45% 66.47%;
             }
             :root {
                 --site-radius: 0px;
@@ -2568,20 +2568,20 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
             }
             :root {
-                --site-bg: 210 6.67% 94.12%;
-                --site-surface: 210 25% 98.43%;
-                --site-fg: 200 6.38% 9.22%;
-                --site-body: 216 4.59% 21.37%;
-                --site-muted: 205.71 3.74% 36.67%;
-                --site-border: 216 22.73% 91.37%;
+                --site-bg: 225 33.33% 97.65%;
+                --site-surface: 230 46.15% 94.9%;
+                --site-fg: 235 40% 17.65%;
+                --site-body: 232.17 18.4% 24.51%;
+                --site-muted: 230.4 12.56% 39.02%;
+                --site-border: 228.75 29.63% 89.41%;
                 --site-accent: 236.5 42.74% 47.25%;
                 --site-accent-fg: 0 0% 100%;
-                --site-hero-bg: 210 6.67% 94.12%;
+                --site-hero-bg: 225 33.33% 97.65%;
                 --site-cta-bg: 236.5 42.74% 47.25%;
                 --site-cta-fg: 0 0% 100%;
-                --site-footer-bg: 210 25% 98.43%;
-                --site-footer-fg: 200 6.38% 9.22%;
-                --site-hero-fg: 200 6.38% 9.22%;
+                --site-footer-bg: 235 40% 17.65%;
+                --site-footer-fg: 232.5 42.11% 92.55%;
+                --site-hero-fg: 235 40% 17.65%;
                 --site-page-margin: 40px;
                 --site-section-padding: 52px;
                 --site-grid-gap: 14px;
@@ -2594,9 +2594,9 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-measure: 76ch;
                 --site-content-width: 980px;
                 --site-accent-text: 236.5 42.74% 47.25%;
-                --site-accent-soft: 235.71 24.14% 88.63%;
-                --site-rule: 214.29 2.95% 53.53%;
-                --site-footer-muted: 210 0.97% 40.39%;
+                --site-accent-soft: 236.25 38.1% 91.76%;
+                --site-rule: 232.8 11.21% 56.27%;
+                --site-footer-muted: 234.78 13.45% 66.47%;
             }
             :root {
                 --site-radius: 999px;
@@ -2915,20 +2915,20 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Noto Sans Devanagari", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
             }
             :root {
-                --site-bg: 210 25% 98.43%;
-                --site-surface: 210 25% 98.43%;
-                --site-fg: 200 6.38% 9.22%;
-                --site-body: 216 4.59% 21.37%;
-                --site-muted: 205.71 3.74% 36.67%;
-                --site-border: 216 22.73% 91.37%;
+                --site-bg: 225 33.33% 97.65%;
+                --site-surface: 230 46.15% 94.9%;
+                --site-fg: 235 40% 17.65%;
+                --site-body: 232.17 18.4% 24.51%;
+                --site-muted: 230.4 12.56% 39.02%;
+                --site-border: 228.75 29.63% 89.41%;
                 --site-accent: 236.5 42.74% 47.25%;
                 --site-accent-fg: 0 0% 100%;
-                --site-hero-bg: 210 25% 98.43%;
+                --site-hero-bg: 225 33.33% 97.65%;
                 --site-cta-bg: 236.5 42.74% 47.25%;
                 --site-cta-fg: 0 0% 100%;
-                --site-footer-bg: 210 25% 98.43%;
-                --site-footer-fg: 200 6.38% 9.22%;
-                --site-hero-fg: 200 6.38% 9.22%;
+                --site-footer-bg: 235 40% 17.65%;
+                --site-footer-fg: 232.5 42.11% 92.55%;
+                --site-hero-fg: 235 40% 17.65%;
                 --site-page-margin: 40px;
                 --site-section-padding: 52px;
                 --site-grid-gap: 14px;
@@ -2941,9 +2941,9 @@ exports[`a look's theme with no component styles is pinned > blogs in indigo und
                 --site-measure: 76ch;
                 --site-content-width: 980px;
                 --site-accent-text: 236.5 42.74% 47.25%;
-                --site-accent-soft: 231.43 35% 92.16%;
-                --site-rule: 210 3.64% 56.86%;
-                --site-footer-muted: 210 0.97% 40.39%;
+                --site-accent-soft: 236.25 38.1% 91.76%;
+                --site-rule: 232.8 11.21% 56.27%;
+                --site-footer-muted: 234.78 13.45% 66.47%;
             }
             :root {
                 --site-radius: 999px;

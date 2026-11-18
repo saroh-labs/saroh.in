@@ -26,6 +26,9 @@ import type { AccountTab, AccountTabKey } from "./model";
  *   stays at the top as the page scrolls, an icon beside each word, the
  *   current one underlined in the accent. A wide window no longer has a
  *   phone's bar pinned to its foot.
+ * - **On a desk (1024px up)** it is the side menu (DEC-229, plan U13): a
+ *   column beside the page, the current one filled, and "Back to the
+ *   site" under the tabs. Still the one `nav` landmark, never a second.
  */
 
 // Kept here for the callers that read them from the tab bar.
@@ -64,10 +67,12 @@ export function AccountTabBar({
                 "bg-site-surface border-site-border font-site-body fixed inset-x-0 bottom-0 z-40 border-t px-2 pb-[calc(6px+env(safe-area-inset-bottom))] pt-1.5",
                 // From tablet width up: a row under the header.
                 "md:bg-site-bg md:sticky md:inset-x-auto md:bottom-auto md:top-0 md:border-b md:border-t-0 md:px-6 md:pb-0 md:pt-0",
+                // On a desk: the side menu, a column beside the page.
+                "lg:top-6 lg:self-start lg:border-b-0 lg:bg-transparent lg:px-0",
             )}
         >
             <div
-                className="mx-auto grid max-w-[640px] grid-cols-[repeat(var(--account-tabs),minmax(0,1fr))] md:flex md:max-w-[960px] md:gap-1"
+                className="mx-auto grid max-w-[640px] grid-cols-[repeat(var(--account-tabs),minmax(0,1fr))] md:flex md:max-w-[960px] md:gap-1 lg:mx-0 lg:max-w-none lg:flex-col"
                 style={{ "--account-tabs": tabs.length } as CSSProperties}
             >
                 {tabs.map((tab) => {
@@ -85,8 +90,10 @@ export function AccountTabBar({
                                 // A row tab: the icon beside the word, and
                                 // the accent under the current one.
                                 "md:flex md:min-h-[48px] md:items-center md:gap-2 md:rounded-none md:px-3 md:py-0 md:text-[14px] md:hover:bg-[color-mix(in_srgb,hsl(var(--site-fg))_5%,transparent)] md:focus-visible:ring-inset",
+                                // A side menu entry: rounded, filled when on.
+                                "lg:min-h-11 lg:gap-3 lg:rounded-[calc(var(--site-radius)+6px)] lg:text-[15px]",
                                 on
-                                    ? "text-site-fg font-bold md:shadow-[inset_0_-2px_0_hsl(var(--site-accent))]"
+                                    ? "text-site-fg lg:bg-site-surface font-bold md:shadow-[inset_0_-2px_0_hsl(var(--site-accent))] lg:shadow-none"
                                     : "text-site-body font-medium",
                             )}
                         >
@@ -130,6 +137,30 @@ export function AccountTabBar({
                         </Link>
                     );
                 })}
+                {/* The way back, under the side menu (the header's letter
+                    says it below a desk). */}
+                <Link
+                    href="/"
+                    className="text-site-body hover:text-site-fg focus-visible:ring-site-fg border-site-border mt-3 hidden min-h-11 items-center gap-3 border-t px-3 pt-3 text-[15px] font-medium focus-visible:outline-none focus-visible:ring-2 lg:flex"
+                >
+                    <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        aria-hidden="true"
+                        className="shrink-0"
+                    >
+                        <path
+                            d="M19 12H5M11 6l-6 6 6 6"
+                            stroke="currentColor"
+                            strokeWidth="1.9"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        />
+                    </svg>
+                    Back to the site
+                </Link>
             </div>
         </nav>
     );
