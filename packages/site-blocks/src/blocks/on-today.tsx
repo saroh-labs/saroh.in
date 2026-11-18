@@ -17,6 +17,7 @@ import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import PlainHero from "./hero-plain";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero with "On today" beside it (G18, R15), as the Customer Site design
@@ -344,7 +345,10 @@ function SplitHero({
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-3.5 max-w-[44ch] text-pretty text-base leading-[1.55] opacity-75">
-                            {content.subheading}
+                            <PhoneText
+                                text={content.subheading}
+                                phone={content.phoneLine}
+                            />
                         </p>
                     ) : null}
                     {content.cta ? (

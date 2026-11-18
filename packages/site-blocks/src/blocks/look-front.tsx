@@ -3,6 +3,7 @@ import { sectionFrameOf } from "@saroh/block-contract";
 import Link from "next/link";
 
 import { cn } from "../lib/utils";
+import { PhoneText } from "./phone-text";
 
 /**
  * What the front-door blocks share under a look (DEC-172, plan U6, #1094):
@@ -166,7 +167,7 @@ export function FrontCta({
     if (href === "") {
         return (
             <span role="link" aria-disabled="true" className={classes}>
-                {content.label}
+                <PhoneText text={content.label} phone={content.phoneLabel} />
             </span>
         );
     }
@@ -178,13 +179,13 @@ export function FrontCta({
                 className={classes}
                 {...primary}
             >
-                {content.label}
+                <PhoneText text={content.label} phone={content.phoneLabel} />
             </a>
         );
     }
     return (
         <Link href={href} className={classes} {...primary}>
-            {content.label}
+            <PhoneText text={content.label} phone={content.phoneLabel} />
         </Link>
     );
 }

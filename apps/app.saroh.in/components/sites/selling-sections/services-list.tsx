@@ -30,6 +30,7 @@ import {
     unlessDefault,
     wordsOrAbsent,
 } from "@/components/sites/section-fields/display-options";
+import { PhoneTextField } from "@/components/sites/section-fields/phone-text-field";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 import { ServicesLoadNotice } from "./services-load-notice";
 
@@ -279,6 +280,17 @@ export function ServicesListFields({
                     pages={pages}
                     onChange={(action) =>
                         patch({ cta: withCtaAction(c.cta, action) })
+                    }
+                />
+            ) : null}
+            {c.cta?.label.trim() ? (
+                <PhoneTextField
+                    label="Button"
+                    value={c.cta.phoneLabel}
+                    fallback={c.cta.label}
+                    maxLength={40}
+                    onChange={(phoneLabel) =>
+                        patch({ cta: c.cta && { ...c.cta, phoneLabel } })
                     }
                 />
             ) : null}

@@ -11,6 +11,7 @@ import { cn } from "../lib/utils";
 import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero's `fullBleed` look (industry templates U2): the photo fills the
@@ -134,7 +135,10 @@ export default function FullBleedHero({
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-4 max-w-[46ch] text-pretty text-base leading-[1.55] opacity-90 sm:text-lg">
-                            {content.subheading}
+                            <PhoneText
+                                text={content.subheading}
+                                phone={content.phoneLine}
+                            />
                         </p>
                     ) : null}
                     {content.cta ? (

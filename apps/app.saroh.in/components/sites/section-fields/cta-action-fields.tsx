@@ -49,7 +49,12 @@ export function withCtaLabel(
     const blank = !label.trim() && actionIsEmpty(action);
     return blank
         ? undefined
-        : { label, action, style: cta?.style ?? "primary" };
+        : { ...phoneOf(cta), label, action, style: cta?.style ?? "primary" };
+}
+
+/** A button's phone words, kept when its label or action changes (KD9). */
+function phoneOf(cta: CtaValue | undefined): Pick<CtaValue, "phoneLabel"> {
+    return cta?.phoneLabel === undefined ? {} : { phoneLabel: cta.phoneLabel };
 }
 
 /**
@@ -78,7 +83,12 @@ export function withCtaAction(
     cta: CtaValue | undefined,
     action: CtaAction,
 ): CtaValue {
-    return { label: cta?.label ?? "", action, style: cta?.style ?? "primary" };
+    return {
+        ...phoneOf(cta),
+        label: cta?.label ?? "",
+        action,
+        style: cta?.style ?? "primary",
+    };
 }
 
 const CTA_KINDS: { value: CtaKind; label: string }[] = [

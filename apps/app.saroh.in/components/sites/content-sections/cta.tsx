@@ -14,6 +14,7 @@ import {
     CtaActionFields,
     actionOf,
 } from "@/components/sites/section-fields/cta-action-fields";
+import { PhoneTextField } from "@/components/sites/section-fields/phone-text-field";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 import type { CtaStyle, CtaValue } from "@/lib/sites/service";
 
@@ -45,6 +46,13 @@ export function CtaFields({
                     placeholder="Start now"
                 />
             </Field>
+            <PhoneTextField
+                label="Label"
+                value={c.phoneLabel}
+                fallback={c.label}
+                maxLength={40}
+                onChange={(phoneLabel) => patch({ phoneLabel })}
+            />
             <CtaActionFields
                 action={actionOf(c)}
                 pages={pages}

@@ -3,6 +3,7 @@
 import { MediaPicker } from "@/components/shared/fields/media-picker";
 import type { HeroPanelKind } from "@saroh/block-contract";
 import { resolveVariant, SAME_DAY_CALL_WORDS } from "@saroh/block-contract";
+import { Button } from "@saroh/ui/button";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
@@ -14,7 +15,7 @@ import {
     SelectValue,
 } from "@saroh/ui/select";
 import { Switch } from "@saroh/ui/switch";
-import { useId } from "react";
+import { useId, useRef } from "react";
 
 import { buildImage } from "@/components/sites/section-fields/build-image";
 import {
@@ -25,6 +26,7 @@ import {
 } from "@/components/sites/section-fields/cta-action-fields";
 import { ImageBrief } from "@/components/sites/section-fields/image-brief";
 import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
+import { PhoneTextField } from "@/components/sites/section-fields/phone-text-field";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 import type { HeroContent } from "@/lib/sites/service";
 
@@ -43,9 +45,14 @@ import type { HeroContent } from "@/lib/sites/service";
 function secondLink(
     label: string,
     href: string | undefined,
-): { label: string; href: string } | undefined {
+    phoneLabel?: string,
+): HeroContent["secondaryCta"] {
     if (label.trim() === "") return undefined;
-    return { label, href: href ?? "/" };
+    return {
+        label,
+        href: href ?? "/",
+        ...(phoneLabel === undefined ? {} : { phoneLabel }),
+    };
 }
 
 /** The answer panel's kinds as the owner reads them (KD14, DEC-228). */
@@ -64,6 +71,7 @@ export function HeroFields({
 }: SectionFieldsProps<"hero">) {
     const c = section.content;
     const id = useId();
+    const headingRef = useRef<HTMLInputElement>(null);
     const patch = (next: Partial<HeroContent>) =>
         onChange({ ...section, content: { ...c, ...next } });
     // The `none` look is a page title: it may keep its heading for screen
@@ -77,11 +85,26 @@ export function HeroFields({
         <div className="grid gap-3">
             <Field label="Heading">
                 <Input
+                    ref={headingRef}
                     value={c.heading}
                     onChange={(e) => patch({ heading: e.target.value })}
                     placeholder="Welcome"
                 />
             </Field>
+            {/* One h1, the same on every width (DEC-227): no phone version. */}
+            <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                Same on phone and desktop. Search engines read the phone page,
+                and a page has one main heading. Too long for a phone?{" "}
+                <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    onClick={() => headingRef.current?.focus()}
+                    className="h-auto p-0 text-[12px] font-semibold coarse:min-h-11"
+                >
+                    Shorten it for both.
+                </Button>
+            </p>
             {titleOnly ? (
                 <div className="grid gap-1">
                     <div className="flex items-center justify-between gap-3">
@@ -108,6 +131,16 @@ export function HeroFields({
                     placeholder="A short tagline"
                 />
             </Field>
+            {c.subheading?.trim() ? (
+                <PhoneTextField
+                    label="Subheading"
+                    value={c.phoneLine}
+                    fallback={c.subheading}
+                    maxLength={200}
+                    searchHint
+                    onChange={(phoneLine) => patch({ phoneLine })}
+                />
+            ) : null}
             <Field label="Button label">
                 <Input
                     value={c.cta?.label ?? ""}
@@ -142,6 +175,17 @@ export function HeroFields({
                     }
                 />
             ) : null}
+            {c.cta?.label.trim() ? (
+                <PhoneTextField
+                    label="Button"
+                    value={c.cta.phoneLabel}
+                    fallback={c.cta.label}
+                    maxLength={40}
+                    onChange={(phoneLabel) =>
+                        patch({ cta: c.cta && { ...c.cta, phoneLabel } })
+                    }
+                />
+            ) : null}
             <Field label="Second link">
                 <Input
                     value={c.secondaryCta?.label ?? ""}
@@ -150,6 +194,7 @@ export function HeroFields({
                             secondaryCta: secondLink(
                                 e.target.value,
                                 c.secondaryCta?.href,
+                                c.secondaryCta?.phoneLabel,
                             ),
                         })
                     }
@@ -165,12 +210,29 @@ export function HeroFields({
                                 secondaryCta: secondLink(
                                     c.secondaryCta?.label ?? "",
                                     e.target.value,
+                                    c.secondaryCta?.phoneLabel,
                                 ),
                             })
                         }
                         placeholder="/#timetable"
                     />
                 </Field>
+            ) : null}
+            {c.secondaryCta ? (
+                <PhoneTextField
+                    label="Second link"
+                    value={c.secondaryCta.phoneLabel}
+                    fallback={c.secondaryCta.label}
+                    maxLength={40}
+                    onChange={(phoneLabel) =>
+                        patch({
+                            secondaryCta: c.secondaryCta && {
+                                ...c.secondaryCta,
+                                phoneLabel,
+                            },
+                        })
+                    }
+                />
             ) : null}
             <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
                 A quieter link beside the button. The Quiet, Folio and Live

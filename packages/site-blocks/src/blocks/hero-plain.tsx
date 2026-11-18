@@ -7,6 +7,7 @@ import { siteImage } from "../lib/site-image";
 import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero as it has always drawn: centred, or copy beside its image
@@ -96,7 +97,10 @@ export default function PlainHero({
                         </HeroHeading>
                         {content.subheading ? (
                             <p className="mt-5 max-w-[54ch] text-pretty text-[length:calc(var(--site-body-size,1rem)*1.125)] leading-relaxed sm:text-[length:calc(var(--site-body-size,1rem)*1.25)]">
-                                {content.subheading}
+                                <PhoneText
+                                    text={content.subheading}
+                                    phone={content.phoneLine}
+                                />
                             </p>
                         ) : null}
                         {content.cta ? (

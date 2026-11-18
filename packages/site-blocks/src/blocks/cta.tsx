@@ -4,6 +4,7 @@ import type { RenderedCta, RenderedCtaSection } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { ctaBandWords } from "./cta-words";
+import { PhoneText } from "./phone-text";
 
 /**
  * Which surface a CTA sits on, because that decides what it may be coloured
@@ -207,7 +208,7 @@ export function CtaButton({
         // seems to work and does nothing under the finger.
         return (
             <span role="link" aria-disabled="true" className={className}>
-                {content.label}
+                <PhoneText text={content.label} phone={content.phoneLabel} />
             </span>
         );
     }
@@ -219,13 +220,13 @@ export function CtaButton({
                 rel="noopener noreferrer"
                 {...mark}
             >
-                {content.label}
+                <PhoneText text={content.label} phone={content.phoneLabel} />
             </a>
         );
     }
     return (
         <Link href={content.href} className={className} {...mark}>
-            {content.label}
+            <PhoneText text={content.label} phone={content.phoneLabel} />
         </Link>
     );
 }

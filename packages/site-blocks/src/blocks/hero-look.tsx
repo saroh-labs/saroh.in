@@ -19,6 +19,7 @@ import {
 } from "./look-front";
 import { OwnerPhotoNote } from "./no-photo";
 import type { PublicToday } from "./on-today";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero under a look (DEC-172, plan U6, #1094), as each look's fixed
@@ -129,7 +130,12 @@ export default function LookHero({
             </>
         ),
         line: content.subheading ? (
-            <p className={LINE[look]}>{content.subheading}</p>
+            <p className={LINE[look]}>
+                <PhoneText
+                    text={content.subheading}
+                    phone={content.phoneLine}
+                />
+            </p>
         ) : null,
         button:
             content.cta || second ? (

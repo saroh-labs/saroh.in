@@ -11,6 +11,7 @@ import PlainHero from "./hero-plain";
 import type { FrontDoor, PageProof } from "./look-front";
 import type { PublicToday } from "./on-today";
 import OnTodayHero from "./on-today";
+import { PhoneText } from "./phone-text";
 
 /**
  * `hero` v1/v2 — a headline block with optional subheading, CTA and image.
@@ -173,7 +174,10 @@ function CompactHeading({
                 <p
                     className={`text-site-body max-w-[60ch] text-pretty text-base leading-relaxed ${visible ? "mt-2" : ""}`}
                 >
-                    {content.subheading}
+                    <PhoneText
+                        text={content.subheading}
+                        phone={content.phoneLine}
+                    />
                 </p>
             ) : null}
         </section>
