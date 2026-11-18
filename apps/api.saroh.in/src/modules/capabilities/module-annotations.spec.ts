@@ -162,6 +162,11 @@ const NEVER: Record<string, string> = {
         "a customer's data removal request: the law's, whichever modules are on",
     "contacts/contact-search.controller.ts":
         "the customer picker in New booking and New order (B13) works whichever of CRM, Appointments and Commerce is on",
+    // #1047: a person's own Google connection. The service asks the
+    // GOOGLE_CALENDAR flag, the plan's integrations row and
+    // calendar:connect-own; disconnecting must work whatever is on.
+    "calendar-sync/calendar-connect.controller.ts":
+        "a person's own Google Calendar connection, not a capability module",
     "notifications/notifications.controller.ts": "cross-cutting",
     // F14: a person's own alert choices; the rows follow their role and
     // the modules on, read by the service.

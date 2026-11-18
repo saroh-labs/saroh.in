@@ -30,7 +30,10 @@ import { join, relative, sep } from "node:path";
  * consequence. Delete the entry in the commit that closes it — the last test
  * below fails until you do, so this list cannot quietly outlive the gap.
  */
-const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {};
+const KNOWN_WITHOUT_CONSUMER: Record<string, string> = {
+    "calendar.busy":
+        "Google Calendar U4 queues the busy read on connect; its handler lands in U6 of the same batch",
+};
 
 /** Registered, but nothing enqueues it. Same rules as above. */
 const KNOWN_WITHOUT_PRODUCER: Record<string, string> = {};

@@ -45,7 +45,8 @@ export class CalendarSealMismatchError extends Error {
     }
 }
 
-function withKey<T>(work: (key: EncryptionKey) => T): T {
+/** Work with the key, a missing or malformed one turned into a 503 that names it. */
+export function withCalendarKey<T>(work: (key: EncryptionKey) => T): T {
     const key = calendarKey();
     try {
         return work(key);
@@ -65,11 +66,13 @@ export function sealToken(token: string, b: TokenBinding): EncryptedSecret {
         c: b.connectionId,
         t: token,
     };
-    return withKey((key) => encryptWithKey(JSON.stringify(envelope), key));
+    return withCalendarKey((key) =>
+        encryptWithKey(JSON.stringify(envelope), key),
+    );
 }
 
 export function openToken(sealed: EncryptedSecret, b: TokenBinding): string {
-    const e = withKey(
+    const e = withCalendarKey(
         (key) => JSON.parse(decryptWithKey(sealed, key)) as Envelope,
     );
     if (e.o !== b.organizationId || e.c !== b.connectionId) {
