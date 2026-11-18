@@ -487,7 +487,7 @@ export const gymTemplateV1: TemplateManifest = {
 export const GYM_PLACES_FROM = 2;
 
 const FIRST_CLASS_FREE =
-    "The first class is free. No booking needed: arrive ten minutes early and ask at the desk.";
+    "The first class is free: just come, ten minutes early, and ask at the desk. Book from your second class.";
 
 /** v1's first visit, its first step saying the first class is free. */
 function firstVisitV2(frame: Record<string, string> = {}) {
@@ -551,7 +551,7 @@ export const gymTemplate: TemplateManifest = {
                         heading: "Train before work, at lunch, or after it.",
                         subheading: FIRST_CLASS_FREE,
                         phoneLine:
-                            "The first class is free. No booking needed.",
+                            "First class free: just come. Book from the second.",
                         panel: { kind: "today" },
                         answerRow: true,
                         ...(classesOn(ctx)

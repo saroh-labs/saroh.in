@@ -325,7 +325,7 @@ describe("clinic@2 (U10, distilled)", () => {
             variant: "answer",
             panel: { kind: "sameDayCall", words: "Same-day? Call the desk" },
             answerRow: true,
-            cta: { label: "Book an appointment", href: "/book" },
+            cta: { label: "Book a visit", href: "/book" },
         });
         expect(hero?.content).not.toHaveProperty("secondaryCta");
         // The photo band is dropped: no image slot in the hero.

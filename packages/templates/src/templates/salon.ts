@@ -78,7 +78,7 @@ const HEADLINE = "Book your chair. Walk in fresh.";
 function heroLine(ctx: TemplateContext): string {
     if (ctx.tagline) return ctx.tagline;
     if (hasPrices(ctx)) {
-        return "Every service with its price and how long it takes, and who has a chair free today.";
+        return "Every service with its price and how long it takes, and who can take you today.";
     }
     return `What ${ctx.organizationName} does, and when to come in.`;
 }
@@ -185,7 +185,7 @@ export const salonTemplateV1: TemplateManifest = {
     version: 1,
     name: "Salon",
     description:
-        "For a salon or barber: who has a chair free today, every service with its price and time, the stylists, what to know before you come, and where to find you.",
+        "For a salon or barber: who can take you today, every service with its price and time, the stylists, what to know before you come, and where to find you.",
     slug: "salon",
     kinds: ["salon"],
     shape: "services",

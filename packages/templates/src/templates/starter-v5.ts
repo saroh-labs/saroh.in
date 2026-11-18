@@ -39,7 +39,7 @@ import {
 const BOOK_WORDS: Partial<Record<TemplateKind, string>> = {
     salon: "Book a chair",
     gym: "Book a class",
-    clinic: "Book an appointment",
+    clinic: "Book a visit",
     coach: "Book a session",
     creator: "Book a session",
 };

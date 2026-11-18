@@ -519,7 +519,7 @@ export const clinicTemplate: TemplateManifest = {
                         ...(hasTreatments(ctx)
                             ? {
                                   cta: {
-                                      label: "Book an appointment",
+                                      label: "Book a visit",
                                       href: "/book",
                                       style: "primary",
                                       phoneLabel: "Book",
