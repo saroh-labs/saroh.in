@@ -120,10 +120,12 @@ const envSchema = z.object({
     // The secret a public page view's visitor hash is derived from, by a
     // salt that changes every day (U15 privacy review): the hash is
     // sha256(HMAC(secret, the UTC day) : site : address), so a visitor can't
-    // be followed from day to day. Unset: a fixed public value in
-    // development and test, and a random one per process anywhere else
-    // (with a warning; a restart splits a day's unique visitors). Read in
-    // `modules/analytics/visitor-hash.ts`. Never logged.
+    // be followed from day to day. It also keys the phone-number and
+    // address hashes the durable sign-in limits count by, so production
+    // refuses to boot without it (03-M3). Unset elsewhere: a fixed public
+    // value in development and test, a random one per process otherwise
+    // (with a warning). Read in `modules/analytics/visitor-hash.ts`. Never
+    // logged.
     ANALYTICS_IP_SALT: z.string().min(1).optional(),
     // Signs the pricing draft-preview token staff mint in the admin console
     // (plans catalogue KTD-10): at most 15 minutes, bound to one draft
@@ -267,6 +269,13 @@ const envSchema = z.object({
     // header in MSG91's webhook settings; delivery reports without it are
     // refused (`messaging/msg91-webhook.controller.ts`). Unset, all are.
     MSG91_WEBHOOK_SECRET: z.string().min(32).optional(),
+    // The platform-wide ceiling on Saroh-paid WhatsApp sign-in codes
+    // (03-H1): past this many in an hour, or in a day, no more are sent
+    // until the window turns (SMS still is), and Platform owners are
+    // emailed. Unset: 100 an hour, 500 a day
+    // (`account-phone/whatsapp-ceiling.ts`).
+    WHATSAPP_CODES_PER_HOUR: z.string().regex(/^\d+$/).optional(),
+    WHATSAPP_CODES_PER_DAY: z.string().regex(/^\d+$/).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never
@@ -463,6 +472,10 @@ const REQUIRED_IN_PRODUCTION = [
     "RENDERER_URL",
     "APP_URL",
     "EMAIL_FROM",
+    // Keys every phone and address hash the durable limits count by: unset,
+    // they were random per process, so phone-code limits started over on
+    // every deploy and a code sent before one could never be checked (03-M3).
+    "ANALYTICS_IP_SALT",
 ] as const;
 
 /**
@@ -475,6 +488,10 @@ const TEST_ONLY = [
     "STRIPE_FAKE",
     "AI_PROVIDER_FAKE",
     "GOOGLE_CALENDAR_FAKE",
+    // Where Saroh's Meta token and MSG91 key are sent: a value left in
+    // production would hand them to that host (03-L8).
+    "META_GRAPH_BASE_URL",
+    "MSG91_BASE_URL",
 ] as const;
 
 const checkedSchema = envSchema.superRefine((value, ctx) => {

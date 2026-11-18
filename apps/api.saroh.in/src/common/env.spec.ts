@@ -13,6 +13,7 @@ const DEPLOYED = {
     RENDERER_URL: "https://saroh.app",
     APP_URL: "https://app.saroh.in",
     EMAIL_FROM: "Saroh <noreply@saroh.in>",
+    ANALYTICS_IP_SALT: "a-test-salt",
 };
 
 const missing = (source: Record<string, string | undefined>) => {
@@ -34,8 +35,32 @@ describe("the API's environment", () => {
                 RENDERER_URL: undefined,
                 APP_URL: undefined,
                 EMAIL_FROM: undefined,
+                ANALYTICS_IP_SALT: undefined,
             }),
-        ).toEqual(["RENDERER_URL", "APP_URL", "EMAIL_FROM"]);
+        ).toEqual([
+            "RENDERER_URL",
+            "APP_URL",
+            "EMAIL_FROM",
+            "ANALYTICS_IP_SALT",
+        ]);
+    });
+
+    // 03-L8: a base URL left set would send Saroh's provider keys there.
+    it("refuses the messaging providers' base URLs in production", () => {
+        expect(
+            missing({
+                ...DEPLOYED,
+                META_GRAPH_BASE_URL: "https://stub.example.com",
+                MSG91_BASE_URL: "https://stub.example.com",
+            }),
+        ).toEqual(["META_GRAPH_BASE_URL", "MSG91_BASE_URL"]);
+        expect(
+            missing({
+                ...BASE,
+                NODE_ENV: "test",
+                META_GRAPH_BASE_URL: "https://stub.example.com",
+            }),
+        ).toEqual([]);
     });
 
     it("refuses the link preview's test-only hosts in production", () => {
