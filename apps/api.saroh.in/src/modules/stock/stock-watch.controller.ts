@@ -5,13 +5,13 @@ import {
     Header,
     Headers,
     HttpCode,
-    Ip,
     Param,
     Post,
     Query,
     UseGuards,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { WatchOfferQueryDto, WatchStockDto } from "./stock-watch.dto";
@@ -46,7 +46,7 @@ export class StockWatchController {
         @Param("siteId") siteId: string,
         @Param("productId") productId: string,
         @Query() query: WatchOfferQueryDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<WatchOffer> {
         return this.watches.offer(
@@ -64,7 +64,7 @@ export class StockWatchController {
         @Param("siteId") siteId: string,
         @Param("productId") productId: string,
         @Body() dto: WatchStockDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<WatchTaken> {
         return this.watches.watch(
@@ -82,7 +82,7 @@ export class StockWatchController {
     read(
         @Param("siteId") siteId: string,
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<WatchView> {
         return this.watches.read(siteId, token, visitorKey(ip, relay));
@@ -95,7 +95,7 @@ export class StockWatchController {
     stop(
         @Param("siteId") siteId: string,
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<WatchView> {
         return this.watches.stop(siteId, token, visitorKey(ip, relay));

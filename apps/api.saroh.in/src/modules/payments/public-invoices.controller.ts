@@ -5,12 +5,12 @@ import {
     Header,
     Headers,
     HttpCode,
-    Ip,
     Param,
     Post,
     StreamableFile,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { AutopayOutcome, AutopayStart } from "./autopay.service";
 import type { CreateIntentResult } from "./payments.service";
@@ -41,7 +41,7 @@ export class PublicInvoicesController {
     @Header("Cache-Control", "no-store")
     read(
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicInvoiceView> {
         return this.invoices.read(token, visitorKey(ip, relay));
@@ -60,7 +60,7 @@ export class PublicInvoicesController {
     @Header("X-Content-Type-Options", "nosniff")
     async pdf(
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<StreamableFile> {
         const { file, fileName } = await this.pdfs.pdf(
@@ -88,7 +88,7 @@ export class PublicInvoicesController {
     createIntent(
         @Param("token") token: string,
         @Body() body: unknown,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<CreateIntentResult> {
         return this.invoices.createIntent(token, body, visitorKey(ip, relay));
@@ -109,7 +109,7 @@ export class PublicInvoicesController {
     startAutopay(
         @Param("token") token: string,
         @Body() body: unknown,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<AutopayStart> {
         return this.invoices.startAutopay(token, body, visitorKey(ip, relay));
@@ -122,7 +122,7 @@ export class PublicInvoicesController {
     @Header("Cache-Control", "no-store")
     autopay(
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<AutopayOutcome & { payUrl: string }> {
         return this.invoices.autopayOutcome(token, visitorKey(ip, relay));

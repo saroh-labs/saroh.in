@@ -4,7 +4,6 @@ import {
     Delete,
     Get,
     HttpCode,
-    Ip,
     Param,
     Post,
     Query,
@@ -12,6 +11,7 @@ import {
 } from "@nestjs/common";
 import type { AnalyticsDailyAggregate } from "@saroh/database";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
@@ -52,7 +52,7 @@ import { TakingsService } from "./takings.service";
  * The owning org is derived entirely from the `:siteId` Site row inside
  * {@link AnalyticsService.ingestPublic}, so this unauthenticated endpoint can
  * only ever write events for the org that owns the targeted site. The source IP
- * (from `@Ip()`) is handed to the service, which salts it into a coarse hash and
+ * (from `@ClientAddress()`) is handed to the service, which salts it into a coarse hash and
  * discards it — the raw IP never lands in the ledger.
  */
 @Controller("public/sites")
@@ -65,7 +65,7 @@ export class AnalyticsPublicController {
     ingest(
         @Param("siteId") siteId: string,
         @Body() dto: IngestAnalyticsEventDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
     ): Promise<IngestResult> {
         return this.analytics.ingestPublic(
             siteId,

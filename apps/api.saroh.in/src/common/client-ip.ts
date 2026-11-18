@@ -105,3 +105,57 @@ export function visitorAddress(
     }
     return peer;
 }
+
+/** What {@link requestAddress} and {@link pinForwardedFor} read off a request. */
+interface AddressedRequest {
+    headers: Record<string, string | string[] | undefined>;
+    socket?: { remoteAddress?: string };
+    ip?: string;
+}
+
+/**
+ * The caller's address every rate limit and address hash keys on: behind
+ * Cloudflare (`TRUST_PROXY=cloudflare`) {@link visitorAddress}, which reads
+ * only `CF-Connecting-IP` from a Cloudflare or private peer; behind a
+ * private proxy, or none, Express's own `req.ip`. Never a value the caller
+ * writes (05-P-01, 03-M2). `@ClientAddress()` hands it to a handler;
+ * `@Ip()` is banned by the API's ESLint config.
+ */
+export function requestAddress(
+    req: AddressedRequest,
+    trustProxyMode: string | undefined,
+): string | undefined {
+    if (trustProxyMode === "cloudflare") {
+        return visitorAddress(req, trustProxyMode);
+    }
+    return req.ip ?? req.socket?.remoteAddress;
+}
+
+/**
+ * Express middleware (03-M2): behind Cloudflare, `X-Forwarded-For` is
+ * replaced by the one address Cloudflare vouches for. Express trusts every
+ * Cloudflare range in that header, so a request sent from anyone's own
+ * Cloudflare Worker could put any address left of the Worker's and have
+ * `req.ip` (and Better Auth's sign-in limit, which reads the header) count
+ * it. With the header pinned, both read Cloudflare's `CF-Connecting-IP`.
+ * Only when the peer is Cloudflare or the private network and Cloudflare
+ * named an address; any other request is left as Express already judges it.
+ */
+export function pinForwardedFor(trustProxyMode: string | undefined) {
+    return (req: AddressedRequest, _res: unknown, next: () => void): void => {
+        if (
+            trustProxyMode === "cloudflare" &&
+            req.headers["cf-connecting-ip"]
+        ) {
+            const address = visitorAddress(req, trustProxyMode);
+            const peer = req.socket?.remoteAddress?.replace(
+                /^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/,
+                "",
+            );
+            if (address && address !== peer) {
+                req.headers["x-forwarded-for"] = address;
+            }
+        }
+        next();
+    };
+}

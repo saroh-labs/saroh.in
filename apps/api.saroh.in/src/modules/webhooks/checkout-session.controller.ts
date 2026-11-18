@@ -6,12 +6,12 @@ import {
     Headers,
     HttpCode,
     HttpException,
-    Ip,
     NotFoundException,
     Param,
     Post,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { CheckoutCancelDto } from "./checkout-return.dto";
@@ -79,7 +79,7 @@ export class CheckoutSessionController {
     @Header("Cache-Control", "no-store")
     async read(
         @Param("sessionId") sessionId: string,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
         @Headers(SITE_RELAY_HEADER) relay?: string,
     ): Promise<CheckoutSessionView> {
         if (
@@ -105,7 +105,7 @@ export class CheckoutSessionController {
     @Header("Cache-Control", "no-store")
     async cancel(
         @Body() dto: CheckoutCancelDto,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
         @Headers(SITE_RELAY_HEADER) relay?: string,
     ): Promise<CheckoutSessionView> {
         if (

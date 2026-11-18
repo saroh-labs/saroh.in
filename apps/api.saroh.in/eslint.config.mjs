@@ -12,6 +12,17 @@ export default [
     {
         rules: {
             "no-console": ["warn", { allow: ["warn", "error", "info"] }],
+            // 05-P-01: `@Ip()` is Express's `req.ip`, which a caller could
+            // steer through X-Forwarded-For; limits key on `@ClientAddress()`.
+            "no-restricted-syntax": [
+                "error",
+                {
+                    selector:
+                        "ImportDeclaration[source.value='@nestjs/common'] > ImportSpecifier[imported.name='Ip']",
+                    message:
+                        "Use @ClientAddress() (common/decorators/client-address.decorator.ts): @Ip() trusts X-Forwarded-For, which a caller can write.",
+                },
+            ],
         },
     },
     ...restrictEnvAccess,

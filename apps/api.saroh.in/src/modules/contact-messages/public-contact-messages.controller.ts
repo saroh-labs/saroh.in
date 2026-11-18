@@ -5,10 +5,10 @@ import {
     HttpCode,
     HttpException,
     HttpStatus,
-    Ip,
     Post,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
@@ -41,7 +41,7 @@ export class PublicContactMessagesController {
     @HttpCode(HttpStatus.OK)
     async send(
         @Body() dto: SendContactMessageDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
         @Headers("host") host?: string,
     ): Promise<{ ok: true }> {

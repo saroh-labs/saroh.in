@@ -3,11 +3,11 @@ import {
     Get,
     Header,
     Headers,
-    Ip,
     Param,
     UseGuards,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { SITE_RELAY_HEADER, visitorKey } from "./site-relay";
 import type { PublicWaitlistClaim } from "./waitlist-claim.service";
@@ -37,7 +37,7 @@ export class WaitlistClaimController {
     read(
         @Param("siteId") siteId: string,
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicWaitlistClaim> {
         return this.claims.read(siteId, token, visitorKey(ip, relay));

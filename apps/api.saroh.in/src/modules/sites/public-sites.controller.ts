@@ -5,13 +5,13 @@ import {
     Headers,
     HttpException,
     HttpStatus,
-    Ip,
     Param,
     Query,
     UseGuards,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { PublicContact } from "../organizations/business-contact";
@@ -98,7 +98,7 @@ export class PublicSitesController {
     @Header("Cache-Control", "no-store")
     moved(
         @Param("address") address: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<SiteMoved> {
         return siteMovedTo(address, visitorKey(ip, relay));
@@ -120,7 +120,7 @@ export class PublicSitesController {
     async testRelease(
         @Query("host") host: string | undefined,
         @Headers(TEST_TOKEN_HEADER) token: string | undefined,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<TestReleaseView> {
         const key = visitorKey(ip, relay);
@@ -202,7 +202,7 @@ export class PublicSitesController {
     @Header("Cache-Control", "no-store")
     visit(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicVisit> {
         return this.visits.read(siteId, undefined, visitorKey(ip, relay));
@@ -219,7 +219,7 @@ export class PublicSitesController {
     @Header("Cache-Control", "no-store")
     footer(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicFooter> {
         return this.footers.read(siteId, visitorKey(ip, relay));
@@ -237,7 +237,7 @@ export class PublicSitesController {
     @Header("Cache-Control", "no-store")
     contact(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicContact> {
         return this.contacts.read(siteId, visitorKey(ip, relay));
@@ -254,7 +254,7 @@ export class PublicSitesController {
     @Header("Cache-Control", "no-store")
     head(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicHead> {
         return this.heads.read(siteId, visitorKey(ip, relay));
@@ -270,7 +270,7 @@ export class PublicSitesController {
     visitStore(
         @Param("siteId") siteId: string,
         @Param("storeId") storeId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
     ): Promise<PublicVisit> {
         return this.visits.read(siteId, storeId, hashClientIp(ip));
     }

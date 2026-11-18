@@ -6,11 +6,11 @@ import {
     HttpCode,
     HttpException,
     HttpStatus,
-    Ip,
     Logger,
     Post,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { editionOfFormHost } from "../../common/edition-address";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { ChallengeVerifier } from "../site-accounts/challenge";
@@ -65,7 +65,7 @@ export class WaitlistController {
     @HttpCode(HttpStatus.OK)
     async join(
         @Body() dto: JoinWaitlistDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
         @Headers("host") host?: string,
     ): Promise<JoinWaitlistResponse> {

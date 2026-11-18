@@ -4,12 +4,12 @@ import {
     Get,
     Header,
     HttpCode,
-    Ip,
     Param,
     Post,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import type { CreateIntentResult } from "./payments.service";
 import type { PublicOrderPayView } from "./public-order-pay.service";
 import { PublicOrderPayService } from "./public-order-pay.service";
@@ -33,7 +33,7 @@ export class PublicOrderPayController {
     @Header("Cache-Control", "no-store")
     read(
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
     ): Promise<PublicOrderPayView> {
         return this.orders.read(token, hashClientIp(ip));
     }
@@ -52,7 +52,7 @@ export class PublicOrderPayController {
     createIntent(
         @Param("token") token: string,
         @Body() body: unknown,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
     ): Promise<CreateIntentResult> {
         return this.orders.createIntent(token, body, hashClientIp(ip));
     }

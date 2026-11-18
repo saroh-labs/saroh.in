@@ -8,7 +8,6 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
-    Ip,
     NotFoundException,
     Post,
     Req,
@@ -19,6 +18,7 @@ import { editionOfHost, editionProfile } from "@saroh/edition";
 import { fromNodeHeaders } from "better-auth/node";
 import type { Request, Response } from "express";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import type { AuthUser } from "../../common/types/store-context";
@@ -61,7 +61,7 @@ export class PhoneSignInController {
     @Header("Cache-Control", "no-store")
     start(
         @Body() dto: StartPhoneDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers("host") host?: string,
     ): Promise<PhoneStart> {
         refusePhoneOnGlobal(host);
@@ -80,7 +80,7 @@ export class PhoneSignInController {
     @Header("Cache-Control", "no-store")
     async signIn(
         @Body() dto: VerifyPhoneDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Req() req: Request,
         @Res({ passthrough: true }) res: Response,
     ): Promise<{ signedIn: true }> {
@@ -110,7 +110,7 @@ export class AccountPhoneController {
     start(
         @CurrentUser() user: AuthUser,
         @Body() dto: StartPhoneDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers("host") host?: string,
     ): Promise<PhoneStart> {
         refusePhoneOnGlobal(host);
@@ -131,7 +131,7 @@ export class AccountPhoneController {
     add(
         @CurrentUser() user: AuthUser,
         @Body() dto: VerifyPhoneDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Req() req: Request,
     ): Promise<{ phoneE164: string; phoneVerifiedAt: Date }> {
         return this.phones.add({
@@ -147,7 +147,7 @@ export class AccountPhoneController {
     @HttpCode(HttpStatus.NO_CONTENT)
     remove(
         @CurrentUser() user: AuthUser,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Req() req: Request,
         @Headers("host") host?: string,
     ): Promise<void> {

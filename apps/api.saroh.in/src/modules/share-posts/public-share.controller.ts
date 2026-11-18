@@ -1,7 +1,6 @@
 import {
     Controller,
     Get,
-    Ip,
     Param,
     Query,
     Res,
@@ -11,6 +10,7 @@ import {
 import type { Response } from "express";
 
 import { hashClientIp } from "../../common/client-ip";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { ShareQuery } from "./public-share.service";
 import { PublicShareService } from "./public-share.service";
@@ -35,7 +35,7 @@ export class PublicShareController {
     async own(
         @Param("id") id: string,
         @Query() query: ShareQuery,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Res({ passthrough: true }) res: Response,
     ): Promise<StreamableFile> {
         return png(res, await this.share.own(id, query, visitor(ip)));
@@ -48,7 +48,7 @@ export class PublicShareController {
         @Param("kind") kind: string,
         @Param("ref") ref: string,
         @Query() query: ShareQuery,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Res({ passthrough: true }) res: Response,
     ): Promise<StreamableFile> {
         return png(

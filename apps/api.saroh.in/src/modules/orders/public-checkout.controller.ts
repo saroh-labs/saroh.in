@@ -6,13 +6,13 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
-    Ip,
     Param,
     Post,
     UseGuards,
 } from "@nestjs/common";
 
 import { AllowOnTestRelease } from "../../common/decorators/allow-on-test-release.decorator";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import { CurrentCustomer } from "../site-accounts/customer-context.decorator";
@@ -66,7 +66,7 @@ export class PublicCheckoutController {
     @Header("Cache-Control", "no-store")
     options(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<CheckoutOptions> {
         return this.checkout.options(siteId, visitorKey(ip, relay));
@@ -80,7 +80,7 @@ export class PublicCheckoutController {
     quote(
         @Param("siteId") siteId: string,
         @Body() dto: CheckoutQuoteDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PricedBag> {
         return this.checkout.quote(siteId, dto, visitorKey(ip, relay));

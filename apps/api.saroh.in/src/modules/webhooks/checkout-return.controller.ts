@@ -3,11 +3,11 @@ import {
     Controller,
     HttpCode,
     HttpException,
-    Ip,
     Post,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { CheckoutReturnDto } from "./checkout-return.dto";
 import { PaymentLookupService } from "./payment-lookup.service";
@@ -50,7 +50,7 @@ export class CheckoutReturnController {
     @HttpCode(200)
     async confirm(
         @Body() dto: CheckoutReturnDto,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
     ): Promise<{ confirmed: boolean }> {
         if (
             !this.perCaller.take(hashClientIp(ip) ?? "unknown") ||

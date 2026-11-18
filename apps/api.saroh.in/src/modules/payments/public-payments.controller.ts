@@ -5,7 +5,6 @@ import {
     Get,
     HttpCode,
     HttpException,
-    Ip,
     Param,
     Post,
     Query,
@@ -14,6 +13,7 @@ import {
 import { hashClientIp } from "../../common/client-ip";
 import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { CreateIntentDto } from "./dto";
 import type {
     CreateIntentResult,
@@ -80,7 +80,7 @@ export class PublicPaymentsController {
     async createIntent(
         @Param("orderId") orderId: string,
         @Body() dto: CreateIntentDto,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
     ): Promise<CreateIntentResult> {
         const caller = hashClientIp(ip) ?? "unknown";
         if (
@@ -107,7 +107,7 @@ export class PublicPaymentsController {
     async receipt(
         @Param("orderId") orderId: string,
         @Query("token") token?: string,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
     ): Promise<PublicReceiptResult> {
         if (!this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown")) {
             throw tooManyRequests();
