@@ -38,9 +38,17 @@ import { SCOPES, SocialMetaError } from "./social-meta.port";
  *   (`quota_usage`, `config.quota_total`)
  * - Facebook Login for Business: developers.facebook.com/docs/facebook-login/facebook-login-for-business
  *   (`config_id`, `response_type=code`, `override_default_response_type`)
- * Unconfirmed until tried against Meta: the limit reference names a User
- * token, and Saroh reads it with the Page token as it publishes; a caption
- * on `/media` is shown in Meta's examples but not its parameter list.
+ * The limit read's token (S-05, checked 18 Nov 2026): the
+ * content_publishing_limit reference's Requirements table, for the
+ * Instagram API with Facebook Login, names a "Facebook User access token"
+ * (`instagram_basic`, `instagram_content_publish`,
+ * `pages_read_engagement`), while the content-publishing guide's table
+ * names a "Facebook Page access token" for the path as a whole. Saroh
+ * keeps only the Page token, so the read is best effort: the publish step
+ * treats any refusal of it as "no pre-check" (`platform-steps.ts`) and
+ * lets the publish call say if the limit is reached; it never marks the
+ * channel signed out. Unconfirmed until tried against Meta: a caption on
+ * `/media` is shown in Meta's examples but not its parameter list.
  */
 
 export const GRAPH_VERSION = "v27.0";
@@ -231,7 +239,7 @@ export class SocialMetaClient implements SocialMetaPort {
             `${graph}/me${query({ fields: "id" })}`,
             { token: userToken },
         );
-        const accounts = await metaCall<{
+        interface Accounts {
             data?: {
                 id?: string;
                 name?: string;
@@ -243,19 +251,32 @@ export class SocialMetaClient implements SocialMetaPort {
                     profile_picture_url?: string;
                 };
             }[];
-        }>(
-            this.fetchFn,
-            `${graph}/me/accounts${query({
-                fields:
-                    kind === "INSTAGRAM"
-                        ? "id,name,access_token,instagram_business_account{id,username,profile_picture_url}"
-                        : "id,name,access_token,picture{url}",
-                limit: "100",
-            })}`,
-            { token: userToken },
-        );
+            paging?: { next?: string };
+        }
+        // Every Page, following Meta's pages of 100 (S-13), up to 500.
+        const data: NonNullable<Accounts["data"]> = [];
+        let next: string | undefined = `${graph}/me/accounts${query({
+            fields:
+                kind === "INSTAGRAM"
+                    ? "id,name,access_token,instagram_business_account{id,username,profile_picture_url}"
+                    : "id,name,access_token,picture{url}",
+            limit: "100",
+        })}`;
+        for (let i = 0; next && i < 5; i++) {
+            const page: Accounts = await metaCall<Accounts>(
+                this.fetchFn,
+                next,
+                {
+                    token: userToken,
+                },
+            );
+            data.push(...(page.data ?? []));
+            const more = page.paging?.next;
+            // Only Meta's own Graph address is followed.
+            next = more?.startsWith(`${graph}/`) ? more : undefined;
+        }
         const platformUserId = need(str(me.id), "user id");
-        const pages = (accounts.data ?? []).flatMap((p) =>
+        const pages = data.flatMap((p) =>
             p.id && p.access_token
                 ? [{ ...p, id: p.id, access_token: p.access_token }]
                 : [],
@@ -441,7 +462,7 @@ export class SocialMetaClient implements SocialMetaPort {
             this.fetchFn,
             `${this.api(kind)}/${accountId}/${edge}${query({
                 fields: `id,${words},${link}`,
-                limit: "10",
+                limit: "25",
             })}`,
             { token },
         );

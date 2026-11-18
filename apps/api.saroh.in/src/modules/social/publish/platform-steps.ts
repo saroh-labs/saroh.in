@@ -11,8 +11,16 @@ import { isMetaError } from "../meta/social-meta.port";
  *   its status read by the job coming back (1, 2, 4, 4 minutes; up to 5
  *   reads), then publish.
  * - Threads: a container, then about 30 seconds, then publish.
- * - Unclear (Meta didn't answer a publish): `UNKNOWN`, never sent again
- *   blind: the next run looks on the platform for the post's ref first.
+ * - Unclear (Meta didn't answer a publish, or a run died mid-call):
+ *   `UNKNOWN`, never sent again blind: it is looked for on the platform by
+ *   the post's ref up to {@link MAX_LOOKS} times, minutes apart, before it
+ *   is sent again. A container that reads PUBLISHED went out: posted.
+ * - Before each publishing call the handler marks the delivery POSTING,
+ *   committed (`beforePublish`), so a run that dies between Meta's answer
+ *   and the record is found by the next run and looked up first (S-01).
+ * - The publishing-limit read is a courtesy: Meta's reference names a
+ *   User token for Instagram's and Saroh holds the Page's, so any refusal
+ *   of it means "no pre-check", never a signed-out channel (S-05).
  *
  * Token refusals are thrown (`auth`): the handler marks the channel.
  */
@@ -35,6 +43,11 @@ export interface StepInput {
     now: Date;
     /** When the platform's limit will let one through, if Saroh can tell. */
     limitFreesAt: () => Promise<Date>;
+    /**
+     * Just before a publishing call: mark the delivery POSTING with this
+     * try counted, on its own committed write.
+     */
+    beforePublish?: (attempts: number) => Promise<void>;
 }
 
 /** What the step did: the delivery's new state, and when to come back. */
@@ -56,6 +69,9 @@ export const MAX_CHECKS = 5;
 const CHECK_WAIT_MIN = [1, 2, 4, 4, 4];
 /** Tries of a call Meta didn't answer before it is given up. */
 export const MAX_ATTEMPTS = 3;
+/** Looks for an unclear post before it is sent again, and the wait before each. */
+export const MAX_LOOKS = 3;
+const LOOK_WAIT_MIN = [1, 2, 5];
 const THREADS_WAIT_MS = 30_000;
 
 const plus = (now: Date, ms: number) => new Date(now.getTime() + ms);
@@ -65,19 +81,30 @@ export async function nextStep(
     d: DeliveryState,
     s: StepInput,
 ): Promise<StepOutcome> {
-    // An unclear publish: is it there already?
+    // An unclear publish: is it there already? Look a few times, minutes
+    // apart (Meta's lists lag), before anything is sent again.
     if (d.status === "UNKNOWN") {
-        const found = await meta.findByRef(d.kind, s.accountId, s.token, s.ref);
+        const looks = d.checks + 1;
+        let found;
+        try {
+            found = await meta.findByRef(d.kind, s.accountId, s.token, s.ref);
+        } catch (error) {
+            if (isMetaError(error, "auth")) throw error;
+            // Couldn't look: never a reason to send again.
+            return looks < MAX_LOOKS ? lookAgain(s, looks) : failed("unknown");
+        }
         if (found) {
             return {
                 status: "POSTED",
                 platformPostId: found.id,
                 permalink: found.permalink,
+                containerId: null,
                 reason: null,
             };
         }
+        if (looks < MAX_LOOKS) return lookAgain(s, looks);
         if (d.attempts >= MAX_ATTEMPTS) return failed("unknown");
-        // Not there: start again with a fresh container.
+        // Not there after every look: start again with a fresh container.
         d = { ...d, status: "WAITING", containerId: null, checks: 0 };
     }
 
@@ -93,7 +120,9 @@ export async function nextStep(
 
     if (!d.containerId) {
         try {
-            const limit = await meta.publishLimit(kind, s.accountId, s.token);
+            const limit = await meta
+                .publishLimit(kind, s.accountId, s.token)
+                .catch(() => null);
             if (limit && limit.used >= limit.total) {
                 return failed("limit", await s.limitFreesAt());
             }
@@ -140,7 +169,17 @@ export async function nextStep(
             };
         }
         if (status === "PUBLISHED") {
-            return { status: "UNKNOWN", attempts: d.attempts, again: s.now };
+            // It went out (S-06): never sent again; its id if Meta lists it.
+            const found = await meta
+                .findByRef(kind, s.accountId, s.token, s.ref)
+                .catch(() => null);
+            return {
+                status: "POSTED",
+                platformPostId: found?.id ?? null,
+                permalink: found?.permalink ?? null,
+                containerId: null,
+                reason: null,
+            };
         }
     } catch (error) {
         return refused(error, d, s);
@@ -158,6 +197,8 @@ async function publishing(
     s: StepInput,
     call: () => Promise<string>,
 ): Promise<StepOutcome> {
+    const attempts = d.attempts + 1;
+    await s.beforePublish?.(attempts);
     let id: string;
     try {
         id = await call();
@@ -166,8 +207,9 @@ async function publishing(
             // It may have gone out: look before sending again.
             return {
                 status: "UNKNOWN",
-                attempts: d.attempts + 1,
-                again: plus(s.now, 60_000),
+                attempts,
+                checks: 0,
+                again: plus(s.now, LOOK_WAIT_MIN[0] * 60_000),
             };
         }
         return refused(error, d, s);
@@ -213,6 +255,14 @@ async function refused(
         default:
             return failed("unknown");
     }
+}
+
+function lookAgain(s: StepInput, looks: number): StepOutcome {
+    return {
+        status: "UNKNOWN",
+        checks: looks,
+        again: plus(s.now, (LOOK_WAIT_MIN[looks] ?? 5) * 60_000),
+    };
 }
 
 function failed(reason: string, retryAfter: Date | null = null): StepOutcome {

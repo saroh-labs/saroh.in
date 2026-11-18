@@ -132,6 +132,8 @@ export class SocialPublishHandler {
                         ref: post.ref,
                         now,
                         limitFreesAt: () => limitFreesAt(channel.id, now),
+                        beforePublish: (attempts) =>
+                            markPosting(d.id, attempts, now),
                     }),
                 );
             } catch (error) {
@@ -305,6 +307,24 @@ async function recordRun(
             at: now.toISOString(),
         });
     }
+}
+
+/**
+ * The attempt marker (S-01): POSTING, committed on its own before Meta is
+ * asked to publish. A run that dies after Meta posted and before
+ * `recordRun` leaves it so; the next claim turns a container-less one into
+ * UNKNOWN, and it is looked up before anything is sent again.
+ */
+export async function markPosting(
+    deliveryId: string,
+    attempts: number,
+    now: Date,
+): Promise<void> {
+    await prisma.socialDelivery.update({
+        where: { id: deliveryId },
+        data: { status: "POSTING", attempts, checks: 0, lastTriedAt: now },
+        select: { id: true },
+    });
 }
 
 /**

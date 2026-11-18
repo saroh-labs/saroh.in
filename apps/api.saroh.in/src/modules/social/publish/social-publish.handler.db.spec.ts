@@ -4,7 +4,9 @@
  * post counts once; a token revoked mid-run marks the channel, tells the
  * business once and leaves the delivery waiting; a container stuck in
  * progress fails after five reads; an unclear publish is checked on the
- * platform, never sent twice; a moved post's old job does nothing. Runs
+ * platform, never sent twice; a run that died after Facebook posted and
+ * before it recorded is looked up, not sent again (S-01); a moved post's
+ * old job does nothing. Runs
  * in the integration project.
  */
 import { prisma } from "@saroh/database";
@@ -23,7 +25,7 @@ import { seal, tokenColumns } from "../channels/sealing";
 import { FakeSocialMeta } from "../meta/fake-social-meta";
 import type { ChannelKind } from "../meta/social-meta.port";
 import { queuePublishInTx } from "../shared/jobs";
-import { SocialPublishHandler } from "./social-publish.handler";
+import { markPosting, SocialPublishHandler } from "./social-publish.handler";
 
 let meta: FakeSocialMeta;
 const handler = () =>
@@ -231,6 +233,38 @@ describe("social.publish", () => {
         expect(
             meta.posts.filter((p) => p.id.startsWith("facebook")),
         ).toHaveLength(1);
+    });
+
+    it("looks up, never resends, a Facebook post a dead run left marked posting (S-01)", async () => {
+        const { ctx, postId } = await due();
+        const fb = (await deliveriesOf(postId)).find(
+            (d) => d.kind === "FACEBOOK",
+        );
+        const channel = await prisma.socialChannel.findUniqueOrThrow({
+            where: {
+                organizationId_kind: {
+                    organizationId: ctx.organizationId,
+                    kind: "FACEBOOK",
+                },
+            },
+        });
+        // The run marked it, Meta posted it, and the process died before
+        // recording: the job is handed out again.
+        await markPosting(fb?.id ?? "", 1, new Date());
+        await meta.postPhoto(channel.accountId, "token-FACEBOOK", {
+            imageUrl: "https://cdn.example.com/p.jpg",
+            caption: "Mango cheesecake is back. ?ref=social-dueposting",
+        });
+        await runAll(ctx.organizationId, postId);
+        expect(
+            (await deliveriesOf(postId)).find((d) => d.kind === "FACEBOOK"),
+        ).toMatchObject({ status: "POSTED" });
+        expect(
+            meta.posts.filter((p) => p.id.startsWith("facebook")),
+        ).toHaveLength(1);
+        expect(meta.calls.filter((c) => c.method === "postPhoto")).toHaveLength(
+            1,
+        );
     });
 
     it("does nothing for a moved post's old job", async () => {

@@ -158,6 +158,33 @@ describe("tokens", () => {
         ]);
     });
 
+    it("follows Meta's pages of Pages, only on Graph's own address (S-13)", async () => {
+        const { meta, seen } = client([
+            [/fb_exchange_token/, { access_token: "long-user" }],
+            [/oauth\/access_token/, { access_token: "short-user" }],
+            [
+                /\/me\/accounts\?after=two/,
+                {
+                    data: [{ id: "p2", name: "Two", access_token: "pt2" }],
+                    paging: { next: "https://evil.example/next" },
+                },
+            ],
+            [
+                /\/me\/accounts/,
+                {
+                    data: [{ id: "p1", name: "One", access_token: "pt1" }],
+                    paging: {
+                        next: "https://graph.facebook.com/v27.0/me/accounts?after=two",
+                    },
+                },
+            ],
+            [/\/me\?/, { id: "fbu-9" }],
+        ]);
+        const got = await meta.pageAccounts("FACEBOOK", "code", "https://cb");
+        expect(got.pages.map((p) => p.accountId)).toEqual(["p1", "p2"]);
+        expect(seen.some((c) => c.url.includes("evil.example"))).toBe(false);
+    });
+
     it("refreshes a Threads token", async () => {
         const { meta, seen } = client([
             [/refresh_access_token/, { access_token: "new", expires_in: 100 }],
