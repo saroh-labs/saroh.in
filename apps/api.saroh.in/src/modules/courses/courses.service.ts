@@ -17,6 +17,7 @@ import {
     readPriceHistory,
     recordPrices,
 } from "../audit/price-history";
+import { assertPlanIncludesModule } from "../billing/module-plan";
 import { BookingEventType } from "../bookings/booking-event-type";
 import { BookingsService } from "../bookings/bookings.service";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -346,6 +347,7 @@ export class CoursesService {
     ): Promise<CourseDetail> {
         authorize(ctx, "course:write");
         const { organizationId } = ctx;
+        await assertPlanIncludesModule(organizationId, "COURSES");
         if (!dto.serviceId) fieldError("Choose the service", "serviceId");
         if (!dto.name) fieldError("Give the course a name", "name");
         if (dto.price === undefined) fieldError("Give it a price", "price");
@@ -527,6 +529,7 @@ export class CoursesService {
     ): Promise<CourseDetail> {
         authorize(ctx, "course:write");
         const { organizationId } = ctx;
+        await assertPlanIncludesModule(organizationId, "COURSES");
         const startAt = new Date(dto.startAt);
         if (startAt <= new Date()) {
             fieldError("A new session has to be in the future", "startAt");
@@ -660,6 +663,7 @@ export class CoursesService {
     ): Promise<EnrollmentView> {
         authorize(ctx, "course:write");
         const { organizationId } = ctx;
+        await assertPlanIncludesModule(organizationId, "COURSES");
         const contact = await prisma.contact.findFirst({
             where: { id: dto.contactId, organizationId },
             select: {

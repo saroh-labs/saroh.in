@@ -658,7 +658,12 @@ export class CatalogueAccessService {
     ): Promise<boolean> {
         const access = await this.resolve(organizationId, now);
         if (access.source !== "catalogue") return true;
-        return registryModuleIncluded(access.catalog, access.modules, registry);
+        return registryModuleIncluded(
+            access.catalog,
+            access.modules,
+            registry,
+            access.planId,
+        );
     }
 
     /**

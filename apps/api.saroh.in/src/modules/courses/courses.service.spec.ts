@@ -4,6 +4,10 @@
 // The business-details refusal (DEC-068) has its own specs
 // (`business-details.spec.ts`, `business-details.db.spec.ts`); here
 // the business has its address.
+// The plan check has its own spec (billing/module-plan.spec.ts).
+jest.mock("../billing/module-plan", () => ({
+    assertPlanIncludesModule: jest.fn(),
+}));
 jest.mock("../invoices/business-details", () => ({
     ...jest.requireActual<typeof import("../invoices/business-details")>(
         "../invoices/business-details",

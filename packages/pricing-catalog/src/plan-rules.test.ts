@@ -30,6 +30,14 @@ describe("plan rules in the sample catalogue", () => {
         expect(at("pro", "review").state).toBe("on");
     });
 
+    it("sells courses and class packs on paid plans only (05-P-02)", () => {
+        for (const row of ["courses", "class-packs"]) {
+            expect(at("free", row).state).not.toBe("on");
+            expect(at("grow", row).state).toBe("on");
+            expect(at("pro", row).state).toBe("on");
+        }
+    });
+
     it("has one team row for everyone, and none for people who only look (DEC-155)", () => {
         const ids = SEED_CATALOG.modules.map((m) => m.id);
         expect(ids).toContain("members");

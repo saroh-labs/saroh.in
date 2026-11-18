@@ -2045,6 +2045,15 @@ options, items, more }` and a sentence with the count, the first
   booking paid with one still says so, and a cancel in time still gives the
   class back. "Also sell" on Bookings › Services and Settings › Modules flip
   the same switch through `ModuleLifecycleService`.
+- **Courses and Class packs are paid plans only** (05-P-02, 18 Nov 2026):
+  catalogue rows `courses` and `class-packs`, locked on Free. The services
+  ask `billing/module-plan.ts` (`assertPlanIncludesModule`) on every write
+  that makes or sells something new — a course, a session, an enrolment; a
+  pack, a draft, a publish, a restore, a sale — whatever `MODULE_ENFORCEMENT`
+  says, behind `PLAN_ENFORCEMENT` like every plan check. A catalogue
+  version with no row for them gives them to paid plans only
+  (`PAID_ONLY_REGISTRY`). Edits, archiving, extending a customer's pack and
+  using one on a booking are never refused for the plan.
 - A Member reads bookings, services and contacts but no billing, course or
   pack screen (DEC-020); every billing read names its own action.
 - Workspace routes: `/billing/{subscriptions,plans,invoices}` (the rail's
