@@ -804,6 +804,9 @@ jobs:
       # memory, nothing calls Meta. Test only, as above. Its key is a
       # throwaway too: it seals only this stack's test channels.
       SOCIAL_FAKE: "1"
+      # Connecting a channel sends Meta (the fake too) back to the API's own
+      # callback, built from this; unset, Connect answers 503.
+      API_PUBLIC_URL: http://localhost:3333
       SOCIAL_ENC_KEY: 0011223344556677889900aabbccddeeff0011223344556677889900aabbccdd # gitleaks:allow (test key, this stack only)
 
     steps:

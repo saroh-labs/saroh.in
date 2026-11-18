@@ -453,6 +453,8 @@ e2e_stack() {
     # memory. Test only. Its key is a throwaway that seals only this
     # stack's test channels.
     export SOCIAL_FAKE=1
+    # Connect's callback address, as CI; unset, Connect answers 503.
+    export API_PUBLIC_URL=http://localhost:3333
     export SOCIAL_ENC_KEY=0011223344556677889900aabbccddeeff0011223344556677889900aabbccdd # gitleaks:allow (test key, this stack only)
 
     # The run's database is a copy of a seeded template, "<name>-template",
