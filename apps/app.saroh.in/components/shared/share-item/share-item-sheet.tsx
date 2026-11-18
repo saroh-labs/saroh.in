@@ -9,7 +9,7 @@ import { Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import type { ShareItem, ShareSetup } from "@/lib/share-item/share";
-import { markColour } from "@/lib/share-item/share";
+import { markColour, postItHref } from "@/lib/share-item/share";
 import { SHARE_WORDS } from "@/lib/share-item/words";
 
 import { LookDots, PictureFailed, SizeSwitch, SwipeTrack } from "./card-picker";
@@ -243,6 +243,7 @@ function ShareBody({
                     <SocialLine
                         lock={setup.schedule}
                         words={SHARE_WORDS.scheduleWith}
+                        postHref={postItHref(item)}
                         className="text-center"
                     />
                 </div>
@@ -288,7 +289,7 @@ function ShareBody({
                 </div>
             </FormSheetBody>
             <div className="mt-4 border-t border-border pt-4">
-                <SocialLine lock={setup.schedule} />
+                <SocialLine lock={setup.schedule} postHref={postItHref(item)} />
             </div>
         </>
     );

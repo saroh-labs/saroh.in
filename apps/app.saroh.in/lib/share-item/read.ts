@@ -9,6 +9,7 @@ import { planMoney } from "@/lib/saroh-billing/money";
 import { billingAccessOrNull, listAddons } from "@/lib/saroh-billing/service";
 import { getSite, listSites } from "@/lib/sites/service";
 import type { WebAddressLinks } from "@/lib/sites/share-links";
+import { readSocialAccess } from "@/lib/social/saroh-social";
 
 import type { ScheduleLock, ShareSetup } from "./share";
 import { shareSwatches } from "./share";
@@ -29,9 +30,10 @@ export const readShareSetup = cache(
     async (web: WebAddressLinks | null): Promise<ShareSetup | null> => {
         // Switched off (DEC-217): no Share button anywhere.
         if (!web || !sharePostsOn()) return null;
-        const [sites, access] = await Promise.all([
+        const [sites, access, social] = await Promise.all([
             listSites().catch(() => []),
             billingAccessOrNull(),
+            readSocialAccess(),
         ]);
         const site = pickShareSite(sites, web.address);
         if (!site?.currentPublicationId) return null;
@@ -46,15 +48,17 @@ export const readShareSetup = cache(
                 urlOf(hostsFor(EDITION, "production").api),
             siteId: site.id,
             schedule:
-                access?.plan?.id === "grow"
-                    ? { tier: "grow", price: await socialPrice() }
-                    : ({ tier: "free" } satisfies ScheduleLock),
+                social?.state === "on"
+                    ? { tier: "on" }
+                    : access?.plan?.id === "grow"
+                      ? { tier: "grow", price: await socialPrice() }
+                      : ({ tier: "free" } satisfies ScheduleLock),
         };
     },
 );
 
 /** Saroh Social's monthly price, from the catalogue's add-ons; never typed in. */
-async function socialPrice(): Promise<string | null> {
+export async function socialPrice(): Promise<string | null> {
     try {
         const read = await listAddons();
         if (read.status !== "ok" || !read.data) return null;
