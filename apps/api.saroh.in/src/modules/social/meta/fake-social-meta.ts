@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/require-await -- a stand-in for a network port: async, so a failure it is told to give rejects as Meta's would */
 import type {
     ChannelKind,
     ConnectedAccount,
@@ -163,7 +164,7 @@ export class FakeSocialMeta implements SocialMetaPort {
         containerId: string,
     ): Promise<string> {
         const container = this.containers.get(containerId);
-        if (!container || container.status !== "FINISHED") {
+        if (container?.status !== "FINISHED") {
             throw new SocialMetaError("unknown", "container not finished");
         }
         // A publish that happened, then the answer was lost: the post is

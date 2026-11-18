@@ -153,7 +153,7 @@ export class MetaCallbacksController {
         @Param("kind") kind: string,
         @Body() body: SignedRequestDto,
     ): Promise<Record<string, never>> {
-        await this.callbacks.deauthorize(kindParam(kind), body?.signed_request);
+        await this.callbacks.deauthorize(kindParam(kind), body.signed_request);
         return {};
     }
 
@@ -166,7 +166,7 @@ export class MetaCallbacksController {
     ): Promise<{ url: string; confirmation_code: string }> {
         return this.callbacks.dataDeletion(
             kindParam(kind),
-            body?.signed_request,
+            body.signed_request,
         );
     }
 

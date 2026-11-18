@@ -33,10 +33,10 @@ export function metaErrorOf(
 ): SocialMetaError {
     const e =
         body && typeof body === "object" && "error" in body
-            ? ((body as { error: unknown }).error as Record<string, unknown>)
+            ? ((body.error ?? {}) as Record<string, unknown>)
             : {};
-    const code = num(e?.code);
-    const sub = num(e?.error_subcode);
+    const code = num(e.code);
+    const sub = num(e.error_subcode);
     const detail = `${status}:${code ?? "-"}${sub ? `/${sub}` : ""}`;
     if (sub !== null && LIMIT_SUBCODES.has(sub)) {
         return new SocialMetaError("limit", detail, hoursFrom(now, 24));

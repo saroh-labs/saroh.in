@@ -39,8 +39,9 @@ export function parseSignedRequest(
     now: Date = new Date(),
 ): SignedRequest | SignedRequestRefusal {
     if (typeof value !== "string" || value.length > 4096) return "invalid";
-    const [sig, body, extra] = value.split(".");
-    if (!sig || !body || extra !== undefined) return "invalid";
+    const parts = value.split(".");
+    if (parts.length !== 2 || !parts[0] || !parts[1]) return "invalid";
+    const [sig, body] = parts;
     const given = Buffer.from(sig, "base64url");
     const signed = secrets.some((secret) => {
         const expected = createHmac("sha256", secret).update(body).digest();

@@ -430,7 +430,7 @@ export class SocialPostsService {
                 }
                 const sameMonth =
                     counted &&
-                    before?.publishAt &&
+                    before.publishAt &&
                     (await countRoom(tx, org, row, before.publishAt))
                         .windowKey ===
                         (await countRoom(tx, org, row, at)).windowKey;
@@ -545,6 +545,8 @@ const PICTURE_FIELDS = [
 /** The stored post with the change laid over it. */
 function merge(before: PostRow | null, dto: PostInputDto): Draft {
     const pick = <K extends keyof PostInputDto>(k: K, fallback: unknown) =>
+        // A null the change sent clears the field: only "left out" keeps it.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         dto[k] !== undefined ? dto[k] : fallback;
     return {
         sourceKind: pick(

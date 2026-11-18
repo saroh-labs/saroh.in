@@ -260,13 +260,17 @@ export class SocialMetaClient implements SocialMetaPort {
         return {
             platformUserId,
             pages: (accounts.data ?? [])
-                .filter((p) => p.id && p.access_token)
+                .flatMap((p) =>
+                    p.id && p.access_token
+                        ? [{ ...p, id: p.id, access_token: p.access_token }]
+                        : [],
+                )
                 .map((p) => ({
-                    accountId: p.id as string,
+                    accountId: p.id,
                     platformUserId,
-                    handle: p.name ?? (p.id as string),
+                    handle: p.name ?? p.id,
                     avatarUrl: p.picture?.data?.url ?? null,
-                    token: p.access_token as string,
+                    token: p.access_token,
                     // A Page token from a long-lived user token doesn't expire.
                     tokenExpiresAt: null,
                 })),
