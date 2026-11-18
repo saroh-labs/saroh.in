@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PricingPage } from "@/components/pricing/pricing-page";
 import { JsonLd } from "@/components/shared/layout/json-ld";
 import { PRICING_COPY, PRICING_DESCRIPTION } from "@/content/pricing";
-import { readLivePricing } from "@/lib/pricing";
+import { readLivePricingVersion } from "@/lib/pricing";
 import { placeholderPricingModel, pricingPageModel } from "@/lib/pricing-view";
 import { pageMetadata, pageTitle } from "@/lib/seo";
 import { breadcrumbLd, softwareApplicationLd } from "@/lib/structured-data";
@@ -23,9 +23,10 @@ export const metadata: Metadata = pageMetadata({
 });
 
 export default async function PricingRoute() {
-    const catalog = await readLivePricing();
-    const model = catalog
-        ? pricingPageModel(catalog)
+    const read = await readLivePricingVersion();
+    const catalog = read?.catalog ?? null;
+    const model = read
+        ? pricingPageModel(read.catalog, read.offers)
         : placeholderPricingModel();
     return (
         <>

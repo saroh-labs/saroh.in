@@ -39,7 +39,10 @@ import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
-import { findUsableCoupon } from "../pricing/coupons.service";
+import {
+    findAutomaticCoupon,
+    findUsableCoupon,
+} from "../pricing/coupons.service";
 import {
     clearAddonsInTx,
     holdMonthAddonChargesInTx,
@@ -373,7 +376,9 @@ const SUB_SELECT = {
  *   plan, checked as usable (`findUsableCoupon`), rate-limited, and carried
  *   on the checkout for the provider and the webhook (which redeems it with
  *   the first discounted charge). Yearly is the plan's yearly row, sold
- *   only while the catalogue offers yearly.
+ *   only while the catalogue offers yearly. With no code typed, the
+ *   plan's automatic coupon (`findAutomaticCoupon`) on the same kinds, or
+ *   the full price when the business can't use it.
  *
  * Nothing here enforces limits (U13); add-ons are `AddonsService`.
  */
@@ -1005,18 +1010,21 @@ export class CheckoutService {
         const term = await this.termOfSubscription(subscription, now);
         const termEndsAt = term?.endsAt ?? null;
         // A year chosen during the first month is a move up or not by what
-        // its plan costs a month (DEC-159).
+        // its plan costs a month (DEC-159); a percent coupon on a year is a
+        // percent of that too (its version's monthly price).
         const targetMonthlyPaise =
-            subscription?.status === "TRIALING" && target.interval === "year"
-                ? (
-                      await this.plans.resolveCatalogue(
-                          edition,
-                          input.plan,
-                          "month",
-                          now,
-                      )
-                  ).priceCents
-                : undefined;
+            target.interval !== "year"
+                ? undefined
+                : subscription?.status === "TRIALING"
+                  ? (
+                        await this.plans.resolveCatalogue(
+                            edition,
+                            input.plan,
+                            "month",
+                            now,
+                        )
+                    ).priceCents
+                  : catalog?.plans.find((p) => p.id === planId)?.pricePaise;
         const asked = {
             subscription,
             target,
@@ -1031,6 +1039,13 @@ export class CheckoutService {
         };
         let coupon: PricingCoupon | null = null;
         const code = input.coupon?.trim();
+        const couponAsk = {
+            organizationId,
+            edition,
+            planId,
+            planName: target.name,
+            now,
+        };
         if (code) {
             const plain = quoteChange(asked);
             if (!COUPON_KINDS.includes(plain.kind)) {
@@ -1040,14 +1055,15 @@ export class CheckoutService {
                     details: { field: "coupon" },
                 });
             }
-            coupon = await findUsableCoupon({
-                code,
-                organizationId,
-                edition,
-                planId,
-                planName: target.name,
-                now,
-            });
+            coupon = await findUsableCoupon({ ...couponAsk, code });
+        } else if (
+            target.priceCents > 0 &&
+            COUPON_KINDS.includes(quoteChange(asked).kind)
+        ) {
+            // No code typed: the plan's automatic coupon, when this business
+            // may still use it; else the full price, silently (owner, 18 Nov
+            // 2026). A typed code always wins over it.
+            coupon = await findAutomaticCoupon(couponAsk);
         }
         let quote = quoteChange({ ...asked, coupon });
         const monthAddons = await this.monthAddons(

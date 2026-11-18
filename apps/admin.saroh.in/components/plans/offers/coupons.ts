@@ -15,6 +15,8 @@ import { paiseToRupees, rupeesToPaise } from "./money";
 export const COUPON_CODE = /^[A-Z0-9][A-Z0-9-]{2,31}$/;
 export const COUPON_MONTHS_MAX = 36;
 export const COUPON_USES_MAX = 1_000_000;
+/** The most a percent coupon may take off (the API's rule). */
+export const COUPON_PERCENT_MAX = 90;
 /**
  * The API's rule for a Razorpay offer id: `offer_` and 14 letters or
  * digits, 20 in all, as the Razorpay Dashboard shows it.
@@ -24,25 +26,33 @@ export const RAZORPAY_OFFER_ID = /^offer_[A-Za-z0-9]{14}$/;
 export type CouponField =
     | "code"
     | "discountPaise"
+    | "percentOff"
     | "months"
     | "planIds"
     | "maxRedemptions"
     | "expiresAt"
-    | "razorpayOfferId";
+    | "razorpayOfferId"
+    | "automatic";
 
 const FIELDS: readonly CouponField[] = [
     "code",
     "discountPaise",
+    "percentOff",
     "months",
     "planIds",
     "maxRedemptions",
     "expiresAt",
     "razorpayOfferId",
+    "automatic",
 ];
+
+/** An amount off each month, or a percent of the plan's monthly price. */
+export type CouponKind = "amount" | "percent";
 
 export interface CouponForm {
     code: string;
-    /** Rupees off a month, as typed. */
+    kind: CouponKind;
+    /** Rupees off a month, or the percent, as typed (`kind`). */
     off: string;
     months: string;
     planIds: string[];
@@ -51,6 +61,8 @@ export interface CouponForm {
     expires: Date | null;
     /** The Razorpay offer's id as pasted; empty for none. */
     offerId: string;
+    /** Taken off at checkout with no code typed. */
+    automatic: boolean;
 }
 
 export type CouponErrors = Partial<Record<CouponField, string>>;
@@ -59,24 +71,30 @@ export type CouponErrors = Partial<Record<CouponField, string>>;
 export function blankCoupon(plans: readonly Plan[]): CouponForm {
     return {
         code: "",
+        kind: "amount",
         off: "",
         months: "1",
         planIds: plans.map((p) => p.id),
         maxUses: "",
         expires: null,
         offerId: "",
+        automatic: false,
     };
 }
 
 export function formOf(coupon: AdminCoupon): CouponForm {
     return {
         code: coupon.code,
-        off: paiseToRupees(coupon.discountPaise),
+        kind: coupon.percentOff ? "percent" : "amount",
+        off: coupon.percentOff
+            ? String(coupon.percentOff)
+            : paiseToRupees(coupon.discountPaise),
         months: String(coupon.months),
         planIds: [...coupon.planIds],
         maxUses: String(coupon.maxRedemptions),
         expires: coupon.expiresAt ? new Date(coupon.expiresAt) : null,
         offerId: coupon.razorpayOfferId ?? "",
+        automatic: coupon.automatic,
     };
 }
 
@@ -121,8 +139,12 @@ export function checkCoupon(
         errors.code =
             "Use 3 to 32 letters, digits or dashes, starting with a letter or digit";
     }
-    const discountPaise = rupeesToPaise(form.off);
-    if (discountPaise === null || discountPaise < 1) {
+    const percent = form.kind === "percent";
+    const percentOff = percent ? whole(form.off, 1, COUPON_PERCENT_MAX) : null;
+    const discountPaise = percent ? 0 : rupeesToPaise(form.off);
+    if (percent && percentOff === null) {
+        errors.percentOff = `A whole percent from 1 to ${COUPON_PERCENT_MAX}`;
+    } else if (!percent && (discountPaise === null || discountPaise < 1)) {
         errors.discountPaise = "Enter an amount off each month";
     }
     const months = whole(form.months, 1, COUPON_MONTHS_MAX);
@@ -131,7 +153,7 @@ export function checkCoupon(
     }
     if (form.planIds.length === 0) {
         errors.planIds = "Pick at least one plan";
-    } else if (discountPaise !== null && !errors.discountPaise) {
+    } else if (!percent && discountPaise !== null && !errors.discountPaise) {
         const over = opts.plans.find(
             (p) => form.planIds.includes(p.id) && discountPaise > p.pricePaise,
         );
@@ -167,6 +189,7 @@ export function checkCoupon(
     if (
         Object.keys(errors).length > 0 ||
         discountPaise === null ||
+        (percent && percentOff === null) ||
         months === null ||
         maxRedemptions === null
     ) {
@@ -176,11 +199,13 @@ export function checkCoupon(
         input: {
             code,
             discountPaise,
+            percentOff,
             months,
             planIds: form.planIds,
             maxRedemptions,
             expiresAt,
             razorpayOfferId,
+            automatic: form.automatic,
         },
         errors,
     };
@@ -192,8 +217,14 @@ export function couponChanges(
     input: CouponInput,
 ): Partial<Omit<CouponInput, "code">> {
     const out: Partial<Omit<CouponInput, "code">> = {};
-    if (input.discountPaise !== coupon.discountPaise) {
+    // An amount and a percent go together: switching sends both.
+    const percentOff = input.percentOff ?? null;
+    if (
+        input.discountPaise !== coupon.discountPaise ||
+        percentOff !== coupon.percentOff
+    ) {
         out.discountPaise = input.discountPaise;
+        out.percentOff = percentOff;
     }
     if (input.months !== coupon.months) out.months = input.months;
     if (
@@ -209,6 +240,8 @@ export function couponChanges(
     if (was !== now) out.expiresAt = input.expiresAt ?? null;
     const offer = input.razorpayOfferId ?? null;
     if (offer !== coupon.razorpayOfferId) out.razorpayOfferId = offer;
+    const automatic = input.automatic ?? false;
+    if (automatic !== coupon.automatic) out.automatic = automatic;
     return out;
 }
 
@@ -220,6 +253,13 @@ export function refusedField(details: unknown): CouponField | null {
         (FIELDS as readonly string[]).includes(field)
         ? (field as CouponField)
         : null;
+}
+
+/** "7% off · 3 months", the list's line for a percent coupon; else empty. */
+export function percentText(coupon: AdminCoupon): string {
+    if (!coupon.percentOff) return "";
+    const months = coupon.months === 1 ? "1 month" : `${coupon.months} months`;
+    return `${coupon.percentOff}% off · ${months}`;
 }
 
 export function usesText(uses: number): string {

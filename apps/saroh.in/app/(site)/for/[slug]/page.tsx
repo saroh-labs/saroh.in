@@ -19,7 +19,7 @@ import { demoHref, demoTradeOf } from "@/lib/demos";
 import { claimOn, featuresOff } from "@/lib/feature-switches";
 import { cta, LAUNCH_MODE } from "@/lib/links";
 import { freePlanLine } from "@/lib/plan-teasers";
-import { readLivePricing } from "@/lib/pricing";
+import { readLivePricingVersion } from "@/lib/pricing";
 import { pricingPageModel } from "@/lib/pricing-view";
 import {
     builtSearchPages,
@@ -100,7 +100,8 @@ export default async function ForPage({ params }: Props) {
     const trade = demoTradeOf(p.demo);
     const demo = trade ? demoHref(trade) : null;
     // Only once the launch switch is open (DEC-136), as a solution page.
-    const catalog = LAUNCH_MODE === "open" ? await readLivePricing() : null;
+    const read = LAUNCH_MODE === "open" ? await readLivePricingVersion() : null;
+    const catalog = read?.catalog ?? null;
     const free = catalog ? freePlanLine(catalog) : null;
 
     const start = cta({ src: `for-${slug}` });
@@ -149,7 +150,10 @@ export default async function ForPage({ params }: Props) {
                         pricing={
                             catalog ? (
                                 <PricingCards
-                                    model={pricingPageModel(catalog)}
+                                    model={pricingPageModel(
+                                        catalog,
+                                        read?.offers,
+                                    )}
                                     src={`for-${slug}-pricing`}
                                     compare
                                 />

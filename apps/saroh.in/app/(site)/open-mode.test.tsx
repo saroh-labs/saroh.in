@@ -28,6 +28,8 @@ vi.mock("@/lib/browser/env", () => ({
 }));
 vi.mock("@/lib/pricing", () => ({
     readLivePricing: () => Promise.resolve(fakeCatalog()),
+    readLivePricingVersion: () =>
+        Promise.resolve({ catalog: fakeCatalog(), offers: [] }),
 }));
 vi.mock("next/navigation", () => ({
     usePathname: () => "/",

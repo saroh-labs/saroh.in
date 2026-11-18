@@ -197,12 +197,17 @@ export interface CancelResult {
 export interface AdminCoupon {
     id: string;
     code: string;
+    /** Off each month before tax; 0 on a percent coupon. */
     discountPaise: number;
+    /** A whole percent off the plan's monthly price; null: an amount. */
+    percentOff: number | null;
     months: number;
     planIds: string[];
     /** The Razorpay Offer made in its Dashboard; null: none linked. */
     razorpayOfferId: string | null;
     active: boolean;
+    /** Taken off at checkout with no code typed (one per plan). */
+    automatic: boolean;
     maxRedemptions: number;
     expiresAt: string | null;
     /** Businesses that have used it (one use each). */
@@ -214,12 +219,14 @@ export interface AdminCoupon {
 export interface CouponInput {
     code: string;
     discountPaise: number;
+    percentOff?: number | null;
     months: number;
     planIds: string[];
     maxRedemptions: number;
     expiresAt?: string | null;
     razorpayOfferId?: string | null;
     active?: boolean;
+    automatic?: boolean;
 }
 
 /** A person's name as the console says it: name, else email, else "Someone". */

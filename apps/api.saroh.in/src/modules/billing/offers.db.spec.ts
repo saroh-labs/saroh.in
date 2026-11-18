@@ -216,6 +216,7 @@ async function coupon(
         maxRedemptions: number;
         expiresAt: Date | null;
         razorpayOfferId: string | null;
+        percentOff: number | null;
     }> = {},
 ) {
     return prisma.pricingCoupon.create({
@@ -1081,5 +1082,168 @@ describe("add-ons", () => {
         expect(
             (await prisma.subscriptionAddonCharge.findFirstOrThrow()).status,
         ).toBe("DROPPED");
+    });
+});
+
+describe("automatic coupons (owner, 18 Nov 2026)", () => {
+    const automatic = (code: string, over: Parameters<typeof coupon>[1] = {}) =>
+        coupon(code, over).then((c) =>
+            prisma.pricingCoupon.update({
+                where: { id: c.id },
+                data: { automatic: true },
+            }),
+        );
+
+    it("comes off a new plan with no code typed, through the provider, and is redeemed with the first charge", async () => {
+        await install();
+        const ctx = await business();
+        const made = await automatic("AUTO-OFF");
+        const c = await row("c");
+
+        const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
+        expect(q).toMatchObject({
+            kind: "NEW",
+            coupon: { code: "AUTO-OFF", discountPaise: 111, charges: 2 },
+            firstChargePaise: c.priceCents - 111,
+        });
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(fake.createCalls[0]?.discount).toMatchObject({
+            code: "AUTO-OFF",
+            razorpayOfferId: OFFER_ID,
+            charges: 2,
+        });
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: r.checkout.id },
+            }),
+        ).toMatchObject({ couponId: made.id });
+        await deliver(`fake_sub_${r.checkout.id}`, "activated", {
+            currentPeriodEnd: new Date(Date.now() + 30 * DAY),
+        });
+        expect(
+            await prisma.pricingCouponRedemption.findFirstOrThrow(),
+        ).toMatchObject({
+            couponId: made.id,
+            organizationId: ctx.organizationId,
+        });
+    });
+
+    it("a percent coupon on Grow and Pro takes its percent of each plan's own monthly price, and the checkout keeps that amount", async () => {
+        await install();
+        const ctx = await business();
+        const made = await automatic("AUTO-PCT", {
+            discountPaise: 0,
+            percentOff: 7,
+            months: 3,
+        });
+        for (const plan of ["b", "c"]) {
+            const price = (await row(plan)).priceCents;
+            const off = Math.floor((price * 7 + 50) / 100);
+            expect(
+                await checkout.quote(ctx, { plan, cycle: "month" }),
+            ).toMatchObject({
+                coupon: { code: "AUTO-PCT", discountPaise: off, charges: 3 },
+                firstChargePaise: price - off,
+            });
+        }
+        const c = await row("c");
+        const off = Math.floor((c.priceCents * 7 + 50) / 100);
+        const r = await checkout.changePlan(ctx, { plan: "c", cycle: "month" });
+        if (r.kind === "TO_FREE") throw new Error("unreachable");
+        expect(
+            await prisma.billingCheckout.findUniqueOrThrow({
+                where: { id: r.checkout.id },
+            }),
+        ).toMatchObject({
+            couponId: made.id,
+            discountPaise: off,
+            discountCharges: 3,
+        });
+        expect(fake.createCalls[0]?.discount).toMatchObject({
+            code: "AUTO-PCT",
+            charges: 3,
+        });
+    });
+
+    it("never comes off an upgrade", async () => {
+        await install(
+            OFFERS((c) => {
+                c.plans[1]!.trial = { on: false, days: 9 };
+            }),
+        );
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        await automatic("AUTO-OFF");
+        const q = await checkout.quote(ctx, { plan: "c", cycle: "month" });
+        expect(q).toMatchObject({ kind: "UPGRADE", coupon: null });
+    });
+
+    it("a typed code wins over it", async () => {
+        await install();
+        const ctx = await business();
+        await automatic("AUTO-OFF");
+        await coupon("TYPED-OFF", { discountPaise: 222, months: 1 });
+        const q = await checkout.quote(ctx, {
+            plan: "c",
+            cycle: "month",
+            coupon: "typed-off",
+        });
+        expect(q.coupon).toEqual({
+            code: "TYPED-OFF",
+            discountPaise: 222,
+            charges: 1,
+        });
+    });
+
+    it("used by this business, used up, expired, paused or another edition's: the full price, never an error", async () => {
+        await install();
+        const ctx = await business();
+        const other = await business();
+        const full = async (who = ctx) =>
+            expect(
+                (await checkout.quote(who, { plan: "c", cycle: "month" }))
+                    .coupon,
+            ).toBeNull();
+
+        const once = await automatic("AUTO-ONE", { maxRedemptions: 1 });
+        await prisma.pricingCouponRedemption.create({
+            data: {
+                couponId: once.id,
+                organizationId: other.organizationId,
+                discountPaise: 111,
+            },
+        });
+        await full(); // used up
+        await full(other); // used by this business
+
+        await prisma.pricingCoupon.update({
+            where: { id: once.id },
+            data: {
+                maxRedemptions: 5,
+                expiresAt: new Date(Date.now() - 1000),
+            },
+        });
+        await full(); // expired
+
+        await prisma.pricingCoupon.update({
+            where: { id: once.id },
+            data: { expiresAt: null, active: false },
+        });
+        await full(); // paused
+
+        await prisma.pricingCoupon.update({
+            where: { id: once.id },
+            data: { active: true, edition: "GLOBAL" },
+        });
+        await full(); // another edition's
+
+        await prisma.pricingCoupon.update({
+            where: { id: once.id },
+            data: { edition: "INDIA" },
+        });
+        expect(
+            (await checkout.quote(ctx, { plan: "c", cycle: "month" })).coupon,
+        ).toMatchObject({ code: "AUTO-ONE" });
     });
 });

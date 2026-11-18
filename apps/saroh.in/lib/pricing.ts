@@ -4,6 +4,8 @@ import { join } from "node:path";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { parseCatalog } from "@saroh/pricing-catalog";
 
+import type { PlanOffer } from "@saroh/marketing/pricing-model";
+
 import { env } from "@/env";
 
 import { withBuildRetries } from "./build-retry";
@@ -31,6 +33,35 @@ export interface PricingRead {
     goLiveAt: string | null;
     preview: boolean;
     catalog: Catalog;
+    /** Each plan's automatic discount; empty when there is none. */
+    offers: PlanOffer[];
+}
+
+const whole = (n: unknown): n is number =>
+    typeof n === "number" && Number.isInteger(n) && n > 0;
+
+/** The answer's `offers`, keeping only whole ones: words come from data. */
+export function parseOffers(raw: unknown): PlanOffer[] {
+    if (!Array.isArray(raw)) return [];
+    return raw.flatMap((o: unknown) => {
+        if (!o || typeof o !== "object") return [];
+        const { planId, discountPaise, months, percentOff } = o as Record<
+            string,
+            unknown
+        >;
+        if (
+            typeof planId !== "string" ||
+            !whole(discountPaise) ||
+            !whole(months)
+        ) {
+            return [];
+        }
+        return [
+            whole(percentOff)
+                ? { planId, discountPaise, months, percentOff }
+                : { planId, discountPaise, months },
+        ];
+    });
 }
 
 /** Parse the API's answer; throws when it isn't a valid catalogue. */
@@ -44,6 +75,7 @@ export function parsePricingResponse(body: unknown): PricingRead {
         goLiveAt: typeof b.goLiveAt === "string" ? b.goLiveAt : null,
         preview: b.preview === true,
         catalog: parseCatalog(b.catalog),
+        offers: parseOffers(b.offers),
     };
 }
 

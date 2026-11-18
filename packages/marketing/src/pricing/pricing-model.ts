@@ -33,7 +33,11 @@ export interface PlanCardView {
     };
     /** "Everything in ‹previous›, plus:", or empty. */
     lead: string;
-    /** "Try it free for N days", or empty. */
+    /**
+     * The plan's offer: its automatic discount ("₹X off a month for your
+     * first N months", "N% off your first N months"), else "Try it free
+     * for N days"; or empty.
+     */
     trial: string;
     lines: { t: string; soon: boolean }[];
     /**
@@ -41,6 +45,19 @@ export interface PlanCardView {
      * what changed" on; never set on the public page.
      */
     changed?: { name: boolean; price: boolean; lines: string[] };
+}
+
+/**
+ * A plan's automatic discount, from `GET /public/pricing`'s `offers`: off
+ * each month's charge, before tax, for so many months.
+ */
+export interface PlanOffer {
+    planId: string;
+    /** Off each month before tax; a percent coupon's, worked out per plan. */
+    discountPaise: number;
+    months: number;
+    /** A percent coupon's whole percent; absent: an amount off. */
+    percentOff?: number;
 }
 
 /** A usage cell for a plan that leaves the row out: drawn as a dash. */

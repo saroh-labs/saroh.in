@@ -4,6 +4,7 @@ import type { Plan } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { cn } from "@saroh/ui/lib/utils";
+import { Switch } from "@saroh/ui/switch";
 import { X } from "lucide-react";
 import type { ReactNode } from "react";
 import { useId, useMemo, useState } from "react";
@@ -31,12 +32,13 @@ import {
     couponChanges,
     formOf,
     normaliseCode,
+    percentText,
     refusedField,
     usesText,
 } from "./coupons";
 import { fieldClass } from "./number-field";
 import { paidPlans } from "./offers";
-import { OfferCard } from "./parts";
+import { OfferCard, Segmented } from "./parts";
 
 /**
  * Coupons (plans catalogue U9). Not part of a version: each save applies at
@@ -147,6 +149,11 @@ function CouponsFailed({ onLoaded }: { onLoaded: (c: AdminCoupon[]) => void }) {
     );
 }
 
+const KINDS = [
+    { value: "amount", label: "Amount off" },
+    { value: "percent", label: "Percent off" },
+] as const;
+
 const ROW =
     "flex flex-wrap items-end gap-x-3 gap-y-2.5 rounded-[10px] border border-border-strong bg-secondary p-3";
 const SMALL = "text-[11.5px] text-muted-foreground";
@@ -241,7 +248,10 @@ function NewCoupon({ plans, onDone }: { plans: Plan[]; onDone: () => void }) {
 function shownErrors(form: CouponForm, errors: CouponErrors): CouponErrors {
     const out: CouponErrors = { ...errors };
     if (form.code.trim() === "") delete out.code;
-    if (form.off.trim() === "") delete out.discountPaise;
+    if (form.off.trim() === "") {
+        delete out.discountPaise;
+        delete out.percentOff;
+    }
     if (form.maxUses.trim() === "") delete out.maxRedemptions;
     return out;
 }
@@ -322,7 +332,9 @@ function CouponRow({
                     disabled={!canManage}
                 />
                 <span className="pb-2 text-[12px] text-muted-foreground">
+                    {percentText(coupon) && `${percentText(coupon)} · `}
                     {usesText(coupon.uses)}
+                    {coupon.automatic && " · Automatic"}
                     {!coupon.active && " · Paused"}
                     {expired && " · Expired"}
                 </span>
@@ -504,20 +516,40 @@ function CouponFields({
                     )}
                 />
             </Field>
+            <div className="grid gap-1">
+                <span className={SMALL}>Discount</span>
+                <Segmented
+                    label="Discount"
+                    size="sm"
+                    value={form.kind}
+                    options={KINDS}
+                    disabled={disabled}
+                    // The typed number means something else in the other kind.
+                    onValue={(kind) => set({ kind, off: "" })}
+                />
+            </div>
             <Field
-                label={`${planCurrencySign()} off a month`}
+                label={
+                    form.kind === "percent"
+                        ? "% off"
+                        : `${planCurrencySign()} off a month`
+                }
                 htmlFor={`${id}-off`}
-                error={errors.discountPaise}
-                errorId={err("discountPaise")}
+                error={errors.discountPaise ?? errors.percentOff}
+                errorId={err(
+                    errors.discountPaise ? "discountPaise" : "percentOff",
+                )}
                 className="w-[100px]"
             >
                 <input
                     id={`${id}-off`}
-                    inputMode="decimal"
+                    inputMode={form.kind === "percent" ? "numeric" : "decimal"}
                     value={form.off}
                     disabled={disabled}
-                    aria-invalid={!!errors.discountPaise}
-                    aria-describedby={err("discountPaise")}
+                    aria-invalid={!!(errors.discountPaise ?? errors.percentOff)}
+                    aria-describedby={err(
+                        errors.discountPaise ? "discountPaise" : "percentOff",
+                    )}
                     onChange={(e) => set({ off: e.target.value })}
                     className={cn(
                         fieldClass,
@@ -662,7 +694,7 @@ function CouponFields({
                 htmlFor={`${id}-offer`}
                 error={errors.razorpayOfferId}
                 errorId={err("razorpayOfferId")}
-                hint="Make the offer in your Razorpay Dashboard, then paste its ID here."
+                hint="Razorpay's Offer is made in the Razorpay Dashboard. If you change the discount, months or plans here, change the Offer to match."
                 hintId={`${id}-offer-hint`}
                 className="w-[13.5rem]"
             >
@@ -686,6 +718,29 @@ function CouponFields({
                         fieldClass,
                         "h-8 w-full min-w-0 px-[9px] font-mono text-[12.5px]",
                     )}
+                />
+            </Field>
+            <Field
+                label="Applies automatically"
+                htmlFor={`${id}-automatic`}
+                error={errors.automatic}
+                errorId={err("automatic")}
+                hint="Taken off a new plan's checkout when no code is typed. One per plan."
+                hintId={`${id}-automatic-hint`}
+                className="w-[13.5rem]"
+            >
+                <Switch
+                    id={`${id}-automatic`}
+                    checked={form.automatic}
+                    disabled={disabled}
+                    onCheckedChange={(automatic) => set({ automatic })}
+                    aria-invalid={!!errors.automatic}
+                    aria-describedby={
+                        [`${id}-automatic-hint`, err("automatic")]
+                            .filter(Boolean)
+                            .join(" ") || undefined
+                    }
+                    className="h-5 w-9 [&>span]:size-4 [&>span]:data-[state=checked]:translate-x-4"
                 />
             </Field>
         </>

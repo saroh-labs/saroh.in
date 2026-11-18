@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+    parseOffers,
     readLivePricing,
     readLivePricingVersion,
     readPreviewPricing,
@@ -199,5 +200,23 @@ describe("the seed", () => {
         };
         walk(root);
         expect(hits).toEqual([]);
+    });
+});
+
+// Made-up plans and numbers.
+describe("parseOffers", () => {
+    it("keeps whole offers, and a percent only when it is a whole one", () => {
+        expect(
+            parseOffers([
+                { planId: "b", discountPaise: 300, months: 3, percentOff: 7 },
+                { planId: "c", discountPaise: 400, months: 1, percentOff: 0 },
+                { planId: "d", discountPaise: 0, months: 1 },
+                "junk",
+            ]),
+        ).toEqual([
+            { planId: "b", discountPaise: 300, months: 3, percentOff: 7 },
+            { planId: "c", discountPaise: 400, months: 1 },
+        ]);
+        expect(parseOffers(undefined)).toEqual([]);
     });
 });

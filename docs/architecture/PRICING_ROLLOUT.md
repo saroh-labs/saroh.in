@@ -418,6 +418,21 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   subscription's first `discountCharges` charges. Coupon tries are limited
   per business and per address (in-process, a speed bump). A coupon a
   checkout was quoted with is archived on delete, never removed.
+- **Automatic and percent coupons (owner, 18 Nov 2026; migration
+  `20270217120000_coupon_automatic`).** A coupon marked **Applies
+  automatically** is taken off a `NEW`/`TRIAL` checkout when no code is
+  typed (`findAutomaticCoupon`), silently skipped when this business can't
+  use it; a typed code wins. One active automatic coupon per edition and
+  plan (`checkOneAutomatic`, an advisory lock); India's needs its Razorpay
+  Offer. `GET /public/pricing` lists them as `offers` (never the code) and
+  the pricing cards say them in place of the trial. A coupon is an amount
+  (`discountPaise` > 0) **or** a whole percent (`percentOff` 1–90,
+  `discountPaise` 0; the CHECK `PricingCoupon_amounts_positive`). A
+  percent is worked out at checkout from the target plan's monthly price
+  before GST, half up to the paisa (`couponMonthPaise`), and then runs
+  exactly as an amount: the checkout, invoices, reminders and redemption
+  keep that amount. Yearly, it is that many months' worth of the monthly
+  price, once, capped at the charge.
 - **Add-ons** — `GET …/billing/addons`, `PUT …/billing/addons/:id
 {quantity}` (zero removes; `billing:manage`). On a paid catalogue plan
   billed through the provider, trialing or paid up; definitions from the
@@ -507,6 +522,14 @@ withGstPaise(price − discount)` the quote shows;
   id: limit such a coupon to monthly plans, or keep it to one month;
 - valid on the plans the coupon names, for at least as long as the coupon
   (`expiresAt`), and not limited to a payment method a business might use.
+
+A **percent** coupon is a different flat amount on each plan (its percent
+of that plan's price), and one coupon holds one Offer id. So on Razorpay
+a percent coupon serves **one plan** (or plans at the same price): for a
+launch offer on two plans, make one coupon per plan, each with its own
+flat Offer. A Razorpay _percentage_ Offer is not the answer: it is taken
+off the GST-inclusive charge and can round a paisa away from Saroh's
+invoice (unverified in test mode).
 
 There is **no check** that the two match: Razorpay documents no endpoint to
 read an Offer back (`GET /v1/offers/:id` isn't in its API reference; only

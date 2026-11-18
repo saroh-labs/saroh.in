@@ -8707,7 +8707,12 @@ model PricingCoupon {
 
   // Taken off each month for `months` months (monthly), or off the first
   // yearly charge as `months` months' worth, capped at that charge (U16).
+  // Zero on a percent coupon.
   discountPaise   Int
+  // Or a whole percent (1-90) off the plan's monthly price before tax, the
+  // same way (owner, 18 Nov 2026); null: an amount coupon. One or the
+  // other (`PricingCoupon_amounts_positive`).
+  percentOff      Int?
   months          Int
   // Catalogue plan ids it applies to.
   planIds         String[]
@@ -8718,6 +8723,10 @@ model PricingCoupon {
   razorpayOfferId String?
 
   active         Boolean   @default(true)
+  // Taken off at checkout with no code typed (owner, 18 Nov 2026): at most
+  // one active, non-archived automatic coupon per edition and plan
+  // (`CouponsService`); a typed code wins over it.
+  automatic      Boolean   @default(false)
   maxRedemptions Int
   expiresAt      DateTime?
   archivedAt     DateTime?
