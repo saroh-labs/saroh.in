@@ -450,6 +450,35 @@ describe("sign up and sign in with an emailed code", () => {
             expect(tokens.at(-1)).toBe("good");
         });
 
+        // 03-M9: a sign-up (and a password sign-in, which mails an unproven
+        // account a code again) went around the per-address cap, so anyone
+        // could flood a stranger's mailbox from Saroh's sending domain.
+        it("a sign-up and a password sign-in ask the per-address cap too, naming the path", async () => {
+            const paths: string[] = [];
+            const s = stack({
+                hooks: {
+                    mayMailCode: (_email, { path }) => {
+                        paths.push(path);
+                        return Promise.resolve({ retryAfterSeconds: 60 });
+                    },
+                },
+            });
+            const signUp = await s.post("/sign-up/email", {
+                name: "Not Meera",
+                email: "meera@example.com",
+                password: "the-squatter's-password",
+            });
+            expect(signUp.status).toBe(429);
+            expect(s.sent).toHaveLength(0);
+            expect(s.db.user).toHaveLength(0);
+            const signIn = await s.post("/sign-in/email", {
+                email: "meera@example.com",
+                password: "the-squatter's-password",
+            });
+            expect(signIn.status).toBe(429);
+            expect(paths).toEqual(["/sign-up/email", "/sign-in/email"]);
+        });
+
         it("the screen's Resend wait lets one resend through", () => {
             // Two sends a `CODE_RESEND_SECONDS` apart are inside what the
             // limiter allows, so pressing Resend the moment it opens works.

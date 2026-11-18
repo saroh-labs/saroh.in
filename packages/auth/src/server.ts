@@ -222,7 +222,7 @@ export interface CreateAuthOptions {
      */
     mayMailCode?: (
         email: string,
-        challenge: { turnstileToken: string | null },
+        challenge: { turnstileToken: string | null; path: string },
     ) => Promise<{ retryAfterSeconds: number } | { challenge: true } | null>;
     /**
      * This instance's GitHub OAuth app. GitHub allows one callback address
@@ -500,6 +500,11 @@ export const CODE_MAIL_PATHS: readonly string[] = [
     "/forget-password/email-otp",
     "/send-verification-email",
     "/request-password-reset",
+    // A sign-up mails the address a code, or the existing-account notice;
+    // a password sign-in to an unproven account mails a code again (03-M9).
+    // The host is told the path, so it counts a sign-in only when it mails.
+    "/sign-up/email",
+    "/sign-in/email",
 ];
 
 /** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
@@ -513,6 +518,7 @@ function codeMailHook(
         if (typeof email !== "string" || !email.trim()) return;
         const verdict = await mayMailCode(email.trim().toLowerCase(), {
             turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
+            path: ctx.path,
         });
         if (!verdict) return;
         if ("challenge" in verdict) {

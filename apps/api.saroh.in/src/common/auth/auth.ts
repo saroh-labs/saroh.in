@@ -23,7 +23,7 @@ import {
     githubKeysOf,
     otherAuthAddress,
 } from "./auth-address";
-import { claimCodeMail } from "./code-mail-limits";
+import { claimCodeMail, mailsOnPasswordSignIn } from "./code-mail-limits";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
@@ -65,8 +65,12 @@ const authServices: Parameters<typeof createAuth>[0] = {
     trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
     // Per address too, not only per caller: many callers can't flood one
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
-    mayMailCode: (email, { turnstileToken }) =>
-        claimCodeMail(email, turnstileToken),
+    // A password sign-in mails only an unproven account (03-M9): any other
+    // sign-in is not a code mail and is never counted or refused here.
+    mayMailCode: async (email, { turnstileToken, path }) =>
+        path === "/sign-in/email" && !(await mailsOnPasswordSignIn(email))
+            ? null
+            : claimCodeMail(email, turnstileToken),
 };
 
 const githubWarned = new Set<Edition>();
