@@ -112,9 +112,11 @@ export async function queueRefreshInTx(
         grantExpiresAt: Date | null;
     },
     now: Date,
+    /** Try again at this time instead (a refresh Meta didn't answer). */
+    retryAt?: Date,
 ): Promise<void> {
     await dropWaitingJob(tx, channel.refreshJobId);
-    const at = refreshAt(channel, now);
+    const at = retryAt ?? refreshAt(channel, now);
     let jobId: string | null = null;
     if (at) {
         const payload: SocialRefreshPayload = { channelId: channel.id };

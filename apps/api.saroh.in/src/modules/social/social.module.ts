@@ -14,6 +14,10 @@ import {
     SocialController,
 } from "./channels/channels.controller";
 import { SocialChannelsService } from "./channels/channels.service";
+import {
+    SOCIAL_REFRESH_TYPE,
+    SocialRefreshHandler,
+} from "./channels/social-refresh.handler";
 import { socialMetaProvider } from "./meta/provider";
 import { SocialPostsController } from "./posts/posts.controller";
 import { SocialPostsService } from "./posts/posts.service";
@@ -46,6 +50,7 @@ import {
         SocialChannelsService,
         SocialPostsService,
         SocialPublishHandler,
+        SocialRefreshHandler,
         OrganizationGuard,
     ],
 })
@@ -53,10 +58,13 @@ export class SocialModule implements OnModuleInit {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly publish: SocialPublishHandler,
+        private readonly refresh: SocialRefreshHandler,
     ) {}
 
     onModuleInit(): void {
         // A post going out at its time, and each follow-up (U6).
         this.registry.register(SOCIAL_PUBLISH_TYPE, this.publish.handle);
+        // An Instagram or Threads token refreshed before it ends (U7).
+        this.registry.register(SOCIAL_REFRESH_TYPE, this.refresh.handle);
     }
 }

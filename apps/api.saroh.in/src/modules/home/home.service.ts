@@ -67,6 +67,7 @@ import {
     sitesNotLive,
     stockShort,
 } from "./home-site-stock-sources";
+import { socialNeeds } from "./home-social";
 import {
     inStores,
     isStaffView,
@@ -680,6 +681,15 @@ export class HomeService {
                       null,
                   )
                 : skip(null),
+            // Saroh Social (U7): a channel to reconnect, a post that didn't
+            // go out. Nothing for a business that never connected one.
+            holds(input, "social:read")
+                ? guard(
+                      { moduleKey: "SOCIAL", label: "Social" },
+                      () => socialNeeds(this.db, input.organizationId),
+                      null,
+                  )
+                : skip(null),
         ]);
         // Home A's sources (DEC-171), asked at once with the rest; their
         // slots come after today's, so `unavailable` keeps its order. Home's
@@ -728,6 +738,7 @@ export class HomeService {
             detailsGap,
             uncollected,
             noEmail,
+            social,
         ] = await reads;
         const [awaiting, low, moneyIn, going] = await todayFirst;
         const cheques = await chequesRead;
@@ -795,6 +806,7 @@ export class HomeService {
             });
         }
         if (uncollected) actions.push(uncollected);
+        if (social) actions.push(social);
         if (refundsFailed) actions.push(refundsFailed);
         if (detailsGap) actions.push(detailsGap);
         if (renewals) actions.push(renewals);
