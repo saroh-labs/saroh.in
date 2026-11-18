@@ -291,14 +291,15 @@ function Rows({
                 ) : (
                     service.name
                 );
-                // VD01: the whole row is the way in, with no Book of its own.
-                const book = quiet ? null : href ? (
+                // Book stays in every look (U8: Quiet had dropped it); Quiet
+                // draws it as a 44px text link, the row still the way in.
+                const book = href ? (
                     <a
                         href={href}
                         aria-label={`${words}: ${service.name}`}
                         className={frontButton(
                             look,
-                            "quiet",
+                            quiet ? "link" : "quiet",
                             cn(
                                 "relative z-10 shrink-0",
                                 // VB01's desk card books with a link.
@@ -312,7 +313,13 @@ function Rows({
                 ) : label ? (
                     // The editor's canvas has no booking page: the words
                     // show, and go nowhere.
-                    <span className={frontButton(look, "quiet", "shrink-0")}>
+                    <span
+                        className={frontButton(
+                            look,
+                            quiet ? "link" : "quiet",
+                            "shrink-0",
+                        )}
+                    >
                         {label}
                     </span>
                 ) : null;

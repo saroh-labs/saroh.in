@@ -27,7 +27,8 @@ import { FALLBACK_TIME_ZONE, weekdayIn } from "./lib/opening-hours";
  * blocks say it, from a read that does.
  *
  * Drawn in the footer's own colours at full strength (no tint nobody
- * checked): today is marked by weight and by a word a screen reader says.
+ * checked): today is marked by weight and a small "Today" tag (U8,
+ * board TPSystem), both drawn only once the browser knows the day.
  */
 const noSubscribe = () => () => undefined;
 
@@ -45,6 +46,8 @@ export function FooterHours({
     timeZone,
     now,
     label = "Opening hours",
+    labelAs: Label = "h3",
+    flush = false,
     labelClassName,
 }: {
     /** The small heading over the week, in the footer's label style. */
@@ -56,6 +59,10 @@ export function FooterHours({
     now?: Date;
     /** What the week is called. */
     label?: string;
+    /** The label's level: an h2 where the week is a column of its own. */
+    labelAs?: "h2" | "h3";
+    /** No space above: the week leads its column. */
+    flush?: boolean;
 }) {
     const zone = timeZone?.trim() ?? "";
     const today = useToday(zone === "" ? FALLBACK_TIME_ZONE : zone, now);
@@ -64,8 +71,8 @@ export function FooterHours({
     if (!rows) return null;
     const lines = groupedHoursRows(rows);
     return (
-        <div data-site-hours="" className="mt-4">
-            <h3 className={labelClassName}>{label}</h3>
+        <div data-site-hours="" className={flush ? undefined : "mt-4"}>
+            <Label className={labelClassName}>{label}</Label>
             <dl className="m-0 grid max-w-xs grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-1 text-[13.5px] leading-snug">
                 {lines.map((line) => {
                     const isToday = today !== null && line.days.includes(today);
@@ -79,7 +86,10 @@ export function FooterHours({
                             <dt className={weight}>
                                 {line.label}
                                 {isToday ? (
-                                    <span className="sr-only">, today</span>
+                                    <span className="border-site-footer-fg/40 ml-2 inline-block rounded-full border px-2 align-[1px] text-[12px] font-semibold leading-[1.5]">
+                                        <span className="sr-only">, </span>
+                                        Today
+                                    </span>
                                 ) : null}
                             </dt>
                             <dd

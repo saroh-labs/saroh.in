@@ -252,7 +252,7 @@ function Marker({ n, show }: { n: number; show: boolean }) {
     return (
         <span
             aria-label={`Note ${n}`}
-            className="bg-site-accent text-site-accent-fg inline-grid size-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold leading-none"
+            className="bg-site-accent text-site-accent-fg inline-grid size-5 shrink-0 place-items-center rounded-full text-[12px] font-semibold leading-none"
         >
             {n}
         </span>
@@ -264,7 +264,7 @@ function VideoBadge({ length }: { length: string }) {
     return (
         <span
             aria-hidden
-            className="bg-site-fg text-site-bg absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums"
+            className="bg-site-fg text-site-bg absolute bottom-1 right-1 inline-flex items-center gap-0.5 rounded-full px-1.5 text-[12px] font-semibold tabular-nums"
         >
             <svg viewBox="0 0 10 10" className="size-2 fill-current">
                 <path d="M2 1l7 4-7 4z" />

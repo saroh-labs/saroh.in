@@ -57,7 +57,7 @@ export function NoTimesYet({
                     href={askHref}
                     aria-label={`Ask about ${service.name}`}
                     className={cn(
-                        "text-site-accent-text coarse:min-h-11 inline-flex items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline",
+                        "text-site-accent-text coarse:min-h-11 inline-flex items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline max-[699px]:min-h-11",
                         focusRing,
                     )}
                 >
@@ -113,7 +113,7 @@ export function ServiceCards({
                                 : "border-site-border bg-site-surface text-site-fg grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
                         }
                     >
-                        <span className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                        <span className="text-site-muted text-[12px] font-bold uppercase tracking-[0.08em]">
                             {formatDuration(service.durationMinutes)}
                         </span>
                         <h3 className="font-site-heading text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em]">

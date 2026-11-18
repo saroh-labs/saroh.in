@@ -314,13 +314,13 @@ export function OneToOne({
                                 there is room: both drawn, one shown. The
                                 button's name is its aria-label. */}
                                     {compact ? null : (
-                                        <span className="mt-0.5 block text-[11px] max-[699px]:hidden">
+                                        <span className="mt-0.5 block text-[12px] max-[699px]:hidden">
                                             {dayCountLabel(d, false)}
                                         </span>
                                     )}
                                     <span
                                         className={cn(
-                                            "mt-0.5 block text-[11px]",
+                                            "mt-0.5 block text-[12px]",
                                             !compact && "min-[700px]:hidden",
                                         )}
                                     >

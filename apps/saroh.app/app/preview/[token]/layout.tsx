@@ -116,8 +116,6 @@ export default async function PreviewLayout({
                 name={snapshot.site.name}
                 // The header's menu again at the foot, as the live site
                 // lists it, every link kept inside the preview.
-                navigation={navigation}
-                modules={modules}
                 basePath={base}
             />
             {/* A preview has no main action, so no Book bar: this keeps the

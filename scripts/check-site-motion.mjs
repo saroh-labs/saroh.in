@@ -47,12 +47,6 @@ const LOOKS_FILE = "packages/block-contract/src/looks.ts";
  */
 export const ALLOWED = [
     {
-        file: "packages/site-blocks/src/site-craft.ts",
-        rule: "scroll",
-        text: /^animation-timeline$/,
-        why: "Classic's sections rise as they scroll in (`motion()`), pinned by classic-pin.test.tsx; under a look `lookMotion()` replaces it and nothing moves on scroll.",
-    },
-    {
         file: "packages/site-blocks/src/account/parts.tsx",
         rule: "loop",
         text: /^animate-pulse$/,

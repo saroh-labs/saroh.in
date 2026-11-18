@@ -533,7 +533,7 @@ function PackCards({
                             key={pack.id}
                             className="bg-site-surface text-site-fg border-site-border grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
                         >
-                            <span className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                            <span className="text-site-muted text-[12px] font-bold uppercase tracking-[0.08em]">
                                 {packEyebrow(pack)}
                             </span>
                             <h3 className="font-site-heading text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em]">

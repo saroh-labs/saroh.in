@@ -8,7 +8,12 @@ import { lookOf } from "./look-context";
 import { LookHeader } from "./look-header";
 import type { SiteContact } from "./site-footer-contact";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
-import { SiteActionLink, SiteMenu, SiteNavRow } from "./site-header-menu";
+import {
+    PhonePageRow,
+    SiteActionLink,
+    SiteMenu,
+    SiteNavRow,
+} from "./site-header-menu";
 import type { ModulePageStates } from "./site-menu";
 import { siteMenuEntries, underBasePath } from "./site-menu";
 import { withoutPrimaryAction } from "./site-primary-action";
@@ -209,7 +214,7 @@ export function SiteHeader({
                     // rather than push the row's actions off the edge. The
                     // menu beside it gives way four times as fast and then
                     // scrolls, so a long name is cut only as a last resort.
-                    className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg focus-visible:ring-offset-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-offset-site-fg flex min-w-0 flex-[0_1_auto] cursor-pointer items-center gap-2.5 rounded-[var(--site-radius)] transition-opacity duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70"
+                    className="text-site-fg focus-visible:ring-site-accent [body:has([data-site-first-hero])_&]:text-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-site-bg focus-visible:ring-offset-site-bg [body:has([data-site-first-hero])_&]:focus-visible:ring-offset-site-fg flex min-h-11 min-w-0 flex-[0_1_auto] cursor-pointer items-center gap-2.5 rounded-[var(--site-radius)] transition-opacity duration-150 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 active:opacity-70"
                 >
                     {mark ? (
                         // The name beside it says whose it is, so the mark
@@ -240,6 +245,11 @@ export function SiteHeader({
                 {main ? <SiteActionLink action={main} /> : null}
                 {hasMenu ? <SiteMenu items={items} action={main} /> : null}
             </div>
+            {/* Over a full-bleed hero the header keeps its 64px: Menu only. */}
+            <PhonePageRow
+                items={items}
+                className="max-w-site-content mx-auto -mt-1.5 px-5 pb-0.5 min-[700px]:hidden [body:has([data-site-first-hero])_&]:hidden"
+            />
         </header>
     );
 }

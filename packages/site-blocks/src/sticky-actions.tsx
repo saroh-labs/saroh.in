@@ -37,15 +37,18 @@ import { chromeActionShows, chromePageKind } from "./site-primary-action";
  * WHAT IT DRAWS, below 700px only (`min-[700px]:hidden`; no width is ever
  * read in script)
  *
- * - Folio and Quiet: the Book bar, the site's main action full width at
- *   the thumb, once the page's own has scrolled away. Quiet's header Book
+ * - Folio and Quiet: the Book bar, the site's booking full width at the
+ *   thumb, once the page's own main action has scrolled away. Only when
+ *   the main action is booking (U8): a site with no booking module gets
+ *   no bar. Quiet's header Book
  *   gives way while it shows (`data-site-bar="book"`). When the action is
  *   booking and the site is live, the bar says the next free time beside
  *   the button (VD01), read in the browser (U8, #1042); until it is, or
  *   when it can't be, the line is empty at the same height and the button
  *   keeps its place.
  * - Live: its dock (`site-dock.tsx`).
- * - Room under the footer for whichever it is, so the last line clears it.
+ * - Room under the footer for whichever it is, the phone's safe area
+ *   included, so the footer's last row clears it (U8).
  *
  * Neither is drawn on `/book` (the step's own action is the bar there),
  * nor on Folio's or Live's account pages, whose tabs are the bar there
@@ -194,17 +197,17 @@ export function StickyActions({
     const inAccount =
         look !== "quiet" &&
         (ownPath === "/account" || (ownPath ?? "").startsWith("/account/"));
-    const bookBar =
+    // The bar carries the site's main action, whatever it is (Book, Order, Ask).
+    const books =
         !inAccount &&
         lookHasBookBar(look) &&
         action !== null &&
         kind === "page" &&
-        chromeActionShows(path, action, basePath) &&
-        primaryShown === false &&
-        !taken;
-    // Next free beside Book, only when the bar books (U8).
+        chromeActionShows(path, action, basePath);
+    const bookBar = books && primaryShown === false && !taken;
+    // Next free beside it only when the bar books.
     const nextFree =
-        live && action !== null && isBookAction(action, basePath) ? live : null;
+        live && books && isBookAction(action, basePath) ? live : null;
     const dockRoom =
         !inAccount &&
         look === "live" &&
@@ -226,14 +229,7 @@ export function StickyActions({
     }, [bar]);
 
     // Room under the footer while a bar may stand over it.
-    const room =
-        dockRoom ||
-        (inAccount && accountBar) ||
-        (!inAccount &&
-            lookHasBookBar(look) &&
-            action !== null &&
-            kind === "page" &&
-            chromeActionShows(path, action, basePath));
+    const room = dockRoom || (inAccount && accountBar) || books;
 
     return (
         <>
@@ -241,7 +237,7 @@ export function StickyActions({
                 <div
                     aria-hidden="true"
                     data-site-bar-room=""
-                    className={`bg-site-footer-bg min-[700px]:hidden ${look === "live" ? "h-24" : inAccount ? "h-[72px]" : "h-[84px]"}`}
+                    className={`bg-site-footer-bg min-[700px]:hidden ${look === "live" ? "h-[calc(96px+env(safe-area-inset-bottom))]" : inAccount ? "h-[72px]" : "h-[calc(84px+env(safe-area-inset-bottom))]"}`}
                 />
             ) : null}
             {bookBar && look !== "live" ? (

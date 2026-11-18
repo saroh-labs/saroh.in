@@ -108,7 +108,7 @@ export function PlansCompare({
                                     )}
                                 >
                                     {said ? (
-                                        <span className="bg-site-accent text-site-accent-fg inline-block rounded-full px-2 py-0.5 text-[11px] font-bold">
+                                        <span className="bg-site-accent text-site-accent-fg inline-block rounded-full px-2 py-0.5 text-[12px] font-bold">
                                             {said}
                                         </span>
                                     ) : (

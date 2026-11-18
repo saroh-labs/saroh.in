@@ -301,7 +301,7 @@ describe("templateRender", () => {
             );
             expect(person.image).toBeTruthy();
             for (const p of person.people) expect(p.image).toBeTruthy();
-            // Free today names the same people the section does.
+            // Open today names the same people the section does.
             for (const item of render?.fixtures.today?.items ?? []) {
                 expect(sample.map((p) => p.name)).toContain(item.staffName);
             }
@@ -310,7 +310,7 @@ describe("templateRender", () => {
 
     it("is drawn at one fixed weekday morning, open, whatever the clock says", () => {
         const now = new Date(FIXTURE_NOW);
-        // A Tuesday, 10:30 in India, on the day Free today is for.
+        // A Tuesday, 10:30 in India, on the day Open today is for.
         expect(
             new Intl.DateTimeFormat("en-GB", {
                 timeZone: FIXTURE_TIME_ZONE,
@@ -330,7 +330,7 @@ describe("templateRender", () => {
             expect(render?.fixtures.now).toBe(FIXTURE_NOW);
             const { visit, today } = render?.fixtures ?? {};
             // Every sample with hours is open then, so the open line and
-            // Free today never disagree.
+            // Open today never disagree.
             for (const hours of [visit?.hours, today?.hours]) {
                 if (!hours) continue;
                 expect(

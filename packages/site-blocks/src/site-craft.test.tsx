@@ -267,12 +267,11 @@ describe("motion", () => {
     });
 
     it("animates transform and opacity only", () => {
-        const frames = sheet.slice(sheet.indexOf("@keyframes site-rise"));
         const animated = Array.from(
-            frames
-                .slice(0, frames.indexOf("@media"))
-                .matchAll(/^\s*([a-z-]+):/gm),
-        ).map((m) => m[1]);
+            sheet.matchAll(/@keyframes [\w-]+ \{\s*from \{([^}]*)\}/g),
+        ).flatMap((m) =>
+            Array.from(m[1].matchAll(/^\s*([a-z-]+):/gm)).map((p) => p[1]),
+        );
         expect(new Set(animated)).toEqual(new Set(["opacity", "transform"]));
     });
 
@@ -290,33 +289,16 @@ describe("motion", () => {
         expect(outside).not.toMatch(/\btransition:/);
     });
 
-    it("brings a section in with the scroll, with no script and nothing hidden without one", () => {
-        const entrance = sheet.slice(
-            sheet.indexOf("@media screen and (prefers-reduced-motion"),
-        );
-        // Behind @supports for the exact range: a browser without scroll
-        // timelines draws the section as it is.
-        expect(entrance).toContain(
-            "@supports (animation-timeline: view()) and (animation-range: entry 0% entry 180px)",
-        );
-        expect(entrance).toContain("animation-timeline: view()");
-        // It lets go once the section is in: no fill that stays.
-        expect(entrance).toContain(
-            "animation: site-rise var(--site-ease) backwards",
-        );
-        expect(entrance).not.toMatch(/\b(?:forwards|both)\b/);
-        // Screens only: a printed page is all there.
-        expect(entrance).toMatch(/^@media screen and/);
-        // Nothing outside that query ever sets a section's opacity.
-        expect(sheet.replace(entrance, "")).not.toMatch(
-            /\[data-site-section\][^{]*\{[^}]*\bopacity\s*:/,
+    it("never hides a section waiting for a scroll (U8)", () => {
+        // Visible at rest, with or without scripts, in captures and print.
+        expect(sheet).not.toMatch(/animation-timeline|view\(\)/);
+        expect(sheet).not.toMatch(
+            /\[data-site-section\][^{]*\{[^}]*\b(?:opacity|animation)\s*:/,
         );
     });
 
-    it("keeps the entrance off the editor's canvas and a catalog tile", () => {
+    it("eases the phone menu in on the editor's canvas too", () => {
         const scoped = css(undefined, ".site-preview-scope");
-        expect(scoped).not.toContain("animation-timeline");
-        // The phone menu still eases in there.
         expect(scoped).toContain("[data-site-menu-panel]");
     });
 });

@@ -297,7 +297,6 @@ export function DraftPreview({
             footer={chrome.footer}
             name={chrome.name}
             // The menu again at the foot, as the live site lists it.
-            navigation={chrome.navigation}
             look={look}
         />
     ) : null;

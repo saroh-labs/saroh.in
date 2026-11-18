@@ -599,7 +599,7 @@ function PreorderTag({ words }: { words: string | null }) {
     return (
         <span
             data-preorder=""
-            className="border-site-accent text-site-accent-text shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold"
+            className="border-site-accent text-site-accent-text shrink-0 rounded-full border px-2 py-0.5 text-[12px] font-bold"
         >
             {words}
         </span>
@@ -686,12 +686,12 @@ function CardWords({
         <>
             {eyebrow || p.soldOut || show.preorder ? (
                 <span className="flex items-center gap-2 px-4">
-                    <span className="text-site-muted min-w-0 flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                    <span className="text-site-muted min-w-0 flex-1 truncate text-[12px] font-bold uppercase tracking-[0.08em]">
                         {eyebrow}
                     </span>
                     <PreorderTag words={show.preorder} />
                     {p.soldOut ? (
-                        <span className="bg-site-fg text-site-bg shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">
+                        <span className="bg-site-fg text-site-bg shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold">
                             Sold out
                         </span>
                     ) : null}
@@ -792,7 +792,7 @@ function BareGrid({
                     p.gstAdded === true,
                 );
                 const soldOut = p.soldOut ? (
-                    <span className="bg-site-fg text-site-bg px-2 py-1 text-[11.5px] font-semibold uppercase tracking-[0.06em]">
+                    <span className="bg-site-fg text-site-bg px-2 py-1 text-[12px] font-semibold uppercase tracking-[0.06em]">
                         Sold out
                     </span>
                 ) : null;

@@ -712,7 +712,7 @@ function JournalCards({
                                     ) : null}
                                     <span className="grid min-w-0 content-start gap-1.5 py-4">
                                         {eyebrow ? (
-                                            <span className="text-site-muted px-4 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                                            <span className="text-site-muted px-4 text-[12px] font-bold uppercase tracking-[0.08em]">
                                                 {eyebrow}
                                             </span>
                                         ) : null}
@@ -759,7 +759,7 @@ function JournalCards({
                                     />
                                 ) : null}
                                 {eyebrow ? (
-                                    <span className="text-site-muted px-4 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                                    <span className="text-site-muted px-4 text-[12px] font-bold uppercase tracking-[0.08em]">
                                         {eyebrow}
                                     </span>
                                 ) : null}

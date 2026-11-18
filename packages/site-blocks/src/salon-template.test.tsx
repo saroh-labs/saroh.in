@@ -133,7 +133,7 @@ describe("the Salon template, rendered live", () => {
         const order = headings(container);
         expect(order[0]).toBe("Book your chair. Walk in fresh.");
         expect(order.slice(1)).toEqual([
-            "Free today",
+            "Open today",
             "Services and prices",
             "Who you'll be with",
             "Before you come in",
@@ -168,7 +168,7 @@ describe("the Salon template, rendered live", () => {
         });
         const order = headings(container);
         expect(order).not.toContain("Services and prices");
-        expect(order).not.toContain("Free today");
+        expect(order).not.toContain("Open today");
         expect(order).toContain("Ask for an appointment");
         expect(
             fetchMock.mock.calls.some(([url]) => String(url).includes("today")),

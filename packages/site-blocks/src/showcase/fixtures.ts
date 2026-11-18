@@ -86,7 +86,7 @@ export const FIXTURE_DAY = "2026-10-13";
 /**
  * The moment every render is drawn at (`SiteFixtures.now`): 10:30 in India
  * on {@link FIXTURE_DAY}, inside every sample business's opening hours. So
- * "Open now" and "Free today" agree, and a capture taken at night reads the
+ * "Open now" and "Open today" agree, and a capture taken at night reads the
  * same as one taken in the morning. Live sites read the clock.
  */
 export const FIXTURE_NOW = `${FIXTURE_DAY}T05:00:00.000Z`;

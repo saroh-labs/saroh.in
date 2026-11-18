@@ -161,7 +161,7 @@ function LeadCard({
             {p.soldOut || eyebrow ? (
                 <span className="flex flex-wrap items-center gap-2">
                     {p.soldOut ? (
-                        <span className="bg-site-fg text-site-bg rounded-full px-2 py-0.5 text-[11.5px] font-bold">
+                        <span className="bg-site-fg text-site-bg rounded-full px-2 py-0.5 text-[12px] font-bold">
                             Sold out
                         </span>
                     ) : null}

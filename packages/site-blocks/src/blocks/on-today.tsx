@@ -132,11 +132,12 @@ function subLine(item: PublicTodayItem): string {
 
 interface Tag {
     text: string;
-    tone: "free" | "left" | "full";
+    tone: "open" | "left" | "full";
 }
 
 function tagOf(item: PublicTodayItem): Tag {
-    if (item.kind === "one") return { text: "Free", tone: "free" };
+    // "Open", never "Free": beside a price it read as free of charge (U8).
+    if (item.kind === "one") return { text: "Open", tone: "open" };
     const left = item.placesLeft ?? 0;
     return left > 0
         ? { text: `${left} left`, tone: "left" }
@@ -144,12 +145,12 @@ function tagOf(item: PublicTodayItem): Tag {
 }
 
 /*
- * The design's pills are green for Free and red for Full. A merchant's page
- * has only its own palette, so: Free wears the accent, a class with places the
+ * The design's pills are green for Open and red for Full. A merchant's page
+ * has only its own palette, so: Open wears the accent, a class with places the
  * quiet fill, and Full reads muted — the word carries the meaning.
  */
 const TAG_TONE: Record<Tag["tone"], string> = {
-    free: "bg-[color-mix(in_srgb,hsl(var(--site-accent))_16%,hsl(var(--site-surface)))] text-site-fg",
+    open: "bg-[color-mix(in_srgb,hsl(var(--site-accent))_16%,hsl(var(--site-surface)))] text-site-fg",
     left: "bg-[color-mix(in_srgb,hsl(var(--site-fg))_7%,hsl(var(--site-surface)))] text-site-fg",
     full: "bg-[color-mix(in_srgb,hsl(var(--site-fg))_7%,hsl(var(--site-surface)))] text-site-muted",
 };
@@ -267,7 +268,7 @@ export default function OnTodayHero({
     return (
         <SplitHero content={content} level={level} line={line}>
             <Panel
-                title={today.classes ? "On today" : "Free today"}
+                title={today.classes ? "On today" : "Open today"}
                 sub={dateText(today.date, true)}
             >
                 {today.items.length > 0 ? (
@@ -430,7 +431,7 @@ function Row({ item, bookHref }: { item: PublicTodayItem; bookHref?: string }) {
             </span>
             <span
                 className={cn(
-                    "whitespace-nowrap rounded-full px-[9px] py-[3px] text-[11.5px] font-bold",
+                    "whitespace-nowrap rounded-full px-[9px] py-[3px] text-[12px] font-bold",
                     TAG_TONE[tag.tone],
                 )}
             >

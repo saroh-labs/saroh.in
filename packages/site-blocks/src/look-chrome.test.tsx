@@ -727,7 +727,6 @@ describe.each(LOOKS)("%s's footer", (look) => {
             footer={{ format: "markdown", value: "Yoga at your pace." }}
             name="Prana Yoga"
             contact={CONTACT}
-            navigation={MENU}
             action={BOOK}
             session={session}
             credit={{

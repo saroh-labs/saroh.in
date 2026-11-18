@@ -12,6 +12,7 @@ import { reachOf } from "./reach-links";
 import type { SiteContact } from "./site-footer-contact";
 import { hasFooterFacts, shownContact } from "./site-footer-contact";
 import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
+import { PhonePageRow } from "./site-header-menu";
 
 /**
  * The site's header under a look (DEC-172, plan U5, #1092), as the fixed
@@ -20,7 +21,8 @@ import type { SiteHeaderAction, SiteNavItem } from "./site-header-menu";
  *
  * - **Folio**: the name on the left in the display face, the menu centred,
  *   Sign in and an outline Book on the right, an ink hairline under it all.
- *   On a phone, the name and the menu button.
+ *   On a phone, the name and the menu button, and under them the first
+ *   three pages (U8).
  * - **Quiet**: the menu on the left, the name centred, Sign in and an
  *   outline Book (a pill) on the right, no rule. On a phone, the menu
  *   button first, the name centred, Book on the right.
@@ -212,6 +214,13 @@ export function LookHeader({
                     </>
                 )}
             </div>
+            {/* Live's dock carries its pages on a phone. */}
+            {look === "live" ? null : (
+                <PhonePageRow
+                    items={withVisit}
+                    className="-mt-1 px-5 pb-1 min-[700px]:hidden"
+                />
+            )}
         </header>
     );
 }

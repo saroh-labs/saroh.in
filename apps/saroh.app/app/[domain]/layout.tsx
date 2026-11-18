@@ -527,9 +527,6 @@ export default async function SiteLayout({
                                     name={snapshot.site.name}
                                     // The header's own menu, listed again at the
                                     // foot with every page in it.
-                                    navigation={navigation}
-                                    modules={resolved.modules}
-                                    shopServes={shopServes}
                                     contact={siteContact}
                                     // "Made with Saroh" on Free only (DEC-102).
                                     // "Report" rides with it: no Saroh link on a

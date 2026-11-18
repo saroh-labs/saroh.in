@@ -393,11 +393,11 @@ export default function ShopListing({
                                         ) : null}
                                         {anyEyebrow ? (
                                             <span className="flex min-h-5 items-center gap-2">
-                                                <span className="text-site-muted min-w-0 flex-1 truncate text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                                                <span className="text-site-muted min-w-0 flex-1 truncate text-[12px] font-bold uppercase tracking-[0.08em]">
                                                     {eyebrow}
                                                 </span>
                                                 {p.soldOut ? (
-                                                    <span className="bg-site-fg text-site-bg shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">
+                                                    <span className="bg-site-fg text-site-bg shrink-0 rounded-full px-2 py-0.5 text-[12px] font-bold">
                                                         Sold out
                                                     </span>
                                                 ) : null}

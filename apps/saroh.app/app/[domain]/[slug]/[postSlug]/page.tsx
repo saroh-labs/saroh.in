@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { PostArticle } from "@/components/post-view";
+import {
+    PostArticle,
+    PostNeighbours,
+    postNeighbours,
+} from "@/components/post-view";
 import {
     getPublishedPost,
     getSiteForHost,
     getSiteForPage,
     postsPrefix,
+    readPublishedPosts,
     shareImages,
 } from "@/lib/publication";
 import { canonical, titled } from "@/lib/site-meta";
@@ -81,8 +86,21 @@ export default async function PostPage({
     // segment is not a post address.
     if (slug !== postsPrefix(resolved.snapshot)) notFound();
 
-    const post = await getPublishedPost(resolved.siteId, postSlug);
+    const [post, posts] = await Promise.all([
+        getPublishedPost(resolved.siteId, postSlug),
+        // Older and Newer (U8). A failed list read draws neither, and the
+        // read keeps the page out of the cache.
+        readPublishedPosts(resolved.siteId),
+    ]);
     if (!post) notFound();
 
-    return <PostArticle post={post} />;
+    return (
+        <>
+            <PostArticle post={post} />
+            <PostNeighbours
+                {...postNeighbours(posts ?? [], post.slug)}
+                basePath={`/${slug}`}
+            />
+        </>
+    );
 }

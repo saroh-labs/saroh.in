@@ -316,11 +316,9 @@ describe.each(LOOKS)("%s: the rest of the front door", (look) => {
             const book = within(row as HTMLElement).queryByRole("link", {
                 name: /^Book: /,
             });
-            if (look === "quiet") {
-                // VD01: the whole row is the way in, with no Book of its own.
-                expect(book).toBeNull();
-                return;
-            }
+            // Book stays in every look (U8); Quiet's is a text link.
+            if (look === "quiet")
+                expect(book?.className).toContain("underline");
             expect(book?.className).toContain("min-h-11");
             expect(book?.className).toContain("z-10");
             expect(name?.getAttribute("href")).toBe(book?.getAttribute("href"));

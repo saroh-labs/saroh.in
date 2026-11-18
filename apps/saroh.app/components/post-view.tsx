@@ -52,7 +52,7 @@ export function postDate(iso: string): string {
  */
 function DraftChip() {
     return (
-        <span className="inline-flex items-center rounded-full bg-neutral-900 px-2 py-0.5 text-[11px] font-medium text-neutral-100">
+        <span className="inline-flex items-center rounded-full bg-neutral-900 px-2 py-0.5 text-[12px] font-medium text-neutral-100">
             Not published
         </span>
     );
@@ -104,6 +104,57 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                 dangerouslySetInnerHTML={{ __html: post.content }}
             />
         </article>
+    );
+}
+
+/** A post either side of this one, in the index's order (newest first). */
+export function postNeighbours<T extends { slug: string }>(
+    posts: readonly T[],
+    slug: string,
+): { newer: T | null; older: T | null } {
+    const at = posts.findIndex((post) => post.slug === slug);
+    if (at < 0) return { newer: null, older: null };
+    return { newer: posts[at - 1] ?? null, older: posts[at + 1] ?? null };
+}
+
+/**
+ * Older and Newer under a post (U8, board TPBlogsPost): the next thing to
+ * read, by title, each a 44px link. Nothing either side draws nothing.
+ */
+export function PostNeighbours({
+    newer,
+    older,
+    basePath,
+}: {
+    newer: { title: string; slug: string } | null;
+    older: { title: string; slug: string } | null;
+    basePath: string;
+}) {
+    if (!newer && !older) return null;
+    const link = (
+        post: { title: string; slug: string },
+        word: string,
+        end: boolean,
+    ) => (
+        <Link
+            href={`${basePath}/${post.slug}`}
+            rel={end ? "next" : "prev"}
+            className={`grid min-h-11 min-w-0 content-center gap-0.5 rounded-sm py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-fg active:opacity-70 ${end ? "text-right sm:col-start-2" : ""}`}
+        >
+            <span className="text-sm text-site-body">{word}</span>
+            <span className="font-site-heading text-lg font-semibold leading-snug text-site-fg underline decoration-1 underline-offset-4 [overflow-wrap:anywhere]">
+                {post.title}
+            </span>
+        </Link>
+    );
+    return (
+        <nav
+            aria-label="More posts"
+            className="mx-auto grid w-full max-w-[var(--site-measure,68ch)] gap-4 border-t border-site-border px-5 pb-[var(--site-section-padding)] pt-6 sm:grid-cols-2 sm:px-[var(--site-page-margin)]"
+        >
+            {newer ? link(newer, "Newer", false) : null}
+            {older ? link(older, "Older", true) : null}
+        </nav>
     );
 }
 

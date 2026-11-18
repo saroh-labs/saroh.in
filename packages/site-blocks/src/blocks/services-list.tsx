@@ -327,7 +327,7 @@ export default function ServicesListSection({
                                                         : `Book ${service.name}`
                                                 }
                                                 className={cn(
-                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70",
+                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70 max-[699px]:min-h-11",
                                                     focusRing,
                                                 )}
                                             >

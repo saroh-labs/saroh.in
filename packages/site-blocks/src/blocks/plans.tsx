@@ -774,11 +774,11 @@ function PlanCards({
                             )}
                         >
                             <span className="flex min-h-[18px] items-center gap-2">
-                                <span className="text-site-muted flex-1 text-[11.5px] font-bold uppercase tracking-[0.08em]">
+                                <span className="text-site-muted flex-1 text-[12px] font-bold uppercase tracking-[0.08em]">
                                     {every}
                                 </span>
                                 {highlighted && plan.mostChosen ? (
-                                    <span className="bg-site-accent text-site-accent-fg rounded-full px-2 py-0.5 text-[11px] font-bold">
+                                    <span className="bg-site-accent text-site-accent-fg rounded-full px-2 py-0.5 text-[12px] font-bold">
                                         {MOST_CHOSEN}
                                     </span>
                                 ) : null}

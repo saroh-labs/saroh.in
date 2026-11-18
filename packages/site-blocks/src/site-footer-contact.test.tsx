@@ -76,9 +76,9 @@ describe("the footer's contact group (DEC-128)", () => {
             screen.getByRole("link", { name: "hello@rye.example.com" }),
         ).toHaveAttribute("href", "mailto:hello@rye.example.com");
 
-        // One place: "Find us", its address line by line in an <address>,
-        // unnamed, with its week by day.
-        const place = screen.getByRole("heading", { name: "Find us" });
+        // One place: "Visit", its address line by line in an <address>,
+        // unnamed; its week a column of its own, "Hours" (U8).
+        const place = screen.getByRole("heading", { name: "Visit" });
         expect(place.tagName).toBe("H2");
         const address = place.parentElement?.querySelector("address");
         expect(address?.textContent).toBe("12th Main\nIndiranagar, Bengaluru");
@@ -86,10 +86,9 @@ describe("the footer's contact group (DEC-128)", () => {
         expect(
             screen.queryByRole("heading", { name: "Indiranagar" }),
         ).toBeNull();
-        expect(
-            screen.getByRole("heading", { name: "Opening hours" }).tagName,
-        ).toBe("H3");
-        expect(weekOf(place.parentElement)).toEqual([
+        const hours = screen.getByRole("heading", { name: "Hours" });
+        expect(hours.tagName).toBe("H2");
+        expect(weekOf(hours.parentElement)).toEqual([
             ["Monday and Tuesday", "6am to 9pm"],
             ["Wednesday to Sunday", "Closed"],
         ]);
@@ -172,13 +171,13 @@ describe("the footer's contact group (DEC-128)", () => {
                 { name: "Koramangala", address: "80 Feet Road" },
             ],
         });
-        // Each place is a column under its own name; none is "Find us".
+        // Each place is a column under its own name; none is "Visit".
         expect(
             screen
                 .getAllByRole("heading", { level: 2 })
                 .map((h) => h.textContent),
-        ).toEqual(["Indiranagar", "Koramangala", "Get in touch"]);
-        expect(screen.queryByRole("heading", { name: "Find us" })).toBeNull();
+        ).toEqual(["Indiranagar", "Koramangala", "Talk"]);
+        expect(screen.queryByRole("heading", { name: "Visit" })).toBeNull();
         expect(
             screen
                 .getAllByRole("link", { name: "Get directions" })

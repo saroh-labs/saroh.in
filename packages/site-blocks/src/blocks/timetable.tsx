@@ -523,7 +523,7 @@ function Places({
     if (!word) return null;
     if (onAccent) {
         return (
-            <span className="text-site-accent-fg inline-block whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em]">
+            <span className="text-site-accent-fg inline-block whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.08em]">
                 {word.text}
             </span>
         );
@@ -531,7 +531,7 @@ function Places({
     return (
         <span
             className={cn(
-                "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-bold",
+                "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-bold",
                 TONE[word.tone],
             )}
         >

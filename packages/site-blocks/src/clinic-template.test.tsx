@@ -131,7 +131,7 @@ describe("the Clinic template, rendered live", () => {
         await screen.findByRole("rowheader", { name: /Monday/ });
         expect(headings(container)).toEqual([
             "Book a check-up. Know what happens next.",
-            "Free today",
+            "Open today",
             "Treatments",
             "What a treatment involves",
             "Who you will see",
@@ -173,7 +173,7 @@ describe("the Clinic template, rendered live", () => {
         });
         const order = headings(container);
         expect(order).not.toContain("Treatments");
-        expect(order).not.toContain("Free today");
+        expect(order).not.toContain("Open today");
         expect(order).toContain("Ask before you book");
         expect(container.querySelectorAll("details").length).toBe(2);
     });

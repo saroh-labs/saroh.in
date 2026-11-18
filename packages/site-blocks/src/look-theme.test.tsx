@@ -352,10 +352,9 @@ describe("motion", () => {
         },
     );
 
-    it("keeps Classic's own entrance and timing exactly", () => {
+    it("keeps Classic's own timing exactly, with no scroll entrance (U8)", () => {
         const classic = craftRules(":root", undefined);
-        expect(classic).toContain("animation-timeline: view();");
-        expect(classic).toContain("translateY(14px)");
+        expect(classic).not.toContain("animation-timeline");
         expect(classic).toContain("site-menu-in 180ms");
         expect(classic).toContain("color 150ms");
         expect(craftRules(":root", undefined, "quiet")).toContain(
