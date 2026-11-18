@@ -17,7 +17,7 @@ import {
 import {
     SECTION_HINTS,
     SECTION_LABELS,
-    addableSections,
+    addableFamilies,
 } from "@/components/sites/editor/editor-constants";
 import { BlockThumbnail } from "./block-thumbnail";
 
@@ -27,6 +27,9 @@ import { BlockThumbnail } from "./block-thumbnail";
  * Two steps. First the block, each drawn by its real component against its
  * catalog example, in THIS merchant's palette. Then, for a block with more
  * than one look, the look. A block with one look inserts straight away.
+ *
+ * A family (Visit us, Plans; KD5) is one card; opening it shows each
+ * layout's looks, and a layout inserts its own section type as before.
  *
  * The picker only SETS the look. It is `content.variant` like any other, and
  * the section editor's Look field changes it afterwards (#254), so the two can
@@ -61,8 +64,9 @@ export function AddSectionDialog({
     /** Class packs is rolled out and on: its block is offered (DEC-057). */
     packsOpen?: boolean;
 }) {
-    const [picked, setType] = useState<SectionType | null>(null);
-    const type = picked ?? startType;
+    /** The layouts being chosen from: a family's, or the one block's. */
+    const [picked, setType] = useState<SectionType[] | null>(null);
+    const types = picked ?? (startType ? [startType] : null);
 
     const close = (next: boolean) => {
         if (!next) setType(null);
@@ -73,44 +77,68 @@ export function AddSectionDialog({
         close(false);
     };
 
-    const meta = type ? BLOCK_META[type] : null;
+    const title =
+        types && types.length > 1
+            ? BLOCK_META[types[0]].label
+            : types
+              ? SECTION_LABELS[types[0]]
+              : "";
 
     return (
         <Dialog open={open} onOpenChange={close}>
             <DialogContent className="max-h-[90dvh] max-w-5xl overflow-y-auto">
-                {meta && type ? (
+                {types ? (
                     <>
                         <DialogHeader>
-                            <DialogTitle>
-                                Choose a look for {SECTION_LABELS[type]}
-                            </DialogTitle>
+                            <DialogTitle>Choose a look for {title}</DialogTitle>
                             <DialogDescription>
                                 You can change the look later from the section
                                 settings.
                             </DialogDescription>
                         </DialogHeader>
-                        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {meta.variants.map((v) => (
-                                <li key={v.id}>
-                                    <PickerCard
-                                        label={v.label}
-                                        description={v.description}
-                                        onPick={() => add(type, v.id)}
-                                    >
-                                        <BlockThumbnail
-                                            variables={variables}
-                                            look={look}
-                                        >
-                                            <BlockFixturePreview
-                                                type={type}
-                                                variant={v.id}
-                                                look={look}
-                                            />
-                                        </BlockThumbnail>
-                                    </PickerCard>
-                                </li>
-                            ))}
-                        </ul>
+                        {types.map((type) => {
+                            const variants = BLOCK_META[type].variants;
+                            return (
+                                <section
+                                    key={type}
+                                    aria-label={SECTION_LABELS[type]}
+                                    className="grid gap-2"
+                                >
+                                    {types.length > 1 ? (
+                                        <h3 className="text-sm font-medium">
+                                            {SECTION_LABELS[type]}
+                                        </h3>
+                                    ) : null}
+                                    <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                        {variants.map((v) => (
+                                            <li key={v.id}>
+                                                <PickerCard
+                                                    label={v.label}
+                                                    description={v.description}
+                                                    // One look inserts as it always did, with no variant.
+                                                    onPick={() =>
+                                                        variants.length > 1
+                                                            ? add(type, v.id)
+                                                            : add(type)
+                                                    }
+                                                >
+                                                    <BlockThumbnail
+                                                        variables={variables}
+                                                        look={look}
+                                                    >
+                                                        <BlockFixturePreview
+                                                            type={type}
+                                                            variant={v.id}
+                                                            look={look}
+                                                        />
+                                                    </BlockThumbnail>
+                                                </PickerCard>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
+                            );
+                        })}
                         <div>
                             <Button
                                 type="button"
@@ -133,21 +161,35 @@ export function AddSectionDialog({
                             </DialogDescription>
                         </DialogHeader>
                         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                            {addableSections(shopOpen, packsOpen).map((t) => {
+                            {addableFamilies(shopOpen, packsOpen).map((f) => {
+                                const t = f.layouts[0].type;
                                 const m = BLOCK_META[t];
                                 const looks = m.variants.length;
+                                const layouts = f.layouts.length;
                                 return (
-                                    <li key={t}>
+                                    <li key={f.head}>
                                         <PickerCard
-                                            label={SECTION_LABELS[t]}
+                                            label={
+                                                layouts > 1
+                                                    ? f.name
+                                                    : SECTION_LABELS[t]
+                                            }
                                             description={SECTION_HINTS[t]}
                                             detail={
-                                                looks > 1
-                                                    ? `${looks} looks`
-                                                    : undefined
+                                                layouts > 1
+                                                    ? `${layouts} layouts`
+                                                    : looks > 1
+                                                      ? `${looks} looks`
+                                                      : undefined
                                             }
                                             onPick={() =>
-                                                looks > 1 ? setType(t) : add(t)
+                                                layouts > 1 || looks > 1
+                                                    ? setType(
+                                                          f.layouts.map(
+                                                              (l) => l.type,
+                                                          ),
+                                                      )
+                                                    : add(t)
                                             }
                                         >
                                             <BlockThumbnail

@@ -713,8 +713,8 @@ describe("SiteEditor shell", () => {
         // Any block with a single look goes straight in.
         const tile = Array.from(
             host.querySelectorAll<HTMLButtonElement>("aside button"),
-        ).find((b) => b.textContent.includes("Contact"));
-        if (!tile) throw new Error("No Contact tile");
+        ).find((b) => b.textContent === "Talk to us");
+        if (!tile) throw new Error("No Visit us · Talk to us layout");
         click(tile);
         // Back on the page's blocks, with the new one selected second.
         expect(button("Page").getAttribute("aria-selected")).toBe("true");
@@ -1753,8 +1753,8 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()?.textContent).toContain("Add a block");
         const tile = Array.from(
             sheet()?.querySelectorAll<HTMLButtonElement>("aside button") ?? [],
-        ).find((b) => b.textContent.includes("Contact"));
-        if (!tile) throw new Error("No Contact tile");
+        ).find((b) => b.textContent === "Talk to us");
+        if (!tile) throw new Error("No Visit us · Talk to us layout");
         click(tile);
         expect($$("[data-block-index]")).toHaveLength(3);
         expect(
@@ -1796,7 +1796,8 @@ describe("SiteEditor narrow and phone (G4)", () => {
                 new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
             );
         });
-        expect(sheet()?.textContent).toContain("Contact");
+        // Contact is Visit us's Talk to us layout, found by its old name (KD5).
+        expect(sheet()?.textContent).toContain("Visit us · Talk to us");
         expect(sheet()?.textContent).not.toContain("Every page");
         type(search, "zzzz");
         // Enter settles the search at once (ListSearch).

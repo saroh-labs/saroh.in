@@ -48,6 +48,32 @@ export interface BlockMeta<T extends SectionType> {
      * stays in `fixtures`, so adding a case never moves a published snapshot.
      */
     cases?: Record<string, RenderedContent<T>>;
+    /**
+     * Set when this block is one layout of a family (KD5, DEC-228): Contact
+     * and Hours are layouts of Visit us, Class packs of Plans. A catalogue
+     * view only: a stored section keeps its own type and bytes, and picking
+     * a layout inserts this type as before. The family's head is the type
+     * named by `of`; its `label` is the family's name.
+     */
+    family?: BlockFamilyRef;
+    /** Other names a merchant may search by: old labels stay findable (R5). */
+    aliases?: readonly string[];
+}
+
+/** Where a block sits in its family. */
+export interface BlockFamilyRef {
+    of: "visitUs" | "plans";
+    /** Stable layout id (KD14). */
+    layout: string;
+    /** The layout's name in Add and MCP. */
+    label: string;
+}
+
+/** One catalogue entry: a family head with its layouts (one for a lone block). */
+export interface BlockFamily {
+    head: SectionType;
+    name: string;
+    layouts: { type: SectionType; label: string }[];
 }
 
 /**
@@ -231,7 +257,8 @@ export const BLOCK_META = {
         },
     },
     richText: {
-        label: "Rich text",
+        label: "Text",
+        aliases: ["Rich text"],
         description:
             "A block of written copy. Sanitized at publish, so what reaches a page is already clean.",
         /*
@@ -398,7 +425,8 @@ export const BLOCK_META = {
         },
     },
     features: {
-        label: "Features",
+        label: "Highlights",
+        aliases: ["Features"],
         description:
             "A heading over a set of short, titled points — what you do, or what a visitor gets.",
         /*
@@ -616,6 +644,8 @@ export const BLOCK_META = {
     },
     contact: {
         label: "Contact",
+        family: { of: "visitUs", layout: "talk", label: "Talk to us" },
+        aliases: ["Contact", "Contact us"],
         description:
             "Where to find you and how to reach you: address, hours, phone, email and WhatsApp.",
         variants: soleVariant(
@@ -692,6 +722,12 @@ export const BLOCK_META = {
     },
     visitUs: {
         label: "Visit us",
+        family: {
+            of: "visitUs",
+            layout: "address",
+            label: "Address and hours",
+        },
+        aliases: ["Address", "Location", "Directions"],
         description:
             "One shop's address, opening hours and phone, with Open now and Get directions, read live from the storefront.",
         variants: soleVariant(
@@ -766,6 +802,7 @@ export const BLOCK_META = {
     },
     plans: {
         label: "Plans",
+        family: { of: "plans", layout: "plans", label: "Plans" },
         description:
             "The business's subscription plans on sale, with price and how often, read live from Payments.",
         variants: soleVariant(
@@ -844,6 +881,8 @@ export const BLOCK_META = {
     },
     packs: {
         label: "Class packs",
+        family: { of: "plans", layout: "packs", label: "Class packs" },
+        aliases: ["Class packs", "Packs"],
         description:
             "The business's class packs on sale, with how many classes, how long they last and the price, read live.",
         variants: soleVariant(
@@ -1038,6 +1077,8 @@ export const BLOCK_META = {
     },
     hours: {
         label: "Opening hours",
+        family: { of: "visitUs", layout: "hours", label: "Hours" },
+        aliases: ["Opening hours", "Hours"],
         description:
             "The week's opening hours as a table, read live from Settings › Hours. Closed days are said, not left out.",
         variants: soleVariant(
@@ -1058,7 +1099,8 @@ export const BLOCK_META = {
         },
     },
     person: {
-        label: "Person",
+        label: "People",
+        aliases: ["Person", "Team"],
         description:
             "One practitioner: a photo, their name, what they do, their qualifications and a few lines about them.",
         /*
@@ -1186,6 +1228,47 @@ export function listBlockMeta(): {
         type,
         meta: BLOCK_META[type],
     }));
+}
+
+/**
+ * What the editor and MCP call a section: "Visit us · Hours" for a family
+ * member, the block's label otherwise ("Plans" where layout and family agree).
+ */
+export function blockHeading(type: SectionType): string {
+    const meta: BlockMeta<SectionType> = BLOCK_META[type];
+    if (!meta.family) return meta.label;
+    const name = BLOCK_META[meta.family.of].label;
+    return meta.family.label === name ? name : `${name} · ${meta.family.label}`;
+}
+
+/** Everything a search for a block should match, lower-cased. */
+export function blockSearchText(type: SectionType): string {
+    const meta: BlockMeta<SectionType> = BLOCK_META[type];
+    return [blockHeading(type), meta.label, ...(meta.aliases ?? [])]
+        .join(" ")
+        .toLowerCase();
+}
+
+/**
+ * `types` grouped one entry per family, in the order given; the head's
+ * layout leads its family, and a family whose head is missing from `types`
+ * still groups its other layouts under the head's name.
+ */
+export function blockFamilies(types: readonly SectionType[]): BlockFamily[] {
+    const byHead = new Map<SectionType, BlockFamily>();
+    for (const type of types) {
+        const meta: BlockMeta<SectionType> = BLOCK_META[type];
+        const head = meta.family?.of ?? type;
+        let entry = byHead.get(head);
+        if (!entry) {
+            entry = { head, name: BLOCK_META[head].label, layouts: [] };
+            byHead.set(head, entry);
+        }
+        const layout = { type, label: meta.family?.label ?? meta.label };
+        if (type === head) entry.layouts.unshift(layout);
+        else entry.layouts.push(layout);
+    }
+    return Array.from(byHead.values());
 }
 
 /**

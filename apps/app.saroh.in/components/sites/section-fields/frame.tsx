@@ -15,6 +15,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@saroh/ui/select";
+import { useState } from "react";
 
 import type { Section } from "@/lib/sites/service";
 
@@ -79,21 +80,29 @@ export function SectionFrameFields({
     const chosen = BANDS.find((b) => b.id === band);
 
     const eyebrow = typeof content.eyebrow === "string" ? content.eyebrow : "";
+    // "Label above" is kept where a section already has one, never offered
+    // on a new one (R17). Decided once, so clearing it while typing doesn't
+    // take the field away; the inspector remounts this per section.
+    const [showEyebrow] = useState(eyebrow !== "");
 
     return (
         <div className="grid gap-3 border-t pt-4">
-            <Field label="Label above the heading">
-                <Input
-                    value={eyebrow}
-                    maxLength={EYEBROW_MAX}
-                    placeholder="Classes and services"
-                    onChange={(e) => set({ eyebrow: e.target.value })}
-                />
-            </Field>
-            <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                Small capitals over the block's heading. The Quiet, Folio and
-                Live looks show it.
-            </p>
+            {showEyebrow ? (
+                <>
+                    <Field label="Label above the heading">
+                        <Input
+                            value={eyebrow}
+                            maxLength={EYEBROW_MAX}
+                            placeholder="Classes and services"
+                            onChange={(e) => set({ eyebrow: e.target.value })}
+                        />
+                    </Field>
+                    <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                        Small capitals over the block's heading. The Quiet,
+                        Folio and Live looks show it.
+                    </p>
+                </>
+            ) : null}
             <Field label="Menu label">
                 <Input
                     value={navLabel}

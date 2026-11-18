@@ -21,7 +21,6 @@ import {
 } from "@saroh/api-contract";
 import type { SectionType } from "@saroh/block-contract";
 import {
-    BLOCK_META,
     blockExample,
     getSectionContract,
     latestContractVersion,
@@ -97,6 +96,7 @@ import {
     ToolError,
 } from "../tool-registry";
 import { quoteUntrusted, untrusted } from "../untrusted";
+import { sectionTypeListing } from "./section-types";
 import type { SiteFromTemplatePayload } from "./site-from-template.job";
 import {
     describeSiteJob,
@@ -480,22 +480,11 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         module: "WEBSITE",
         hints: READ_ONLY,
         run({ type }) {
-            const types = SECTION_TYPES.map((t) => ({
-                type: t,
-                label: BLOCK_META[t].label,
-                description: BLOCK_META[t].description,
-                variants: BLOCK_META[t].variants.map((v) => v.id),
-            }));
+            const { types, families, text } = sectionTypeListing();
             if (!type) {
                 return Promise.resolve({
-                    text: [
-                        `${types.length} section types. Call again with type for one type's fields and an example.`,
-                        ...types.map(
-                            (t) =>
-                                `- ${t.type} (${t.label}): ${t.description} Variants: ${t.variants.join(", ")}.`,
-                        ),
-                    ].join("\n"),
-                    data: { types, schema: null, example: null },
+                    text,
+                    data: { types, families, schema: null, example: null },
                 });
             }
             if (!(SECTION_TYPES as readonly string[]).includes(type)) {
@@ -525,7 +514,14 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 ]
                     .filter(Boolean)
                     .join("\n"),
-                data: { types: one, schema, example },
+                data: {
+                    types: one,
+                    families: families.filter((f) =>
+                        f.layouts.some((l) => l.type === type),
+                    ),
+                    schema,
+                    example,
+                },
             });
         },
     });

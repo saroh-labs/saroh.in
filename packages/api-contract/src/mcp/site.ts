@@ -130,6 +130,26 @@ export const listSectionTypesTool = {
                 variants: z.array(z.string()),
             }),
         ),
+        /**
+         * The same types as catalogue entries, one per family (KD5): Visit
+         * us lists Address and hours, Hours and Talk to us. Each layout is
+         * added by its own `type`. Optional, so older readers are unchanged.
+         */
+        families: z
+            .array(
+                z.object({
+                    family: z.string(),
+                    description: z.string(),
+                    layouts: z.array(
+                        z.object({
+                            type: z.string(),
+                            label: z.string(),
+                            variants: z.array(z.string()),
+                        }),
+                    ),
+                }),
+            )
+            .optional(),
         schema: z.record(z.string(), z.unknown()).nullable(),
         example: z.record(z.string(), z.unknown()).nullable(),
     }),

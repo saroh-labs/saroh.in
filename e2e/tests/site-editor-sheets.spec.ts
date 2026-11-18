@@ -270,7 +270,10 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         await sheet.getByLabel("Search blocks").fill("contact");
         // By its name: the list filters a beat after typing, and the first
         // row before it does is Hero.
-        await sheet.getByRole("button", { name: "Add Contact" }).click();
+        // Contact is now Visit us's Talk to us layout, found by its old name (KD5).
+        await sheet
+            .getByRole("button", { name: "Add Visit us · Talk to us" })
+            .click();
         // Its settings rise; the toolbar is on the new block.
         const tools = page.getByRole("toolbar", { name: "Block actions" });
         await expect(tools).toBeVisible({ timeout: 15_000 });

@@ -18,10 +18,10 @@ describe("held-back copy", () => {
 
     it("names several, in order, in the plural", () => {
         expect(unfinishedPhrase(held("faq", "contact", "gallery"))).toBe(
-            "the unfinished FAQ, Contact and Gallery sections",
+            "the unfinished FAQ, Visit us · Talk to us and Gallery sections",
         );
         expect(heldBackSummary(held("faq", "contact"))).toBe(
-            "Saved · 2 sections not finished: FAQ, Contact",
+            "Saved · 2 sections not finished: FAQ, Visit us · Talk to us",
         );
     });
 });
