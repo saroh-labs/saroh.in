@@ -47,82 +47,96 @@ async function rollOut(
     }
 }
 
-/** Disconnect Instagram, whatever the test left. */
+/** Disconnect Instagram, whatever an earlier attempt or this one left. */
 async function disconnect(page: Page) {
-    await page.request.delete(
+    const res = await page.request.delete(
         `${urls.API_URL}/organizations/${NORTHWIND_ORG}/social/channels/instagram`,
         { headers: { origin: urls.APP_URL } },
     );
+    expect(res.ok(), `disconnect: ${await res.text()}`).toBe(true);
 }
+
+// Set up and put back in hooks: a retry starts clean even when the attempt
+// before it ran out of time, and afterEach gets its own time after a timeout.
+test.beforeEach(async ({ page, browser }, testInfo) => {
+    await useSession(page);
+    await page.goto(`/open/${NORTHWIND_ORG}`);
+    await rollOut(browser, true, testInfo);
+    await disconnect(page);
+});
+
+test.afterEach(async ({ page, browser }, testInfo) => {
+    await disconnect(page);
+    await rollOut(browser, false, testInfo);
+});
 
 test(
     "connects Instagram and schedules a post at the good time",
     { tag: "@serial" },
-    async ({ page, browser }, testInfo) => {
-        await useSession(page);
-        await page.goto(`/open/${NORTHWIND_ORG}`);
-        await rollOut(browser, true, testInfo);
-        try {
-            await page.goto("/social?tab=channels");
-            const instagram = page.locator("[data-channel=INSTAGRAM]");
-            await expect(instagram).toHaveAttribute(
-                "data-channel-state",
-                "NOT_CONNECTED",
-            );
-            await expect(page.locator("[data-channel]")).toHaveCount(3);
+    async ({ page }, testInfo) => {
+        await page.goto("/social?tab=channels");
+        const instagram = page.locator("[data-channel=INSTAGRAM]");
+        await expect(instagram).toHaveAttribute(
+            "data-channel-state",
+            "NOT_CONNECTED",
+        );
+        await expect(page.locator("[data-channel]")).toHaveCount(3);
 
-            // What it needs, said before "Meta"; Continue goes there and back.
-            const sheet = page.locator("[data-connect-needs=INSTAGRAM]");
-            await pressUntil(
-                page
-                    .locator("[data-connect=INSTAGRAM]")
-                    .filter({ visible: true }),
-                sheet,
-            );
-            await expect(sheet).toContainText("Business or Creator");
-            await page
-                .getByRole("dialog")
-                .getByRole("button", { name: "Continue" })
-                .click();
-            await page.waitForURL(/result=connected/);
-            await expect(
-                page.locator("[data-connect-result=connected]"),
-            ).toContainText("Instagram is connected.");
-            await expect(instagram).toHaveAttribute(
-                "data-channel-state",
-                "CONNECTED",
-            );
+        // What it needs, said before "Meta"; Continue goes there and back.
+        const sheet = page.locator("[data-connect-needs=INSTAGRAM]");
+        await pressUntil(
+            page.locator("[data-connect=INSTAGRAM]").filter({ visible: true }),
+            sheet,
+        );
+        await expect(sheet).toContainText("Business or Creator");
+        await page
+            .getByRole("dialog")
+            .getByRole("button", { name: "Continue" })
+            .click();
+        await page.waitForURL(/result=connected/);
+        await expect(
+            page.locator("[data-connect-result=connected]"),
+        ).toContainText("Instagram is connected.");
+        await expect(instagram).toHaveAttribute(
+            "data-channel-state",
+            "CONNECTED",
+        );
 
-            // A post of its own words, scheduled at the good time.
-            await page.goto("/social/new?own=text");
-            await page
-                .locator("[data-own-headline]")
-                .filter({ visible: true })
-                .fill(`Open late ${stamp(testInfo)}`.slice(0, 40));
-            const panel = page
-                .locator("[data-social-panel]")
-                .filter({ visible: true });
-            await expect(
-                panel.locator("[data-post-to=INSTAGRAM] [role=switch]"),
-            ).toHaveAttribute("aria-checked", "true");
-            await panel.locator("[data-schedule-good]").click();
-            await page.waitForURL(/\/social\?post=/);
-            const opened = page.locator("[data-post-sheet]");
-            await expect(opened).toBeVisible();
-            await expect(
-                opened.locator("[data-delivery=INSTAGRAM]"),
-            ).toHaveAttribute("data-delivery-status", "WAITING");
+        // A post of its own words, scheduled at the good time.
+        await page.goto("/social/new?own=text");
+        // Words typed before hydration are lost when the phone layout
+        // takes over from the server's: type until the post is saved.
+        const headline = page
+            .locator("[data-own-headline]")
+            .filter({ visible: true });
+        const words = `Open late ${stamp(testInfo)}`.slice(0, 40);
+        await expect(async () => {
+            if ((await headline.inputValue()) !== words)
+                await headline.fill(words);
+            await expect(page.locator("[data-own-no-cards]")).toHaveCount(0, {
+                timeout: 3_000,
+            });
+        }).toPass({ timeout: 20_000 });
+        const panel = page
+            .locator("[data-social-panel]")
+            .filter({ visible: true });
+        await expect(
+            panel.locator("[data-post-to=INSTAGRAM] [role=switch]"),
+        ).toHaveAttribute("aria-checked", "true");
+        await panel.locator("[data-schedule-good]").click();
+        await page.waitForURL(/\/social\?post=/);
+        const opened = page.locator("[data-post-sheet]");
+        await expect(opened).toBeVisible();
+        await expect(
+            opened.locator("[data-delivery=INSTAGRAM]"),
+        ).toHaveAttribute("data-delivery-status", "WAITING");
 
-            // Delete it: it was never posted.
-            await page.locator("[data-post-action=delete]").click();
-            await page
-                .getByRole("alertdialog")
-                .getByRole("button", { name: "Delete post" })
-                .click();
-            await expect(opened).toHaveCount(0);
-        } finally {
-            await disconnect(page);
-            await rollOut(browser, false, testInfo);
-        }
+        // Delete it: it was never posted.
+        await page.locator("[data-post-action=delete]").click();
+        await page
+            .getByRole("alertdialog")
+            .getByRole("button", { name: "Delete post" })
+            .click();
+        await expect(opened).toHaveCount(0);
     },
 );

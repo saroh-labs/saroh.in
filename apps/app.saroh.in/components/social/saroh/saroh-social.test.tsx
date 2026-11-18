@@ -427,14 +427,20 @@ function Panel({
     social,
     text = "Fresh buns",
     story = false,
+    empty = false,
 }: {
     social: SocialCompose;
     text?: string;
     story?: boolean;
+    /** Nothing written and no photo yet (an own post). */
+    empty?: boolean;
 }) {
     const sp = useSocialPost({
         social,
-        base: () => ({ sourceKind: "product", sourceRef: "x", caption: text }),
+        base: () =>
+            empty
+                ? null
+                : { sourceKind: "product", sourceRef: "x", caption: text },
         text,
         link: "https://rye.example.com/shop/x",
         zone: "Asia/Kolkata",
@@ -483,6 +489,18 @@ describe("the composer's Post to and When (S4, S7)", () => {
     it("warns when Threads would cut the caption", () => {
         draw(<Panel social={COMPOSE} text={"क".repeat(160)} />);
         expect(q("[data-threads-fit=cut]")).not.toBeNull();
+    });
+
+    it("says what it needs when there is nothing to post yet", async () => {
+        draw(<Panel social={COMPOSE} empty />);
+        await act(() => {
+            (q("[data-schedule-good]") as HTMLButtonElement).click();
+            return Promise.resolve();
+        });
+        expect(q("[data-social-error]")?.textContent).toBe(
+            "Write a headline or add a photo first.",
+        );
+        expect(actions.savePost).not.toHaveBeenCalled();
     });
 
     it("won't post a story size", () => {

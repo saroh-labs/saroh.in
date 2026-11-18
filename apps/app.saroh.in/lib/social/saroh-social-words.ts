@@ -188,6 +188,7 @@ export const SOCIAL_WORDS = {
     saveDraft: "Save as draft",
     draftSaved: "Saved as a draft.",
     pickAChannel: "Switch on a channel to post to.",
+    nothingToPost: "Write a headline or add a photo first.",
     storyNotPosted:
         "Saroh posts Post and Square sizes. Pick one of those to post it.",
     editFor: (kind: ChannelKind) => `Edit for ${CHANNEL_SHORT[kind]}`,

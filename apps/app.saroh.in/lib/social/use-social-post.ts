@@ -136,7 +136,11 @@ export function useSocialPost({
         publishAt?: string,
     ): Promise<boolean> {
         const post = base();
-        if (!post) return false;
+        if (!post) {
+            // Never a press that does nothing: say what it needs.
+            setError(SOCIAL_WORDS.nothingToPost);
+            return false;
+        }
         if (action !== "draft" && blocked) {
             setError(blocked);
             return false;
