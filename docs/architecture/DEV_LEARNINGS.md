@@ -6840,3 +6840,10 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** a sign-in code goes only to a number verified on an account; others get the same answer after the same work, and the send runs after the answer so timing and send failures say nothing. Turnstile's `hostname` must be an accounts host from env, and the phone start and Better Auth code-mailing routes refuse any `Origin` but accounts (`common/accounts-origins.ts`). New people sign up with email, then add the phone.
 - **Rule:** an answer that must not reveal whether something exists has to cost the same and fail the same in both cases: do the work that differs after the answer. Pinned by `account-phone.db.spec.ts` (unknown number, slow provider, failed send), `accounts-origins.spec.ts`, `code-mail-origin.spec.ts`, `challenge.spec.ts`. Pattern: `docs/patterns/backend-auth-and-access.md`.
 - **Category:** backend · security
+
+### The built API didn't boot: a package it used but never listed (18 Nov 2026)
+
+- **Symptom:** on PR #1434 every Browser E2E shard failed with "api never came up"; the stack log said `Cannot find module 'express'` from `dist/modules/messaging/meta-webhook-body.js`. Unit and integration tests, run from source under jest, passed.
+- **Cause:** the Meta webhook's own JSON parser imported `json` from `express`, which the API reaches only through `@nestjs/platform-express`. pnpm doesn't hoist it, so `node dist/main` can't resolve it.
+- **Fix:** `express` is a direct dependency of `@saroh/api` (the version Nest already brings). The API's ESLint config turns on `import/no-extraneous-dependencies` (type-only imports and the developer CLIs excepted), so the next one fails lint, not the browser shards.
+- **Category:** backend · tooling

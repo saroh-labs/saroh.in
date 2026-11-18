@@ -12,6 +12,16 @@ export default [
     {
         rules: {
             "no-console": ["warn", { allow: ["warn", "error", "info"] }],
+            // The built API runs from dist, where only its own dependencies
+            // resolve: `express` used through Nest's failed to boot on CI.
+            "import/no-extraneous-dependencies": [
+                "error",
+                {
+                    // A developer's tools, run where dev deps are installed.
+                    devDependencies: ["src/cli/ask.cli.ts", "eval/**"],
+                    packageDir: import.meta.dirname,
+                },
+            ],
             // 05-P-01: `@Ip()` is Express's `req.ip`, which a caller could
             // steer through X-Forwarded-For; limits key on `@ClientAddress()`.
             "no-restricted-syntax": [

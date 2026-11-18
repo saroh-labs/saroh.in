@@ -17,6 +17,8 @@ const ALLOWED_DIR = "apps/api.saroh.in/src/modules/messaging/";
 const ALLOWED: Record<string, string> = {
     "apps/api.saroh.in/src/env.ts": "the provider's environment names",
     "apps/api.saroh.in/.env.example": "the provider's environment names",
+    "apps/api.saroh.in/src/common/env.spec.ts":
+        "checks the provider's base URL is refused in production",
     // The webhook's public path is set in MSG91's dashboard; these list every route.
     "apps/api.saroh.in/src/common/guards/test-host-routes.spec.ts":
         "lists the public webhook path",
