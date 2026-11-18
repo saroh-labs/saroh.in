@@ -164,6 +164,13 @@ export function resolveAccess(
         }
     }
 
+    const offered = offeredPlans(catalog);
+    const at = offered.findIndex((p) => p.id === planId);
+    const up = offered
+        .slice(Math.max(at + 1, 0))
+        .find((p) => cellOf(mod, p.id).inc);
+    const upCell = up ? cellOf(mod, up.id) : null;
+
     for (const bought of input.addons ?? []) {
         const n = Math.max(0, Math.trunc(bought.quantity));
         if (!n) continue;
@@ -174,7 +181,11 @@ export function resolveAccess(
             if (a.module === moduleId && !r.inc) {
                 r.inc = true;
                 r.text = "Add-on";
-                r.limit = null;
+                // The row as the next plan up has it: an add-on never gives
+                // more than the plan that includes it (Saroh Social's posts a
+                // month). Uncapped there, uncapped here.
+                r.limit = upCell?.inc ? upCell.limit : null;
+                r.per = upCell?.inc ? upCell.per : "";
                 r.override = "Bought as an add-on";
             }
         } else if (a.kind === moduleId && r.inc && r.limit !== null) {
@@ -185,16 +196,10 @@ export function resolveAccess(
 
     r.state = r.inc ? "on" : r.off;
 
-    const offered = offeredPlans(catalog);
-    const at = offered.findIndex((p) => p.id === planId);
-    const up = offered
-        .slice(Math.max(at + 1, 0))
-        .find((p) => cellOf(mod, p.id).inc);
-    if (up) {
+    if (up && upCell) {
         r.upgradeTo = up.name;
         r.upgradePlanId = up.id;
         r.upgradePricePaise = up.pricePaise;
-        const upCell = cellOf(mod, up.id);
         r.upgradeUncapped = upCell.inc && upCell.limit === null;
     }
     return r;

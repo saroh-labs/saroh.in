@@ -104,6 +104,7 @@ describe("plan keys", () => {
                 "roles",
                 "site-trackers",
                 "sites",
+                "social",
                 "storage",
                 "subscriptions",
                 "themes",

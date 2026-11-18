@@ -335,6 +335,34 @@ describe("resolveAccess", () => {
             ).toBeNull();
         });
 
+        it("gives a capped row as the next plan up has it, never uncapped", () => {
+            const catalog = edit(fixture(), (c) => {
+                const row = c.modules.find((m) => m.id === "invoicing");
+                if (row) {
+                    row.cells.b = {
+                        inc: true,
+                        text: "5 a month",
+                        card: "",
+                        limit: 5,
+                        per: "month",
+                        soft: false,
+                    };
+                }
+            });
+            const r = resolveAccess(
+                {
+                    ...on(
+                        "a",
+                        [],
+                        [{ addonId: "invoices-alone", quantity: 1 }],
+                    ),
+                    catalog,
+                },
+                "invoicing",
+            );
+            expect(r).toMatchObject({ state: "on", limit: 5, per: "month" });
+        });
+
         it("counts an add-on only on a plan it is offered on (DEC-157)", () => {
             const held = [{ addonId: "one-person", quantity: 2 }];
             expect(resolveAccess(on("b", [], held), "members").limit).toBe(5);

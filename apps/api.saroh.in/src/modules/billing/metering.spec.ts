@@ -26,6 +26,7 @@ const tx = {
     media: { aggregate: jest.fn() },
     analyticsDailyAggregate: { aggregate: jest.fn() },
     subscription: { findUnique: jest.fn() },
+    socialPost: { count: jest.fn() },
 };
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
@@ -238,6 +239,7 @@ describe("which rows metering counts", () => {
             storage: "storageGb",
             visits: "visitsPerMonth",
             "ask-ai": "aiQuestionsPerMonth",
+            social: "socialPostsPerMonth",
         });
         expect(meteredKeyOf("roles")).toBeNull();
     });
@@ -285,6 +287,31 @@ describe("what each count asks", () => {
                 status: "CONFIRMED",
                 courseEnrollmentId: null,
                 bookedOnline: true,
+            },
+        });
+    });
+
+    it("counts Saroh Social posts going out this month, once each, by when they go out", async () => {
+        tx.socialPost.count.mockResolvedValue(3);
+        expect(
+            await countUsage(tx as never, "org", "socialPostsPerMonth", now),
+        ).toBe(3);
+        expect(tx.socialPost.count).toHaveBeenCalledWith({
+            where: {
+                organizationId: "org",
+                status: {
+                    in: [
+                        "SCHEDULED",
+                        "PUBLISHING",
+                        "DONE",
+                        "PARTLY_DONE",
+                        "FAILED",
+                    ],
+                },
+                publishAt: {
+                    gte: start,
+                    lt: new Date("2026-10-31T18:30:00.000Z"),
+                },
             },
         });
     });

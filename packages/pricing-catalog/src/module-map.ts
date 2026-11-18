@@ -206,6 +206,19 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "aiQuestionsPerMonth",
         legacyEntitlementKey: null,
     },
+    /**
+     * Saroh Social: posts Saroh publishes to the business's Instagram,
+     * Facebook Page and Threads, counted once a post however many channels
+     * it goes to, in the month it goes out. Locked where the catalogue
+     * leaves it off; a `social` module add-on unlocks it with the next
+     * plan's allowance. Under no registry module: its rollout is the
+     * `MODULE_SOCIAL` flag, and free Share stays under Website.
+     */
+    social: {
+        registry: null,
+        limitKey: "socialPostsPerMonth",
+        legacyEntitlementKey: null,
+    },
 };
 
 /**
