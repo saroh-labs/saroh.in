@@ -8,6 +8,7 @@ import type { AnalyticsDailyAggregate } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 import { randomUUID } from "node:crypto";
 
+import { hashClientIp } from "../../common/client-ip";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { authorize } from "../organizations/organization-policy";
@@ -172,7 +173,11 @@ export class AnalyticsService {
                 : undefined;
 
         if (ipHash !== undefined) {
-            const allowed = this.rateLimiter.take(`${siteId}:${ipHash}`);
+            // Keyed by the caller's /64, not the raw address: every address
+            // in one IPv6 subscriber block is one caller (03-L10).
+            const allowed = this.rateLimiter.take(
+                `${siteId}:${hashClientIp(ip) ?? ipHash}`,
+            );
             if (!allowed) {
                 throw new HttpException(
                     "Too many events. Wait a moment, then try again.",
