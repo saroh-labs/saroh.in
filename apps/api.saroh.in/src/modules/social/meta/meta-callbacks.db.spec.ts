@@ -4,7 +4,9 @@
  * refused; deauthorize marks the person's channel; data deletion removes
  * their channels and tokens and answers the status page's address and
  * code, which the page reads without anyone signed in. Facebook and
- * Instagram share Facebook Login, so either callback reaches both.
+ * Instagram share Facebook Login, so either callback reaches both. Data
+ * deletion fails what waited for the channel and tells the business once
+ * (S-02).
  */
 import { prisma } from "@saroh/database";
 
@@ -15,6 +17,7 @@ import {
     uniq,
 } from "../../../../test/fixtures/social";
 import { env } from "../../../env";
+import { TEAM_ALERT_TYPE } from "../../notifications/team-alerts";
 import { MetaCallbacksService } from "./meta-callbacks.controller";
 import { signRequest } from "./signed-request";
 import type { ChannelKind } from "./social-meta.port";
@@ -149,5 +152,50 @@ describe("Facebook Login's two kinds", () => {
                 where: { id: { in: [ig.row.id, fb.row.id] } },
             }),
         ).toBe(0);
+    });
+});
+
+describe("data deletion and waiting posts", () => {
+    it("fails what waited for the channel and tells the business once (S-02)", async () => {
+        const { row, userId } = await connected("FACEBOOK");
+        const org = row.organizationId;
+        const post = await prisma.socialPost.create({
+            data: {
+                organizationId: org,
+                sourceKind: "own",
+                ref: uniq("social-held"),
+                status: "PUBLISHING",
+                publishAt: new Date(),
+                deliveries: {
+                    create: [
+                        {
+                            organizationId: org,
+                            kind: "FACEBOOK",
+                            channelId: row.id,
+                        },
+                    ],
+                },
+            },
+        });
+        await service.dataDeletion("FACEBOOK", signed("FACEBOOK", userId));
+        expect(
+            await prisma.socialDelivery.findFirstOrThrow({
+                where: { postId: post.id },
+            }),
+        ).toMatchObject({ status: "FAILED", reason: "deleted" });
+        expect(
+            await prisma.socialPost.findUniqueOrThrow({
+                where: { id: post.id },
+            }),
+        ).toMatchObject({ status: "FAILED" });
+        expect(
+            await prisma.job.count({
+                where: {
+                    organizationId: org,
+                    type: TEAM_ALERT_TYPE,
+                    payload: { path: ["about"], equals: "deleted" },
+                },
+            }),
+        ).toBe(1);
     });
 });

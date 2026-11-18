@@ -14,21 +14,14 @@ import {
     Post,
 } from "@nestjs/common";
 import { outsideOrgContext, prisma } from "@saroh/database";
-import { IsOptional, IsString, MaxLength } from "class-validator";
 
 import { appBase } from "../../../common/app-url";
+import { enqueueTeamAlert } from "../../notifications/team-alerts";
 import { markAttentionInTx } from "../channels/channel-attention";
+import { failWaitingInTx } from "../channels/channels.service";
 import { kindParam } from "../channels/dto";
 import { callbackSecrets, parseSignedRequest } from "./signed-request";
 import type { ChannelKind } from "./social-meta.port";
-
-/** Meta's form body: `signed_request`, checked by the service. */
-export class SignedRequestDto {
-    @IsOptional()
-    @IsString()
-    @MaxLength(4096)
-    signed_request?: string;
-}
 
 /** What the deletion status page shows. */
 export interface DeletionView {
@@ -100,6 +93,21 @@ export class MetaCallbacksService {
                     kind: { in: loginKinds(kind) },
                     platformUserId: req.userId,
                 };
+                // What waited for them fails now, and each business is told
+                // once, rather than posts failing one by one at their time (S-02).
+                const rows = await tx.socialChannel.findMany({
+                    where,
+                    select: { id: true, organizationId: true, kind: true },
+                });
+                for (const row of rows) {
+                    await failWaitingInTx(tx, row.id, "deleted");
+                    await enqueueTeamAlert(tx, row.organizationId, {
+                        event: "social",
+                        about: "deleted",
+                        kind: row.kind,
+                        at: now.toISOString(),
+                    });
+                }
                 const { count } = await tx.socialChannel.deleteMany({ where });
                 await tx.socialConnectChoice.deleteMany({ where });
                 await tx.socialDeletion.create({
@@ -162,9 +170,11 @@ export class MetaCallbacksController {
     @Header("Cache-Control", "no-store")
     async deauthorize(
         @Param("kind") kind: string,
-        @Body() body: SignedRequestDto,
+        // Only `signed_request` is read: a field Meta adds beside it is
+        // ignored, not a 400 (S-14). The parser checks its type and length.
+        @Body("signed_request") signed: unknown,
     ): Promise<Record<string, never>> {
-        await this.callbacks.deauthorize(kindParam(kind), body.signed_request);
+        await this.callbacks.deauthorize(kindParam(kind), signed);
         return {};
     }
 
@@ -173,12 +183,9 @@ export class MetaCallbacksController {
     @Header("Cache-Control", "no-store")
     dataDeletion(
         @Param("kind") kind: string,
-        @Body() body: SignedRequestDto,
+        @Body("signed_request") signed: unknown,
     ): Promise<{ url: string; confirmation_code: string }> {
-        return this.callbacks.dataDeletion(
-            kindParam(kind),
-            body.signed_request,
-        );
+        return this.callbacks.dataDeletion(kindParam(kind), signed);
     }
 
     @Get("social/deletion/:code")

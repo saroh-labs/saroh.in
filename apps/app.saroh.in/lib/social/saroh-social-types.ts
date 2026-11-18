@@ -91,6 +91,8 @@ export interface SocialPost {
     zone: string | null;
     channels: SocialDelivery[];
     canEdit: boolean;
+    /** Past its time and waiting, with no run coming: cancel, delete, or post it from Channels. */
+    held: boolean;
     createdAt: string;
     updatedAt: string;
 }

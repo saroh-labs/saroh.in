@@ -93,7 +93,9 @@ export function postPill(post: SocialPost): { word: string; tone: PillTone } {
         case "SCHEDULED":
             return { word: SOCIAL_WORDS.scheduled, tone: "info" };
         case "PUBLISHING":
-            return { word: SOCIAL_WORDS.posting, tone: "active" };
+            return post.held
+                ? { word: SOCIAL_WORDS.onHold, tone: "warning" }
+                : { word: SOCIAL_WORDS.posting, tone: "active" };
         case "DONE":
             return { word: SOCIAL_WORDS.posted, tone: "success" };
         case "PARTLY_DONE":
@@ -123,7 +125,9 @@ export function deliveryPill(d: SocialPost["channels"][number]): {
         case "WAITING":
             return d.reason === "attention"
                 ? { word: SOCIAL_WORDS.waitsReconnect, tone: "warning" }
-                : { word: SOCIAL_WORDS.scheduled, tone: "info" };
+                : d.reason === "off"
+                  ? { word: SOCIAL_WORDS.onHold, tone: "warning" }
+                  : { word: SOCIAL_WORDS.scheduled, tone: "info" };
     }
 }
 

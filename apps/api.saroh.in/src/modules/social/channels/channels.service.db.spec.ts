@@ -18,6 +18,7 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import { FakeSocialMeta } from "../meta/fake-social-meta";
 import { SOCIAL_REFRESH_TYPE } from "../shared/jobs";
 import { SocialChannelsService } from "./channels.service";
+import { deleteExpiredSocialChoices } from "./choice-retention";
 import { signState, STATE_TTL_MS } from "./connect-state";
 
 let meta: FakeSocialMeta;
@@ -239,5 +240,62 @@ describe("disconnecting", () => {
         expect(await prisma.socialPost.count({ where: { id: post.id } })).toBe(
             1,
         );
+    });
+});
+
+describe("Page choices and held posts", () => {
+    it("deletes Page choices nobody picked once they run out (S-09)", async () => {
+        meta.pages = 2;
+        const ctx = await socialBusiness();
+        const to = await connectFlow(ctx, "FACEBOOK");
+        const choiceId = new URL(to).searchParams.get("choice") ?? "";
+        await prisma.socialConnectChoice.update({
+            where: { id: choiceId },
+            data: { expiresAt: new Date(Date.now() - 60_000) },
+        });
+        expect(await deleteExpiredSocialChoices(new Date())).toBeGreaterThan(0);
+        expect(
+            await prisma.socialConnectChoice.count({ where: { id: choiceId } }),
+        ).toBe(0);
+    });
+
+    it("counts as held only a post with no run coming, and posts only those (S-11)", async () => {
+        const ctx = await socialBusiness();
+        await connectFlow(ctx, "THREADS");
+        const make = (publishJobId: string | null) =>
+            prisma.socialPost.create({
+                data: {
+                    organizationId: ctx.organizationId,
+                    sourceKind: "own",
+                    ref: uniq("social-held"),
+                    status: "PUBLISHING",
+                    publishAt: new Date(),
+                    publishJobId,
+                    deliveries: {
+                        create: {
+                            organizationId: ctx.organizationId,
+                            kind: "THREADS",
+                        },
+                    },
+                },
+            });
+        await make(null);
+        const running = await prisma.job.create({
+            data: {
+                organizationId: ctx.organizationId,
+                type: "social.publish",
+                runAt: new Date(),
+                status: "PROCESSING",
+                payload: {},
+            },
+        });
+        await make(running.id);
+        const threads = (await service().list(ctx)).find(
+            (c) => c.kind === "THREADS",
+        );
+        expect(threads?.heldPosts).toBe(1);
+        expect(await service().retryHeld(ctx, "THREADS")).toEqual({
+            queued: 1,
+        });
     });
 });

@@ -39,7 +39,7 @@ export const CONNECT_NEEDS: Record<ChannelKind, readonly string[]> = {
     THREADS: [
         "A Threads profile.",
         "You'll sign in on Threads and allow Saroh to post.",
-        "A private profile signs Saroh out every 90 days. Saroh tells you a week before.",
+        "A private profile signs Saroh out every 90 days. Saroh tells you when it does, and you reconnect in a minute.",
     ],
 };
 
@@ -116,6 +116,7 @@ export const SOCIAL_WORDS = {
     didntPost: "Didn't post",
     cancelled: "Cancelled",
     waitsReconnect: "Waits for you",
+    onHold: "On hold",
     // The post's sheet (S5, S6).
     when: "When",
     channelsHeading: "Channels",
@@ -336,8 +337,13 @@ export function deliveryReason(
             };
         case "off":
             return {
-                line: "Saroh Social wasn't on for your business when it was due. Try again.",
+                line: "Saroh Social wasn't on for your business when it was due, so it is on hold. Cancel or delete it, or post it from Channels once Social is on.",
                 fix: "again",
+            };
+        case "deleted":
+            return {
+                line: `Meta asked Saroh to delete its connection to ${name}, so it didn't go there.`,
+                fix: "connect",
             };
         case "site":
             return {

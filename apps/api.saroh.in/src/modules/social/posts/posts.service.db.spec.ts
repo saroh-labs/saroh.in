@@ -4,7 +4,9 @@
  * Move replaces the run; cancelling frees the count only before it
  * starts; the month's limit refuses with when it resets; Request more is
  * once a month; a Threads caption of its own over 500 bytes is refused
- * with the count. The card is a stand-in (the renderer has its own
+ * with the count; a held post can be cancelled or deleted with the plan
+ * off (S-02); at the limit nothing is drawn (S-04); saving a scheduled
+ * post again starts a channel failed by an old disconnect afresh (S-14). The card is a stand-in (the renderer has its own
  * specs); storage is in memory. Runs in the integration project.
  */
 import { prisma } from "@saroh/database";
@@ -217,6 +219,7 @@ describe("scheduling a post", () => {
         world.addon = true;
         world.limit = 2;
         const at = inHours(1);
+        (share.socialCard as jest.Mock).mockClear();
         await prisma.socialPost.createMany({
             data: ["social-filledaaaa", "social-filledbbbb"].map((ref) => ({
                 organizationId: ctx.organizationId,
@@ -236,7 +239,8 @@ describe("scheduling a post", () => {
                 resetsAt: expect.any(String),
             },
         });
-        // Nothing drawn is left behind.
+        // Nothing drawn, nothing left behind (S-04).
+        expect(share.socialCard).not.toHaveBeenCalled();
         expect(storage.listKeys()).toHaveLength(0);
     });
 
@@ -293,6 +297,96 @@ describe("scheduling a post", () => {
             .catch((e: { getResponse(): unknown }) => e.getResponse());
         expect(refusal).toMatchObject({
             message: "Publish it first. A draft has no public page.",
+        });
+    });
+});
+
+describe("held posts and rescheduling", () => {
+    /** A post past its time that its run held: Social was off then. */
+    async function held(ctx: OrganizationContext, posted = false) {
+        const post = await service().create(ctx, {
+            ...product,
+            action: "schedule",
+            publishAt: inHours(1),
+        });
+        await prisma.socialPost.update({
+            where: { id: post.id },
+            data: { status: "PUBLISHING", publishJobId: null },
+        });
+        await prisma.socialDelivery.updateMany({
+            where: { postId: post.id },
+            data: { reason: "off" },
+        });
+        if (posted) {
+            await prisma.socialDelivery.updateMany({
+                where: { postId: post.id, kind: "INSTAGRAM" },
+                data: { status: "POSTED", reason: null },
+            });
+        }
+        return post.id;
+    }
+
+    it("lets a held post be cancelled, and says it is held, with the plan off (S-02)", async () => {
+        const ctx = await ready();
+        const id = await held(ctx);
+        expect((await service().get(ctx, id)).held).toBe(true);
+        world.planId = "free";
+        expect((await service().cancel(ctx, id)).status).toBe("CANCELLED");
+    });
+
+    it("deletes a held post that sent nothing, and removes one that sent some (S-02)", async () => {
+        const ctx = await ready();
+        const none = await held(ctx);
+        const some = await held(ctx, true);
+        world.flag = false;
+        await service().remove(ctx, none);
+        expect(await prisma.socialPost.count({ where: { id: none } })).toBe(0);
+        await service().remove(ctx, some);
+        const row = await prisma.socialPost.findUniqueOrThrow({
+            where: { id: some },
+            include: { deliveries: true },
+        });
+        expect(row.removedAt).not.toBeNull();
+        expect(row.status).toBe("PARTLY_DONE");
+        expect(row.deliveries.find((d) => d.kind === "THREADS")).toMatchObject({
+            status: "FAILED",
+            reason: "removed",
+        });
+    });
+
+    it("still refuses a post whose run is queued or running", async () => {
+        const ctx = await ready();
+        const post = await service().create(ctx, {
+            ...product,
+            action: "schedule",
+            publishAt: inHours(1),
+        });
+        await prisma.socialPost.update({
+            where: { id: post.id },
+            data: { status: "PUBLISHING" },
+        });
+        await expect(service().remove(ctx, post.id)).rejects.toMatchObject({
+            status: 409,
+        });
+    });
+
+    it("starts afresh a channel an old disconnect failed when the post is saved again (S-14)", async () => {
+        const ctx = await ready();
+        const post = await service().create(ctx, {
+            ...product,
+            action: "schedule",
+            publishAt: inHours(3),
+        });
+        await prisma.socialDelivery.updateMany({
+            where: { postId: post.id, kind: "THREADS" },
+            data: { status: "FAILED", reason: "disconnected", channelId: null },
+        });
+        const saved = await service().update(ctx, post.id, {
+            publishAt: inHours(4),
+        });
+        expect(saved.channels.find((c) => c.kind === "THREADS")).toMatchObject({
+            status: "WAITING",
+            reason: null,
         });
     });
 });

@@ -13,6 +13,10 @@ import type { TeamAlertPayload, WordedAlert } from "./team-alerts";
  *   keyed to the channel and that instant, so ten jobs meeting the same
  *   refusal tell it once. Still standing when told: the channel is there
  *   and still needs attention since that instant.
+ * - `deleted`: Meta asked Saroh to delete what it held for a person
+ *   (`social/meta/meta-callbacks.controller.ts`), and a channel of this
+ *   business went with it: what waited for it won't go out (S-02). Still
+ *   standing when told: that kind hasn't been connected again since.
  * - `post`: a post that didn't go out on one or more channels, keyed to
  *   the post and the run that found it. Still standing when told: a
  *   delivery of it is still FAILED.
@@ -57,6 +61,34 @@ export async function wordSocial(
         return {
             event: "social",
             eventKey: `team:social-channel:${p.channelId}:${p.since}`,
+            notificationId: null,
+            ...noticeOf(SOCIAL_ATTENTION_NOTIFICATION_TYPE, {}),
+            title: words.heading,
+            body: words.body,
+            mail: words,
+            path: "/social?tab=channels",
+            cta: "Open Social",
+            skipUserId: null,
+        };
+    }
+    if (p.about === "deleted") {
+        const again = await tx.socialChannel.findFirst({
+            where: {
+                organizationId,
+                kind: p.kind,
+                connectedAt: { gt: new Date(p.at) },
+            },
+            select: { id: true },
+        });
+        if (again) return null;
+        const name = KIND_NAMES[p.kind] ?? p.kind;
+        const words = {
+            heading: `${name} was disconnected`,
+            body: `Meta asked Saroh to delete its connection to ${name}, so posts waiting for it won't go out there. Connect it again in Social to keep posting.`,
+        };
+        return {
+            event: "social",
+            eventKey: `team:social-deleted:${p.kind}:${p.at}`,
             notificationId: null,
             ...noticeOf(SOCIAL_ATTENTION_NOTIFICATION_TYPE, {}),
             title: words.heading,

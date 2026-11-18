@@ -18,15 +18,18 @@ import { readLinkCounts } from "../../analytics/visit-sources";
 import { businessTimezone } from "../../bookings/staff-availability";
 import { MediaService } from "../../media/media.service";
 import { OBJECT_STORAGE } from "../../media/object-storage.provider";
+import { authorize } from "../../organizations/organization-policy";
 import { PublicShareService } from "../../share-posts/public-share.service";
 import { siteOriginOf } from "../../sites/site-origin";
 import {
     assertPostRoom,
     countRoom,
+    postLimitReached,
     SocialAccess,
 } from "../access/social-access";
 import type { ChannelKind } from "../meta/social-meta.port";
 import { dropWaitingJob, queuePublishInTx } from "../shared/jobs";
+import { settledStatus } from "../shared/status";
 import { captionProblem, trackedLink } from "./captions";
 import type { PostAction, PostInputDto, PostListQueryDto } from "./dto";
 import { drawAndStore, removePicture } from "./picture";
@@ -142,6 +145,8 @@ export class SocialPostsService {
         dto: PostInputDto,
         now: Date = new Date(),
     ): Promise<PostView> {
+        // Asked before the post is read, so its status never answers first.
+        authorize(ctx, "social:post");
         const before = await this.row(ctx, id);
         if (before.status !== "DRAFT" && before.status !== "SCHEDULED") {
             throw goneOut();
@@ -165,12 +170,19 @@ export class SocialPostsService {
         );
     }
 
-    /** Cancel a post not started: it no longer counts. */
+    /**
+     * Cancel a post not started, or one held with nothing sent (S-02): it
+     * no longer counts. Only `social:post` is asked, as for disconnect: a
+     * business whose plan or rollout ended can still clear its posts.
+     */
     async cancel(ctx: OrganizationContext, id: string): Promise<PostView> {
-        await this.access.assertOn(ctx, "social:post");
+        authorize(ctx, "social:post");
         await prisma.$transaction(async (tx) => {
             const post = await lockPost(tx, ctx, id);
-            if (post.status !== "SCHEDULED") throw goneOut();
+            const held = await heldState(tx, post);
+            if (post.status !== "SCHEDULED" && held !== "nothing-sent") {
+                throw goneOut();
+            }
             if (!(await dropWaitingJob(tx, post.publishJobId)))
                 throw postingNow();
             await tx.socialPost.update({
@@ -182,18 +194,38 @@ export class SocialPostsService {
     }
 
     /**
-     * Delete a draft, a cancelled post or one not started; "Remove from
-     * Saroh" on one that went out, which stays counted in its month and is
-     * never deleted from the platform. Refused while it is posting.
+     * Delete a draft, a cancelled post, one not started or one held with
+     * nothing sent; "Remove from Saroh" on one that went out (or was held
+     * after some channels posted: what waited won't go), which stays
+     * counted in its month and is never deleted from the platform. Refused
+     * while it is posting. Only `social:post` is asked (S-02).
      */
     async remove(ctx: OrganizationContext, id: string): Promise<void> {
-        await this.access.assertOn(ctx, "social:post");
+        authorize(ctx, "social:post");
         const imageKey = await prisma.$transaction(async (tx) => {
             const post = await lockPost(tx, ctx, id);
-            if (post.status === "PUBLISHING") throw postingNow();
+            const held = await heldState(tx, post);
+            if (post.status === "PUBLISHING" && !held) throw postingNow();
             if (!(await dropWaitingJob(tx, post.publishJobId)))
                 throw postingNow();
-            if (["DONE", "PARTLY_DONE", "FAILED"].includes(post.status)) {
+            if (held === "some-sent") {
+                await tx.socialDelivery.updateMany({
+                    where: { postId: id, status: "WAITING" },
+                    data: { status: "FAILED", reason: "removed" },
+                });
+                const ds = await tx.socialDelivery.findMany({
+                    where: { postId: id },
+                    select: { status: true },
+                });
+                await tx.socialPost.update({
+                    where: { id },
+                    data: { status: settledStatus(ds) },
+                });
+            }
+            if (
+                held === "some-sent" ||
+                ["DONE", "PARTLY_DONE", "FAILED"].includes(post.status)
+            ) {
                 await tx.socialPost.update({
                     where: { id },
                     data: {
@@ -353,6 +385,8 @@ export class SocialPostsService {
             const id = await prisma.$transaction(async (tx) => {
                 if (before) {
                     const post = await lockPost(tx, ctx, before.id);
+                    // It went out (or started) since it was read (S-10).
+                    if (post.status !== before.status) throw goneOut();
                     if (!(await dropWaitingJob(tx, post.publishJobId)))
                         throw postingNow();
                 }
@@ -394,6 +428,14 @@ export class SocialPostsService {
             }
         }
 
+        // A cheap count before the picture is drawn and stored (S-04); the
+        // locked check below still decides.
+        if (before?.status !== "SCHEDULED") {
+            const room = await countRoom(prisma, org, row, at);
+            if (room.limit !== null && room.used >= room.limit) {
+                throw postLimitReached(room);
+            }
+        }
         const redraw =
             !before?.imageKey ||
             PICTURE_FIELDS.some((f) => before[f] !== draft[f]) ||
@@ -519,6 +561,25 @@ export class SocialPostsService {
             })),
             skipDuplicates: true,
         });
+        if (state.status === "SCHEDULED") {
+            // Not started yet: each channel starts afresh on its current
+            // connection, so a delivery failed by an old disconnect isn't
+            // skipped at its time (S-14).
+            for (const c of channels) {
+                await tx.socialDelivery.updateMany({
+                    where: { postId: id, kind: c.kind },
+                    data: {
+                        channelId: c.id,
+                        status: "WAITING",
+                        reason: null,
+                        retryAfter: null,
+                        containerId: null,
+                        checks: 0,
+                        attempts: 0,
+                    },
+                });
+            }
+        }
         return id;
     }
 
@@ -647,6 +708,29 @@ async function lockPost(
             imageKey: true,
         },
     });
+}
+
+/**
+ * Whether a PUBLISHING post is held (S-02): no job will run it (the plan
+ * or rollout was off at its time, or a channel needs reconnecting) and
+ * something still waits. `nothing-sent` when every channel still waits.
+ */
+async function heldState(
+    tx: Prisma.TransactionClient,
+    post: { id: string; status: string; publishJobId: string | null },
+): Promise<"nothing-sent" | "some-sent" | null> {
+    if (post.status !== "PUBLISHING" || post.publishJobId) return null;
+    const ds = await tx.socialDelivery.findMany({
+        where: { postId: post.id },
+        select: { status: true },
+    });
+    if (!ds.some((d) => d.status === "WAITING")) return null;
+    if (ds.some((d) => d.status === "POSTING" || d.status === "UNKNOWN")) {
+        return null;
+    }
+    return ds.every((d) => d.status === "WAITING")
+        ? "nothing-sent"
+        : "some-sent";
 }
 
 function goneOut(): ConflictException {

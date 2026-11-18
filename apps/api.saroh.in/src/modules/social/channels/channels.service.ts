@@ -108,12 +108,17 @@ export class SocialChannelsService {
                 _count: { _all: true },
             }),
         ]);
+        // Held: past its time with no run coming (S-11), not one mid-run.
         const held = await prisma.socialDelivery.groupBy({
             by: ["kind"],
             where: {
                 organizationId: ctx.organizationId,
                 status: "WAITING",
-                post: { status: "PUBLISHING" },
+                post: {
+                    status: "PUBLISHING",
+                    publishJobId: null,
+                    removedAt: null,
+                },
             },
             _count: { _all: true },
         });
@@ -157,9 +162,19 @@ export class SocialChannelsService {
         signedInUserId: string,
         resolve: (orgId: string) => Promise<OrganizationContext>,
     ): Promise<string> {
-        const state = verifyState(query.state, kind);
-        if (typeof state === "string") return this.back(null, kind, state);
-        const edition = await editionOf(state.organizationId);
+        let state: ReturnType<typeof verifyState>;
+        let edition: Edition | null;
+        try {
+            state = verifyState(query.state, kind);
+            if (typeof state === "string") return this.back(null, kind, state);
+            edition = await editionOf(state.organizationId);
+        } catch (error) {
+            // A missing key or a database blip still ends in the app (S-14).
+            this.logger.warn(
+                `social_connect_failed kind=${kind} reason=${reasonOf(error)}`,
+            );
+            return this.back(null, kind, outcomeOf(error));
+        }
         if (state.userId !== signedInUserId) {
             return this.back(edition, kind, "someone-else");
         }
@@ -209,6 +224,14 @@ export class SocialChannelsService {
             await this.keep(ctx, kind, pages[0], now);
             return { outcome: "connected" };
         }
+        // Choices this business left unpicked go now (S-09); the daily
+        // sweep clears the rest.
+        await prisma.socialConnectChoice.deleteMany({
+            where: {
+                organizationId: ctx.organizationId,
+                expiresAt: { lt: now },
+            },
+        });
         const choiceId = crypto.randomUUID();
         const sealed = seal(JSON.stringify(pages), {
             organizationId: ctx.organizationId,
@@ -326,6 +349,9 @@ export class SocialChannelsService {
                 where: {
                     organizationId: ctx.organizationId,
                     status: "PUBLISHING",
+                    // A post whose run is queued or running isn't held (S-11).
+                    publishJobId: null,
+                    removedAt: null,
                     deliveries: { some: { kind, status: "WAITING" } },
                 },
                 select: { id: true, organizationId: true, publishJobId: true },
@@ -472,10 +498,10 @@ export class SocialChannelsService {
  * A channel's deliveries that were still to go fail, with `reason`, and
  * their started posts are settled.
  */
-async function failWaitingInTx(
+export async function failWaitingInTx(
     tx: Prisma.TransactionClient,
     channelId: string,
-    reason: "disconnected" | "reconnected",
+    reason: "disconnected" | "reconnected" | "deleted",
 ): Promise<void> {
     // A draft's channels are only a choice: it keeps them.
     const where = {

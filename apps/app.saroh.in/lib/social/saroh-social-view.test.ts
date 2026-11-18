@@ -9,6 +9,7 @@ import {
     chipPosts,
     connectedLine,
     countsNextMonth,
+    deliveryPill,
     inChip,
     meterOf,
     nextSevenDays,
@@ -63,6 +64,7 @@ const post = (
     zone: ZONE,
     channels,
     canEdit: status === "DRAFT" || status === "SCHEDULED",
+    held: false,
     createdAt: "2026-11-17T06:30:00.000Z",
     updatedAt: "2026-11-17T06:30:00.000Z",
 });
@@ -132,6 +134,24 @@ describe("Posted and drafts chips (S3)", () => {
         });
         expect(postPill(posts[3]).word).toBe("Posted");
         expect(postPill(posts[0]).tone).toBe("draft");
+    });
+
+    it("says a held post is on hold, not posting (S-02)", () => {
+        const held = {
+            ...post("held", "PUBLISHING", "2026-11-17T14:00:00.000Z", [
+                delivery("INSTAGRAM", "WAITING", "off"),
+            ]),
+            held: true,
+        };
+        expect(postPill(held)).toEqual({ word: "On hold", tone: "warning" });
+        expect(deliveryPill(held.channels[0]).word).toBe("On hold");
+        expect(
+            postPill({
+                ...held,
+                held: false,
+                channels: [delivery("INSTAGRAM", "POSTING")],
+            }).word,
+        ).toBe("Posting");
     });
 
     it("writes when and where under a post", () => {

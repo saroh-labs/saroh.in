@@ -80,7 +80,11 @@ export function PostSheet({
     const [caption, setCaption] = useState(post.caption);
     const pill = postPill(post);
     const gone = post.status === "DONE" || post.status === "PARTLY_DONE";
-    const started = !post.canEdit && post.status !== "CANCELLED";
+    // Held with every channel still waiting: never sent, so it can be
+    // cancelled or deleted outright (S-02).
+    const heldUnsent =
+        post.held && post.channels.every((c) => c.status === "WAITING");
+    const started = !post.canEdit && post.status !== "CANCELLED" && !heldUnsent;
     const failed = post.channels.filter((c) => c.status === "FAILED");
 
     /** A write: said once, the list refreshed; false keeps a dialog open. */
@@ -165,7 +169,7 @@ export function PostSheet({
                     {SOCIAL_WORDS.tryAgain}
                 </Button>
             ) : null}
-            {post.status === "SCHEDULED" ? (
+            {post.status === "SCHEDULED" || heldUnsent ? (
                 <Button
                     type="button"
                     variant="outline"
@@ -284,7 +288,8 @@ export function PostSheet({
                                 ) : null}
                                 {d.status === "FAILED" ||
                                 (d.status === "WAITING" &&
-                                    d.reason === "attention") ? (
+                                    (d.reason === "attention" ||
+                                        d.reason === "off")) ? (
                                     <Reason
                                         delivery={d}
                                         canPost={canPost}

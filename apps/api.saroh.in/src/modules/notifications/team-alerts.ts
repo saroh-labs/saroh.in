@@ -169,6 +169,12 @@ export type TeamAlertPayload =
     | { event: "social"; about: "channel"; channelId: string; since: string }
     | { event: "social"; about: "post"; postId: string; at: string }
     | {
+          event: "social";
+          about: "deleted";
+          kind: "INSTAGRAM" | "FACEBOOK" | "THREADS";
+          at: string;
+      }
+    | {
           event: "site";
           testReleaseId: string;
           goLiveAt: string;

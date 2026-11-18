@@ -55,7 +55,8 @@ export interface DeliveryView {
      * (try after `retryAfter`), `media` (the picture was refused),
      * `stuck` (the platform didn't take it in time), `unknown`,
      * `disconnected`, `reconnected` (another account now), `attention`
-     * (waits for a reconnect), `off` (Social isn't on for the business now).
+     * (waits for a reconnect), `off` (Social isn't on for the business now),
+     * `removed` (the post was removed from Saroh before it went out here).
      */
     reason: string | null;
     retryAfter: string | null;
@@ -90,6 +91,12 @@ export interface PostView {
     channels: DeliveryView[];
     /** A draft or a post not started can be changed, moved and cancelled. */
     canEdit: boolean;
+    /**
+     * Past its time and not going out on its own (S-02): Social was off
+     * for the business then, or a channel needs reconnecting. It can be
+     * cancelled (nothing sent yet) or deleted, or posted from Channels.
+     */
+    held: boolean;
     createdAt: string;
     updatedAt: string;
 }
@@ -124,6 +131,13 @@ export function postView(row: PostRow): PostView {
             postedAt: d.postedAt?.toISOString() ?? null,
         })),
         canEdit: row.status === "DRAFT" || row.status === "SCHEDULED",
+        held:
+            row.status === "PUBLISHING" &&
+            !row.publishJobId &&
+            row.deliveries.some((d) => d.status === "WAITING") &&
+            !row.deliveries.some(
+                (d) => d.status === "POSTING" || d.status === "UNKNOWN",
+            ),
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
     };
