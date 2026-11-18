@@ -341,6 +341,10 @@ const envSchema = z.object({
     // Ask AI (DEC-220): seals conversation and report text. Its own 32-byte
     // key or ring, checked at use like the keys above; never logged.
     AI_TEXT_ENC_KEY: z.string().optional(),
+    // Google Calendar (#1047): seals each person's Google refresh token. Its
+    // own 32-byte key or ring, checked at use like the keys above; never
+    // logged. The Google client itself is AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET.
+    CALENDAR_ENC_KEY: z.string().optional(),
     // Ask AI's provider (DEC-220): Anthropic's API key. Optional at boot;
     // read only by `modules/ai/providers/ai-sdk.adapter.ts`, which refuses
     // a call without it. Never logged, never in an example file with a value.

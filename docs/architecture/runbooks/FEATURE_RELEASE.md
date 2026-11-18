@@ -25,6 +25,7 @@ the operator's notes.
 | API and webhooks | `NEXT_PUBLIC_DEVELOPERS` | `developers`      | `API_SECRET`, `API_STOREFRONT`, `API_WEBHOOKS` flags; `NEXT_PUBLIC_API_AREA` |
 | Docs site        | `NEXT_PUBLIC_DOCS`       | `docs`            | none: says docs.saroh.in answers                                             |
 | Templates        | `NEXT_PUBLIC_TEMPLATES`  | `templates`       | `SITE_TEMPLATE_CHOICE` flag (DEC-135, DEC-216)                               |
+| Google Calendar  | none yet                 | none yet          | `GOOGLE_CALENDAR` flag (#1047, #1048); its app screens come next             |
 
 ## The release check
 

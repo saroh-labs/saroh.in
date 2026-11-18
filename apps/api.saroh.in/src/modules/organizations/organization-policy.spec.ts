@@ -67,6 +67,8 @@ const EXPECTED: Record<OrgRole, OrgAction[]> = {
         // DEC-170, #1038: the alerts addressed to them alone, never the
         // business's inbox.
         "notification:read-own",
+        // #1047: their own Google Calendar, their own diary.
+        "calendar:connect-own",
     ],
     /*
      * REVIEWER is website-only (#193) and is NOT a narrower MEMBER: it holds

@@ -339,6 +339,12 @@ export const CAPABILITIES: readonly Capability[] = [
         label: "Set hours and time off",
         note: "Weekly hours, extra hours and time off for anyone who takes bookings, and their own booking rules (waiting for approval when the business asks for it). Adding people, changing services and anyone else's booking rules still need Change services, hours, time off and booking rules.",
     },
+    {
+        action: "calendar:connect-own",
+        group: "schedule",
+        label: "Connect their own Google Calendar",
+        note: "Their bookings go on their Google Calendar, busy times there block their slots, and their online sessions get Google Meet links. Only their own account and diary.",
+    },
     { action: "course:read", group: "schedule", label: "See courses" },
     {
         action: "course:write",

@@ -21,12 +21,17 @@
   is set, or its last 4 characters to `team:pay` holders, and every such read
   or replacement is on the admin ledger. The owner sets the value on Coolify;
   it is never written in the repo.
-- The API's five encryption keys (`PAYMENTS_ENC_KEY`, `STAFF_PII_ENC_KEY`,
-  `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY`) are key rings
+- The API's encryption keys (`PAYMENTS_ENC_KEY`, `STAFF_PII_ENC_KEY`,
+  `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY`,
+  `AI_TEXT_ENC_KEY` and `CALENDAR_ENC_KEY`) are key rings
   (DEC-214): one key, or `v2:<key>,v1:<key>` newest first. Each stored value
   names the key that sealed it, so any key can be replaced without breaking
   stored data. How, routinely or after a leak:
   `docs/architecture/runbooks/KEY_ROTATION.md`.
+- A person's Google refresh token for Calendar sync (#1047) is sealed under
+  its own key, `CALENDAR_ENC_KEY`, bound to its connection
+  (`calendar-sync/sealing.ts`). Access tokens are never stored: each job
+  refreshes one and keeps it in memory. Neither is logged or returned.
 - Test fixtures use visibly fake values (`user:pass@prod-host`).
 - `.claude/settings.local.json` is ignored by git.
 
