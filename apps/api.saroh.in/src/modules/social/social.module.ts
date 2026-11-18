@@ -7,6 +7,7 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
+import { LimitsModule } from "../rate-limits/limits.module";
 import { SharePostsModule } from "../share-posts/share-posts.module";
 import { SocialAccess } from "./access/social-access";
 import {
@@ -42,6 +43,7 @@ import {
         JobsModule,
         MediaStorageModule,
         SharePostsModule,
+        LimitsModule,
     ],
     controllers: [
         SocialController,

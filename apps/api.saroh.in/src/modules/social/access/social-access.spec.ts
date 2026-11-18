@@ -27,7 +27,7 @@ import type {
 import type { CatalogueAccessService } from "../../billing/catalogue-access.service";
 import type { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { resolveCapabilities } from "../../organizations/organization-policy";
-import { SocialAccess } from "./social-access";
+import { SocialAccess, WRITES_PER_MINUTE } from "./social-access";
 
 const now = new Date("2026-11-18T06:00:00Z");
 
@@ -155,5 +155,20 @@ describe("SocialAccess", () => {
         expect(
             (await access("pro", { flag: false }).view(owner, now)).state,
         ).toBe("unavailable");
+    });
+    it("slows a burst of writes per person (S-04), never the reads", async () => {
+        const a = access("pro");
+        const owner = person("OWNER");
+        for (let i = 0; i < WRITES_PER_MINUTE.member; i++) {
+            await a.assertOn(owner, "social:post", now);
+        }
+        await expect(
+            a.assertOn(owner, "social:post", now),
+        ).rejects.toMatchObject({
+            status: 429,
+        });
+        await expect(
+            a.assertOn(owner, "social:read", now),
+        ).resolves.toBeTruthy();
     });
 });

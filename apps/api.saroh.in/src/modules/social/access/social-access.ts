@@ -1,5 +1,7 @@
 import {
     ForbiddenException,
+    HttpException,
+    HttpStatus,
     Injectable,
     NotFoundException,
     Optional,
@@ -21,11 +23,18 @@ import {
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import type { OrgAction } from "../../organizations/organization-actions";
 import { allows, authorize } from "../../organizations/organization-policy";
+import { LimitsService } from "../../rate-limits/limits.service";
 import { goodTimes } from "../posts/good-time";
 
 /** Saroh Social's row in the plans catalogue (`MODULE_MAP`), and its add-on's module. */
 export const SOCIAL_MODULE = "social";
 export const SOCIAL_LIMIT_KEY = "socialPostsPerMonth" as const;
+/**
+ * Social's writes a minute (S-04): generous for a person at a screen, low
+ * enough that a script can't keep the API drawing pictures or Meta's app
+ * exchanging codes. Per person, and per business across its people.
+ */
+export const WRITES_PER_MINUTE = { member: 30, business: 60 } as const;
 
 /** Whether Saroh Social is open to this business, as the screens need it (S1, S7). */
 export interface SocialAccessView {
@@ -84,6 +93,8 @@ export class SocialAccess {
         private readonly flags: FeatureFlagService,
         @Optional()
         private readonly catalogue: CatalogueAccessService = new CatalogueAccessService(),
+        @Optional()
+        private readonly limits: LimitsService = new LimitsService(null),
     ) {}
 
     /** The rollout alone: for the jobs, which have no person. */
@@ -126,7 +137,38 @@ export class SocialAccess {
         const row = await this.planRow(ctx.organizationId, now);
         if (!row) throw lockedOffCatalogue();
         if (row.state !== "on") throw moduleLocked(row);
+        if (action === "social:post") await this.throttle(ctx);
         return row;
+    }
+
+    /** Refuse (429) past {@link WRITES_PER_MINUTE}, per person and per business. */
+    async throttle(ctx: OrganizationContext): Promise<void> {
+        // Wall time, whatever instant the caller reasons about.
+        const at = Date.now();
+        const member = await this.limits.take(
+            "social-member",
+            `${ctx.organizationId}:${ctx.userId}`,
+            WRITES_PER_MINUTE.member,
+            at,
+        );
+        const business = member.allowed
+            ? await this.limits.take(
+                  "social-business",
+                  ctx.organizationId,
+                  WRITES_PER_MINUTE.business,
+                  at,
+              )
+            : member;
+        if (!business.allowed) {
+            throw new HttpException(
+                {
+                    message:
+                        "That's a lot of changes in a minute. Wait a moment and try again.",
+                    details: { code: "SOCIAL_TOO_MANY" },
+                },
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
     }
 
     async view(
@@ -180,7 +222,9 @@ export class SocialAccess {
                 resetsAt: room.end.toISOString(),
                 requested: requested > 0,
             },
-            goodTimes: goodTimes(now, room.zone).map((d) => d.toISOString()),
+            goodTimes: goodTimes(now, room.zone, ctx.organizationId).map((d) =>
+                d.toISOString(),
+            ),
         };
     }
 }
