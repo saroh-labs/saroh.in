@@ -749,6 +749,8 @@ export function toPublicBooking(booking: {
     snapshot: unknown;
     status?: string;
     locationType?: string | null;
+    /** Its own Google Meet link (#1048), when one was made for it. */
+    meetingUrl?: string | null;
 }): PublicBooking {
     const service = (
         booking.snapshot as {
@@ -773,11 +775,13 @@ export function toPublicBooking(booking: {
         // holds one at all — so only CONFIRMED carries the way in. `outcome`
         // (ATTENDED/NO_SHOW) never touches this: it is set after the class,
         // once the link is no longer needed either way.
+        // Its own Meet link first; else the service's, frozen at booking.
         meetingUrl:
-            online &&
-            booking.status === "CONFIRMED" &&
-            typeof service?.meetingUrl === "string"
-                ? service.meetingUrl
+            online && booking.status === "CONFIRMED"
+                ? (booking.meetingUrl ??
+                  (typeof service?.meetingUrl === "string"
+                      ? service.meetingUrl
+                      : null))
                 : null,
     };
 }

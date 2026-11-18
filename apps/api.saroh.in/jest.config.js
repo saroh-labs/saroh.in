@@ -533,6 +533,10 @@ module.exports = {
         // The AI layer (DEC-220): the provider adapter with the SDK's mock
         // model, and later specs with the fake provider. No DB.
         "<rootDir>/src/modules/ai/**/*.spec.ts",
+        // Google Calendar sync (#1047): the client, the fake, the sealing,
+        // the state and the event's shape, DB-free; the rows are in its
+        // *.db.spec.ts (integration).
+        "<rootDir>/src/modules/calendar-sync/**/*.spec.ts",
         "<rootDir>/test/**/*.spec.ts",
         // #90 (S0-011) API bootstrap smoke test: compiles the full AppModule DI
         // graph so "the app doesn't even start" (the 0fc8f72 boot crash class)

@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 
 import { whenWords } from "../../common/words-format";
 import { recordOrderPaidInTx } from "../analytics/order-events";
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
@@ -548,6 +549,12 @@ export async function confirmHoldInTx(
             },
         },
         select: { id: true },
+    });
+    // Paid, so it goes on Google Calendar now, as any booking (#1047).
+    await queueCalendarSyncInTx(tx, {
+        organizationId: input.organizationId,
+        bookingId: booking.id,
+        staffId: booking.staffId,
     });
     const profile = await loadTaxProfile(tx, input.organizationId);
     const number = await numberFor(

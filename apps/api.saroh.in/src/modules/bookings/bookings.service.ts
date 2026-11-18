@@ -20,6 +20,7 @@ import {
     serviceFacts,
 } from "../audit/price-history";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
+import { googleMeetReady } from "../calendar-sync/meet-ready";
 import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
 import { assertBusinessDetails } from "../invoices/business-details";
@@ -81,6 +82,7 @@ import type {
     BookingOutcome,
     CreateServiceDto,
     LocationType,
+    MeetingLink,
     PaidWith,
     UpdateServiceDto,
 } from "./dto";
@@ -353,6 +355,9 @@ export class BookingsService {
         const location = resolveLocation(
             dto.locationType ?? "IN_PERSON",
             dto.meetingUrl ?? null,
+            dto.meetingLink ?? "MANUAL",
+            dto.meetingLink === "GOOGLE_MEET" &&
+                (await googleMeetReady(ctx.organizationId)),
         );
         const depositMode = dto.depositMode ?? "NONE";
         assertDepositPriced(dto.priceCents ?? null, depositMode);
@@ -521,7 +526,13 @@ export class BookingsService {
         }
         if (dto.timezone !== undefined) data.timezone = dto.timezone;
         if (dto.status !== undefined) data.status = dto.status;
-        if (dto.locationType !== undefined || dto.meetingUrl !== undefined) {
+        if (
+            dto.locationType !== undefined ||
+            dto.meetingUrl !== undefined ||
+            dto.meetingLink !== undefined
+        ) {
+            const meetingLink =
+                dto.meetingLink ?? (service.meetingLink as MeetingLink);
             Object.assign(
                 data,
                 resolveLocation(
@@ -529,6 +540,9 @@ export class BookingsService {
                     dto.meetingUrl !== undefined
                         ? dto.meetingUrl
                         : service.meetingUrl,
+                    meetingLink,
+                    meetingLink === "GOOGLE_MEET" &&
+                        (await googleMeetReady(ctx.organizationId)),
                 ),
             );
         }
@@ -1799,13 +1813,35 @@ export class BookingsService {
  * everyone who books online, so nothing that could run script or send them
  * somewhere unencrypted. Going back to in person drops the link rather than
  * leaving a credential lying in the row.
+ *
+ * Or a Google Meet link per booking (#1048, KTD8): GOOGLE_MEET needs no
+ * typed link once someone here has Google Calendar connected (`meetReady`);
+ * a typed one, when given, is still checked and is the fallback for a
+ * booking taken by someone who isn't. Not connected and no typed link is
+ * refused, as before.
  */
 export function resolveLocation(
     locationType: LocationType,
     meetingUrl: string | null,
-): { locationType: LocationType; meetingUrl: string | null } {
+    meetingLink: MeetingLink = "MANUAL",
+    meetReady = false,
+): {
+    locationType: LocationType;
+    meetingUrl: string | null;
+    meetingLink: MeetingLink;
+} {
     if (locationType === "IN_PERSON") {
-        return { locationType, meetingUrl: null };
+        return { locationType, meetingUrl: null, meetingLink: "MANUAL" };
+    }
+    if (!meetingUrl && meetingLink === "GOOGLE_MEET" && meetReady) {
+        return { locationType, meetingUrl: null, meetingLink };
+    }
+    if (!meetingUrl && meetingLink === "GOOGLE_MEET") {
+        throw new BadRequestException({
+            message:
+                "Connect Google Calendar to make Meet links, or add a meeting link",
+            details: { field: "meetingUrl" },
+        });
     }
     if (!meetingUrl) {
         throw new BadRequestException({
@@ -1831,7 +1867,7 @@ export function resolveLocation(
             details: { field: "meetingUrl" },
         });
     }
-    return { locationType, meetingUrl: parsed.toString() };
+    return { locationType, meetingUrl: parsed.toString(), meetingLink };
 }
 
 /** How early before the start the desk may check someone in. */

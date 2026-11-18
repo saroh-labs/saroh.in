@@ -46,6 +46,9 @@ jest.mock("@saroh/database", () => {
         },
         bookingEvent: { create: jest.fn() },
         job: { create: jest.fn() },
+        // Google Calendar (#1047): nobody here is connected.
+        googleCalendarEvent: { count: jest.fn().mockResolvedValue(0) },
+        googleCalendarConnection: { count: jest.fn().mockResolvedValue(0) },
         site: { findUnique: jest.fn(), findFirst: jest.fn() },
         organizationModule: { findFirst: jest.fn() },
         // A storefront to sell treatments from (E10) unless a test says not.
@@ -74,6 +77,7 @@ jest.mock("@saroh/database", () => {
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        googleCalendarBusy: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
         businessProfile: {
             findUnique: jest.fn().mockResolvedValue({ timezone: "UTC" }),

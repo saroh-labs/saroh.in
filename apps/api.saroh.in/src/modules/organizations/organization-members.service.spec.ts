@@ -1186,6 +1186,8 @@ describe("invented roles on the roster", () => {
             "hours:write",
             // And reads the alerts meant for them alone (DEC-170, #1038).
             "notification:read-own",
+            // And connects their own Google Calendar (#1047).
+            "calendar:connect-own",
         ]);
         await service.updateRole(lead, "user_x", { role: "stock-clerk" });
         expect(db.membership.update.mock.calls[0][0].data).toEqual({

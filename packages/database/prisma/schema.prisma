@@ -339,6 +339,12 @@ model Organization {
   qrScanDays           QrScanDay[]
   // What customers reported about this business at saroh.in/customers.
   businessReports      BusinessReport[]
+  // Google Calendar (#1047, #1048): each person's connection, the calendars
+  // they chose, the events Saroh made and the busy times read.
+  googleCalendarConnections GoogleCalendarConnection[]
+  googleCalendarLinks       GoogleCalendarLink[]
+  googleCalendarEvents      GoogleCalendarEvent[]
+  googleCalendarBusy        GoogleCalendarBusy[]
 
   // Subdomain / custom-domain claims (S2-007). Each Domain is org-owned and its
   // `hostname` is globally unique, so a hostname maps to at most one org.
@@ -765,6 +771,9 @@ model Membership {
 
   // The staff member this team member is on the diary as, if any (U3).
   staffMember StaffMember?
+
+  // Their Google Calendar in this business (#1047): at most one.
+  googleCalendarConnection GoogleCalendarConnection?
 
   // Extra permissions for this one person, on top of their role (F17,
   // DEC-039). Action keys, like OrganizationRole.actions: unknown strings are
@@ -5767,6 +5776,10 @@ model Service {
   // (`Booking.locationType`).
   locationType String  @default("IN_PERSON")
   meetingUrl   String?
+  // Where an online booking's link comes from (#1048): MANUAL, the typed
+  // `meetingUrl` above; GOOGLE_MEET, a link of its own per booking, made
+  // on the Google Calendar of the person who takes it. CHECKed.
+  meetingLink  String  @default("MANUAL")
 
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
@@ -5956,6 +5969,12 @@ model Booking {
   order       Order?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
   visitNumber Int?
 
+  // This booking's own meeting link (#1048): a Google Meet link made for it
+  // alone. Null: the service's typed link in the snapshot, as before.
+  meetingUrl          String?
+  // The event Saroh keeps for it on the Google Calendar of whoever takes it.
+  googleCalendarEvent GoogleCalendarEvent?
+
   // A given idempotency key yields at most one booking per service.
   @@unique([serviceId, idempotencyKey])
   // One live booking per visit of a treatment (E9): two people booking
@@ -6023,6 +6042,8 @@ model StaffMember {
   latestBookingMinutes Int? // the notice they need before a start
   gapMinutes           Int? // kept clear between their bookings
   ruleRequests         StaffRuleRequest[]
+  // Their busy times read from Google (#1047): they block slots.
+  googleCalendarBusy   GoogleCalendarBusy[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -10491,4 +10512,115 @@ model AskAiDraft {
 
   @@index([organizationId, userId, createdAt])
   @@index([conversationId])
+}
+
+// ============================================================================
+// GOOGLE CALENDAR (#1047, #1048)
+// ============================================================================
+//
+// One person, in one business, connects their Google account through
+// Saroh's own consent (the API's, not sign-in's). Their bookings are copied
+// to the calendar they write to, and busy times on the calendars they check
+// block their slots. Every table is the business's, under RLS.
+
+// A person's Google connection in one business. Only the refresh token is
+// kept, sealed with CALENDAR_ENC_KEY (a DEC-214 ring: the key's id travels
+// in the ciphertext) and bound to this row; access tokens live in memory
+// for one job. Disconnecting deletes the row.
+model GoogleCalendarConnection {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  membershipId   String       @unique
+  membership     Membership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  // The Google account it reaches, as Google said at consent.
+  googleEmail String
+
+  // The refresh token, sealed. Null once Google refused it (LAPSED).
+  tokenCiphertext String?
+  tokenIv         String?
+  tokenAuthTag    String?
+
+  // The scopes Google granted; a person may untick one at consent.
+  scopes String[] @default([])
+
+  // CONNECTED | LAPSED (Google refused the token: reconnect), CHECKed.
+  status   String    @default("CONNECTED")
+  lapsedAt DateTime?
+
+  // When busy times were last read; older than two hours reads as behind.
+  busyRefreshedAt DateTime?
+  // The last thing that went wrong, in words, never a token or an email.
+  lastError       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  calendars GoogleCalendarLink[]
+  events    GoogleCalendarEvent[]
+  busy      GoogleCalendarBusy[]
+
+  @@unique([organizationId, membershipId])
+  @@index([organizationId])
+}
+
+// A calendar the person chose: Saroh writes their bookings to the one
+// `writeTo` calendar, and reads busy times from every `checkBusy` one.
+model GoogleCalendarLink {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectionId   String
+  connection     GoogleCalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  calendarId String
+  name       String
+  writeTo    Boolean @default(false)
+  checkBusy  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@unique([connectionId, calendarId])
+  // One calendar to write to per connection.
+  @@unique([connectionId], map: "GoogleCalendarLink_one_write", where: raw("\"writeTo\""))
+  @@index([organizationId])
+}
+
+// The event Saroh made in Google for one booking, and its Meet link.
+model GoogleCalendarEvent {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bookingId      String                   @unique
+  booking        Booking                  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  connectionId   String
+  connection     GoogleCalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  calendarId String
+  eventId    String
+  meetUrl    String?
+  syncedAt   DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([connectionId])
+}
+
+// A busy time read from Google for one person, replaced whole on each read.
+model GoogleCalendarBusy {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectionId   String
+  connection     GoogleCalendarConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  // Whose slots it blocks: the connection's person on the diary.
+  staffId        String
+  staff          StaffMember              @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  startAt DateTime
+  endAt   DateTime
+
+  @@index([organizationId])
+  @@index([connectionId])
+  @@index([staffId, startAt])
 }

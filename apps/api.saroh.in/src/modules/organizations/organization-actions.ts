@@ -116,6 +116,13 @@ export type OrgAction =
     | "hours:write"
     | "booking:read"
     | "booking:write"
+    // Connect their OWN Google Calendar (#1047): their bookings copied to
+    // it, its busy times blocking their slots, and Meet links for their
+    // online sessions. Only ever the holder's own account and diary, never
+    // anyone else's. Every role that takes bookings holds it by default
+    // but the Reviewer; a role saved before it gained it only where it
+    // could already change bookings (migration `20270217120000`).
+    | "calendar:connect-own"
     | "order:read"
     | "order:write"
     // The kitchen (DEC-024, ADR-008): read an order's kitchen view with no
@@ -261,6 +268,7 @@ export const ORG_ACTIONS: readonly OrgAction[] = [
     "hours:write",
     "booking:read",
     "booking:write",
+    "calendar:connect-own",
     "order:read",
     "order:write",
     "order:stage",

@@ -44,6 +44,9 @@ function makeTx() {
             findFirst: jest.fn().mockResolvedValue({ id: "ev_booked" }),
         },
         job: { create: jest.fn().mockResolvedValue({ id: "job_1" }) },
+        // Google Calendar (#1047): nobody here is connected.
+        googleCalendarEvent: { count: jest.fn().mockResolvedValue(0) },
+        googleCalendarConnection: { count: jest.fn().mockResolvedValue(0) },
         invoice: {
             create: jest.fn().mockResolvedValue({ id: "inv_1" }),
             findFirst: jest.fn(),

@@ -29,7 +29,8 @@
   `WEBHOOK_SECRET_KEY`) may be a ring, `v2:<key>,v1:<key>` newest first
   (DEC-214, `runbooks/KEY_ROTATION.md`). `AI_TEXT_ENC_KEY` (Ask AI's
   conversation text, DEC-220) and the provider key `ANTHROPIC_API_KEY`
-  follow the same rule: optional at boot, refused at use.
+  follow the same rule: optional at boot, refused at use. So does
+  `CALENDAR_ENC_KEY` (each person's Google refresh token, #1047).
 
 - **Current** — **A build-time switch that hides something is off when
   unset.** `NEXT_PUBLIC_TEMPLATES` (DEC-135) shows templates only when it is

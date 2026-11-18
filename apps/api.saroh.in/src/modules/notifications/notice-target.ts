@@ -84,6 +84,9 @@ export const NOTICE_KINDS = {
     "plan.move": "plan",
     // Written by the catalogue backfill in `@saroh/database`.
     "catalogue.merge-report": "products",
+    // Google stopped Saroh's access to someone's Google Calendar (#1047):
+    // to that person alone (`userId`), on their own Hours and time off.
+    "calendar.lapsed": "hours",
     // A webhook endpoint Saroh switched off after repeated failed
     // deliveries (plan 2026-11-10-001, U13): Settings › API and AI apps.
     "webhook.disabled": "developers",

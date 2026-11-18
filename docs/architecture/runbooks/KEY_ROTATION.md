@@ -1,8 +1,8 @@
 # Key rotation: replacing one of the API's encryption keys
 
 > **Read when:** replacing `PAYMENTS_ENC_KEY`, `STAFF_PII_ENC_KEY`,
-> `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY` or
-> `AI_TEXT_ENC_KEY`, on a
+> `MESSAGING_ENC_KEY`, `APIKEY_ENC_KEY`, `WEBHOOK_SECRET_KEY`,
+> `AI_TEXT_ENC_KEY` or `CALENDAR_ENC_KEY`, on a
 > schedule or because one leaked. Decision: DEC-214. Code:
 > `apps/api.saroh.in/src/common/crypto.ts`, re-seal
 > `apps/api.saroh.in/src/cli/keys-reseal.ts`.
@@ -40,6 +40,7 @@ database. A database copy alone opens nothing either.
 | `WEBHOOK_SECRET_KEY` | Businesses' outbound webhook signing secrets                                                                                           | The secrets: someone could sign fake events to a business's receiver                                                |
 | `APIKEY_ENC_KEY`     | Fingerprints of public API keys and visitor tokens (never the token)                                                                   | Nothing usable: a token is 32 random bytes and can't be guessed from its fingerprint                                |
 | `AI_TEXT_ENC_KEY`    | Ask AI's messages and conversation titles (DEC-220), each bound to its business, conversation and row                                  | People's questions and the answers, up to 90 days of them, with the customer details the answers named              |
+| `CALENDAR_ENC_KEY`   | People's Google refresh tokens for Calendar sync (#1047), each bound to its business and connection                                    | Access to those people's Google Calendars: their events and busy times, until each is revoked                       |
 
 **The API key exception.** An API key's fingerprint can't be re-made, because
 the token is never stored. It moves to the newest key by itself the next time
@@ -152,6 +153,10 @@ leaked with the key, also replace what the key protected:
   stop working.
 - `AI_TEXT_ENC_KEY`: nothing to replace; record the exposure of the
   conversations kept at that moment (at most 90 days of them).
+- `CALENDAR_ENC_KEY`: the tokens are live access to people's calendars.
+  Revoke them: ask each connected person to disconnect and connect again
+  (disconnecting revokes the token at Google), or reset the Google client's
+  secret, which ends every token it issued.
 
 Then follow `devops-secrets.md`: check access logs for the window, and write
 up the incident (`DEPLOY_ROLLBACK_INCIDENT.md`).

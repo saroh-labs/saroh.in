@@ -209,6 +209,15 @@ export const FlagKey = {
      * `social/access/social-access.ts`.
      */
     MODULE_SOCIAL: "MODULE_SOCIAL",
+    /**
+     * Google Calendar sync and Meet links (#1047, #1048): off for everyone
+     * until the owner opens it, a business's override first. Off, connecting
+     * is refused, `calendar.sync` and `calendar.busy` do nothing, and slots
+     * ignore Google. Readers: `calendar-sync/calendar-connect.service.ts`,
+     * `calendar-sync/calendar-sync.handler.ts`,
+     * `calendar-sync/calendar-busy.handler.ts`.
+     */
+    GOOGLE_CALENDAR: "GOOGLE_CALENDAR",
 } as const;
 
 export type FlagKey = (typeof FlagKey)[keyof typeof FlagKey];
@@ -459,5 +468,15 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-06-30",
         removeWhen:
             "Saroh Social has been on for every business on every instance for a release with no need to switch it off.",
+    },
+    GOOGLE_CALENDAR: {
+        shownAs: "Google Calendar",
+        group: "feature",
+        purpose:
+            "Lets a person who takes bookings connect their own Google Calendar: bookings copied to it with the customer invited, busy times there blocking their slots, and Google Meet links for online sessions (#1047, #1048). Turn it on for Saroh's own test business first, once the Google client and CALENDAR_ENC_KEY are set; off, connecting is refused, nothing is sent to or read from Google, and slots ignore it. Connections already made stay, and work again when it is back on.",
+        owner: "Owner",
+        reviewBy: "2027-06-30",
+        removeWhen:
+            "Google Calendar has been on for every business on every instance for a release with no need to switch it off, and the calendar-sync module no longer asks it.",
     },
 };

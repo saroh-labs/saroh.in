@@ -130,6 +130,8 @@ const MEMBER_ACTIONS: readonly OrgAction[] = [
     // Their own alerts (DEC-170, #1038): the answer to a request they made,
     // never the business's inbox.
     "notification:read-own",
+    // Their own Google Calendar (#1047): their account, their diary.
+    "calendar:connect-own",
 ];
 
 /**
