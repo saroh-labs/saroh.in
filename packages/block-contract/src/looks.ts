@@ -1,3 +1,4 @@
+import type { ComponentDefaults } from "./component-styles";
 import type { FontPairKey } from "./fonts";
 import type { SectionType } from "./section-contract";
 import type { SiteTypeScale } from "./type-scale";
@@ -90,6 +91,12 @@ export interface SiteLook {
     /** A few words for the Look list's card, where `suits` is too long. */
     short: string;
     tokens: LookTokens;
+    /**
+     * Its component styles (DEC-227, KD3; BRIEF Wave 2): what each option
+     * row in Customise starts on. Each is how the look draws today, so a
+     * site that changed nothing renders as it always has.
+     */
+    components: ComponentDefaults;
     fontPair: LookFontPair;
     type: SiteTypeScale;
     /**
@@ -127,6 +134,17 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
             sectionPadding: { phone: 72, desk: 136 },
             measure: 64,
         },
+        components: {
+            buttons: "square",
+            secondButton: "text",
+            cards: "flat",
+            cardCorners: "soft",
+            images: "square",
+            headings: "display",
+            spacing: "standard",
+            tags: "tag",
+            links: "arrow",
+        },
         fontPair: "folio",
         type: {
             displaySize: 64,
@@ -159,6 +177,17 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
             sectionPadding: { phone: 72, desk: 120 },
             measure: 60,
         },
+        components: {
+            buttons: "pill",
+            secondButton: "text",
+            cards: "flat",
+            cardCorners: "soft",
+            images: "arch",
+            headings: "normal",
+            spacing: "airy",
+            tags: "tag",
+            links: "underlined",
+        },
         fontPair: "quiet",
         type: { displaySize: 56, bodySize: 17, measure: 60 },
         defaultVariants: {
@@ -187,6 +216,17 @@ export const LOOKS: Readonly<Record<LookId, SiteLook>> = {
             // sections (48 + 8 on a phone); split evenly here.
             sectionPadding: { phone: 28, desk: 40 },
             measure: 68,
+        },
+        components: {
+            buttons: "pill",
+            secondButton: "outline",
+            cards: "raised",
+            cardCorners: "soft",
+            images: "soft",
+            headings: "caps",
+            spacing: "compact",
+            tags: "pill",
+            links: "arrow",
         },
         fontPair: "live",
         type: { displaySize: 48, bodySize: 16, measure: 68 },

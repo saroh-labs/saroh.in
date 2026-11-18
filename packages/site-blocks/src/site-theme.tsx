@@ -12,12 +12,14 @@
 
 import type { SiteFontFace, SiteFontPair } from "@saroh/block-contract";
 import {
+    COMPONENT_VARIABLE_PREFIX,
     findFontPair,
     fontFaceKey,
     fontStack,
     LOOKS,
 } from "@saroh/block-contract";
 
+import { componentRules } from "./component-theme";
 import { lookOf, lookScope } from "./look-context";
 import { lookRules, lookViewOf } from "./look-theme";
 import { craftRules } from "./site-craft";
@@ -245,7 +247,7 @@ ${
         : custom === null
           ? ""
           : `            ${at} {\n${custom}\n            }`
-}${lookTokens}${labels}${column}${sectionRules(at)}${craftRules(at, view, look)}
+}${lookTokens}${labels}${column}${sectionRules(at)}${craftRules(at, view, look)}${componentRules(at, look, variables)}
         `}</style>
     );
 }
@@ -460,8 +462,12 @@ function cssVariables(
     const safeValue = /^[a-zA-Z0-9 .%]{1,64}$/;
 
     const declarations = Object.entries(variables)
-        // A word that chooses a rule, not a value (see `labelRule`).
-        .filter(([name]) => name !== LABEL_STYLE_VARIABLE)
+        // Words that choose a rule, not values (`labelRule`, `componentRules`).
+        .filter(
+            ([name]) =>
+                name !== LABEL_STYLE_VARIABLE &&
+                !name.startsWith(COMPONENT_VARIABLE_PREFIX),
+        )
         .map(([name, value]): [string, unknown] => {
             // The two font variables carry a pair's KEY (KTD-2), translated
             // here from the curated list; an unknown key is dropped, leaving

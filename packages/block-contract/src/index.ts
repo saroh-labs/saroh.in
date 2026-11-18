@@ -1,5 +1,7 @@
 // Address rules by country, for site blocks, which import only this package (#252).
 export * from "@saroh/edition/address-rules";
+export * from "./coming-blocks";
+export * from "./component-styles";
 export * from "./delivery-place";
 export * from "./examples";
 export * from "./fixtures";
