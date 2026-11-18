@@ -69,6 +69,8 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import type { ModuleReadinessRegistry } from "../capabilities/readiness/module-readiness.registry";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { OrganizationContextService } from "../organizations/organization-context.service";
+import { SiteRedirectsController } from "./site-redirects.controller";
+import { SiteRedirectsService } from "./site-redirects.service";
 import { SitesController } from "./sites.controller";
 import { SitesService } from "./sites.service";
 import { TestReleasesController } from "./test-releases.controller";
@@ -146,6 +148,11 @@ const releaseRoute = (handler: keyof TestReleasesController): Target => ({
     controller: TestReleasesController,
     handler,
 });
+const redirectRoute = (handler: keyof SiteRedirectsController): Target => ({
+    controller: SiteRedirectsController,
+    handler,
+});
+const redirects = () => new SiteRedirectsService();
 
 /**
  * The context the guards read, pointed at a REAL controller handler.
@@ -419,6 +426,36 @@ const OPERATIONS: readonly Operation[] = [
         run: (ctx) => releases().discard(ctx, SITE, "release_1"),
         allowed: ["OWNER", "ADMIN"],
     },
+    // Old page links that forward (KTD-3): reading them is reading the
+    // site; adding or removing one is editing it.
+    {
+        what: "see the old links that forward",
+        handler: "list",
+        target: redirectRoute("list"),
+        method: "GET",
+        run: (ctx) => redirects().list(ctx, SITE),
+        allowed: ["OWNER", "ADMIN", "MEMBER", "REVIEWER"],
+    },
+    {
+        what: "forward an old link to a page",
+        handler: "list",
+        target: redirectRoute("create"),
+        method: "POST",
+        run: (ctx) =>
+            redirects().create(ctx, SITE, {
+                fromPath: "/old-prices",
+                toPath: "/prices",
+            }),
+        allowed: ["OWNER", "ADMIN"],
+    },
+    {
+        what: "stop forwarding an old link",
+        handler: "list",
+        target: redirectRoute("remove"),
+        method: "DELETE",
+        run: (ctx) => redirects().remove(ctx, SITE, "redirect_1"),
+        allowed: ["OWNER", "ADMIN"],
+    },
 ];
 
 const ROLES: readonly OrgRole[] = ["OWNER", "ADMIN", "MEMBER", "REVIEWER"];
@@ -514,6 +551,25 @@ describe("a website request, through the real guard chain", () => {
                     service().getReviewState(ctx, SITE),
                 ),
             ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it("404s the old links of a site the reviewer was not invited to", async () => {
+            signedInAs("REVIEWER");
+            siteFindFirst.mockResolvedValue(null);
+
+            await expect(
+                throughChain(
+                    "GET",
+                    (ctx) => redirects().list(ctx, SITE),
+                    "list",
+                    redirectRoute("list"),
+                ),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(siteFindFirst).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    where: expect.objectContaining(REVIEWER_SCOPE),
+                }),
+            );
         });
     });
 

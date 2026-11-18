@@ -167,3 +167,50 @@ describe("pendingSiteChanges with module pages (G14)", () => {
         ).toEqual([]);
     });
 });
+
+describe("pendingSiteChanges: old links and a page's own head (KTD-3, KTD-7)", () => {
+    const forward = { from: "/services/bridal-makeup-packages", to: "/bridal" };
+
+    it("reports a renamed page and its new old-link forward", () => {
+        const draftPages = [page("/", "Home", true), page("/bridal", "About")];
+        const live = snapshot(liveSite, [
+            page("/", "Home", true),
+            page("/services/bridal-makeup-packages", "About"),
+        ]);
+        expect(
+            pendingSiteChanges(liveSite, draftPages, live, [forward]),
+        ).toEqual(["pages", "redirects"]);
+    });
+
+    it("reports nothing once the forward is live, or on a snapshot from before forwards", () => {
+        const live = { ...snapshot(), redirects: [forward] };
+        expect(
+            pendingSiteChanges(liveSite, livePages, live, [forward]),
+        ).toEqual([]);
+        expect(pendingSiteChanges(liveSite, livePages, snapshot(), [])).toEqual(
+            [],
+        );
+    });
+
+    it("reports a forward the next publish takes out", () => {
+        const live = { ...snapshot(), redirects: [forward] };
+        expect(pendingSiteChanges(liveSite, livePages, live, [])).toEqual([
+            "redirects",
+        ]);
+    });
+
+    it.each([
+        ["Google title", { seoTitle: "About Northwind" }],
+        ["Google text", { seoDescription: "Who we are" }],
+        ["share image", { shareImageUrl: "https://img.test/about.png" }],
+        ["Show on Google off", { noindex: true as const }],
+    ])("counts a page's own %s as a page-list change", (_what, head) => {
+        const draftPages = [
+            page("/", "Home", true),
+            { ...page("/about", "About"), ...head },
+        ];
+        expect(pendingSiteChanges(liveSite, draftPages, snapshot())).toEqual([
+            "pages",
+        ]);
+    });
+});

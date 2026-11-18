@@ -4,19 +4,25 @@
 // against the page that actually holds the path.
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
-    return {
-        ...actual,
-        prisma: {
-            site: { findFirst: jest.fn() },
-            page: {
-                findFirst: jest.fn(),
-                findMany: jest.fn(),
-                create: jest.fn(),
-                update: jest.fn(),
-                delete: jest.fn(),
-            },
+    const prisma: Record<string, unknown> = {
+        site: { findFirst: jest.fn(), findUnique: jest.fn() },
+        page: {
+            findFirst: jest.fn(),
+            findMany: jest.fn(),
+            create: jest.fn(),
+            update: jest.fn(),
+            delete: jest.fn(),
         },
+        // Old page links that forward (KTD-3).
+        siteRedirect: {
+            findMany: jest.fn().mockResolvedValue([]),
+            updateMany: jest.fn(),
+            create: jest.fn(),
+        },
+        // A page write and its forwards run in one transaction.
+        $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };
+    return { ...actual, prisma };
 });
 
 import { BadRequestException, NotFoundException } from "@nestjs/common";
@@ -47,6 +53,12 @@ const service = new SitesService({
     can: jest.fn().mockResolvedValue(true),
     getEntitlements: jest.fn(),
 } as unknown as import("../billing/entitlement.service").EntitlementService);
+
+/** Every page settings write says who made it (KTD-4). */
+const STAMP = {
+    settingsEditedByUserId: "user_1",
+    settingsEditedAt: expect.any(Date),
+};
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -230,6 +242,7 @@ describe("SitesService.updatePage", () => {
         // ABSENT must mean "leave alone" — a rename that omitted the path must
         // not move the page to an empty one.
         expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
             title: "Our story",
         });
     });
@@ -276,7 +289,10 @@ describe("SitesService.updatePage", () => {
         // Hiding is not an edit to what the page SAYS. Its title and path are
         // untouched, so the merchant gets the page back exactly as they left
         // it — which is the whole difference between hiding and deleting.
-        expect(pageUpdate.mock.calls[0][0].data).toEqual({ hidden: true });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
+            hidden: true,
+        });
     });
 
     it("leaves visibility alone when the field is absent", async () => {
@@ -301,6 +317,7 @@ describe("SitesService.updatePage", () => {
         // predates the field must not be able to put a deliberately parked
         // page back on a live site by not mentioning it.
         expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
             title: "Our story",
         });
     });
@@ -427,7 +444,10 @@ describe("SitesService.updatePage", () => {
         await service.updatePage(ctx(), "site_1", "page_book", {
             title: "Classes",
         });
-        expect(pageUpdate.mock.calls[0][0].data).toEqual({ title: "Classes" });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
+            title: "Classes",
+        });
     });
 
     it("moves a Contact page to a free address, but not into /shop (G14)", async () => {
@@ -445,7 +465,10 @@ describe("SitesService.updatePage", () => {
         await service.updatePage(ctx(), "site_1", "page_contact", {
             path: "/find-us",
         });
-        expect(pageUpdate.mock.calls[0][0].data).toEqual({ path: "/find-us" });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
+            path: "/find-us",
+        });
 
         pageFindFirst.mockResolvedValueOnce({
             id: "page_contact",
@@ -472,10 +495,16 @@ describe("SitesService.updatePage", () => {
         pageUpdate.mockResolvedValue({ id: "page_2" });
 
         await service.updatePage(ctx(), "site_1", "page_2", { inMenu: false });
-        expect(pageUpdate.mock.calls[0][0].data).toEqual({ inMenu: false });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
+            inMenu: false,
+        });
 
         await service.updatePage(ctx(), "site_1", "page_2", { title: "Us" });
-        expect(pageUpdate.mock.calls[1][0].data).toEqual({ title: "Us" });
+        expect(pageUpdate.mock.calls[1][0].data).toEqual({
+            ...STAMP,
+            title: "Us",
+        });
     });
 
     it("denies site:update to a MEMBER before touching the database", async () => {
@@ -520,5 +549,268 @@ describe("SitesService.deletePage", () => {
             response: roleDenial("site:update"),
         });
         expect(pageDelete).not.toHaveBeenCalled();
+    });
+});
+
+describe("SitesService.updatePage: old links and the page's own head (KTD-3, KTD-7)", () => {
+    const siteFindUnique = prisma.site.findUnique as jest.Mock;
+    const redirectFindMany = prisma.siteRedirect.findMany as jest.Mock;
+    const redirectUpdateMany = prisma.siteRedirect.updateMany as jest.Mock;
+    const redirectCreate = prisma.siteRedirect.create as jest.Mock;
+
+    const OLD = "/services/bridal-makeup-packages";
+
+    beforeEach(() => {
+        pageFindFirst.mockImplementation(({ where }) =>
+            Promise.resolve(
+                where.id
+                    ? {
+                          id: "page_2",
+                          path: OLD,
+                          isHome: false,
+                          title: "Bridal",
+                          kind: "FREE",
+                      }
+                    : null, // the new link is free
+            ),
+        );
+        pageUpdate.mockResolvedValue({ id: "page_2" });
+        redirectFindMany.mockResolvedValue([]);
+    });
+
+    function liveAt(...paths: string[]) {
+        siteFindUnique.mockResolvedValue({
+            currentPublication: {
+                snapshot: { pages: paths.map((path) => ({ path })) },
+            },
+        });
+    }
+
+    it("keeps a live page's old link forwarding to its new one", async () => {
+        liveAt("/", OLD);
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            path: "/bridal",
+        });
+
+        expect(redirectCreate.mock.calls[0][0].data).toEqual({
+            organizationId: "org_1",
+            siteId: "site_1",
+            fromPath: OLD,
+            toPath: "/bridal",
+            source: "AUTO",
+            createdByUserId: "user_1",
+        });
+        expect(pageUpdate.mock.calls[0][0].data).toMatchObject({
+            path: "/bridal",
+        });
+    });
+
+    it("makes no forward for a page that never went live", async () => {
+        siteFindUnique.mockResolvedValue({ currentPublication: null });
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            path: "/bridal",
+        });
+        expect(redirectCreate).not.toHaveBeenCalled();
+    });
+
+    it("points an earlier forward at the page's newest link", async () => {
+        liveAt("/");
+        redirectFindMany.mockResolvedValue([
+            { id: "r1", fromPath: "/a", toPath: OLD },
+        ]);
+        await service.updatePage(ctx(), "site_1", "page_2", { path: "/c" });
+        expect(redirectUpdateMany).toHaveBeenCalledWith({
+            where: { id: { in: ["r1"] } },
+            data: { toPath: "/c" },
+        });
+        expect(redirectCreate).not.toHaveBeenCalled();
+    });
+
+    it("touches no forward when the link is not changed", async () => {
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            title: "Bridal",
+        });
+        expect(redirectFindMany).not.toHaveBeenCalled();
+        expect(redirectCreate).not.toHaveBeenCalled();
+    });
+
+    it("saves the page's own Google title and text, and Show on Google", async () => {
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            seoTitle: "Bridal make-up",
+            seoDescription: null,
+            noindex: true,
+        });
+        expect(pageUpdate.mock.calls[0][0].data).toEqual({
+            ...STAMP,
+            seoTitle: "Bridal make-up",
+            seoDescription: null,
+            noindex: true,
+        });
+    });
+
+    it("takes a library photo's address for the share image", async () => {
+        const readyObject = jest.fn().mockResolvedValue({
+            id: "media_1",
+            url: "https://cdn.example.com/org/org_1/a.jpg",
+            contentType: "image/jpeg",
+            sizeBytes: 1000,
+        });
+        const withMedia = new SitesService(
+            {
+                check: jest.fn(),
+                can: jest.fn(),
+                getEntitlements: jest.fn(),
+            } as never,
+            undefined,
+            { readyObject } as never,
+        );
+        await withMedia.updatePage(ctx(), "site_1", "page_2", {
+            shareImageMediaId: "media_1",
+        });
+        expect(readyObject).toHaveBeenCalledWith("org_1", "media_1");
+        expect(pageUpdate.mock.calls[0][0].data).toMatchObject({
+            shareImageMediaId: "media_1",
+            shareImageUrl: "https://cdn.example.com/org/org_1/a.jpg",
+        });
+    });
+
+    it("refuses a share image a share card can't show", async () => {
+        const withMedia = new SitesService({} as never, undefined, {
+            readyObject: jest.fn().mockResolvedValue({
+                id: "media_1",
+                url: "https://cdn.example.com/a.svg",
+                contentType: "image/svg+xml",
+                sizeBytes: 10,
+            }),
+        } as never);
+        await expect(
+            withMedia.updatePage(ctx(), "site_1", "page_2", {
+                shareImageMediaId: "media_1",
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(pageUpdate).not.toHaveBeenCalled();
+    });
+
+    it("clears the share image, library photo and address together", async () => {
+        await service.updatePage(ctx(), "site_1", "page_2", {
+            shareImageMediaId: null,
+        });
+        expect(pageUpdate.mock.calls[0][0].data).toMatchObject({
+            shareImageMediaId: null,
+            shareImageUrl: null,
+        });
+    });
+});
+
+describe("SitesService.createPage: a new page wins over an old link", () => {
+    it("stops forwarding the old link the new page takes", async () => {
+        pageFindFirst.mockResolvedValue(null);
+        pageCreate.mockResolvedValue({ id: "page_9", path: "/old-prices" });
+        await service.createPage(ctx(), "site_1", {
+            title: "Prices",
+            path: "/old-prices",
+        });
+        expect(prisma.siteRedirect.updateMany).toHaveBeenCalledWith({
+            where: {
+                siteId: "site_1",
+                fromPath: "/old-prices",
+                removedAt: null,
+            },
+            data: { removedAt: expect.any(Date) },
+        });
+    });
+});
+
+describe("SitesService.buildSnapshot: old links and a page's own head", () => {
+    function draft(
+        over: Record<string, unknown> = {},
+        page: Record<string, unknown> = {},
+    ) {
+        return {
+            id: "site_1",
+            name: "Northwind Supply",
+            slug: "northwind",
+            postsPrefix: null,
+            style: null,
+            seoTitle: null,
+            seoDescription: null,
+            socialImageUrl: null,
+            socialImageWidth: null,
+            socialImageHeight: null,
+            socialImageBytes: null,
+            footer: null,
+            navigation: null,
+            redirects: [],
+            pages: [
+                {
+                    id: "p1",
+                    path: "/",
+                    title: "Home",
+                    isHome: true,
+                    kind: "FREE",
+                    inMenu: true,
+                    versions: [],
+                },
+                {
+                    id: "p2",
+                    path: "/bridal",
+                    title: "Bridal",
+                    isHome: false,
+                    kind: "FREE",
+                    inMenu: true,
+                    seoTitle: null,
+                    seoDescription: null,
+                    shareImageUrl: null,
+                    noindex: false,
+                    versions: [],
+                    ...page,
+                },
+            ],
+            ...over,
+        } as never;
+    }
+
+    it("adds nothing for a site without forwards or page head, byte for byte as before", () => {
+        const snapshot = service.buildSnapshot(draft(), new Date(0));
+        expect(snapshot).not.toHaveProperty("redirects");
+        expect(snapshot.pages[1]).toEqual({
+            path: "/bridal",
+            title: "Bridal",
+            isHome: false,
+            sections: [],
+        });
+    });
+
+    it("carries the forwards and the page's own head into what goes live", () => {
+        const snapshot = service.buildSnapshot(
+            draft(
+                {
+                    redirects: [
+                        {
+                            fromPath: "/services/bridal-makeup-packages",
+                            toPath: "/bridal",
+                        },
+                        // Lands on no page this publish serves: left out.
+                        { fromPath: "/old", toPath: "/gone" },
+                    ],
+                },
+                {
+                    seoTitle: "Bridal make-up",
+                    seoDescription: "Trials on weekdays",
+                    shareImageUrl: "https://cdn.example.com/bridal.jpg",
+                    noindex: true,
+                },
+            ),
+            new Date(0),
+        );
+        expect(snapshot.redirects).toEqual([
+            { from: "/services/bridal-makeup-packages", to: "/bridal" },
+        ]);
+        expect(snapshot.pages[1]).toMatchObject({
+            seoTitle: "Bridal make-up",
+            seoDescription: "Trials on weekdays",
+            shareImageUrl: "https://cdn.example.com/bridal.jpg",
+            noindex: true,
+        });
     });
 });

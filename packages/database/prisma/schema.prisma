@@ -328,6 +328,7 @@ model Organization {
   aiRequests           AiRequest[]
   aiReports            AiReport[]
   siteLinks            SiteLink[]
+  siteRedirects        SiteRedirect[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
   qrScanDays           QrScanDay[]
@@ -937,6 +938,8 @@ model Media {
   siteIcons      Site[]            @relation("SiteIcon")
   // The posts the business made with it (Create post).
   sharePosts     SharePost[]       @relation("SharePostMedia")
+  // The pages that use it as their own share image.
+  pageShareImages Page[]           @relation("PageShareImage")
 
   @@index([organizationId])
 }
@@ -4084,6 +4087,8 @@ model Site {
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
   siteLinks        SiteLink[]
+  // Old page links that forward to a page (page links forward, KTD-3).
+  redirects        SiteRedirect[]
   // What Undo puts back after starter content was copied in (DEC-182).
   draftSnapshots   SiteDraftSnapshot[]
   // "Tell me when it's back" asked on this site (DEC-174 U23).
@@ -4189,6 +4194,24 @@ model Page {
   // listed. On by default, so every page that existed before keeps the menu
   // it had.
   inMenu Boolean @default(true)
+
+  // The page's own Google title and text and share image (KTD-7). Draft like
+  // every page setting: they reach visitors with the next publish. Unset
+  // falls back to the site's.
+  seoTitle          String?
+  seoDescription    String?
+  // From the photo library, its address taken when chosen (as the site
+  // icon's is), or a pasted address with no library object behind it.
+  shareImageMediaId String?
+  shareImageMedia   Media?  @relation("PageShareImage", fields: [shareImageMediaId], references: [id], onDelete: SetNull)
+  shareImageUrl     String?
+  // "Show on Google" off: the page asks search engines not to list it.
+  noindex           Boolean @default(false)
+
+  // Who last changed this page's settings, and when (for "changed by" on
+  // the Publish sheet). A plain id, as `SiteLink.createdByUserId` is.
+  settingsEditedByUserId String?
+  settingsEditedAt       DateTime?
 
   @@unique([siteId, path])
   @@unique([siteId, kind], map: "Page_siteId_module_kind_key", where: raw("kind <> 'FREE'"))
@@ -4770,6 +4793,38 @@ model SiteTrackingSettings {
 /// Insights › Where customers come from; any other `ref` a visit carries
 /// counts under its group with no label. Archived, never deleted, so the
 /// figures a label already counted keep their name.
+// How an old page link came to forward (KTD-3): AUTO when a published
+// page's link changed, OWN when the merchant added one (an old site's link).
+enum SiteRedirectSource {
+  AUTO
+  OWN
+}
+
+// An old page link that forwards to a page on the same site. Draft: rows
+// reach the site in the next publish's snapshot (`redirects`), never read
+// live. AUTO rows never expire (owner, O2); `removedAt` takes a row out of
+// the next publish and frees its old link.
+model SiteRedirect {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fromPath String
+  toPath   String
+  source   SiteRedirectSource
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  removedAt       DateTime?
+
+  // One forward per old link on a site among rows not removed.
+  @@unique([siteId, fromPath], map: "SiteRedirect_siteId_fromPath_live_key", where: raw("\"removedAt\" IS NULL"))
+  @@index([organizationId, siteId])
+}
+
 model SiteLink {
   id     String @id @default(cuid())
   siteId String

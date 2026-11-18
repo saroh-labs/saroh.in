@@ -5,6 +5,7 @@ import {
     Injectable,
     NotFoundException,
     Optional,
+    ServiceUnavailableException,
 } from "@nestjs/common";
 import type { PageKind } from "@saroh/database";
 import {
@@ -22,6 +23,7 @@ import { ActivationEvents } from "../analytics/activation-events";
 import { EntitlementService } from "../billing/entitlement.service";
 import { keptPostsOnSite } from "../content/post-paused";
 import { parsePostsPrefix } from "../content/posts-prefix";
+import { MediaService } from "../media/media.service";
 import {
     checkoutReadiness,
     readinessMessage,
@@ -43,7 +45,11 @@ import type {
     UpdateSiteSettingsDto,
 } from "./dto";
 import { lockSite, putLive, readReviewStanding } from "./live-pointer";
-import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
+import {
+    createModulePage,
+    PAGE_HEAD_SELECT,
+    PAGE_VIEW_SELECT,
+} from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
 import {
     addableModulePageKinds,
@@ -56,6 +62,7 @@ import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
     countPendingSectionChanges,
+    pageHead,
     pagePathResolver,
     pendingSiteChanges,
     toPendingPages,
@@ -137,6 +144,8 @@ import {
     resolveSiteNavigation,
     withInPageNavigation,
 } from "./site-navigation";
+import { snapshotRedirects } from "./site-redirects";
+import { dropRedirectsAt, followPageMove } from "./site-redirects.service";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
@@ -282,6 +291,13 @@ export interface PageView {
     kind: PageKind;
     /** "Show in menu" (G14). */
     inMenu: boolean;
+    /** The page's own head (KTD-7); null falls back to the site's. */
+    seoTitle: string | null;
+    seoDescription: string | null;
+    shareImageMediaId: string | null;
+    shareImageUrl: string | null;
+    /** "Show on Google" off. */
+    noindex: boolean;
 }
 
 /** A section as returned by the draft-editing endpoints. */
@@ -529,6 +545,12 @@ export interface SiteDetailView {
         kind: PageKind;
         /** "Show in menu" (G14). */
         inMenu: boolean;
+        /** The page's own head (KTD-7); null falls back to the site's. */
+        seoTitle: string | null;
+        seoDescription: string | null;
+        shareImageMediaId: string | null;
+        shareImageUrl: string | null;
+        noindex: boolean;
         /**
          * When the page was last changed — renamed, moved, hidden or its
          * sections saved (#908, `pageUpdatedAt`).
@@ -713,6 +735,11 @@ const draftSiteSelect = {
     // Not part of the snapshot: what a Publication is stamped with (KTD-7).
     templateId: true,
     templateVersion: true,
+    // Old page links that forward (KTD-3), as the next publish carries them.
+    redirects: {
+        where: { removedAt: null },
+        select: { fromPath: true, toPath: true },
+    },
     pages: {
         // A hidden page does not travel, for the same reason a
         // hidden section does not: a Publication is immutable once
@@ -729,6 +756,11 @@ const draftSiteSelect = {
             // shows in the menu decides the resolved navigation.
             kind: true,
             inMenu: true,
+            // The page's own head (KTD-7).
+            seoTitle: true,
+            seoDescription: true,
+            shareImageUrl: true,
+            noindex: true,
             versions: {
                 where: { status: "DRAFT" },
                 orderBy: { createdAt: "desc" },
@@ -836,6 +868,8 @@ export class SitesService {
         private readonly entitlements: EntitlementService,
         /** The activation ledger, for the first publish (DEC-125). */
         @Optional() private readonly activation?: ActivationEvents,
+        /** The library photo a page's share image is chosen from (KTD-7). */
+        @Optional() private readonly media?: MediaService,
     ) {}
 
     /**
@@ -999,7 +1033,12 @@ export class SitesService {
             });
             byId.set(site.id, {
                 sections: countPendingSectionChanges(pages, live),
-                site: pendingSiteChanges(draft.site, pages, live),
+                site: pendingSiteChanges(
+                    draft.site,
+                    pages,
+                    live,
+                    (draft.redirects as unknown[] | undefined) ?? [],
+                ),
                 liveLook: snapshotLook(live) ?? null,
             });
         }
@@ -1066,6 +1105,7 @@ export class SitesService {
                         hidden: true,
                         kind: true,
                         inMenu: true,
+                        ...PAGE_HEAD_SELECT,
                         // The Pages tab's Updated column (#908).
                         ...pageUpdatedSelect,
                     },
@@ -2023,9 +2063,21 @@ export class SitesService {
                 // every snapshot of a site without module pages is byte for
                 // byte what it was.
                 ...(isModulePageKind(page.kind) ? { kind: page.kind } : {}),
+                // The page's own Google title, text, share image and "Show
+                // on Google" (KTD-7), only those set.
+                ...pageHead(page),
                 sections,
             };
         });
+        /*
+         * Old page links that forward (KTD-3), only to a page this publish
+         * serves. Only when there are some: a site without keeps a snapshot
+         * byte for byte what it was.
+         */
+        const redirects = snapshotRedirects(
+            site.redirects,
+            new Set(pages.map((p) => p.path)),
+        );
 
         const publishedStyle = parseSiteStyle(site.style);
         const draftFooter = parseSiteFooter(site.footer);
@@ -2122,6 +2174,7 @@ export class SitesService {
                 ),
             },
             pages,
+            ...(redirects.length > 0 ? { redirects } : {}),
             publishedAt: publishedAt.toISOString(),
         };
         return snapshot;
@@ -3675,7 +3728,10 @@ export class SitesService {
             });
             if (!site)
                 throw new NotFoundException(`Site "${siteId}" not found`);
-            return createModulePage(ctx, site, dto.kind, dto);
+            const made = await createModulePage(ctx, site, dto.kind, dto);
+            // A page now has this link: it wins over an old link's forward.
+            await dropRedirectsAt(prisma, siteId, made.path);
+            return made;
         }
 
         // The DTO requires both for a free-form page; checked again so the
@@ -3687,16 +3743,24 @@ export class SitesService {
         }
         await assertPathIsFree(siteId, dto.path, { title: dto.title });
 
-        return prisma.page.create({
-            data: {
-                siteId,
-                organizationId: ctx.organizationId,
-                path: dto.path,
-                title: dto.title,
-                isHome: false,
-                ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
-            },
-            select: PAGE_VIEW_SELECT,
+        const path = dto.path;
+        const title = dto.title;
+        return prisma.$transaction(async (tx) => {
+            // A page now has this link: it wins over an old link's forward.
+            await dropRedirectsAt(tx, siteId, path);
+            return tx.page.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    path,
+                    title,
+                    isHome: false,
+                    ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: new Date(),
+                },
+                select: PAGE_VIEW_SELECT,
+            });
         });
     }
 
@@ -3763,17 +3827,92 @@ export class SitesService {
             );
         }
 
-        return prisma.page.update({
-            where: { id: pageId },
-            data: {
-                // ABSENT means leave alone, so each field is set only when sent.
-                ...(dto.title === undefined ? {} : { title: dto.title }),
-                ...(dto.path === undefined ? {} : { path: dto.path }),
-                ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
-                ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
-            },
-            select: PAGE_VIEW_SELECT,
+        const shareImage = await this.pageShareImage(ctx, dto);
+        const moved =
+            dto.path !== undefined && dto.path !== page.path ? dto.path : null;
+
+        return prisma.$transaction(async (tx) => {
+            /*
+             * A link change keeps the old link forwarding once published
+             * (KTD-3), in the same transaction as the move, so a page never
+             * moves without its forward.
+             */
+            if (moved) {
+                await followPageMove(tx, {
+                    organizationId: ctx.organizationId,
+                    siteId,
+                    oldPath: page.path,
+                    newPath: moved,
+                    userId: ctx.userId,
+                });
+            }
+            return tx.page.update({
+                where: { id: pageId },
+                data: {
+                    // ABSENT means leave alone, so each field is set only when sent.
+                    ...(dto.title === undefined ? {} : { title: dto.title }),
+                    ...(dto.path === undefined ? {} : { path: dto.path }),
+                    ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
+                    ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
+                    ...(dto.seoTitle === undefined
+                        ? {}
+                        : { seoTitle: dto.seoTitle }),
+                    ...(dto.seoDescription === undefined
+                        ? {}
+                        : { seoDescription: dto.seoDescription }),
+                    ...shareImage,
+                    ...(dto.noindex === undefined
+                        ? {}
+                        : { noindex: dto.noindex }),
+                    // Who changed the page's settings, for the Publish
+                    // sheet's "changed by" (KTD-4).
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: new Date(),
+                },
+                select: PAGE_VIEW_SELECT,
+            });
         });
+    }
+
+    /**
+     * The share image fields a page update writes: a library photo (READY,
+     * this business's, a picture a share card can show) with its address
+     * taken now, a pasted address, or null for neither. Empty when the
+     * update leaves the share image alone.
+     */
+    private async pageShareImage(
+        ctx: OrganizationContext,
+        dto: UpdatePageDto,
+    ): Promise<{
+        shareImageMediaId?: string | null;
+        shareImageUrl?: string | null;
+    }> {
+        if (typeof dto.shareImageMediaId === "string") {
+            if (!this.media) {
+                throw new ServiceUnavailableException(
+                    "Photos can't be chosen right now. Try again in a moment.",
+                );
+            }
+            const media = await this.media.readyObject(
+                ctx.organizationId,
+                dto.shareImageMediaId,
+            );
+            if (!SHARE_IMAGE_TYPES.has(media.contentType) || !media.url) {
+                throw new BadRequestException({
+                    message:
+                        "Pick a JPG, PNG or WebP photo for the share image.",
+                    details: { field: "shareImageMediaId" },
+                });
+            }
+            return { shareImageMediaId: media.id, shareImageUrl: media.url };
+        }
+        if (dto.shareImageMediaId === null || dto.shareImageUrl !== undefined) {
+            return {
+                shareImageMediaId: null,
+                shareImageUrl: dto.shareImageUrl ?? null,
+            };
+        }
+        return {};
     }
 
     /**
@@ -3813,6 +3952,9 @@ export class SitesService {
         return { deleted: true };
     }
 }
+
+/** What WhatsApp, Facebook and Google draw as a share card. */
+const SHARE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 /**
  * A few words naming a section, for a list that has to distinguish two heroes

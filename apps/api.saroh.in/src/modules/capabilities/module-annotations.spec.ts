@@ -57,6 +57,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-icon.controller.ts": "WEBSITE",
     // A site's QR codes (Settings › Share).
     "sites/qr-codes.controller.ts": "WEBSITE",
+    // Old page links that forward (KTD-3).
+    "sites/site-redirects.controller.ts": "WEBSITE",
     "share-posts/share-posts.controller.ts": "WEBSITE",
     // The booking page's card with the sheet's headline (#1375).
     "share-posts/share-cards.controller.ts": "WEBSITE",

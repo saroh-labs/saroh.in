@@ -28,6 +28,8 @@ import { QrPrintService } from "./qr-print.service";
 import { SiteIconController } from "./site-icon.controller";
 import { SiteIconService } from "./site-icon.service";
 import { SitePreviewLinksService } from "./site-preview-links.service";
+import { SiteRedirectsController } from "./site-redirects.controller";
+import { SiteRedirectsService } from "./site-redirects.service";
 import { SiteTrackingController } from "./site-tracking.controller";
 import { SiteTrackingService } from "./site-tracking.service";
 import { SitesController } from "./sites.controller";
@@ -68,6 +70,8 @@ import { TestReleasesService } from "./test-releases.service";
         SiteTrackingController,
         SiteIconController,
         QrCodesController,
+        // Old page links that forward (KTD-3).
+        SiteRedirectsController,
         PublicSitesController,
         PublicQrController,
         // "Your booking page" in Bookings (DEC-175).
@@ -88,6 +92,7 @@ import { TestReleasesService } from "./test-releases.service";
         PublicContactService,
         PublicHeadService,
         QrCodesService,
+        SiteRedirectsService,
         QrPrintService,
         PublicQrService,
         GoLiveHandler,

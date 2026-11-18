@@ -267,6 +267,71 @@ export class UpdatePageDto {
     @IsOptional()
     @IsBoolean({ message: "inMenu must be a boolean" })
     inMenu?: boolean;
+
+    /*
+     * The page's own Google title and text and share image (KTD-7). Absent
+     * leaves alone; null (or blank) clears, and the site's own is used.
+     * Lengths are what Google shows before it cuts.
+     */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(70, { message: "Keep the Google title to 70 characters" })
+    seoTitle?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(300, { message: "Keep the Google text to 300 characters" })
+    seoDescription?: string | null;
+
+    /** A photo from the library; its address is taken when it is chosen. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    shareImageMediaId?: string | null;
+
+    /** A pasted address, when no library photo is chosen. */
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(2048)
+    @Matches(/^https?:\/\/\S+$/i, {
+        message:
+            "The share image must be a web address starting with http:// or https://",
+    })
+    shareImageUrl?: string | null;
+
+    /** "Show on Google" off. Absent leaves alone. */
+    @IsOptional()
+    @IsBoolean({ message: "noindex must be a boolean" })
+    noindex?: boolean;
+}
+
+/**
+ * One of the merchant's old links forwarding to a page (KTD-3): a link from
+ * an old site, or one printed before a page moved.
+ */
+export class CreateSiteRedirectDto {
+    @Transform(trim)
+    @IsString()
+    @Matches(PAGE_PATH_RE, {
+        message:
+            "The old link must start with / and use lowercase letters, numbers and hyphens (for example /old-prices)",
+    })
+    @MaxLength(200, { message: "The old link must be at most 200 characters" })
+    fromPath!: string;
+
+    @Transform(trim)
+    @IsString()
+    @Matches(PAGE_PATH_RE, { message: "Pick one of your pages" })
+    @MaxLength(200)
+    toPath!: string;
 }
 
 /**
