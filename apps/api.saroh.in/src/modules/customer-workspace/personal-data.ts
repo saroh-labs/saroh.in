@@ -62,6 +62,10 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
     "Contact.firstName": { rule: "cleared", why: "Their name." },
     "Contact.lastName": { rule: "cleared", why: "Their name." },
     "Contact.phone": { rule: "cleared", why: "Their phone." },
+    "Contact.gstin": {
+        rule: "cleared",
+        why: "Their tax number; issued invoices keep their own copy.",
+    },
     "Contact.addressLine1": { rule: "cleared", why: "Their address." },
     "Contact.addressLine2": { rule: "cleared", why: "Their address." },
     "Contact.city": { rule: "cleared", why: "Their address." },
@@ -131,9 +135,17 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
         rule: "kept",
         why: "Printed on an issued invoice.",
     },
+    "Invoice.billToGstin": {
+        rule: "kept",
+        why: "Printed on an issued invoice.",
+    },
     "Invoice.sellerAddress": {
         rule: "kept",
         why: "The business's address, not theirs.",
+    },
+    "Invoice.sellerGstin": {
+        rule: "kept",
+        why: "The business's GSTIN, not theirs.",
     },
     "Invoice.sellerName": {
         rule: "kept",
@@ -234,7 +246,7 @@ export const PERSONAL_FIELDS: Readonly<Record<string, PersonalField>> = {
  * body, a note, or a snapshot that can copy any of these.
  */
 export function looksPersonal(field: string): boolean {
-    return /^(email|phone|firstName|lastName|displayName|toAddress|invitedTo|city|state|zipCode|postalCode|notes|body|error|intakeNote|snapshot|address.*|delivery.*|booker.*|.*Name|.*Email|.*Phone|.*PhoneE164|phoneE164|.*Address)$/.test(
+    return /^(email|phone|firstName|lastName|displayName|toAddress|invitedTo|city|state|zipCode|postalCode|notes|body|error|intakeNote|snapshot|address.*|delivery.*|booker.*|.*Name|.*Email|.*Phone|.*PhoneE164|phoneE164|.*Address|gstin|.*Gstin)$/.test(
         field,
     );
 }

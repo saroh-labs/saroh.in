@@ -615,6 +615,88 @@ describe("Me", () => {
     });
 });
 
+describe("Me: a GSTIN for invoices (R16)", () => {
+    const GSTIN = "29AAAAA0000A1ZY";
+    function renderMe(account: AccountView, api: MeApi) {
+        return render(
+            <Me
+                account={account}
+                receipts={{ ok: true, value: [] }}
+                notes={null}
+                options={OPTIONS}
+                api={api}
+            />,
+        );
+    }
+
+    it("draws no GST card for an older API or caller", () => {
+        renderMe(ACCOUNT, meApi({ saveGstin: vi.fn() }));
+        expect(screen.queryByText("Business details for GST")).toBeNull();
+        renderMe({ ...ACCOUNT, gstin: null }, meApi());
+        expect(screen.queryByText("Business details for GST")).toBeNull();
+    });
+
+    it("adds a GSTIN through the site's server and shows it", async () => {
+        const saveGstin = vi
+            .fn<NonNullable<MeApi["saveGstin"]>>()
+            .mockResolvedValue({
+                ok: true,
+                account: { ...ACCOUNT, gstin: GSTIN },
+            });
+        renderMe({ ...ACCOUNT, gstin: null }, meApi({ saveGstin }));
+        await click(screen.getByRole("button", { name: "Add GSTIN" }));
+        fireEvent.change(screen.getByLabelText("GSTIN"), {
+            target: { value: "29aaaaa0000a1zy" },
+        });
+        await click(screen.getByRole("button", { name: "Save" }));
+        expect(saveGstin).toHaveBeenCalledWith(GSTIN);
+        expect(await screen.findByText(`GSTIN ${GSTIN}`)).toBeInTheDocument();
+        expect(
+            screen.getByText("On your invoices from now on"),
+        ).toBeInTheDocument();
+    });
+
+    it("says why a GSTIN was refused, naming it, and keeps the sheet open", async () => {
+        const saveGstin = vi
+            .fn<NonNullable<MeApi["saveGstin"]>>()
+            .mockResolvedValue({
+                ok: false,
+                message:
+                    "That GSTIN does not check out. Look for a mistyped character.",
+            });
+        renderMe({ ...ACCOUNT, gstin: null }, meApi({ saveGstin }));
+        await click(screen.getByRole("button", { name: "Add GSTIN" }));
+        fireEvent.change(screen.getByLabelText("GSTIN"), {
+            target: { value: "29AAAAA0000A1Z5" },
+        });
+        await click(screen.getByRole("button", { name: "Save" }));
+        expect(await screen.findByRole("alert")).toHaveTextContent(
+            "That GSTIN does not check out",
+        );
+        expect(screen.getByLabelText("GSTIN")).toHaveAttribute(
+            "aria-invalid",
+            "true",
+        );
+    });
+
+    it("removes a saved GSTIN", async () => {
+        const saveGstin = vi
+            .fn<NonNullable<MeApi["saveGstin"]>>()
+            .mockResolvedValue({
+                ok: true,
+                account: { ...ACCOUNT, gstin: null },
+            });
+        renderMe({ ...ACCOUNT, gstin: GSTIN }, meApi({ saveGstin }));
+        await click(screen.getByRole("button", { name: "Change" }));
+        await click(screen.getByRole("button", { name: "Remove GSTIN" }));
+        expect(saveGstin).toHaveBeenCalledWith("");
+        expect(await screen.findByText("Removed.")).toBeInTheDocument();
+        expect(
+            screen.getByRole("button", { name: "Add GSTIN" }),
+        ).toBeInTheDocument();
+    });
+});
+
 describe("the header's account entry", () => {
     const signIn = {
         requestCode: vi.fn(),

@@ -3,6 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { whenWords } from "../../common/words-format";
 import { recordOrderPaidInTx } from "../analytics/order-events";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
+import { contactBillToGst } from "../invoices/contact-gstin";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import type { OnlinePayment } from "../invoices/invoice-ledger";
@@ -186,6 +187,11 @@ export async function createHoldInvoiceInTx(
     },
 ): Promise<{ invoiceId: string; payToken: string }> {
     const profile = await loadTaxProfile(tx, input.organizationId);
+    const gst = await contactBillToGst(
+        tx,
+        input.organizationId,
+        input.contactId,
+    );
     const doc = buildManualInvoice(
         [
             {
@@ -203,7 +209,7 @@ export async function createHoldInvoiceInTx(
             },
         ],
         profile,
-        null,
+        gst.billToState,
         0,
     );
     const { token, tokenHash } = mintPayToken();
@@ -218,6 +224,7 @@ export async function createHoldInvoiceInTx(
             contactId: input.contactId,
             billToName: input.billToName,
             billToEmail: input.billToEmail,
+            ...gst,
             currency: input.service.currency,
             ...documentColumns(doc),
             payTokenHash: tokenHash,

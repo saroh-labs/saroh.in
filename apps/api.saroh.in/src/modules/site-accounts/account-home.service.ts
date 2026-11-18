@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     ConflictException,
     Inject,
     Injectable,
@@ -13,6 +14,7 @@ import { MODULE_BY_KEY } from "../capabilities/module-registry";
 import { PACKS_ON_SALE } from "../class-packs/pack-on-sale";
 import { packsOffered } from "../class-packs/packs-offered";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { gstinProblem } from "../invoices/gst-states";
 import type { PublicInvoiceView } from "../payments/public-invoices.service";
 import { invoicePaper } from "../payments/public-invoices.service";
 import { PLANS_ON_SALE } from "../subscriptions/plan-on-sale";
@@ -112,7 +114,12 @@ export class AccountHomeService {
                 email: true,
                 phoneE164: true,
                 contact: {
-                    select: { firstName: true, lastName: true, phone: true },
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        phone: true,
+                        gstin: true,
+                    },
                 },
                 organization: { select: { name: true } },
             },
@@ -154,6 +161,7 @@ export class AccountHomeService {
             firstName?: string | null;
             lastName?: string | null;
             phone?: string | null;
+            gstin?: string | null;
         } = {};
         if (dto.name !== undefined) {
             // The DTO refuses a blank name, so there is a first word.
@@ -163,6 +171,18 @@ export class AccountHomeService {
         }
         if (dto.phone !== undefined)
             data.phone = dto.phone === "" ? null : dto.phone;
+        if (dto.gstin !== undefined) {
+            // Only invoices made from now on print it (R16): issued ones keep theirs.
+            const gstin = dto.gstin.toUpperCase();
+            const problem = gstin === "" ? null : gstinProblem(gstin);
+            if (problem) {
+                throw new BadRequestException({
+                    message: problem,
+                    details: { field: "gstin" },
+                });
+            }
+            data.gstin = gstin === "" ? null : gstin;
+        }
         if (Object.keys(data).length > 0) {
             const updated = await prisma.contact.updateMany({
                 where: {

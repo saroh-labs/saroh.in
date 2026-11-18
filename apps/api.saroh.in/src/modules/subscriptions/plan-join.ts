@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 import { DateTime, IANAZone } from "luxon";
 
 import { resolveContact } from "../customer-workspace/resolve-contact";
+import { contactBillToGst } from "../invoices/contact-gstin";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { isGstPriceMode } from "../invoices/gst-price";
@@ -239,6 +240,11 @@ export async function createPlanJoinDraftInTx(
     },
 ): Promise<{ id: string; total: Prisma.Decimal; currency: string }> {
     const profile = await loadTaxProfile(tx, input.organizationId);
+    const gst = await contactBillToGst(
+        tx,
+        input.organizationId,
+        input.contactId,
+    );
     const doc = buildManualInvoice(
         [
             {
@@ -251,7 +257,7 @@ export async function createPlanJoinDraftInTx(
             },
         ],
         profile,
-        null,
+        gst.billToState,
         0,
     );
     const created = await tx.invoice.create({
@@ -263,6 +269,7 @@ export async function createPlanJoinDraftInTx(
             contactId: input.contactId,
             billToName: input.billToName,
             billToEmail: input.billToEmail,
+            ...gst,
             currency: input.terms.currency,
             ...documentColumns(doc),
             planTerms: { ...input.terms },

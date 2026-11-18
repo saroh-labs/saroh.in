@@ -17,6 +17,7 @@ import { AllExceptionsFilter } from "../../common/filters/all-exceptions.filter"
 import { OrgRlsInterceptor } from "../../common/interceptors/org-rls.interceptor";
 import { validationPipeOptions } from "../../common/validation";
 import { env } from "../../env";
+import { InvoicesService } from "../invoices/invoices.service";
 import {
     AccountHomeService,
     CUSTOMER_NOTES_OPEN,
@@ -332,6 +333,118 @@ describe("Me", () => {
             401,
         );
         expect((await call("GET", ME, { token })).status).toBe(401);
+    });
+});
+
+describe("a GSTIN for invoices (R16)", () => {
+    const GSTIN = "29AAAAA0000A1ZY";
+    const invoices = new InvoicesService();
+    const issue = (organizationId: string, contactId: string) =>
+        prisma.$transaction((tx) =>
+            invoices.issueInTx(tx, organizationId, {
+                contactId,
+                currency: "INR",
+                lines: [
+                    { description: "Class", quantity: 1, unitPrice: "500" },
+                ],
+                source: "SUBSCRIPTION",
+            }),
+        );
+    const billedGstin = async (id: string) =>
+        (
+            await prisma.invoice.findUniqueOrThrow({
+                where: { id },
+                select: { billToGstin: true },
+            })
+        ).billToGstin;
+
+    it("prints on invoices made after it is saved, never on ones already issued", async () => {
+        const biz = await business("Kavi Dental", ["APPOINTMENTS"]);
+        const { token, account } = await signIn(biz.host);
+        const before = await issue(biz.organizationId, account.contactId);
+
+        const saved = await call("PATCH", ME, {
+            host: biz.host,
+            token,
+            body: { gstin: " 29aaaaa0000a1zy " },
+        });
+        expect(saved.status).toBe(200);
+        expect(saved.body).toMatchObject({ gstin: GSTIN });
+        expect(
+            (await call("GET", ME, { host: biz.host, token })).body,
+        ).toMatchObject({ gstin: GSTIN });
+
+        const after = await issue(biz.organizationId, account.contactId);
+        expect(await billedGstin(after.id)).toBe(GSTIN);
+        expect(await billedGstin(before.id)).toBeNull();
+
+        // Removed: the next one has none; the one before keeps its own.
+        const removed = await call("PATCH", ME, {
+            host: biz.host,
+            token,
+            body: { gstin: "" },
+        });
+        expect(removed.body).toMatchObject({ gstin: null });
+        const later = await issue(biz.organizationId, account.contactId);
+        expect(await billedGstin(later.id)).toBeNull();
+        expect(await billedGstin(after.id)).toBe(GSTIN);
+    });
+
+    it("refuses a GSTIN that doesn't check out, naming the field, and saves nothing", async () => {
+        const biz = await business("Kavi Dental", ["APPOINTMENTS"]);
+        const { token, account } = await signIn(biz.host);
+        for (const gstin of [
+            "29AAAAA0000A1Z5",
+            "NOT-A-GSTIN",
+            "99AAAAA0000A1ZY",
+        ]) {
+            const refused = await call("PATCH", ME, {
+                host: biz.host,
+                token,
+                body: { gstin },
+            });
+            expect(refused.status).toBe(400);
+            expect(refused.body.error).toMatchObject({
+                message: expect.stringMatching(/GSTIN/),
+                details: { field: "gstin" },
+            });
+        }
+        const contact = await prisma.contact.findUniqueOrThrow({
+            where: { id: account.contactId },
+        });
+        expect(contact.gstin).toBeNull();
+    });
+
+    it("another business's account can't read or write it", async () => {
+        const one = await business("Kavi Dental", ["APPOINTMENTS"]);
+        const two = await business("Pulse Fitness", ["APPOINTMENTS"]);
+        const mine = await signIn(one.host);
+        const theirs = await signIn(two.host);
+        await call("PATCH", ME, {
+            host: one.host,
+            token: mine.token,
+            body: { gstin: GSTIN },
+        });
+
+        // Another business's customer sees only their own.
+        expect(
+            (await call("GET", ME, { host: two.host, token: theirs.token }))
+                .body,
+        ).toMatchObject({ gstin: null });
+        // One business's session never reaches the other's account.
+        const crossed = await call("PATCH", ME, {
+            host: two.host,
+            token: mine.token,
+            body: { gstin: "" },
+        });
+        expect(crossed.status).toBe(401);
+        const kept = await prisma.contact.findUniqueOrThrow({
+            where: { id: mine.account.contactId },
+        });
+        expect(kept.gstin).toBe(GSTIN);
+        // Nor does an invoice the other business makes for its own contact.
+        const other = await issue(two.organizationId, theirs.account.contactId);
+        expect(await billedGstin(other.id)).toBeNull();
     });
 });
 

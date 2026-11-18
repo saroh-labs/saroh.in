@@ -71,6 +71,7 @@ describe("the account's allow-list", () => {
                 firstName: " Farah ",
                 lastName: "Khan",
                 phone: " +91 98765 43210 ",
+                gstin: "29AAAAA0000A1ZY",
                 email: "account+contact_secret_id@account.invalid",
                 ...noisy,
             } as never,
@@ -92,6 +93,7 @@ describe("the account's allow-list", () => {
             email: "farah@example.in",
             phone: "+91 98765 43210",
             signInPhone: null,
+            gstin: "29AAAAA0000A1ZY",
             businessName: "Kavi Dental",
             tabs: [
                 { key: "home", label: "Home" },

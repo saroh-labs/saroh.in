@@ -318,6 +318,7 @@ export class MergeService {
                     lastName: null,
                     phone: null,
                     company: null,
+                    gstin: null,
                     addressLine1: null,
                     addressLine2: null,
                     city: null,

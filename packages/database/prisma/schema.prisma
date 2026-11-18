@@ -5026,6 +5026,9 @@ model Contact {
   lastName  String?
   phone     String?
   company   String?
+  // Their GSTIN, saved by them in their site account's details (R16). Copied
+  // onto an invoice when it is made; an issued one keeps what it had.
+  gstin     String?
 
   // Free-form provenance, e.g. "enquiry:form:<id>" — where this contact first
   // entered the CRM. Never a tenant boundary; informational only.

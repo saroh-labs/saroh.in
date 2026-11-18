@@ -44,6 +44,8 @@ function makeTx() {
             findFirst: jest.fn().mockResolvedValue({ id: "ev_booked" }),
         },
         job: { create: jest.fn().mockResolvedValue({ id: "job_1" }) },
+        // No GSTIN saved on the contact (R16).
+        contact: { findFirst: jest.fn().mockResolvedValue(null) },
         invoice: {
             create: jest.fn().mockResolvedValue({ id: "inv_1" }),
             findFirst: jest.fn(),
