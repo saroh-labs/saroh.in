@@ -17,10 +17,27 @@ export const onPhone = (page: Page): boolean =>
 
 /**
  * The reviewer's one site, opened from Website: `/sites` → the site →
- * the editor, read-only. Returns the site's id.
+ * the editor, read-only (through All sites and Open editor while the
+ * Website area is on). Returns the site's id.
  */
 export async function openReviewedSite(page: Page): Promise<string> {
     await page.goto(`${urls.APP_URL}/sites`);
+    // The Website area (NEXT_PUBLIC_WEBSITE_AREA, on in CI) lists the site
+    // at /sites: its card opens the Overview, whose Open editor opens it
+    // read-only. Off, /sites forwards straight to the editor.
+    if (new URL(page.url()).pathname === "/sites") {
+        await page
+            .getByRole("list", { name: "Your sites" })
+            .getByRole("link")
+            .first()
+            .click();
+        await page.waitForURL(/\/overview$/, { timeout: 30_000 });
+        await page
+            .getByRole("link", { name: /Open editor/ })
+            .filter({ visible: true })
+            .first()
+            .click();
+    }
     await page.waitForURL(/\/sites\/[^/?]+(\?.*)?$/, { timeout: 30_000 });
     await expect(page.locator("[data-layout]")).toBeVisible({
         timeout: 30_000,

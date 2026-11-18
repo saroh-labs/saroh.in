@@ -398,6 +398,8 @@ e2e_stack() {
     export NEXT_PUBLIC_WEBSITE_LIBRARY=on
     # Settings › API and AI apps on, as CI: the role specs list its tab.
     export NEXT_PUBLIC_API_AREA=on
+    # The redesigned Website area on, as CI (plan 2026-11-18-001).
+    export NEXT_PUBLIC_WEBSITE_AREA=on
     # Share as a post and Create post on, as CI (DEC-217): app and API.
     export NEXT_PUBLIC_SHARE_POSTS=on SHARE_POSTS=on
     # Ask AI's screens on, as CI (DEC-220).

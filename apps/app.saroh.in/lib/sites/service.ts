@@ -661,6 +661,22 @@ export interface SiteSummary {
     pendingSiteChanges?: SiteChangeKind[] | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
+    /**
+     * Visits in the last 7 days, from the analytics rollups (plan
+     * 2026-11-18-001 U3). Absent from an API that doesn't send it yet: the
+     * All sites card then leaves the figure out, never shows 0.
+     */
+    visitsLast7Days?: number | null;
+    /**
+     * The last thing done to the site, for the All sites card ("Ritika
+     * edited 2h ago", "Mohit published 9 Nov"). Absent until the API sends
+     * it; `by` is null when nobody is named (A4: earlier changes).
+     */
+    lastActivity?: {
+        kind: "edited" | "published";
+        by: string | null;
+        at: string;
+    } | null;
 }
 
 /** A menu entry names a page; the label is optional and defaults to its title. */

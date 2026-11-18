@@ -80,6 +80,9 @@
         // Settings › API and AI apps (#1357): "on" here, on development.
         // Production leaves it out, which is off: no tab, no page.
         "NEXT_PUBLIC_API_AREA": "on",
+        // The redesigned Website area (plan 2026-11-18-001): "on" here, on
+        // development. Production leaves it out, which keeps today's tabs.
+        "NEXT_PUBLIC_WEBSITE_AREA": "on",
         // Share as a post and Create post (DEC-217): "on" here, on
         // development. Production leaves it out, which is off.
         "NEXT_PUBLIC_SHARE_POSTS": "on",

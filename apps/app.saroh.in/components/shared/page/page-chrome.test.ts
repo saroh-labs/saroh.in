@@ -58,6 +58,9 @@ const DRAWN_ELSEWHERE: Record<string, string> = {
     "sites/[siteId]/(tabs)/pages": "full",
     "sites/[siteId]/(tabs)/posts": "full",
     "sites/[siteId]/(tabs)/review": "full",
+    // The Website area's Overview and Writing (plan 2026-11-18-001 U3).
+    "sites/[siteId]/(tabs)/overview": "full",
+    "sites/[siteId]/(tabs)/writing": "full",
     // API and AI apps' layout draws the panel, the header and its tabs.
     "settings/(sections)/developers": "full",
     "settings/(sections)/developers/ai": "full",

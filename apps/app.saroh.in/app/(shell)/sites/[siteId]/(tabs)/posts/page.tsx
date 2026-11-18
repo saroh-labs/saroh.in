@@ -1,170 +1,26 @@
-import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
-import { EmptyState } from "@saroh/ui/data-state";
-import { NotebookPen } from "lucide-react";
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 
-import { PausedNote } from "@/components/billing/paused-banner";
-import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
-import { ViewerDate } from "@/components/shared/dates/viewer-date";
-import { activeCut, pausedListWords, postPaused } from "@/lib/billing/paused";
-import type { Post } from "@/lib/content/service";
-import { listPosts } from "@/lib/content/service";
-import { pausedOrNull } from "@/lib/saroh-billing/service";
-import { requireSession } from "@/lib/session";
-import { getSite } from "@/lib/sites/service";
-import { postUpdatedIso } from "@/lib/sites/updated";
-import { ListCard, ListRow } from "@saroh/ui/list-card";
+import { SitePostsList } from "@/components/sites/posts/site-posts-list";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
+import { withQuery } from "@/lib/sites/with-query";
 
 export const metadata = { title: "Posts · Website" };
 
 /**
- * What a post's pill says: whether the PUBLIC is being served it (#232).
- *
- * `status` alone cannot say that, so `live` — whether the post has a
- * published copy — decides "Published", and a post marked published with
- * nothing live says so rather than claiming it.
- */
-function postPill(post: Post): {
-    label: string;
-    variant: "success" | "draft" | "warning" | "neutral";
-} {
-    if (post.status === "ARCHIVED") {
-        return { label: "Archived", variant: "neutral" };
-    }
-    if (post.live) return { label: "Live", variant: "success" };
-    if (post.status === "DRAFT") return { label: "Draft", variant: "draft" };
-    return { label: "Not live", variant: "warning" };
-}
-
-/**
- * The Posts tab — a site's writing (ADR-004).
- *
- * Reading it is `site:read`, so everyone who can reach the site can read its
- * posts — a reviewer included, deliberately: the writing is part of what they
- * were asked to look at. Writing it is `section:write`, and the header only
- * offers New post and Categories to someone the server says may (#313).
+ * The Posts tab. With the Website area on, its screen is Writing, and this
+ * address forwards there with its query (the Categories sheet's included),
+ * so old links and bookmarks still land.
  */
 export default async function SitePostsPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ siteId: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { siteId } = await params;
-    await requireSession();
-    const site = await getSite(siteId);
-    if (!site) notFound();
-
-    const [posts, paused] = await Promise.all([
-        listPosts(siteId),
-        // Past the plan's blog posts limit (#800): marked, and why.
-        pausedOrNull(),
-    ]);
-    const cut = activeCut(paused, "posts");
-    const isPaused = (p: Post) => postPaused(p, cut);
-    const pausedHere = posts.filter(isPaused).length;
-    const base = `/sites/${siteId}/posts`;
-    const prefix = site.postsPrefix ?? "blog";
-
-    if (posts.length === 0) {
-        return (
-            <EmptyState
-                icon={<NotebookPen />}
-                title="No posts yet"
-                description="Posts are dated and listed newest first, like a journal or news."
-                action={
-                    site.can.edit ? (
-                        <Button asChild>
-                            <Link href={`${base}/new`}>New post</Link>
-                        </Button>
-                    ) : undefined
-                }
-            />
-        );
+    if (websiteAreaOn()) {
+        redirect(withQuery(`/sites/${siteId}/writing`, await searchParams));
     }
-
-    return (
-        <>
-            {pausedHere > 0 ? (
-                <PausedNote className="mb-4">
-                    {pausedListWords("post", pausedHere)}
-                </PausedNote>
-            ) : null}
-            <PlanLimitNotice moduleId="blog" className="mb-4" />
-            <ListCard
-                main="Post"
-                paged={{ list: "site-posts", things: "posts" }}
-                end="Updated"
-                note="Drafts are visible to the team and to nobody else."
-            >
-                {posts.map((post) => {
-                    const pill = postPill(post);
-                    return (
-                        <li
-                            key={post.id}
-                            className="border-b border-border last:border-b-0"
-                        >
-                            <Link
-                                href={`${base}/${post.id}`}
-                                // A reader opens the post editor read-only,
-                                // with its notes (DEC-200 U8); the row says so.
-                                aria-label={`${site.can.edit ? "" : "View "}${post.title}, ${pill.label.toLowerCase()}${isPaused(post) ? ", paused" : ""}`}
-                                className="block bg-card transition-colors duration-fast hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                            >
-                                <ListRow
-                                    title={post.title}
-                                    tag={
-                                        <>
-                                            <Badge variant={pill.variant}>
-                                                {pill.label}
-                                            </Badge>
-                                            {isPaused(post) ? (
-                                                <Badge variant="warning">
-                                                    Paused
-                                                </Badge>
-                                            ) : null}
-                                            {post.featured ? (
-                                                <Badge variant="neutral">
-                                                    Featured
-                                                </Badge>
-                                            ) : null}
-                                        </>
-                                    }
-                                    sub={
-                                        <>
-                                            <span className="font-mono">
-                                                /{prefix}/{post.slug}
-                                            </span>
-                                            {" · "}
-                                            {post.category?.name ??
-                                                "Uncategorized"}
-                                            {post.author
-                                                ? ` · ${post.author}`
-                                                : ""}
-                                        </>
-                                    }
-                                    end={
-                                        <span className="flex items-center gap-3 whitespace-nowrap text-[12px] tabular-nums text-muted-foreground">
-                                            <ViewerDate
-                                                iso={postUpdatedIso(post)}
-                                            />
-                                            {site.can.edit ? null : (
-                                                <span
-                                                    data-ph-unmask=""
-                                                    className="font-medium text-foreground"
-                                                >
-                                                    View
-                                                </span>
-                                            )}
-                                        </span>
-                                    }
-                                />
-                            </Link>
-                        </li>
-                    );
-                })}
-            </ListCard>
-        </>
-    );
+    return <SitePostsList siteId={siteId} />;
 }
