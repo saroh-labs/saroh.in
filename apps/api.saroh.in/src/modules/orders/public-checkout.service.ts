@@ -13,7 +13,6 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { isCustomerPhone } from "../../common/customer-phone";
 import { toMinor, toMoneyString } from "../../common/money";
 import { notTakingOrders } from "../billing/paused-errors";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { reservedAccountEmail } from "../contacts/contact-email";
 import { DiscountsService } from "../discounts/discounts.service";
 import {
@@ -22,6 +21,8 @@ import {
 } from "../organizations/organization-lifecycle.gate";
 import type { CreateIntentResult } from "../payments/payments.service";
 import { PaymentsService } from "../payments/payments.service";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import type { CustomerContext } from "../site-accounts/customer-context.decorator";
 import { qrSourceFor } from "../sites/qr-source";
 import {
@@ -198,12 +199,14 @@ export class PublicCheckoutService {
         private readonly payments: PaymentsService,
         // Not DI providers — per-instance defaults that tests can replace.
         @Optional()
-        private readonly readLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly readLimiter: WindowLimiter = new SharedRateLimiter(
+            "checkout-reads",
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
         @Optional()
-        private readonly startLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly startLimiter: WindowLimiter = new SharedRateLimiter(
+            "checkout-starts",
             STARTS_PER_WINDOW,
             START_WINDOW_MS,
         ),
@@ -218,7 +221,7 @@ export class PublicCheckoutService {
         siteId: string,
         callerHash: string | undefined,
     ): Promise<CheckoutOptions> {
-        this.read(siteId, callerHash);
+        await this.read(siteId, callerHash);
         return this.inShop(siteId, async (scope) => {
             const settings = await shopSettings(scope);
             const ready = await checkoutReadiness(
@@ -276,7 +279,7 @@ export class PublicCheckoutService {
         dto: CheckoutQuoteDto,
         callerHash: string | undefined,
     ): Promise<PricedBag> {
-        this.read(siteId, callerHash);
+        await this.read(siteId, callerHash);
         return this.inShop(siteId, async (scope) => {
             if (scope.demo) throw demoRefusal();
             if (scope.takingOrders === false) throw notTakingOrders();
@@ -345,7 +348,8 @@ export class PublicCheckoutService {
         clientHash: string,
         dto: CheckoutStartDto,
     ): Promise<CheckoutStarted> {
-        if (!this.startLimiter.take(clientHash)) throw tooManyRequests();
+        if (!(await this.startLimiter.take(clientHash)))
+            throw tooManyRequests();
         return this.inShop(siteId, async (scope) => {
             if (scope.organizationId !== organizationId) {
                 throw signedOut();
@@ -507,7 +511,7 @@ export class PublicCheckoutService {
         orderId: string,
     ): Promise<CheckoutStanding> {
         if (customer.siteId !== siteId) throw signedOut();
-        this.read(siteId, customer.accountId);
+        await this.read(siteId, customer.accountId);
         return runInOrgContext(customer.organizationId, async () => {
             const account = await this.account(customer);
             const order = await prisma.order.findFirst({
@@ -602,10 +606,13 @@ export class PublicCheckoutService {
         };
     }
 
-    private read(siteId: string, callerHash: string | undefined): void {
+    private async read(
+        siteId: string,
+        callerHash: string | undefined,
+    ): Promise<void> {
         // A caller the platform gives no address for shares one bucket per
         // site, as the shop's other reads do.
-        if (!this.readLimiter.take(callerHash ?? `site:${siteId}`)) {
+        if (!(await this.readLimiter.take(callerHash ?? `site:${siteId}`))) {
             throw tooManyRequests();
         }
     }

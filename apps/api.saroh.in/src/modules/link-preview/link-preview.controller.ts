@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 
 import { editionOfFormHost } from "../../common/edition-address";
-import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import type { SiteRelay } from "../site-accounts/site-relay";
 import { RelayContext, SiteRelayGuard } from "../site-accounts/site-relay";
 import { CheckLinkDto, UnlockReportDto } from "./dto";
@@ -81,17 +81,31 @@ export function checkView(check: LinkCheck): LinkCheckView {
 @Controller("public/tools/link-preview")
 @UseGuards(SiteRelayGuard)
 export class LinkPreviewController {
-    private readonly perMinute = new FixedWindowRateLimiter(10, 60_000);
-    private readonly perHour = new FixedWindowRateLimiter(60, 60 * 60_000);
-    private readonly unlocks = new FixedWindowRateLimiter(5, 60_000);
+    private readonly perMinute = new SharedRateLimiter(
+        "link-preview-minute",
+        10,
+        60_000,
+    );
+    private readonly perHour = new SharedRateLimiter(
+        "link-preview-hour",
+        60,
+        60 * 60_000,
+    );
+    private readonly unlocks = new SharedRateLimiter(
+        "link-preview-unlocks",
+        5,
+        60_000,
+    );
 
     constructor(
         private readonly preview: LinkPreviewService,
         private readonly gate: LinkReportGateService,
     ) {}
 
-    private takeCheck(key: string): void {
-        if (!(this.perMinute.take(key) && this.perHour.take(key))) {
+    private async takeCheck(key: string): Promise<void> {
+        if (!(
+            (await this.perMinute.take(key)) && (await this.perHour.take(key))
+        )) {
             throw new HttpException(
                 "Too many checks from this address. Try again in a minute.",
                 HttpStatus.TOO_MANY_REQUESTS,
@@ -105,7 +119,7 @@ export class LinkPreviewController {
         @Body() dto: CheckLinkDto,
         @RelayContext() relay: SiteRelay,
     ): Promise<LinkCheckView> {
-        this.takeCheck(relay.clientHash);
+        await this.takeCheck(relay.clientHash);
         return checkView(
             await this.preview.check(dto.url, { fresh: dto.fresh === true }),
         );
@@ -120,13 +134,13 @@ export class LinkPreviewController {
         @Headers("host") host?: string,
     ): Promise<UnlockResult> {
         const key = relay.clientHash;
-        if (!this.unlocks.take(key)) {
+        if (!(await this.unlocks.take(key))) {
             throw new HttpException(
                 "Too many requests from this address. Try again in a minute.",
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }
-        this.takeCheck(key);
+        await this.takeCheck(key);
         return this.gate.unlock({
             email: dto.email,
             url: dto.url,

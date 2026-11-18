@@ -12,7 +12,7 @@ import {
 } from "@nestjs/common";
 
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { CheckoutCancelDto } from "./checkout-return.dto";
 import type { CheckoutSessionView } from "./checkout-session.service";
@@ -53,19 +53,23 @@ function tooManyRequests(): HttpException {
  */
 @Controller("public/payments/checkout")
 export class CheckoutSessionController {
-    private readonly readsPerCaller = new FixedWindowRateLimiter(
+    private readonly readsPerCaller = new SharedRateLimiter(
+        "checkout-session-caller",
         READS_PER_CALLER,
         WINDOW_MS,
     );
-    private readonly readsPerSession = new FixedWindowRateLimiter(
+    private readonly readsPerSession = new SharedRateLimiter(
+        "checkout-session-id",
         READS_PER_SESSION,
         WINDOW_MS,
     );
-    private readonly cancelsPerCaller = new FixedWindowRateLimiter(
+    private readonly cancelsPerCaller = new SharedRateLimiter(
+        "checkout-cancel-caller",
         CANCELS_PER_CALLER,
         WINDOW_MS,
     );
-    private readonly cancelsPerIntent = new FixedWindowRateLimiter(
+    private readonly cancelsPerIntent = new SharedRateLimiter(
+        "checkout-cancel-intent",
         CANCELS_PER_INTENT,
         WINDOW_MS,
     );
@@ -83,8 +87,10 @@ export class CheckoutSessionController {
         @Headers(SITE_RELAY_HEADER) relay?: string,
     ): Promise<CheckoutSessionView> {
         if (
-            !this.readsPerCaller.take(visitorKey(ip, relay) ?? "unknown") ||
-            !this.readsPerSession.take(sessionId)
+            !(await this.readsPerCaller.take(
+                visitorKey(ip, relay) ?? "unknown",
+            )) ||
+            !(await this.readsPerSession.take(sessionId))
         ) {
             throw tooManyRequests();
         }
@@ -109,8 +115,10 @@ export class CheckoutSessionController {
         @Headers(SITE_RELAY_HEADER) relay?: string,
     ): Promise<CheckoutSessionView> {
         if (
-            !this.cancelsPerCaller.take(visitorKey(ip, relay) ?? "unknown") ||
-            !this.cancelsPerIntent.take(dto.intent)
+            !(await this.cancelsPerCaller.take(
+                visitorKey(ip, relay) ?? "unknown",
+            )) ||
+            !(await this.cancelsPerIntent.take(dto.intent))
         ) {
             throw tooManyRequests();
         }

@@ -10,7 +10,7 @@ import {
 
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { editionOfFormHost } from "../../common/edition-address";
-import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { ContactMessagesService } from "./contact-messages.service";
 import { SendContactMessageDto } from "./dto";
@@ -27,8 +27,16 @@ export class PublicContactMessagesController {
      * Per-visitor speed bumps, the business reports' in-process limiter: a
      * cheap brake on someone flooding the staff's list, not a guarantee.
      */
-    private readonly perMinute = new FixedWindowRateLimiter(3, 60_000);
-    private readonly perDay = new FixedWindowRateLimiter(20, 24 * 60 * 60_000);
+    private readonly perMinute = new SharedRateLimiter(
+        "contact-messages-minute",
+        3,
+        60_000,
+    );
+    private readonly perDay = new SharedRateLimiter(
+        "contact-messages-day",
+        20,
+        24 * 60 * 60_000,
+    );
 
     constructor(private readonly messages: ContactMessagesService) {}
 
@@ -48,7 +56,10 @@ export class PublicContactMessagesController {
         const ipHash = visitorKey(ip, relay);
         if (
             ipHash &&
-            !(this.perMinute.take(ipHash) && this.perDay.take(ipHash))
+            !(
+                (await this.perMinute.take(ipHash)) &&
+                (await this.perDay.take(ipHash))
+            )
         ) {
             throw new HttpException(
                 "Too many messages from this address. Try again later.",

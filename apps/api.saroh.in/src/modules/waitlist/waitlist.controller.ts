@@ -12,7 +12,7 @@ import {
 
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { editionOfFormHost } from "../../common/edition-address";
-import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { ChallengeVerifier } from "../site-accounts/challenge";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { JoinWaitlistDto } from "./dto";
@@ -46,7 +46,11 @@ export class WaitlistController {
      * behind N replicas a client gets N× the limit). A waitlist is a low-value
      * target, so this is proportionate.
      */
-    private readonly limiter = new FixedWindowRateLimiter(5, 60_000);
+    private readonly limiter = new SharedRateLimiter(
+        "waitlist-joins",
+        5,
+        60_000,
+    );
 
     private readonly logger = new Logger(WaitlistController.name);
 
@@ -73,7 +77,7 @@ export class WaitlistController {
         // is used as the rate-limit key and stored only as a digest.
         const ipHash = visitorKey(ip, relay);
 
-        if (ipHash && !this.limiter.take(ipHash)) {
+        if (ipHash && !(await this.limiter.take(ipHash))) {
             throw new HttpException(
                 "Too many signups from this address. Try again shortly.",
                 HttpStatus.TOO_MANY_REQUESTS,

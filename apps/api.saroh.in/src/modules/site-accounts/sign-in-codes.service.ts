@@ -12,8 +12,9 @@ import {
 } from "@nestjs/common";
 import { Prisma, prisma, runInOrgContext } from "@saroh/database";
 
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import type { SignInIdentity } from "./account-linking.service";
 import { AccountLinkingService } from "./account-linking.service";
 import { ChallengeVerifier } from "./challenge";
@@ -188,12 +189,14 @@ export class SignInCodesService {
         private readonly alerts: SiteCodeAlerts,
         private readonly ways: SignInWaysService,
         @Optional()
-        private readonly codeLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly codeLimiter: WindowLimiter = new SharedRateLimiter(
+            "site-code-requests",
             CODE_REQUESTS_PER_ADDRESS,
             ADDRESS_WINDOW_MS,
         ),
         @Optional()
-        private readonly verifyLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly verifyLimiter: WindowLimiter = new SharedRateLimiter(
+            "site-code-tries",
             VERIFY_TRIES_PER_ADDRESS,
             ADDRESS_WINDOW_MS,
         ),
@@ -246,7 +249,7 @@ export class SignInCodesService {
             // No challenge to ask, so past the address limit is a refusal:
             // the one hard stop on one address asking this business for
             // code after code (A-2).
-            const addressBusy = this.takeAddress(site, relay, now);
+            const addressBusy = await this.takeAddress(site, relay, now);
 
             // Email off (DEC-196): only an email-only account gets a code;
             // anyone else gets the same answer and nothing is sent.
@@ -329,13 +332,20 @@ export class SignInCodesService {
      * address is past it. Past it with no challenge configured is a 429
      * (the one hard stop, A-2); with one, the limits ask for the challenge.
      */
-    takeAddress(site: SiteHost, relay: SiteRelay, now: Date): boolean {
+    async takeAddress(
+        site: SiteHost,
+        relay: SiteRelay,
+        now: Date,
+    ): Promise<boolean> {
         const addressKey = `${site.organizationId}:${relay.clientHash}`;
-        const busy = !this.codeLimiter.take(addressKey, now.getTime());
+        const busy = !(await this.codeLimiter.take(addressKey, now.getTime()));
         if (busy && !this.challenge.configured) {
             throw limited(
                 "limit",
-                this.codeLimiter.retryAfterSeconds(addressKey, now.getTime()),
+                await this.codeLimiter.retryAfterSeconds(
+                    addressKey,
+                    now.getTime(),
+                ),
             );
         }
         return busy;
@@ -345,17 +355,20 @@ export class SignInCodesService {
      * The per-address limit on verify tries, keyed by the destination: only
      * the visitor's own tries at their own code count (429 past it).
      */
-    takeVerifyTry(
+    async takeVerifyTry(
         site: SiteHost,
         relay: SiteRelay,
         destinationHash: string,
         now: Date,
-    ): void {
+    ): Promise<void> {
         const tries = `${site.organizationId}:${destinationHash}:${relay.clientHash}`;
-        if (!this.verifyLimiter.take(tries, now.getTime())) {
+        if (!(await this.verifyLimiter.take(tries, now.getTime()))) {
             throw limited(
                 "limit",
-                this.verifyLimiter.retryAfterSeconds(tries, now.getTime()),
+                await this.verifyLimiter.retryAfterSeconds(
+                    tries,
+                    now.getTime(),
+                ),
             );
         }
     }
@@ -375,7 +388,7 @@ export class SignInCodesService {
                 site.organizationId,
                 email,
             );
-            this.takeVerifyTry(site, relay, destinationHash, now);
+            await this.takeVerifyTry(site, relay, destinationHash, now);
             // Email off and not an email-only account: as if no code was
             // sent, which none was (DEC-196).
             if (!(await this.ways.emailAllowed(site.organizationId, email))) {

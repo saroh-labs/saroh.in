@@ -10,7 +10,6 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { fromMinor, toMoneyString } from "../../common/money";
 import { holdState } from "../bookings/booking-hold";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { addedLine } from "../invoices/added-line";
 import type { GstOnPrice } from "../invoices/gst-price";
 import { printedSeller } from "../invoices/invoice-paper-view";
@@ -37,6 +36,8 @@ import {
     assertOrganizationOpen,
     assertOrganizationWindingDown,
 } from "../organizations/organization-lifecycle.gate";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { siteOriginOf } from "../sites/site-origin";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import { nextAutopayCharge } from "../subscriptions/next-autopay-charge";
@@ -346,12 +347,14 @@ export class PublicInvoicesService {
     constructor(
         private readonly payments: PaymentsService,
         @Optional()
-        private readonly readLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly readLimiter: WindowLimiter = new SharedRateLimiter(
+            "invoice-pay-reads",
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
         @Optional()
-        private readonly payLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly payLimiter: WindowLimiter = new SharedRateLimiter(
+            "invoice-pay-intents",
             PAYS_PER_WINDOW,
             PAY_WINDOW_MS,
         ),
@@ -367,7 +370,7 @@ export class PublicInvoicesService {
         // Keyed on the caller, like the booking and enquiry limiters: a limiter
         // keyed on the token the caller sent throttles nothing, because every
         // new token is a fresh window.
-        if (!this.readLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.readLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
@@ -508,7 +511,7 @@ export class PublicInvoicesService {
     ): Promise<AutopayStart> {
         const options = parseAutopayBody(body);
         const tokenHash = hashPayToken(token);
-        if (!this.payLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.payLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
@@ -548,7 +551,7 @@ export class PublicInvoicesService {
         callerHash?: string,
     ): Promise<AutopayOutcome & { payUrl: string }> {
         const tokenHash = hashPayToken(token);
-        if (!this.readLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.readLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
@@ -587,7 +590,7 @@ export class PublicInvoicesService {
         const options = parseIntentBody(body);
         const tokenHash = hashPayToken(token);
         // The caller, not the token they sent — see `read`.
-        if (!this.payLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.payLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);

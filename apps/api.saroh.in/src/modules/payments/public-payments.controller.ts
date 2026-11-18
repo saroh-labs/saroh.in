@@ -11,7 +11,7 @@ import {
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { CreateIntentDto } from "./dto";
@@ -54,15 +54,18 @@ function tooManyRequests(): HttpException {
  */
 @Controller("public/orders")
 export class PublicPaymentsController {
-    private readonly intentsPerOrder = new FixedWindowRateLimiter(
+    private readonly intentsPerOrder = new SharedRateLimiter(
+        "pay-intents-order",
         INTENTS_PER_ORDER,
         WINDOW_MS,
     );
-    private readonly intentsPerCaller = new FixedWindowRateLimiter(
+    private readonly intentsPerCaller = new SharedRateLimiter(
+        "pay-intents-caller",
         INTENTS_PER_CALLER,
         WINDOW_MS,
     );
-    private readonly receiptsPerCaller = new FixedWindowRateLimiter(
+    private readonly receiptsPerCaller = new SharedRateLimiter(
+        "pay-receipts",
         RECEIPTS_PER_CALLER,
         WINDOW_MS,
     );
@@ -84,8 +87,8 @@ export class PublicPaymentsController {
     ): Promise<CreateIntentResult> {
         const caller = hashClientIp(ip) ?? "unknown";
         if (
-            !this.intentsPerCaller.take(caller) ||
-            !this.intentsPerOrder.take(orderId)
+            !(await this.intentsPerCaller.take(caller)) ||
+            !(await this.intentsPerOrder.take(orderId))
         ) {
             throw tooManyRequests();
         }
@@ -109,7 +112,9 @@ export class PublicPaymentsController {
         @Query("token") token?: string,
         @ClientAddress() ip?: string,
     ): Promise<PublicReceiptResult> {
-        if (!this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown")) {
+        if (
+            !(await this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown"))
+        ) {
             throw tooManyRequests();
         }
         if (typeof token !== "string" || token.length === 0) {

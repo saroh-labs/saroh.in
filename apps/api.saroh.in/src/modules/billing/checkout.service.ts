@@ -35,7 +35,6 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
@@ -43,6 +42,7 @@ import {
     findAutomaticCoupon,
     findUsableCoupon,
 } from "../pricing/coupons.service";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import {
     clearAddonsInTx,
     holdMonthAddonChargesInTx,
@@ -161,7 +161,7 @@ export const CHECKOUT_TTL_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Coupon tries a minute (U16): per business, and per address across
- * businesses. In-process, like every limiter here (`FixedWindowRateLimiter`):
+ * businesses. Shared across replicas in Redis (`SharedRateLimiter`):
  * a speed bump against guessing codes, not a guarantee.
  */
 export const COUPON_TRIES_PER_ORG = 10;
@@ -385,11 +385,13 @@ const SUB_SELECT = {
 @Injectable()
 export class CheckoutService {
     private readonly logger = new Logger(CheckoutService.name);
-    private readonly couponTriesByOrg = new FixedWindowRateLimiter(
+    private readonly couponTriesByOrg = new SharedRateLimiter(
+        "coupon-tries-business",
         COUPON_TRIES_PER_ORG,
         60_000,
     );
-    private readonly couponTriesByAddress = new FixedWindowRateLimiter(
+    private readonly couponTriesByAddress = new SharedRateLimiter(
+        "coupon-tries-address",
         COUPON_TRIES_PER_ADDRESS,
         60_000,
     );
@@ -414,7 +416,12 @@ export class CheckoutService {
     ): Promise<ChangePlanQuoteView> {
         authorize(ctx, "billing:read");
         await assertSarohKeeps(ctx, now);
-        this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
+        await this.limitCouponTries(
+            ctx.organizationId,
+            input.coupon,
+            client,
+            now,
+        );
         const { target, quote, coupon, addonsEnding, monthAddons } =
             await this.resolve(
                 ctx.organizationId,
@@ -660,7 +667,12 @@ export class CheckoutService {
         authorize(ctx, "billing:manage");
         await assertSarohKeeps(ctx, now);
         const billTo = checkoutBillTo(input);
-        this.limitCouponTries(ctx.organizationId, input.coupon, client, now);
+        await this.limitCouponTries(
+            ctx.organizationId,
+            input.coupon,
+            client,
+            now,
+        );
         const {
             target,
             quote,
@@ -943,17 +955,23 @@ export class CheckoutService {
     // ── Steps ───────────────────────────────────────────────────────────
 
     /** A coupon in the request counts against both limits (U16). */
-    private limitCouponTries(
+    private async limitCouponTries(
         organizationId: string,
         code: string | null | undefined,
         client: CheckoutClient,
         now: Date,
-    ): void {
+    ): Promise<void> {
         if (!code?.trim()) return;
         const at = now.getTime();
-        const byOrg = this.couponTriesByOrg.take(`org:${organizationId}`, at);
+        const byOrg = await this.couponTriesByOrg.take(
+            `org:${organizationId}`,
+            at,
+        );
         const byAddress = client.addressKey
-            ? this.couponTriesByAddress.take(`ip:${client.addressKey}`, at)
+            ? await this.couponTriesByAddress.take(
+                  `ip:${client.addressKey}`,
+                  at,
+              )
             : true;
         if (!byOrg || !byAddress) {
             throw new HttpException(

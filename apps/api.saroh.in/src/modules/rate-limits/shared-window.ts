@@ -27,6 +27,16 @@ return {count, ttl}
 `;
 
 /**
+ * What a caller holds when it takes a hit: a {@link SharedRateLimiter} in
+ * the API, or a {@link FixedWindowRateLimiter} a spec hands in. Always
+ * awaited.
+ */
+export interface WindowLimiter {
+    take(key: string, now?: number): boolean | Promise<boolean>;
+    retryAfterSeconds(key: string, now?: number): number | Promise<number>;
+}
+
+/**
  * {@link FixedWindowRateLimiter}'s rule, kept in Redis so every replica
  * shares one window and a deploy does not empty it (03-M7, 05-P-03). For
  * the limits that guard money, sends or outbound work: codes, sign-in,
@@ -37,7 +47,7 @@ return {count, ttl}
  * in this process exactly as the in-memory class does, and says so at WARN
  * (`rate_limit_open`, once for no Redis, at most once a minute for errors).
  */
-export class SharedRateLimiter {
+export class SharedRateLimiter implements WindowLimiter {
     private readonly memory: FixedWindowRateLimiter;
     private readonly redis: Pick<Redis, "eval"> | null;
 

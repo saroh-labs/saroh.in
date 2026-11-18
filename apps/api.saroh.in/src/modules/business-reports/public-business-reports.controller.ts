@@ -10,7 +10,7 @@ import {
 
 import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { editionOfFormHost } from "../../common/edition-address";
-import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import { BusinessReportsService } from "./business-reports.service";
 import { SubmitBusinessReportDto } from "./dto";
@@ -28,8 +28,16 @@ export class PublicBusinessReportsController {
      * Per-visitor speed bumps, the waitlist's in-process limiter: a cheap
      * brake on someone flooding the staff's list, not a guarantee.
      */
-    private readonly perMinute = new FixedWindowRateLimiter(3, 60_000);
-    private readonly perDay = new FixedWindowRateLimiter(20, 24 * 60 * 60_000);
+    private readonly perMinute = new SharedRateLimiter(
+        "business-reports-minute",
+        3,
+        60_000,
+    );
+    private readonly perDay = new SharedRateLimiter(
+        "business-reports-day",
+        20,
+        24 * 60 * 60_000,
+    );
 
     constructor(private readonly reports: BusinessReportsService) {}
 
@@ -49,7 +57,10 @@ export class PublicBusinessReportsController {
         const ipHash = visitorKey(ip, relay);
         if (
             ipHash &&
-            !(this.perMinute.take(ipHash) && this.perDay.take(ipHash))
+            !(
+                (await this.perMinute.take(ipHash)) &&
+                (await this.perDay.take(ipHash))
+            )
         ) {
             throw new HttpException(
                 "Too many reports from this address. Try again later.",
