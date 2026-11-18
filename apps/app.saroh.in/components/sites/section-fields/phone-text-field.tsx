@@ -58,6 +58,8 @@ export function PhoneTextField({
             {shorter
                 ? (children ?? (
                       <Field
+                          // The field's own name from the editor, never a record's.
+                          holdsData={false}
                           label={`${label}, on phone`}
                           hint={fallback.trim() ? empty : undefined}
                       >

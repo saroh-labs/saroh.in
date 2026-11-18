@@ -43,6 +43,13 @@ export interface TryWords {
  * click goes to the full one: a tag that reports outbound links (Google's
  * enhanced measurement) reads the `href`, so it never sees a business name.
  */
+/** What "Try it" carries into sign-up (U12); the name only when typed. */
+export interface TryPicked {
+    name?: string;
+    trade: string;
+    colour: string;
+}
+
 export function TryPanel({
     words,
     trades,
@@ -63,11 +70,7 @@ export function TryPanel({
     visitor: TryVisitor;
     onChange: (next: TryVisitor) => void;
     /** Sign-up's address with what the visitor picked (and, with `name`, typed). */
-    startHref: (picked: {
-        name?: string;
-        trade: string;
-        colour: string;
-    }) => string;
+    startHref: (picked: TryPicked) => string;
     onStart?: () => void;
 }) {
     const id = useId();

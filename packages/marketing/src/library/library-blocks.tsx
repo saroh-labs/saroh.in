@@ -8,7 +8,7 @@ import { ring } from "../ring";
 import { useBrowserValue } from "../use-browser-value";
 import { BlockFrame } from "./block-frame";
 import { RadioGroup } from "./radio-group";
-import type { TryVisitor, TryWords } from "./try-panel";
+import type { TryPicked, TryVisitor, TryWords } from "./try-panel";
 import { TryPanel } from "./try-panel";
 import type {
     LibraryBlock,
@@ -91,11 +91,7 @@ export function LibraryBlocks({
         words: TryWords;
         trades: LibraryControl;
         colourKey: string;
-        startHref: (picked: {
-            name?: string;
-            trade: string;
-            colour: string;
-        }) => string;
+        startHref: (picked: TryPicked) => string;
         onStart?: () => void;
     };
 }) {
@@ -116,7 +112,7 @@ export function LibraryBlocks({
         const next = { ...choice, [key]: value };
         setPicked(next);
         window.history.replaceState(
-            window.history.state,
+            null,
             "",
             withChoice(
                 [...controls, ...componentControls],
