@@ -17,7 +17,13 @@ export const SITEMAP_URL_LIMIT = 50_000;
 export interface SitemapSource {
     /** `https://rye.saroh.app`, or the custom domain's origin. */
     origin: string;
-    pages: readonly { path: string; kind?: string | null }[];
+    pages: readonly {
+        path: string;
+        kind?: string | null;
+        isHome?: boolean;
+        /** "Show on Google" off (KTD-7): never listed. */
+        noindex?: boolean;
+    }[];
     modules: ModulePageStates | null;
     /** The posts prefix (`blog` unless the merchant chose another word). */
     postsPrefix: string;
@@ -47,7 +53,7 @@ function normalise(path: string): string {
 
 /**
  * Every address worth indexing, home first: published pages (not a module
- * page whose module is off), the posts and their index, and the shop and
+ * page whose module is off, nor one kept off Google), the posts and their index, and the shop and
  * its products while the shop is open. Never a private page. Capped at
  * {@link SITEMAP_URL_LIMIT}.
  */
@@ -61,9 +67,9 @@ export function sitemapPaths(source: SitemapSource): string[] {
         paths.push(clean);
     };
 
-    add("/");
+    if (!source.pages.some((page) => page.isHome && page.noindex)) add("/");
     for (const page of source.pages) {
-        if (moduleOff(page, source.modules)) continue;
+        if (page.noindex || moduleOff(page, source.modules)) continue;
         add(page.path);
     }
     const prefix = normalise(source.postsPrefix);

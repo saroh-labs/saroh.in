@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import { PostIndex } from "@/components/post-view";
 import { PublishedPage } from "@/components/published-page";
@@ -8,11 +8,13 @@ import { lookOf, ModulePageUnavailable } from "@saroh/site-blocks";
 import { moduleOff } from "@/lib/module-pages";
 import {
     findPageByPath,
+    findRedirect,
     getSiteForHost,
     getSiteForPage,
+    pageHead,
     postsPrefix,
     readPublishedPosts,
-    shareImages,
+    withQuery,
 } from "@/lib/publication";
 import { canonical, titled } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
@@ -61,16 +63,18 @@ export async function generateMetadata({
     // An inner page shared on WhatsApp or Slack used to arrive with a title and
     // nothing else (#220): the description and picture live on the site, and
     // this route did not read them. It inherits both, and names its own
-    // address so a share of /about is cached as /about.
-    const { name, seoDescription } = snapshot.site;
+    // address so a share of /about is cached as /about. A page's own Google
+    // title, text and share image win over the site's (KTD-7).
+    const { name } = snapshot.site;
+    const head = pageHead(page, snapshot.site);
     // "About · Rye & Co.": the page, then whose site it is. The share
     // card keeps the page's own name, with the site's beside it.
-    const title = page.title ?? name;
-    const description = seoDescription?.trim() ? seoDescription : undefined;
-    const images = shareImages(snapshot.site);
+    const title = head.title ?? page.title ?? name;
+    const { description, images } = head;
     return shareable(resolved, {
-        title: titled(page.title, name),
+        title: head.title ?? titled(page.title, name),
         description,
+        ...(head.robots ? { robots: head.robots } : {}),
         openGraph: {
             title,
             description,
@@ -90,8 +94,11 @@ export async function generateMetadata({
 
 export default async function SitePostPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ domain: string; slug: string }>;
+    /** Absent when another route draws this one (`/shop` as a page or the posts). */
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { domain, slug } = await params;
     const resolved = await getSiteForPage(domain);
@@ -120,6 +127,10 @@ export default async function SitePostPage({
 
     const page = findPageByPath(snapshot, `/${slug}`);
     if (!page) {
+        // An old page link forwards for good (KTD-3). A 308 is never kept
+        // by the page cache, which stores only a 200.
+        const to = findRedirect(snapshot, `/${slug}`);
+        if (to) permanentRedirect(withQuery(to, (await searchParams) ?? {}));
         notFound();
     }
 

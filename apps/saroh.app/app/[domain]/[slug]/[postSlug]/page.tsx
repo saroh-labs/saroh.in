@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 
 import {
     PostArticle,
@@ -7,12 +7,14 @@ import {
     postNeighbours,
 } from "@/components/post-view";
 import {
+    findRedirect,
     getPublishedPost,
     getSiteForHost,
     getSiteForPage,
     postsPrefix,
     readPublishedPosts,
     shareImages,
+    withQuery,
 } from "@/lib/publication";
 import { canonical, titled } from "@/lib/site-meta";
 import { shareable } from "@/lib/test-metadata";
@@ -75,16 +77,24 @@ export async function generateMetadata({
 
 export default async function PostPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ domain: string; slug: string; postSlug: string }>;
+    /** Absent when another route draws this one (`/shop` as a page or the posts). */
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { domain, slug, postSlug } = await params;
     const resolved = await getSiteForPage(domain);
     if (!resolved?.siteId) notFound();
 
     // The prefix is the whole reason this route exists; a different first
-    // segment is not a post address.
-    if (slug !== postsPrefix(resolved.snapshot)) notFound();
+    // segment is not a post address, but may be an old page link that
+    // forwards (KTD-3). A post's own address never does (batch 3).
+    if (slug !== postsPrefix(resolved.snapshot)) {
+        const to = findRedirect(resolved.snapshot, `/${slug}/${postSlug}`);
+        if (to) permanentRedirect(withQuery(to, (await searchParams) ?? {}));
+        notFound();
+    }
 
     const [post, posts] = await Promise.all([
         getPublishedPost(resolved.siteId, postSlug),

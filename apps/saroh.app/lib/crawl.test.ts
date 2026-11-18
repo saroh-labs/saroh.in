@@ -48,6 +48,24 @@ describe("sitemapPaths (#890)", () => {
         expect(paths).toEqual(["/", "/about"]);
     });
 
+    it("leaves out a page kept off Google, the home page included (KTD-7)", () => {
+        expect(
+            sitemapPaths({
+                ...base,
+                pages: [{ path: "/about" }, { path: "/thanks", noindex: true }],
+            }),
+        ).toEqual(["/", "/about"]);
+        expect(
+            sitemapPaths({
+                ...base,
+                pages: [
+                    { path: "/", isHome: true, noindex: true },
+                    { path: "/about" },
+                ],
+            }),
+        ).toEqual(["/about"]);
+    });
+
     it("leaves out a module page whose module is off", () => {
         const paths = sitemapPaths({
             ...base,
