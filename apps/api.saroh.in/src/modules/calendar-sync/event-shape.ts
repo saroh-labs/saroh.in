@@ -50,9 +50,15 @@ export function addressLine(
 
 export function eventFor(
     booking: BookingForEvent,
-    opts: { connectionId: string; meet: boolean; address: string | null },
+    opts: {
+        connectionId: string;
+        meet: boolean;
+        address: string | null;
+        /** The event Saroh already made for it on this calendar, if any. */
+        eventId?: string;
+    },
 ): EventInput {
-    const eventId = eventIdFor(booking.id, opts.connectionId);
+    const eventId = opts.eventId ?? eventIdFor(booking.id, opts.connectionId);
     const who = booking.bookerName?.trim();
     const email = booking.bookerEmail?.trim();
     const location = booking.online ? "Online" : opts.address;

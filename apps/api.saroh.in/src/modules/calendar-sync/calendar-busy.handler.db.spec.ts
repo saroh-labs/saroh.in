@@ -2,8 +2,11 @@
  * Google busy times (#1047, U6) against a real Postgres, with the
  * in-memory Google: a read keeps the blocks and a later one replaces
  * them; Google's error keeps the old ones until they're stale; one
- * waiting run per connection; and slots read only fresh blocks. Runs in
- * the integration project (TEST_DATABASE_URL).
+ * waiting run per connection; and slots read only fresh blocks. Saroh's
+ * own events don't block (GC-01), a calendar not theirs is read with
+ * free/busy, a paused connection stops (GC-02, GC-03), and a key that
+ * can't open the token keeps the chain going (GC-16). Runs in the
+ * integration project (TEST_DATABASE_URL).
  */
 import { randomBytes } from "node:crypto";
 
@@ -11,14 +14,18 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import { planMeter } from "../billing/metering.service";
+import { setGoogleBusyGate } from "../bookings/google-busy-gate";
 import {
     GOOGLE_BUSY_FRESH_MS,
     loadPeople,
 } from "../bookings/staff-availability";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { googleBusyAllowed } from "./calendar-allowed";
 import { CalendarBusyHandler } from "./calendar-busy.handler";
 import { CALENDAR_BUSY_TYPE, scheduleBusy } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
+import { CalendarSyncHandler } from "./calendar-sync.handler";
 import { FakeGoogleCalendar } from "./google/fake-google-calendar";
 import { SCOPES } from "./google/google-calendar.port";
 import { sealToken, tokenColumns } from "./sealing";
@@ -34,9 +41,17 @@ const flags = { isEnabled: jest.fn().mockResolvedValue(true) };
 let google: FakeGoogleCalendar;
 let handler: CalendarBusyHandler;
 
-beforeAll(() => {
+beforeAll(async () => {
     // A throwaway key for this run only, never a value in the repo.
     mutableEnv.CALENDAR_ENC_KEY = randomBytes(32).toString("base64");
+    // Slot reads ask whether Google busy times count (GC-02), as the
+    // module registers at boot; the flag is on per business.
+    setGoogleBusyGate(googleBusyAllowed);
+    await prisma.featureFlag.upsert({
+        where: { key: "GOOGLE_CALENDAR" },
+        create: { key: "GOOGLE_CALENDAR", enabledByDefault: false },
+        update: {},
+    });
 });
 afterAll(async () => {
     mutableEnv.CALENDAR_ENC_KEY = before;
@@ -56,6 +71,9 @@ async function connected() {
         data: { name: "Pulse Fitness", slug: uniq("gcal-busy") },
     });
     const organizationId = org.id;
+    await prisma.featureFlagOverride.create({
+        data: { flagKey: "GOOGLE_CALENDAR", organizationId, enabled: true },
+    });
     const user = await prisma.user.create({
         data: { email: `${uniq("p")}@example.com`, name: "Kabir" },
     });
@@ -92,7 +110,12 @@ async function connected() {
             checkBusy: true,
         },
     });
-    return { organizationId, connectionId: row.id, staffId: staff.id };
+    return {
+        organizationId,
+        connectionId: row.id,
+        staffId: staff.id,
+        membershipId: membership.id,
+    };
 }
 
 const hours = (h: number) => new Date(Date.now() + h * 3_600_000);
@@ -155,7 +178,7 @@ describe("calendar.busy", () => {
             { startAt: hours(24), endAt: hours(25) },
         ]);
         await handler.handle(job(c.organizationId, c.connectionId));
-        google.failNext("freeBusy", "retry");
+        google.failNext("busyEvents", "retry");
         await handler.handle(job(c.organizationId, c.connectionId));
         expect(
             await prisma.googleCalendarBusy.count({
@@ -198,5 +221,192 @@ describe("calendar.busy", () => {
                 },
             }),
         ).toBe(0);
+    });
+
+    it("leaves out the person's own Saroh bookings, so one can move by less than its length (GC-01)", async () => {
+        const c = await connected();
+        const service = await prisma.service.create({
+            data: {
+                organizationId: c.organizationId,
+                name: "Session",
+                durationMinutes: 60,
+                timezone: "UTC",
+            },
+        });
+        const startAt = hours(24);
+        const booking = await prisma.booking.create({
+            data: {
+                organizationId: c.organizationId,
+                serviceId: service.id,
+                staffId: c.staffId,
+                startAt,
+                endAt: hours(25),
+                timezone: "UTC",
+                snapshot: {},
+                bookerName: "Asha",
+                bookerEmail: "asha@example.com",
+            },
+        });
+        // Saroh puts it on their calendar; they have one meeting of their own.
+        await new CalendarSyncHandler(
+            google,
+            flags as unknown as FeatureFlagService,
+            new CalendarLapseService(),
+        ).sync(c.organizationId, {
+            bookingId: booking.id,
+            meetTries: 0,
+            quiet: false,
+        });
+        expect(google.liveEvents()).toHaveLength(1);
+        google.busy.set("primary-cal", [
+            { startAt: hours(48), endAt: hours(49) },
+        ]);
+
+        await handler.handle(job(c.organizationId, c.connectionId));
+
+        const rows = await prisma.googleCalendarBusy.findMany({
+            where: { connectionId: c.connectionId },
+        });
+        expect(rows).toHaveLength(1);
+        expect(rows[0].startAt.getTime()).toBeGreaterThan(hours(47).getTime());
+        // Moving it by half an hour: the slot engine sees only the booking.
+        const people = await loadPeople(
+            prisma,
+            c.organizationId,
+            [c.staffId],
+            hours(0),
+            hours(72),
+            booking.id,
+        );
+        expect(
+            people[0].timeOff.some(
+                (t) => t.startAt.getTime() === startAt.getTime(),
+            ),
+        ).toBe(false);
+    });
+
+    it("reads a calendar that isn't theirs with free/busy instead", async () => {
+        const c = await connected();
+        google.notOwned.add("primary-cal");
+        google.busy.set("primary-cal", [
+            { startAt: hours(24), endAt: hours(25) },
+        ]);
+        await handler.handle(job(c.organizationId, c.connectionId));
+        expect(google.calls).toEqual(
+            expect.arrayContaining(["busyEvents", "freeBusy"]),
+        );
+        expect(
+            await prisma.googleCalendarBusy.count({
+                where: { connectionId: c.connectionId },
+            }),
+        ).toBe(1);
+    });
+
+    it("pauses on a Free plan: busy times go, the chain ends, slots ignore it (GC-02)", async () => {
+        const c = await connected();
+        google.busy.set("primary-cal", [
+            { startAt: hours(24), endAt: hours(25) },
+        ]);
+        await handler.handle(job(c.organizationId, c.connectionId));
+        const read = () =>
+            loadPeople(
+                prisma,
+                c.organizationId,
+                [c.staffId],
+                hours(0),
+                hours(72),
+            );
+        expect((await read())[0].timeOff).toHaveLength(1);
+
+        const spy = jest
+            .spyOn(planMeter, "isIncluded")
+            .mockResolvedValue(false);
+        try {
+            // Slots stop counting it at once, before any job runs.
+            expect((await read())[0].timeOff).toHaveLength(0);
+            await prisma.job.deleteMany({
+                where: {
+                    type: CALENDAR_BUSY_TYPE,
+                    payload: { path: ["connectionId"], equals: c.connectionId },
+                },
+            });
+            google.calls.length = 0;
+            await handler.handle(job(c.organizationId, c.connectionId));
+            expect(google.calls).toHaveLength(0);
+            expect(
+                await prisma.googleCalendarBusy.count({
+                    where: { connectionId: c.connectionId },
+                }),
+            ).toBe(0);
+            expect(
+                await prisma.job.count({
+                    where: {
+                        type: CALENDAR_BUSY_TYPE,
+                        status: "PENDING",
+                        payload: {
+                            path: ["connectionId"],
+                            equals: c.connectionId,
+                        },
+                    },
+                }),
+            ).toBe(0);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it("pauses for someone who lost the permission (GC-03)", async () => {
+        const c = await connected();
+        await prisma.membership.update({
+            where: { id: c.membershipId },
+            data: { role: "REVIEWER" },
+        });
+        await handler.handle(job(c.organizationId, c.connectionId));
+        expect(google.calls).toHaveLength(0);
+    });
+
+    it("keeps going when the stored token can't be opened, and says why (GC-16)", async () => {
+        const c = await connected();
+        const key = mutableEnv.CALENDAR_ENC_KEY;
+        mutableEnv.CALENDAR_ENC_KEY = randomBytes(32).toString("base64");
+        try {
+            await expect(
+                handler.handle(job(c.organizationId, c.connectionId)),
+            ).resolves.toBeUndefined();
+        } finally {
+            mutableEnv.CALENDAR_ENC_KEY = key;
+        }
+        const row = await prisma.googleCalendarConnection.findUniqueOrThrow({
+            where: { id: c.connectionId },
+        });
+        expect(row.status).toBe("CONNECTED");
+        expect(row.lastError).toMatch(/can't be opened/);
+        expect(
+            await prisma.job.count({
+                where: {
+                    type: CALENDAR_BUSY_TYPE,
+                    status: "PENDING",
+                    payload: { path: ["connectionId"], equals: c.connectionId },
+                },
+            }),
+        ).toBe(1);
+    });
+
+    it("brings a waiting run forward when asked for an earlier one (GC-13)", async () => {
+        const c = await connected();
+        await scheduleBusy(c.organizationId, c.connectionId, hours(0.15));
+        const now = new Date();
+        await scheduleBusy(c.organizationId, c.connectionId, now);
+        const waiting = await prisma.job.findMany({
+            where: {
+                type: CALENDAR_BUSY_TYPE,
+                status: "PENDING",
+                payload: { path: ["connectionId"], equals: c.connectionId },
+            },
+        });
+        expect(waiting).toHaveLength(1);
+        expect(waiting[0].runAt.getTime()).toBeLessThanOrEqual(
+            now.getTime() + 1000,
+        );
     });
 });

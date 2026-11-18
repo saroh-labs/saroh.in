@@ -134,6 +134,12 @@ export interface Booking extends SharedBooking {
      */
     freeCancelUntil?: string | null;
     /**
+     * Its own Google Meet link (#1047, GC-07), once Google made it: joined
+     * by before the service's typed link (`joinLink`). Absent from an API
+     * older than it.
+     */
+    meetingUrl?: string | null;
+    /**
      * The CRM contact this booking belongs to, when one is linked.
      *
      * Preferred over `bookerName` for display: the typed-in name is whatever the

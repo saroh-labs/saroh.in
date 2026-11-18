@@ -2,8 +2,8 @@ import type { Job } from "@saroh/database";
 import { Prisma, prisma } from "@saroh/database";
 
 import { env } from "../../env";
-import type { EnqueueJobInput, JobQueue } from "./job-queue.port";
-import { retryDelay } from "./job-queue.port";
+import type { EnqueueJobInput, JobLane, JobQueue } from "./job-queue.port";
+import { CALENDAR_LANE_PREFIX, retryDelay } from "./job-queue.port";
 
 /**
  * Postgres-backed {@link JobQueue} (S3-003).
@@ -56,8 +56,19 @@ export class PrismaJobQueue implements JobQueue {
      * `$transaction` per the port contract. `RETURNING j.*` gives back the
      * claimed rows.
      */
-    async claimDue(workerId: string, limit: number): Promise<Job[]> {
+    async claimDue(
+        workerId: string,
+        limit: number,
+        lane?: JobLane,
+    ): Promise<Job[]> {
         const visibilitySecs = this.visibilityMs / 1000;
+        const calendar = `${CALENDAR_LANE_PREFIX}%`;
+        const inLane =
+            lane === "calendar"
+                ? Prisma.sql`AND type LIKE ${calendar}`
+                : lane === "main"
+                  ? Prisma.sql`AND type NOT LIKE ${calendar}`
+                  : Prisma.empty;
         // `now() AT TIME ZONE 'UTC'`, never bare `now()`: Prisma stores these
         // columns as `timestamp without time zone` holding UTC, and comparing
         // one with `now()` reads it in the SESSION's zone. On a database set
@@ -72,9 +83,10 @@ export class PrismaJobQueue implements JobQueue {
                     "lockedBy" = ${workerId}
                 WHERE j.id IN (
                     SELECT id FROM "Job"
-                    WHERE (status = 'PENDING' AND "runAt" <= (now() AT TIME ZONE 'UTC'))
+                    WHERE ((status = 'PENDING' AND "runAt" <= (now() AT TIME ZONE 'UTC'))
                        OR (status = 'PROCESSING'
-                           AND "lockedAt" < (now() AT TIME ZONE 'UTC') - make_interval(secs => ${visibilitySecs}))
+                           AND "lockedAt" < (now() AT TIME ZONE 'UTC') - make_interval(secs => ${visibilitySecs})))
+                      ${inLane}
                     ORDER BY "runAt" ASC
                     FOR UPDATE SKIP LOCKED
                     LIMIT ${limit}

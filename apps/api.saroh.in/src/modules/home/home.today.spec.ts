@@ -453,6 +453,8 @@ describe("HomeService: the today block", () => {
                 groupBy: jest.fn().mockResolvedValue([]),
             },
             user: empty,
+            socialChannel: empty,
+            socialPost: empty,
             storeSettings: {
                 aggregate: jest.fn().mockResolvedValue({
                     _max: { pickupLateAfterMinutes: null },

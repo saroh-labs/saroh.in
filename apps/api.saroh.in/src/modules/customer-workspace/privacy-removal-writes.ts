@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 
 import { AuditAction } from "../audit/audit.service";
 import { removeWaitlistInTx } from "../bookings/waitlist-merge";
+import { queueCalendarSyncInTx } from "../calendar-sync/queue-sync";
 import { reservedRemovedEmail } from "../contacts/contact-email";
 import { anonymiseStoreCustomersInTx } from "../customers/anonymise-customer";
 import { enqueueDataRequestEmail } from "../site-accounts/data-request-email.handler";
@@ -210,6 +211,21 @@ export async function removeDetailsInTx(
           AND "contactId" = ${contactId}
           AND jsonb_typeof(snapshot::jsonb) = 'object'
           AND snapshot::jsonb ? 'booker'`;
+    // Their name and email on a team member's Google Calendar go too
+    // (GC-09): each event Saroh made for one of their bookings is written
+    // again from the blanked booking, with no email to anyone.
+    const inGoogle = await tx.googleCalendarEvent.findMany({
+        where: { organizationId, booking: { contactId } },
+        select: { bookingId: true },
+    });
+    for (const { bookingId } of inGoogle) {
+        await queueCalendarSyncInTx(tx, {
+            organizationId,
+            bookingId,
+            staffId: null,
+            quiet: true,
+        });
+    }
 
     // What hangs off the contact.
     const notes = await tx.contactNote.deleteMany({ where: { contactId } });

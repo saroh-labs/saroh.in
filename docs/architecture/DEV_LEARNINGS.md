@@ -6832,3 +6832,29 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** the coupon was checked once, before the provider call and outside the transaction that records the checkout, counting redemptions and open checkouts only; the automatic coupon reused the typed code's refusal path; nothing tied a coupon to the business's history beyond its own redemption.
 - **Fix:** one place count for quote, checkout and the public offers (`couponPlacesTaken`: redemptions, completed checkouts, unlapsed open ones), re-counted under a per-coupon advisory lock in the checkout's transaction; automatic checkouts held an hour; the automatic coupon falls back to the full price and raises `billing_coupon_offer_refused` once; `hadPaidPlanOrLaunchOffer` for every automatic coupon; a coupon's terms can't change under the same Offer, and a mismatched discounted charge raises `billing_coupon_offer_mismatch` once. Specs: `offers.db.spec.ts` → "coupon abuse refused".
 - **Rule:** a limit that a provider call sits between checking and recording is re-checked under a lock in the recording transaction; an "automatic" offer never reuses a typed code's error path (`PRICING_ROLLOUT.md` → Automatic and percent coupons).
+
+### A check made only when connecting is not a check (18 Nov 2026)
+
+- **Symptom:** the Google Calendar review (GC-02, GC-03) found that a business moved down to Free, a person who lost `calendar:connect-own`, or one taken off the diary kept syncing for good, and the person couldn't even disconnect: only connecting asked the plan and the permission.
+- **Cause:** the gate lived in the connect service; the two jobs and the slot reads trusted the connection's own status.
+- **Fix:** one `calendar-allowed.ts` asked by both jobs and every slot read; a connection that fails it reads PAUSED and resumes by itself; disconnect needs only a membership. Rule for any provider a person connects: what lets them connect is asked again wherever it acts (`backend-integrations.md` → Google Calendar).
+
+### Revoking one Google token ended the person's other connections (18 Nov 2026)
+
+- **Symptom:** GC-06: disconnecting Google Calendar in one business would have broken the same Google account in another, and the person's Google sign-in consent.
+- **Cause:** Google's revoke ends the whole grant for the client, not the one token.
+- **Fix:** revoke only at the last use (`CalendarReleaseService.lastUse`); otherwise delete Saroh's stored token. `calendar-connect.service.db.spec.ts` pins it.
+
+### Words typed before hydration vanish when a phone layout takes over; a clean-up in `finally` never runs after a timeout (18 Nov 2026)
+
+- **Symptom:** on #1431, `social-channels.spec.ts` passed on desk and timed out on phone: Create post's headline was empty and pressing "Schedule for tomorrow" sent nothing. The retry then found Instagram still connected, because the `finally` that disconnects it had no time left.
+- **Cause:** `useNarrow()` is false on the server, so the phone first gets the desk layout and swaps to its own after hydration, with a new input. `fill` landed on the server's input and was lost. The composer's `save()` then returned quietly when there was nothing to post. A `finally` in the test body shares the test's 60s; `afterEach` gets its own.
+- **Fix:** Schedule, Post now and Save as draft say "Write a headline or add a photo first." when there's nothing to post (`use-social-post.ts`). The spec types until the post is saved (`toPass`), and connects/rolls out in `beforeEach` (disconnecting anything left) and puts back in `afterEach`.
+- **Rule:** in a spec, type into a field until the screen shows it took (it saved, it drew), like `pressUntil` for presses; set up and put back business-wide state in `beforeEach`/`afterEach`, never `finally`. A button never does nothing: say what it needs.
+
+### A phone page wider than the screen zooms out, and Playwright then clicks the wrong thing (18 Nov 2026)
+
+- **Symptom:** on #1431, `social-channels.spec.ts` on phone failed both tries at "Delete post" in the post's sheet: the button resolved and was "visible, enabled and stable", but the sheet's own header "intercepts pointer events". The trace's viewport grew from 412 to 476 on Create post and to 606 on Social with the sheet open; the screenshot showed the sheet cut off on the left.
+- **Cause:** two rows ran wider than the phone: the composer's "Schedule for tomorrow" button (a `Button` is `whitespace-nowrap`, so its two-line suggestion never wrapped), and Social's page header with `compactOnPhone` (meant for one button) holding the meter and two buttons to their own width, about 600px. A mobile browser zooms out to fit the widest content; Playwright's hit point then lands on whatever is drawn there. The page's own `scrollWidth` read 412 in the end state, so a scroll check didn't show it. Separately, `QuickLook` focused the sheet while it was still below the screen, which scrolled the page behind to its foot.
+- **Fix:** `whitespace-normal` on the composer's big button; `compactOnPhone` only on the Channels tab; `focus({ preventScroll: true })` in `QuickLook`. The spec now checks `window.innerWidth` equals the viewport on the composer and with the sheet open.
+- **Rule:** a phone spec that can fail on a click asserts `innerWidth === viewport width` first; a zoomed-out page is a layout bug, not a flaky click. Find the culprit by rendering the trace's DOM snapshot (drop its `<base>`, point the CSS at `resources/`) in a non-mobile 412px context and listing elements past 412. `compactOnPhone` is for one action.

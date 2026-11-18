@@ -768,6 +768,52 @@ Settings › API and AI apps › Webhooks. `modules/outbound-webhooks/`.
   the events. Resend re-queues the same delivery; "Send a test" sends a
   `ping`.
 
+## Google Calendar — **Current** (#1047; review fixes 18 Nov 2026)
+
+A person's own Google Calendar in one business (`modules/calendar-sync`).
+What the review (GC-01 to GC-18) settled:
+
+- **Allowed is asked every time, not only at connect** (GC-02, GC-03).
+  `calendar-allowed.ts`: the `GOOGLE_CALENDAR` flag, the plan's
+  `integrations` row, and the person still holding `calendar:connect-own`
+  and a place on the diary. Both jobs and every slot read ask it; a
+  connection that fails it is PAUSED (kept, nothing sent or read, its busy
+  times ignored) and carries on by itself when allowed again (the hourly
+  `calendar.sweep`). Disconnect needs only a membership, and anyone with
+  `member:role:update` can disconnect someone else.
+- **Busy times leave out Saroh's own events** (GC-01). On a calendar the
+  person owns they are read with `events.list` (the `calendar.events.owned`
+  scope reaches it), skipping the events Saroh made for this connection
+  (`eventIdFor`). Counting them again refused every move shorter than the
+  booking itself.
+- **Only what the person made or accepted blocks** (GC-10). `busyOf`:
+  not cancelled, not "show as free", not a working location, and either
+  theirs or accepted. An invitation nobody answered doesn't block, so a
+  stranger can't close someone's diary. Known limit: a calendar the person
+  doesn't own is read with Google's free/busy, which can't tell an
+  unanswered invitation from a meeting; there it still blocks.
+- **Short calls, own lane** (GC-04): 5 s per Google call, and the
+  `calendar` worker lane (`backend-jobs.md`).
+- **Revoke at the last use only** (GC-06). Revoking one token ends the
+  whole grant for Saroh's Google client, sign-in included (Google's
+  docs). `CalendarReleaseService.lastUse` revokes only when no other
+  connected connection reaches the same Google address, in any business,
+  and nobody signs in with Google as that person or that address;
+  otherwise only Saroh's stored token goes.
+- **Letting go clears what's to come, quietly** (GC-09). Disconnect,
+  another Google account, and leaving the team delete the upcoming events
+  Saroh made, with `sendUpdates=none` (the bookings still stand); past
+  events stay. A deleted customer's cancelled bookings and a privacy
+  removal queue a quiet `calendar.sync`; a booking that has ended is never
+  deleted with an email, and never added somewhere new.
+- **Sign-in stays apart** (GC-08, GC-17, `packages/auth/src/server.ts`):
+  Google sign-in sends `includeGrantedScopes: false`, OAuth tokens are
+  stored encrypted (`encryptOAuthTokens`; rows from before read as they
+  are), and no provider is trusted to link an unverified address.
+- **The booking's own Meet link wins** (GC-07): `Booking.meetingUrl`
+  before the service's typed link, in the booker's answer
+  (`toPublicBooking`) and the team's booking page (`joinLink`).
+
 ## Media storage — **Current**
 
 One R2 bucket per environment in the Saroh labs Cloudflare account:

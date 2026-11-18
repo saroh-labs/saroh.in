@@ -31,15 +31,19 @@ interface Payload {
     e: number;
 }
 
+/** A fresh nonce: the caller keeps it to make the state good once (GC-15). */
+export const newNonce = (): string => randomBytes(12).toString("base64url");
+
 export function signState(
     who: Pick<ConnectState, "organizationId" | "membershipId" | "userId">,
     now: Date = new Date(),
+    nonce: string = newNonce(),
 ): string {
     const payload: Payload = {
         o: who.organizationId,
         m: who.membershipId,
         u: who.userId,
-        n: randomBytes(12).toString("base64url"),
+        n: nonce,
         e: now.getTime() + STATE_TTL_MS,
     };
     const body = Buffer.from(JSON.stringify(payload)).toString("base64url");

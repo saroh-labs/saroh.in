@@ -39,6 +39,7 @@ import {
     linkDiaryPerson,
 } from "./diary-invite";
 import { hashInviteToken } from "./invite-token";
+import { memberLeaving } from "./member-leaving";
 import type {
     InviteMemberDto,
     SetExtraActionsDto,
@@ -1069,6 +1070,17 @@ export class OrganizationMembersService {
     ): Promise<{ revokedLinks: number; storefrontRoles: number }> {
         if (role === "OWNER") {
             await this.assertNotLastOwner(organizationId, userId, what);
+        }
+        // Their Google Calendar goes first, while its token still works:
+        // upcoming events Saroh put there are taken off, quietly (GC-09),
+        // and the grant revoked when nothing else uses it (GC-06). The
+        // connection would otherwise go with the membership, untouched.
+        const membership = await prisma.membership.findUnique({
+            where: { organizationId_userId: { organizationId, userId } },
+            select: { id: true },
+        });
+        if (membership) {
+            await memberLeaving(organizationId, membership.id);
         }
 
         const detached = await prisma.$transaction(

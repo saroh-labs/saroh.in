@@ -3,7 +3,14 @@
 import { planLabel } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
-import { AtSign, BarChart3, Flag, Instagram, Lock } from "lucide-react";
+import {
+    AtSign,
+    BarChart3,
+    CalendarClock,
+    Flag,
+    Instagram,
+    Lock,
+} from "lucide-react";
 import { useId } from "react";
 
 import { PlanWay } from "@/components/billing/plan-way";
@@ -13,20 +20,23 @@ import { ADD_ONS_HREF } from "@/lib/share-item/share";
 import { addSocialLabel, SHARE_WORDS } from "@/lib/share-item/words";
 
 /**
- * Saroh Social, drawn locked (boards SBShare*, BPost*, BDone*): it isn't
- * built, so no business has it. Free is pointed at the plans, Grow at the
- * add-on, its price only from the catalogue. Someone who can't change the
- * plan reads who can (`PlanWay`); while plans aren't shown, no link at all.
- * Share now never waits on it.
+ * Saroh Social beside Share (boards SBShare*, BPost*, BDone*). Locked:
+ * Free is pointed at the plans, Grow at the add-on, its price only from
+ * the catalogue. Someone who can't change the plan reads who can
+ * (`PlanWay`); while plans aren't shown, no link at all. On (S9): the
+ * line points at posting it with Saroh Social, and the locked pieces are
+ * left out. Share now never waits on it.
  */
 
-const wayHref = (lock: ScheduleLock) =>
+type Locked = Exclude<ScheduleLock, { tier: "on" }>;
+
+const wayHref = (lock: Locked) =>
     lock.tier === "grow" ? ADD_ONS_HREF : upgradeHref();
-const wayLabel = (lock: ScheduleLock) =>
+const wayLabel = (lock: Locked) =>
     lock.tier === "grow" ? addSocialLabel(lock.price) : planLabel();
 
 /** The way to Saroh Social, as a link after a sentence. */
-function Way({ lock }: { lock: ScheduleLock }) {
+function Way({ lock }: { lock: Locked }) {
     return (
         <PlanWay
             fallback={
@@ -46,18 +56,47 @@ function Way({ lock }: { lock: ScheduleLock }) {
     );
 }
 
-/** One quiet line: what Saroh Social adds, and the way to it. */
+/**
+ * One quiet line: what Saroh Social adds, and the way to it. With it on,
+ * the way to post this with it (`postHref`, Create post on the item).
+ */
 export function SocialLine({
     lock,
     words = SHARE_WORDS.postStraight,
     icon = "lock",
+    postHref = "/social/new",
     className,
 }: {
     lock: ScheduleLock;
     words?: string;
     icon?: "lock" | "chart";
+    postHref?: string;
     className?: string;
 }) {
+    if (lock.tier === "on") {
+        return (
+            <p
+                data-social-line="on"
+                className={cn(
+                    "text-pretty text-[12.5px] leading-[1.5] text-muted-foreground",
+                    className,
+                )}
+            >
+                <CalendarClock
+                    aria-hidden
+                    className="mr-1.5 inline size-3.5 align-[-2px]"
+                />
+                {SHARE_WORDS.postWithSocial}{" "}
+                <TextLink
+                    href={postHref}
+                    className="whitespace-nowrap font-semibold"
+                    data-social-post-it=""
+                >
+                    {SHARE_WORDS.postIt}
+                </TextLink>
+            </p>
+        );
+    }
     const Icon = icon === "chart" ? BarChart3 : Lock;
     return (
         <p
@@ -75,6 +114,7 @@ export function SocialLine({
 
 /** After sharing (BDone*, SPayoff*): the dashed "next time" note. */
 export function SocialTease({ lock }: { lock: ScheduleLock }) {
+    if (lock.tier === "on") return null;
     return (
         <div
             data-social-tease={lock.tier}
@@ -103,6 +143,7 @@ const CHANNELS = [
  */
 export function PostToLocked({ lock }: { lock: ScheduleLock }) {
     const id = useId();
+    if (lock.tier === "on") return null;
     return (
         <section
             data-channels-locked={lock.tier}

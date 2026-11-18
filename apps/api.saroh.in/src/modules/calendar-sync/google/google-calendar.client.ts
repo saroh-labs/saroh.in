@@ -1,4 +1,7 @@
+import { DateTime } from "luxon";
+
 import type {
+    BusyEvent,
     BusyInterval,
     ConsentInput,
     EventInput,
@@ -24,8 +27,18 @@ const REVOKE = "https://oauth2.googleapis.com/revoke";
 const CALENDAR = "https://www.googleapis.com/calendar/v3";
 const MEET = "https://meet.googleapis.com/v2";
 
-/** How long Saroh waits on Google before giving up and trying later. */
-export const GOOGLE_CALL_TIMEOUT_MS = 15_000;
+/**
+ * How long Saroh waits on Google before giving up and trying later. Short
+ * (GC-04): Google answers in well under a second, and a job waiting on a
+ * slow Google holds its worker lane for every person behind it.
+ */
+export const GOOGLE_CALL_TIMEOUT_MS = 5_000;
+
+/** An events page: the most Google gives, so 60 days is one call for nearly everyone. */
+const EVENTS_PAGE = 2500;
+/** Only the parts of an event a busy read needs. */
+const BUSY_FIELDS =
+    "timeZone,nextPageToken,items(id,status,transparency,eventType,start,end,organizer(self),attendees(self,organizer,responseStatus),extendedProperties(private(sarohBookingId)))";
 
 /** Google's free/busy reads a window this long at most per call; longer ones are split. */
 const FREEBUSY_SPAN_MS = 30 * 86_400_000;
@@ -39,6 +52,28 @@ export interface GoogleClientConfig {
     clientSecret: string;
     fetch?: Fetch;
     timeoutMs?: number;
+}
+
+interface GoogleWhen {
+    dateTime?: string;
+    /** An all-day event: a date in the calendar's zone. */
+    date?: string;
+}
+
+interface GoogleListedEvent {
+    id?: string;
+    status?: string;
+    transparency?: string;
+    eventType?: string;
+    start?: GoogleWhen;
+    end?: GoogleWhen;
+    organizer?: { self?: boolean };
+    attendees?: {
+        self?: boolean;
+        organizer?: boolean;
+        responseStatus?: string;
+    }[];
+    extendedProperties?: { private?: { sarohBookingId?: string } };
 }
 
 interface GoogleEvent {
@@ -158,6 +193,40 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
         return out;
     }
 
+    async busyEvents(
+        accessToken: string,
+        calendarId: string,
+        from: Date,
+        to: Date,
+    ): Promise<BusyEvent[]> {
+        const out: BusyEvent[] = [];
+        let pageToken: string | undefined;
+        do {
+            const url = new URL(
+                `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events`,
+            );
+            const q = url.searchParams;
+            q.set("timeMin", from.toISOString());
+            q.set("timeMax", to.toISOString());
+            // Repeating events as their single times, as free/busy has them.
+            q.set("singleEvents", "true");
+            q.set("maxResults", String(EVENTS_PAGE));
+            q.set("fields", BUSY_FIELDS);
+            if (pageToken) q.set("pageToken", pageToken);
+            const body = await this.json<{
+                timeZone?: string;
+                items?: GoogleListedEvent[];
+                nextPageToken?: string;
+            }>(url.toString(), accessToken, { method: "GET" }, "events list");
+            for (const item of body.items ?? []) {
+                const busy = busyOf(item, body.timeZone ?? "UTC");
+                if (busy) out.push(busy);
+            }
+            pageToken = body.nextPageToken;
+        } while (pageToken);
+        return out;
+    }
+
     async freeBusy(
         accessToken: string,
         calendarIds: readonly string[],
@@ -223,9 +292,10 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
         accessToken: string,
         calendarId: string,
         event: EventInput,
+        opts: { quiet?: boolean } = {},
     ): Promise<EventResult> {
         const base = `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events`;
-        const query = "?sendUpdates=all&conferenceDataVersion=1";
+        const query = `?sendUpdates=${opts.quiet ? "none" : "all"}&conferenceDataVersion=1`;
         const res = await this.call(base + query, {
             method: "POST",
             headers: authJson(accessToken),
@@ -256,9 +326,11 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
         accessToken: string,
         calendarId: string,
         eventId: string,
+        opts: { quiet?: boolean } = {},
     ): Promise<void> {
+        const send = opts.quiet ? "none" : "all";
         const res = await this.call(
-            `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
+            `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}?sendUpdates=${send}`,
             { method: "DELETE", headers: authJson(accessToken) },
         );
         if (res.ok || res.status === 404 || res.status === 410) {
@@ -416,6 +488,10 @@ function eventBody(e: EventInput): Record<string, unknown> {
               ]
             : [],
         extendedProperties: { private: { sarohBookingId: e.bookingId } },
+        // Only the customer is invited (R5, GC-12): they can't add someone
+        // who would then join the Meet without knocking.
+        guestsCanInviteOthers: false,
+        guestsCanSeeOtherGuests: false,
         ...(e.meetRequestId
             ? {
                   conferenceData: {
@@ -427,6 +503,48 @@ function eventBody(e: EventInput): Record<string, unknown> {
               }
             : {}),
     };
+}
+
+/**
+ * Whether a listed event makes the person busy, as an interval (GC-10):
+ * - not cancelled, not "show as free" (`transparent`, which every all-day
+ *   event is unless the person chose busy), not a working location;
+ * - made by them (no guest list, or they organise it) or accepted. An
+ *   invitation they haven't answered, declined or only said maybe to
+ *   doesn't block: anyone who knows their address can send one.
+ */
+export function busyOf(e: GoogleListedEvent, zone: string): BusyEvent | null {
+    if (!e.id || e.status === "cancelled") return null;
+    if (e.transparency === "transparent") return null;
+    if (e.eventType === "workingLocation") return null;
+    const me = e.attendees?.find((a) => a.self);
+    const theirs =
+        e.organizer?.self === true ||
+        !me ||
+        me.organizer === true ||
+        me.responseStatus === "accepted";
+    if (!theirs) return null;
+    const startAt = instantOf(e.start, zone);
+    const endAt = instantOf(e.end, zone);
+    if (!startAt || !endAt || endAt <= startAt) return null;
+    return {
+        eventId: e.id,
+        startAt,
+        endAt,
+        bookingId: str(e.extendedProperties?.private?.sarohBookingId) ?? null,
+    };
+}
+
+function instantOf(when: GoogleWhen | undefined, zone: string): Date | null {
+    if (when?.dateTime) {
+        const at = new Date(when.dateTime);
+        return Number.isNaN(at.getTime()) ? null : at;
+    }
+    if (when?.date) {
+        const day = DateTime.fromISO(when.date, { zone });
+        return day.isValid ? day.toJSDate() : null;
+    }
+    return null;
 }
 
 function resultOf(e: GoogleEvent): EventResult {

@@ -717,6 +717,70 @@ describe("removing a customer's details (DEC-042)", () => {
         ).toMatchObject({ contactId: asha, data: { name: "Asha" } });
     });
 
+    it("rewrites their past booking on a team member's Google Calendar, with no email (GC-09)", async () => {
+        const ctx = await business();
+        const asha = await person(ctx);
+        const user = await prisma.user.create({
+            data: { email: `c11-staff-${next()}@x.com` },
+        });
+        const membership = await prisma.membership.create({
+            data: {
+                organizationId: ctx.organizationId,
+                userId: user.id,
+                role: "MEMBER",
+            },
+        });
+        const connection = await prisma.googleCalendarConnection.create({
+            data: {
+                organizationId: ctx.organizationId,
+                membershipId: membership.id,
+                googleEmail: `c11-${next()}@example.com`,
+            },
+        });
+        const service = await prisma.service.create({
+            data: {
+                organizationId: ctx.organizationId,
+                name: "Consultation",
+                durationMinutes: 30,
+                timezone: "UTC",
+            },
+        });
+        const startAt = new Date(Date.now() - 7 * 86_400_000);
+        const booking = await prisma.booking.create({
+            data: {
+                organizationId: ctx.organizationId,
+                serviceId: service.id,
+                contactId: asha,
+                startAt,
+                endAt: new Date(startAt.getTime() + 1_800_000),
+                timezone: "UTC",
+                snapshot: {},
+                bookerName: "Asha Rao",
+                bookerEmail: "asha@example.in",
+            },
+        });
+        await prisma.googleCalendarEvent.create({
+            data: {
+                organizationId: ctx.organizationId,
+                bookingId: booking.id,
+                connectionId: connection.id,
+                calendarId: "primary",
+                eventId: "saroh0past",
+            },
+        });
+
+        await removals.remove(ctx, asha);
+
+        const job = await prisma.job.findFirst({
+            where: {
+                organizationId: ctx.organizationId,
+                type: "calendar.sync",
+                payload: { path: ["bookingId"], equals: booking.id },
+            },
+        });
+        expect(job?.payload).toEqual({ bookingId: booking.id, quiet: true });
+    });
+
     it("deletes their message thread with every message in it (A13)", async () => {
         const ctx = await business();
         const asha = await person(ctx);

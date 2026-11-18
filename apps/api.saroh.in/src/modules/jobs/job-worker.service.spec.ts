@@ -297,6 +297,45 @@ describe("JobWorkerService.runOnce", () => {
     });
 });
 
+describe("lanes (GC-04)", () => {
+    it("runs a payment webhook while a slow calendar job holds its own lane", async () => {
+        const queue = new FakeJobQueue();
+        const registry = new JobHandlerRegistry();
+        let release: () => void = () => undefined;
+        const slow = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        registry.register("calendar.busy", () => slow);
+        const webhook = jest.fn().mockResolvedValue(undefined);
+        registry.register("webhook.process", webhook);
+        await queue.enqueue({ type: "calendar.busy", payload: {} });
+        await queue.enqueue({ type: "webhook.process", payload: {} });
+        const worker = makeWorker(queue, registry);
+
+        const calendarTick = worker.runOnce("calendar");
+        const mainProcessed = await worker.runOnce("main");
+
+        expect(mainProcessed).toBe(1);
+        expect(webhook).toHaveBeenCalledTimes(1);
+        expect(queue.jobs[0].status).toBe("PROCESSING");
+        release();
+        await calendarTick;
+        expect(queue.jobs[0].status).toBe("DONE");
+    });
+
+    it("claims only its own lane's types", async () => {
+        const queue = new FakeJobQueue();
+        await queue.enqueue({ type: "calendar.sync", payload: {} });
+        await queue.enqueue({ type: "booking.notify", payload: {} });
+
+        const main = await queue.claimDue("w", 10, "main");
+        const calendar = await queue.claimDue("w", 10, "calendar");
+
+        expect(main.map((j) => j.type)).toEqual(["booking.notify"]);
+        expect(calendar.map((j) => j.type)).toEqual(["calendar.sync"]);
+    });
+});
+
 describe("FakeJobQueue visibility", () => {
     it("does not re-claim a job already PROCESSING", async () => {
         const queue = new FakeJobQueue();

@@ -29,8 +29,10 @@ export interface JobQueue {
      * PROCESSING. "Runnable" = PENDING and due (`runAt <= now`), OR stuck
      * PROCESSING past the visibility timeout (a crashed worker). Concurrent
      * workers never receive the same row. Returns the claimed jobs.
+     * `lane` narrows the claim to that lane's types ({@link JOB_LANES});
+     * absent, any type (tests driving one tick).
      */
-    claimDue(workerId: string, limit: number): Promise<Job[]>;
+    claimDue(workerId: string, limit: number, lane?: JobLane): Promise<Job[]>;
 
     /**
      * Restart a claimed job's lease (`lockedAt` = now), fenced on the lease
@@ -88,6 +90,22 @@ export interface EnqueueJobInput {
     /** Earliest execution time (defaults to now — run ASAP). */
     runAt?: Date;
 }
+
+/**
+ * The worker's lanes: each is its own poll loop, so a slow lane never
+ * holds up another. `calendar` takes the Google Calendar jobs
+ * (`calendar.*`, #1047 GC-04): a slow Google must not delay a payment
+ * webhook or a customer's message; `main` takes every other type.
+ */
+export const JOB_LANES = ["main", "calendar"] as const;
+export type JobLane = (typeof JOB_LANES)[number];
+
+/** The prefix of the types the `calendar` lane runs. */
+export const CALENDAR_LANE_PREFIX = "calendar.";
+
+/** Which lane runs a job of `type`. */
+export const laneOf = (type: string): JobLane =>
+    type.startsWith(CALENDAR_LANE_PREFIX) ? "calendar" : "main";
 
 /** DI token for the {@link JobQueue} port. Inject with `@Inject(JOB_QUEUE)`. */
 export const JOB_QUEUE = Symbol("JOB_QUEUE");
@@ -148,14 +166,30 @@ export const RETRY_SCHEDULES: Readonly<
     // A business's own server that is down (outbound webhooks, U13): about
     // 8 hours of tries before the delivery is FAILED.
     "webhooks.deliver": [1, 5, 15, 30, 60, 120, 240].map((m) => m * MINUTE_MS),
+    // Google's 429 or 503 (GC-05): minutes, not seconds, so a rate limit
+    // or an outage of hours still lands the booking in Google. Its
+    // attempts are `CALENDAR_SYNC_ATTEMPTS` (one more than the schedule).
+    "calendar.sync": [1, 5, 15, 60, 240].map((m) => m * MINUTE_MS),
 };
 
+/**
+ * Types whose scheduled waits are spread by up to a fifth either way, so a
+ * bulk change that met one rate limit doesn't come back all at once.
+ */
+const JITTERED: ReadonlySet<string> = new Set(["calendar.sync"]);
+
 /** The wait before a failed job of `type` runs again (`attempts` as in {@link nextBackoff}). */
-export function retryDelay(type: string, attempts: number): number {
+export function retryDelay(
+    type: string,
+    attempts: number,
+    random: () => number = Math.random,
+): number {
     const schedule = RETRY_SCHEDULES[type];
     if (!schedule?.length) return nextBackoff(attempts);
     const i = Math.min(Math.max(1, Math.floor(attempts)), schedule.length) - 1;
-    return schedule[i] ?? nextBackoff(attempts);
+    const wait = schedule[i] ?? nextBackoff(attempts);
+    if (!JITTERED.has(type)) return wait;
+    return Math.round(wait * (0.8 + 0.4 * random()));
 }
 
 /**
@@ -193,10 +227,13 @@ export class FakeJobQueue implements JobQueue {
         return Promise.resolve(job);
     }
 
-    claimDue(workerId: string, limit: number): Promise<Job[]> {
+    claimDue(workerId: string, limit: number, lane?: JobLane): Promise<Job[]> {
         const now = Date.now();
         const due = this.jobs.filter(
-            (j) => j.status === "PENDING" && j.runAt.getTime() <= now,
+            (j) =>
+                j.status === "PENDING" &&
+                j.runAt.getTime() <= now &&
+                (!lane || laneOf(j.type) === lane),
         );
         const claimed = due.slice(0, Math.max(0, limit));
         for (const j of claimed) {

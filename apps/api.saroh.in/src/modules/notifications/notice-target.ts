@@ -87,9 +87,19 @@ export const NOTICE_KINDS = {
     // Google stopped Saroh's access to someone's Google Calendar (#1047):
     // to that person alone (`userId`), on their own Hours and time off.
     "calendar.lapsed": "hours",
+    // A booking that didn't reach their Google Calendar after every retry,
+    // or got no Meet link (GC-05, GC-07): to that person, on the booking.
+    "calendar.sync-failed": "booking",
+    // Their Google busy times haven't been read for two hours (GC-14):
+    // slots are on Saroh's own times; to that person, on their Hours.
+    "calendar.behind": "hours",
     // A webhook endpoint Saroh switched off after repeated failed
     // deliveries (plan 2026-11-10-001, U13): Settings › API and AI apps.
     "webhook.disabled": "developers",
+    // Saroh Social: a channel to reconnect, and a post that didn't go out.
+    // Social's page: Channels, or the post by the address's `post`.
+    "social.attention": "social",
+    "social.failed": "social",
 } as const;
 
 export type NoticeType = keyof typeof NOTICE_KINDS;
@@ -113,6 +123,7 @@ interface TargetColumns {
     "customer-request": { contactId: string | null };
     member: { contactId: string };
     developers: Record<never, never>;
+    social: Record<never, never>;
 }
 
 /** What a notice of type `T` must point at. */
@@ -247,6 +258,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     "customer-request": (n) => n.contactId ?? null,
     member: (n) => n.contactId ?? null,
     developers: () => null,
+    social: () => null,
 };
 
 /**

@@ -199,6 +199,17 @@ export const FlagKey = {
     ASK_AI: "ASK_AI",
 
     /**
+     * Saroh Social (plan saroh-social 2026-11-18-001): connecting
+     * Instagram, a Facebook Page and Threads, and posts Saroh publishes to
+     * them. Off for everyone until the owner opens it, a business's
+     * override first (Saroh's own). Not a registry module: free Share
+     * stays under Website on every plan, and the plan gate is the
+     * catalogue's `social` row. Off, every Social route answers 404 and
+     * scheduled posts wait; nothing already posted is touched. Readers:
+     * `social/access/social-access.ts`.
+     */
+    MODULE_SOCIAL: "MODULE_SOCIAL",
+    /**
      * Google Calendar sync and Meet links (#1047, #1048): off for everyone
      * until the owner opens it, a business's override first. Off, connecting
      * is refused, `calendar.sync` and `calendar.busy` do nothing, and slots
@@ -447,6 +458,16 @@ export const FLAG_METADATA: Record<FlagKey, FlagMetadata> = {
         reviewBy: "2027-06-30",
         removeWhen:
             "Ask AI has been on for every paying business on every instance for a release with no need to switch it off, and the AI module no longer asks it (the Saroh-wide halt stays).",
+    },
+    MODULE_SOCIAL: {
+        shownAs: "Saroh Social",
+        group: "module",
+        purpose:
+            "Makes the Saroh Social module available: a business with it on its plan connects Instagram, a Facebook Page and Threads and Saroh posts for it. Turn it on for Saroh's own business first, once Meta's keys are set on the instance; off, Social's routes answer not found and scheduled posts wait until it is on again.",
+        owner: "Owner",
+        reviewBy: "2027-06-30",
+        removeWhen:
+            "Saroh Social has been on for every business on every instance for a release with no need to switch it off.",
     },
     GOOGLE_CALENDAR: {
         shownAs: "Google Calendar",

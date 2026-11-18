@@ -14,6 +14,13 @@ export const CALENDAR_BUSY_TYPE = "calendar.busy";
 /** How often a connection's busy times are read. */
 export const BUSY_EVERY_MS = 10 * 60_000;
 
+/**
+ * A `calendar.sync`'s tries: one, then one per wait of its retry schedule
+ * (`RETRY_SCHEDULES`, 1, 5, 15, 60 and 240 minutes, GC-05), about five
+ * hours in all, so a rate limit or an outage of hours still lands it.
+ */
+export const CALENDAR_SYNC_ATTEMPTS = 6;
+
 const logger = new Logger("CalendarJobs");
 
 /**
@@ -21,6 +28,8 @@ const logger = new Logger("CalendarJobs");
  * unless one is: "is one waiting? if not, add one" under the advisory lock
  * `calendar-busy:<connectionId>`, as the manager link sweep keeps its one
  * run. A reconnect, a retry and the run's own next run can't make two.
+ * One waiting for later is brought forward to `runAt` (GC-13): choosing
+ * calendars reads them now, not at the next ten-minute run.
  * Never throws; false when it couldn't queue.
  */
 export async function scheduleBusy(
@@ -32,14 +41,24 @@ export async function scheduleBusy(
     try {
         await prisma.$transaction(async (tx) => {
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
-            const waiting = await tx.job.count({
+            const waiting = await tx.job.findFirst({
                 where: {
                     type: CALENDAR_BUSY_TYPE,
                     status: "PENDING",
                     payload: { path: ["connectionId"], equals: connectionId },
                 },
+                select: { id: true, runAt: true },
             });
-            if (waiting > 0) return;
+            if (waiting) {
+                if (waiting.runAt > runAt) {
+                    await tx.job.update({
+                        where: { id: waiting.id },
+                        data: { runAt },
+                        select: { id: true },
+                    });
+                }
+                return;
+            }
             await tx.job.create({
                 data: {
                     organizationId,

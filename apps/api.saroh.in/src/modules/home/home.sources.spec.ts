@@ -559,6 +559,8 @@ function home(
         organizationModule: { findFirst: jest.fn().mockResolvedValue(null) },
         // B9's failed refunds: none.
         paymentRefund: { findMany: jest.fn().mockResolvedValue([]) },
+        socialChannel: { findMany: jest.fn().mockResolvedValue([]) },
+        socialPost: { findMany: jest.fn().mockResolvedValue([]) },
         // PAY-06's captures at the wrong amount: none.
         paymentAttempt: { findMany: jest.fn().mockResolvedValue([]) },
         paymentIntent: {

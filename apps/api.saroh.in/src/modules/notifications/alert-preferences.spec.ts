@@ -35,6 +35,8 @@ describe("alerts", () => {
             // A new enquiry and a customer's message (audit 2026-11-12).
             "enquiry",
             "message",
+            // Saroh Social: a channel to reconnect, a post that didn't go out.
+            "social",
         ]);
     });
 
@@ -47,7 +49,8 @@ describe("alerts", () => {
                     event === "request" ||
                     event === "mine" ||
                     event === "enquiry" ||
-                    event === "message",
+                    event === "message" ||
+                    event === "social",
             );
             expect(defaultOn(event, "whatsapp")).toBe(false);
         }

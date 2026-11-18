@@ -118,6 +118,18 @@ export interface BusyInterval {
     endAt: Date;
 }
 
+/**
+ * One event on a calendar that counts as busy time (GC-01, GC-10): one the
+ * person made, or an invitation they accepted, shown as busy. Saroh's own
+ * events carry the booking's id, so the caller can leave out the ones it
+ * made for this connection.
+ */
+export interface BusyEvent extends BusyInterval {
+    eventId: string;
+    /** `sarohBookingId` from the event's private properties, when Saroh made it. */
+    bookingId: string | null;
+}
+
 /** An event as Saroh writes it: a plain default (R7). */
 export interface EventInput {
     /** Google's own id for it, chosen by Saroh so a retry can't make two. */
@@ -163,7 +175,23 @@ export interface GoogleCalendarPort {
     /** Revoke the grant at Google. A token already gone counts as done. */
     revoke(token: string): Promise<void>;
     listCalendars(accessToken: string): Promise<GoogleCalendarEntry[]>;
-    /** Busy times over `[from, to)` on these calendars, merged. */
+    /**
+     * The events that make the person busy over `[from, to)` on one calendar
+     * they own: made by them or accepted, not "show as free", not cancelled.
+     * `refused` or `gone` for a calendar they don't own (the events scope
+     * reaches owned calendars only): read it with {@link freeBusy} instead.
+     */
+    busyEvents(
+        accessToken: string,
+        calendarId: string,
+        from: Date,
+        to: Date,
+    ): Promise<BusyEvent[]>;
+    /**
+     * Busy times over `[from, to)` on these calendars, merged. Google's own
+     * answer: it can't say which event a time is, so it counts Saroh's own
+     * events and invitations nobody answered.
+     */
     freeBusy(
         accessToken: string,
         calendarIds: readonly string[],
@@ -172,18 +200,24 @@ export interface GoogleCalendarPort {
     ): Promise<BusyInterval[]>;
     /**
      * Make the event, or, when one with its id is there already (a retry,
-     * or one cancelled earlier), bring it back up to date.
+     * or one cancelled earlier), bring it back up to date. The guest is
+     * emailed unless `quiet` (a privacy removal blanking their name).
      */
     putEvent(
         accessToken: string,
         calendarId: string,
         event: EventInput,
+        opts?: { quiet?: boolean },
     ): Promise<EventResult>;
-    /** Delete it, emailing the guest. Already gone counts as done. */
+    /**
+     * Delete it, emailing the guest; `quiet` emails nobody (the booking
+     * still stands, only Saroh's copy goes). Already gone counts as done.
+     */
     deleteEvent(
         accessToken: string,
         calendarId: string,
         eventId: string,
+        opts?: { quiet?: boolean },
     ): Promise<void>;
     getEvent(
         accessToken: string,

@@ -23,7 +23,12 @@ export interface CardRender extends Omit<ShareCardInput, "photo" | "logo"> {
     fonts: { heading: string | null; body: string | null };
     /** A smaller picture this many pixels wide (a thumbnail); none: full size. */
     width?: number | null;
+    /** PNG (the share sheet's), or JPEG (Saroh Social's: Instagram takes only JPEG). */
+    format?: "png" | "jpeg";
 }
+
+/** JPEG quality for Saroh Social's pictures: well under Meta's 8 MB at 1080 wide. */
+const JPEG_QUALITY = 90;
 
 /** PNG, JPEG, WebP or GIF by its first bytes; AVIF and the rest are not drawn. */
 export function drawable(bytes: Uint8Array | null | undefined): boolean {
@@ -123,7 +128,8 @@ export async function renderCard(input: CardRender): Promise<Buffer> {
                 width,
                 height,
                 devicePixelRatio: scale,
-                format: "png",
+                format: input.format ?? "png",
+                ...(input.format === "jpeg" ? { quality: JPEG_QUALITY } : {}),
                 images: withImages ? images : [],
             },
         );
@@ -137,4 +143,33 @@ export async function renderCard(input: CardRender): Promise<Buffer> {
         );
         return draw(false);
     }
+}
+
+/**
+ * The business's own photo as Saroh Social posts it (U5): JPEG, the
+ * size's full width and shape, the photo covering the frame (cropped to
+ * fit, never stretched). Throws when the photo can't be read as an image.
+ */
+export async function renderPhotoJpeg(
+    photo: Uint8Array,
+    size: "post" | "square",
+): Promise<Buffer> {
+    if (!drawable(photo)) throw new Error("photo is not a drawable image");
+    const { renderer: r, ready } = renderer();
+    await ready;
+    const { width, height } = SHARE_SIZES[size];
+    return r.render(
+        {
+            type: "image",
+            src: "photo",
+            style: { width, height, objectFit: "cover" },
+        } as unknown as Node,
+        {
+            width,
+            height,
+            format: "jpeg",
+            quality: JPEG_QUALITY,
+            images: [{ src: "photo", data: photo }],
+        },
+    );
 }

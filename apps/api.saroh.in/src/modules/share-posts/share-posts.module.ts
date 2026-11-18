@@ -33,5 +33,7 @@ import { SharePostsService } from "./share-posts.service";
         PublicShareController,
     ],
     providers: [SharePostsService, PublicShareService, OrganizationGuard],
+    // Saroh Social draws its pictures with the same cards.
+    exports: [PublicShareService],
 })
 export class SharePostsModule {}

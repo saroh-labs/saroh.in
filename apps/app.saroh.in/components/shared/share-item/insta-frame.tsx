@@ -59,6 +59,7 @@ export function InstaFrame({
     words,
     picture,
     clamp = false,
+    tail,
     className,
 }: {
     business: string;
@@ -68,6 +69,11 @@ export function InstaFrame({
     picture: React.ReactNode;
     /** One line and "…", as the feed folds it. */
     clamp?: boolean;
+    /**
+     * What ends the caption: "Link in bio" (Instagram, the default), or the
+     * link itself where a channel shows it inline (Saroh Social's preview).
+     */
+    tail?: React.ReactNode;
     className?: string;
 }) {
     return (
@@ -106,7 +112,7 @@ export function InstaFrame({
             >
                 <span className="font-semibold">{business}</span> {words.trim()}{" "}
                 <mark className="rounded-[3px] bg-warning-subtle px-0.5 text-foreground">
-                    {SHARE_WORDS.linkInBio}
+                    {tail ?? SHARE_WORDS.linkInBio}
                 </mark>
             </figcaption>
         </figure>
