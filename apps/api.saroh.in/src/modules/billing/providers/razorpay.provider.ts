@@ -393,12 +393,32 @@ export class RazorpayBillingProvider implements BillingProvider {
                 },
             ];
         }
+        // With an Offer, a refusal keeps Razorpay's words: the checkout
+        // logs them when it falls back from an automatic coupon (F1).
         const res = await this.call(
             "subscription creation",
             "POST",
             "/subscriptions",
             body,
+            offerId ? { accept: REFUSAL_STATUSES } : {},
         );
+        if (!res.ok) {
+            const err = (await res.json().catch(() => ({}))) as {
+                error?: { description?: unknown; field?: unknown };
+            };
+            const words = [err.error?.field, err.error?.description]
+                .filter((w): w is string => typeof w === "string" && !!w)
+                .join(": ")
+                .slice(0, 200);
+            this.logger.warn(
+                `Razorpay subscription creation failed with HTTP ${res.status}`,
+            );
+            throw new BillingProviderError(
+                "REFUSED",
+                `Razorpay subscription creation failed (HTTP ${res.status})`,
+                words || undefined,
+            );
+        }
         const json = (await res.json()) as {
             id?: string;
             customer_id?: string;

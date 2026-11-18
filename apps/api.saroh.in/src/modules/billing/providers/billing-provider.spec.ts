@@ -1144,6 +1144,41 @@ describe("RazorpayBillingProvider plans, checkout and cancel (U15)", () => {
         });
     });
 
+    it("a refused Offer is REFUSED, keeping Razorpay's words apart from the message (F1)", async () => {
+        const { provider } = recorded([
+            {
+                status: 400,
+                body: {
+                    error: {
+                        field: "offer_id",
+                        description: "made-up offer words",
+                    },
+                },
+            },
+        ]);
+        const error = (await provider
+            .createSubscription({
+                planKey: "catalog.b",
+                planId: "row_b",
+                priceCents: 22_200,
+                currency: "INR",
+                interval: "month",
+                organizationId: "org_1",
+                providerPlanId: "plan_b",
+                discount: {
+                    code: "TEST-OFF",
+                    amountPaise: 131,
+                    charges: 2,
+                    razorpayOfferId: "offer_ABCDEFGHIJKLMN",
+                },
+            })
+            .catch((e: unknown) => e)) as BillingProviderError;
+        expect(error).toBeInstanceOf(BillingProviderError);
+        expect(error.kind).toBe("REFUSED");
+        expect(error.said).toBe("offer_id: made-up offer words");
+        expect(error.message).not.toContain("made-up offer words");
+    });
+
     it("sends no offer_id without a coupon", async () => {
         const { provider, calls } = recorded([
             { status: 200, body: { id: "sub_11", status: "created" } },
