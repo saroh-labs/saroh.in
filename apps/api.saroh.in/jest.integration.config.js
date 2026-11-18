@@ -61,6 +61,8 @@ module.exports = {
         // Admin specs mock Prisma and run in the unit project; only the
         // admin *.db.spec.ts (U11's overrides) run here.
         "<rootDir>/src/modules/admin/(?!.*\\.db\\.spec\\.ts$)",
+        // Saroh Social's unit specs mock Prisma: unit project only.
+        "<rootDir>/src/modules/social/(?!.*\\.db\\.spec\\.ts$)",
         "\\.authorization\\.spec\\.ts$",
         // Phone sign-in's options spec mocks Prisma: unit project only.
         "<rootDir>/src/modules/account-phone/(?!.*\\.db\\.spec\\.ts$)",

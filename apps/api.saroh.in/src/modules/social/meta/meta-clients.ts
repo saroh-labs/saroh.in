@@ -95,6 +95,14 @@ export class SocialMetaClient implements SocialMetaPort {
 
     private readonly fetchFn: FetchFn;
 
+    available(kind: ChannelKind): boolean {
+        return kind === "FACEBOOK"
+            ? this.keys.facebook !== null
+            : (kind === "INSTAGRAM"
+                  ? this.keys.instagram
+                  : this.keys.threads) !== null;
+    }
+
     authorizeUrl(
         kind: ChannelKind,
         input: { redirectUri: string; state: string },

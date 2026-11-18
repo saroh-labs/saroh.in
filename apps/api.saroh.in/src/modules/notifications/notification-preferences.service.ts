@@ -205,8 +205,16 @@ export class NotificationPreferencesService {
         const website =
             readable.includes("site") && (await this.websiteRowOn(ctx));
         const diary = readable.includes("mine") && (await this.onDiary(ctx));
+        // Saroh Social's row only once it is rolled out to the business.
+        const social =
+            readable.includes("social") &&
+            (await this.flags.isEnabled(
+                FlagKey.MODULE_SOCIAL,
+                ctx.organizationId,
+            ));
         return readable.filter((e) => {
             if (e === "site" && !website) return false;
+            if (e === "social" && !social) return false;
             if (e === "mine" && !diary) return false;
             const module = ALERT_MODULE[e];
             return module === null || on.get(module) === true;

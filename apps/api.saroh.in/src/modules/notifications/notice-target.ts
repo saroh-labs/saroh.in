@@ -87,6 +87,10 @@ export const NOTICE_KINDS = {
     // A webhook endpoint Saroh switched off after repeated failed
     // deliveries (plan 2026-11-10-001, U13): Settings › API and AI apps.
     "webhook.disabled": "developers",
+    // Saroh Social: a channel to reconnect, and a post that didn't go out.
+    // Social's page: Channels, or the post by the address's `post`.
+    "social.attention": "social",
+    "social.failed": "social",
 } as const;
 
 export type NoticeType = keyof typeof NOTICE_KINDS;
@@ -110,6 +114,7 @@ interface TargetColumns {
     "customer-request": { contactId: string | null };
     member: { contactId: string };
     developers: Record<never, never>;
+    social: Record<never, never>;
 }
 
 /** What a notice of type `T` must point at. */
@@ -244,6 +249,7 @@ const ID_OF: Record<NoticeKind, (n: StoredNotice) => string | null> = {
     "customer-request": (n) => n.contactId ?? null,
     member: (n) => n.contactId ?? null,
     developers: () => null,
+    social: () => null,
 };
 
 /**

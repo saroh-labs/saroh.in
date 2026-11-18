@@ -91,6 +91,8 @@ export interface ImagePost {
 }
 
 export interface SocialMetaPort {
+    /** Whether this login's keys are set here, so it can be connected. */
+    available(kind: ChannelKind): boolean;
     /** The consent page to send the person to. */
     authorizeUrl(
         kind: ChannelKind,

@@ -68,6 +68,10 @@ export class FakeSocialMeta implements SocialMetaPort {
         this.failures.length = 0;
     }
 
+    available(): boolean {
+        return true;
+    }
+
     authorizeUrl(
         kind: ChannelKind,
         input: { redirectUri: string; state: string },

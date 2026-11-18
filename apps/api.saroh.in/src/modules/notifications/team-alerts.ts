@@ -91,6 +91,11 @@ export const TEAM_ALERT_TYPE = "team.alert";
  *   the one who did it. `change` "moved-away" and a "new" from a
  *   reassignment (#1157) are email only: the reassigning write put the
  *   bell's notice in their alerts already. Keyed to the event and person.
+ * - `social`: Saroh Social (`social-alerts.ts`): a channel that needs
+ *   reconnecting (`about` "channel", keyed to the channel and when it
+ *   started needing it), or a post that didn't go out on a channel
+ *   (`about` "post", keyed to the post and the run). Told once each, on
+ *   the Saroh Social row.
  * - `member`: a member cancelled or paused their own membership from their
  *   account (`eventId`, the SubscriptionEvent), or their bank cancelled its
  *   autopay (`mandateId`, once per mandate), DEC-174 U19 (#1150), on the
@@ -161,6 +166,8 @@ export type TeamAlertPayload =
           step: "asked" | "answered";
           notificationId: string;
       }
+    | { event: "social"; about: "channel"; channelId: string; since: string }
+    | { event: "social"; about: "post"; postId: string; at: string }
     | {
           event: "site";
           testReleaseId: string;

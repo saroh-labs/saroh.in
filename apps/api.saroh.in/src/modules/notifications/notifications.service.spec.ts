@@ -443,6 +443,9 @@ describe("what each person sees of the inbox (F14)", () => {
                 // No lead:read or message:read (audit 2026-11-12 #3).
                 "enquiry.new",
                 "message.new",
+                // Saroh Social's, to who reads posts.
+                "social.attention",
+                "social.failed",
                 // A rules request, only to who may approve it (#1138).
                 "hours.rule-request",
             ],

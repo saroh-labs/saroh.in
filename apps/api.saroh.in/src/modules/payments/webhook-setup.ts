@@ -65,7 +65,7 @@ export function lacksWebhookSecret(row: SealedRow): boolean {
  * launch plan R5): a Global business's provider calls api.saroh.tech. A
  * local stack has one API, so it stays on it.
  */
-function apiBase(edition?: Edition | null): string | null {
+export function apiBase(edition?: Edition | null): string | null {
     const base = env.API_PUBLIC_URL;
     if (!base) return null;
     const environment = edition ? environmentOfHost(new URL(base).host) : null;
