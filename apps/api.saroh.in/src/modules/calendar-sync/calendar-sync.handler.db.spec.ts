@@ -3,7 +3,11 @@
  * with the in-memory Google: made, moved, cancelled and handed to someone
  * else; Meet links (pending, tightened, a personal account's refusal);
  * the no-ops; Google's "try later" and a refused token; and the same job
- * twice. Runs in the integration project (TEST_DATABASE_URL).
+ * twice. Then the review's fixes: paused by the plan or a lost permission
+ * (GC-02, GC-03), the last retry telling the person once (GC-05), a cancel
+ * that lands mid-create (GC-11), past events deleted with no email and a
+ * quiet rewrite (GC-09). Runs in the integration project
+ * (TEST_DATABASE_URL).
  */
 import { randomBytes } from "node:crypto";
 
@@ -11,9 +15,13 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
+import { planMeter } from "../billing/metering.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { CALENDAR_SYNC_TYPE } from "./calendar-jobs";
-import { CalendarLapseService } from "./calendar-lapse.service";
+import {
+    CALENDAR_SYNC_FAILED_NOTICE,
+    CalendarLapseService,
+} from "./calendar-lapse.service";
 import { CalendarSyncHandler } from "./calendar-sync.handler";
 import { eventIdFor } from "./event-shape";
 import { FakeGoogleCalendar } from "./google/fake-google-calendar";
@@ -107,7 +115,7 @@ async function staff(
         });
         connectionId = row.id;
     }
-    return { staffId: person.id, connectionId };
+    return { staffId: person.id, connectionId, membershipId };
 }
 
 async function service(
@@ -131,9 +139,9 @@ async function booking(
     organizationId: string,
     serviceId: string,
     staffId: string | null,
-    opts: { email?: string | null } = {},
+    opts: { email?: string | null; startAt?: Date } = {},
 ) {
-    const startAt = new Date(Date.now() + 2 * 86_400_000);
+    const startAt = opts.startAt ?? new Date(Date.now() + 2 * 86_400_000);
     return prisma.booking.create({
         data: {
             organizationId,
@@ -359,5 +367,174 @@ describe("calendar.sync", () => {
         expect(row.status).toBe("LAPSED");
         expect(row.tokenCiphertext).toBeNull();
         expect(google.liveEvents()).toHaveLength(0);
+    });
+
+    it("does nothing for a business moved down to Free, and keeps its events (GC-02)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, b.id));
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: { status: "CANCELLED", cancelledAt: new Date() },
+        });
+        const spy = jest
+            .spyOn(planMeter, "isIncluded")
+            .mockResolvedValue(false);
+        try {
+            google.calls.length = 0;
+            await handler.handle(job(org, b.id));
+            expect(google.calls).toHaveLength(0);
+            expect(google.liveEvents()).toHaveLength(1);
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
+    it("leaves alone the calendar of someone who lost the permission (GC-03)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, b.id));
+        await prisma.membership.update({
+            where: { id: a.membershipId ?? "" },
+            data: { role: "REVIEWER" },
+        });
+        const later = new Date(b.startAt.getTime() + 3_600_000);
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: {
+                startAt: later,
+                endAt: new Date(later.getTime() + 1_800_000),
+            },
+        });
+        google.calls.length = 0;
+        await handler.handle(job(org, b.id));
+        expect(google.calls).toHaveLength(0);
+        // A new booking for them isn't copied either.
+        const fresh = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, fresh.id));
+        expect(google.calls).toHaveLength(0);
+    });
+
+    it("tells the person once when the last retry fails (GC-05)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const s = await service(org);
+        const last = (bookingId: string): Job =>
+            ({ ...job(org, bookingId), attempts: 5, maxAttempts: 6 }) as Job;
+        const first = await booking(org, s.id, a.staffId);
+        const second = await booking(org, s.id, a.staffId);
+
+        google.failNext("putEvent", "retry", 2);
+        await expect(handler.handle(last(first.id))).rejects.toMatchObject({
+            kind: "retry",
+        });
+        await expect(handler.handle(last(second.id))).rejects.toMatchObject({
+            kind: "retry",
+        });
+
+        const notices = await prisma.notification.findMany({
+            where: { organizationId: org, type: CALENDAR_SYNC_FAILED_NOTICE },
+        });
+        expect(notices).toHaveLength(1);
+        expect(notices[0].bookingId).toBe(first.id);
+    });
+
+    it("doesn't tell anyone about an attempt that will be retried", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        google.failNext("putEvent", "retry");
+        await expect(
+            handler.handle({
+                ...job(org, b.id),
+                attempts: 0,
+                maxAttempts: 6,
+            } as Job),
+        ).rejects.toMatchObject({ kind: "retry" });
+        expect(
+            await prisma.notification.count({
+                where: {
+                    organizationId: org,
+                    type: CALENDAR_SYNC_FAILED_NOTICE,
+                },
+            }),
+        ).toBe(0);
+    });
+
+    it("queues one more pass when the booking is cancelled while its event is made (GC-11)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        const put = google.putEvent.bind(google);
+        const spy = jest
+            .spyOn(google, "putEvent")
+            .mockImplementation(async (...args: Parameters<typeof put>) => {
+                const made = await put(...args);
+                // The cancel commits while Google is answering.
+                await prisma.booking.update({
+                    where: { id: b.id },
+                    data: { status: "CANCELLED", cancelledAt: new Date() },
+                });
+                return made;
+            });
+        await handler.handle(job(org, b.id));
+        const again = await prisma.job.findFirst({
+            where: {
+                organizationId: org,
+                type: CALENDAR_SYNC_TYPE,
+                status: "PENDING",
+                payload: { path: ["bookingId"], equals: b.id },
+            },
+        });
+        expect(again).not.toBeNull();
+        spy.mockRestore();
+        await handler.handle(job(org, b.id));
+        expect(google.liveEvents()).toHaveLength(0);
+    });
+
+    it("deletes a past booking's event with no email, and never adds one for it (GC-09)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true, cal: "cal-a" });
+        const other = await staff(org, { connected: true, cal: "cal-b" });
+        const s = await service(org);
+        const past = await booking(org, s.id, a.staffId);
+        await handler.handle(job(org, past.id));
+        const ago = new Date(Date.now() - 3 * 86_400_000);
+        await prisma.booking.update({
+            where: { id: past.id },
+            data: {
+                startAt: ago,
+                endAt: new Date(ago.getTime() + 1_800_000),
+                staffId: other.staffId,
+            },
+        });
+        await handler.handle(job(org, past.id));
+        const all = [...google.events.values()].flatMap((m) => [...m.values()]);
+        expect(all.filter((e) => e.calendarId === "cal-a")[0]).toMatchObject({
+            status: "cancelled",
+            quiet: true,
+        });
+        expect(google.liveEvents()).toHaveLength(0);
+    });
+
+    it("rewrites an event quietly for a privacy removal (GC-09)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, b.id));
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: { bookerName: "Removed customer", bookerEmail: null },
+        });
+        await handler.handle({
+            ...job(org, b.id),
+            payload: { bookingId: b.id, quiet: true },
+        } as Job);
+        const [event] = google.liveEvents();
+        expect(event.quiet).toBe(true);
+        expect(event.input.guest).toBeUndefined();
+        expect(event.input.title).not.toContain("Asha");
     });
 });
