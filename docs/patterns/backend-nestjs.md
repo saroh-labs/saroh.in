@@ -127,8 +127,18 @@ src/
 - Retry-safe writes use `IdempotencyService`: the same key with the same request
   fingerprint replays the original response; the same key with a different
   request is a 409.
-- Abusable public endpoints use `FixedWindowRateLimiter` and answer 429. It is
-  per process, so the limit is per instance.
+- Abusable public endpoints are rate limited and answer 429. A limit that
+  guards money, a send or outbound work uses `SharedRateLimiter`
+  (`modules/rate-limits/shared-window.ts`): one window per key in Redis,
+  shared by every replica and kept across deploys, falling back to the
+  process at WARN. A limit that only slows page reads may use the in-process
+  `FixedWindowRateLimiter`, which is per instance.
+- **A limit keys on `@ClientAddress()`, never `@Ip()`** (05-P-01): behind
+  Cloudflare it reads `CF-Connecting-IP` from a Cloudflare or private peer
+  only; `@Ip()` trusts `X-Forwarded-For`, which a caller can write. The
+  API's ESLint config refuses importing `Ip`.
+- Every signed-in request counts against a per-person ceiling in
+  `BetterAuthGuard` (`MEMBER_REQUESTS_PER_MINUTE`, 04-F9).
 - Log with the class `Logger` or `structuredLogger`, never `console.log`
   (`devops-observability.md`).
 
