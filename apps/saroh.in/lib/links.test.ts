@@ -75,4 +75,24 @@ describe("cta", () => {
     it("defaults to waitlist when the switch is unset", () => {
         expect(cta({ src: "nav" }).mode).toBe("waitlist");
     });
+
+    it("the library's Try: name, trade and colour, URL-encoded, in both modes (U12)", () => {
+        const tried = {
+            src: "library-try",
+            name: " Rasoi & Co ",
+            trade: "food",
+            colour: "kesar",
+        };
+        for (const mode of ["waitlist", "open"] as const) {
+            const { href } = cta({ ...tried, mode });
+            expect(href).toContain("name=Rasoi+%26+Co&trade=food&colour=kesar");
+            const q = new URL(href, "https://www.saroh.in").searchParams;
+            expect(q.get("name")).toBe("Rasoi & Co");
+            expect(q.get("src")).toBe("library-try");
+        }
+        // Nothing typed, nothing carried.
+        expect(cta({ src: "x", name: "  ", mode: "open" }).href).toMatch(
+            /\/signup\?src=x$/,
+        );
+    });
 });

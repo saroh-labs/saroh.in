@@ -63,6 +63,15 @@ export interface CtaInput {
      * sign-up for onboarding to read once it does.
      */
     template?: { slug: string; name: string };
+    /**
+     * What the visitor typed and picked in the library's Try panel (U12,
+     * KD12): carried on the link only, for sign-up to prefill. Never put in
+     * saroh.in's own address (DEC-127); `page-address.ts` cuts them if a
+     * waitlist link lands them there.
+     */
+    name?: string;
+    trade?: string;
+    colour?: string;
 }
 
 export interface Cta {
@@ -95,7 +104,15 @@ export function cta({
     cycle,
     mode = LAUNCH_MODE,
     template,
+    name: business,
+    trade,
+    colour,
 }: CtaInput): Cta {
+    const tried = (q: URLSearchParams) => {
+        if (business?.trim()) q.set("name", business.trim());
+        if (trade) q.set("trade", trade);
+        if (colour) q.set("colour", colour);
+    };
     const paid = plan !== undefined && (paidIn ?? plan !== "free");
     const name =
         plan === undefined
@@ -107,6 +124,7 @@ export function cta({
         const q = new URLSearchParams();
         if (plan) q.set("plan", plan);
         if (template) q.set("template", template.slug);
+        tried(q);
         q.set("src", src);
         if (template && !paid) {
             return {
@@ -129,6 +147,7 @@ export function cta({
     if (plan) q.set("plan", plan);
     if (paid) q.set("cycle", cycle ?? "month");
     if (template) q.set("template", template.slug);
+    tried(q);
     q.set("src", src);
     let label = "Start free";
     if (paid) {

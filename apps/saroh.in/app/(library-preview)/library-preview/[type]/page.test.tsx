@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-import { cleanup, render } from "@testing-library/react";
+import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { resetAddress } from "@/lib/page-address";
@@ -17,6 +17,7 @@ import LibraryPreviewPage, { generateStaticParams } from "./page";
  */
 vi.mock("@/env", () => ({ env: { NEXT_PUBLIC_WEBSITE_LIBRARY: "on" } }));
 vi.mock("next/navigation", () => ({
+    usePathname: () => "/library-preview/cta",
     notFound: () => {
         throw new Error("NEXT_NOT_FOUND");
     },
@@ -65,6 +66,32 @@ describe("/library-preview/[type]", () => {
         expect(await cssOf("?look=live&palette=mauve&buttons=<script>")).toBe(
             live,
         );
+    });
+
+    it("draws the Try panel's name and town from the framing page's message, never from its address (U12)", async () => {
+        const { container, findByText } = await preview(
+            "cta",
+            "?palette=kesar",
+        );
+        const send = (data: unknown, origin = window.location.origin) =>
+            act(() => {
+                window.dispatchEvent(
+                    new MessageEvent("message", {
+                        data,
+                        origin,
+                        source: window,
+                    }),
+                );
+            });
+        send(
+            { kind: "saroh-library-try", name: "Rasoi & Co", town: "Aundh" },
+            "https://elsewhere.example",
+        );
+        expect(container.textContent).not.toContain("Rasoi");
+        send({ kind: "saroh-library-try", name: "Rasoi & Co", town: "Aundh" });
+        expect((await findByText("Aundh")).textContent).toBe("Aundh");
+        expect(container.textContent).toContain("Rasoi & Co");
+        expect(window.location.href).not.toContain("Rasoi");
     });
 
     it("is a bare page: no Saroh tokens, fonts, tags or recorder, and noindex", () => {

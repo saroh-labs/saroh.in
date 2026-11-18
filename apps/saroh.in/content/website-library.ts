@@ -1,4 +1,5 @@
 import type { SectionType } from "@saroh/block-contract";
+import type { TemplateKind } from "@saroh/templates";
 
 /**
  * The day this module's words last changed, the sitemap's `lastmod` for
@@ -45,6 +46,18 @@ export const LIBRARY = {
         coming: "Coming",
         loading: "Loading preview",
         failed: "Preview could not load",
+    },
+    try: {
+        title: "Try it on your business",
+        lead: "Type your name and town, pick what you do and a colour. Every preview below fills in with your words, right here.",
+        name: "Business name",
+        town: "Town or area",
+        namePlaceholder: "Noor Beauty Studio",
+        townPlaceholder: "Hazratganj, Lucknow",
+        trade: "What you do",
+        colour: "Pick a colour",
+        note: "Nothing is saved. Your words stay on this page and are gone when you leave it.",
+        start: "Use this for my business",
     },
     templates: {
         title: "Whole sites, ready to start from",
@@ -186,3 +199,18 @@ export const LIBRARY_COLOURWAYS = [
     { id: "tide", name: "Tide", template: "clinic", style: "tide" },
     { id: "acid", name: "Acid", template: "gym", style: "acid" },
 ] as const;
+
+/**
+ * What the Try panel asks "What you do" with (U12): the trades setup offers
+ * a business (DEC-216, `TRADE_CHOICES` in app.saroh.in), by their stored
+ * ids, which sign-up checks against `TEMPLATE_KINDS`. Other is left out:
+ * it asks the trade in words, which Try doesn't.
+ */
+export const LIBRARY_TRADES = [
+    { value: "salon", label: "Salon" },
+    { value: "food", label: "Bakery or food" },
+    { value: "gym", label: "Gym or studio" },
+    { value: "clinic", label: "Clinic" },
+    { value: "coach", label: "Dietician or coach" },
+    { value: "shop", label: "Shop" },
+] as const satisfies readonly { value: TemplateKind; label: string }[];

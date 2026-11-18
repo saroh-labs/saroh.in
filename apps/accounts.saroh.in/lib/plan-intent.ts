@@ -1,3 +1,5 @@
+import { listTemplates, tradeOf } from "@saroh/templates";
+
 import { getOnboardingUrl } from "@/lib/app-urls";
 
 /** Longer than any catalogue id; anything past it is not one. */
@@ -66,5 +68,45 @@ export function withTemplate(
     if (!asked || !TEMPLATE_ID.test(asked)) return onboarding;
     const url = new URL(onboarding ?? getOnboardingUrl());
     url.searchParams.set("template", asked);
+    return url.toString();
+}
+
+/** A business name's longest, as saroh.in's waitlist and the storefront take it. */
+export const BUSINESS_NAME_MAX = 120;
+
+/** Every colourway a template offers (`styles`); saroh.in's library offers some of them. */
+const COLOURWAYS: ReadonlySet<string> = new Set(
+    listTemplates().flatMap((t) => (t.styles ?? []).map((s) => s.id)),
+);
+
+/**
+ * What the visitor typed and picked in saroh.in's website library Try panel
+ * (plan 2026-11-18-001 U12, KD12): a business name, a trade and a colourway,
+ * carried to onboarding to fill its form in. Prefill only: nothing is
+ * stored before the business is made, and onboarding checks them again.
+ * An unknown trade or colourway is dropped, and the name is cut to
+ * {@link BUSINESS_NAME_MAX}.
+ */
+export function withTried(
+    onboarding: string | null,
+    params: {
+        name?: string | string[];
+        trade?: string | string[];
+        colour?: string | string[];
+    },
+): string | null {
+    const name = first(params.name)
+        ?.replace(/\s+/g, " ")
+        .trim()
+        .slice(0, BUSINESS_NAME_MAX)
+        .trim();
+    const trade = tradeOf(first(params.trade));
+    const asked = first(params.colour);
+    const colour = asked && COLOURWAYS.has(asked) ? asked : null;
+    if (!name && !trade && !colour) return onboarding;
+    const url = new URL(onboarding ?? getOnboardingUrl());
+    if (name) url.searchParams.set("name", name);
+    if (trade) url.searchParams.set("trade", trade);
+    if (colour) url.searchParams.set("colour", colour);
     return url.toString();
 }

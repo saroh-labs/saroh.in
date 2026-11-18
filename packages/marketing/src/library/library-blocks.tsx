@@ -8,6 +8,8 @@ import { ring } from "../ring";
 import { useBrowserValue } from "../use-browser-value";
 import { BlockFrame } from "./block-frame";
 import { RadioGroup } from "./radio-group";
+import type { TryVisitor, TryWords } from "./try-panel";
+import { TryPanel } from "./try-panel";
 import type {
     LibraryBlock,
     LibraryControl,
@@ -69,6 +71,7 @@ export function LibraryBlocks({
     read,
     previewSrc,
     frameWidth,
+    tryIt,
 }: {
     groups: readonly LibraryGroup[];
     /** Look, colours, desk or phone. */
@@ -80,6 +83,21 @@ export function LibraryBlocks({
     read: () => string;
     previewSrc: (layout: LibraryLayout, choice: LibraryChoice) => string;
     frameWidth: (choice: LibraryChoice) => number;
+    /**
+     * "Try it on your business" (U12): its words, the trades, which toolbar
+     * key is the colourway, and sign-up's address for what was picked.
+     */
+    tryIt?: {
+        words: TryWords;
+        trades: LibraryControl;
+        colourKey: string;
+        startHref: (picked: {
+            name?: string;
+            trade: string;
+            colour: string;
+        }) => string;
+        onStart?: () => void;
+    };
 }) {
     // The address as opened (null on the server and the first render), then
     // what the visitor picks here.
@@ -115,9 +133,30 @@ export function LibraryBlocks({
         });
     const valueOf = (c: LibraryControl) => choice[c.key] ?? c.options[0].value;
     const width = frameWidth(choice);
+    // What the visitor typed into Try: this page's memory only (KD12).
+    const [visitor, setVisitor] = useState<TryVisitor>({
+        name: "",
+        town: "",
+        trade: tryIt?.trades.options[0].value ?? "",
+    });
+    const colours = controls.find((c) => c.key === tryIt?.colourKey);
+    const tried = { name: visitor.name.trim(), town: visitor.town.trim() };
 
     return (
         <div className="grid gap-12">
+            {tryIt && colours ? (
+                <TryPanel
+                    words={tryIt.words}
+                    trades={tryIt.trades}
+                    colours={colours}
+                    colour={valueOf(colours)}
+                    onColour={(v) => change(colours.key, v)}
+                    visitor={visitor}
+                    onChange={setVisitor}
+                    startHref={tryIt.startHref}
+                    onStart={tryIt.onStart}
+                />
+            ) : null}
             <div
                 role="group"
                 aria-label={words.toolbar.label}
@@ -187,6 +226,7 @@ export function LibraryBlocks({
                                     ready ? previewSrc(layout, choice) : null
                                 }
                                 width={width}
+                                tried={tried}
                             />
                         ))}
                     </div>
@@ -201,11 +241,13 @@ function BlockCard({
     words,
     src,
     width,
+    tried,
 }: {
     block: LibraryBlock;
     words: LibraryWords;
     src: (layout: LibraryLayout) => string | null;
     width: number;
+    tried: { name: string; town: string };
 }) {
     const [picked, setPicked] = useState(0);
     const layout = block.layouts.length > 0 ? block.layouts[picked] : null;
@@ -255,6 +297,7 @@ function BlockCard({
                     name={block.name}
                     loading={words.card.loading}
                     failed={words.card.failed}
+                    tried={tried}
                 />
             ) : null}
         </article>

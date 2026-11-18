@@ -8,6 +8,13 @@ const FALLBACK_HEIGHT = 480;
 const MAX_HEIGHT = 1600;
 /** What the preview route marks its page with; a 404 or an error page has none. */
 export const PREVIEW_MARK = "data-library-preview";
+/**
+ * The Try panel's message to a preview (U12): `{ kind, name, town }` down,
+ * and `{ kind }` up when a preview opens and asks for them. By message, not
+ * in the frame's address: a business name never sits in an address, a
+ * request or the page's markup, and typing never reloads a frame.
+ */
+export const TRY_MESSAGE = "saroh-library-try";
 
 /**
  * One block preview in its own document (the ui.saroh.in pattern): an
@@ -24,6 +31,7 @@ export function BlockFrame({
     name,
     loading,
     failed,
+    tried,
 }: {
     /** Null until the toolbar has read the address. */
     src: string | null;
@@ -34,8 +42,13 @@ export function BlockFrame({
     name: string;
     loading: string;
     failed: string;
+    /** The Try panel's name and town, drawn in the preview. */
+    tried?: { name: string; town: string };
 }) {
     const box = useRef<HTMLDivElement>(null);
+    const frame = useRef<HTMLIFrameElement>(null);
+    const triedName = tried?.name ?? "";
+    const triedTown = tried?.town ?? "";
     const [boxWidth, setBoxWidth] = useState(0);
     const [height, setHeight] = useState(FALLBACK_HEIGHT);
     // What the last load of which address found: a new address is loading.
@@ -54,6 +67,26 @@ export function BlockFrame({
         observer.observe(el);
         return () => observer.disconnect();
     }, []);
+
+    // Sent as they change, and to a preview that opens and asks.
+    useEffect(() => {
+        const send = () =>
+            frame.current?.contentWindow?.postMessage(
+                { kind: TRY_MESSAGE, name: triedName, town: triedTown },
+                window.location.origin,
+            );
+        send();
+        const asked = (e: MessageEvent) => {
+            if (
+                e.origin === window.location.origin &&
+                e.source === frame.current?.contentWindow &&
+                (e.data as { kind?: unknown } | null)?.kind === TRY_MESSAGE
+            )
+                send();
+        };
+        window.addEventListener("message", asked);
+        return () => window.removeEventListener("message", asked);
+    }, [triedName, triedTown, state]);
 
     const scale = boxWidth > 0 ? Math.min(1, boxWidth / width) : 0;
 
@@ -98,6 +131,7 @@ export function BlockFrame({
             {src && scale > 0 ? (
                 <iframe
                     key={src}
+                    ref={frame}
                     src={src}
                     title={title}
                     loading="lazy"
