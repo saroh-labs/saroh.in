@@ -379,7 +379,7 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
 }
 
 /**
- * Live's list (VB01 "Next free"): the classes in one row of cards, in
+ * Live's list (VB01 "Next open"): the classes in one row of cards, in
  * time order, sharing the row on a desk (188px at least) and 212px each
  * on a phone, scrolling sideways when they run past the page. A card says the day ("Today", "Tomorrow", then the date), the
  * time large, the class, who · how long · price, its places as a tag,

@@ -618,11 +618,11 @@ function NextFreePanel(props: PanelProps) {
     const today = read.data;
     const canvas =
         props.siteId === undefined && !props.today
-            ? "Your next free time shows here on your live site."
+            ? "Your next open time shows here on your live site."
             : null;
     return (
         <Card look={look} kind="nextFree">
-            <Title level={level}>Next free</Title>
+            <Title level={level}>Next open</Title>
             <div aria-live="polite" data-live-state={read.status}>
                 {item && today ? (
                     <>

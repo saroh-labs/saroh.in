@@ -916,7 +916,7 @@ const PRANA_HOURS = week({
     SAT: ["07:00", "13:00"],
 });
 
-/** VB01's "Next free": today and tomorrow, the Foundations full. */
+/** VB01's "Next open": today and tomorrow, the Foundations full. */
 const PRANA_WEEK: TimetableSession[] = [
     pranaSession(FIXTURE_DAY, "18:00", "prana-vinyasa", "Kabir", 3),
     pranaSession(FIXTURE_DAY, "19:30", "prana-online", "Ananya", 12),

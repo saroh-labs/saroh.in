@@ -206,7 +206,7 @@ describe("a day and a time, by state", () => {
             />,
         );
         expect(
-            screen.getByText(/Nothing free in the next two weeks\./),
+            screen.getByText(/No open times in the next two weeks\./),
         ).toBeVisible();
         expect(screen.getByRole("link", { name: /^Call / })).toBeVisible();
     });

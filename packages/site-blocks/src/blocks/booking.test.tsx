@@ -318,7 +318,7 @@ describe("booking block — each free time is a way in", () => {
             />,
         );
         expect(
-            await screen.findByText(/Nothing free in the next 14 days/),
+            await screen.findByText(/No open times in the next 14 days/),
         ).toBeInTheDocument();
         expect(
             screen.getByRole("link", { name: "Call +91 80409 92210" }),
@@ -337,7 +337,7 @@ describe("booking block — each free time is a way in", () => {
                 bookHref="/book"
             />,
         );
-        await screen.findByText(/Nothing free in the next 14 days/);
+        await screen.findByText(/No open times in the next 14 days/);
         expect(screen.queryByRole("link", { name: /^Call/ })).toBeNull();
         expect(screen.queryByRole("link", { name: /WhatsApp/ })).toBeNull();
     });

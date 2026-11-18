@@ -452,7 +452,7 @@ describe("one filled button, one fixed bar", () => {
             act(() => FakeObserver.see(screen.getByTestId("hero-book"), false));
             const bar = theBar();
             expect(
-                await within(bar).findByText("Next free: today, 6:00 pm"),
+                await within(bar).findByText("Next open: today, 6:00 pm"),
             ).toBeInTheDocument();
             expect(
                 within(bar).getByRole("link", { name: "Book" }),

@@ -338,7 +338,7 @@ export default function BookingSection({
             <div className="mt-8">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="text-site-fg text-sm font-semibold">
-                        Next free times
+                        Next open times
                     </h3>
                     {zone ? (
                         <p className="text-site-muted text-xs">
@@ -375,7 +375,7 @@ export default function BookingSection({
                 ) : groups.length === 0 ? (
                     <div className="mt-4">
                         <p className="text-site-body text-sm">
-                            Nothing free in the next {DAYS_WINDOW} days. Get in
+                            No open times in the next {DAYS_WINDOW} days. Get in
                             touch and we&apos;ll find you a time.
                         </p>
                         <ReachLinks reach={reach} className="mt-1" />

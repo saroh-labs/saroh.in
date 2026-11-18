@@ -1999,7 +1999,7 @@ describe("sign-in at the last step (A9)", () => {
 
         expect(
             await screen.findByText(
-                "That time has gone. We've chosen the next free one: Sun 20 Sep at 8:00 am.",
+                "That time has gone. We've chosen the next open one: Sun 20 Sep at 8:00 am.",
             ),
         ).toBeInTheDocument();
         expect(

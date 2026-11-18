@@ -135,7 +135,7 @@ test.describe("each look's home and About", { tag: "@serial" }, () => {
                             name:
                                 kind === "shop"
                                     ? "See the shop"
-                                    : /^(See times|Book this (class|time)|Next free: .+|I’d like an? .+ at .+\.)$/,
+                                    : /^(See times|Book this (class|time)|Next open: .+|I’d like an? .+ at .+\.)$/,
                         }),
                     ).toBeVisible();
                 }

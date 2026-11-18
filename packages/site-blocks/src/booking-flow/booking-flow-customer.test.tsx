@@ -421,7 +421,7 @@ describe("choosing on the booking page", () => {
             screen.getByRole("radio", { name: /Personal training/ }),
         );
         expect(
-            await screen.findByText(/Nothing free in the next two weeks/),
+            await screen.findByText(/No open times in the next two weeks/),
         ).toBeVisible();
         expect(
             screen.getByRole("link", { name: "Call +91 80409 92210" }),
@@ -445,7 +445,7 @@ describe("choosing on the booking page", () => {
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
-        await screen.findByText(/Nothing free in the next two weeks/);
+        await screen.findByText(/No open times in the next two weeks/);
         expect(screen.queryByRole("link", { name: /^Call/ })).toBeNull();
         expect(screen.queryByRole("link", { name: /WhatsApp/ })).toBeNull();
     });
@@ -544,7 +544,7 @@ describe("the booking through a reload", () => {
         ).toBeVisible();
         expect(
             screen.getAllByText(
-                "That time has gone. We've chosen the next free one: Sun 20 Sep at 9:00 am.",
+                "That time has gone. We've chosen the next open one: Sun 20 Sep at 9:00 am.",
             ).length,
         ).toBeGreaterThan(0);
     });

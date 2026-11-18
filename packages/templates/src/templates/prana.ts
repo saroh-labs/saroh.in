@@ -108,7 +108,7 @@ export const PRANA_GALLERY_SAMPLE = {
             "Small classes with Meera, Kabir and Ananya at our studio on 27th Main, or live online from home. Your first class is free.",
         second: "Or try a free intro class",
         next: {
-            title: "Next free",
+            title: "Next open",
             intro: "Classes you can still book today and tomorrow.",
         },
         classes: "Classes and private sessions",
@@ -376,7 +376,7 @@ export const PRANA_LOOK_WORDS: Readonly<
             secondaryCta: { label: S.live.second, href: "/book" },
             imageBrief: "Prana, a class in progress",
         },
-        // VB01's "Next free" is a row of cards: Live's list (its default,
+        // VB01's "Next open" is a row of cards: Live's list (its default,
         // the week across, is VB09's timetable page).
         timetable: { variant: "list" },
         servicesList: {

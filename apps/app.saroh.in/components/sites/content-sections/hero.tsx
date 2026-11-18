@@ -58,7 +58,7 @@ function secondLink(
 /** The answer panel's kinds as the owner reads them (KD14, DEC-228). */
 const PANEL_KINDS: readonly (readonly [HeroPanelKind, string])[] = [
     ["today", "Today's classes"],
-    ["nextFree", "Next free time"],
+    ["nextFree", "Next open time"],
     ["sameDayCall", "Same-day call"],
     ["consultation", "One consultation"],
     ["pickup", "Pickup"],
