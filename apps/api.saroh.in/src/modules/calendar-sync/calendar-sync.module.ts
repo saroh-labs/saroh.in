@@ -6,6 +6,7 @@ import { setGoogleBusyGate } from "../bookings/google-busy-gate";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
+import { setMemberLeavingHook } from "../organizations/member-leaving";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
 import { googleBusyAllowed } from "./calendar-allowed";
 import {
@@ -44,8 +45,6 @@ import { googleCalendarProvider } from "./google/google-calendar.provider";
         CalendarSweepJob,
         CalendarReleaseService,
     ],
-    // Removing someone from the team lets go of their calendar (GC-09).
-    exports: [CalendarReleaseService],
 })
 export class CalendarSyncModule implements OnModuleInit, OnModuleDestroy {
     private chainCheck?: ReturnType<typeof setInterval>;
@@ -55,11 +54,16 @@ export class CalendarSyncModule implements OnModuleInit, OnModuleDestroy {
         private readonly sync: CalendarSyncHandler,
         private readonly busy: CalendarBusyHandler,
         private readonly sweep: CalendarSweepJob,
+        private readonly releases: CalendarReleaseService,
     ) {}
 
     async onModuleInit(): Promise<void> {
         // Slot reads count a person's Google busy times only while allowed.
         setGoogleBusyGate(googleBusyAllowed);
+        // Someone leaving the team lets go of their calendar (GC-09).
+        setMemberLeavingHook((organizationId, membershipId) =>
+            this.releases.releaseMember(organizationId, membershipId),
+        );
         // A booking's event in Google, made, moved or deleted (U5).
         this.registry.register(CALENDAR_SYNC_TYPE, this.sync.handle);
         // A person's busy times read from Google, every 10 minutes (U6).
@@ -76,6 +80,7 @@ export class CalendarSyncModule implements OnModuleInit, OnModuleDestroy {
 
     onModuleDestroy(): void {
         setGoogleBusyGate(null);
+        setMemberLeavingHook(null);
         clearInterval(this.chainCheck);
     }
 }

@@ -2,7 +2,6 @@ import { Module } from "@nestjs/common";
 
 import { AnalyticsCoreModule } from "../analytics/analytics-core.module";
 import { AuditModule } from "../audit/audit.module";
-import { CalendarSyncModule } from "../calendar-sync/calendar-sync.module";
 import { MediaModule } from "../media/media.module";
 import { MomentsController } from "./moments.controller";
 import { MomentsService } from "./moments.service";
@@ -39,8 +38,6 @@ import { WebAddressService } from "./web-address.service";
         AnalyticsCoreModule,
         // The business logo is a library object (`MediaService.readyObject`).
         MediaModule,
-        // Removing someone lets go of their Google Calendar (GC-09).
-        CalendarSyncModule,
     ],
     controllers: [
         OrganizationsController,

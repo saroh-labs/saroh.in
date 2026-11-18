@@ -29,7 +29,7 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { AuditService } from "../audit/audit.service";
-import type { CalendarReleaseService } from "../calendar-sync/calendar-release.service";
+import { setMemberLeavingHook } from "./member-leaving";
 import { OrganizationContextService } from "./organization-context.service";
 import {
     LAST_OWNER_CANT_LEAVE,
@@ -252,11 +252,12 @@ describe("letting go of a leaver's Google Calendar (GC-09)", () => {
         const releaseMember = jest.fn(async () => {
             stillMember = (await membershipOf(orgId, "calendar")) !== null;
         });
-        const withCalendar = new OrganizationMembersService(audit, {
-            releaseMember,
-        } as unknown as CalendarReleaseService);
-
-        await withCalendar.leave(await as("calendar"));
+        setMemberLeavingHook(releaseMember);
+        try {
+            await members.leave(await as("calendar"));
+        } finally {
+            setMemberLeavingHook(null);
+        }
 
         expect(releaseMember).toHaveBeenCalledWith(orgId, joined.id);
         expect(stillMember).toBe(true);
