@@ -697,7 +697,7 @@ export const BLOCK_META = {
                 items: [
                     {
                         question: "Do you deliver outside the city?",
-                        answer: "Yes, anywhere on the mainland. Orders over £150 go free; below that it is a flat £12.",
+                        answer: "Yes, anywhere in the country. Larger orders go free; below that there is a flat delivery charge.",
                     },
                     {
                         question: "Can I collect instead?",
