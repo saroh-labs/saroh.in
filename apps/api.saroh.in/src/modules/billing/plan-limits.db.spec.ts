@@ -256,16 +256,20 @@ describe("products (DB, U13)", () => {
                 }),
             );
         }
+        const rows = await prisma.product.findMany({
+            where: { id: { in: archived.map((p) => p.id) } },
+            select: { id: true, name: true, slug: true },
+        });
         // Cap 3, one live: two places. Both the patch and the full save race.
         const results = await Promise.allSettled(
-            archived.map((p, i) =>
+            rows.map((p, i) =>
                 i % 2 === 0
-                    ? products.patchIn(scope, p.id, { status: "ACTIVE" })
+                    ? products.patchIn(scope, p.id, { status: "PUBLISHED" })
                     : products.updateIn(scope, p.id, {
                           name: p.name,
                           slug: p.slug,
                           price: "10",
-                          status: "ACTIVE",
+                          status: "PUBLISHED",
                       }),
             ),
         );
