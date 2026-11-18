@@ -5,6 +5,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
@@ -28,6 +29,7 @@ import { planMeter } from "../billing/metering.service";
 import { overLimit } from "../billing/over-limit.service";
 import { invitationPaused } from "../billing/paused-errors";
 import { countedOnDiary } from "../billing/seats";
+import { CalendarReleaseService } from "../calendar-sync/calendar-release.service";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { isCalendarOnly } from "./calendar-only-role";
 import { CAPABILITY_BY_ACTION } from "./capability-catalogue";
@@ -166,7 +168,10 @@ export const LAST_OWNER_CANT_LEAVE =
 export class OrganizationMembersService {
     private readonly logger = new Logger(OrganizationMembersService.name);
 
-    constructor(private readonly audit: AuditService) {}
+    constructor(
+        private readonly audit: AuditService,
+        @Optional() private readonly calendars?: CalendarReleaseService,
+    ) {}
 
     /** Everyone in the org, with a reviewer's granted sites. */
     async list(ctx: OrganizationContext): Promise<MemberView[]> {
@@ -1069,6 +1074,17 @@ export class OrganizationMembersService {
     ): Promise<{ revokedLinks: number; storefrontRoles: number }> {
         if (role === "OWNER") {
             await this.assertNotLastOwner(organizationId, userId, what);
+        }
+        // Their Google Calendar goes first, while its token still works:
+        // upcoming events Saroh put there are taken off, quietly (GC-09),
+        // and the grant revoked when nothing else uses it (GC-06). The
+        // connection would otherwise go with the membership, untouched.
+        const membership = await prisma.membership.findUnique({
+            where: { organizationId_userId: { organizationId, userId } },
+            select: { id: true },
+        });
+        if (membership) {
+            await this.calendars?.releaseMember(organizationId, membership.id);
         }
 
         const detached = await prisma.$transaction(
