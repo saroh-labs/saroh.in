@@ -304,12 +304,14 @@ export class AdminPricingController {
         const fields = {
             code: dto.code,
             discountPaise: dto.discountPaise,
+            percentOff: dto.percentOff ?? null,
             months: dto.months,
             planIds: dto.planIds,
             maxRedemptions: dto.maxRedemptions,
             expiresAt: dto.expiresAt ?? null,
             razorpayOfferId: dto.razorpayOfferId ?? null,
             active: dto.active ?? false,
+            automatic: dto.automatic ?? false,
         };
         return this.idempotency.run(
             {
@@ -359,6 +361,7 @@ export class AdminPricingController {
                     couponId,
                     {
                         discountPaise: dto.discountPaise,
+                        percentOff: dto.percentOff,
                         months: dto.months,
                         planIds: dto.planIds,
                         maxRedemptions: dto.maxRedemptions,
@@ -370,6 +373,7 @@ export class AdminPricingController {
                                   : new Date(dto.expiresAt),
                         razorpayOfferId: dto.razorpayOfferId,
                         active: dto.active,
+                        automatic: dto.automatic,
                         reason: dto.reason,
                         idempotencyKey: dto.idempotencyKey,
                     },

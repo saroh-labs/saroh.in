@@ -6,7 +6,11 @@
 import { gstPaise, withGstPaise } from "@saroh/pricing-catalog";
 
 import type { QuotePlanRow, QuoteSubscription } from "./checkout-quote";
-import { prorateDifferencePaise, quoteChange } from "./checkout-quote";
+import {
+    couponMonthPaise,
+    prorateDifferencePaise,
+    quoteChange,
+} from "./checkout-quote";
 import { moveReadiness } from "./plan-moves";
 
 const row = (
@@ -538,6 +542,88 @@ describe("offers in the quote (U16)", () => {
             discountCharges: 0,
             firstChargePaise: 33_300,
         });
+    });
+});
+
+describe("percent coupons (owner, 18 Nov 2026)", () => {
+    const pct = (percentOff: number, months = 3) => ({
+        discountPaise: 0,
+        months,
+        percentOff,
+    });
+
+    it("a percent of the monthly price before tax, rounded half up to the paisa", () => {
+        // 11,100 × 7% = 777 exactly; 22,250 × 3% = 667.5 → 668; 22,249 ×
+        // 3% = 667.47 → 667.
+        expect(couponMonthPaise(pct(7), 11_100)).toBe(777);
+        expect(couponMonthPaise(pct(3), 22_250)).toBe(668);
+        expect(couponMonthPaise(pct(3), 22_249)).toBe(667);
+        // An amount coupon is its amount, whatever the price.
+        expect(couponMonthPaise({ discountPaise: 111, months: 1 }, 1)).toBe(
+            111,
+        );
+    });
+
+    it("monthly: off each of its months, through the same quote as an amount", () => {
+        const q = quoteChange({
+            subscription: null,
+            target: B,
+            now: NOW,
+            coupon: pct(15),
+        });
+        // 22,200 × 15% = 3,330.
+        expect(q).toMatchObject({
+            kind: "NEW",
+            discountPaise: 3_330,
+            discountCharges: 3,
+            firstChargePaise: 22_200 - 3_330,
+            discountTotalPaise:
+                withGstPaise(22_200) - withGstPaise(22_200 - 3_330),
+        });
+        // One coupon, two plans: each its own percent.
+        expect(
+            quoteChange({
+                subscription: null,
+                target: C,
+                now: NOW,
+                coupon: pct(15),
+            }).discountPaise,
+        ).toBe(4_995);
+    });
+
+    it("yearly: its months' worth of the monthly price once, off the first yearly charge, capped", () => {
+        expect(
+            quoteChange({
+                subscription: null,
+                target: B_YEAR,
+                now: NOW,
+                targetMonthlyPaise: 22_200,
+                coupon: pct(15),
+            }),
+        ).toMatchObject({
+            discountPaise: 3 * 3_330,
+            discountCharges: 1,
+            firstChargePaise: 222_000 - 3 * 3_330,
+        });
+        // Never more than the yearly charge.
+        expect(
+            quoteChange({
+                subscription: null,
+                target: B_YEAR,
+                now: NOW,
+                targetMonthlyPaise: 22_200,
+                coupon: pct(90, 36),
+            }),
+        ).toMatchObject({ discountPaise: 222_000, firstChargePaise: 0 });
+        // Without the monthly price, a twelfth of the year (rounded up).
+        expect(
+            quoteChange({
+                subscription: null,
+                target: B_YEAR,
+                now: NOW,
+                coupon: pct(10, 1),
+            }).discountPaise,
+        ).toBe(1_850);
     });
 });
 

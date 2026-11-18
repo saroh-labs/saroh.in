@@ -326,4 +326,142 @@ describe("coupons (DB, U4)", () => {
             }),
         ).toBe(2);
     });
+
+    describe("applies automatically", () => {
+        const OFFER = "offer_ABCDEFGHIJKLMN";
+        const auto = (over: Record<string, unknown> = {}) =>
+            create({
+                automatic: true,
+                active: true,
+                razorpayOfferId: OFFER,
+                ...over,
+            });
+
+        it("one active automatic coupon per plan: a second is refused on its field, a paused one or another plan's is fine", async () => {
+            const first = await auto({ code: "AUTO-B", planIds: ["b"] });
+            expect(first).toMatchObject({ automatic: true, active: true });
+            await expect(
+                auto({ code: "AUTO-B2", planIds: ["b", "c"] }),
+            ).rejects.toMatchObject({
+                status: 409,
+                response: { details: { field: "automatic" } },
+            });
+            // Paused, it can be made; resuming it while the first runs can't.
+            const paused = await auto({
+                code: "AUTO-B3",
+                planIds: ["b"],
+                active: false,
+            });
+            await expect(
+                controller.updateCoupon(me(), paused.id, {
+                    active: true,
+                    reason: "fake",
+                    idempotencyKey: key(),
+                } as never),
+            ).rejects.toMatchObject({ status: 409 });
+            await expect(
+                auto({ code: "AUTO-C", planIds: ["c"] }),
+            ).resolves.toMatchObject({ automatic: true });
+            // Turning the first one off frees the plan.
+            await controller.updateCoupon(me(), first.id, {
+                automatic: false,
+                reason: "fake",
+                idempotencyKey: key(),
+            } as never);
+            await expect(
+                controller.updateCoupon(me(), paused.id, {
+                    active: true,
+                    reason: "fake",
+                    idempotencyKey: key(),
+                } as never),
+            ).resolves.toMatchObject({ active: true, automatic: true });
+            expect(
+                await prisma.adminAuditEvent.findFirstOrThrow({
+                    where: {
+                        action: "pricing.coupon.update",
+                        targetId: first.id,
+                    },
+                }),
+            ).toMatchObject({
+                metadata: expect.objectContaining({ automatic: false }),
+            });
+        });
+
+        it("a percent coupon covers Grow and Pro at once, and the pricing page gets each plan's amount and the percent", async () => {
+            const made = await auto({
+                code: "AUTO-PCT",
+                planIds: ["b", "c"],
+                discountPaise: 0,
+                percentOff: 7,
+            });
+            expect(made).toMatchObject({ discountPaise: 0, percentOff: 7 });
+            const body = await new CatalogueService(
+                new ImpactService(),
+            ).publicPricing("INDIA", new Date());
+            const price = (id: string) =>
+                body.catalog.plans.find((p) => p.id === id)!.pricePaise;
+            expect(body.offers).toEqual(
+                ["b", "c"].map((planId) => ({
+                    planId,
+                    discountPaise: Math.floor((price(planId) * 7 + 50) / 100),
+                    months: 2,
+                    percentOff: 7,
+                })),
+            );
+            // Back to an amount: the percent goes with it.
+            await expect(
+                controller.updateCoupon(me(), made.id, {
+                    discountPaise: 111,
+                    percentOff: null,
+                    reason: "fake",
+                    idempotencyKey: key(),
+                } as never),
+            ).resolves.toMatchObject({ discountPaise: 111, percentOff: null });
+        });
+
+        it("an amount or a percent, never both or neither, and the percent 1 to 90", async () => {
+            for (const over of [
+                { discountPaise: 111, percentOff: 7 },
+                { discountPaise: 0 },
+            ]) {
+                await expect(
+                    create({ code: `BAD-${++n}`, ...over }),
+                ).rejects.toMatchObject({
+                    status: 400,
+                    response: { details: { field: "discountPaise" } },
+                });
+            }
+            await expect(
+                create({
+                    code: `BAD-${++n}`,
+                    discountPaise: 0,
+                    percentOff: 91,
+                }),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { details: { field: "percentOff" } },
+            });
+        });
+
+        it("needs its Razorpay offer on India's", async () => {
+            await expect(
+                auto({ code: "NO-OFFER", razorpayOfferId: undefined }),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { details: { field: "razorpayOfferId" } },
+            });
+        });
+
+        it("shows on the public pricing as an amount and months only, never its code", async () => {
+            await auto({ code: "AUTO-SHOWN", planIds: ["b"] });
+            await create({ code: "TYPED-ONLY", planIds: ["c"], active: true });
+            const body = await new CatalogueService(
+                new ImpactService(),
+            ).publicPricing("INDIA", new Date());
+            expect(body.offers).toEqual([
+                { planId: "b", discountPaise: 111, months: 2 },
+            ]);
+            expect(JSON.stringify(body)).not.toContain("AUTO-SHOWN");
+        });
+    });
 });

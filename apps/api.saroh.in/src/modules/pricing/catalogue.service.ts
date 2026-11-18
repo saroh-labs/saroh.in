@@ -15,8 +15,10 @@ import type { Edition } from "@saroh/edition";
 import { editionProfile } from "@saroh/edition";
 import type { Catalog } from "@saroh/pricing-catalog";
 import { diff, planPriceOf, validateCatalog } from "@saroh/pricing-catalog";
+import { couponMonthPaise } from "../billing/checkout-quote";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
+import { automaticOffers } from "./coupons.service";
 import type { FreeStyleChoices } from "./free-style-choices";
 import { freeStyleChoices } from "./free-style-choices";
 
@@ -221,11 +223,24 @@ export class CatalogueService {
         const live = await this.live(edition, now);
         if (!live) throw new NotFoundException("No pricing is published yet");
         const catalog = publicCatalog(live.catalog);
+        const monthly = new Map(
+            catalog.plans
+                .filter((p) => p.pricePaise > 0)
+                .map((p) => [p.id, p.pricePaise]),
+        );
         return {
             version: live.version,
             goLiveAt: live.goLiveAt.toISOString(),
             preview: false,
             catalog,
+            // A percent coupon is said with what it takes off each plan, as
+            // checkout works it out.
+            offers: (await automaticOffers(edition, now)).flatMap((o) => {
+                const price = monthly.get(o.planId);
+                return price === undefined
+                    ? []
+                    : [{ ...o, discountPaise: couponMonthPaise(o, price) }];
+            }),
             ...(editionProfile(edition).sarohBilling
                 ? {}
                 : {
@@ -277,6 +292,7 @@ export class CatalogueService {
             goLiveAt: null,
             preview: true,
             catalog: publicCatalog(r.catalog),
+            offers: [],
         };
     }
 

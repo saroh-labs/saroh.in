@@ -37,6 +37,21 @@ export interface PublicPricing {
      * true (owner, 16 Nov 2026, #7).
      */
     cardOnline?: boolean;
+    /**
+     * Each paid plan's automatic coupon (owner, 18 Nov 2026): off each
+     * month's charge, before tax, for so many months. Never its code.
+     */
+    offers: PublicOffer[];
+}
+
+/** A plan's automatic coupon, as a visitor may see it. */
+export interface PublicOffer {
+    planId: string;
+    /** Off each month before tax; a percent coupon's, worked out per plan. */
+    discountPaise: number;
+    months: number;
+    /** A percent coupon's whole percent; absent: an amount coupon. */
+    percentOff?: number;
 }
 
 /** The visitor's view of a snapshot. */

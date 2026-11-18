@@ -116,10 +116,15 @@ export interface QuoteSubscription {
     plan: QuotePlanRow;
 }
 
-/** A coupon, as much as the rule needs: off a month, for so many months. */
+/**
+ * A coupon, as much as the rule needs: off a month, for so many months.
+ * A percent coupon (`percentOff`, `discountPaise` 0) takes that percent of
+ * the plan's monthly price instead (`couponMonthPaise`).
+ */
 export interface QuoteCoupon {
     discountPaise: number;
     months: number;
+    percentOff?: number | null;
 }
 
 export interface ChangeQuote {
@@ -219,19 +224,33 @@ export function prorateDifferencePaise(input: {
 }
 
 /**
+ * What a coupon takes off a month, before tax: its amount, or its percent
+ * of the plan's monthly price, rounded half up to the paisa in whole
+ * numbers (no float touches money).
+ */
+export function couponMonthPaise(
+    coupon: QuoteCoupon,
+    monthlyPaise: number,
+): number {
+    return coupon.percentOff
+        ? Math.floor((monthlyPaise * coupon.percentOff + 50) / 100)
+        : coupon.discountPaise;
+}
+
+/**
  * A coupon's discount on a plan's charge: monthly, its discount (no more than
  * the charge) off each of its months; yearly, that many months' worth once,
- * off the first yearly charge, no more than the charge.
+ * off the first yearly charge, no more than the charge. `monthlyPaise` is
+ * what the plan costs a month, a percent coupon's base; unset, the charge.
  */
 export function couponDiscount(
     coupon: QuoteCoupon,
     pricePaise: number,
     cycle: BillingCycle,
+    monthlyPaise = pricePaise,
 ): { discountPaise: number; discountCharges: number } {
-    const off =
-        cycle === "year"
-            ? coupon.discountPaise * coupon.months
-            : coupon.discountPaise;
+    const month = couponMonthPaise(coupon, monthlyPaise);
+    const off = cycle === "year" ? month * coupon.months : month;
     const discountPaise = Math.max(0, Math.min(off, pricePaise));
     if (discountPaise === 0) return { discountPaise: 0, discountCharges: 0 };
     return {
@@ -248,7 +267,15 @@ export function quoteChange(input: QuoteInput): ChangeQuote {
     const price = input.target.priceCents;
     const off =
         input.coupon && COUPON_KINDS.includes(base.kind)
-            ? couponDiscount(input.coupon, price, cycle)
+            ? couponDiscount(
+                  input.coupon,
+                  price,
+                  cycle,
+                  cycle === "year"
+                      ? (input.targetMonthlyPaise ??
+                            Math.ceil(price / YEAR_MONTHS))
+                      : price,
+              )
             : { discountPaise: 0, discountCharges: 0 };
     const first = price - off.discountPaise;
     const firstTotal = withTaxPaise(input.tax ?? "gst", first);
@@ -324,8 +351,8 @@ export interface QuoteInput {
     /**
      * What the target's plan costs a month before GST, when the target is
      * its yearly row: a change in the first month is a move up by what the
-     * plans cost a month (DEC-159). Unset, a yearly price is read as a
-     * twelfth of itself.
+     * plans cost a month (DEC-159), and a percent coupon is a percent of it.
+     * Unset, a yearly price is read as a twelfth of itself.
      */
     targetMonthlyPaise?: number;
     /** A coupon to apply, already checked as usable (the service's job). */

@@ -166,10 +166,17 @@ export class CreateCouponDto extends ReasonedWriteDto {
     @Matches(COUPON_CODE, { message: COUPON_CODE_MESSAGE })
     code!: string;
 
-    /** Off each month's charge, in paise, before GST. */
+    /** Off each month's charge, in paise, before GST; 0 with `percentOff`. */
+    @IsInt()
+    @Min(0)
+    discountPaise!: number;
+
+    /** Or a whole percent off the plan's monthly price; absent: an amount. */
+    @IsOptional()
     @IsInt()
     @Min(1)
-    discountPaise!: number;
+    @Max(90)
+    percentOff?: number | null;
 
     @IsInt()
     @Min(1)
@@ -203,14 +210,25 @@ export class CreateCouponDto extends ReasonedWriteDto {
     @IsOptional()
     @IsBoolean()
     active?: boolean;
+    /** Taken off at checkout with no code typed; absent: no. */
+    @IsOptional()
+    @IsBoolean()
+    automatic?: boolean;
 }
 
 /** `PATCH /admin/pricing/coupons/:id`. The code itself never changes. */
 export class UpdateCouponDto extends ReasonedWriteDto {
     @IsOptional()
     @IsInt()
-    @Min(1)
+    @Min(0)
     discountPaise?: number;
+
+    /** A whole percent, or null to make it an amount coupon. */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(90)
+    percentOff?: number | null;
 
     @IsOptional()
     @IsInt()
@@ -246,6 +264,10 @@ export class UpdateCouponDto extends ReasonedWriteDto {
     @IsOptional()
     @IsBoolean()
     active?: boolean;
+
+    @IsOptional()
+    @IsBoolean()
+    automatic?: boolean;
 }
 
 /** `DELETE /admin/pricing/coupons/:id`. */
