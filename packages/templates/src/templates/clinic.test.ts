@@ -19,8 +19,10 @@ import {
     CLINIC_GALLERY_SAMPLE,
     CLINIC_TEMPLATE_ID,
     clinicServiceIds,
-    clinicTemplate,
+    clinicTemplateV1 as clinicTemplate,
+    clinicTemplate as clinicV2,
 } from "./clinic";
+import { firstSection, redesignChecks, stringsIn } from "./redesign-checks";
 
 type Ctx = TemplateContext;
 
@@ -93,8 +95,8 @@ function section(ctx: Ctx, type: string) {
 describe("clinic@1 (industry templates U11)", () => {
     it("is registered as the Clinic template, version 1", () => {
         expect(clinicTemplate.id).toBe(CLINIC_TEMPLATE_ID);
-        expect(getTemplate("clinic")).toBe(clinicTemplate);
-        expect(listTemplates()).toContain(clinicTemplate);
+        expect(getTemplate("clinic", 1)).toBe(clinicTemplate);
+        expect(listTemplates()).not.toContain(clinicTemplate);
         expect(clinicTemplate.version).toBe(1);
     });
 
@@ -310,4 +312,39 @@ describe("clinic@1 (industry templates U11)", () => {
             );
         },
     );
+});
+
+describe("clinic@2 (U10, distilled)", () => {
+    const all = profiles.map(([, ctx]) => ctx);
+    redesignChecks(clinicV2, clinicTemplate, all);
+
+    it("opens on the Same-day call panel, the answer row and one main action", () => {
+        const hero = firstSection(clinicV2, booking);
+        expect(hero?.type).toBe("hero");
+        expect(hero?.content).toMatchObject({
+            variant: "answer",
+            panel: { kind: "sameDayCall", words: "Same-day? Call the desk" },
+            answerRow: true,
+            cta: { label: "Book an appointment", href: "/book" },
+        });
+        expect(hero?.content).not.toHaveProperty("secondaryCta");
+        // The photo band is dropped: no image slot in the hero.
+        expect(hero?.content).not.toHaveProperty("imageBrief");
+    });
+
+    it("never says emergency, for any profile", () => {
+        for (const ctx of all) {
+            const words = instantiateTemplate(clinicV2, ctx)
+                .pages.flatMap((p) => p.sections)
+                .flatMap((s) => stringsIn(s.content))
+                .join("\n");
+            expect(words).not.toMatch(/emergenc/i);
+        }
+    });
+
+    it("ends on the clinic's place, and keeps Heather as its second colourway", () => {
+        const [home] = instantiateTemplate(clinicV2, booking).pages;
+        expect(home.sections.at(-1)?.type).toBe("visitUs");
+        expect(clinicV2.styles?.map((s) => s.id)).toEqual(["tide", "heather"]);
+    });
 });

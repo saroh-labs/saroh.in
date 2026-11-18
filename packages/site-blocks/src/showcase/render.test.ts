@@ -277,10 +277,14 @@ describe("templateRender", () => {
             ...DIETICIAN_GALLERY_SAMPLE.credentials,
         ]);
         expect(person.bio).toBe(DIETICIAN_GALLERY_SAMPLE.bio);
-        // Its consultation is the sample business's own service, listed.
-        expect(render?.sections.some((s) => s.type === "servicesList")).toBe(
-            true,
-        );
+        // Its consultation is the sample business's own service, in the
+        // hero's Consultation panel (dietician@2), the next open times
+        // under it.
+        expect(render?.sections[0]?.content).toMatchObject({
+            variant: "answer",
+            panel: { kind: "consultation" },
+        });
+        expect(render?.sections[1]?.type).toBe("booking");
     });
 
     it.each([
@@ -672,10 +676,13 @@ describe("the starter's renders (DEC-141)", () => {
         ]);
         const render = templateRender("starter-salon", "clay", "/");
         expect(render?.action).toEqual({ label: "Book", href: "/book" });
+        // starter@5: what and where beside the Stamp, the answer row
+        // under the button (U10); no longer today's free times.
         expect(render?.sections[0]?.content).toMatchObject({
+            variant: "split",
             heading: "Meher Hair Studio",
             subheading: "Haircut, Colour and Bridal styling in Bengaluru",
-            onToday: true,
+            answerRow: true,
         });
         // The brief stays a note to the owner: no picture is drawn from it.
         expect(render?.sections[0]?.content).not.toHaveProperty("image");

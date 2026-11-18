@@ -1,4 +1,10 @@
-import type { TemplateContext, TemplateManifest } from "../manifest";
+import type {
+    TemplateContext,
+    TemplateManifest,
+    TemplatePage,
+    TemplateSection,
+} from "../manifest";
+import { resolveContent } from "../manifest";
 
 /**
  * `gym` — the Gym industry template (industry templates plan, U6), built from
@@ -180,7 +186,8 @@ const SCALARS = {
 } as const;
 const TYPE = { bodySize: 15.5, measure: 52, contentWidth: 1240 } as const;
 
-export const gymTemplate: TemplateManifest = {
+/** `gym@1`, as it shipped: kept for the sites made from it. */
+export const gymTemplateV1: TemplateManifest = {
     id: GYM_TEMPLATE_ID,
     version: 1,
     name: "Gym",
@@ -459,6 +466,161 @@ export const gymTemplate: TemplateManifest = {
                 },
             ],
         },
+    ],
+};
+
+/*
+ * `gym@2` (plan 2026-11-18-001 U10, board TG Gym): OVERDRIVE around the
+ * timetable. The hero is the Answer panel's Today: the next classes today
+ * with their places, read live, beside the headline and "your first class
+ * is free" (no longer second from the bottom), with the answer row (Open
+ * now, Directions, Call) under Book a class. The week follows, every class
+ * a Book link; places are counted only from two left down (`placesFrom`),
+ * so the loud colour means scarce, not every other class (the critique).
+ * Where and when ends Home as Visit us when the gym has a place.
+ *
+ * The first class free is a promise in the owner's words, laid down where
+ * the board says it and theirs to change. For new sites only (KD10).
+ */
+
+/** Count places only from this many left down: honest scarcity (KD8). */
+export const GYM_PLACES_FROM = 2;
+
+const FIRST_CLASS_FREE =
+    "The first class is free. No booking needed: arrive ten minutes early and ask at the desk.";
+
+/** v1's first visit, its first step saying the first class is free. */
+function firstVisitV2(frame: Record<string, string> = {}) {
+    const visit = firstVisit(frame);
+    const [first, ...rest] = visit.items;
+    return {
+        ...visit,
+        items: [
+            {
+                ...first,
+                body: "Ask at the desk when you arrive. The first class is free, with no booking needed.",
+            },
+            ...rest,
+        ],
+    };
+}
+
+/** A section with `placesFrom` added when it is a timetable. */
+function scarce(section: TemplateSection): TemplateSection {
+    if (section.type !== "timetable") return section;
+    return {
+        ...section,
+        content: (ctx: TemplateContext) => ({
+            ...(resolveContent(section.content, ctx) as Record<
+                string,
+                unknown
+            >),
+            placesFrom: GYM_PLACES_FROM,
+        }),
+    };
+}
+
+/** v1's page at `path`, for the pages v2 keeps. */
+function v1Page(path: string): TemplatePage {
+    const page = gymTemplateV1.pages.find((p) => p.path === path);
+    if (!page) throw new Error(`gym@1 has no ${path}`);
+    return page;
+}
+
+const V1_HOME = v1Page("/").sections;
+
+/** `gym@2`: the one new sites start from. */
+export const gymTemplate: TemplateManifest = {
+    ...gymTemplateV1,
+    version: 2,
+    description:
+        "For a gym or studio that runs classes: today's classes and the first one free up top, the week's timetable with who is coaching and the places left, the coaches, memberships, a first visit and where to find you.",
+    pages: [
+        {
+            path: "/",
+            title: "Home",
+            isHome: true,
+            sections: [
+                {
+                    // The headline beside today's next classes (read live),
+                    // the first class free, Book, and the answer row.
+                    type: "hero",
+                    contractVersion: 1,
+                    content: (ctx: TemplateContext) => ({
+                        variant: "answer",
+                        heading: "Train before work, at lunch, or after it.",
+                        subheading: FIRST_CLASS_FREE,
+                        phoneLine:
+                            "The first class is free. No booking needed.",
+                        panel: { kind: "today" },
+                        answerRow: true,
+                        ...(classesOn(ctx)
+                            ? {
+                                  cta: {
+                                      label: "Book a class",
+                                      href: "/book",
+                                      style: "primary",
+                                  },
+                              }
+                            : {}),
+                    }),
+                },
+                // The week, coaches, plans and packs as v1, scarcity honest.
+                ...V1_HOME.filter((s) =>
+                    ["timetable", "person", "plans", "packs"].includes(s.type),
+                ).map(scarce),
+                {
+                    type: "features",
+                    contractVersion: 1,
+                    content: firstVisitV2({
+                        anchor: "visit",
+                        navLabel: "First visit",
+                        band: "surface",
+                    }),
+                },
+                {
+                    // Where and when: the place, its week, directions.
+                    type: "visitUs",
+                    contractVersion: 1,
+                    when: (ctx) => ctx.hasPlace === true,
+                    content: {
+                        anchor: "where",
+                        title: "Where and when",
+                        showMap: true,
+                        showHours: true,
+                    },
+                },
+                ...V1_HOME.filter((s) => s.type === "hours").map((s) => ({
+                    ...s,
+                    when: (ctx: TemplateContext) => ctx.hasPlace !== true,
+                })),
+            ],
+        },
+        {
+            ...v1Page("/timetable"),
+            sections: v1Page("/timetable").sections.map((s, i) =>
+                i === 0
+                    ? {
+                          ...s,
+                          content: {
+                              variant: "none",
+                              heading: "Timetable",
+                              subheading:
+                                  "The next seven days, with who is coaching each class and the places left. The first class is free.",
+                          },
+                      }
+                    : scarce(s),
+            ),
+        },
+        {
+            ...v1Page("/membership"),
+            sections: v1Page("/membership").sections.map((s) =>
+                s.type === "features"
+                    ? { ...s, content: firstVisitV2({ band: "surface" }) }
+                    : s,
+            ),
+        },
+        v1Page("/trainers"),
     ],
 };
 

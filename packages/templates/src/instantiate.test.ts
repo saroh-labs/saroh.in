@@ -11,7 +11,8 @@ import {
     starterTemplateV2,
     starterTemplateV3,
 } from "./templates/starter";
-import { starterTemplate } from "./templates/starter-v4";
+import { starterTemplateV4 } from "./templates/starter-v4";
+import { starterTemplate } from "./templates/starter-v5";
 
 const sampleProfile: TemplateContext = {
     organizationName: "Acme Roasters",
@@ -49,9 +50,10 @@ function everySection(template: TemplateManifest, ctx: TemplateContext) {
 
 describe("registry", () => {
     it("resolves the starter template by id (latest) and by exact version", () => {
-        expect(starterTemplate.version).toBe(4);
+        expect(starterTemplate.version).toBe(5);
         expect(getTemplate(STARTER_TEMPLATE_ID)).toBe(starterTemplate);
-        expect(getTemplate(STARTER_TEMPLATE_ID, 4)).toBe(starterTemplate);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 5)).toBe(starterTemplate);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 4)).toBe(starterTemplateV4);
         expect(getTemplate(STARTER_TEMPLATE_ID, 3)).toBe(starterTemplateV3);
         expect(getTemplate(STARTER_TEMPLATE_ID, 2)).toBe(starterTemplateV2);
         // Sites built from v1 keep resolving it (KTD-12).
@@ -73,7 +75,7 @@ describe("registry", () => {
             listTemplates()
                 .map((t) => `${t.id}@${t.version}`)
                 .slice(0, 4),
-        ).toEqual(["starter@4", "personal@2", "portfolio@2", "writing@1"]);
+        ).toEqual(["starter@5", "personal@2", "portfolio@2", "writing@1"]);
         for (const id of ["personal", "portfolio", "writing"]) {
             expect(getTemplate(id)?.id).toBe(id);
             expect(getTemplate(id, 1)?.version).toBe(1);

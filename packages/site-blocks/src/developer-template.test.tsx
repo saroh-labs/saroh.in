@@ -1,6 +1,10 @@
 import { toRendered } from "@saroh/block-contract";
-import type { TemplateContext } from "@saroh/templates";
-import { developerTemplate, instantiateTemplate } from "@saroh/templates";
+import type { TemplateContext, TemplateManifest } from "@saroh/templates";
+import {
+    developerTemplateV1 as developerTemplate,
+    developerTemplate as developerTemplateV2,
+    instantiateTemplate,
+} from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -19,8 +23,14 @@ const ctx: TemplateContext = {
     tagline: "Backend and infrastructure, working independently.",
 };
 
-function renderHome() {
-    const [page] = instantiateTemplate(developerTemplate, ctx).pages;
+function renderHome(
+    template: TemplateManifest = developerTemplate,
+    path = "/",
+) {
+    const page = instantiateTemplate(template, ctx).pages.find(
+        (p) => p.path === path,
+    );
+    if (!page) throw new Error(`No page at ${path}`);
     const resolvePage = () => undefined;
     return render(
         <>
@@ -148,5 +158,38 @@ describe("the Developer template, rendered live", () => {
             page.getByLabelText(/What are you building/),
         ).toBeInTheDocument();
         expect(page.getByLabelText(/Email/)).toBeInTheDocument();
+    });
+});
+
+describe("developer@2, rendered live (U10)", () => {
+    it("opens on Work with me, the one main action, then when the owner is free", () => {
+        const { container } = renderHome(developerTemplateV2);
+        const first = container.querySelectorAll("section")[0];
+        const main = within(first)
+            .getAllByRole("link")
+            .filter((a) => a.textContent.includes("Work with me"));
+        expect(main.map((a) => a.getAttribute("href"))).toEqual(["/#hire"]);
+        const titles = Array.from(container.querySelectorAll("h1, h2")).map(
+            (h) => h.textContent,
+        );
+        expect(titles.slice(0, 2)).toEqual(["Sample Engineer", "Availability"]);
+        // The enquiry Work with me lands on (`#hire`, drawn by the page).
+        expect(container.querySelector("form")).not.toBeNull();
+    });
+
+    it("tells the case study on its own page, its parts as labels", () => {
+        const { container } = renderHome(developerTemplateV2, "/case-study");
+        expect(
+            within(container).getByRole("heading", {
+                level: 1,
+                name: "Case study",
+            }),
+        ).toBeTruthy();
+        expect(within(container).getByText("The problem")).toBeTruthy();
+        expect(
+            within(container)
+                .getAllByRole("link", { name: /Work with me/ })
+                .map((a) => a.getAttribute("href")),
+        ).toContain("/#hire");
     });
 });

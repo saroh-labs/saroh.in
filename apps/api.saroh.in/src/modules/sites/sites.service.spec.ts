@@ -377,7 +377,7 @@ describe("SitesService.createFromTemplate", () => {
                 // The template it came from (KTD-7): the kind's default, in
                 // the first of its colourways (DEC-141).
                 templateId: STARTER_TEMPLATE_ID,
-                templateVersion: 4,
+                templateVersion: 5, // starter@5 (U10): what new sites start from
                 templateStyleId: "stone",
                 storefrontId: null,
                 style: expect.objectContaining({

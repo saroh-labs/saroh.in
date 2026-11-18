@@ -1,4 +1,9 @@
-import type { TemplateContext, TemplateManifest } from "../manifest";
+import type {
+    TemplateContext,
+    TemplateManifest,
+    TemplateSection,
+} from "../manifest";
+import { resolveContent } from "../manifest";
 
 /**
  * `dietician` — the Dietician industry template (industry templates plan,
@@ -217,7 +222,8 @@ const TYPE = {
     contentWidth: 1080,
 } as const;
 
-export const dieticianTemplate: TemplateManifest = {
+/** `dietician@1`, as it shipped: kept for the sites made from it. */
+export const dieticianTemplateV1: TemplateManifest = {
     id: DIETICIAN_TEMPLATE_ID,
     version: 1,
     name: "Dietician",
@@ -497,6 +503,163 @@ export const dieticianTemplate: TemplateManifest = {
                         groupDays: true,
                     },
                 },
+            ],
+        },
+    ],
+};
+
+/*
+ * `dietician@2` (plan 2026-11-18-001 U10, board TC Dietician): DISTILLED
+ * so the price and the way to book are in the first screen, not 1,600px
+ * down. With one consultation on the booking page the hero is the
+ * practitioner's name beside the Consultation panel (its price and length,
+ * read live, and Book), and the next open days (Book's Next open, with the
+ * "Before you book" words) follow at once. The portrait and the words
+ * about the practice come after, as the page's About, no longer its h1.
+ * Where the practice is ends the page (Visit us) when it has a place, else
+ * the week of appointments as before.
+ *
+ * Anything else (several consultations, or none yet) keeps v1's opening:
+ * the practitioner as the page's title. For new sites only (KD10).
+ */
+
+/** One consultation on the booking page: the Consultation panel's case. */
+function oneConsultation(ctx: TemplateContext): boolean {
+    return dieticianServiceIds(ctx).length === 1;
+}
+
+const V1 = dieticianTemplateV1.pages[0]?.sections ?? [];
+/** v1's section of this type, the `nth` of it, to build v2 from. */
+function v1(type: TemplateSection["type"], nth = 0): TemplateSection {
+    const found = V1.filter((s) => s.type === type).at(nth);
+    if (!found) throw new Error(`dietician@1 has no ${type} #${nth}`);
+    return found;
+}
+
+/** v1's content, laid down with v2's changes over it. */
+function over(
+    section: TemplateSection,
+    change: (ctx: TemplateContext) => Record<string, unknown>,
+    when?: TemplateSection["when"],
+): TemplateSection {
+    return {
+        ...section,
+        ...(when ? { when } : {}),
+        content: (ctx: TemplateContext) => ({
+            ...(resolveContent(section.content, ctx) as Record<
+                string,
+                unknown
+            >),
+            ...change(ctx),
+        }),
+    };
+}
+
+const BEFORE_YOU_BOOK =
+    "Bring, or have on screen: recent blood work, a doctor's note, anything a previous dietician gave you.";
+
+/** `dietician@2`: the one new sites start from. */
+export const dieticianTemplate: TemplateManifest = {
+    ...dieticianTemplateV1,
+    version: 2,
+    description:
+        "A calm site for a dietician or coach: the consultation's price and the next open times first, then who you are, how you work, what you are asked about most, your writing and where to find you.",
+    pages: [
+        {
+            path: "/",
+            title: "Home",
+            isHome: true,
+            sections: [
+                {
+                    // The name beside the Consultation panel: the one
+                    // service's price and length, read live, and Book.
+                    type: "hero",
+                    contractVersion: 1,
+                    when: oneConsultation,
+                    content: (ctx: TemplateContext) => ({
+                        variant: "answer",
+                        heading: ctx.organizationName,
+                        subheading:
+                            ctx.tagline ??
+                            "For people who have been told to change how they eat, and not told how.",
+                        panel: { kind: "consultation" },
+                        cta: {
+                            label: "Book a consultation",
+                            href: "/book",
+                            style: "primary",
+                            phoneLabel: "Book",
+                        },
+                    }),
+                },
+                {
+                    // How to book, straight after: the next three open days
+                    // and the fortnight, each a way into the booking page.
+                    type: "booking",
+                    contractVersion: 1,
+                    when: oneConsultation,
+                    content: (ctx: TemplateContext) => ({
+                        variant: "nextOpen",
+                        serviceId: dieticianServiceIds(ctx)[0],
+                        title: "Next open times",
+                        beforeYouBook: BEFORE_YOU_BOOK,
+                    }),
+                },
+                // The practitioner: the page's title only when no hero is.
+                over(v1("person"), (ctx) =>
+                    oneConsultation(ctx)
+                        ? { anchor: "about", band: "surface", asTitle: false }
+                        : {},
+                ),
+                v1("features", 0),
+                v1("features", 1),
+                // What the one consultation includes: its price is up top.
+                over(
+                    v1("features", 2),
+                    () => ({
+                        anchor: "includes",
+                        heading: "What the consultation includes",
+                    }),
+                    oneConsultation,
+                ),
+                v1("servicesList", 1),
+                v1("features", 2),
+                v1("features", 3),
+                v1("features", 4),
+                v1("journal"),
+                // No booking page: write, by email or the form.
+                over(
+                    v1("contact"),
+                    () => ({}),
+                    (ctx) =>
+                        Boolean(ctx.contactEmail) &&
+                        dieticianServiceIds(ctx).length === 0,
+                ),
+                over(
+                    v1("enquiry"),
+                    () => ({}),
+                    (ctx) =>
+                        !ctx.contactEmail &&
+                        dieticianServiceIds(ctx).length === 0,
+                ),
+                {
+                    // Where and when: the place, its week, directions.
+                    type: "visitUs",
+                    contractVersion: 1,
+                    when: (ctx) => ctx.hasPlace === true,
+                    content: {
+                        anchor: "where",
+                        navLabel: "Where and when",
+                        band: "surface",
+                        title: "Where and when",
+                        showMap: true,
+                        showHours: true,
+                    },
+                },
+                over(
+                    v1("hours"),
+                    () => ({}),
+                    (ctx) => ctx.hasPlace !== true,
+                ),
             ],
         },
     ],

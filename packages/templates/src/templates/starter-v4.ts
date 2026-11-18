@@ -264,7 +264,8 @@ function hasAbout(ctx: TemplateContext): boolean {
     return starterLine(ctx) !== undefined && aboutFacts(ctx).length >= 2;
 }
 
-export const starterTemplate: TemplateManifest = {
+/** `starter@4`, as it shipped: new sites start from v5 (`starter-v5.ts`). */
+export const starterTemplateV4: TemplateManifest = {
     id: STARTER_TEMPLATE_ID,
     version: 4,
     name: "Starter",

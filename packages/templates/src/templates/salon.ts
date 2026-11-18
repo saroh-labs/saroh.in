@@ -179,7 +179,8 @@ const TYPE = {
     contentWidth: 1200,
 } as const;
 
-export const salonTemplate: TemplateManifest = {
+/** `salon@1`, as it shipped: kept for the sites made from it. */
+export const salonTemplateV1: TemplateManifest = {
     id: SALON_TEMPLATE_ID,
     version: 1,
     name: "Salon",
@@ -378,6 +379,142 @@ export const salonTemplate: TemplateManifest = {
     ],
 };
 
+/*
+ * `salon@2` (plan 2026-11-18-001 U10, board TC Salon): OVERDRIVE. A salon
+ * is chosen by its work, so the work leads: the headline and Book a chair,
+ * the answer row (Open now, Directions, Call) under it, then the Lookbook,
+ * each photo with its name, its price and a way to book it. Then the
+ * services as a Menu (groups the owner types, Book on every row), the
+ * stylists, the house rules on a Highlights Band, and where the salon is.
+ * Its own skeleton, no longer the clinic's recoloured.
+ *
+ * The Lookbook ships as a brief and no photographs: the live site draws it
+ * once the owner adds some (a brief is never shown to a visitor). Who has
+ * a chair free today stays (the hero's On today, with Appointments on).
+ * For new sites only (KD10).
+ */
+
+/** What the Lookbook's photographs should be, until the owner adds them. */
+export const SALON_LOOKBOOK_BRIEF =
+    "Your best recent work, one look a photo: the finished cut or colour from behind or the side, in daylight";
+
+/** `salon@2`: the one new sites start from. */
+export const salonTemplate: TemplateManifest = {
+    ...salonTemplateV1,
+    version: 2,
+    description:
+        "For a salon or barber: the work first, every look with its price and a way to book it, the services as a menu, the stylists, the house rules and where to find you.",
+    pages: [
+        {
+            path: "/",
+            title: "Home",
+            isHome: true,
+            sections: [
+                {
+                    // The headline, Book a chair, and the answer row under
+                    // it; who is free today beside it with Appointments on.
+                    type: "hero",
+                    contractVersion: 1,
+                    content: (ctx: TemplateContext) => ({
+                        variant: "centered",
+                        heading: HEADLINE,
+                        subheading: heroLine(ctx),
+                        answerRow: true,
+                        ...(appointmentsOn(ctx) ? { onToday: true } : {}),
+                        ...(hasPrices(ctx)
+                            ? {
+                                  cta: {
+                                      label: "Book a chair",
+                                      href: "/book",
+                                      style: "primary",
+                                  },
+                              }
+                            : {}),
+                    }),
+                },
+                {
+                    // The work: each look with its name, price and Book.
+                    type: "gallery",
+                    contractVersion: 2,
+                    content: {
+                        anchor: "work",
+                        navLabel: "The work",
+                        variant: "lookbook",
+                        images: [],
+                        imageBrief: SALON_LOOKBOOK_BRIEF,
+                    },
+                },
+                {
+                    // The price list as a menu: Book on every row, prices
+                    // and lengths read live; the owner types the groups.
+                    type: "servicesList",
+                    contractVersion: 1,
+                    when: hasPrices,
+                    content: (ctx: TemplateContext) => ({
+                        anchor: "prices",
+                        navLabel: "Prices",
+                        variant: "menu",
+                        heading: "Pick a service",
+                        intro: "What each one costs and how long it takes in the chair. Book any of them with whoever is free.",
+                        serviceIds: salonServiceIds(ctx),
+                        showPrices: true,
+                        showDescriptions: true,
+                        buttonLabel: "Book",
+                    }),
+                },
+                {
+                    type: "person",
+                    contractVersion: 1,
+                    content: stylists({
+                        anchor: "stylists",
+                        navLabel: "Stylists",
+                        title: "Who you'll be with",
+                    }),
+                },
+                {
+                    // The house rules, on the band: worth stopping on.
+                    type: "features",
+                    contractVersion: 1,
+                    content: {
+                        anchor: "before",
+                        variant: "band",
+                        heading: "Before you come in",
+                        items: BEFORE_YOU_COME.map((i) => ({ ...i })),
+                    },
+                },
+                {
+                    // No booking page: a form, so a visitor can still ask.
+                    type: "enquiry",
+                    contractVersion: 1,
+                    when: (ctx) => !hasPrices(ctx),
+                    content: {
+                        anchor: "appointments",
+                        navLabel: "Appointments",
+                        title: "Ask for an appointment",
+                        description:
+                            "Say what you would like done and which days suit you, and the salon will reply with a time.",
+                        submitLabel: "Send",
+                        successMessage:
+                            "Thank you. The salon will reply to the email you gave.",
+                        fields: ENQUIRY_FIELDS.map((f) => ({ ...f })),
+                    },
+                },
+                {
+                    type: "visitUs",
+                    contractVersion: 1,
+                    content: {
+                        anchor: "find",
+                        navLabel: "Find us",
+                        title: "Find the salon",
+                        showMap: true,
+                        showHours: true,
+                    },
+                },
+            ],
+        },
+    ],
+};
+
 /**
  * The sample stylists the gallery renders this template with (KTD-6), in
  * place of the placeholders a live site starts with. Never laid down on a
@@ -406,6 +543,26 @@ export const SALON_GALLERY_SAMPLE = {
         "First-time colour needs a patch test 48 hours before.",
         "Move or cancel up to three hours ahead.",
         "Walk-ins welcome on weekdays when a chair is free.",
+    ],
+    /**
+     * The Menu's groups as the design draws them, over the sample's
+     * services (the gallery fixture's ids). A live site's groups are the
+     * owner's to type.
+     */
+    menu: [
+        {
+            name: "Cuts",
+            serviceIds: ["salon-cut-blow-dry", "salon-mens-cut"],
+        },
+        {
+            name: "Colour",
+            serviceIds: [
+                "salon-root-touch-up",
+                "salon-global-colour",
+                "salon-keratin",
+            ],
+        },
+        { name: "Bridal", serviceIds: ["salon-bridal-trial"] },
     ],
     /** The footer's line: the sample salon's street, and the day it shuts. */
     footer: "22 Linking Road, Khar West · Closed Mondays",

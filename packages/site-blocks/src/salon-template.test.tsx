@@ -1,7 +1,11 @@
 import { toRendered } from "@saroh/block-contract";
-import type { TemplateContext } from "@saroh/templates";
-import { instantiateTemplate, salonTemplate } from "@saroh/templates";
-import { render, screen } from "@testing-library/react";
+import type { TemplateContext, TemplateManifest } from "@saroh/templates";
+import {
+    instantiateTemplate,
+    salonTemplateV1 as salonTemplate,
+    salonTemplate as salonTemplateV2,
+} from "@saroh/templates";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SAMPLE_VISIT } from "./block-fixture-preview";
@@ -91,8 +95,11 @@ function stubApi() {
     return fetchMock;
 }
 
-function renderHome(ctx: TemplateContext) {
-    const [home] = instantiateTemplate(salonTemplate, ctx).pages;
+function renderHome(
+    ctx: TemplateContext,
+    template: TemplateManifest = salonTemplate,
+) {
+    const [home] = instantiateTemplate(template, ctx).pages;
     const resolvePage = () => undefined;
     return render(
         <PageSections
@@ -173,5 +180,44 @@ describe("the Salon template, rendered live", () => {
         expect(
             fetchMock.mock.calls.some(([url]) => String(url).includes("today")),
         ).toBe(false);
+    });
+});
+
+describe("salon@2, rendered live (U10)", () => {
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it("opens on the headline with one Book a chair, then the menu with Book on every row", async () => {
+        stubApi();
+        const { container } = renderHome(bookable, salonTemplateV2);
+        const first = container.querySelectorAll("section")[0];
+        expect(
+            within(first).getByRole("heading", {
+                level: 1,
+                name: "Book your chair. Walk in fresh.",
+            }),
+        ).toBeTruthy();
+        const main = within(first)
+            .getAllByRole("link", { name: "Book a chair" })
+            .map((a) => a.getAttribute("href"));
+        expect(main).toEqual(["/book"]);
+        // The menu: every service read live, each with its Book.
+        const prices = container.querySelectorAll<HTMLElement>("#prices")[0];
+        expect(prices).not.toBeNull();
+        await waitFor(() =>
+            expect(
+                within(prices).getByText(SERVICES[0]?.name ?? ""),
+            ).toBeTruthy(),
+        );
+        for (const service of SERVICES) {
+            expect(
+                within(prices).getByRole("link", {
+                    name: new RegExp(`Book.*${service.name}`, "i"),
+                }),
+            ).toBeTruthy();
+        }
+        // The house rules on the band.
+        expect(container.querySelector("[data-features-band]")).not.toBeNull();
     });
 });

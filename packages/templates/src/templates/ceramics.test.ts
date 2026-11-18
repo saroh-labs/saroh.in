@@ -15,7 +15,7 @@ import {
     CERAMICS_COLLECTION_COUNT,
     CERAMICS_FOOTER_LINE,
     CERAMICS_TEMPLATE_ID,
-    ceramicsTemplate,
+    ceramicsTemplateV1,
 } from "./ceramics";
 
 /** Every string anywhere in a section's content, however deeply nested. */
@@ -49,20 +49,21 @@ const profiles: [string, TemplateContext][] = [
 ];
 
 function home(ctx: TemplateContext) {
-    const { pages } = instantiateTemplate(ceramicsTemplate, ctx);
+    const { pages } = instantiateTemplate(ceramicsTemplateV1, ctx);
     return pages[0];
 }
 
 describe("ceramics@1, the gallery's Store (U5)", () => {
-    it("is registered as the latest ceramics and offered in the picker", () => {
-        expect(ceramicsTemplate.id).toBe(CERAMICS_TEMPLATE_ID);
-        expect(ceramicsTemplate.version).toBe(1);
-        expect(getTemplate("ceramics")).toBe(ceramicsTemplate);
-        expect(listTemplates()).toContain(ceramicsTemplate);
+    it("stays registered as version 1 for the sites made from it (KD10)", () => {
+        expect(ceramicsTemplateV1.id).toBe(CERAMICS_TEMPLATE_ID);
+        expect(ceramicsTemplateV1.version).toBe(1);
+        expect(getTemplate("ceramics", 1)).toBe(ceramicsTemplateV1);
+        // A new site starts on version 2 (U9); version 1 is no longer offered.
+        expect(listTemplates()).not.toContain(ceramicsTemplateV1);
     });
 
     it("carries the gallery's facts: Store, for shops and creators, on Products", () => {
-        expect(ceramicsTemplate).toMatchObject({
+        expect(ceramicsTemplateV1).toMatchObject({
             name: "Store",
             slug: "store",
             kinds: ["shop", "creator"],
@@ -73,12 +74,12 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
     });
 
     it("has the design's two colourways, Green first, in Fraunces + Inter Tight", () => {
-        const styles = ceramicsTemplate.styles ?? [];
+        const styles = ceramicsTemplateV1.styles ?? [];
         expect(styles.map((s) => [s.id, s.name])).toEqual([
             ["green", "Green"],
             ["oxblood", "Oxblood"],
         ]);
-        expect(templateStylePreset(ceramicsTemplate)?.id).toBe("green");
+        expect(templateStylePreset(ceramicsTemplateV1)?.id).toBe("green");
         for (const s of styles) {
             expect(isFontPairKey(s.style.fontPair)).toBe(true);
             expect(s.style.fontPair).toBe("fraunces-inter-tight");
@@ -96,7 +97,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
     });
 
     it("draws each colourway in the design's exact colours, every pairing at 4.5:1", () => {
-        const [green, oxblood] = ceramicsTemplate.styles ?? [];
+        const [green, oxblood] = ceramicsTemplateV1.styles ?? [];
         expect(green.style.palette).toMatchObject({
             bg: "#F4F1E8",
             surface: "#EAE6DB",
@@ -111,7 +112,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
             surface: "#DADADE",
             accent: "#4F2927",
         });
-        for (const s of ceramicsTemplate.styles ?? []) {
+        for (const s of ceramicsTemplateV1.styles ?? []) {
             expect(parsePalette(s.style.palette)).toMatchObject({ ok: true });
             expect(parseTypeScale(s.style.type)).toEqual({
                 ok: true,
@@ -128,7 +129,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
     });
 
     it("starts the footer as one left-set line that says what to write", () => {
-        expect(ceramicsTemplate.footer).toMatchObject({
+        expect(ceramicsTemplateV1.footer).toMatchObject({
             line: CERAMICS_FOOTER_LINE,
             layout: "left",
         });
@@ -141,7 +142,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
         );
         expect(CERAMICS_FOOTER_LINE).not.toMatch(/studio|—/i);
         // The old line is kept only so the pre-publish check still knows it.
-        expect(ceramicsTemplate.footer?.formerLines).toEqual([
+        expect(ceramicsTemplateV1.footer?.formerLines).toEqual([
             "Your area and town — and when the studio is open",
         ]);
     });
@@ -159,7 +160,7 @@ describe("ceramics@1, the gallery's Store (U5)", () => {
     it.each(profiles)(
         "instantiates and every section passes the contract, for %s",
         (_label, ctx) => {
-            const { pages } = instantiateTemplate(ceramicsTemplate, ctx);
+            const { pages } = instantiateTemplate(ceramicsTemplateV1, ctx);
             expect(pages).toHaveLength(1);
             for (const section of pages[0].sections) {
                 expect(

@@ -54,6 +54,7 @@ export const PRANA_GALLERY_SAMPLE = {
     },
     classes: {
         eyebrow: "Classes and services",
+        intro: "Every class with its length and price. New here? Start with the free intro.",
         heading: "Seven ways to practise.",
     },
     teachers: { title: "The teachers", people: TEACHERS },
@@ -156,6 +157,23 @@ function serviceIds(ctx: TemplateContext): string[] {
         : [];
 }
 
+/**
+ * Classic Prana (board TG): white, warm stone text and a terracotta accent,
+ * ending on a deep clay footer. Every text pairing 4.5:1.
+ */
+const PRANA_CLASSIC_PALETTE = {
+    bg: "#FFFFFF",
+    surface: "#F7F3F0",
+    fg: "#1C1917",
+    body: "#3B3532",
+    muted: "#6B635D",
+    border: "#E6E1DD",
+    accent: "#A65E3F",
+    accentFg: "#FFFFFF",
+    footerBg: "#634336",
+    footerFg: "#F6EEE9",
+} as const;
+
 export const pranaShowcase: TemplateManifest = {
     id: PRANA_TEMPLATE_ID,
     version: 1,
@@ -163,8 +181,16 @@ export const pranaShowcase: TemplateManifest = {
     description: "The looks' boards' studio: classes, teachers and plans.",
     sample: { name: S.name, host: "pranayoga.saroh.app" },
     uses: [APPOINTMENTS, PAYMENTS, CLASS_PACKS],
-    // One colourway: a look's Preview draws its board's own colours.
-    styles: [{ id: "board", name: "Board", style: {} }],
+    // One colourway: Classic's, from board TG (U9: Classic raised to
+    // Folio's level, its quiet text at 5.9:1, not 3.3:1). A look's Preview
+    // draws its board's own colours instead (`LOOK_SHOWCASE_PALETTE`).
+    styles: [
+        {
+            id: "board",
+            name: "Board",
+            style: { palette: PRANA_CLASSIC_PALETTE },
+        },
+    ],
     footer: { line: S.footer, layout: "left" },
     pages: [
         {
@@ -181,6 +207,9 @@ export const pranaShowcase: TemplateManifest = {
                         subheading: S.hero.subheading,
                         cta: { label: S.hero.cta, href: "/book" },
                         secondaryCta: { label: S.hero.second, href: "/book" },
+                        // Classic's way in for a visit: Open now, Directions
+                        // and Call under the buttons (board TG).
+                        answerRow: true,
                     },
                 },
                 {
@@ -201,7 +230,8 @@ export const pranaShowcase: TemplateManifest = {
                     contractVersion: 1,
                     content: {
                         format: "html",
-                        value: "",
+                        // The room's caption under its photo (board TG).
+                        value: `<p>${S.room.caption}</p>`,
                         imageSide: "above",
                         imageBrief: S.room.imageBrief,
                     },
@@ -215,6 +245,7 @@ export const pranaShowcase: TemplateManifest = {
                         navLabel: "Classes",
                         eyebrow: S.classes.eyebrow,
                         heading: S.classes.heading,
+                        intro: S.classes.intro,
                         serviceIds: serviceIds(ctx),
                         showPrices: true,
                         showDescriptions: true,
@@ -315,14 +346,20 @@ export const PRANA_LOOK_SECTIONS: Readonly<Record<LookId, readonly string[]>> =
 export const PRANA_LOOK_WORDS: Readonly<
     Record<LookId, Readonly<Partial<Record<string, Record<string, unknown>>>>>
 > = {
-    quiet: {},
+    // Classic's additions (U9) stay Classic's: each look keeps its board.
+    quiet: {
+        hero: { answerRow: undefined },
+        richText: { value: "" },
+        servicesList: { intro: undefined },
+    },
     folio: {
         hero: {
+            answerRow: undefined,
             subheading: S.folio.subheading,
             imageBrief: S.hero.imageBrief,
         },
         richText: { value: `<p>${S.room.caption}</p>` },
-        servicesList: { heading: S.folio.classes },
+        servicesList: { heading: S.folio.classes, intro: undefined },
         // VA01 heads its quotes with the small label alone.
         testimonials: {
             heading: undefined,
@@ -332,6 +369,7 @@ export const PRANA_LOOK_WORDS: Readonly<
     },
     live: {
         hero: {
+            answerRow: undefined,
             eyebrow: undefined,
             heading: S.live.heading,
             subheading: S.live.subheading,
@@ -341,7 +379,11 @@ export const PRANA_LOOK_WORDS: Readonly<
         // VB01's "Next free" is a row of cards: Live's list (its default,
         // the week across, is VB09's timetable page).
         timetable: { variant: "list" },
-        servicesList: { eyebrow: undefined, heading: S.live.classes },
+        servicesList: {
+            eyebrow: undefined,
+            heading: S.live.classes,
+            intro: undefined,
+        },
         person: { title: S.live.teachers },
         testimonials: {
             heading: S.live.quotes.heading,

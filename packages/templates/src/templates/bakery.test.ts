@@ -19,7 +19,7 @@ import {
     BAKERY_FOOTER_LINE,
     BAKERY_IMAGE_BRIEFS,
     BAKERY_TEMPLATE_ID,
-    bakeryTemplate,
+    bakeryTemplateV1,
 } from "./bakery";
 
 /** Every string anywhere in a section's content, however deeply nested. */
@@ -50,19 +50,20 @@ const profiles: [string, TemplateContext][] = [
 ];
 
 function home(ctx: TemplateContext) {
-    return instantiateTemplate(bakeryTemplate, ctx).pages[0];
+    return instantiateTemplate(bakeryTemplateV1, ctx).pages[0];
 }
 
 describe("bakery@1 (industry templates U4)", () => {
-    it("is registered and listed as the latest bakery", () => {
-        expect(bakeryTemplate.id).toBe(BAKERY_TEMPLATE_ID);
-        expect(bakeryTemplate.version).toBe(1);
-        expect(getTemplate("bakery")).toBe(bakeryTemplate);
-        expect(listTemplates()).toContain(bakeryTemplate);
+    it("stays registered as version 1 for the sites made from it (KD10)", () => {
+        expect(bakeryTemplateV1.id).toBe(BAKERY_TEMPLATE_ID);
+        expect(bakeryTemplateV1.version).toBe(1);
+        expect(getTemplate("bakery", 1)).toBe(bakeryTemplateV1);
+        // A new site starts on version 2 (U9); version 1 is no longer offered.
+        expect(listTemplates()).not.toContain(bakeryTemplateV1);
     });
 
     it("describes itself for the picker and the gallery", () => {
-        expect(bakeryTemplate).toMatchObject({
+        expect(bakeryTemplateV1).toMatchObject({
             name: "Bakery",
             slug: "bakery",
             kinds: ["food"],
@@ -70,22 +71,22 @@ describe("bakery@1 (industry templates U4)", () => {
             sample: { name: "Rye & Co.", host: "ryeandco.saroh.app" },
             uses: ["COMMERCE"],
         });
-        for (const kind of bakeryTemplate.kinds ?? []) {
+        for (const kind of bakeryTemplateV1.kinds ?? []) {
             expect(TEMPLATE_KINDS).toContain(kind);
         }
-        expect(TEMPLATE_SHAPES).toContain(bakeryTemplate.shape);
+        expect(TEMPLATE_SHAPES).toContain(bakeryTemplateV1.shape);
     });
 
     it("comes in Crust, the default, and Porcelain, both in Fraunces and Inter Tight", () => {
-        expect(bakeryTemplate.styles?.map((s) => [s.id, s.name])).toEqual([
+        expect(bakeryTemplateV1.styles?.map((s) => [s.id, s.name])).toEqual([
             ["crust", "Crust"],
             ["porcelain", "Porcelain"],
         ]);
-        expect(templateStylePreset(bakeryTemplate)?.id).toBe("crust");
-        expect(templateStylePreset(bakeryTemplate, "porcelain")?.id).toBe(
+        expect(templateStylePreset(bakeryTemplateV1)?.id).toBe("crust");
+        expect(templateStylePreset(bakeryTemplateV1, "porcelain")?.id).toBe(
             "porcelain",
         );
-        for (const preset of bakeryTemplate.styles ?? []) {
+        for (const preset of bakeryTemplateV1.styles ?? []) {
             expect(preset.style.fontPair).toBe("fraunces-inter-tight");
             expect(isFontPairKey(preset.style.fontPair)).toBe(true);
             // Square corners: the design draws none.
@@ -94,7 +95,7 @@ describe("bakery@1 (industry templates U4)", () => {
     });
 
     it("draws each colourway in the design's colours, every pairing at 4.5:1", () => {
-        const [crust, porcelain] = bakeryTemplate.styles ?? [];
+        const [crust, porcelain] = bakeryTemplateV1.styles ?? [];
         expect(crust.style.palette).toMatchObject({
             bg: "#FBF7EF",
             fg: "#2A1F14",
@@ -108,13 +109,13 @@ describe("bakery@1 (industry templates U4)", () => {
         });
         // "Open now"'s green: the design's pale one over the photo and the
         // dark band, a deeper leaf on the page, each at a graphic's 3:1.
-        for (const preset of bakeryTemplate.styles ?? []) {
+        for (const preset of bakeryTemplateV1.styles ?? []) {
             expect(preset.style.palette).toMatchObject({
                 status: "#4E8A36",
                 statusInverse: "#9BD17B",
             });
         }
-        for (const preset of bakeryTemplate.styles ?? []) {
+        for (const preset of bakeryTemplateV1.styles ?? []) {
             expect(parsePalette(preset.style.palette)).toMatchObject({
                 ok: true,
             });
@@ -126,7 +127,7 @@ describe("bakery@1 (industry templates U4)", () => {
     });
 
     it("starts the footer as one left-set line that says what to write", () => {
-        expect(bakeryTemplate.footer).toEqual({
+        expect(bakeryTemplateV1.footer).toEqual({
             line: BAKERY_FOOTER_LINE,
             layout: "left",
         });
@@ -149,7 +150,7 @@ describe("bakery@1 (industry templates U4)", () => {
     it.each(profiles)(
         "instantiates and every section passes the contract, with %s",
         (_label, ctx) => {
-            const { pages } = instantiateTemplate(bakeryTemplate, ctx);
+            const { pages } = instantiateTemplate(bakeryTemplateV1, ctx);
             expect(pages.map((p) => p.path)).toEqual(["/"]);
             expect(pages[0].isHome).toBe(true);
             for (const section of pages.flatMap((p) => p.sections)) {

@@ -162,7 +162,7 @@ describe("/templates/[slug]", () => {
     });
 
     it("a one-page template has no page switcher", async () => {
-        await renderAt("bakery", AFTER);
+        await renderAt("clinic", AFTER);
         expect(screen.queryByRole("group", { name: "Pages" })).toBeNull();
         expect(screen.getByRole("group", { name: "Show it on" })).toBeTruthy();
     });
