@@ -317,6 +317,12 @@ model Organization {
   // A site's QR codes and their daily scan counts.
   qrCodes              QrCode[]
   sharePosts           SharePost[]
+  // Saroh Social: channels, posts and their deliveries.
+  socialChannels       SocialChannel[]
+  socialConnectChoices SocialConnectChoice[]
+  socialPosts          SocialPost[]
+  socialDeliveries     SocialDelivery[]
+  socialRequests       SocialRequest[]
   // Ask AI (DEC-220): conversations, their usage, and the business's settings.
   aiConversations      AiConversation[]
   aiMessages           AiMessage[]
@@ -4889,6 +4895,235 @@ model QrScanDay {
 
   @@id([qrCodeId, day])
   @@index([organizationId])
+}
+
+// ============================================================================
+// SAROH SOCIAL (plan saroh-social 2026-11-18-001): Saroh posts for the
+// business to its Instagram, Facebook Page and Threads.
+// ============================================================================
+
+enum SocialChannelKind {
+  INSTAGRAM
+  FACEBOOK
+  THREADS
+}
+
+enum SocialChannelStatus {
+  CONNECTED
+  // A token Meta refused or revoked, or a Threads grant that ended: posts
+  // to it wait until someone reconnects.
+  NEEDS_ATTENTION
+}
+
+enum SocialPostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  DONE
+  PARTLY_DONE
+  FAILED
+  CANCELLED
+}
+
+enum SocialDeliveryStatus {
+  WAITING
+  POSTING
+  POSTED
+  FAILED
+  // Saroh asked the platform to publish and didn't hear back: checked on
+  // the platform for the post's ref before anything is sent again.
+  UNKNOWN
+}
+
+/// One connected account of each kind per business (the unique is the
+/// "one of each" rule). The token is sealed to the row under
+/// SOCIAL_ENC_KEY and never leaves the API.
+model SocialChannel {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  kind           SocialChannelKind
+  // The account Saroh posts as: the Instagram account, the Page, the
+  // Threads profile.
+  accountId      String
+  // Who signed in at Meta (the Instagram or Threads user, the Facebook
+  // user who chose the Page): what Meta's deauthorize and data deletion
+  // callbacks name.
+  platformUserId String
+  // "@chaiandcrumb", or the Page's name.
+  handle         String
+  avatarUrl      String?
+
+  tokenCiphertext String?
+  tokenIv         String?
+  tokenAuthTag    String?
+  tokenIssuedAt   DateTime?
+  // Null for a Facebook Page token, which doesn't expire.
+  tokenExpiresAt  DateTime?
+  // Threads only: when Meta's grant itself ends (90 days, extended by a
+  // refresh for a public profile).
+  grantExpiresAt  DateTime?
+
+  status          SocialChannelStatus @default(CONNECTED)
+  // Why it needs attention ("revoked", "expired", "grant-ended") and since when.
+  attentionReason String?
+  attentionAt     DateTime?
+
+  // The waiting `social.refresh` job, so a reconnect's chain replaces it.
+  refreshJobId String?
+
+  connectedByUserId String?
+  connectedAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  deliveries SocialDelivery[]
+
+  @@unique([organizationId, kind])
+  @@index([kind, platformUserId])
+}
+
+/// A Facebook sign-in that manages several Pages: the Pages and their
+/// tokens, sealed, for ten minutes while the person picks one.
+model SocialConnectChoice {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId         String
+  kind           SocialChannelKind
+  platformUserId String
+
+  choicesCiphertext String
+  choicesIv         String
+  choicesAuthTag    String
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, userId])
+}
+
+/// A post Saroh publishes: what it says and shows, and when. Each channel
+/// it goes to has its own delivery, which holds the result.
+model SocialPost {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdByUserId String?
+
+  // What it is about: product | service | post | offer | book | review |
+  // own, and the item's slug or id (none for own words).
+  sourceKind String
+  sourceRef  String?
+  // The item's name as lists show it ("Mango cheesecake").
+  title      String  @default("")
+
+  // The picture: a Share card (card) or the business's own photo (photo).
+  picture   String  @default("card")
+  cardStyle String  @default("photo")
+  // post (4:5) or square (1:1).
+  size      String  @default("post")
+  headline  String?
+  mediaId   String?
+  // The JPEG Saroh drew and stored for Meta to fetch.
+  imageKey  String?
+  imageUrl  String?
+
+  caption  String @default("")
+  // A channel's own caption, by kind: { "THREADS": "…" }.
+  captions Json?
+  // Where the link goes on the business's own site, and its `ref`
+  // (`social-<letters>`), which the site's visits count.
+  linkPath String @default("/")
+  ref      String
+
+  status       SocialPostStatus @default(DRAFT)
+  publishAt    DateTime?
+  zone         String?
+  // The waiting `social.publish` job: a run of any other is a no-op.
+  publishJobId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deliveries SocialDelivery[]
+
+  @@unique([organizationId, ref])
+  @@index([organizationId, publishAt])
+  @@index([organizationId, status])
+}
+
+/// One post on one channel: its state and the platform's answer.
+model SocialDelivery {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  postId String
+  post   SocialPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  kind      SocialChannelKind
+  // The channel it goes to; null once that channel is disconnected.
+  channelId String?
+  channel   SocialChannel?    @relation(fields: [channelId], references: [id], onDelete: SetNull)
+
+  status SocialDeliveryStatus @default(WAITING)
+
+  // Instagram and Threads: the container made, and how often its status
+  // was read.
+  containerId String?
+  checks      Int     @default(0)
+  attempts    Int     @default(0)
+
+  platformPostId String?
+  permalink      String?
+  // Why it didn't post, or why it waits: a code the screens word.
+  reason         String?
+  // A limit's: when the platform will take it again.
+  retryAfter     DateTime?
+  lastTriedAt    DateTime?
+  postedAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([postId, kind])
+  @@index([channelId, status])
+  @@index([organizationId, status])
+}
+
+/// "Request more" at the monthly post limit: one a business a month.
+model SocialRequest {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId    String
+  windowKey String
+  createdAt DateTime @default(now())
+
+  @@unique([organizationId, windowKey])
+}
+
+/// Meta's data deletion callback: what was deleted for whom, read by the
+/// public status page by its code. Names no business and no person.
+model SocialDeletion {
+  id String @id @default(cuid())
+
+  code     String            @unique
+  kind     SocialChannelKind
+  // How many connections were deleted with their tokens.
+  channels Int
+
+  createdAt DateTime @default(now())
 }
 
 /// A post the business wrote itself in Create post (#1378, plan
