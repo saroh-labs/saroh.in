@@ -411,6 +411,19 @@ describe("the look reaches every block", () => {
         );
     });
 
+    it("a layout no block draws yet draws as if none were named (U15)", () => {
+        const answer = hero({ variant: "answer" });
+        expect(withLookVariant(answer, undefined)).not.toHaveProperty(
+            "variant",
+        );
+        // Under a look, the look's own layout, as for a hero naming none.
+        expect(withLookVariant(answer, "quiet")).toEqual(
+            withLookVariant(hero(), "quiet"),
+        );
+        const band = { type: "features", content: { variant: "band" } };
+        expect(withLookVariant(band, undefined)).toEqual({});
+    });
+
     it("the header lies over a full-bleed hero the look chose too", () => {
         const section = hero();
         expect(opensOverPhoto(section)).toBe(false);

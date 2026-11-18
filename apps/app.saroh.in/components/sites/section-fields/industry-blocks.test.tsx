@@ -19,7 +19,10 @@ import type { Section } from "@/lib/sites/service";
 import { emptySection } from "@/components/sites/blocks/empty-section";
 import { HeroFields } from "@/components/sites/content-sections/hero";
 import { PersonFields } from "@/components/sites/content-sections/person";
-import { TimetableFields } from "@/components/sites/selling-sections/timetable";
+import {
+    placesFromChoice,
+    TimetableFields,
+} from "@/components/sites/selling-sections/timetable";
 
 vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: ({
@@ -216,5 +219,23 @@ describe("a hero shipped as a brief (KTD-5)", () => {
         expect(host.textContent).toContain(
             "Photo wanted: Loaves on the counter at dawn",
         );
+    });
+});
+
+describe("a Timetable's places left from (KD8)", () => {
+    it("stores 1 to 10, and Automatic or anything else as absent", () => {
+        expect(placesFromChoice("1")).toBe(1);
+        expect(placesFromChoice("10")).toBe(10);
+        expect(placesFromChoice("auto")).toBeUndefined();
+        expect(placesFromChoice("0")).toBeUndefined();
+        expect(placesFromChoice("11")).toBeUndefined();
+    });
+
+    it("shows Automatic while nothing is set", () => {
+        act(() => {
+            root.render(<Harness start={emptySection("timetable")} />);
+        });
+        expect(host.textContent).toContain("Say places left from");
+        expect(host.textContent).toContain("Automatic");
     });
 });

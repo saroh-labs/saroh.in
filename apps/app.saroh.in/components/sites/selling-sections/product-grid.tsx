@@ -243,6 +243,26 @@ export function ProductGridFieldsView({
                     placeholder="Order by 9 pm"
                 />
             </Field>
+            <Field
+                optional
+                label="Pre-order tag"
+                hint="Your own words on each card, shown only when you write them."
+            >
+                <Input
+                    value={c.preorderWords ?? ""}
+                    onChange={(e) =>
+                        patch({ preorderWords: e.target.value || undefined })
+                    }
+                    maxLength={60}
+                    placeholder="Pre-order for Saturday"
+                />
+            </Field>
+            <OptionSwitch
+                label="Add to bag from the card"
+                checked={c.addInPlace === true}
+                onChange={(on) => patch({ addInPlace: on ? true : undefined })}
+                note="A − and + on each card, so a customer adds without opening the product."
+            />
         </div>
     );
 }

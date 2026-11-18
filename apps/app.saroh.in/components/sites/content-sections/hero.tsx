@@ -1,21 +1,30 @@
 "use client";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
-import { resolveVariant } from "@saroh/block-contract";
+import type { HeroPanelKind } from "@saroh/block-contract";
+import { resolveVariant, SAME_DAY_CALL_WORDS } from "@saroh/block-contract";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@saroh/ui/select";
 import { Switch } from "@saroh/ui/switch";
 import { useId } from "react";
 
 import { buildImage } from "@/components/sites/section-fields/build-image";
 import {
-    CtaActionFields,
     actionOf,
+    CtaActionFields,
     withCtaAction,
     withCtaLabel,
 } from "@/components/sites/section-fields/cta-action-fields";
 import { ImageBrief } from "@/components/sites/section-fields/image-brief";
+import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 import type { HeroContent } from "@/lib/sites/service";
 
@@ -39,6 +48,15 @@ function secondLink(
     return { label, href: href ?? "/" };
 }
 
+/** The answer panel's kinds as the owner reads them (KD14, DEC-228). */
+const PANEL_KINDS: readonly (readonly [HeroPanelKind, string])[] = [
+    ["today", "Today's classes"],
+    ["nextFree", "Next free time"],
+    ["sameDayCall", "Same-day call"],
+    ["consultation", "One consultation"],
+    ["pickup", "Pickup"],
+];
+
 export function HeroFields({
     section,
     pages,
@@ -50,7 +68,11 @@ export function HeroFields({
         onChange({ ...section, content: { ...c, ...next } });
     // The `none` look is a page title: it may keep its heading for screen
     // readers only, when the header already shows the same name.
-    const titleOnly = resolveVariant("hero", c) === "none";
+    const look = resolveVariant("hero", c);
+    const titleOnly = look === "none";
+    const panel = c.panel ?? { kind: "today" as const };
+    const patchPanel = (next: Partial<NonNullable<HeroContent["panel"]>>) =>
+        patch({ panel: { ...panel, ...next } });
     return (
         <div className="grid gap-3">
             <Field label="Heading">
@@ -154,6 +176,97 @@ export function HeroFields({
                 A quieter link beside the button. The Quiet, Folio and Live
                 looks show it.
             </p>
+            {look === "answer" ? (
+                <>
+                    <Field label="The panel answers">
+                        <Select
+                            value={panel.kind}
+                            onValueChange={(v) =>
+                                patchPanel({ kind: v as HeroPanelKind })
+                            }
+                        >
+                            <SelectTrigger aria-label="The panel answers">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PANEL_KINDS.map(([kind, words]) => (
+                                    <SelectItem key={kind} value={kind}>
+                                        {words}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                    {panel.kind === "sameDayCall" ? (
+                        <>
+                            <Field optional label="The panel's line">
+                                <Input
+                                    value={panel.words ?? ""}
+                                    onChange={(e) =>
+                                        patchPanel({
+                                            words: e.target.value || undefined,
+                                        })
+                                    }
+                                    maxLength={160}
+                                    placeholder={SAME_DAY_CALL_WORDS}
+                                />
+                            </Field>
+                            <Field
+                                optional
+                                label="Number to call"
+                                hint="Leave empty to use your business's phone."
+                            >
+                                <Input
+                                    type="tel"
+                                    value={panel.phone ?? ""}
+                                    onChange={(e) =>
+                                        patchPanel({
+                                            phone: e.target.value || undefined,
+                                        })
+                                    }
+                                />
+                            </Field>
+                        </>
+                    ) : null}
+                    {panel.kind === "pickup" ? (
+                        <>
+                            <Field label="Order by">
+                                <Input
+                                    value={panel.orderBy ?? ""}
+                                    onChange={(e) =>
+                                        patchPanel({
+                                            orderBy:
+                                                e.target.value || undefined,
+                                        })
+                                    }
+                                    maxLength={80}
+                                    placeholder="Order by 9 pm for tomorrow"
+                                />
+                            </Field>
+                            <Field label="Where to pick up">
+                                <Input
+                                    value={panel.where ?? ""}
+                                    onChange={(e) =>
+                                        patchPanel({
+                                            where: e.target.value || undefined,
+                                        })
+                                    }
+                                    maxLength={160}
+                                    placeholder="From the counter"
+                                />
+                            </Field>
+                        </>
+                    ) : null}
+                    <OptionSwitch
+                        label="Open now, directions and call"
+                        checked={c.answerRow === true}
+                        onChange={(on) =>
+                            patch({ answerRow: on ? true : undefined })
+                        }
+                        note="A row under the buttons, read from your hours, address and phone."
+                    />
+                </>
+            ) : null}
             <Field label="Image">
                 {/*
                  * The picture first, the address second. A merchant

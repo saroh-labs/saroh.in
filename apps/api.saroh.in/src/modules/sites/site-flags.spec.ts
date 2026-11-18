@@ -1455,7 +1455,7 @@ describe("the first starters' stock sentences (DEC-141)", () => {
             ).filter(
                 (f) =>
                     f.type === "placeholderText" &&
-                    f.message.includes("rich text block still has") &&
+                    f.message.includes("text block still has") &&
                     f.message.includes("template's placeholder words"),
             );
             expect(texts.length).toBeGreaterThan(0);

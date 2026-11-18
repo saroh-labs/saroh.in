@@ -44,7 +44,7 @@ export type {
  * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
  * start demanding their entries instead of silently accepting six.
  */
-import type { LookId, SectionType } from "@saroh/block-contract";
+import type { HeroPanelKind, LookId, SectionType } from "@saroh/block-contract";
 import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
@@ -72,6 +72,8 @@ export interface CtaValue {
     href?: string;
     action?: CtaAction;
     style?: CtaStyle;
+    /** Shorter words for a phone (KD9); absent, the label. */
+    phoneLabel?: string;
 }
 
 export interface ImageValue {
@@ -96,7 +98,27 @@ export interface HeroContent {
     /** `false`: the `none` look's heading is for screen readers only. */
     titleVisible?: boolean;
     /** A quieter link beside the button, drawn by the looks (DEC-172). */
-    secondaryCta?: { label: string; href: string };
+    secondaryCta?: { label: string; href: string; phoneLabel?: string };
+    /** The answer look's panel (DEC-228); absent, Today. */
+    panel?: HeroPanel;
+    /** Open now, Directions and Call under the buttons. */
+    answerRow?: boolean;
+    /** Who is behind the business, beside the heading. */
+    byline?: { image?: ImageValue; name: string; role?: string };
+    /** A shorter line for a phone (KD9); absent, the subheading. */
+    phoneLine?: string;
+}
+
+/** What a hero's answer panel answers first (mirror of the contract). */
+export interface HeroPanel {
+    kind: HeroPanelKind;
+    /** Same-day call's line; absent, the contract's default words. */
+    words?: string;
+    /** Same-day call's number; absent, the business's own. */
+    phone?: string;
+    /** Pickup's "Order by 9 pm" and where. */
+    orderBy?: string;
+    where?: string;
 }
 
 export interface RichTextContent {
@@ -112,6 +134,8 @@ export interface RichTextContent {
     callout?: { label?: string; text: string };
     /** The text's h3s as small capitals part labels. */
     partLabels?: boolean;
+    /** A shorter body for a phone (KD9); absent, `value`. */
+    phoneBody?: string;
 }
 
 export type CtaContent = CtaValue;
@@ -119,7 +143,16 @@ export type CtaContent = CtaValue;
 export type GalleryLayout = "grid" | "carousel" | "masonry";
 
 /** A gallery photo, with an optional line under it (gallery@2, U2). */
-export type GalleryImage = ImageValue & { caption?: string };
+export type GalleryImage = ImageValue & {
+    caption?: string;
+    /** The lookbook look's words and link per photo (DEC-228). */
+    name?: string;
+    fromPrice?: string;
+    link?:
+        | { kind: "service"; serviceId: string }
+        | { kind: "product"; productId: string }
+        | { kind: "page"; pageId: string };
+};
 
 export interface GalleryContent {
     images: GalleryImage[];
@@ -229,6 +262,8 @@ export interface ServicesListContent {
     followUpLine?: string;
     includesLabel?: string;
     includes?: string[];
+    /** The menu look's headings, each over its services (DEC-227). */
+    groups?: { name: string; serviceIds: string[] }[];
 }
 
 /** "Show as" (G16): side by side, or one per row. */
@@ -244,6 +279,8 @@ export interface VisitUsContent {
     storeId?: string;
     showMap?: boolean;
     showHours?: boolean;
+    /** A line of the owner's own under the address. */
+    extraLine?: string;
 }
 
 /**
@@ -286,6 +323,10 @@ export interface PlansContent {
     /** Display options (G16). Absent: cards, with prices. */
     layout?: ListLayout;
     showPrices?: boolean;
+    /** Plans, class packs or both; absent, plans. */
+    show?: "plans" | "packs" | "both";
+    /** The compare look's rows: per plan or pack id, the cell's words. */
+    includes?: { label: string; cells?: { id: string; words?: string }[] }[];
 }
 
 /**
@@ -321,6 +362,10 @@ export interface ProductGridContent {
     columns?: 3 | 4 | 5;
     /** Across on a phone, the owner's choice; absent, the look's own. */
     phoneColumns?: 1 | 2;
+    /** A − / + stepper on each card (DEC-227). */
+    addInPlace?: boolean;
+    /** The owner's Pre-order tag words. */
+    preorderWords?: string;
 }
 
 /**
@@ -349,6 +394,8 @@ export interface TimetableContent {
     weekdaysOnly?: boolean;
     /** "13 sessions across 5 days" under the title. */
     showCounts?: boolean;
+    /** Places left from this many down (KD8); absent, "Automatic". */
+    placesFrom?: number;
 }
 
 /**
@@ -441,6 +488,8 @@ export interface BookingContent {
      */
     submitLabel?: string;
     successMessage?: string;
+    /** The owner's "Before you book" note. */
+    beforeYouBook?: string;
 }
 
 /** Content shape keyed by section type. */

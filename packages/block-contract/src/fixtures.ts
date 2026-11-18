@@ -114,6 +114,12 @@ const heroVariants = [
         description:
             "Just the page's heading and a line under it, small, for pages that go straight to a list.",
     },
+    {
+        id: "answer",
+        label: "Answer panel",
+        description:
+            "The heading beside a panel that answers first: today's classes with places, the next free time, a same-day call, one consultation's price or when to pick up.",
+    },
 ] as const;
 
 /** The single look a block has, when it honestly has one. */
@@ -244,6 +250,20 @@ export const BLOCK_META = {
                 subheading:
                     "Notes on building small things, about once a month.",
             },
+            answer: {
+                variant: "answer",
+                heading: "Strength classes, small groups",
+                subheading:
+                    "Twelve to a class, coached from the first rep to the last.",
+                cta: {
+                    label: "See the timetable",
+                    href: "/timetable",
+                    style: "primary",
+                    action: { kind: "page" },
+                },
+                panel: { kind: "today" },
+                answerRow: true,
+            },
         },
         cases: {
             // A slot shipped as a brief (KTD-5): no photo yet, so the live
@@ -253,6 +273,31 @@ export const BLOCK_META = {
                 heading: "Bread, the slow way",
                 imageBrief:
                     "Morning light on the counter, loaves stacked, steam rising",
+            },
+            // Same-day call with the owner's number and the default words.
+            sameDayCall: {
+                variant: "answer",
+                heading: "Dental care in Aundh",
+                cta: {
+                    label: "Book a check-up",
+                    href: "/book",
+                    style: "primary",
+                    action: { kind: "page" },
+                    phoneLabel: "Book",
+                },
+                panel: { kind: "sameDayCall", phone: "+91 00000 01001" },
+                byline: { name: "Dr Meera Rao", role: "Dentist" },
+                phoneLine: "Check-ups and same-day care.",
+            },
+            // Pickup: the owner's order-by line and where.
+            pickup: {
+                variant: "answer",
+                heading: "Cakes to order",
+                panel: {
+                    kind: "pickup",
+                    orderBy: "Order by 9 pm for tomorrow",
+                    where: "From the counter, MG Road",
+                },
             },
         },
     },
@@ -367,11 +412,36 @@ export const BLOCK_META = {
                 description:
                     "Columns that keep each image's own proportions rather than cropping to a grid.",
             },
+            {
+                id: "lookbook",
+                label: "Lookbook",
+                description:
+                    "Large photos, each with a name, a from-price and a link to the service, product or page it shows.",
+            },
         ] as const,
         fixtures: {
             grid: { variant: "grid", images: [...GALLERY_IMAGES] },
             carousel: { variant: "carousel", images: [...GALLERY_IMAGES] },
             masonry: { variant: "masonry", images: [...GALLERY_IMAGES] },
+            lookbook: {
+                variant: "lookbook",
+                images: [
+                    {
+                        ...GALLERY_IMAGES[0],
+                        name: "Sourdough, whole",
+                        fromPrice: "From ₹180",
+                        link: {
+                            kind: "product",
+                            productId: "sample-sourdough",
+                        },
+                    },
+                    {
+                        ...GALLERY_IMAGES[1],
+                        name: "Bread class, Saturday",
+                        link: { kind: "service", serviceId: "fixture-class" },
+                    },
+                ],
+            },
         },
         cases: {
             // A line under each photo (U2), as the studio design writes them.
@@ -460,6 +530,12 @@ export const BLOCK_META = {
                 description:
                     "Short facts side by side: each point's figure set large, its title as the label under it. For a few numbers worth knowing first.",
             },
+            {
+                id: "band",
+                label: "Band",
+                description:
+                    "The facts row on a full-width band of colour, for a promise worth stopping on: delivery, pickup, how it works.",
+            },
         ] as const,
         fixtures: {
             grid: {
@@ -518,6 +594,14 @@ export const BLOCK_META = {
                     },
                 ],
             },
+            band: {
+                variant: "band",
+                items: [
+                    { title: "Order by", value: "9 pm" },
+                    { title: "Ready from", value: "7 am" },
+                    { title: "Delivered within", value: "5 km" },
+                ],
+            },
             facts: {
                 variant: "facts",
                 items: [
@@ -556,8 +640,23 @@ export const BLOCK_META = {
         label: "Booking",
         description:
             "A widget a visitor reserves a slot through, against one bookable Service.",
-        variants: soleVariant("A date and slot picker with a confirm button."),
+        variants: [
+            ...soleVariant("A date and slot picker with a confirm button."),
+            {
+                id: "nextOpen",
+                label: "Next open",
+                description:
+                    "The next three open days with their times, and a month strip for the rest. Opens the booking page.",
+            },
+        ] as const,
         fixtures: {
+            nextOpen: {
+                variant: "nextOpen",
+                serviceId: "fixture-service",
+                title: "Book a consultation",
+                beforeYouBook:
+                    "Bring any recent reports. The first visit takes about 45 minutes.",
+            },
             default: {
                 variant: "default",
                 // A booking block with no `serviceId` renders NOTHING at all
@@ -683,8 +782,42 @@ export const BLOCK_META = {
                 description:
                     "One appointment as a card — its price set large, how long it takes and a button — beside what it includes. For a practice with a single consultation.",
             },
+            {
+                id: "cards",
+                label: "Cards",
+                description:
+                    "Services side by side as cards, each with its price, how long it takes and Book.",
+            },
+            {
+                id: "menu",
+                label: "Menu",
+                description:
+                    "Services under headings you name, like a salon's price list: Hair, Colour, Nails. Anything not in a heading goes under More.",
+            },
         ] as const,
         fixtures: {
+            cards: {
+                variant: "cards",
+                heading: "Services",
+                serviceIds: [
+                    "fixture-cut",
+                    "fixture-colour",
+                    "fixture-consult",
+                ],
+            },
+            menu: {
+                variant: "menu",
+                heading: "Price list",
+                serviceIds: [
+                    "fixture-cut",
+                    "fixture-colour",
+                    "fixture-consult",
+                ],
+                groups: [
+                    { name: "Hair", serviceIds: ["fixture-cut"] },
+                    { name: "Colour", serviceIds: ["fixture-colour"] },
+                ],
+            },
             priceCard: {
                 variant: "priceCard",
                 heading: "One consultation",
@@ -730,10 +863,24 @@ export const BLOCK_META = {
         aliases: ["Address", "Location", "Directions"],
         description:
             "One shop's address, opening hours and phone, with Open now and Get directions, read live from the storefront.",
-        variants: soleVariant(
-            "A card with the address and the week's hours, a call button and a directions link.",
-        ),
+        variants: [
+            ...soleVariant(
+                "A card with the address and the week's hours, a call button and a directions link.",
+            ),
+            {
+                id: "map",
+                label: "With map",
+                description:
+                    "A wide band: the shop's photo or map beside the address, today's hours and Directions.",
+            },
+        ] as const,
         fixtures: {
+            map: {
+                variant: "map",
+                title: "Find us",
+                storeId: "fixture-shop",
+                extraLine: "Parking at the back",
+            },
             default: {
                 variant: "default",
                 title: "Come and see us",
@@ -805,12 +952,38 @@ export const BLOCK_META = {
         family: { of: "plans", layout: "plans", label: "Plans" },
         description:
             "The business's subscription plans on sale, with price and how often, read live from Payments.",
-        variants: soleVariant(
-            "Cards with how often, the plan's name, its description and price, and a button; the first can be highlighted.",
-        ),
+        variants: [
+            ...soleVariant(
+                "Cards with how often, the plan's name, its description and price, and a button; the first can be highlighted.",
+            ),
+            {
+                id: "compare",
+                label: "Compare",
+                description:
+                    "A table of what each plan includes, row by row, every cell in words, with the buttons under it.",
+            },
+        ] as const,
         fixtures: {
             // The catalog and the snapshot hand the component sample plans.
             default: { variant: "default", title: "Memberships" },
+            compare: {
+                variant: "compare",
+                title: "Which one fits",
+                show: "both",
+                includes: [
+                    {
+                        label: "Evening classes",
+                        cells: [{ id: "sample-full", words: "Every one" }],
+                    },
+                    {
+                        label: "Open gym",
+                        cells: [
+                            { id: "sample-off-peak", words: "When staffed" },
+                            { id: "sample-full", words: "When staffed" },
+                        ],
+                    },
+                ],
+            },
         },
         cases: {
             // No highlight, no descriptions, the merchant's own button.
@@ -876,6 +1049,14 @@ export const BLOCK_META = {
                 cardStyle: "bare",
                 showAvailability: true,
                 note: "Baked this morning. What is gone usually goes before ten.",
+            },
+            // Add in place, a Pre-order tag and the cut-off line (DEC-227).
+            preorder: {
+                variant: "default",
+                title: "Cakes for the weekend",
+                addInPlace: true,
+                preorderWords: "Pre-order for Saturday",
+                cutOff: "Order by 9 pm Thursday",
             },
         },
     },
@@ -1056,6 +1237,12 @@ export const BLOCK_META = {
                     "Each day in turn, its classes one per row. Better for a short week.",
             },
             {
+                id: "today",
+                label: "Today",
+                description:
+                    "Today's classes in order, with the places left and a link to the whole week. The page carries the week; the browser marks today.",
+            },
+            {
                 id: "accent",
                 label: "Bold week",
                 description:
@@ -1066,6 +1253,7 @@ export const BLOCK_META = {
             // The catalog and the snapshot hand the component a sample week.
             grid: { variant: "grid", title: "This week" },
             list: { variant: "list", title: "This week" },
+            today: { variant: "today", title: "Today", placesFrom: 3 },
             accent: {
                 variant: "accent",
                 title: "This week",

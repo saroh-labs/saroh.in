@@ -7,6 +7,7 @@ import {
     parseSectionContent,
     parseSectionContentOrThrow,
     requiresSanitization,
+    SAME_DAY_CALL_WORDS,
     SECTION_TYPES,
 } from "./section-contract";
 
@@ -192,9 +193,10 @@ describe("richText v1", () => {
             expect(result.success).toBe(false);
         });
 
-        it("does not sanitize the photo — only `value` is HTML", () => {
+        it("does not sanitize the photo — only `value` and its phone version are HTML", () => {
             expect(getSectionContract("richText", 1)?.sanitizedFields).toEqual([
                 "value",
+                "phoneBody",
             ]);
         });
     });
@@ -203,6 +205,7 @@ describe("richText v1", () => {
         expect(requiresSanitization("richText", 1)).toBe(true);
         expect(getSectionContract("richText", 1)?.sanitizedFields).toEqual([
             "value",
+            "phoneBody",
         ]);
     });
 
@@ -690,5 +693,121 @@ describe("list sections' display options (G16)", () => {
                 }).success,
             ).toBe(false);
         }
+    });
+});
+
+describe("phase 2 block fields (U15)", () => {
+    const ok = (type: string, version: number, content: unknown) =>
+        parseSectionContent(type, version, content).success;
+
+    it("takes a hero's answer panel, row, byline and phone line", () => {
+        const parsed = parseSectionContent("hero", 2, {
+            variant: "answer",
+            heading: "Dental care",
+            panel: { kind: "sameDayCall", phone: "+91 00000 01001" },
+            answerRow: true,
+            byline: { name: "Dr Meera Rao", role: "Dentist" },
+            phoneLine: "Same-day care.",
+            cta: {
+                label: "Book a check-up",
+                phoneLabel: "Book",
+                action: { kind: "url", href: "/book" },
+            },
+        });
+        expect(parsed.success && parsed.data).toMatchObject({
+            panel: { kind: "sameDayCall" },
+            cta: { phoneLabel: "Book" },
+        });
+    });
+
+    it("refuses a panel kind it does not know", () => {
+        expect(
+            ok("hero", 2, { heading: "x", panel: { kind: "emergency" } }),
+        ).toBe(false);
+    });
+
+    it("has no phone version of the heading: one h1 on every width", () => {
+        const parsed = parseSectionContent("hero", 2, {
+            heading: "x",
+            phoneHeading: "y",
+        });
+        expect(parsed.success && parsed.data).not.toHaveProperty(
+            "phoneHeading",
+        );
+    });
+
+    it("never says emergency in the Same-day call default", () => {
+        expect(SAME_DAY_CALL_WORDS).toBe("Same-day? Call the desk");
+        expect(SAME_DAY_CALL_WORDS.toLowerCase()).not.toContain("emergency");
+    });
+
+    it("takes places-left from 1 to 10, and absent", () => {
+        expect(ok("timetable", 1, {})).toBe(true);
+        expect(ok("timetable", 1, { placesFrom: 1 })).toBe(true);
+        expect(ok("timetable", 1, { placesFrom: 10 })).toBe(true);
+        expect(ok("timetable", 1, { placesFrom: 0 })).toBe(false);
+        expect(ok("timetable", 1, { placesFrom: 11 })).toBe(false);
+        expect(ok("timetable", 1, { placesFrom: 2.5 })).toBe(false);
+    });
+
+    it("keeps each block's other new fields through a save", () => {
+        const cases: [string, number, Record<string, unknown>][] = [
+            ["richText", 1, { value: "<p>a</p>", phoneBody: "<p>b</p>" }],
+            [
+                "servicesList",
+                1,
+                {
+                    serviceIds: ["a", "b"],
+                    groups: [{ name: "Hair", serviceIds: ["a"] }],
+                },
+            ],
+            [
+                "plans",
+                1,
+                {
+                    show: "both",
+                    includes: [
+                        {
+                            label: "Open gym",
+                            cells: [{ id: "p1", words: "Yes" }],
+                        },
+                    ],
+                },
+            ],
+            [
+                "gallery",
+                2,
+                {
+                    images: [
+                        {
+                            src: "/a.jpg",
+                            name: "Cut and finish",
+                            fromPrice: "From ₹800",
+                            link: { kind: "page", pageId: "page_1" },
+                        },
+                    ],
+                },
+            ],
+            [
+                "productGrid",
+                1,
+                { addInPlace: true, preorderWords: "Pre-order for Saturday" },
+            ],
+            ["booking", 1, { beforeYouBook: "Come ten minutes early." }],
+            ["visitUs", 1, { extraLine: "Parking at the back" }],
+            ["cta", 1, { label: "Go", href: "/", phoneLabel: "Go" }],
+        ];
+        for (const [type, version, content] of cases) {
+            const parsed = parseSectionContent(type, version, content);
+            expect(parsed.success && parsed.data).toMatchObject(content);
+        }
+    });
+
+    it("refuses a lookbook link of a kind it does not know", () => {
+        expect(
+            ok("gallery", 2, {
+                images: [{ src: "/a.jpg", link: { kind: "url", href: "/" } }],
+            }),
+        ).toBe(false);
     });
 });

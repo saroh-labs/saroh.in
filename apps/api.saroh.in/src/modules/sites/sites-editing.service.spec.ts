@@ -490,6 +490,65 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
     });
 });
 
+describe("SitesService.replaceDraftSections takes the phase 2 block fields (U15)", () => {
+    beforeEach(() => {
+        siteFindFirst.mockResolvedValue({ id: "site_1" });
+        pageFindFirst.mockResolvedValue({ id: "page_1" });
+        versionFindFirst.mockResolvedValue({ id: "ver_1" });
+        sectionFindMany.mockResolvedValue([]);
+        sectionDeleteMany.mockResolvedValue({ count: 0 });
+        sectionCreateMany.mockResolvedValue({ count: 0 });
+    });
+
+    const save = (type: string, contractVersion: number, content: object) =>
+        service.replaceDraftSections(ctx(), "site_1", "page_1", {
+            sections: [{ type, contractVersion, content }],
+        });
+
+    it("keeps the new fields and layouts through a save", async () => {
+        await save("hero", 2, {
+            variant: "answer",
+            heading: "Dental care",
+            panel: { kind: "pickup", orderBy: "Order by 9 pm" },
+            answerRow: true,
+            phoneLine: "Same-day care.",
+        });
+        await save("timetable", 1, { variant: "today", placesFrom: 3 });
+        await save("visitUs", 1, { variant: "map", extraLine: "Parking" });
+        const saved = sectionCreateMany.mock.calls.map(
+            (call) => call[0].data[0].content,
+        );
+        expect(saved).toMatchObject([
+            { panel: { kind: "pickup" }, answerRow: true },
+            { variant: "today", placesFrom: 3 },
+            { variant: "map", extraLine: "Parking" },
+        ]);
+    });
+
+    it("refuses places-left from 11 and a panel kind it does not know", async () => {
+        await expect(
+            save("timetable", 1, { placesFrom: 11 }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        await expect(
+            save("hero", 2, { heading: "x", panel: { kind: "emergency" } }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(sectionCreateMany).not.toHaveBeenCalled();
+    });
+
+    it("cleans a text block's phone version as it cleans the text", async () => {
+        await save("richText", 1, {
+            format: "html",
+            value: "<p>ok</p>",
+            phoneBody: "<p>short</p><script>alert(1)</script>",
+        });
+        const created = sectionCreateMany.mock.calls[0][0].data as Array<{
+            content: { phoneBody: string };
+        }>;
+        expect(created[0].content.phoneBody).toContain("short");
+        expect(created[0].content.phoneBody).not.toMatch(/script|alert/);
+    });
+});
+
 describe("SitesService.updateFooter (#280)", () => {
     beforeEach(() => {
         siteFindFirst.mockResolvedValue({

@@ -71,6 +71,21 @@ export const BLOCK_EXAMPLES: Partial<
             // The merchant's own photo goes here; there is no example one.
             awaits: "image",
         },
+        // Today's panel reads the booking page live: nothing invented.
+        answer: {
+            contractVersion: 2,
+            content: {
+                variant: "answer",
+                heading: BLOCK_META.hero.fixtures.answer.heading,
+                subheading: BLOCK_META.hero.fixtures.answer.subheading,
+                cta: {
+                    label: BLOCK_META.hero.fixtures.answer.cta.label,
+                    action: { kind: "url", href: "/" },
+                    style: "primary",
+                },
+                panel: { kind: "today" },
+            },
+        },
     },
     richText: {
         default: {
@@ -109,6 +124,13 @@ export const BLOCK_EXAMPLES: Partial<
                 heading: features.list.heading,
                 intro: features.list.intro,
                 items: features.list.items.map((i) => ({ ...i })),
+            },
+        },
+        band: {
+            contractVersion: 1,
+            content: {
+                variant: "band",
+                items: features.band.items.map((i) => ({ ...i })),
             },
         },
     },
