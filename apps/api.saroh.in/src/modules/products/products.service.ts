@@ -718,16 +718,18 @@ export class ProductsService {
             dto.categoryId ?? undefined,
         );
         // Bringing an archived product back adds one to the plan's cap (U13).
-        if (
+        const restoring =
             current.status === "ARCHIVED" &&
-            dto.status &&
-            dto.status !== "ARCHIVED"
-        )
-            await planMeter.assertRoom(organizationId, "products");
+            !!dto.status &&
+            dto.status !== "ARCHIVED";
 
         try {
             // The save and its price history entry stand or fall together.
             await prisma.$transaction(async (tx) => {
+                // On the save's own transaction, under the meter's lock, so
+                // restores at once can't all pass one free place (04-F6).
+                if (restoring)
+                    await planMeter.roomInTx(tx, organizationId, "products");
                 await tx.product.update({
                     where: { id: productId },
                     data: {
@@ -828,6 +830,7 @@ export class ProductsService {
                 ? dto[key] != null
                 : dto[key] !== undefined;
         const data: Record<string, unknown> = {};
+        let restoring = false;
 
         if (has("name")) data.name = dto.name;
         if (has("slug")) {
@@ -882,9 +885,10 @@ export class ProductsService {
         if (has("gstPriceMode")) data.gstPriceMode = dto.gstPriceMode ?? null;
         if (has("mrp")) data.mrp = dto.mrp ?? null;
         if (has("status")) {
-            // Bringing an archived product back adds one to the plan's cap.
-            if (current.status === "ARCHIVED" && dto.status !== "ARCHIVED")
-                await planMeter.assertRoom(organizationId, "products");
+            // Bringing an archived product back adds one to the plan's cap:
+            // checked on the save's transaction below (04-F6).
+            restoring =
+                current.status === "ARCHIVED" && dto.status !== "ARCHIVED";
             data.status = dto.status;
             // When it went, for the archived banner; cleared when it leaves.
             if (dto.status === "ARCHIVED" && current.status !== "ARCHIVED")
@@ -993,6 +997,12 @@ export class ProductsService {
                 // together; a save that moved nothing about the cost
                 // records nothing.
                 await prisma.$transaction(async (tx) => {
+                    if (restoring)
+                        await planMeter.roomInTx(
+                            tx,
+                            organizationId,
+                            "products",
+                        );
                     await tx.product.update({
                         where: { id: productId },
                         data,

@@ -242,6 +242,41 @@ describe("products (DB, U13)", () => {
         ).resolves.toBeDefined();
     });
 
+    it("lets only the free places through when archived products come back at once (04-F6)", async () => {
+        const b = await business("free");
+        const scope = await scopeOf(b);
+        await products.createIn(scope, { name: "Live", price: "10" });
+        const archived = [];
+        for (let i = 0; i < 5; i++) {
+            archived.push(
+                await products.createIn(scope, {
+                    name: `Old ${i}`,
+                    price: "10",
+                    status: "ARCHIVED",
+                }),
+            );
+        }
+        // Cap 3, one live: two places. Both the patch and the full save race.
+        const results = await Promise.allSettled(
+            archived.map((p, i) =>
+                i % 2 === 0
+                    ? products.patchIn(scope, p.id, { status: "ACTIVE" })
+                    : products.updateIn(scope, p.id, {
+                          name: p.name,
+                          slug: p.slug,
+                          price: "10",
+                          status: "ACTIVE",
+                      }),
+            ),
+        );
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(2);
+        expect(
+            await prisma.product.count({
+                where: { organizationId: b.orgId, status: { not: "ARCHIVED" } },
+            }),
+        ).toBe(3);
+    });
+
     it("an import row that brings a product back from the archive counts as one more", async () => {
         const b = await business("free");
         const scope = await scopeOf(b);
