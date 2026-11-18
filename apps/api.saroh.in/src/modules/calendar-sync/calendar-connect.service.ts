@@ -13,6 +13,7 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { appBase } from "../../common/app-url";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { planMeter } from "../billing/metering.service";
+import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { authorize } from "../organizations/organization-policy";
 import { apiBase } from "../payments/webhook-setup";
@@ -43,8 +44,6 @@ import { openToken, sealedToken, sealToken, tokenColumns } from "./sealing";
 export const CALLBACK_PATH = "/integrations/google-calendar/callback";
 /** Where the API then sends them, in the app: their calendar settings (the next round's screen). */
 export const RETURN_PATH = "/settings/google-calendar";
-/** Busy times older than this are ignored, and the connection reads behind. */
-export const BUSY_FRESH_MS = 2 * 60 * 60_000;
 
 /**
  * How many of their Google calendars one person may choose (KTD5): one
@@ -565,7 +564,7 @@ export class CalendarConnectService {
 }
 
 const isStale = (at: Date | null, now: Date = new Date()) =>
-    !at || now.getTime() - at.getTime() > BUSY_FRESH_MS;
+    !at || now.getTime() - at.getTime() > GOOGLE_BUSY_FRESH_MS;
 
 /** A failure in words for a log line: a kind and status, never a token. */
 function reasonOf(error: unknown): string {

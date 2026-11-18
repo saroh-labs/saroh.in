@@ -70,6 +70,7 @@ jest.mock("@saroh/database", () => {
         staffHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffExtraHours: { findMany: jest.fn().mockResolvedValue([]) },
         staffTimeOff: { findMany: jest.fn().mockResolvedValue([]) },
+        googleCalendarBusy: { findMany: jest.fn().mockResolvedValue([]) },
         businessClosure: { findMany: jest.fn().mockResolvedValue([]) },
         // No hours saved: opening hours cut nothing (DEC-087, DEC-096).
         store: {

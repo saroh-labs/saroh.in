@@ -6,6 +6,10 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
 import {
+    CALENDAR_BUSY_TYPE,
+    CalendarBusyHandler,
+} from "./calendar-busy.handler";
+import {
     CalendarCallbackController,
     CalendarConnectController,
 } from "./calendar-connect.controller";
@@ -31,16 +35,20 @@ import { googleCalendarProvider } from "./google/google-calendar.provider";
         CalendarConnectService,
         CalendarLapseService,
         CalendarSyncHandler,
+        CalendarBusyHandler,
     ],
 })
 export class CalendarSyncModule implements OnModuleInit {
     constructor(
         private readonly registry: JobHandlerRegistry,
         private readonly sync: CalendarSyncHandler,
+        private readonly busy: CalendarBusyHandler,
     ) {}
 
     onModuleInit(): void {
         // A booking's event in Google, made, moved or deleted (U5).
         this.registry.register(CALENDAR_SYNC_TYPE, this.sync.handle);
+        // A person's busy times read from Google, every 10 minutes (U6).
+        this.registry.register(CALENDAR_BUSY_TYPE, this.busy.handle);
     }
 }
