@@ -2,11 +2,13 @@
 import type {
     ChannelKind,
     ConnectedAccount,
+    ContainerKind,
     ContainerStatus,
     ExpiringKind,
     FacebookPages,
     ImagePost,
     MetaErrorKind,
+    PageKind,
     PlatformPost,
     SocialMetaPort,
 } from "./social-meta.port";
@@ -25,9 +27,9 @@ interface FakePost extends PlatformPost {
  *
  * - Consent comes straight back: the authorize address is the callback
  *   with `code=fake-<kind>`, so a browser lands where Meta would send it.
- *   `fake-personal` connects a personal Instagram account.
  * - Facebook signs in with `pages` Pages (one by default; set more to see
- *   the picker).
+ *   the picker, 0 for none); Instagram with as many linked Instagram
+ *   accounts, each with its Page's token.
  * - Posts are kept per account, and a container finishes at once unless
  *   `stuck` is set.
  * - `failNext(method, kind)` makes the next call of that method fail that
@@ -83,35 +85,35 @@ export class FakeSocialMeta implements SocialMetaPort {
         return url.toString();
     }
 
-    async connect(kind: ExpiringKind, code: string): Promise<ConnectedAccount> {
+    async connect(kind: ExpiringKind): Promise<ConnectedAccount> {
         this.take("connect", kind);
-        const personal = code === "fake-personal";
-        const name =
-            kind === "INSTAGRAM" ? "chaiandcrumb" : "chaiandcrumb.threads";
         return {
-            accountId: `${kind.toLowerCase()}-account-1`,
-            platformUserId: `${kind.toLowerCase()}-user-1`,
-            handle: `@${name}`,
+            accountId: "threads-account-1",
+            platformUserId: "threads-user-1",
+            handle: "@chaiandcrumb.threads",
             avatarUrl: null,
-            token: `fake-token-${kind.toLowerCase()}-${++this.n}`,
+            token: `fake-token-threads-${++this.n}`,
             tokenExpiresAt: new Date(Date.now() + 60 * 86_400_000),
-            ...(kind === "INSTAGRAM"
-                ? { accountType: personal ? "PERSONAL" : "BUSINESS" }
-                : {}),
         };
     }
 
-    async facebookPages(): Promise<FacebookPages> {
-        this.take("facebookPages", "FACEBOOK");
+    async pageAccounts(kind: PageKind): Promise<FacebookPages> {
+        this.take("pageAccounts", kind);
+        const ig = kind === "INSTAGRAM";
         return {
             platformUserId: "facebook-user-1",
             pages: Array.from({ length: this.pages }, (_, i) => ({
-                accountId: `page-${i + 1}`,
+                accountId: ig ? `instagram-account-${i + 1}` : `page-${i + 1}`,
                 platformUserId: "facebook-user-1",
-                handle: i === 0 ? "Chai & Crumb" : `Chai & Crumb ${i + 1}`,
+                handle: ig
+                    ? `@chaiandcrumb${i === 0 ? "" : i + 1}`
+                    : i === 0
+                      ? "Chai & Crumb"
+                      : `Chai & Crumb ${i + 1}`,
                 avatarUrl: null,
                 token: `fake-page-token-${i + 1}`,
                 tokenExpiresAt: null,
+                ...(ig ? { pageId: `page-${i + 1}` } : {}),
             })),
         };
     }
@@ -127,14 +129,14 @@ export class FakeSocialMeta implements SocialMetaPort {
     }
 
     async publishLimit(
-        kind: ExpiringKind,
+        kind: ContainerKind,
     ): Promise<{ used: number; total: number } | null> {
         this.take("publishLimit", kind);
         return this.limit;
     }
 
     async createContainer(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         _token: string,
         post: ImagePost,
@@ -150,7 +152,7 @@ export class FakeSocialMeta implements SocialMetaPort {
     }
 
     async containerStatus(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         containerId: string,
     ): Promise<ContainerStatus> {
         this.take("containerStatus", kind);
@@ -158,7 +160,7 @@ export class FakeSocialMeta implements SocialMetaPort {
     }
 
     async publishContainer(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         _token: string,
         containerId: string,

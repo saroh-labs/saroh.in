@@ -44,12 +44,19 @@ export const CHOICE_TTL_MS = 10 * 60_000;
 export const callbackPath = (kind: ChannelKind) =>
     `/integrations/${kindPath(kind)}/callback`;
 
+/** The kinds whose sign-in can offer several Pages (or Instagram accounts): a choice to pick from. */
+export const PICKER_KINDS: readonly ChannelKind[] = ["INSTAGRAM", "FACEBOOK"];
+const pickerName = (kind: ChannelKind) =>
+    kind === "INSTAGRAM" ? "Instagram" : "Facebook";
+
 /**
  * How a callback ended, in the app's address (`result`):
- * - `connected`; `choose` (Facebook: pick a Page, `choice` names it);
+ * - `connected`; `choose` (pick a Page or an Instagram account, `choice`
+ *   names it);
  * - `denied` (they said no at Meta); `invalid` or `expired` (the state);
  * - `someone-else` (signed in as another person than who started);
- * - `personal` (an Instagram account that isn't Business or Creator);
+ * - `no-instagram` (a Facebook sign-in none of whose Pages has an
+ *   Instagram professional account linked);
  * - `no-pages` (a Facebook sign-in that manages no Page);
  * - `refused` (no permission, not rolled out, or the plan leaves it off);
  * - `unavailable` (Meta's keys aren't set here); `failed` (anything else).
@@ -60,13 +67,11 @@ export type CallbackOutcome =
     | "denied"
     | StateRefusal
     | "someone-else"
-    | "personal"
+    | "no-instagram"
     | "no-pages"
     | "refused"
     | "unavailable"
     | "failed";
-
-const PUBLISHING_TYPES = new Set(["BUSINESS", "MEDIA_CREATOR"]);
 
 /**
  * Social › Channels (U4, KTD3): one Instagram professional account, one
@@ -185,21 +190,20 @@ export class SocialChannelsService {
         await this.access.assertOn(ctx, "social:post", now);
         const meta = this.metaFor(kind);
         const redirectUri = this.redirectUri(ctx.edition ?? null, kind);
-        if (kind !== "FACEBOOK") {
+        if (kind === "THREADS") {
             const account = await meta.connect(kind, code, redirectUri);
-            if (
-                kind === "INSTAGRAM" &&
-                !PUBLISHING_TYPES.has(account.accountType ?? "")
-            ) {
-                return { outcome: "personal" };
-            }
             await this.keep(ctx, kind, account, now);
             return { outcome: "connected" };
         }
-        const { platformUserId, pages } = await meta.facebookPages(
+        // Facebook Login: the Pages, or the Instagram accounts linked to them.
+        const { platformUserId, pages } = await meta.pageAccounts(
+            kind,
             code,
             redirectUri,
         );
+        if (kind === "INSTAGRAM" && pages.length === 0) {
+            return { outcome: "no-instagram" };
+        }
         if (pages.length === 0) return { outcome: "no-pages" };
         if (pages.length === 1) {
             await this.keep(ctx, kind, pages[0], now);
@@ -226,13 +230,14 @@ export class SocialChannelsService {
         return { outcome: "choose", choiceId };
     }
 
-    /** The Pages a Facebook sign-in manages, to pick one: names only. */
+    /** The Pages (or linked Instagram accounts) a sign-in offers, to pick one: names only. */
     async choices(
         ctx: OrganizationContext,
+        kind: ChannelKind,
         choiceId: string,
     ): Promise<PageChoiceView[]> {
         await this.access.assertOn(ctx, "social:post");
-        return (await this.openChoice(ctx, choiceId)).map((p) => ({
+        return (await this.openChoice(ctx, kind, choiceId)).map((p) => ({
             id: p.accountId,
             name: p.handle,
             avatarUrl: p.avatarUrl,
@@ -242,19 +247,20 @@ export class SocialChannelsService {
     /** Connect the Page picked; the choice is gone after. */
     async choose(
         ctx: OrganizationContext,
+        kind: ChannelKind,
         choiceId: string,
         pageId: string,
     ): Promise<ChannelView[]> {
         await this.access.assertOn(ctx, "social:post");
-        const page = (await this.openChoice(ctx, choiceId)).find(
+        const page = (await this.openChoice(ctx, kind, choiceId)).find(
             (p) => p.accountId === pageId,
         );
         if (!page) {
             throw new NotFoundException(
-                "That Page isn't one you manage. Connect Facebook again.",
+                `That ${kind === "INSTAGRAM" ? "account" : "Page"} isn't one you manage. Connect ${pickerName(kind)} again.`,
             );
         }
-        await this.keep(ctx, "FACEBOOK", page, new Date());
+        await this.keep(ctx, kind, page, new Date());
         await prisma.socialConnectChoice.deleteMany({
             where: { id: choiceId, organizationId: ctx.organizationId },
         });
@@ -358,6 +364,7 @@ export class SocialChannelsService {
                 platformUserId: account.platformUserId,
                 handle: account.handle,
                 avatarUrl: account.avatarUrl,
+                pageId: account.pageId ?? null,
                 status: "CONNECTED" as const,
                 attentionReason: null,
                 attentionAt: null,
@@ -388,12 +395,16 @@ export class SocialChannelsService {
             if (before && before.accountId !== account.accountId) {
                 await failWaitingInTx(tx, row.id, "reconnected");
             }
-            if (kind !== "FACEBOOK") await queueRefreshInTx(tx, row, now);
+            // Facebook and Instagram post with a Page token, which doesn't expire.
+            if (kind !== "FACEBOOK" && kind !== "INSTAGRAM") {
+                await queueRefreshInTx(tx, row, now);
+            }
         });
     }
 
     private async openChoice(
         ctx: OrganizationContext,
+        kind: ChannelKind,
         choiceId: string,
     ): Promise<ConnectedAccount[]> {
         const row = await prisma.socialConnectChoice.findFirst({
@@ -401,12 +412,13 @@ export class SocialChannelsService {
                 id: choiceId,
                 organizationId: ctx.organizationId,
                 userId: ctx.userId,
+                kind,
                 expiresAt: { gt: new Date() },
             },
         });
         if (!row) {
             throw new NotFoundException(
-                "That choice has run out. Connect Facebook again.",
+                `That choice has run out. Connect ${pickerName(kind)} again.`,
             );
         }
         return JSON.parse(

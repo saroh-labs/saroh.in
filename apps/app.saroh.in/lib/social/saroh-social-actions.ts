@@ -25,12 +25,16 @@ export async function connectChannel(kind: ChannelKind) {
     return startConnect(kind);
 }
 
-export async function pickPage(choiceId: string, pageId: string) {
-    return choosePage(choiceId, pageId);
+export async function pickPage(
+    kind: ChannelKind,
+    choiceId: string,
+    pageId: string,
+) {
+    return choosePage(kind, choiceId, pageId);
 }
 
-export async function pageChoices(choiceId: string) {
-    return readPageChoices(choiceId);
+export async function pageChoices(kind: ChannelKind, choiceId: string) {
+    return readPageChoices(kind, choiceId);
 }
 
 export async function postHeld(kind: ChannelKind) {

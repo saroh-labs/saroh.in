@@ -24,6 +24,7 @@ import {
     readSocialAccess,
 } from "@/lib/social/saroh-social";
 import type { SocialParams } from "@/lib/social/saroh-social-types";
+import { PICKER_KINDS } from "@/lib/social/saroh-social-types";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
 import { POST_WORDS } from "@/lib/social/words";
 
@@ -67,12 +68,15 @@ export default async function SocialPage({
     const social = await readSocialAccess();
 
     if (social?.state === "on") {
+        const picking = PICKER_KINDS.find(
+            (k) => k.toLowerCase() === params.channel,
+        );
         const [channels, posts, opened, pages] = await Promise.all([
             listChannels(),
             listSocialPosts(),
             params.post ? getSocialPost(params.post) : null,
-            params.result === "choose" && params.choice
-                ? readPageChoices(params.choice)
+            params.result === "choose" && params.choice && picking
+                ? readPageChoices(picking, params.choice)
                 : null,
         ]);
         return (

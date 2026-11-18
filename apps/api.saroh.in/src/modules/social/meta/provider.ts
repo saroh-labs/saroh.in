@@ -37,11 +37,15 @@ export function metaKeys(): MetaKeys {
                       configId: env.META_FB_LOGIN_CONFIG_ID,
                   }
                 : null,
+        // Instagram through Facebook Login: the same app, its own configuration.
         instagram:
-            env.INSTAGRAM_APP_ID && env.INSTAGRAM_APP_SECRET
+            env.META_APP_ID &&
+            env.META_APP_SECRET &&
+            env.META_IG_LOGIN_CONFIG_ID
                 ? {
-                      appId: env.INSTAGRAM_APP_ID,
-                      appSecret: env.INSTAGRAM_APP_SECRET,
+                      appId: env.META_APP_ID,
+                      appSecret: env.META_APP_SECRET,
+                      configId: env.META_IG_LOGIN_CONFIG_ID,
                   }
                 : null,
         threads:

@@ -237,8 +237,8 @@ describe("channels", () => {
     it("says each way a connect came back, once, in its own words", () => {
         expect(connectResultLine("INSTAGRAM", "connected")).toBeNull();
         expect(connectResultLine("FACEBOOK", "choose")).toBeNull();
-        expect(connectResultLine("INSTAGRAM", "personal")).toContain(
-            "Business or Creator",
+        expect(connectResultLine("INSTAGRAM", "no-instagram")).toContain(
+            "link your Instagram professional account to a Facebook Page first",
         );
         expect(connectResultLine("FACEBOOK", "no-pages")).toContain(
             "manages no Page",

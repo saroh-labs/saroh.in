@@ -76,31 +76,39 @@ const alerts = (organizationId: string) =>
     });
 
 describe("social.refresh", () => {
-    it.each(["INSTAGRAM", "THREADS"] as const)(
-        "refreshes %s 7 days before it ends and queues the next",
-        async (kind) => {
-            const { row, binding } = await channel(kind, 7);
-            const handler = new SocialRefreshHandler(meta);
-            expect(await handler.run(row.id, row.refreshJobId ?? "")).toBe(
-                "refreshed",
-            );
-            const after = await prisma.socialChannel.findUniqueOrThrow({
-                where: { id: row.id },
-            });
-            expect(unseal(sealedToken(after)!, binding)).not.toBe("old-token");
-            expect(after.refreshJobId).not.toBe(row.refreshJobId);
-            const next = await prisma.job.findUniqueOrThrow({
-                where: { id: after.refreshJobId ?? "" },
-            });
-            expect(next.type).toBe(SOCIAL_REFRESH_TYPE);
-            expect(next.runAt.getTime()).toBe(
-                after.tokenExpiresAt!.getTime() - 7 * day,
-            );
-        },
-    );
+    it("refreshes Threads 7 days before it ends and queues the next", async () => {
+        const { row, binding } = await channel("THREADS", 7);
+        const handler = new SocialRefreshHandler(meta);
+        expect(await handler.run(row.id, row.refreshJobId ?? "")).toBe(
+            "refreshed",
+        );
+        const after = await prisma.socialChannel.findUniqueOrThrow({
+            where: { id: row.id },
+        });
+        expect(unseal(sealedToken(after)!, binding)).not.toBe("old-token");
+        expect(after.refreshJobId).not.toBe(row.refreshJobId);
+        const next = await prisma.job.findUniqueOrThrow({
+            where: { id: after.refreshJobId ?? "" },
+        });
+        expect(next.type).toBe(SOCIAL_REFRESH_TYPE);
+        expect(next.runAt.getTime()).toBe(
+            after.tokenExpiresAt!.getTime() - 7 * day,
+        );
+    });
+
+    it("leaves an Instagram channel alone: its Page token doesn't expire", async () => {
+        const { row } = await channel("INSTAGRAM", 7);
+        expect(
+            await new SocialRefreshHandler(meta).run(
+                row.id,
+                row.refreshJobId ?? "",
+            ),
+        ).toBe("skipped");
+        expect(meta.calls).toEqual([]);
+    });
 
     it("marks a refused refresh and tells the business once", async () => {
-        const { ctx, row } = await channel("INSTAGRAM", 7);
+        const { ctx, row } = await channel("THREADS", 7);
         meta.failNext("refresh", "auth");
         const handler = new SocialRefreshHandler(meta);
         expect(await handler.run(row.id, row.refreshJobId ?? "")).toBe(

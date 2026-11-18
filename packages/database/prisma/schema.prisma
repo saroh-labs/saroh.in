@@ -4948,19 +4948,22 @@ model SocialChannel {
   // The account Saroh posts as: the Instagram account, the Page, the
   // Threads profile.
   accountId      String
-  // Who signed in at Meta (the Instagram or Threads user, the Facebook
-  // user who chose the Page): what Meta's deauthorize and data deletion
-  // callbacks name.
+  // Who signed in at Meta (the Threads user, or the Facebook user who
+  // chose the Page or the Instagram account): what Meta's deauthorize and
+  // data deletion callbacks name.
   platformUserId String
   // "@chaiandcrumb", or the Page's name.
   handle         String
   avatarUrl      String?
+  // Instagram only: the Facebook Page the account is linked to, whose
+  // (non-expiring) Page token Saroh posts with.
+  pageId         String?
 
   tokenCiphertext String?
   tokenIv         String?
   tokenAuthTag    String?
   tokenIssuedAt   DateTime?
-  // Null for a Facebook Page token, which doesn't expire.
+  // Null for a Page token (Facebook, Instagram), which doesn't expire.
   tokenExpiresAt  DateTime?
   // Threads only: when Meta's grant itself ends (90 days, extended by a
   // refresh for a public profile).

@@ -1,5 +1,6 @@
 "use client";
 
+import { Avatar, AvatarFallback, AvatarImage } from "@saroh/ui/avatar";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Notice } from "@saroh/ui/notice";
@@ -8,19 +9,26 @@ import { useState } from "react";
 
 import { runAction } from "@/lib/api/run-action";
 import { pickPage } from "@/lib/social/saroh-social-actions";
-import type { PageChoice, Read } from "@/lib/social/saroh-social-types";
+import type {
+    ChannelKind,
+    PageChoice,
+    Read,
+} from "@/lib/social/saroh-social-types";
 import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
 
 /**
- * The Facebook Page to post to, when the sign-in manages several (S2:
- * a radio list in the sheet). Choosing finishes the connect; the choice
+ * The Facebook Page to post to, or the Instagram account linked to one,
+ * when the sign-in offers several (S2: a radio list in the sheet).
+ * Choosing finishes the connect; the choice
  * lasts ten minutes on the API, after which the person connects again.
  */
 export function PagePicker({
+    kind,
     choiceId,
     pages,
     onClose,
 }: {
+    kind: ChannelKind;
     choiceId: string;
     pages: Read<PageChoice[]> | null;
     onClose: () => void;
@@ -30,11 +38,13 @@ export function PagePicker({
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const list = pages?.ok ? pages.data : [];
+    const ig = kind === "INSTAGRAM";
+    const title = ig ? SOCIAL_WORDS.pickAccount : SOCIAL_WORDS.pickPage;
 
     async function choose() {
-        if (!page) return setError(SOCIAL_WORDS.pickPage);
+        if (!page) return setError(title);
         setError(null);
-        const res = await runAction(() => pickPage(choiceId, page), {
+        const res = await runAction(() => pickPage(kind, choiceId, page), {
             setBusy,
             quiet: true,
             onUnreached: setError,
@@ -42,7 +52,7 @@ export function PagePicker({
         if (!res) return;
         if (!res.ok) return setError(res.error);
         router.replace(
-            "/social?tab=channels&channel=facebook&result=connected",
+            `/social?tab=channels&channel=${kind.toLowerCase()}&result=connected`,
             { scroll: false },
         );
         router.refresh();
@@ -52,11 +62,13 @@ export function PagePicker({
         <FormSheet
             open
             bottomOnPhone
-            title={SOCIAL_WORDS.pickPage}
-            description={SOCIAL_WORDS.pickPageWhat}
+            title={title}
+            description={
+                ig ? SOCIAL_WORDS.pickAccountWhat : SOCIAL_WORDS.pickPageWhat
+            }
             pending={busy}
             dirty={page !== null}
-            saveLabel={SOCIAL_WORDS.usePage}
+            saveLabel={ig ? SOCIAL_WORDS.useAccount : SOCIAL_WORDS.usePage}
             savingLabel={SOCIAL_WORDS.connecting}
             saveOff={list.length === 0}
             onClose={onClose}
@@ -64,14 +76,34 @@ export function PagePicker({
         >
             {list.length > 0 ? (
                 <RadioCards
-                    label={SOCIAL_WORDS.pickPage}
+                    label={title}
                     value={page}
                     onChange={setPage}
-                    options={list.map((p) => ({ value: p.id, label: p.name }))}
+                    options={list.map((p) => ({
+                        value: p.id,
+                        label: ig ? (
+                            <span className="flex min-w-0 items-center gap-2">
+                                <Avatar size="row">
+                                    {p.avatarUrl ? (
+                                        <AvatarImage src={p.avatarUrl} alt="" />
+                                    ) : null}
+                                    <AvatarFallback>
+                                        {p.name
+                                            .replace("@", "")
+                                            .slice(0, 1)
+                                            .toUpperCase()}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <span className="truncate">{p.name}</span>
+                            </span>
+                        ) : (
+                            p.name
+                        ),
+                    }))}
                 />
             ) : (
                 <Notice tone="error" role="alert">
-                    {SOCIAL_WORDS.pageLoadFailed}
+                    {SOCIAL_WORDS.pageLoadFailed(kind)}
                 </Notice>
             )}
             {error ? (

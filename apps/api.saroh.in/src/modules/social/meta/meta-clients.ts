@@ -3,39 +3,64 @@ import { expiresIn, metaCall, query } from "./graph-http";
 import type {
     ChannelKind,
     ConnectedAccount,
+    ContainerKind,
     ContainerStatus,
     ExpiringKind,
     FacebookPages,
     ImagePost,
+    PageKind,
     PlatformPost,
     SocialMetaPort,
 } from "./social-meta.port";
 import { SCOPES, SocialMetaError } from "./social-meta.port";
 
 /**
- * Meta's three logins and their publishing APIs with plain `fetch` (U3):
- * Instagram API with Instagram Login (graph.instagram.com, no Page
- * needed), Facebook Login for Business with Page tokens
- * (graph.facebook.com), and Threads (graph.threads.com). Graph v27.0,
- * Threads v1.0. Token exchanges send the app secret and the short token as
- * Meta asks, in the request; every call for an account sends its token
- * in the Authorization header.
+ * Meta's logins and their publishing APIs with plain `fetch` (U3):
+ * Facebook Login for Business with Page tokens (graph.facebook.com) for
+ * Facebook Pages and for Instagram, and Threads (graph.threads.com).
+ * Graph v27.0, Threads v1.0. Token exchanges send the app secret and the
+ * short token as Meta asks, in the request; every call for an account
+ * sends its token in the Authorization header.
+ *
+ * Instagram (owner, 18 Nov 2026): Meta no longer offers "API setup with
+ * Instagram login" to newer apps, so Instagram is the Instagram API with
+ * Facebook Login, under its own login configuration
+ * (META_IG_LOGIN_CONFIG_ID). The person signs in with Facebook; each Page
+ * they manage names its linked Instagram professional account
+ * (`instagram_business_account`); Saroh keeps that account's id and the
+ * Page's token, and publishes on graph.facebook.com. Meta's docs:
+ * - get started: developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/get-started
+ *   (`/me/accounts`, `instagram_business_account`, `instagram_basic`, `pages_show_list`)
+ * - content publishing: developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/content-publishing
+ *   (`/<IG_ID>/media`, `status_code`, `/<IG_ID>/media_publish`,
+ *   `/<IG_ID>/content_publishing_limit`; "Facebook Login: Facebook Page access token")
+ * - content_publishing_limit: developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/content_publishing_limit
+ *   (`quota_usage`, `config.quota_total`)
+ * - Facebook Login for Business: developers.facebook.com/docs/facebook-login/facebook-login-for-business
+ *   (`config_id`, `response_type=code`, `override_default_response_type`)
+ * Unconfirmed until tried against Meta: the limit reference names a User
+ * token, and Saroh reads it with the Page token as it publishes; a caption
+ * on `/media` is shown in Meta's examples but not its parameter list.
  */
 
 export const GRAPH_VERSION = "v27.0";
 export const THREADS_VERSION = "v1.0";
 
+/** Facebook Login for Business: the Meta app, and one of its login configurations. */
+export interface FacebookLogin {
+    appId: string;
+    appSecret: string;
+    configId: string;
+}
+
 export interface MetaKeys {
-    /** Facebook Login for Business: the Meta app, and its login configuration. */
-    facebook: { appId: string; appSecret: string; configId: string } | null;
-    instagram: { appId: string; appSecret: string } | null;
+    facebook: FacebookLogin | null;
+    /** The same Meta app, under the Instagram login configuration. */
+    instagram: FacebookLogin | null;
     threads: { appId: string; appSecret: string } | null;
 }
 
 export interface MetaBases {
-    instagramAuth: string;
-    instagramToken: string;
-    instagramGraph: string;
     facebookAuth: string;
     facebookGraph: string;
     threadsAuth: string;
@@ -43,17 +68,11 @@ export interface MetaBases {
 }
 
 export const META_BASES: MetaBases = {
-    instagramAuth: "https://www.instagram.com/oauth/authorize",
-    instagramToken: "https://api.instagram.com/oauth/access_token",
-    instagramGraph: "https://graph.instagram.com",
     facebookAuth: `https://www.facebook.com/${GRAPH_VERSION}/dialog/oauth`,
     facebookGraph: `https://graph.facebook.com/${GRAPH_VERSION}`,
     threadsAuth: "https://threads.com/oauth/authorize",
     threadsGraph: "https://graph.threads.com",
 };
-
-/** Instagram accounts that can publish through the API. */
-export const PUBLISHING_ACCOUNT_TYPES = new Set(["BUSINESS", "MEDIA_CREATOR"]);
 
 interface TokenAnswer {
     access_token?: string;
@@ -96,11 +115,11 @@ export class SocialMetaClient implements SocialMetaPort {
     private readonly fetchFn: FetchFn;
 
     available(kind: ChannelKind): boolean {
-        return kind === "FACEBOOK"
-            ? this.keys.facebook !== null
-            : (kind === "INSTAGRAM"
-                  ? this.keys.instagram
-                  : this.keys.threads) !== null;
+        return (
+            (kind === "THREADS"
+                ? this.keys.threads
+                : this.keys[loginOf(kind)]) !== null
+        );
     }
 
     authorizeUrl(
@@ -109,15 +128,8 @@ export class SocialMetaClient implements SocialMetaPort {
     ): string {
         switch (kind) {
             case "INSTAGRAM":
-                return `${this.bases.instagramAuth}${query({
-                    client_id: this.app("INSTAGRAM").appId,
-                    redirect_uri: input.redirectUri,
-                    response_type: "code",
-                    scope: SCOPES.INSTAGRAM.join(","),
-                    state: input.state,
-                })}`;
             case "FACEBOOK": {
-                const fb = this.facebook();
+                const fb = this.login(kind);
                 return `${this.bases.facebookAuth}${query({
                     client_id: fb.appId,
                     redirect_uri: input.redirectUri,
@@ -129,7 +141,7 @@ export class SocialMetaClient implements SocialMetaPort {
             }
             case "THREADS":
                 return `${this.bases.threadsAuth}${query({
-                    client_id: this.app("THREADS").appId,
+                    client_id: this.threads().appId,
                     redirect_uri: input.redirectUri,
                     response_type: "code",
                     scope: SCOPES.THREADS.join(","),
@@ -139,17 +151,15 @@ export class SocialMetaClient implements SocialMetaPort {
     }
 
     async connect(
-        kind: ExpiringKind,
+        _kind: ExpiringKind,
         code: string,
         redirectUri: string,
     ): Promise<ConnectedAccount> {
-        const app = this.app(kind);
+        const app = this.threads();
         const short = tokenOf(
             await metaCall<TokenAnswer & { data?: TokenAnswer[] }>(
                 this.fetchFn,
-                kind === "INSTAGRAM"
-                    ? this.bases.instagramToken
-                    : `${this.bases.threadsGraph}/oauth/access_token`,
+                `${this.bases.threadsGraph}/oauth/access_token`,
                 {
                     form: {
                         client_id: app.appId,
@@ -163,37 +173,16 @@ export class SocialMetaClient implements SocialMetaPort {
         );
         const shortToken = need(short.access_token, "token");
         const userId = need(str(short.user_id), "user id");
-        const graph = this.graphOf(kind);
+        const graph = this.bases.threadsGraph;
         const long = await metaCall<TokenAnswer>(
             this.fetchFn,
             `${graph}/access_token${query({
-                grant_type:
-                    kind === "INSTAGRAM"
-                        ? "ig_exchange_token"
-                        : "th_exchange_token",
+                grant_type: "th_exchange_token",
                 client_secret: app.appSecret,
                 access_token: shortToken,
             })}`,
         );
         const token = need(long.access_token, "long-lived token");
-        if (kind === "INSTAGRAM") {
-            const me = await metaCall<Record<string, unknown>>(
-                this.fetchFn,
-                `${graph}/${GRAPH_VERSION}/me${query({
-                    fields: "user_id,username,account_type,profile_picture_url",
-                })}`,
-                { token },
-            );
-            return {
-                accountId: str(me.user_id) ?? userId,
-                platformUserId: userId,
-                handle: `@${str(me.username) ?? userId}`,
-                avatarUrl: str(me.profile_picture_url),
-                token,
-                tokenExpiresAt: expiresIn(long.expires_in),
-                accountType: str(me.account_type),
-            };
-        }
         const me = await metaCall<Record<string, unknown>>(
             this.fetchFn,
             `${graph}/${THREADS_VERSION}/me${query({
@@ -211,11 +200,12 @@ export class SocialMetaClient implements SocialMetaPort {
         };
     }
 
-    async facebookPages(
+    async pageAccounts(
+        kind: PageKind,
         code: string,
         redirectUri: string,
     ): Promise<FacebookPages> {
-        const fb = this.facebook();
+        const fb = this.login(kind);
         const graph = this.bases.facebookGraph;
         const short = await metaCall<TokenAnswer>(
             this.fetchFn,
@@ -247,47 +237,74 @@ export class SocialMetaClient implements SocialMetaPort {
                 name?: string;
                 access_token?: string;
                 picture?: { data?: { url?: string } };
+                instagram_business_account?: {
+                    id?: string;
+                    username?: string;
+                    profile_picture_url?: string;
+                };
             }[];
         }>(
             this.fetchFn,
             `${graph}/me/accounts${query({
-                fields: "id,name,access_token,picture{url}",
+                fields:
+                    kind === "INSTAGRAM"
+                        ? "id,name,access_token,instagram_business_account{id,username,profile_picture_url}"
+                        : "id,name,access_token,picture{url}",
                 limit: "100",
             })}`,
             { token: userToken },
         );
         const platformUserId = need(str(me.id), "user id");
-        return {
-            platformUserId,
-            pages: (accounts.data ?? [])
-                .flatMap((p) =>
-                    p.id && p.access_token
-                        ? [{ ...p, id: p.id, access_token: p.access_token }]
-                        : [],
-                )
-                .map((p) => ({
+        const pages = (accounts.data ?? []).flatMap((p) =>
+            p.id && p.access_token
+                ? [{ ...p, id: p.id, access_token: p.access_token }]
+                : [],
+        );
+        // A Page token from a long-lived user token doesn't expire.
+        if (kind === "FACEBOOK") {
+            return {
+                platformUserId,
+                pages: pages.map((p) => ({
                     accountId: p.id,
                     platformUserId,
                     handle: p.name ?? p.id,
                     avatarUrl: p.picture?.data?.url ?? null,
                     token: p.access_token,
-                    // A Page token from a long-lived user token doesn't expire.
                     tokenExpiresAt: null,
                 })),
+            };
+        }
+        // Instagram: only Pages with a linked professional account.
+        return {
+            platformUserId,
+            pages: pages.flatMap((p) => {
+                const ig = p.instagram_business_account;
+                const igId = str(ig?.id);
+                return igId
+                    ? [
+                          {
+                              accountId: igId,
+                              platformUserId,
+                              handle: `@${str(ig?.username) ?? igId}`,
+                              avatarUrl: str(ig?.profile_picture_url),
+                              token: p.access_token,
+                              tokenExpiresAt: null,
+                              pageId: p.id,
+                          },
+                      ]
+                    : [];
+            }),
         };
     }
 
     async refresh(
-        kind: ExpiringKind,
+        _kind: ExpiringKind,
         token: string,
     ): Promise<{ token: string; expiresAt: Date }> {
         const answer = await metaCall<TokenAnswer>(
             this.fetchFn,
-            `${this.graphOf(kind)}/refresh_access_token${query({
-                grant_type:
-                    kind === "INSTAGRAM"
-                        ? "ig_refresh_token"
-                        : "th_refresh_token",
+            `${this.bases.threadsGraph}/refresh_access_token${query({
+                grant_type: "th_refresh_token",
                 access_token: token,
             })}`,
         );
@@ -298,7 +315,7 @@ export class SocialMetaClient implements SocialMetaPort {
     }
 
     async publishLimit(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         token: string,
     ): Promise<{ used: number; total: number } | null> {
@@ -320,7 +337,7 @@ export class SocialMetaClient implements SocialMetaPort {
     }
 
     async createContainer(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         token: string,
         post: ImagePost,
@@ -344,7 +361,7 @@ export class SocialMetaClient implements SocialMetaPort {
     }
 
     async containerStatus(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         containerId: string,
         token: string,
     ): Promise<ContainerStatus> {
@@ -364,7 +381,7 @@ export class SocialMetaClient implements SocialMetaPort {
     }
 
     async publishContainer(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         token: string,
         containerId: string,
@@ -435,32 +452,27 @@ export class SocialMetaClient implements SocialMetaPort {
         return id ? { id, permalink: str(hit?.[link]) } : null;
     }
 
-    private graphOf(kind: ExpiringKind): string {
-        return kind === "INSTAGRAM"
-            ? this.bases.instagramGraph
-            : this.bases.threadsGraph;
-    }
-
     /** The versioned API an account's calls go to. */
     private api(kind: ChannelKind): string {
-        if (kind === "FACEBOOK") return this.bases.facebookGraph;
-        return kind === "INSTAGRAM"
-            ? `${this.bases.instagramGraph}/${GRAPH_VERSION}`
-            : `${this.bases.threadsGraph}/${THREADS_VERSION}`;
+        return kind === "THREADS"
+            ? `${this.bases.threadsGraph}/${THREADS_VERSION}`
+            : this.bases.facebookGraph;
     }
 
-    private app(kind: ExpiringKind): { appId: string; appSecret: string } {
-        const app =
-            kind === "INSTAGRAM" ? this.keys.instagram : this.keys.threads;
-        if (!app) throw new MetaNotSetUpError(kind);
-        return app;
+    private threads(): { appId: string; appSecret: string } {
+        if (!this.keys.threads) throw new MetaNotSetUpError("THREADS");
+        return this.keys.threads;
     }
 
-    private facebook() {
-        if (!this.keys.facebook) throw new MetaNotSetUpError("FACEBOOK");
-        return this.keys.facebook;
+    private login(kind: PageKind): FacebookLogin {
+        const login = this.keys[loginOf(kind)];
+        if (!login) throw new MetaNotSetUpError(kind);
+        return login;
     }
 }
+
+const loginOf = (kind: PageKind) =>
+    kind === "INSTAGRAM" ? "instagram" : "facebook";
 
 /** A login whose keys aren't set on this API: connecting it answers 503. */
 export class MetaNotSetUpError extends Error {

@@ -1,7 +1,8 @@
 /**
  * Everything Saroh Social asks of Meta (plan saroh-social 2026-11-18-001,
- * U3): the three logins, their tokens, and publishing an image post. One
- * port, so the connect flow and the publish job run on the real clients
+ * U3): Facebook Login for Business (a Page, or the Instagram account
+ * linked to one) and Threads' login, their tokens, and publishing an image
+ * post. One port, so the connect flow and the publish job run on the real clients
  * (`meta-clients.ts`) or, in tests, the fake (`fake-social-meta.ts`).
  *
  * Calls that act for an account take its token; nothing here stores one.
@@ -14,8 +15,16 @@ export const SOCIAL_META = Symbol("SOCIAL_META");
 export const CHANNEL_KINDS = ["INSTAGRAM", "FACEBOOK", "THREADS"] as const;
 export type ChannelKind = (typeof CHANNEL_KINDS)[number];
 
-/** The channels whose token Saroh must refresh: Facebook Page tokens don't expire. */
-export type ExpiringKind = Exclude<ChannelKind, "FACEBOOK">;
+/** The channels that publish through a media container: Instagram and Threads. */
+export type ContainerKind = Exclude<ChannelKind, "FACEBOOK">;
+/**
+ * The channels whose token Saroh must refresh: only Threads. Facebook and
+ * Instagram (through Facebook Login for Business) post with a Page token,
+ * which doesn't expire.
+ */
+export type ExpiringKind = "THREADS";
+/** The channels signed in with Facebook Login for Business: a Page token each. */
+export type PageKind = "FACEBOOK" | "INSTAGRAM";
 
 /**
  * What went wrong, as Saroh acts on it:
@@ -60,14 +69,15 @@ export interface ConnectedAccount {
     token: string;
     /** Null: the token doesn't expire (a Page's). */
     tokenExpiresAt: Date | null;
-    /**
-     * Instagram only: BUSINESS or MEDIA_CREATOR can publish; anything else
-     * (a personal account) can't.
-     */
-    accountType?: string | null;
+    /** Instagram only: the Facebook Page the account is linked to, whose token this is. */
+    pageId?: string | null;
 }
 
-/** A Facebook sign-in: the person, and each Page they manage with its Page token. */
+/**
+ * A Facebook sign-in: the person, and each Page they manage with its Page
+ * token (Facebook), or each Instagram professional account linked to one
+ * of those Pages, with that Page's token (Instagram).
+ */
 export interface FacebookPages {
     platformUserId: string;
     pages: ConnectedAccount[];
@@ -98,15 +108,22 @@ export interface SocialMetaPort {
         kind: ChannelKind,
         input: { redirectUri: string; state: string },
     ): string;
-    /** Instagram or Threads: the code traded for a long-lived token and the profile. */
+    /** Threads: the code traded for a long-lived token and the profile. */
     connect(
         kind: ExpiringKind,
         code: string,
         redirectUri: string,
     ): Promise<ConnectedAccount>;
-    /** Facebook: the code traded for the person's Pages, each with a Page token. */
-    facebookPages(code: string, redirectUri: string): Promise<FacebookPages>;
-    /** A long-lived Instagram or Threads token, refreshed (at least 24 hours old). */
+    /**
+     * Facebook or Instagram: the code traded for the person's Pages, or the
+     * Instagram accounts linked to them, each with its Page's token.
+     */
+    pageAccounts(
+        kind: PageKind,
+        code: string,
+        redirectUri: string,
+    ): Promise<FacebookPages>;
+    /** A long-lived Threads token, refreshed (at least 24 hours old). */
     refresh(
         kind: ExpiringKind,
         token: string,
@@ -116,25 +133,25 @@ export interface SocialMetaPort {
      * hours, Threads' 250 a day); null when Meta didn't say.
      */
     publishLimit(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         token: string,
     ): Promise<{ used: number; total: number } | null>;
     /** Instagram or Threads: a media container for the picture and words. */
     createContainer(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         token: string,
         post: ImagePost,
     ): Promise<string>;
     containerStatus(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         containerId: string,
         token: string,
     ): Promise<ContainerStatus>;
     /** Publish a finished container: the post's id. */
     publishContainer(
-        kind: ExpiringKind,
+        kind: ContainerKind,
         accountId: string,
         token: string,
         containerId: string,
@@ -162,12 +179,14 @@ export interface SocialMetaPort {
 
 /** The scopes each login asks for: only what posting needs. */
 export const SCOPES: Record<ChannelKind, readonly string[]> = {
-    INSTAGRAM: [
-        "instagram_business_basic",
-        "instagram_business_content_publish",
-    ],
     // Facebook Login for Business takes its permissions from the login
-    // configuration (`config_id`); these are what that configuration holds.
+    // configuration (`config_id`); these are what each configuration holds.
+    INSTAGRAM: [
+        "instagram_basic",
+        "instagram_content_publish",
+        "pages_show_list",
+        "pages_read_engagement",
+    ],
     FACEBOOK: [
         "pages_manage_posts",
         "pages_read_engagement",

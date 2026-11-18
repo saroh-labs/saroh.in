@@ -11,6 +11,9 @@ export const CHANNEL_KINDS: readonly ChannelKind[] = [
     "THREADS",
 ];
 
+/** The kinds whose sign-in can offer several Pages (or Instagram accounts) to pick from. */
+export const PICKER_KINDS: readonly ChannelKind[] = ["INSTAGRAM", "FACEBOOK"];
+
 /** `GET …/social`: whether Saroh Social is open here, and this month's count. */
 export interface SocialAccess {
     state: "on" | "locked" | "unavailable";

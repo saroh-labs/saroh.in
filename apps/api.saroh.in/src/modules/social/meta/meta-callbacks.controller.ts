@@ -47,6 +47,10 @@ export interface DeletionView {
  * `signed_request`, checked against that login's secret; a bad signature
  * is a 400, an old one is refused too.
  *
+ * Facebook and Instagram sign in through the same Facebook Login, so the
+ * person Meta names is the same Facebook user for both: a callback for
+ * either reaches both kinds' channels.
+ *
  * CROSS-TENANT: Meta names a person, not a business, so their channels in
  * any business are found; nothing is returned about them.
  */
@@ -62,7 +66,10 @@ export class MetaCallbacksService {
         const req = this.verify(kind, signed, now);
         return outsideOrgContext(async () => {
             const rows = await prisma.socialChannel.findMany({
-                where: { kind, platformUserId: req.userId },
+                where: {
+                    kind: { in: loginKinds(kind) },
+                    platformUserId: req.userId,
+                },
                 select: { id: true },
             });
             let marked = 0;
@@ -89,12 +96,12 @@ export class MetaCallbacksService {
         const code = randomBytes(9).toString("base64url");
         await outsideOrgContext(() =>
             prisma.$transaction(async (tx) => {
-                const { count } = await tx.socialChannel.deleteMany({
-                    where: { kind, platformUserId: req.userId },
-                });
-                await tx.socialConnectChoice.deleteMany({
-                    where: { kind, platformUserId: req.userId },
-                });
+                const where = {
+                    kind: { in: loginKinds(kind) },
+                    platformUserId: req.userId,
+                };
+                const { count } = await tx.socialChannel.deleteMany({ where });
+                await tx.socialConnectChoice.deleteMany({ where });
                 await tx.socialDeletion.create({
                     data: { code, kind, channels: count, createdAt: now },
                 });
@@ -132,6 +139,10 @@ export class MetaCallbacksService {
         return req;
     }
 }
+
+/** The kinds one Meta sign-in covers: Facebook Login's two, or Threads. */
+const loginKinds = (kind: ChannelKind): ChannelKind[] =>
+    kind === "THREADS" ? ["THREADS"] : ["FACEBOOK", "INSTAGRAM"];
 
 /**
  *   POST public/webhooks/meta/deauthorize/:kind      Meta: someone removed Saroh

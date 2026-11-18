@@ -76,9 +76,9 @@ export const getSocialPost = (id: string) =>
 export const getPostResults = (id: string) =>
     read<PostResults>(`/posts/${encodeURIComponent(id)}/results`);
 
-export const readPageChoices = (choiceId: string) =>
+export const readPageChoices = (kind: ChannelKind, choiceId: string) =>
     read<PageChoice[]>(
-        `/channels/facebook/choices/${encodeURIComponent(choiceId)}`,
+        `/channels/${path(kind)}/choices/${encodeURIComponent(choiceId)}`,
     );
 
 // The writes. Each says its own sentence when the API gives none.
@@ -91,9 +91,13 @@ export const startConnect = (kind: ChannelKind) =>
         "Couldn't start connecting. Try again.",
     );
 
-export const choosePage = (choiceId: string, pageId: string) =>
+export const choosePage = (
+    kind: ChannelKind,
+    choiceId: string,
+    pageId: string,
+) =>
     mutate<SocialChannel[]>(
-        `/social/channels/facebook/choices/${encodeURIComponent(choiceId)}`,
+        `/social/channels/${path(kind)}/choices/${encodeURIComponent(choiceId)}`,
         "POST",
         { pageId },
         "Couldn't connect that Page. Try again.",

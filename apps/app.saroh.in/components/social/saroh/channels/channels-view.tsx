@@ -21,7 +21,7 @@ import type {
     SocialChannel,
     SocialParams,
 } from "@/lib/social/saroh-social-types";
-import { CHANNEL_KINDS } from "@/lib/social/saroh-social-types";
+import { CHANNEL_KINDS, PICKER_KINDS } from "@/lib/social/saroh-social-types";
 import {
     attentionLine,
     CHANNEL_NAMES,
@@ -52,7 +52,7 @@ export function ChannelsView({
     channels: Read<SocialChannel[]>;
     canPost: boolean;
     params: SocialParams;
-    /** The Pages to pick from, when a Facebook sign-in manages several. */
+    /** The Pages (or Instagram accounts) to pick from, when a sign-in offers several. */
     pages: Read<PageChoice[]> | null;
 }) {
     const router = useRouter();
@@ -94,8 +94,12 @@ export function ChannelsView({
             <p className="text-[12.5px] text-muted-foreground">
                 {SOCIAL_WORDS.oneEach}
             </p>
-            {back === "FACEBOOK" && result === "choose" && params.choice ? (
+            {back &&
+            PICKER_KINDS.includes(back) &&
+            result === "choose" &&
+            params.choice ? (
                 <PagePicker
+                    kind={back}
                     choiceId={params.choice}
                     pages={pages}
                     onClose={() =>

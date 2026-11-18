@@ -5,6 +5,7 @@ import {
     Get,
     Header,
     HttpCode,
+    NotFoundException,
     Param,
     Post,
     Query,
@@ -24,9 +25,18 @@ import type { OrganizationContext } from "../../../common/types/organization-con
 import { OrganizationContextService } from "../../organizations/organization-context.service";
 import type { SocialAccessView } from "../access/social-access";
 import { SocialAccess } from "../access/social-access";
-import { SocialChannelsService } from "./channels.service";
+import { PICKER_KINDS, SocialChannelsService } from "./channels.service";
 import type { ChannelView, PageChoiceView } from "./dto";
 import { ChoosePageDto, kindParam } from "./dto";
+
+/** A kind whose sign-in can offer several Pages, from an address, or 404. */
+function pickerKind(value: string) {
+    const kind = kindParam(value);
+    if (!PICKER_KINDS.includes(kind)) {
+        throw new NotFoundException("No such channel.");
+    }
+    return kind;
+}
 
 /**
  * Saroh Social's access and Channels (U1, U4). No `@RequireModule`:
@@ -37,8 +47,8 @@ import { ChoosePageDto, kindParam } from "./dto";
  *   GET    …/social                                  access, plan and this month's count
  *   GET    …/social/channels                         the three rows
  *   POST   …/social/channels/:kind/connect           { url } of Meta's consent
- *   GET    …/social/channels/facebook/choices/:id    the Pages to pick from
- *   POST   …/social/channels/facebook/choices/:id    { pageId }: connect it
+ *   GET    …/social/channels/:kind/choices/:id       the Pages (facebook) or accounts (instagram) to pick from
+ *   POST   …/social/channels/:kind/choices/:id       { pageId }: connect it
  *   POST   …/social/channels/:kind/retry             post again what waited for it
  *   DELETE …/social/channels/:kind                   disconnect
  */
@@ -72,24 +82,31 @@ export class SocialController {
         return this.channels.start(ctx, kindParam(kind));
     }
 
-    @Get("channels/facebook/choices/:choiceId")
+    @Get("channels/:kind/choices/:choiceId")
     @Header("Cache-Control", "no-store")
     choices(
         @OrgContext() ctx: OrganizationContext,
+        @Param("kind") kind: string,
         @Param("choiceId") choiceId: string,
     ): Promise<PageChoiceView[]> {
-        return this.channels.choices(ctx, choiceId);
+        return this.channels.choices(ctx, pickerKind(kind), choiceId);
     }
 
-    @Post("channels/facebook/choices/:choiceId")
+    @Post("channels/:kind/choices/:choiceId")
     @HttpCode(200)
     @Header("Cache-Control", "no-store")
     choose(
         @OrgContext() ctx: OrganizationContext,
+        @Param("kind") kind: string,
         @Param("choiceId") choiceId: string,
         @Body() dto: ChoosePageDto,
     ): Promise<ChannelView[]> {
-        return this.channels.choose(ctx, choiceId, dto.pageId);
+        return this.channels.choose(
+            ctx,
+            pickerKind(kind),
+            choiceId,
+            dto.pageId,
+        );
     }
 
     @Post("channels/:kind/retry")

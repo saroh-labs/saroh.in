@@ -17,7 +17,7 @@ export { SOCIAL_REFRESH_TYPE } from "../shared/jobs";
 export const REFRESH_RETRY_MS = 6 * 3_600_000;
 
 /**
- * `social.refresh` (U7, KTD4): an Instagram or Threads token refreshed 7
+ * `social.refresh` (U7, KTD4): a Threads token refreshed 7
  * days before it, or a Threads grant, ends; then the next one is queued.
  * A Threads profile's grant is extended by a refresh (public profiles);
  * a private one's ends at 90 days and Meta refuses the refresh then.
@@ -68,7 +68,8 @@ export class SocialRefreshHandler {
             !channel ||
             !sealed ||
             !this.meta ||
-            channel.kind === "FACEBOOK" ||
+            // Facebook and Instagram hold Page tokens, which don't expire.
+            channel.kind !== "THREADS" ||
             channel.status !== "CONNECTED" ||
             channel.refreshJobId !== jobId
         ) {
@@ -91,13 +92,9 @@ export class SocialRefreshHandler {
                         ...tokenColumns(seal(fresh.token, binding)),
                         tokenIssuedAt: now,
                         tokenExpiresAt: fresh.expiresAt,
-                        ...(kind === "THREADS"
-                            ? {
-                                  grantExpiresAt: new Date(
-                                      now.getTime() + THREADS_GRANT_MS,
-                                  ),
-                              }
-                            : {}),
+                        grantExpiresAt: new Date(
+                            now.getTime() + THREADS_GRANT_MS,
+                        ),
                     },
                 });
                 await queueRefreshInTx(tx, row, now);
@@ -109,7 +106,6 @@ export class SocialRefreshHandler {
                 channel.tokenExpiresAt <= now;
             if (isMetaError(error, "auth") || (ended && isMetaError(error))) {
                 const grantEnded =
-                    kind === "THREADS" &&
                     channel.grantExpiresAt !== null &&
                     channel.grantExpiresAt <= now;
                 const reason: AttentionReason = grantEnded

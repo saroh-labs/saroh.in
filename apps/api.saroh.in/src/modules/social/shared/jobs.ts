@@ -8,7 +8,7 @@ import type { Prisma } from "@saroh/database";
  *   follow-up while a container is being made. The post keeps the waiting
  *   job's id (`publishJobId`); a run of any other job is a no-op, so moving
  *   or cancelling a post drops its job and a stale one does nothing.
- * - `social.refresh` `{ channelId }`: an Instagram or Threads token
+ * - `social.refresh` `{ channelId }`: a Threads token
  *   refreshed 7 days before it ends. The channel keeps the waiting job's id
  *   (`refreshJobId`) the same way.
  */

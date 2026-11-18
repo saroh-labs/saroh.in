@@ -27,8 +27,8 @@ export const CHANNEL_SHORT: Record<ChannelKind, string> = {
 /** What a channel needs, said before Meta's own screen (S2). */
 export const CONNECT_NEEDS: Record<ChannelKind, readonly string[]> = {
     INSTAGRAM: [
-        "A Business or Creator account on Instagram. A personal one can't be posted to.",
-        "You'll sign in on Instagram and allow Saroh to post.",
+        "A Business or Creator account on Instagram, linked to a Facebook Page you manage.",
+        "You'll sign in with Facebook and pick the Instagram account linked to your Page.",
         "Saroh posts only what you schedule here.",
     ],
     FACEBOOK: [
@@ -74,7 +74,11 @@ export const SOCIAL_WORDS = {
     pickPage: "Pick the Page Saroh posts to",
     pickPageWhat: "That sign-in manages more than one Page.",
     usePage: "Use this Page",
-    pageLoadFailed: "Couldn't load your Pages. Connect Facebook again.",
+    pickAccount: "Pick the Instagram account Saroh posts to",
+    pickAccountWhat: "Your Pages have more than one Instagram account linked.",
+    useAccount: "Use this account",
+    pageLoadFailed: (kind: ChannelKind) =>
+        `Couldn't load your Pages. Connect ${CHANNEL_SHORT[kind]} again.`,
     postThemNow: "Post them now",
     // The posts page (board BSocialHomeSocialDesk).
     nextDays: "Next 7 days",
@@ -254,8 +258,8 @@ export function connectResultLine(
             return `${name} didn't connect: the sign-in took too long. Try again.`;
         case "someone-else":
             return `${name} didn't connect: the sign-in was finished by someone else. Connect it while signed in to Saroh as yourself.`;
-        case "personal":
-            return "Instagram didn't connect: it's a personal account. Switch it to Business or Creator in Instagram's settings, then connect again.";
+        case "no-instagram":
+            return "Instagram didn't connect: link your Instagram professional account to a Facebook Page first. In Instagram, open Settings › Accounts Center, add your Facebook Page, then connect again.";
         case "no-pages":
             return "Facebook didn't connect: that sign-in manages no Page. Make a Page on Facebook, or sign in as someone who manages one.";
         case "refused":

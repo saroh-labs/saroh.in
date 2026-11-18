@@ -2,8 +2,8 @@
  * Social › Channels (U4) against a real Postgres, with the in-memory Meta:
  * connecting each kind seals its token, a Facebook sign-in with three
  * Pages goes through the picker, the refusals (a bad or expired state,
- * someone else's state, not rolled out, plan locked, a personal Instagram
- * account), and disconnect. Runs in the integration project.
+ * someone else's state, not rolled out, plan locked, a Facebook sign-in
+ * with no Instagram account linked), and disconnect. Runs in the integration project.
  */
 import { prisma } from "@saroh/database";
 
@@ -83,9 +83,10 @@ describe("connecting a channel", () => {
                     payload: { path: ["channelId"], equals: row.id },
                 },
             });
-            // A Page's token never ends; the others are refreshed.
-            expect(refresh).toBe(kind === "FACEBOOK" ? 0 : 1);
+            // A Page's token (Facebook, Instagram) never ends; Threads' is refreshed.
+            expect(refresh).toBe(kind === "THREADS" ? 1 : 0);
             expect(row.grantExpiresAt !== null).toBe(kind === "THREADS");
+            expect(row.pageId).toBe(kind === "INSTAGRAM" ? "page-1" : null);
         },
     );
 
@@ -95,10 +96,15 @@ describe("connecting a channel", () => {
         const to = await connectFlow(ctx, "FACEBOOK");
         expect(resultOf(to)).toBe("choose");
         const choiceId = new URL(to).searchParams.get("choice") ?? "";
-        const pages = await service().choices(ctx, choiceId);
+        const pages = await service().choices(ctx, "FACEBOOK", choiceId);
         expect(pages.map((p) => p.id)).toEqual(["page-1", "page-2", "page-3"]);
         expect(JSON.stringify(pages)).not.toContain("token");
-        const rows = await service().choose(ctx, choiceId, "page-2");
+        const rows = await service().choose(
+            ctx,
+            "FACEBOOK",
+            choiceId,
+            "page-2",
+        );
         expect(rows.find((r) => r.kind === "FACEBOOK")).toMatchObject({
             state: "CONNECTED",
             handle: "Chai & Crumb 2",
@@ -108,11 +114,46 @@ describe("connecting a channel", () => {
         ).toBe(0);
     });
 
-    it("refuses a personal Instagram account, saying how to fix it", async () => {
+    it("offers the Instagram accounts linked to the person's Pages, and keeps the one picked with its Page", async () => {
+        meta.pages = 2;
         const ctx = await socialBusiness();
+        const to = await connectFlow(ctx, "INSTAGRAM");
+        expect(resultOf(to)).toBe("choose");
+        const choiceId = new URL(to).searchParams.get("choice") ?? "";
+        const accounts = await service().choices(ctx, "INSTAGRAM", choiceId);
+        expect(accounts.map((a) => a.name)).toEqual([
+            "@chaiandcrumb",
+            "@chaiandcrumb2",
+        ]);
+        await service().choose(
+            ctx,
+            "INSTAGRAM",
+            choiceId,
+            "instagram-account-2",
+        );
         expect(
-            resultOf(await connectFlow(ctx, "INSTAGRAM", "fake-personal")),
-        ).toBe("personal");
+            await prisma.socialChannel.findUniqueOrThrow({
+                where: {
+                    organizationId_kind: {
+                        organizationId: ctx.organizationId,
+                        kind: "INSTAGRAM",
+                    },
+                },
+                select: { accountId: true, pageId: true, platformUserId: true },
+            }),
+        ).toEqual({
+            accountId: "instagram-account-2",
+            pageId: "page-2",
+            platformUserId: "facebook-user-1",
+        });
+    });
+
+    it("says to link an Instagram account to a Page when no Page has one", async () => {
+        meta.pages = 0;
+        const ctx = await socialBusiness();
+        expect(resultOf(await connectFlow(ctx, "INSTAGRAM"))).toBe(
+            "no-instagram",
+        );
         expect(
             await prisma.socialChannel.count({
                 where: { organizationId: ctx.organizationId },

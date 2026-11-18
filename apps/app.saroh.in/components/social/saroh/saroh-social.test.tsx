@@ -241,12 +241,16 @@ describe("Channels (S2)", () => {
             <ChannelsView
                 channels={{ ok: true, data: rows }}
                 canPost
-                params={{ ...PARAMS, channel: "instagram", result: "personal" }}
+                params={{
+                    ...PARAMS,
+                    channel: "instagram",
+                    result: "no-instagram",
+                }}
                 pages={null}
             />,
         );
-        expect(q("[data-connect-result=personal]")?.textContent).toContain(
-            "it's a personal account",
+        expect(q("[data-connect-result=no-instagram]")?.textContent).toContain(
+            "to a Facebook Page first",
         );
     });
 
@@ -288,6 +292,31 @@ describe("Channels (S2)", () => {
             />,
         );
         expect(text()).toContain("Pick the Page Saroh posts to");
+        expect(document.querySelectorAll("[role=radio]")).toHaveLength(2);
+    });
+
+    it("asks which Instagram account when the Pages have several linked", () => {
+        draw(
+            <ChannelsView
+                channels={{ ok: true, data: rows }}
+                canPost
+                params={{
+                    ...PARAMS,
+                    channel: "instagram",
+                    result: "choose",
+                    choice: "c1",
+                }}
+                pages={{
+                    ok: true,
+                    data: [
+                        { id: "ig-1", name: "@chaiandcrumb", avatarUrl: null },
+                        { id: "ig-2", name: "@crumbtwo", avatarUrl: null },
+                    ],
+                }}
+            />,
+        );
+        expect(text()).toContain("Pick the Instagram account Saroh posts to");
+        expect(text()).toContain("@crumbtwo");
         expect(document.querySelectorAll("[role=radio]")).toHaveLength(2);
     });
 });

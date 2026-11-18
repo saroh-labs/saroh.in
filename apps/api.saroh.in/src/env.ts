@@ -250,16 +250,16 @@ const envSchema = z.object({
     META_WA_TEMPLATE_LANG: z.string().optional(),
     // TEST ONLY in practice: where Graph API calls go, version included.
     META_GRAPH_BASE_URL: z.url().optional(),
-    // Saroh Social (plan saroh-social 2026-11-18-001): one Meta app, three
-    // logins. Facebook Login for Business needs the app's id, its secret
-    // (META_APP_SECRET, above) and the login configuration's id; Instagram
-    // Login and Threads each have their own app id and secret inside the
-    // same Meta app. Each is read when used: a missing one makes connecting
-    // that channel answer 503, never a failed boot. Secrets never logged.
+    // Saroh Social (plan saroh-social 2026-11-18-001): one Meta app.
+    // Facebook Pages and Instagram both sign in with Facebook Login for
+    // Business: the app's id, its secret (META_APP_SECRET, above) and a
+    // login configuration's id each (Instagram Login isn't offered to newer
+    // apps). Threads has its own app id and secret inside the same Meta app.
+    // Each is read when used: a missing one makes connecting that channel
+    // answer 503, never a failed boot. Secrets never logged.
     META_APP_ID: z.string().optional(),
     META_FB_LOGIN_CONFIG_ID: z.string().optional(),
-    INSTAGRAM_APP_ID: z.string().optional(),
-    INSTAGRAM_APP_SECRET: z.string().optional(),
+    META_IG_LOGIN_CONFIG_ID: z.string().optional(),
     THREADS_APP_ID: z.string().optional(),
     THREADS_APP_SECRET: z.string().optional(),
     // Seals a connected channel's token to its row (DEC-214 ring, like the

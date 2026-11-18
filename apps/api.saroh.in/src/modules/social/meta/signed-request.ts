@@ -6,8 +6,10 @@ import type { ChannelKind } from "./social-meta.port";
 /**
  * Meta's `signed_request` (U8, KTD11): `<signature>.<payload>`, both
  * base64url, the signature an HMAC-SHA256 of the payload's text with the
- * login's app secret. Instagram and Threads may sign with their own app's
- * secret or the Meta app's (unconfirmed until tested), so each is tried.
+ * login's app secret. Facebook and Instagram sign in with Facebook Login,
+ * so the Meta app's secret signs theirs; Threads may sign with its own
+ * app's secret or the Meta app's (unconfirmed until tested), so both are
+ * tried.
  */
 
 /** How old a request Saroh still takes. */
@@ -22,12 +24,7 @@ export type SignedRequestRefusal = "invalid" | "expired";
 
 /** The secrets one login's callbacks may be signed with. */
 export function callbackSecrets(kind: ChannelKind): string[] {
-    const own =
-        kind === "INSTAGRAM"
-            ? env.INSTAGRAM_APP_SECRET
-            : kind === "THREADS"
-              ? env.THREADS_APP_SECRET
-              : undefined;
+    const own = kind === "THREADS" ? env.THREADS_APP_SECRET : undefined;
     return [own, env.META_APP_SECRET].filter(
         (s): s is string => typeof s === "string" && s !== "",
     );

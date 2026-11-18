@@ -3,7 +3,8 @@
  * for each login is taken, a bad signature is a 400 and an old one is
  * refused; deauthorize marks the person's channel; data deletion removes
  * their channels and tokens and answers the status page's address and
- * code, which the page reads without anyone signed in.
+ * code, which the page reads without anyone signed in. Facebook and
+ * Instagram share Facebook Login, so either callback reaches both.
  */
 import { prisma } from "@saroh/database";
 
@@ -20,20 +21,19 @@ import type { ChannelKind } from "./social-meta.port";
 
 const mutableEnv = env as {
     META_APP_SECRET?: string;
-    INSTAGRAM_APP_SECRET?: string;
     THREADS_APP_SECRET?: string;
 };
 const saved = { ...mutableEnv };
 const SECRETS: Record<ChannelKind, string> = {
     FACEBOOK: "fb-test-secret",
-    INSTAGRAM: "ig-test-secret",
+    // Instagram signs in with Facebook Login: the Meta app's secret.
+    INSTAGRAM: "fb-test-secret",
     THREADS: "th-test-secret",
 };
 
 beforeAll(() => {
     socialEnv();
     mutableEnv.META_APP_SECRET = SECRETS.FACEBOOK;
-    mutableEnv.INSTAGRAM_APP_SECRET = SECRETS.INSTAGRAM;
     mutableEnv.THREADS_APP_SECRET = SECRETS.THREADS;
 });
 afterAll(async () => {
@@ -44,9 +44,8 @@ afterAll(async () => {
 
 const service = new MetaCallbacksService();
 
-async function connected(kind: ChannelKind) {
+async function connected(kind: ChannelKind, userId = uniq("meta-user")) {
     const ctx = await socialBusiness();
-    const userId = uniq("meta-user");
     const row = await prisma.socialChannel.create({
         data: {
             organizationId: ctx.organizationId,
@@ -129,3 +128,26 @@ describe.each(["INSTAGRAM", "FACEBOOK", "THREADS"] as const)(
         });
     },
 );
+
+describe("Facebook Login's two kinds", () => {
+    it("reaches the person's Instagram channel from Facebook's callback, and their Page from Instagram's", async () => {
+        const userId = uniq("meta-user");
+        const ig = await connected("INSTAGRAM", userId);
+        const fb = await connected("FACEBOOK", userId);
+        expect(
+            await service.deauthorize("FACEBOOK", signed("FACEBOOK", userId)),
+        ).toEqual({ marked: 2 });
+        const out = await service.dataDeletion(
+            "INSTAGRAM",
+            signed("INSTAGRAM", userId),
+        );
+        expect(await service.status(out.confirmation_code)).toMatchObject({
+            channels: 2,
+        });
+        expect(
+            await prisma.socialChannel.count({
+                where: { id: { in: [ig.row.id, fb.row.id] } },
+            }),
+        ).toBe(0);
+    });
+});

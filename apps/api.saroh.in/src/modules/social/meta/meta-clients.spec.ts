@@ -11,7 +11,7 @@ import { isMetaError } from "./social-meta.port";
 
 const keys = {
     facebook: { appId: "fb-app", appSecret: "fb-secret", configId: "cfg-1" },
-    instagram: { appId: "ig-app", appSecret: "ig-secret" },
+    instagram: { appId: "fb-app", appSecret: "fb-secret", configId: "ig-cfg" },
     threads: { appId: "th-app", appSecret: "th-secret" },
 };
 
@@ -36,16 +36,17 @@ describe("consent links", () => {
     const { meta } = client([]);
     const input = { redirectUri: "https://api.test/cb", state: "s.t" };
 
-    it("asks Instagram for its two publishing scopes with the Instagram app's id", () => {
+    it("sends Instagram to Facebook's dialog with the Instagram configuration", () => {
         const url = new URL(meta.authorizeUrl("INSTAGRAM", input));
         expect(url.origin + url.pathname).toBe(
-            "https://www.instagram.com/oauth/authorize",
+            "https://www.facebook.com/v27.0/dialog/oauth",
         );
         expect(Object.fromEntries(url.searchParams)).toEqual({
-            client_id: "ig-app",
+            client_id: "fb-app",
             redirect_uri: "https://api.test/cb",
             response_type: "code",
-            scope: "instagram_business_basic,instagram_business_content_publish",
+            config_id: "ig-cfg",
+            override_default_response_type: "true",
             state: "s.t",
         });
     });
@@ -80,44 +81,56 @@ describe("consent links", () => {
 });
 
 describe("tokens", () => {
-    it("trades an Instagram code for a 60-day token and reads the account", async () => {
+    it("trades an Instagram code, through Facebook Login, for the linked accounts with their Page's token", async () => {
         const { meta, seen } = client([
+            [/fb_exchange_token/, { access_token: "long-user" }],
+            [/oauth\/access_token/, { access_token: "short-user" }],
             [
-                /api\.instagram\.com\/oauth/,
-                { access_token: "short", user_id: 17 },
-            ],
-            [
-                /graph\.instagram\.com\/access_token/,
-                { access_token: "long", expires_in: 5_184_000 },
-            ],
-            [
-                /graph\.instagram\.com\/v27\.0\/me/,
+                /\/me\/accounts/,
                 {
-                    user_id: "1784",
-                    username: "chaiandcrumb",
-                    account_type: "BUSINESS",
+                    data: [
+                        {
+                            id: "p1",
+                            name: "Chai & Crumb",
+                            access_token: "pt1",
+                            instagram_business_account: {
+                                id: "1784",
+                                username: "chaiandcrumb",
+                                profile_picture_url: "https://cdn/a.jpg",
+                            },
+                        },
+                        // A Page with no Instagram account linked isn't offered.
+                        { id: "p2", name: "Crumb Two", access_token: "pt2" },
+                    ],
                 },
             ],
+            [/\/me\?/, { id: "fbu-9" }],
         ]);
-        const at = Date.now();
-        const account = await meta.connect("INSTAGRAM", "code-1", "https://cb");
-        expect(account).toMatchObject({
-            accountId: "1784",
-            platformUserId: "17",
-            handle: "@chaiandcrumb",
-            token: "long",
-            accountType: "BUSINESS",
+        const got = await meta.pageAccounts("INSTAGRAM", "code", "https://cb");
+        expect(got).toEqual({
+            platformUserId: "fbu-9",
+            pages: [
+                {
+                    accountId: "1784",
+                    platformUserId: "fbu-9",
+                    handle: "@chaiandcrumb",
+                    avatarUrl: "https://cdn/a.jpg",
+                    token: "pt1",
+                    tokenExpiresAt: null,
+                    pageId: "p1",
+                },
+            ],
         });
-        expect(account.tokenExpiresAt!.getTime()).toBeGreaterThanOrEqual(
-            at + 5_184_000_000 - 1000,
-        );
-        const exchange = seen[0].init?.body as URLSearchParams;
-        expect(exchange.get("grant_type")).toBe("authorization_code");
-        expect(exchange.get("client_secret")).toBe("ig-secret");
-        expect(seen[1].url).toContain("grant_type=ig_exchange_token");
         expect(
-            (seen[2].init?.headers as Record<string, string>).Authorization,
-        ).toBe("Bearer long");
+            seen.every((s) =>
+                s.url.startsWith("https://graph.facebook.com/v27.0/"),
+            ),
+        ).toBe(true);
+        expect(seen[0].url).toContain("client_secret=fb-secret");
+        expect(seen[1].url).toContain("grant_type=fb_exchange_token");
+        expect(decodeURIComponent(seen[3].url)).toContain(
+            "instagram_business_account{id,username,profile_picture_url}",
+        );
     });
 
     it("trades a Facebook code for the person's Pages, each with its own token", async () => {
@@ -135,7 +148,7 @@ describe("tokens", () => {
             ],
             [/\/me\?/, { id: "fbu-9" }],
         ]);
-        const got = await meta.facebookPages("code", "https://cb");
+        const got = await meta.pageAccounts("FACEBOOK", "code", "https://cb");
         expect(got.platformUserId).toBe("fbu-9");
         expect(
             got.pages.map((p) => [p.accountId, p.token, p.tokenExpiresAt]),
@@ -157,7 +170,7 @@ describe("tokens", () => {
 });
 
 describe("publishing", () => {
-    it("makes an Instagram container, reads its status and publishes it", async () => {
+    it("makes an Instagram container on graph.facebook.com, reads its status and publishes it", async () => {
         const { meta, seen } = client([
             [/\/media_publish/, { id: "post-1" }],
             [/\/media$/, { id: "c-1" }],
@@ -183,6 +196,11 @@ describe("publishing", () => {
         expect(await meta.publishContainer("INSTAGRAM", "ig-1", "t", id)).toBe(
             "post-1",
         );
+        expect(
+            seen.every((s) =>
+                s.url.startsWith("https://graph.facebook.com/v27.0/"),
+            ),
+        ).toBe(true);
         const made = seen.find((s) => s.url.endsWith("/media"));
         expect((made?.init?.body as URLSearchParams).get("image_url")).toBe(
             "https://cdn/x.jpg",
@@ -252,7 +270,7 @@ describe("Meta's errors", () => {
             fetchFn: (() =>
                 Promise.reject(new TypeError("fetch failed"))) as never,
         });
-        await expect(meta.refresh("INSTAGRAM", "t")).rejects.toMatchObject({
+        await expect(meta.refresh("THREADS", "t")).rejects.toMatchObject({
             kind: "retry",
         });
     });
