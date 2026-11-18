@@ -102,10 +102,15 @@ export function QuickLook({
                           : "sm:max-w-[460px]",
                 )}
                 // Focus lands on the sheet, not its first link, so nothing
-                // opens already ringed; Tab moves in from there.
+                // opens already ringed; Tab moves in from there. Without
+                // scrolling: on a phone the sheet is still below the screen
+                // as it rises, and focusing it scrolled the page behind to
+                // its foot.
                 onOpenAutoFocus={(e) => {
                     e.preventDefault();
-                    (e.currentTarget as HTMLElement | null)?.focus();
+                    (e.currentTarget as HTMLElement | null)?.focus({
+                        preventScroll: true,
+                    });
                 }}
                 onCloseAutoFocus={(e) => {
                     const back = opener.current;

@@ -267,7 +267,9 @@ export function SocialPostPanel({
                                     if (post.at) void post.schedule(post.at);
                                 }}
                                 data-schedule-good=""
-                                className="h-auto min-h-14 w-full justify-start gap-3 rounded-xl px-4 py-2.5 text-left text-[15px] font-semibold"
+                                // whitespace-normal: the button's nowrap ran the
+                                // suggestion past a phone's edge and zoomed the page out.
+                                className="h-auto min-h-14 w-full justify-start gap-3 whitespace-normal rounded-xl px-4 py-2.5 text-left text-[15px] font-semibold"
                             >
                                 <CalendarClock
                                     aria-hidden

@@ -123,6 +123,11 @@ test(
         await expect(
             panel.locator("[data-post-to=INSTAGRAM] [role=switch]"),
         ).toHaveAttribute("aria-checked", "true");
+        // Nothing on the composer runs past the screen: a phone that has
+        // to zoom out can't reach the sheet's buttons after it (CI, 18 Nov).
+        await expect
+            .poll(() => page.evaluate(() => window.innerWidth))
+            .toBe(page.viewportSize()?.width);
         await panel.locator("[data-schedule-good]").click();
         await page.waitForURL(/\/social\?post=/);
         const opened = page.locator("[data-post-sheet]");
@@ -130,6 +135,10 @@ test(
         await expect(
             opened.locator("[data-delivery=INSTAGRAM]"),
         ).toHaveAttribute("data-delivery-status", "WAITING");
+
+        await expect
+            .poll(() => page.evaluate(() => window.innerWidth))
+            .toBe(page.viewportSize()?.width);
 
         // Delete it: it was never posted.
         await page.locator("[data-post-action=delete]").click();

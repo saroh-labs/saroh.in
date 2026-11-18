@@ -74,7 +74,11 @@ export function SarohSocialPage({
         <div data-saroh-social="" className="grid gap-6">
             <PageHeader
                 holdsData={onChannels ? false : "description"}
-                compactOnPhone
+                // Compact (actions beside the title) only with one button:
+                // the posts tab's meter and two buttons, held to their own
+                // width there, ran the page ~600px wide on a phone and it
+                // zoomed out (CI, 18 Nov). Below the title they wrap.
+                compactOnPhone={onChannels}
                 breadcrumb={
                     onChannels
                         ? [
