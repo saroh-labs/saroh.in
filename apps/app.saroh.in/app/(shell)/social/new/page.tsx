@@ -14,6 +14,8 @@ import { fixedChoices, pageChoices } from "@/lib/social/links";
 import { getOwnPost, listOwnPosts } from "@/lib/social/own-posts";
 import { pickRows } from "@/lib/social/pick";
 import { readCreatePost } from "@/lib/social/read";
+import { listChannels, readSocialAccess } from "@/lib/social/saroh-social";
+import type { SocialCompose } from "@/lib/social/use-social-post";
 import { POST_WORDS } from "@/lib/social/words";
 
 /**
@@ -21,8 +23,13 @@ import { POST_WORDS } from "@/lib/social/words";
  * BPost*, BOwn*): Create post. Seen with `social:read`; an own post needs
  * `social:post` too. Everything is drawn from the live site, so without
  * one the page says so, once. Not there at all while Share is switched
- * off (DEC-217). `?item=<pick key>` opens on a thing, `?post=<id>` on a
- * saved own post, `?own=text|photo` on a new one.
+ * off (DEC-217). `?item=<pick key>` opens on a thing (or `?kind=&ref=`,
+ * as an item's Share sheet names it), `?post=<id>` on a saved own post,
+ * `?own=text|photo` on a new one.
+ *
+ * With Saroh Social on and `social:post` (plan saroh-social U10, board
+ * BSocialDesk), the post goes to the business's channels, now or at a
+ * time: `?at=<instant>` or `?day=<YYYY-MM-DD>` start it there.
  */
 export const metadata = { title: "New post" };
 
@@ -59,11 +66,19 @@ export default async function NewPostPage({
     const params = await searchParams;
     const canPost = may("social:post");
     const postId = one(params.post);
-    const [posts, saved] = await Promise.all([
+    const [posts, saved, social] = await Promise.all([
         listOwnPosts().catch(() => []),
         postId && canPost ? getOwnPost(postId).catch(() => null) : null,
+        canPost ? readSocialCompose(params) : null,
     ]);
-    const item = one(params.item);
+    const rows = pickRows(read.pick);
+    const kind = one(params.kind);
+    const ref = one(params.ref);
+    const item =
+        one(params.item) ??
+        (kind && ref
+            ? rows.find((r) => r.item?.kind === kind && r.item.ref === ref)?.key
+            : undefined);
     const own = one(params.own);
     const start: Step = saved
         ? { at: "own", photo: false, post: saved }
@@ -75,7 +90,7 @@ export default async function NewPostPage({
     return (
         <PageContainer width="full">
             <CreatePost
-                rows={pickRows(read.pick)}
+                rows={rows}
                 setup={read.setup}
                 origin={read.origin}
                 fixedLinks={fixedChoices(read.links)}
@@ -85,7 +100,26 @@ export default async function NewPostPage({
                 failed={read.failed}
                 ownCount={posts.length}
                 start={start}
+                social={social}
             />
         </PageContainer>
     );
+}
+
+/** Saroh Social for the composer, when it is on here; null otherwise. */
+async function readSocialCompose(
+    params: Record<string, string | string[] | undefined>,
+): Promise<SocialCompose | null> {
+    const access = await readSocialAccess();
+    if (access?.state !== "on" || !access.canPost) return null;
+    const channels = await listChannels();
+    const at = one(params.at);
+    const day = one(params.day);
+    return {
+        access,
+        channels: channels.ok ? channels.data : [],
+        channelsFailed: !channels.ok,
+        at: at && !Number.isNaN(Date.parse(at)) ? at : null,
+        day: day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null,
+    };
 }

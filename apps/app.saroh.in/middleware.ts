@@ -3,6 +3,7 @@ import { createAuthMiddleware } from "@saroh/auth/middleware";
 import { withPrivateApp } from "@saroh/auth/private-app";
 
 import { accountsLoginUrl, inviteLandingFor } from "@/lib/accounts";
+import { isPublicPath } from "@/lib/public-paths";
 
 // Auth-only gate: every app route requires an accounts session. (The old
 // host-based tenant rewriting is gone — the public renderer is saroh.app.)
@@ -13,6 +14,7 @@ export default withPrivateApp(
     withDevAccess(
         createAuthMiddleware({
             loginUrl: accountsLoginUrl,
+            isProtected: (path) => !isPublicPath(path),
             // An invitation link opens the invitation, not the login (UX-029).
             signedOutUrl: inviteLandingFor,
         }),

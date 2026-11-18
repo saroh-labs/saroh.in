@@ -103,6 +103,12 @@ export const ALERTS = [
         label: "Customer messages",
         note: "When a customer writes to you from their account",
     },
+    // Saroh Social: offered by the API once it is rolled out to the business.
+    {
+        key: "social",
+        label: "Saroh Social",
+        note: "When a channel needs reconnecting or a post didn't go out",
+    },
 ] as const;
 export type AlertKey = (typeof ALERTS)[number]["key"];
 
@@ -198,7 +204,8 @@ export function alertGrid(read: AlertPreferencesRead): AlertGrid {
                     alert.key !== "mine" &&
                     alert.key !== "member" &&
                     alert.key !== "enquiry" &&
-                    alert.key !== "message",
+                    alert.key !== "message" &&
+                    alert.key !== "social",
             ).map((alert) => ({
                 key: alert.key,
                 label: alert.label,

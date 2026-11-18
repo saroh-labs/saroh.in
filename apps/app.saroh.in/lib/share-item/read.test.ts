@@ -14,6 +14,11 @@ vi.mock("@/lib/saroh-billing/service", () => ({
     listAddons: () => Promise.resolve({ status: "unavailable" }),
 }));
 
+const social = vi.hoisted(() => ({ state: "unavailable" }));
+vi.mock("@/lib/social/saroh-social", () => ({
+    readSocialAccess: () => Promise.resolve({ state: social.state }),
+}));
+
 import { readShareSetup } from "./read";
 
 const WEB = {
@@ -53,5 +58,14 @@ describe("readShareSetup and the switch", () => {
             siteId: "site_1",
             schedule: { tier: "free" },
         });
+    });
+
+    it("points Share at posting it when Saroh Social is on (S9)", async () => {
+        switchState.on = true;
+        social.state = "on";
+        await expect(
+            readShareSetup({ ...WEB, address: "rye-social" }),
+        ).resolves.toMatchObject({ schedule: { tier: "on" } });
+        social.state = "unavailable";
     });
 });

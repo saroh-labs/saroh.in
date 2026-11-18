@@ -63,6 +63,7 @@ import { SharePostsModule } from "./modules/share-posts/share-posts.module";
 import { SignInOptionsModule } from "./modules/sign-in-options/sign-in-options.module";
 import { SiteAccountsModule } from "./modules/site-accounts/site-accounts.module";
 import { SitesModule } from "./modules/sites/sites.module";
+import { SocialModule } from "./modules/social/social.module";
 import { StaffModule } from "./modules/staff/staff.module";
 import { StockModule } from "./modules/stock/stock.module";
 // "Tell me when it's back" (DEC-174 U23).
@@ -143,6 +144,7 @@ import { WebhooksModule } from "./modules/webhooks/webhooks.module";
         SitesModule,
         // Share pictures and own posts (#1375, #1378).
         SharePostsModule,
+        SocialModule,
         // Ask AI's layer (DEC-220): settings, history, retention.
         AiModule,
         // Google Calendar sync and Meet links (#1047, #1048).

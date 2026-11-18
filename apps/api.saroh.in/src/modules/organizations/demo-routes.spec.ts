@@ -127,6 +127,12 @@ const ASKS: Record<string, How> = {
     "POST public/webhooks/meta": {
         exempt: "Saroh's WhatsApp delivery reports from Meta",
     },
+    "POST public/webhooks/meta/deauthorize/:kind": {
+        exempt: "Meta's signed Saroh Social deauthorize callback",
+    },
+    "POST public/webhooks/meta/data-deletion/:kind": {
+        exempt: "Meta's signed Saroh Social data deletion callback",
+    },
 };
 
 const modules = join(__dirname, "..");

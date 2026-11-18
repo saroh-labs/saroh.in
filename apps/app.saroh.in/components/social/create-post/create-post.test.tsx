@@ -38,7 +38,12 @@ const saved = vi.hoisted(() => ({
 const router = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => router }));
 const removed = vi.hoisted(() => ({ ids: [] as string[] }));
-vi.mock("@saroh/ui/toast", () => ({ showUndo: vi.fn(), showError: vi.fn() }));
+vi.mock("@saroh/ui/toast", () => ({
+    showUndo: vi.fn(),
+    showError: vi.fn(),
+    showSuccess: vi.fn(),
+}));
+vi.mock("@/lib/social/saroh-social-actions", () => ({}));
 vi.mock("@/lib/social/actions", () => ({
     removeOwnPost: (id: string) => {
         removed.ids.push(id);

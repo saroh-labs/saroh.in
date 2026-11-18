@@ -21,6 +21,7 @@
  * | `storageGb`        | photos and videos uploaded and checked (`Media.status` READY), in GB  |
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
  * | `aiQuestionsPerMonth` | Ask AI turns that counted (`AiUsage.counted`, DEC-220): answered, drafted or stopped after the answer began |
+ * | `socialPostsPerMonth` | Saroh Social posts going out in the window (by `publishAt`, so one scheduled into next month counts there), once each however many channels; drafts and posts cancelled before they started never count |
  *
  * A cap inside one thing (a product's variants, `variantsPerProduct`) is
  * not counted here: it has no total across the business, so it is no meter
@@ -65,6 +66,7 @@ export const METERED_LIMIT_KEYS = [
     "storageGb",
     "visitsPerMonth",
     "aiQuestionsPerMonth",
+    "socialPostsPerMonth",
 ] as const;
 export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
 
@@ -256,6 +258,7 @@ export type MeterDb = Pick<
     | "analyticsDailyAggregate"
     | "subscription"
     | "aiUsage"
+    | "socialPost"
 >;
 
 /**
@@ -359,6 +362,26 @@ export function countedQuestions(since: Date): Prisma.AiUsageWhereInput {
     return { counted: true, startedAt: { gte: since } };
 }
 
+/** Saroh Social's statuses that hold a place: going out, or gone out (well or not). */
+export const COUNTED_POST_STATUSES = [
+    "SCHEDULED",
+    "PUBLISHING",
+    "DONE",
+    "PARTLY_DONE",
+    "FAILED",
+] as const;
+
+/** Saroh Social posts that count in a window: by when they go out. */
+export function countedPosts(window: {
+    start: Date;
+    end: Date;
+}): Prisma.SocialPostWhereInput {
+    return {
+        status: { in: [...COUNTED_POST_STATUSES] },
+        publishAt: { gte: window.start, lt: window.end },
+    };
+}
+
 /**
  * How much of one limit a business uses now. Monthly keys count over
  * {@link meterWindow}.
@@ -454,6 +477,12 @@ export async function countUsage(
             const { start } = await meterWindow(db, organizationId, now);
             return db.aiUsage.count({
                 where: { organizationId, ...countedQuestions(start) },
+            });
+        }
+        case "socialPostsPerMonth": {
+            const window = await meterWindow(db, organizationId, now);
+            return db.socialPost.count({
+                where: { organizationId, ...countedPosts(window) },
             });
         }
     }

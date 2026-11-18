@@ -11,6 +11,8 @@ import type { ShareSetup } from "@/lib/share-item/share";
 import type { LinkChoice } from "@/lib/social/links";
 import type { OwnPost } from "@/lib/social/own-posts";
 import type { PickRow } from "@/lib/social/pick";
+import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
+import type { SocialCompose } from "@/lib/social/use-social-post";
 import { POST_WORDS } from "@/lib/social/words";
 
 import { ItemComposer } from "./item-composer";
@@ -41,6 +43,7 @@ export function CreatePost({
     failed,
     ownCount,
     start = { at: "pick" },
+    social = null,
 }: {
     rows: PickRow[];
     setup: ShareSetup;
@@ -53,6 +56,8 @@ export function CreatePost({
     failed: string[];
     ownCount: number;
     start?: Step;
+    /** Saroh Social, when it is on for the business: post it, not only share it. */
+    social?: SocialCompose | null;
 }) {
     const narrow = useNarrow();
     const [step, setStep] = useState<Step>(start);
@@ -89,7 +94,9 @@ export function CreatePost({
                       ? POST_WORDS.pickDescription
                       : own
                         ? POST_WORDS.ownDescription
-                        : POST_WORDS.readyDescription
+                        : social
+                          ? SOCIAL_WORDS.readyFor
+                          : POST_WORDS.readyDescription
             }
             actions={
                 narrow && row && !done ? (
@@ -122,6 +129,7 @@ export function CreatePost({
                     narrow={narrow}
                     onAnother={toPick}
                     onDone={setDone}
+                    social={social}
                 />
             </div>
         );
@@ -140,6 +148,7 @@ export function CreatePost({
                     onChange={toPick}
                     onAnother={toPick}
                     onDone={setDone}
+                    social={social}
                 />
             </div>
         );

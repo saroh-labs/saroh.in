@@ -85,6 +85,15 @@ describe("the API's environment", () => {
         ).toEqual([]);
     });
 
+    it("refuses Saroh Social's fake Meta in production", () => {
+        expect(missing({ ...DEPLOYED, SOCIAL_FAKE: "1" })).toEqual([
+            "SOCIAL_FAKE",
+        ]);
+        expect(
+            missing({ ...BASE, NODE_ENV: "test", SOCIAL_FAKE: "1" }),
+        ).toEqual([]);
+    });
+
     it("refuses the Ask AI fake in production", () => {
         expect(missing({ ...DEPLOYED, AI_PROVIDER_FAKE: "1" })).toEqual([
             "AI_PROVIDER_FAKE",

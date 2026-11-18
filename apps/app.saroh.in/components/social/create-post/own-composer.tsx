@@ -17,6 +17,7 @@ import { Check, Link2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import type { PickedImage } from "@/components/shared/fields/media-picker";
 import { MediaPicker } from "@/components/shared/fields/media-picker";
 import {
@@ -41,6 +42,7 @@ import {
 } from "@/components/shared/share-item/share-actions";
 import { useCardImage } from "@/components/shared/share-item/use-card-image";
 import { useSettled } from "@/components/shared/share-item/use-share-state";
+import { SocialPostPanel } from "@/components/social/saroh/composer/social-post-panel";
 import type {
     CardSize,
     CardStyle,
@@ -61,6 +63,9 @@ import { removeOwnPost, saveOwnPost } from "@/lib/social/actions";
 import type { LinkChoice } from "@/lib/social/links";
 import { addressOf, shownAddress } from "@/lib/social/links";
 import type { OwnPost, OwnPostInput } from "@/lib/social/own-posts";
+import { SOCIAL_WORDS } from "@/lib/social/saroh-social-words";
+import type { SocialCompose } from "@/lib/social/use-social-post";
+import { NO_SOCIAL, useSocialPost } from "@/lib/social/use-social-post";
 import { counted, POST_WORDS } from "@/lib/social/words";
 
 import { PhoneFoot } from "./item-composer";
@@ -100,6 +105,7 @@ export function OwnComposer({
     narrow,
     onAnother,
     onDone,
+    social = null,
 }: {
     initial: OwnPost | null;
     startWithPhoto: boolean;
@@ -114,6 +120,8 @@ export function OwnComposer({
     narrow: boolean;
     onAnother: () => void;
     onDone?: (done: boolean) => void;
+    /** Saroh Social, when it is on for the business (board BSocialDesk). */
+    social?: SocialCompose | null;
 }) {
     const id = useId();
     const router = useRouter();
@@ -132,6 +140,10 @@ export function OwnComposer({
     const [editing, setEditing] = useState(false);
     const [done, setDoneState] = useState<Shared | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const zone = useBusinessZone();
+    // "Or share it yourself": Ready to share, as without Saroh Social.
+    const [manual, setManual] = useState(false);
+    const posting = social !== null && !manual;
     const setDone = (d: Shared | null) => {
         setDoneState(d);
         onDone?.(d !== null);
@@ -199,6 +211,37 @@ export function OwnComposer({
             ? cardImageUrl(setup, item, s, size, { w, v: post.updatedAt })
             : null;
     const { image, retry } = useCardImage(src(shownStyle));
+    const sp = useSocialPost({
+        social: social ?? NO_SOCIAL,
+        // Saroh draws the post from the words and photo as they are now.
+        base: () =>
+            headline.trim() || mediaId
+                ? {
+                      sourceKind: "own",
+                      sourceRef: null,
+                      title: headline.trim() || POST_WORDS.ownTitle,
+                      picture: "card",
+                      cardStyle: shownStyle,
+                      size: size === "square" ? "square" : "post",
+                      headline: headline.trim() || null,
+                      mediaId,
+                      caption,
+                      linkPath,
+                  }
+                : null,
+        text: caption,
+        link: url,
+        zone,
+    });
+    const panel = social ? (
+        <SocialPostPanel
+            social={social}
+            post={sp}
+            text={caption}
+            storySize={size === "story"}
+            onShareYourself={() => setManual(true)}
+        />
+    ) : null;
     const parts: ShareParts = {
         caption: withLink(caption, url),
         link: url,
@@ -506,20 +549,23 @@ export function OwnComposer({
                     {POST_WORDS.captionAndLink}
                 </Button>
                 {editing ? captionEditor : null}
+                {posting ? panel : null}
                 {draftLine}
                 {confirm}
-                <PhoneFoot>
-                    <div className="flex items-center gap-2">
-                        <ShareNowButton {...parts} onShared={setDone} />
-                        <DownloadIconButton
-                            image={image}
-                            fileName={parts.fileName}
-                        />
-                    </div>
-                    <p className="text-center text-[12.5px] text-muted-foreground">
-                        {SHARE_WORDS.copiesFirst}
-                    </p>
-                </PhoneFoot>
+                {posting ? null : (
+                    <PhoneFoot>
+                        <div className="flex items-center gap-2">
+                            <ShareNowButton {...parts} onShared={setDone} />
+                            <DownloadIconButton
+                                image={image}
+                                fileName={parts.fileName}
+                            />
+                        </div>
+                        <p className="text-center text-[12.5px] text-muted-foreground">
+                            {SHARE_WORDS.copiesFirst}
+                        </p>
+                    </PhoneFoot>
+                )}
             </div>
         );
     }
@@ -553,12 +599,22 @@ export function OwnComposer({
                 </section>
                 {editing ? (
                     captionEditor
+                ) : posting ? (
+                    panel
                 ) : (
                     <div className="grid gap-3">
                         <h2 className="mt-1.5 text-[20px] font-semibold tracking-[-0.01em]">
                             {SHARE_WORDS.ready}
                         </h2>
                         <ReadyActions {...parts} onShared={setDone} />
+                        {social ? (
+                            <TextLink
+                                onClick={() => setManual(false)}
+                                className="w-fit font-semibold"
+                            >
+                                {SOCIAL_WORDS.backToSchedule}
+                            </TextLink>
+                        ) : null}
                     </div>
                 )}
                 {looks}

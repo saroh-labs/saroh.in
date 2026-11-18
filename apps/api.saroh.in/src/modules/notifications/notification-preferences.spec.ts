@@ -206,6 +206,8 @@ describe("reading your alerts", () => {
             "member",
             "enquiry",
             "message",
+            // Every flag reads on here, MODULE_SOCIAL with them.
+            "social",
         ]);
         // Email on by default: the site changed, or didn't, unwatched.
         expect(view.alerts.find((a) => a.key === "site")?.channels).toEqual({

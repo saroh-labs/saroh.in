@@ -256,6 +256,48 @@ export class PublicShareService {
         );
     }
 
+    /**
+     * Saroh Social's picture (plan saroh-social 2026-11-18-001, U5): a
+     * live item's card, or the business's own words (with its own photo,
+     * if any), on its live site's look, as a JPEG at full size. The item
+     * is read as its public page reads it, so a draft, hidden or expired
+     * one is a 404 here too. For the business's own people only (the
+     * posts service asks `social:post`); no visitor limit.
+     */
+    async socialCard(
+        organizationId: string,
+        card: {
+            kind: ShareKind | "own";
+            ref: string | null;
+            headline?: string | null;
+            mediaId?: string | null;
+            style: string;
+            size: "post" | "square";
+        },
+    ): Promise<Buffer> {
+        const site = await this.liveSite(await this.liveSiteId(organizationId));
+        const content: Content =
+            card.kind === "own"
+                ? {
+                      name: card.headline ?? "",
+                      price: null,
+                      photoMediaId: card.mediaId ?? null,
+                  }
+                : await this.content(
+                      site,
+                      card.kind,
+                      card.ref ?? "",
+                      `social:${organizationId}`,
+                      {},
+                  );
+        return this.draw(
+            site,
+            content,
+            { style: card.style, size: card.size },
+            "jpeg",
+        );
+    }
+
     /** The business's live site: its first, as the own post's picture reads it. */
     private async liveSiteId(organizationId: string): Promise<string> {
         const live = await prisma.site.findFirst({
@@ -511,6 +553,7 @@ export class PublicShareService {
         site: LiveSite,
         content: Content,
         query: ShareQuery,
+        format: "png" | "jpeg" = "png",
     ): Promise<Buffer> {
         const families = siteFamilies(site.variables, site.look);
         const chosen = curatedFont(query.font);
@@ -552,6 +595,7 @@ export class PublicShareService {
                 heading: chosen ?? families.heading,
                 body: families.body,
             },
+            format,
         });
     }
 

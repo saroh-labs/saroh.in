@@ -424,6 +424,21 @@ const input: CatalogInput = {
                 pro: C("100,000 questions a month", "", 100000, "month"),
             },
         },
+        // Saroh Social: locked on Free and on Grow until its add-on is
+        // bought, which brings Pro's allowance. Made up, high on Pro so no
+        // browser spec meets it.
+        {
+            id: "social",
+            name: "Saroh Social",
+            group: "usage",
+            pricing: "hidden",
+            what: "Saroh posts to your Instagram, Facebook Page and Threads, on time, and shows what each post brought.",
+            cells: {
+                free: X(),
+                grow: X(),
+                pro: C("100,000 posts a month", "", 100000, "month"),
+            },
+        },
         {
             id: "webhooks",
             name: "Webhooks",
@@ -458,6 +473,17 @@ const input: CatalogInput = {
             qty: 1,
             plans: ["grow"],
             max: 3,
+        },
+        {
+            id: "social-grow",
+            kind: "module",
+            module: "social",
+            name: "Saroh Social",
+            pricePaise: 9_900,
+            mode: "pack",
+            qty: 1,
+            plans: ["grow"],
+            max: 1,
         },
         {
             id: "member-pro",
