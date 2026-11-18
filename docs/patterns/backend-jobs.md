@@ -17,6 +17,22 @@
 - **At-least-once.** Retries back off exponentially (1 s base, 5 min cap) up to
   `maxAttempts` (5), and the job is then FAILED. Staff may cancel a job that
   is still `PENDING` (`CANCELLED`, below).
+- **Lanes** (18 Nov 2026, GC-04). The worker runs one poll loop per lane
+  (`JOB_LANES` in `job-queue.port.ts`), each claiming only its own types:
+  `calendar` takes `calendar.*`, `main` everything else. A job that waits
+  on an outside service many times per business (Google Calendar's busy
+  reads, every ten minutes per person) gets its own lane, so a slow
+  provider delays only itself, never a payment webhook or a customer's
+  message. A new lane is a prefix, a value in `JOB_LANES` and its arm in
+  `PrismaJobQueue.claimDue`; `runOnce()` with no lane claims any type
+  (tests).
+- **Long schedules.** A type whose failures are an outside service's
+  outage retries on `RETRY_SCHEDULES` (minutes to hours) with its own
+  `maxAttempts`, not the 5-minute backoff: `webhook.process`,
+  `webhooks.deliver`, and `calendar.sync` (1, 5, 15, 60, 240 minutes, six
+  tries, each wait spread by up to a fifth either way so a bulk change
+  that met a rate limit doesn't return at once). The handler tells a
+  person once when the last try fails, where someone is waiting on it.
 
 ## Rules
 
@@ -130,7 +146,8 @@ waits while holding one.
 | `ai-request:<organizationId>`             | Request more: one open request a business                                                                                                                                                                                                                                                                                                | `ai/requests/ai-requests.service.ts` (U7)                                           |
 | `search-pages:publish`                    | One search-page action at a time (DEC-193), so two can't both read a path as unpublished and write it                                                                                                                                                                                                                                    | `search-pages/search-pages.service.ts` (`act`)                                      |
 | `webhooks:<organizationId>`               | Making a business's webhook endpoints (U13): the count under `webhooks.max` and the insert, so two at once can't both fit the last place                                                                                                                                                                                                 | `outbound-webhooks/endpoints.service.ts` (`create`)                                 |
-| `calendar-busy:<connectionId>`            | Leaving one waiting `calendar.busy` run per Google Calendar connection (#1047): "is one waiting? if not, add one", so a reconnect, a status read and the run's own next run can't make two                                                                                                                                               | `calendar-sync/calendar-jobs.ts` (`scheduleBusy`)                                   |
+| `calendar-busy:<connectionId>`            | Leaving one waiting `calendar.busy` run per Google Calendar connection (#1047): "is one waiting? if not, add one", so a reconnect, a status read and the run's own next run can't make two; one waiting for later is brought forward (GC-13)                                                                                             | `calendar-sync/calendar-jobs.ts` (`scheduleBusy`)                                   |
+| `job-chain:calendar.sweep`                | Leaving one waiting run of the hourly calendar sweep (GC-14), as the manager link sweep does                                                                                                                                                                                                                                             | `calendar-sync/calendar-sweep.job.ts` (`schedule`)                                  |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).

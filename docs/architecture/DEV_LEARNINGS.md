@@ -6826,6 +6826,18 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** turbo runs ten tasks at once by default; with nearly every package affected (a merge from development), several `tsc` and ESLint processes for the big apps at once starve the 16 GB hosted runner.
 - **Fix:** `--concurrency=4` on that step (`.github/workflows/ci.yml`), as the test step already caps itself. A job that dies with "lost communication" and no log is memory, not the code: cap the parallelism, don't re-run it again and again.
 
+### A check made only when connecting is not a check (18 Nov 2026)
+
+- **Symptom:** the Google Calendar review (GC-02, GC-03) found that a business moved down to Free, a person who lost `calendar:connect-own`, or one taken off the diary kept syncing for good, and the person couldn't even disconnect: only connecting asked the plan and the permission.
+- **Cause:** the gate lived in the connect service; the two jobs and the slot reads trusted the connection's own status.
+- **Fix:** one `calendar-allowed.ts` asked by both jobs and every slot read; a connection that fails it reads PAUSED and resumes by itself; disconnect needs only a membership. Rule for any provider a person connects: what lets them connect is asked again wherever it acts (`backend-integrations.md` → Google Calendar).
+
+### Revoking one Google token ended the person's other connections (18 Nov 2026)
+
+- **Symptom:** GC-06: disconnecting Google Calendar in one business would have broken the same Google account in another, and the person's Google sign-in consent.
+- **Cause:** Google's revoke ends the whole grant for the client, not the one token.
+- **Fix:** revoke only at the last use (`CalendarReleaseService.lastUse`); otherwise delete Saroh's stored token. `calendar-connect.service.db.spec.ts` pins it.
+
 ### Words typed before hydration vanish when a phone layout takes over; a clean-up in `finally` never runs after a timeout (18 Nov 2026)
 
 - **Symptom:** on #1431, `social-channels.spec.ts` passed on desk and timed out on phone: Create post's headline was empty and pressing "Schedule for tomorrow" sent nothing. The retry then found Instagram still connected, because the `finally` that disconnects it had no time left.

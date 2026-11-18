@@ -1,4 +1,5 @@
 import type {
+    BusyEvent,
     BusyInterval,
     ConsentInput,
     EventInput,
@@ -19,6 +20,8 @@ export interface FakeEvent {
     input: EventInput;
     status: "confirmed" | "cancelled";
     meetCode: string | null;
+    /** Deleted with no email to the guest. */
+    quiet?: boolean;
 }
 
 /**
@@ -31,7 +34,10 @@ export interface FakeEvent {
 export class FakeGoogleCalendar implements GoogleCalendarPort {
     /** Calendar id → events by id. */
     readonly events = new Map<string, Map<string, FakeEvent>>();
+    /** Other events on a calendar that count as busy (made by the person, or accepted). */
     readonly busy = new Map<string, BusyInterval[]>();
+    /** Calendars the person doesn't own: the events read is refused there. */
+    readonly notOwned = new Set<string>();
     readonly spaces = new Map<string, MeetAccess>();
     readonly revoked: string[] = [];
     readonly calls: Op[] = [];
@@ -101,6 +107,26 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
         });
     }
 
+    busyEvents(
+        _accessToken: string,
+        calendarId: string,
+        from: Date,
+        to: Date,
+    ): Promise<BusyEvent[]> {
+        return this.answer("busyEvents", () => {
+            if (this.notOwned.has(calendarId)) {
+                throw new GoogleCalendarError(
+                    "refused",
+                    "events list 403 forbidden",
+                );
+            }
+            return this.eventsOn(calendarId).filter(
+                (b) => b.startAt < to && b.endAt > from,
+            );
+        });
+    }
+
+    /** As Google's free/busy: every busy time, Saroh's own events included. */
     freeBusy(
         _accessToken: string,
         calendarIds: readonly string[],
@@ -109,15 +135,35 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
     ): Promise<BusyInterval[]> {
         return this.answer("freeBusy", () => {
             return calendarIds
-                .flatMap((id) => this.busy.get(id) ?? [])
-                .filter((b) => b.startAt < to && b.endAt > from);
+                .flatMap((id) => this.eventsOn(id))
+                .filter((b) => b.startAt < to && b.endAt > from)
+                .map(({ startAt, endAt }) => ({ startAt, endAt }));
         });
+    }
+
+    private eventsOn(calendarId: string): BusyEvent[] {
+        const own = [...(this.events.get(calendarId)?.values() ?? [])]
+            .filter((e) => e.status === "confirmed")
+            .map((e) => ({
+                eventId: e.input.eventId,
+                startAt: e.input.startAt,
+                endAt: e.input.endAt,
+                bookingId: e.input.bookingId,
+            }));
+        const other = (this.busy.get(calendarId) ?? []).map((b, i) => ({
+            eventId: `other${i}`,
+            startAt: b.startAt,
+            endAt: b.endAt,
+            bookingId: null,
+        }));
+        return [...own, ...other];
     }
 
     putEvent(
         _accessToken: string,
         calendarId: string,
         input: EventInput,
+        opts: { quiet?: boolean } = {},
     ): Promise<EventResult> {
         return this.answer("putEvent", () => {
             const calendar =
@@ -136,6 +182,7 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
                 input,
                 status: "confirmed",
                 meetCode,
+                quiet: opts.quiet === true,
             });
             return this.resultOf(input.eventId, meetCode);
         });
@@ -145,10 +192,14 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
         _accessToken: string,
         calendarId: string,
         eventId: string,
+        opts: { quiet?: boolean } = {},
     ): Promise<void> {
         return this.answer("deleteEvent", () => {
             const event = this.events.get(calendarId)?.get(eventId);
-            if (event) event.status = "cancelled";
+            if (event) {
+                event.status = "cancelled";
+                event.quiet = opts.quiet === true;
+            }
         });
     }
 

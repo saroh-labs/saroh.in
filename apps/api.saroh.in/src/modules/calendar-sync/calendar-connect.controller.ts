@@ -5,6 +5,7 @@ import {
     Get,
     Header,
     HttpCode,
+    Param,
     Post,
     Put,
     Query,
@@ -18,10 +19,12 @@ import type { Request, Response } from "express";
 import { auth } from "../../common/auth/auth";
 import { LifecycleWrite } from "../../common/decorators/lifecycle-write.decorator";
 import { OrgContext } from "../../common/decorators/org-context.decorator";
+import { assertEditionMatchesAddress } from "../../common/edition-address";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { OrganizationContextService } from "../organizations/organization-context.service";
+import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { CalendarConnectService } from "./calendar-connect.service";
 import type {
     CalendarStatusView,
@@ -82,6 +85,17 @@ export class CalendarConnectController {
     ): Promise<CalendarStatusView> {
         return this.calendars.disconnect(ctx);
     }
+
+    /** Someone else's connection, stopped by whoever may change their role (GC-03). */
+    @Delete("members/:membershipId")
+    @LifecycleWrite("wind-down")
+    @Header("Cache-Control", "no-store")
+    disconnectMember(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("membershipId") membershipId: string,
+    ): Promise<CalendarStatusView> {
+        return this.calendars.disconnectMember(ctx, membershipId);
+    }
 }
 
 /**
@@ -114,7 +128,16 @@ export class CalendarCallbackController {
         const to = await this.calendars.callback(
             { code, state, error },
             session?.user.id ?? "",
-            (orgId) => this.contexts.resolve(session?.user.id ?? "", orgId),
+            async (orgId) => {
+                const ctx = await this.contexts.resolve(
+                    session?.user.id ?? "",
+                    orgId,
+                );
+                // What OrganizationGuard asks of every other write (GC-15).
+                assertEditionMatchesAddress(ctx.edition, req.headers.host);
+                await assertWorkspaceWrite(orgId, "new");
+                return ctx;
+            },
         );
         res.redirect(302, to);
     }

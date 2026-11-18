@@ -1,3 +1,8 @@
+const allowed = jest.fn<Promise<Set<string> | null>, [string]>();
+jest.mock("../bookings/google-busy-gate", () => ({
+    googleBusyCounted: (organizationId: string) => allowed(organizationId),
+}));
+
 import type { Prisma } from "@saroh/database";
 
 import { staffSlots } from "../bookings/availability";
@@ -24,9 +29,22 @@ const service = {
     timezone: "UTC",
 };
 
-function db(google: { staffId: string; startAt: Date; endAt: Date }[]) {
+interface Block {
+    staffId: string;
+    startAt: Date;
+    endAt: Date;
+    /** Whose connection read it; Asha's unless said. */
+    membershipId?: string;
+}
+
+function db(google: Block[]) {
     const empty = () => jest.fn().mockResolvedValue([]);
-    const googleBusy = jest.fn().mockResolvedValue(google);
+    const googleBusy = jest.fn().mockResolvedValue(
+        google.map(({ membershipId, ...b }) => ({
+            ...b,
+            connection: { membershipId: membershipId ?? "m_asha" },
+        })),
+    );
     return {
         client: {
             staffHours: {
@@ -53,6 +71,11 @@ function db(google: { staffId: string; startAt: Date; endAt: Date }[]) {
         googleBusy,
     };
 }
+
+beforeEach(() => {
+    allowed.mockReset();
+    allowed.mockResolvedValue(new Set(["m_asha"]));
+});
 
 describe("Google busy times in slots", () => {
     it("takes the overlapping slot away, without the gap around it", async () => {
@@ -94,5 +117,32 @@ describe("Google busy times in slots", () => {
         const since = where.connection.busyRefreshedAt.gte.getTime();
         expect(since).toBeGreaterThanOrEqual(before - GOOGLE_BUSY_FRESH_MS);
         expect(since).toBeLessThanOrEqual(Date.now() - GOOGLE_BUSY_FRESH_MS);
+    });
+
+    const block = (membershipId?: string): Block => ({
+        staffId: "asha",
+        startAt: iso("2026-07-20T08:00:00Z"),
+        endAt: iso("2026-07-20T09:00:00Z"),
+        ...(membershipId ? { membershipId } : {}),
+    });
+
+    it("ignores them once the flag or the plan is off (GC-02)", async () => {
+        allowed.mockResolvedValue(null);
+        const { client } = db([block()]);
+        const people = await loadPeople(client, "org_a", ["asha"], from, to);
+        expect(people[0].timeOff).toHaveLength(0);
+    });
+
+    it("ignores them from someone who no longer holds the permission (GC-03)", async () => {
+        allowed.mockResolvedValue(new Set(["m_someone_else"]));
+        const { client } = db([block()]);
+        const people = await loadPeople(client, "org_a", ["asha"], from, to);
+        expect(people[0].timeOff).toHaveLength(0);
+    });
+
+    it("asks nothing more of a business with no busy times", async () => {
+        const { client } = db([]);
+        await loadPeople(client, "org_a", ["asha"], from, to);
+        expect(allowed).not.toHaveBeenCalled();
     });
 });

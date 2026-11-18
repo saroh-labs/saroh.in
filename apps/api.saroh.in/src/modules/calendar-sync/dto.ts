@@ -6,6 +6,7 @@ import {
     MaxLength,
 } from "class-validator";
 
+import type { PauseReason } from "./calendar-allowed";
 import type { GrantedParts } from "./google/google-calendar.port";
 
 /**
@@ -41,7 +42,13 @@ export interface ChosenCalendarView {
 
 /** A person's Google Calendar, as their settings show it. */
 export interface CalendarStatusView {
-    state: "NOT_CONNECTED" | "CONNECTED" | "LAPSED";
+    /**
+     * PAUSED: kept, but not syncing now (GC-02, GC-03): the business's
+     * plan or the flag left it off, or the person no longer holds
+     * `calendar:connect-own` or a place on the diary. It carries on by
+     * itself once allowed again; Disconnect still works.
+     */
+    state: "NOT_CONNECTED" | "CONNECTED" | "LAPSED" | "PAUSED";
     googleEmail: string | null;
     calendars: ChosenCalendarView[];
     /** What the person let Saroh do at consent. */
@@ -49,6 +56,8 @@ export interface CalendarStatusView {
     busyRefreshedAt: string | null;
     /** Busy times are older than two hours: slots are on Saroh's times only. */
     behind: boolean;
+    /** Why it is PAUSED; null otherwise. */
+    pausedBecause: PauseReason | null;
     /** How many calendars they may choose (one today). */
     calendarsAllowed: number;
 }

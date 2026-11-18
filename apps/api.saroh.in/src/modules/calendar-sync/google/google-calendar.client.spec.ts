@@ -1,5 +1,10 @@
 import { FakeGoogleCalendar } from "./fake-google-calendar";
-import { emailOf, GoogleCalendarClient } from "./google-calendar.client";
+import {
+    busyOf,
+    emailOf,
+    GOOGLE_CALL_TIMEOUT_MS,
+    GoogleCalendarClient,
+} from "./google-calendar.client";
 import type { EventInput } from "./google-calendar.port";
 import { grantedParts, isPartial, SCOPES } from "./google-calendar.port";
 import { googleFakeAllowed } from "./google-calendar.provider";
@@ -243,6 +248,137 @@ describe("GoogleCalendarClient", () => {
         );
         expect(emailOf("not-a-token")).toBeUndefined();
         expect(emailOf(undefined)).toBeUndefined();
+    });
+});
+
+describe("busy reads and guest limits (GC-01, GC-04, GC-09, GC-10, GC-12)", () => {
+    const at = (iso: string) => ({ dateTime: iso });
+
+    it("counts what the person made or accepted, and nothing else", () => {
+        const base = {
+            start: at("2027-01-04T05:00:00Z"),
+            end: at("2027-01-04T06:00:00Z"),
+        };
+        // Their own: no guest list, or they organise it.
+        expect(busyOf({ id: "a", ...base }, "UTC")).not.toBeNull();
+        expect(
+            busyOf({ id: "b", ...base, organizer: { self: true } }, "UTC"),
+        ).not.toBeNull();
+        expect(
+            busyOf(
+                {
+                    id: "c",
+                    ...base,
+                    attendees: [{ self: true, responseStatus: "accepted" }],
+                },
+                "UTC",
+            ),
+        ).not.toBeNull();
+        // An invitation nobody answered, or declined, or a maybe: free.
+        for (const responseStatus of ["needsAction", "declined", "tentative"]) {
+            expect(
+                busyOf(
+                    {
+                        id: "d",
+                        ...base,
+                        attendees: [{ self: true, responseStatus }],
+                    },
+                    "UTC",
+                ),
+            ).toBeNull();
+        }
+        // Shown as free, cancelled, a working location: free.
+        expect(
+            busyOf({ id: "e", ...base, transparency: "transparent" }, "UTC"),
+        ).toBeNull();
+        expect(
+            busyOf({ id: "f", ...base, status: "cancelled" }, "UTC"),
+        ).toBeNull();
+        expect(
+            busyOf({ id: "g", ...base, eventType: "workingLocation" }, "UTC"),
+        ).toBeNull();
+    });
+
+    it("reads an all-day busy event in the calendar's zone, and Saroh's own booking id", () => {
+        const allDay = busyOf(
+            {
+                id: "h",
+                start: { date: "2027-01-04" },
+                end: { date: "2027-01-05" },
+                extendedProperties: { private: { sarohBookingId: "bk_9" } },
+            },
+            "Asia/Kolkata",
+        );
+        expect(allDay).toEqual({
+            eventId: "h",
+            startAt: new Date("2027-01-03T18:30:00Z"),
+            endAt: new Date("2027-01-04T18:30:00Z"),
+            bookingId: "bk_9",
+        });
+    });
+
+    it("lists a calendar's events over the window, page by page", async () => {
+        const { fetch, calls } = fetchOf(
+            json(200, {
+                timeZone: "UTC",
+                items: [
+                    {
+                        id: "one",
+                        start: at("2027-01-04T05:00:00Z"),
+                        end: at("2027-01-04T06:00:00Z"),
+                    },
+                ],
+                nextPageToken: "p2",
+            }),
+            json(200, {
+                items: [
+                    {
+                        id: "two",
+                        start: at("2027-01-05T05:00:00Z"),
+                        end: at("2027-01-05T06:00:00Z"),
+                        attendees: [
+                            { self: true, responseStatus: "needsAction" },
+                        ],
+                    },
+                ],
+            }),
+        );
+        const busy = await client(fetch).busyEvents(
+            "at",
+            "primary",
+            new Date("2027-01-01T00:00:00Z"),
+            new Date("2027-03-01T00:00:00Z"),
+        );
+        expect(busy.map((b) => b.eventId)).toEqual(["one"]);
+        const first = new URL(calls[0].url);
+        expect(first.searchParams.get("singleEvents")).toBe("true");
+        expect(first.searchParams.get("fields")).toContain("attendees");
+        expect(new URL(calls[1].url).searchParams.get("pageToken")).toBe("p2");
+    });
+
+    it("waits on Google for seconds, not a quarter of a minute", () => {
+        expect(GOOGLE_CALL_TIMEOUT_MS).toBeLessThanOrEqual(5_000);
+    });
+
+    it("lets the customer neither invite others nor see other guests", async () => {
+        const { fetch, calls } = fetchOf(json(200, { id: "saroh0abc" }));
+        await client(fetch).putEvent("at", "primary", event);
+        expect(JSON.parse(String(calls[0].init.body))).toMatchObject({
+            guestsCanInviteOthers: false,
+            guestsCanSeeOtherGuests: false,
+        });
+    });
+
+    it("emails nobody when told to be quiet", async () => {
+        const { fetch, calls } = fetchOf(
+            json(200, { id: "saroh0abc" }),
+            new Response(null, { status: 204 }),
+        );
+        const c = client(fetch);
+        await c.putEvent("at", "primary", event, { quiet: true });
+        await c.deleteEvent("at", "primary", "saroh0abc", { quiet: true });
+        expect(calls[0].url).toContain("sendUpdates=none");
+        expect(calls[1].url).toContain("sendUpdates=none");
     });
 });
 

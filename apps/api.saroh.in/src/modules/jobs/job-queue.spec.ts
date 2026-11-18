@@ -3,6 +3,7 @@
 import {
     BACKOFF_BASE_MS,
     BACKOFF_CAP_MS,
+    laneOf,
     nextBackoff,
     retryDelay,
 } from "./job-queue.port";
@@ -55,5 +56,37 @@ describe("retryDelay", () => {
             .map((n) => retryDelay("webhook.process", n))
             .reduce((a, b) => a + b, 0);
         expect(total / (60 * MIN)).toBeGreaterThan(15);
+    });
+
+    it("waits minutes, not seconds, before retrying a Google Calendar sync (GC-05)", () => {
+        const MIN = 60_000;
+        const mid = () => 0.5;
+        expect(retryDelay("calendar.sync", 1, mid)).toBe(MIN);
+        expect(retryDelay("calendar.sync", 5, mid)).toBe(240 * MIN);
+        const total = [1, 2, 3, 4, 5]
+            .map((n) => retryDelay("calendar.sync", n, mid))
+            .reduce((a, b) => a + b, 0);
+        // A rate limit or an outage of hours still lands it.
+        expect(total / (60 * MIN)).toBeGreaterThan(5);
+    });
+
+    it("spreads a Google Calendar retry by up to a fifth either way", () => {
+        const MIN = 60_000;
+        expect(retryDelay("calendar.sync", 2, () => 0)).toBe(4 * MIN);
+        expect(retryDelay("calendar.sync", 2, () => 0.999_999)).toBeCloseTo(
+            6 * MIN,
+            -2,
+        );
+        // Other schedules stay exact.
+        expect(retryDelay("webhook.process", 2, () => 0)).toBe(5 * MIN);
+    });
+});
+
+describe("laneOf", () => {
+    it("runs Google Calendar jobs on their own lane, everything else on main", () => {
+        expect(laneOf("calendar.sync")).toBe("calendar");
+        expect(laneOf("calendar.busy")).toBe("calendar");
+        expect(laneOf("webhook.process")).toBe("main");
+        expect(laneOf("booking.notify")).toBe("main");
     });
 });
