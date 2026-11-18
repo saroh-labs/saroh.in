@@ -107,7 +107,7 @@ async function* walk(dir) {
         const full = join(dir, entry.name);
         if (entry.isDirectory()) {
             if (
-                ["node_modules", ".next", "dist", ".turbo"].includes(entry.name)
+                ["node_modules", ".next", ".open-next", "dist", ".turbo"].includes(entry.name)
             )
                 continue;
             yield* walk(full);
@@ -216,6 +216,10 @@ const SITE_LAYER_ALLOWED = new Set([
     // without it every palette would look identical behind the section. It
     // draws no block of its own — it renders SectionRenderer from the package.
     "apps/ui.saroh.in/app/preview/[type]/page.tsx",
+    // The website library's block preview on saroh.in (DEC-228, U11): the
+    // ui.saroh.in preview's twin, a frame around BlockFixturePreview in
+    // SiteTheme. Every block it shows is the package's own.
+    "apps/saroh.in/app/(library-preview)/library-preview/[type]/block-preview.tsx",
     // The site editor's preview frame. Same category: it supplies the
     // merchant's page ground and the selection outlines around each block, and
     // delegates every block to @saroh/site-blocks rather than drawing one.
