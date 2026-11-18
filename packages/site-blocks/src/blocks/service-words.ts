@@ -21,6 +21,12 @@ export interface PublicService {
      * price GST is added to.
      */
     gst?: GstOnPrice | null;
+    /**
+     * No time free to book in the next fortnight. Absent from an API that
+     * doesn't say: nothing is claimed. The cards and the menu then say "No
+     * times yet · Ask", and Book stays.
+     */
+    noTimesSoon?: boolean;
 }
 
 /**
@@ -35,6 +41,11 @@ export interface ServicesFeed {
      * list doesn't draw it all: the merchant chose some, or draws one card.
      */
     moreHref?: string | null;
+    /**
+     * The site's enquiry form, for "No times yet · Ask" on a service with
+     * nothing free soon. Absent: the words show without a link.
+     */
+    askHref?: string | null;
 }
 
 /**

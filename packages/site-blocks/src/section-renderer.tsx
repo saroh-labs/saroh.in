@@ -20,7 +20,6 @@ import type {
     RenderedTestimonials,
     RenderedTimetable,
     RenderedVisitUs,
-    SectionType,
 } from "@saroh/block-contract";
 import {
     isSectionType,
@@ -118,8 +117,17 @@ export default function SectionRenderer({
     proof = null,
     credit,
     beside = null,
+    town = null,
+    askHref = null,
 }: LookProps & {
     section: Section;
+    /**
+     * The business's town (from the public contact read), with `siteName`
+     * for a no-photo hero's Stamp, so it is in the cached HTML.
+     */
+    town?: string | null;
+    /** The page with the enquiry form, for Next open's "Ask us". */
+    askHref?: string | null;
     /**
      * A Plans section's cards drawn first in its row: Live's class packs
      * (VB01), which `PageSections` folds in. Absent elsewhere.
@@ -249,6 +257,8 @@ export default function SectionRenderer({
                     level={heroLevel}
                     frontDoor={frontDoor}
                     proof={proof}
+                    siteName={siteName}
+                    town={town}
                 />
             );
         case "richText":
@@ -272,6 +282,9 @@ export default function SectionRenderer({
                 <GallerySection
                     {...site}
                     content={content as RenderedGallery}
+                    apiUrl={apiUrl}
+                    siteId={siteId}
+                    bookHref={bookHref}
                 />
             );
         case "enquiry":
@@ -345,6 +358,7 @@ export default function SectionRenderer({
                     {...site}
                     content={content as RenderedPlans}
                     feed={plans}
+                    packs={packs}
                     prices={prices}
                     apiUrl={apiUrl}
                     siteId={siteId}
@@ -415,6 +429,7 @@ export default function SectionRenderer({
                     apiUrl={apiUrl}
                     bookHref={bookHref}
                     reach={reach}
+                    askHref={askHref}
                 />
             );
         default:
@@ -457,22 +472,6 @@ export function opensOverPhoto(section: Section, look?: LookId): boolean {
 }
 
 /**
- * Layouts the contract names (U15) that no block draws yet. A section naming
- * one draws as if it named none, so picking it changes nothing on the page.
- * shortcut: a table to empty as U4–U7 draw each layout; delete it then.
- */
-const NOT_DRAWN_YET: Partial<Record<SectionType, readonly string[]>> = {
-    hero: ["answer"],
-    servicesList: ["cards", "menu"],
-    plans: ["compare"],
-    gallery: ["lookbook"],
-    timetable: ["today"],
-    booking: ["nextOpen"],
-    visitUs: ["map"],
-    features: ["band"],
-};
-
-/**
  * A section's content with the look's layout written in (KD2), where the
  * section chose none and the look's default differs from what the block
  * would draw without a look: every block, and every helper inside it that
@@ -485,15 +484,9 @@ export function withLookVariant(section: Section, look?: LookId): unknown {
     if (!isSectionType(type)) return section.content;
     const raw = section.content;
     if (raw === null || typeof raw !== "object") return raw;
-    let content = raw as Record<string, unknown>;
+    const content = raw as Record<string, unknown>;
     const named = content.variant;
-    if (typeof named === "string" && NOT_DRAWN_YET[type]?.includes(named)) {
-        // Draw as if no layout were named: the block's own rule, or the look's.
-        const { variant: _notYet, ...rest } = content;
-        content = rest;
-    } else if (typeof named === "string" && named.trim() !== "") {
-        return content;
-    }
+    if (typeof named === "string" && named.trim() !== "") return content;
     if (!look) return content;
     const chosen = resolveVariant(type, content, look);
     if (chosen === resolveVariant(type, content)) return content;
@@ -543,8 +536,14 @@ export function PageSections({
     isOwnerPreview = false,
     frontDoor = null,
     credit,
+    town = null,
+    askHref = null,
 }: LookProps & {
     sections: Section[];
+    /** The business's town, for a no-photo hero's Stamp. */
+    town?: string | null;
+    /** The page with the site's enquiry form, for the blocks that offer it. */
+    askHref?: string | null;
     /** The signed-in customer's class credit, for a look's Timetable (U7). */
     credit?: CreditFor;
     /**
@@ -669,6 +668,8 @@ export function PageSections({
                         look={look}
                         isOwnerPreview={isOwnerPreview}
                         credit={credit}
+                        town={town}
+                        askHref={askHref}
                         {...(i === opener ? { frontDoor, proof } : {})}
                         beside={
                             joinsPacks(i) ? (

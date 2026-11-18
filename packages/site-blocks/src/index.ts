@@ -34,8 +34,11 @@ export type { SiteFixtures } from "./site-fixtures";
 export {
     FEED_BACKED_SECTIONS,
     sectionRendersNothing,
+    showsPacks,
     withoutEmptyInPageEntries,
 } from "./section-empty";
+// Server-safe: the town in an address, for the hero's Stamp.
+export { townOf } from "./blocks/stamp";
 export type { FeedsFor, SectionFeeds } from "./section-empty";
 
 export {

@@ -22,6 +22,7 @@ export function RepeatedItems<T>({
     items,
     onChange,
     max,
+    min = 1,
     itemNoun,
     addLabel,
     fullMessage,
@@ -33,6 +34,11 @@ export function RepeatedItems<T>({
     onChange: (items: T[]) => void;
     /** The contract's cap on this list. */
     max: number;
+    /**
+     * The fewest items the contract allows: 1 by default, so the last one
+     * stays. 0 for an optional list, whose last item can go too.
+     */
+    min?: number;
     /** What one item is called, sentence case: "Point", "Question". */
     itemNoun: string;
     /** Verb plus noun: "Add a point". */
@@ -94,7 +100,7 @@ export function RepeatedItems<T>({
                                     />
                                 </>
                             ) : null}
-                            {items.length > 1 ? (
+                            {items.length > min ? (
                                 <Button
                                     type="button"
                                     variant="ghost"

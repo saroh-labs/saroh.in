@@ -64,14 +64,16 @@ export function sectionRendersNothing(
                       feeds.journal,
                   )
                 : false;
-        case "plans":
-            return feeds.plans
-                ? !feeds.plans.failed && feeds.plans.plans.length === 0
-                : false;
+        case "plans": {
+            // A Plans block may sell packs too, or only (DEC-228).
+            const show = plansShows(section.content);
+            const noPlans = show === "packs" || plansEmpty(feeds.plans);
+            return show === "plans"
+                ? noPlans
+                : noPlans && packsEmpty(feeds.packs);
+        }
         case "packs":
-            return feeds.packs
-                ? !feeds.packs.failed && feeds.packs.packs.length === 0
-                : false;
+            return packsEmpty(feeds.packs);
         case "productGrid": {
             if (!feeds.productGrid || feeds.productGrid.failed) return false;
             const count =
@@ -82,6 +84,34 @@ export function sectionRendersNothing(
         default:
             return false;
     }
+}
+
+function plansEmpty(feed: PlansFeed | undefined): boolean {
+    return feed ? !feed.failed && feed.plans.length === 0 : false;
+}
+
+function packsEmpty(feed: PacksFeed | undefined): boolean {
+    return feed ? !feed.failed && feed.packs.length === 0 : false;
+}
+
+/** What a Plans section offers (DEC-228), read from snapshot JSON. */
+function plansShows(content: unknown): "plans" | "packs" | "both" {
+    const show = (content as { show?: unknown } | null)?.show;
+    return show === "packs" || show === "both" ? show : "plans";
+}
+
+/**
+ * Whether a section draws class packs: a Class packs block, or a Plans
+ * block that sells them too (DEC-228). The page reads the packs for it.
+ */
+export function showsPacks(section: {
+    type: string;
+    content?: unknown;
+}): boolean {
+    return (
+        section.type === "packs" ||
+        (section.type === "plans" && plansShows(section.content) !== "plans")
+    );
 }
 
 interface FeedSection {

@@ -13,7 +13,9 @@ vi.mock("@saroh/site-blocks", () => ({
     PageSections: () => null,
     modulePageTopOf: () => null,
     reachOf: () => null,
+    townOf: () => null,
 }));
+vi.mock("@/lib/shop-checkout-shape", () => ({ enquiryPagePath: () => null }));
 vi.mock("@/app/[domain]/account/actions", () => ({
     requestSignInCode: vi.fn(),
     verifySignInCode: vi.fn(),

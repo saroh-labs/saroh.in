@@ -79,6 +79,20 @@ export function timetableQuery(
         : "";
 }
 
+/**
+ * A section's `placesFrom` (KD8) as a rule can use it: a whole number 1 to
+ * 10, else undefined ("Automatic", each path's own rule). A snapshot is
+ * read defensively: it may predate the contract's bounds.
+ */
+export function placesFromOf(content: {
+    placesFrom?: unknown;
+}): number | undefined {
+    const n = content.placesFrom;
+    return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 10
+        ? n
+        : undefined;
+}
+
 /** How a session's places read: always in words, never colour alone. */
 export interface PlacesWord {
     text: string;
@@ -89,16 +103,18 @@ export interface PlacesWord {
  * "Full" with no places left — said whatever `showPlacesLeft` is, because a
  * visitor must not tap through to find it. With places shown: "Fills fast ·
  * 2 left" when a fifth or fewer remain (two at least), else "6 places".
- * With them hidden, only Full is said.
+ * With them hidden, only Full is said. `placesFrom` (KD8), when set,
+ * replaces the fifth: "Fills fast" from that many down.
  */
 export function placesWord(
     session: Pick<TimetableSession, "placesLeft" | "capacity">,
     showPlacesLeft: boolean,
+    placesFrom?: number,
 ): PlacesWord | null {
     const left = Math.max(0, session.placesLeft);
     if (left === 0) return { text: "Full", tone: "full" };
     if (!showPlacesLeft) return null;
-    const few = Math.max(2, Math.ceil(session.capacity * 0.2));
+    const few = placesFrom ?? Math.max(2, Math.ceil(session.capacity * 0.2));
     if (left <= few) {
         return { text: `Fills fast · ${left} left`, tone: "filling" };
     }
@@ -173,8 +189,9 @@ export function isWeekday(date: string): boolean {
  */
 export function fills(
     session: Pick<TimetableSession, "placesLeft" | "capacity">,
+    placesFrom?: number,
 ): boolean {
-    const tone = placesWord(session, true)?.tone;
+    const tone = placesWord(session, true, placesFrom)?.tone;
     return tone === "full" || tone === "filling";
 }
 
@@ -183,7 +200,10 @@ export function fills(
  * sessions across 5 days", and how many of them fill. Days are those with
  * a session, so a quiet day is not counted as one.
  */
-export function weekCounts(sessions: readonly TimetableSession[]): {
+export function weekCounts(
+    sessions: readonly TimetableSession[],
+    placesFrom?: number,
+): {
     line: string;
     filling: number;
 } | null {
@@ -191,5 +211,8 @@ export function weekCounts(sessions: readonly TimetableSession[]): {
     if (n === 0) return null;
     const days = new Set(sessions.map((s) => s.date)).size;
     const line = `${n} ${n === 1 ? "session" : "sessions"} across ${days} ${days === 1 ? "day" : "days"}`;
-    return { line, filling: sessions.filter(fills).length };
+    return {
+        line,
+        filling: sessions.filter((s) => fills(s, placesFrom)).length,
+    };
 }

@@ -319,6 +319,10 @@ export function HeroFields({
                             </Field>
                         </>
                     ) : null}
+                </>
+            ) : null}
+            {!titleOnly && look !== "fullBleed" ? (
+                <>
                     <OptionSwitch
                         label="Open now, directions and call"
                         checked={c.answerRow === true}
@@ -326,6 +330,10 @@ export function HeroFields({
                             patch({ answerRow: on ? true : undefined })
                         }
                         note="A row under the buttons, read from your hours, address and phone."
+                    />
+                    <BylineFields
+                        byline={c.byline}
+                        onChange={(byline) => patch({ byline })}
                     />
                 </>
             ) : null}
@@ -392,5 +400,66 @@ export function HeroFields({
                 </Field>
             ) : null}
         </div>
+    );
+}
+
+/**
+ * The Byline (U4): who is behind the business, under the line. A name
+ * makes one; clearing the name removes it, photo and all.
+ */
+function BylineFields({
+    byline,
+    onChange,
+}: {
+    byline: HeroContent["byline"];
+    onChange: (next: HeroContent["byline"]) => void;
+}) {
+    const set = (next: Partial<NonNullable<HeroContent["byline"]>>) => {
+        const merged = { name: "", ...byline, ...next };
+        onChange(merged.name.trim() ? merged : undefined);
+    };
+    return (
+        <>
+            <Field
+                optional
+                label="Byline"
+                hint="Who is behind the business, shown under the line."
+            >
+                <Input
+                    value={byline?.name ?? ""}
+                    onChange={(e) => set({ name: e.target.value })}
+                    maxLength={120}
+                    placeholder="Dr Meera Rao"
+                />
+            </Field>
+            {byline?.name.trim() ? (
+                <>
+                    <Field optional label="Their role">
+                        <Input
+                            value={byline.role ?? ""}
+                            onChange={(e) =>
+                                set({ role: e.target.value || undefined })
+                            }
+                            maxLength={160}
+                            placeholder="Dentist"
+                        />
+                    </Field>
+                    <Field optional label="Their photo">
+                        <MediaPicker
+                            onPick={(img) =>
+                                set({
+                                    image: {
+                                        src: img.src,
+                                        alt: "",
+                                        width: img.width,
+                                        height: img.height,
+                                    },
+                                })
+                            }
+                        />
+                    </Field>
+                </>
+            ) : null}
+        </>
     );
 }

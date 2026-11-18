@@ -91,6 +91,17 @@ const galleryLegacy: LegacyResolver = (content) => {
 };
 
 /**
+ * Services' "Show as: Cards" (G16) predates the `cards` look (DEC-227) and
+ * draws the same cards, so content that names no variant but chose cards
+ * resolves to that look: the editor shows Cards picked, and nothing on a
+ * live page moves. A named variant always wins over `layout`.
+ */
+const servicesListLegacy: LegacyResolver = (content) =>
+    field(content, "layout") === "cards"
+        ? "cards"
+        : defaultVariant("servicesList");
+
+/**
  * `Record<SectionType, …>` is the gate (G3): a block type added to
  * `SECTION_TYPES` without a rule for its own legacy content does not compile.
  */
@@ -113,7 +124,7 @@ const LEGACY_RESOLVERS = {
     faq: () => defaultVariant("faq"),
     testimonials: () => defaultVariant("testimonials"),
     contact: () => defaultVariant("contact"),
-    servicesList: () => defaultVariant("servicesList"),
+    servicesList: servicesListLegacy,
     visitUs: () => defaultVariant("visitUs"),
     journal: () => defaultVariant("journal"),
     plans: () => defaultVariant("plans"),

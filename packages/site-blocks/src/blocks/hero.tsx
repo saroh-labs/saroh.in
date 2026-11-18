@@ -3,10 +3,14 @@ import { LOOKS, resolveVariant } from "@saroh/block-contract";
 
 import type { PublicVisit } from "../lib/public-visit";
 import type { LookProps } from "../look-context";
+import { AnswerRow, VisitStamp } from "./answer-row";
+import { HeroByline } from "./byline";
+import AnswerHero from "./hero-answer-panel";
 import FullBleedHero from "./hero-full-bleed";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
 import LookHero from "./hero-look";
+import { panelHasWords } from "./hero-panel";
 import PlainHero from "./hero-plain";
 import type { FrontDoor, PageProof } from "./look-front";
 import type { PublicToday } from "./on-today";
@@ -40,25 +44,21 @@ import { PhoneText } from "./phone-text";
  * full-bleed or `none` hero, and one with On today keep their layouts,
  * restyled by the look's tokens. Classic is unchanged.
  *
+ * THE ANSWER PANEL (`answer`, DEC-228, `hero-answer-panel.tsx`) is its own
+ * layout on every look: the heading beside a card that answers first. A
+ * panel with nothing true to say draws this hero's Centered layout.
+ *
+ * THE ANSWER ROW AND THE BYLINE (`answerRow`, `byline`) go on every layout
+ * but `none` and full-bleed: Open now, Directions and Call under the
+ * buttons, read in the browser (`answer-row.tsx`), and who is behind the
+ * business under the line (`byline.tsx`). A Classic split hero with no
+ * photo puts the Stamp in its image slot (`stamp.tsx`).
+ *
  * ONE H1 A PAGE. Only the page's first hero draws its headline as the `h1`;
  * a later one is an `h2` (`level`, from `hero-level.ts`), whichever look it
  * wears.
  */
-export default function HeroSection({
-    content,
-    siteId,
-    apiUrl,
-    bookHref,
-    visit,
-    today,
-    now,
-    priority = false,
-    level = 1,
-    look: siteLook,
-    isOwnerPreview = false,
-    frontDoor = null,
-    proof = null,
-}: LookProps & {
+type HeroProps = LookProps & {
     content: RenderedHero;
     /**
      * `1`: this is the page's first hero, and its headline is the page's
@@ -90,8 +90,72 @@ export default function HeroSection({
     frontDoor?: FrontDoor | null;
     /** Under a look: the page's first testimonial, as one proof line. */
     proof?: PageProof | null;
-}) {
+    /**
+     * Whose site and which town, for the no-photo Stamp, given by the page
+     * that serves the site so the Stamp is in its HTML. Absent: read.
+     */
+    siteName?: string | null;
+    town?: string | null;
+};
+
+export default function HeroSection(props: HeroProps) {
+    const {
+        content,
+        siteId,
+        apiUrl,
+        bookHref,
+        visit,
+        today,
+        now,
+        priority = false,
+        level = 1,
+        look: siteLook,
+        isOwnerPreview = false,
+        frontDoor = null,
+        proof = null,
+        siteName = null,
+        town = null,
+    } = props;
     const look = resolveVariant("hero", content);
+    if (look === "answer") {
+        const centered = (
+            <HeroSection
+                {...props}
+                content={{ ...content, variant: "centered" }}
+            />
+        );
+        if (!panelHasWords(content)) return centered;
+        return (
+            <AnswerHero
+                content={content}
+                look={siteLook}
+                level={level}
+                siteId={siteId}
+                apiUrl={apiUrl}
+                bookHref={bookHref}
+                visit={visit}
+                today={today}
+                now={now}
+                fallback={centered}
+            />
+        );
+    }
+    const row = (className?: string, center = false) =>
+        content.answerRow ? (
+            <AnswerRow
+                siteId={siteId}
+                apiUrl={apiUrl}
+                visit={visit}
+                now={now}
+                look={siteLook}
+                center={center}
+                className={className}
+            />
+        ) : null;
+    const byline = (className?: string) =>
+        content.byline ? (
+            <HeroByline byline={content.byline} className={className} />
+        ) : null;
     if (siteLook && wearsLookHero(content, look, siteLook)) {
         return (
             <LookHero
@@ -106,6 +170,16 @@ export default function HeroSection({
                 apiUrl={apiUrl}
                 today={today}
                 now={now}
+                row={row(
+                    siteLook === "quiet"
+                        ? "min-[700px]:justify-center"
+                        : undefined,
+                )}
+                byline={byline(
+                    siteLook === "quiet"
+                        ? "min-[700px]:justify-center"
+                        : undefined,
+                )}
             />
         );
     }
@@ -138,7 +212,28 @@ export default function HeroSection({
             />
         );
     }
-    return <PlainHero content={content} priority={priority} level={level} />;
+    const split = look === "split";
+    const under = row("mt-6", !split);
+    return (
+        <PlainHero
+            content={content}
+            priority={priority}
+            level={level}
+            afterLine={byline(split ? "mt-6" : "mt-6 justify-center")}
+            below={under ?? undefined}
+            noPhoto={
+                <VisitStamp
+                    siteId={siteId}
+                    apiUrl={apiUrl}
+                    visit={visit}
+                    isOwnerPreview={isOwnerPreview}
+                    imageBrief={content.imageBrief}
+                    name={siteName}
+                    town={town}
+                />
+            }
+        />
+    );
 }
 
 /** The `none` look: a page title, not a hero. */

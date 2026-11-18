@@ -7,7 +7,12 @@ import type {
     ServicesFeed,
     SignInOptions,
 } from "@saroh/site-blocks";
-import { modulePageTopOf, PageSections, reachOf } from "@saroh/site-blocks";
+import {
+    modulePageTopOf,
+    PageSections,
+    reachOf,
+    townOf,
+} from "@saroh/site-blocks";
 
 import {
     requestPhoneSignInCode,
@@ -30,6 +35,7 @@ import { getSignedInCustomer } from "@/lib/customer-session";
 import { frontDoorFor } from "@/lib/front-door";
 import type { PublicationPage, PublicationSnapshot } from "@/lib/publication";
 import { getJournalFeed } from "@/lib/publication";
+import { enquiryPagePath } from "@/lib/shop-checkout-shape";
 import { getSignInOptions } from "@/lib/sign-in";
 import { getSiteContact } from "@/lib/site-contact";
 import { getPacksFeed } from "@/lib/site-packs";
@@ -75,9 +81,10 @@ export async function PublishedPage({
         pricesActions(snapshot.site.name, plans, packs),
         threadActions(snapshot.site.name, page.sections),
         // How to reach the business, for a booking block with no time to
-        // offer: the layout's own read (shared through `cache`), and only
-        // on a page that draws the block.
-        siteId && page.sections.some((s) => s.type === "booking")
+        // offer, and its town for a hero's no-photo Stamp: the layout's own
+        // read (shared through `cache`), and only on a page that draws one.
+        siteId &&
+        page.sections.some((s) => s.type === "booking" || s.type === "hero")
             ? getSiteContact(siteId)
             : null,
         // Under a look, the hero's way in beside its button (U6): the
@@ -107,7 +114,12 @@ export async function PublishedPage({
             productGrids={productGrids}
             serviceLists={serviceLists}
             reach={reachOf(contact)}
-            // For a closing band whose content gives no heading.
+            // With the name, a no-photo hero's Stamp, drawn in the HTML.
+            town={townOf(contact?.places[0]?.address)}
+            // Next open's "Ask us" when nothing is open.
+            askHref={enquiryPagePath(snapshot)}
+            // For a closing band whose content gives no heading, and the
+            // hero's Stamp.
             siteName={snapshot.site.name}
             look={snapshot.site.look}
             frontDoor={frontDoor}

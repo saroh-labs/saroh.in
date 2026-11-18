@@ -5,12 +5,15 @@ import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 
-import { liftToLatest } from "@saroh/block-contract";
+import { liftToLatest, resolveVariant } from "@saroh/block-contract";
 
 import { FIELD_LABEL } from "@/components/sites/section-fields/constants";
 import { ImageBrief } from "@/components/sites/section-fields/image-brief";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
+import { useGridCatalogue } from "@/components/sites/selling-sections/use-grid-catalogue";
 import type { GalleryContent, GalleryImage } from "@/lib/sites/service";
+
+import { LookbookItemFields } from "./lookbook-item-fields";
 
 /**
  * The `gallery` section's editor fields.
@@ -23,10 +26,30 @@ import type { GalleryContent, GalleryImage } from "@/lib/sites/service";
  * handlers. The refactor changes where the code lives and nothing about what it
  * does.
  */
-export function GalleryFields({
+export function GalleryFields(props: SectionFieldsProps<"gallery">) {
+    // Only a lookbook links photos to products, so only it reads them.
+    return resolveVariant("gallery", props.section.content) === "lookbook" ? (
+        <LookbookGalleryFields {...props} />
+    ) : (
+        <GalleryFieldsView {...props} catalogue={null} />
+    );
+}
+
+function LookbookGalleryFields(props: SectionFieldsProps<"gallery">) {
+    const catalogue = useGridCatalogue();
+    return <GalleryFieldsView {...props} catalogue={catalogue} />;
+}
+
+function GalleryFieldsView({
     section,
     onChange,
-}: SectionFieldsProps<"gallery">) {
+    pages,
+    services,
+    catalogue,
+}: SectionFieldsProps<"gallery"> & {
+    /** The products a lookbook photo can link to; null for other looks. */
+    catalogue: ReturnType<typeof useGridCatalogue> | null;
+}) {
     const c = section.content;
     const setImages = (images: GalleryImage[]) =>
         onChange({ ...section, content: { ...c, images } });
@@ -129,6 +152,22 @@ export function GalleryFields({
                             placeholder="Caption, shown under the photo. Optional."
                             aria-label={`Caption for image ${i + 1}`}
                         />
+                        {catalogue ? (
+                            <LookbookItemFields
+                                image={img}
+                                index={i}
+                                services={services}
+                                catalogue={catalogue}
+                                pages={pages}
+                                onChange={(next) =>
+                                    setCaptioned(
+                                        c.images.map((im, idx) =>
+                                            idx === i ? next : im,
+                                        ),
+                                    )
+                                }
+                            />
+                        ) : null}
                     </div>
                 ))}
                 {/*

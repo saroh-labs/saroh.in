@@ -526,3 +526,112 @@ describe("products across on a phone, the owner's choice (24 Oct)", () => {
         ).toContain("grid-cols-1");
     });
 });
+
+describe("Product grid: Add in place and Pre-order words (DEC-227/228, U5)", () => {
+    afterEach(() => {
+        window.localStorage.clear();
+    });
+    const rye = card({ slug: "rye", name: "Seeded rye", listingId: "lst_rye" });
+    const gone = card({
+        slug: "milk",
+        name: "Milk bread",
+        listingId: "lst_milk",
+        soldOut: true,
+    });
+
+    it("Add turns into a stepper that changes the bag; 44px buttons", () => {
+        render(
+            <ProductGridSection
+                content={{ ...content, addInPlace: true }}
+                feed={{ products: [rye], basePath: "/shop", bagSite: "site_1" }}
+            />,
+        );
+        fireEvent.click(
+            screen.getByRole("button", { name: "Add Seeded rye to your bag" }),
+        );
+        expect(window.localStorage.getItem("saroh.bag.site_1")).toContain(
+            '"quantity":1',
+        );
+        const more = screen.getByRole("button", {
+            name: "One more Seeded rye",
+        });
+        expect(more.className).toContain("size-11");
+        fireEvent.click(more);
+        expect(window.localStorage.getItem("saroh.bag.site_1")).toContain(
+            '"quantity":2',
+        );
+        const count = screen.getByText("2 Seeded rye in your bag");
+        expect(count.closest("[aria-live='polite']")).toBeTruthy();
+        // The card's words still open the product; the control is not in it.
+        const link = screen.getByRole("link", { name: /Seeded rye/ });
+        expect(within(link).queryByRole("button")).toBeNull();
+    });
+
+    it("a sold-out product's control is off and says Sold out", () => {
+        render(
+            <ProductGridSection
+                content={{ ...content, addInPlace: true }}
+                feed={{
+                    products: [gone],
+                    basePath: "/shop",
+                    bagSite: "site_1",
+                }}
+            />,
+        );
+        const off = screen.getByRole("button", { name: "Sold out" });
+        expect(off).toBeDisabled();
+    });
+
+    it("off by default: no control on the card", () => {
+        render(
+            <ProductGridSection
+                content={content}
+                feed={{ products: [rye], basePath: "/shop", bagSite: "site_1" }}
+            />,
+        );
+        expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("the owner's Pre-order words and cut-off line show on the cards", () => {
+        render(
+            <ProductGridSection
+                content={{
+                    ...content,
+                    preorderWords: "Pre-order for Saturday",
+                    cutOff: "Order by 8 pm, collect tomorrow from 7 am",
+                }}
+                feed={{ products: [rye], basePath: "/shop" }}
+            />,
+        );
+        expect(screen.getByText("Pre-order for Saturday")).toBeTruthy();
+        expect(
+            screen.getByText("Order by 8 pm, collect tomorrow from 7 am"),
+        ).toBeTruthy();
+    });
+
+    it("marks product photos for the component styles", () => {
+        render(
+            <ProductGridSection
+                content={content}
+                feed={{
+                    products: [
+                        card({
+                            slug: "a",
+                            name: "A",
+                            image: {
+                                url: "https://cdn.test/a.jpg",
+                                alt: "A loaf",
+                            },
+                        }),
+                    ],
+                    basePath: "/shop",
+                }}
+            />,
+        );
+        expect(
+            screen
+                .getByAltText("A loaf")
+                .closest("[data-site-photo='product']"),
+        ).toBeTruthy();
+    });
+});

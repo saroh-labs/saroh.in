@@ -3,6 +3,7 @@ import { resolveVariant } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
+import { FeaturesBand } from "./features-band";
 
 /**
  * `features` v1 — a heading over a set of short, titled points (#255).
@@ -34,6 +35,7 @@ export default function FeaturesSection({
 }) {
     const variant = resolveVariant("features", content);
     if (variant === "facts") return <FactsRow content={content} />;
+    if (variant === "band") return <FeaturesBand content={content} />;
     const isSteps = variant === "steps";
     const isList = variant === "list" || isSteps;
     const List = isSteps ? "ol" : "ul";

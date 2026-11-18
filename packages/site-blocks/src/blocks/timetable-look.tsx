@@ -58,6 +58,8 @@ export interface TimetableShow {
     trainer: boolean;
     places: boolean;
     bookHref?: string;
+    /** Places left from this many down (KD8); absent, the live rule. */
+    placesFrom?: number;
 }
 
 /** Places left are said only when true and this few or fewer (U8). */
@@ -71,9 +73,12 @@ export { PLACES_SHOWN_AT_MOST as FEW_PLACES } from "../live/live-words";
 export function placesLine(
     session: Pick<TimetableSession, "placesLeft">,
     showCount: boolean,
+    placesFrom?: number,
 ): { text: string; tone: "full" | "last" | "few" } | null {
     if (session.placesLeft <= 0) return { text: "Full", tone: "full" };
-    const words = showCount ? placesLeftWords(session.placesLeft) : null;
+    const words = showCount
+        ? placesLeftWords(session.placesLeft, { from: placesFrom })
+        : null;
     if (!words) return null;
     return { text: words, tone: session.placesLeft === 1 ? "last" : "few" };
 }
@@ -822,7 +827,7 @@ function wordsOf(
         who,
         // A pack or membership that covers it, else the class's price.
         price: paidWith ?? sessionPrice(session),
-        places: placesLine(session, show.places),
+        places: placesLine(session, show.places, show.placesFrom),
     };
 }
 

@@ -2,6 +2,7 @@
 
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { listVisitPlaces } from "@/lib/stores/storefronts";
+import { listPlans } from "@/lib/subscriptions/service";
 import type { LookId } from "@saroh/block-contract";
 
 import type { GridCatalogueRead } from "./grid-catalogue";
@@ -293,6 +294,23 @@ export async function listVisitPlacesForPicker(): Promise<VisitPlacesRead> {
  */
 export async function listGridCatalogue(): Promise<GridCatalogueRead> {
     return readGridCatalogue();
+}
+
+/**
+ * The plans on sale, by name, for a Plans block's Compare rows (DEC-228):
+ * each row's cells are kept by plan id. Null when the read failed, so the
+ * editor never calls a chosen plan gone because of it.
+ */
+export async function listPlansForCompare(): Promise<
+    { id: string; name: string }[] | null
+> {
+    try {
+        return (await listPlans())
+            .filter((plan) => plan.status === "ACTIVE")
+            .map(({ id, name }) => ({ id, name }));
+    } catch {
+        return null;
+    }
 }
 
 /**

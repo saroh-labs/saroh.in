@@ -15,7 +15,10 @@ import { PhoneText } from "./phone-text";
  * no panel to put beside the headline — a shop-only business, or a read that
  * failed — so the hero never changes shape for a panel that isn't there.
  *
- * `below` is a line under the button: On today's "Open now · closes 9pm".
+ * `below` is a line under the button: On today's "Open now · closes 9pm",
+ * the Answer row. `afterLine` sits under the line: the Byline. `noPhoto`
+ * fills a split hero's image slot when it has no photo (the Stamp), so it
+ * keeps its two columns; without it, a split hero with no photo is centred.
  *
  * Sits on the merchant's HERO BAND colour, not the page ground (#189): it is
  * one of the six colours they pick, and it was previously unreadable by this
@@ -44,11 +47,15 @@ import { PhoneText } from "./phone-text";
 export default function PlainHero({
     content,
     below,
+    afterLine,
+    noPhoto,
     priority = false,
     level = 1,
 }: {
     content: RenderedHero;
     below?: ReactNode;
+    afterLine?: ReactNode;
+    noPhoto?: ReactNode;
     /** The page opens on this hero: its photo is fetched first. */
     priority?: boolean;
     /** `1` for the page's first hero, `2` for any later one (`hero.tsx`). */
@@ -67,7 +74,7 @@ export default function PlainHero({
     const split = variant === "split";
     const photo = content.image?.src ? content.image : null;
     // A split hero still needs something to put beside the copy.
-    const hasImage = split && photo !== null;
+    const hasImage = split && (photo !== null || Boolean(noPhoto));
     return (
         <section
             data-site-ground="hero"
@@ -103,6 +110,7 @@ export default function PlainHero({
                                 />
                             </p>
                         ) : null}
+                        {afterLine ?? null}
                         {content.cta ? (
                             <div className="mt-8">
                                 <CtaButton
@@ -135,6 +143,8 @@ export default function PlainHero({
                                     : "mt-10 h-auto w-full rounded-[var(--site-radius)] object-cover"
                             }
                         />
+                    ) : hasImage ? (
+                        noPhoto
                     ) : null}
                 </div>
             </div>

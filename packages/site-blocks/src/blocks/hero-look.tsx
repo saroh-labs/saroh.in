@@ -91,9 +91,15 @@ export default function LookHero({
     apiUrl,
     today,
     now,
+    row = null,
+    byline = null,
 }: {
     content: RenderedHero;
     look: LookId;
+    /** The Answer row, under the buttons (`answer-row.tsx`). */
+    row?: ReactNode;
+    /** The Byline, under the line (`byline.tsx`). */
+    byline?: ReactNode;
     level?: HeroLevel;
     priority?: boolean;
     isOwnerPreview?: boolean;
@@ -129,15 +135,28 @@ export default function LookHero({
                 </HeroHeading>
             </>
         ),
-        line: content.subheading ? (
-            <p className={LINE[look]}>
-                <PhoneText
-                    text={content.subheading}
-                    phone={content.phoneLine}
-                />
-            </p>
-        ) : null,
-        button:
+        line:
+            content.subheading || byline ? (
+                <div
+                    className={cn(
+                        "flex flex-col gap-5",
+                        look === "quiet" && "min-[700px]:items-center",
+                    )}
+                >
+                    {content.subheading ? (
+                        <p className={LINE[look]}>
+                            <PhoneText
+                                text={content.subheading}
+                                phone={content.phoneLine}
+                            />
+                        </p>
+                    ) : null}
+                    {byline}
+                </div>
+            ) : null,
+        button: withRow(
+            look,
+            row,
             content.cta || second ? (
                 <div className={SECOND_ROW[look]}>
                     {content.cta ? (
@@ -155,6 +174,7 @@ export default function LookHero({
                     ) : null}
                 </div>
             ) : null,
+        ),
         door: frontDoor ? (
             <FrontDoorSlot
                 door={frontDoor}
@@ -226,6 +246,22 @@ export default function LookHero({
                 <LiveHero {...parts} />
             )}
         </section>
+    );
+}
+
+/** The buttons with the Answer row under them, or either alone. */
+function withRow(look: LookId, row: ReactNode, buttons: ReactNode): ReactNode {
+    if (!row) return buttons;
+    return (
+        <div
+            className={cn(
+                "flex flex-col gap-3",
+                look === "quiet" && "min-[700px]:items-center",
+            )}
+        >
+            {buttons}
+            {row}
+        </div>
     );
 }
 
