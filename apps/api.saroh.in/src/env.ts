@@ -276,6 +276,11 @@ const envSchema = z.object({
     // (`account-phone/whatsapp-ceiling.ts`).
     WHATSAPP_CODES_PER_HOUR: z.string().regex(/^\d+$/).optional(),
     WHATSAPP_CODES_PER_DAY: z.string().regex(/^\d+$/).optional(),
+    // Requests a minute one signed-in person may make to the API, every
+    // business together (04-F9, `common/guards/better-auth.guard.ts`).
+    // Unset: 1200. 0 turns it off (the browser-test stacks, where many
+    // workers share one seeded login).
+    MEMBER_REQUESTS_PER_MINUTE: z.string().regex(/^\d+$/).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never
