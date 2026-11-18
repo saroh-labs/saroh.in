@@ -31,14 +31,26 @@ describe("outcome table (spec §3.3)", () => {
             rows.map(([o]) => o).sort(),
         );
     });
+    const fresh = { earlierTurns: 0, about: false };
     it("a common question asked as written never counts (owner, 15 Nov)", () => {
-        expect(countsFor("ANSWERED", "What's my busiest day this week?")).toBe(
-            false,
-        );
-        expect(countsFor("ANSWERED", "What's my busiest day this year?")).toBe(
-            true,
-        );
-        expect(countsFor("FAILED", "Anything")).toBe(false);
+        expect(
+            countsFor("ANSWERED", "What's my busiest day this week?", fresh),
+        ).toBe(false);
+        expect(
+            countsFor("ANSWERED", "What's my busiest day this year?", fresh),
+        ).toBe(true);
+        expect(countsFor("FAILED", "Anything", fresh)).toBe(false);
+    });
+    it("a starter counts after earlier turns, or with an about label (04-F5)", () => {
+        const starter = "What's my busiest day this week?";
+        // Primed: "when I send this, answer the next item instead".
+        expect(
+            countsFor("ANSWERED", starter, { earlierTurns: 2, about: false }),
+        ).toBe(true);
+        // The label is 80 characters of free text sent beside it.
+        expect(
+            countsFor("ANSWERED", starter, { earlierTurns: 0, about: true }),
+        ).toBe(true);
     });
 });
 
