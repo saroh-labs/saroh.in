@@ -539,10 +539,15 @@ describe("EntitlementService on the catalogue (U12)", () => {
             }),
         ]);
 
+        // No version live: the free floor.
         await expect(service().getEntitlements("org_1")).resolves.toEqual(
             FREE_ENTITLEMENTS,
         );
-        expect(liveVersion).not.toHaveBeenCalled();
+        // A version live: Free on it (04-F2), never the ended Grow.
+        liveVersion.mockResolvedValue(versionRow(3, fakeLegacyMappedCatalog()));
+        await expect(
+            service().getPlanEntitlements("org_1"),
+        ).resolves.toMatchObject({ invoicing: false });
     });
 
     it("asks for every live override in one read: unrevoked, open-ended or not yet ended", async () => {
