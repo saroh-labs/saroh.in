@@ -47,6 +47,7 @@ export function SocialLocked({
         return (
             <PlanLockedState
                 data-social-locked="grow"
+                data-ph-unmask=""
                 size="panel"
                 className="max-w-[640px]"
                 name="Saroh Social"
@@ -62,7 +63,7 @@ export function SocialLocked({
                             </span>
                         }
                     >
-                        <Button asChild>
+                        <Button data-ph-unmask="" asChild>
                             <a href={ADD_ONS_HREF}>{addSocialLabel(price)}</a>
                         </Button>
                     </PlanWay>
@@ -74,6 +75,7 @@ export function SocialLocked({
     return (
         <PlanLockedCard
             data-social-locked="plan"
+            data-ph-unmask=""
             size="panel"
             className="max-w-[640px]"
             name="Saroh Social"
