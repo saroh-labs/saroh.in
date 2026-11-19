@@ -1,6 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
-import { CALENDAR_SYNC_TYPE } from "./calendar-jobs";
+import { CALENDAR_SYNC_ATTEMPTS, CALENDAR_SYNC_TYPE } from "./calendar-jobs";
 
 type Tx = Pick<
     Prisma.TransactionClient,
@@ -21,6 +21,8 @@ export async function queueCalendarSyncInTx(
         organizationId: string;
         bookingId: string;
         staffId: string | null;
+        /** Email nobody (GC-09): a deleted customer, a privacy removal. */
+        quiet?: boolean;
     },
 ): Promise<void> {
     const mapped = await tx.googleCalendarEvent.count({
@@ -41,7 +43,11 @@ export async function queueCalendarSyncInTx(
         data: {
             organizationId: input.organizationId,
             type: CALENDAR_SYNC_TYPE,
-            payload: { bookingId: input.bookingId },
+            payload: {
+                bookingId: input.bookingId,
+                ...(input.quiet ? { quiet: true } : {}),
+            },
+            maxAttempts: CALENDAR_SYNC_ATTEMPTS,
         },
         select: { id: true },
     });

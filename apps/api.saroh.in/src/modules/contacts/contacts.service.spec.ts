@@ -32,6 +32,10 @@ jest.mock("@saroh/database", () => {
                 updateMany: jest.fn(),
             },
             bookingEvent: { createMany: jest.fn() },
+            // A cancelled booking leaves its person's Google Calendar (GC-09).
+            googleCalendarEvent: { count: jest.fn().mockResolvedValue(1) },
+            googleCalendarConnection: { count: jest.fn() },
+            job: { create: jest.fn() },
             customerSubscription: { count: jest.fn() },
             packPurchase: { count: jest.fn() },
             courseEnrollment: { count: jest.fn(), deleteMany: jest.fn() },
@@ -902,6 +906,15 @@ describe("ContactsService.remove", () => {
         });
         expect(bookingUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(
             contactDelete.mock.invocationCallOrder[0]!,
+        );
+        // Off Google Calendar too, with no email to the deleted customer.
+        expect(prisma.job.create).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    type: "calendar.sync",
+                    payload: { bookingId: "bk_1", quiet: true },
+                }),
+            }),
         );
     });
 

@@ -5,7 +5,8 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import type { SealedConnection } from "./calendar-access";
 import { accessTokenFor, SEALED_CONNECTION } from "./calendar-access";
-import { CALENDAR_SYNC_TYPE } from "./calendar-jobs";
+import { businessPause, syncingMembers } from "./calendar-allowed";
+import { CALENDAR_SYNC_ATTEMPTS, CALENDAR_SYNC_TYPE } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
 import { addressLine, eventFor } from "./event-shape";
 import type { GoogleCalendarPort } from "./google/google-calendar.port";
@@ -25,12 +26,21 @@ export const MEET_TRIES = 6;
 interface SyncPayload {
     bookingId: string;
     meetTries: number;
+    /** Email nobody: a privacy removal or a deleted customer (GC-09). */
+    quiet: boolean;
 }
 
 /** Where a booking belongs in Google now: a connection and its write calendar. */
 interface Target {
     connection: SealedConnection & { scopes: string[] };
     calendarId: string;
+}
+
+interface Mapping {
+    connectionId: string;
+    calendarId: string;
+    eventId: string;
+    meetUrl: string | null;
 }
 
 /**
@@ -53,7 +63,14 @@ interface Target {
  * sessions are not copied.
  *
  * Google's "try later" (429, 5xx, a timeout) throws, so the worker retries
- * with its backoff. A refused token marks the connection lapsed and stops.
+ * on `calendar.sync`'s schedule of minutes (GC-05); the last failure tells
+ * the person, once. A refused token marks the connection lapsed and stops.
+ *
+ * Only while allowed (GC-02, GC-03, `calendar-allowed.ts`): with the flag
+ * or the plan off, or the person no longer holding `calendar:connect-own`,
+ * the job does nothing and events in Google stay as they were. A paused
+ * person's calendar gets no new events; one already there is left alone.
+ * A booking whose time has passed is never deleted with an email.
  */
 @Injectable()
 export class CalendarSyncHandler {
@@ -77,12 +94,20 @@ export class CalendarSyncHandler {
         }
         const organizationId = job.organizationId;
         if (!this.google) return;
-        if (!(await this.flags.isEnabled("GOOGLE_CALENDAR", organizationId))) {
-            return;
+        if (await businessPause(organizationId, this.flags)) return;
+        try {
+            await runInOrgContext(organizationId, () =>
+                this.sync(organizationId, payload),
+            );
+        } catch (error) {
+            // The last try: the booking won't reach Google on its own now.
+            if (job.attempts + 1 >= job.maxAttempts) {
+                await runInOrgContext(organizationId, () =>
+                    this.tellFailed(organizationId, payload.bookingId),
+                );
+            }
+            throw error;
         }
-        await runInOrgContext(organizationId, () =>
-            this.sync(organizationId, payload),
-        );
     };
 
     async sync(organizationId: string, payload: SyncPayload): Promise<void> {
@@ -123,21 +148,39 @@ export class CalendarSyncHandler {
         // Deleted: its event went with it (the row cascades); Google's stays.
         if (!booking) return;
         const mapping = booking.googleCalendarEvent;
+        const syncing = await syncingMembers(organizationId);
+        // Its event is on a paused person's calendar: left as it is.
+        if (mapping && !(await this.mayReach(mapping.connectionId, syncing))) {
+            return;
+        }
         const copied =
             booking.status === "CONFIRMED" &&
             !booking.courseEnrollmentId &&
             booking.service.capacity <= 1;
-        const target =
+        const found =
             copied && booking.staffId
-                ? await this.targetFor(organizationId, booking.staffId)
+                ? await this.targetFor(organizationId, booking.staffId, syncing)
                 : null;
+        // A booking that has ended is only ever brought up to date where
+        // its event is (a privacy removal), never added somewhere new.
+        const ended = booking.endAt.getTime() <= Date.now();
+        const target =
+            found &&
+            ended &&
+            (mapping?.connectionId !== found.connection.id ||
+                mapping.calendarId !== found.calendarId)
+                ? null
+                : found;
 
         // 1. Off the calendar it no longer belongs on.
         const stays =
             mapping?.connectionId === target?.connection.id &&
             mapping?.calendarId === target?.calendarId;
         if (mapping && !stays) {
-            await this.remove(organizationId, booking.id, mapping);
+            await this.remove(organizationId, booking.id, mapping, {
+                // Never a cancellation email for a time that has passed.
+                quiet: payload.quiet || booking.endAt.getTime() <= Date.now(),
+            });
         }
 
         const online = booking.locationType
@@ -153,11 +196,11 @@ export class CalendarSyncHandler {
                 online,
                 wantsMeet,
                 meetTries: payload.meetTries,
+                quiet: payload.quiet,
                 // Tightened once, when the link is new to Saroh.
-                knownMeet:
-                    mapping?.connectionId === target.connection.id
-                        ? mapping.meetUrl
-                        : null,
+                knownMeet: stays ? (mapping?.meetUrl ?? null) : null,
+                // The event it already has there, never a second one.
+                knownEventId: stays ? (mapping?.eventId ?? null) : null,
             });
         }
 
@@ -175,10 +218,26 @@ export class CalendarSyncHandler {
         }
     }
 
-    /** The connected calendar whoever takes the booking writes to, if any. */
+    /** Whether the connection's person may sync now (GC-03). */
+    private async mayReach(
+        connectionId: string,
+        syncing: ReadonlySet<string>,
+    ): Promise<boolean> {
+        const row = await prisma.googleCalendarConnection.findUnique({
+            where: { id: connectionId },
+            select: { membershipId: true },
+        });
+        return !row || syncing.has(row.membershipId);
+    }
+
+    /**
+     * The connected calendar whoever takes the booking writes to, if any:
+     * none for someone who may no longer sync (GC-03).
+     */
     private async targetFor(
         organizationId: string,
         staffId: string,
+        syncing: ReadonlySet<string>,
     ): Promise<Target | null> {
         const connection = await prisma.googleCalendarConnection.findFirst({
             where: {
@@ -189,6 +248,7 @@ export class CalendarSyncHandler {
             select: {
                 ...SEALED_CONNECTION,
                 scopes: true,
+                membershipId: true,
                 calendars: {
                     where: { writeTo: true },
                     select: { calendarId: true },
@@ -197,6 +257,7 @@ export class CalendarSyncHandler {
         });
         const calendarId = connection?.calendars[0]?.calendarId;
         if (!connection || !calendarId) return null;
+        if (!syncing.has(connection.membershipId)) return null;
         if (!grantedParts(connection.scopes).events) return null;
         return { connection, calendarId };
     }
@@ -205,7 +266,8 @@ export class CalendarSyncHandler {
     private async remove(
         organizationId: string,
         bookingId: string,
-        mapping: { connectionId: string; calendarId: string; eventId: string },
+        mapping: Mapping,
+        opts: { quiet: boolean },
     ): Promise<void> {
         const google = this.google;
         const connection = await prisma.googleCalendarConnection.findFirst({
@@ -220,6 +282,7 @@ export class CalendarSyncHandler {
                     access,
                     mapping.calendarId,
                     mapping.eventId,
+                    { quiet: opts.quiet },
                 );
                 return true;
             });
@@ -233,6 +296,8 @@ export class CalendarSyncHandler {
         organizationId: string,
         booking: {
             id: string;
+            status: string;
+            staffId: string | null;
             startAt: Date;
             endAt: Date;
             timezone: string;
@@ -245,7 +310,9 @@ export class CalendarSyncHandler {
             online: boolean;
             wantsMeet: boolean;
             meetTries: number;
+            quiet: boolean;
             knownMeet: string | null;
+            knownEventId: string | null;
         },
     ): Promise<string | null> {
         const google = this.google;
@@ -276,11 +343,14 @@ export class CalendarSyncHandler {
                 connectionId: target.connection.id,
                 meet: opts.wantsMeet,
                 address: addressLine(profile),
+                ...(opts.knownEventId ? { eventId: opts.knownEventId } : {}),
             },
         );
         const result = await this.withGoogle(target.connection, (access) =>
             google
-                .putEvent(access, target.calendarId, input)
+                .putEvent(access, target.calendarId, input, {
+                    quiet: opts.quiet,
+                })
                 .then(async (made) => {
                     if (
                         made.meetUrl &&
@@ -316,6 +386,7 @@ export class CalendarSyncHandler {
                 syncedAt: new Date(),
             },
         });
+        await this.followUp(organizationId, booking);
         // Google is still making the Meet: ask again shortly.
         if (opts.wantsMeet && result.meetPending) {
             if (opts.meetTries + 1 < MEET_TRIES) {
@@ -327,6 +398,7 @@ export class CalendarSyncHandler {
                             bookingId: booking.id,
                             meetTries: opts.meetTries + 1,
                         },
+                        maxAttempts: CALENDAR_SYNC_ATTEMPTS,
                         runAt: new Date(Date.now() + MEET_RETRY_MS),
                     },
                     select: { id: true },
@@ -335,9 +407,77 @@ export class CalendarSyncHandler {
                 this.logger.warn(
                     `google_meet_not_ready booking=${booking.id}: Google never finished the Meet link`,
                 );
+                await this.lapses.syncFailed(
+                    target.connection.id,
+                    booking.id,
+                    "meet",
+                );
             }
         }
         return result.meetUrl;
+    }
+
+    /**
+     * The booking changed while Google was making its event (GC-11): a
+     * cancel then found no event to delete and queued nothing. Read it
+     * again now the event is recorded, and queue one more pass if it moved
+     * on, so the event is brought in line instead of left behind.
+     */
+    private async followUp(
+        organizationId: string,
+        before: { id: string; status: string; staffId: string | null },
+    ): Promise<void> {
+        const now = await prisma.booking.findFirst({
+            where: { id: before.id, organizationId },
+            select: { status: true, staffId: true },
+        });
+        if (
+            !now ||
+            (now.status === before.status && now.staffId === before.staffId)
+        ) {
+            return;
+        }
+        await prisma.job.create({
+            data: {
+                organizationId,
+                type: CALENDAR_SYNC_TYPE,
+                payload: { bookingId: before.id },
+                maxAttempts: CALENDAR_SYNC_ATTEMPTS,
+            },
+            select: { id: true },
+        });
+    }
+
+    /** Every retry spent: tell the person whose calendar it was for (GC-05). */
+    private async tellFailed(
+        organizationId: string,
+        bookingId: string,
+    ): Promise<void> {
+        const booking = await prisma.booking.findFirst({
+            where: { id: bookingId, organizationId },
+            select: {
+                staffId: true,
+                googleCalendarEvent: { select: { connectionId: true } },
+            },
+        });
+        const connectionId =
+            booking?.googleCalendarEvent?.connectionId ??
+            (booking?.staffId
+                ? (
+                      await prisma.googleCalendarConnection.findFirst({
+                          where: {
+                              organizationId,
+                              membership: {
+                                  staffMember: { id: booking.staffId },
+                              },
+                          },
+                          select: { id: true },
+                      })
+                  )?.id
+                : undefined);
+        if (connectionId) {
+            await this.lapses.syncFailed(connectionId, bookingId, "sync");
+        }
     }
 
     /**
@@ -405,11 +545,16 @@ export class CalendarSyncHandler {
 
 function payloadOf(raw: unknown): SyncPayload | null {
     if (!raw || typeof raw !== "object") return null;
-    const p = raw as { bookingId?: unknown; meetTries?: unknown };
+    const p = raw as {
+        bookingId?: unknown;
+        meetTries?: unknown;
+        quiet?: unknown;
+    };
     if (typeof p.bookingId !== "string" || !p.bookingId) return null;
     return {
         bookingId: p.bookingId,
         meetTries: typeof p.meetTries === "number" ? p.meetTries : 0,
+        quiet: p.quiet === true,
     };
 }
 

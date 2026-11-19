@@ -4,13 +4,19 @@ import { prisma, runInOrgContext } from "@saroh/database";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { accessTokenFor, SEALED_CONNECTION } from "./calendar-access";
+import { pausedBecause } from "./calendar-allowed";
 import {
     BUSY_EVERY_MS,
     CALENDAR_BUSY_TYPE,
     scheduleBusy,
 } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
-import type { GoogleCalendarPort } from "./google/google-calendar.port";
+import { eventIdFor } from "./event-shape";
+import type {
+    BusyInterval,
+    GoogleCalendarPort,
+    GrantedParts,
+} from "./google/google-calendar.port";
 import {
     GOOGLE_CALENDAR,
     grantedParts,
@@ -29,11 +35,21 @@ export const BUSY_AHEAD_MS = 60 * 86_400_000;
  * (one waiting run per connection, `scheduleBusy`). Slot reads never call
  * Google: they read what this keeps, while it is fresh (`loadPeople`).
  *
+ * What counts (GC-01, GC-10): on a calendar the person owns, the events
+ * they made or accepted, read with `events.list`, less the events Saroh
+ * made for this connection (their own bookings already block in Saroh, and
+ * counting them again stopped a booking being moved by less than its
+ * length). An invitation nobody answered doesn't block. A calendar they
+ * don't own, or a grant without the events scope, is read with Google's
+ * free/busy, which can't tell either apart: there, unanswered invitations
+ * still block (documented limit).
+ *
  * Google's error keeps the old busy times until they are two hours old,
  * then slots fall back to Saroh's own times and the connection reads
  * behind (R9). A refused token lapses the connection and ends its chain;
- * a disconnected one, or the flag off, ends it too (connecting again, or
- * reading the status, starts it).
+ * a disconnected or paused one (`calendar-allowed.ts`) ends it too, and
+ * its busy times go; the daily sweep, connecting again or reading the
+ * status starts it again.
  */
 @Injectable()
 export class CalendarBusyHandler {
@@ -57,9 +73,6 @@ export class CalendarBusyHandler {
         }
         const organizationId = job.organizationId;
         if (!this.google) return;
-        if (!(await this.flags.isEnabled("GOOGLE_CALENDAR", organizationId))) {
-            return;
-        }
         const goOn = await runInOrgContext(organizationId, () =>
             this.refresh(organizationId, connectionId),
         );
@@ -85,6 +98,7 @@ export class CalendarBusyHandler {
             select: {
                 ...SEALED_CONNECTION,
                 scopes: true,
+                membershipId: true,
                 membership: {
                     select: { staffMember: { select: { id: true } } },
                 },
@@ -95,22 +109,44 @@ export class CalendarBusyHandler {
             },
         });
         if (!connection) return false;
+        if (
+            await pausedBecause(
+                organizationId,
+                connection.membershipId,
+                this.flags,
+            )
+        ) {
+            // Paused: its busy times stop blocking now, not in two hours.
+            await prisma.googleCalendarBusy.deleteMany({
+                where: { connectionId },
+            });
+            return false;
+        }
         const staffId = connection.membership.staffMember?.id;
-        const ids = grantedParts(connection.scopes).freeBusy
+        const parts = grantedParts(connection.scopes);
+        const ids = parts.freeBusy
             ? connection.calendars.map((c) => c.calendarId)
             : [];
-        let busy: { startAt: Date; endAt: Date }[] = [];
+        const busy: BusyInterval[] = [];
         if (staffId && ids.length > 0) {
             try {
                 const access = await accessTokenFor(google, connection, (id) =>
                     this.lapses.lapse(id),
                 );
-                busy = await google.freeBusy(
-                    access,
-                    ids,
-                    now,
-                    new Date(now.getTime() + BUSY_AHEAD_MS),
-                );
+                const to = new Date(now.getTime() + BUSY_AHEAD_MS);
+                for (const calendarId of ids) {
+                    busy.push(
+                        ...(await this.busyOn(
+                            google,
+                            access,
+                            parts,
+                            connectionId,
+                            calendarId,
+                            now,
+                            to,
+                        )),
+                    );
+                }
             } catch (error) {
                 if (isGoogleError(error, "lapsed")) return false;
                 if (!isGoogleError(error)) throw error;
@@ -146,6 +182,49 @@ export class CalendarBusyHandler {
             });
         });
         return true;
+    }
+
+    /**
+     * One calendar's busy times. Its events when Saroh may read them (an
+     * owned calendar), less the ones Saroh made for this connection; else,
+     * or when Google refuses that read, its free/busy.
+     */
+    private async busyOn(
+        google: GoogleCalendarPort,
+        access: string,
+        parts: GrantedParts,
+        connectionId: string,
+        calendarId: string,
+        from: Date,
+        to: Date,
+    ): Promise<BusyInterval[]> {
+        if (parts.events) {
+            try {
+                const events = await google.busyEvents(
+                    access,
+                    calendarId,
+                    from,
+                    to,
+                );
+                return events
+                    .filter(
+                        (e) =>
+                            !e.bookingId ||
+                            e.eventId !== eventIdFor(e.bookingId, connectionId),
+                    )
+                    .map(({ startAt, endAt }) => ({ startAt, endAt }));
+            } catch (error) {
+                // Not theirs to read event by event (a calendar shared
+                // with them): Google's free/busy still answers for it.
+                if (
+                    !isGoogleError(error, "refused") &&
+                    !isGoogleError(error, "gone")
+                ) {
+                    throw error;
+                }
+            }
+        }
+        return google.freeBusy(access, [calendarId], from, to);
     }
 }
 

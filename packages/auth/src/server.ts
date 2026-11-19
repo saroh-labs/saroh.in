@@ -643,13 +643,22 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         account: {
             accountLinking: {
                 enabled: true,
-                // Google only: every Google account's address is verified.
-                // GitHub lets an account keep an address it never verified,
-                // so a GitHub sign-in links only when GitHub says it is
-                // verified (Better Auth reads that flag), or anyone could add
-                // someone's address to GitHub and take their account.
-                trustedProviders: ["google"],
+                // No provider is trusted blindly (GC-17): a Google or GitHub
+                // sign-in links to an account with the same address only
+                // when the provider says it verified that address (Better
+                // Auth reads the flag), which every normal Google account
+                // has. Trusting Google outright also linked the rare
+                // address Google itself marks unverified.
+                trustedProviders: [],
             },
+            // Sign-in tokens are kept encrypted (GC-08). Saroh never uses
+            // them, and Google Calendar keeps its own, sealed under its own
+            // key; this keeps a database copy from holding a live token.
+            // Rows written before stay readable: Better Auth passes a
+            // token through as it is unless it looks encrypted, and no
+            // GitHub or Google token looks like that (they start `gho_`
+            // and `ya29.`).
+            encryptOAuthTokens: true,
         },
         emailAndPassword: {
             enabled: true,
@@ -770,6 +779,10 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
             google: {
                 clientId: process.env.AUTH_GOOGLE_ID ?? "",
                 clientSecret: process.env.AUTH_GOOGLE_SECRET ?? "",
+                // Sign-in asks for name, email and photo, and its token
+                // covers only those (GC-08): never the calendar access the
+                // same Google client was given for Google Calendar.
+                includeGrantedScopes: false,
             },
         },
         advanced: {

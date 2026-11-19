@@ -5,6 +5,7 @@ import { IANAZone } from "luxon";
 
 import type { Interval, StaffAvailabilityInput } from "./availability";
 import { holdsPlace } from "./booking-hold";
+import { googleBusyCounted } from "./google-busy-gate";
 
 /**
  * Reading people's hours for the slot engine (U3). The geometry is pure and
@@ -195,9 +196,11 @@ export async function loadPeople(
         loadGaps(db, organizationId, staffIds),
         // Busy in their own Google Calendar (#1047): time off, so the gap
         // between bookings isn't kept around it. Only what is fresh, from
-        // a connection that still works. Known gap, accepted (U6): the
-        // clash check inside a booking's lock counts Saroh's bookings only,
-        // so a time made busy in Google seconds before can still be taken.
+        // a connection that still works and is still allowed (GC-02,
+        // GC-03: asked below, only when there is any). Known gap, accepted
+        // (U6): the clash check inside a booking's lock counts Saroh's
+        // bookings only, so a time made busy in Google seconds before can
+        // still be taken.
         db.googleCalendarBusy.findMany({
             where: {
                 organizationId,
@@ -209,9 +212,19 @@ export async function loadPeople(
                     busyRefreshedAt: { gte: freshSince },
                 },
             },
-            select: { staffId: true, startAt: true, endAt: true },
+            select: {
+                staffId: true,
+                startAt: true,
+                endAt: true,
+                connection: { select: { membershipId: true } },
+            },
         }),
     ]);
+    const counted =
+        google.length > 0 ? await googleBusyCounted(organizationId) : null;
+    const googleBusy = google.filter((b) =>
+        counted?.has(b.connection.membershipId),
+    );
     const pick = <T extends { staffId: string | null }>(
         rows: T[],
         id: string,
@@ -235,7 +248,7 @@ export async function loadPeople(
         timeOff: [
             ...pick(off, id).map(interval),
             ...closed.map(interval),
-            ...pick(google, id).map(interval),
+            ...pick(googleBusy, id).map(interval),
         ],
         busy: pick(busy, id).map(interval),
         gapMinutes: gaps.get(id) ?? 0,

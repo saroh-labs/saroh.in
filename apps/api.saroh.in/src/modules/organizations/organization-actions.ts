@@ -121,7 +121,7 @@ export type OrgAction =
     // online sessions. Only ever the holder's own account and diary, never
     // anyone else's. Every role that takes bookings holds it by default
     // but the Reviewer; a role saved before it gained it only where it
-    // could already change bookings (migration `20270217120000`).
+    // could already change bookings (migration `20270218120000_google_calendar`).
     | "calendar:connect-own"
     | "order:read"
     | "order:write"

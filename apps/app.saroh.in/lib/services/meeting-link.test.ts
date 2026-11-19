@@ -48,4 +48,29 @@ describe("joinLink", () => {
             }),
         ).toBeNull();
     });
+
+    it("prefers the booking's own Meet link to the service's typed one (GC-07)", () => {
+        expect(
+            joinLink({
+                snapshot: online("https://meet.example.com/typed"),
+                status: "CONFIRMED",
+                meetingUrl: "https://meet.google.com/abc-defg-hij",
+            }),
+        ).toBe("https://meet.google.com/abc-defg-hij");
+        // A Meet-only service has no typed link at all.
+        expect(
+            joinLink({
+                snapshot: online(null),
+                status: "CONFIRMED",
+                meetingUrl: "https://meet.google.com/abc-defg-hij",
+            }),
+        ).toBe("https://meet.google.com/abc-defg-hij");
+        expect(
+            joinLink({
+                snapshot: online(null),
+                status: "CANCELLED",
+                meetingUrl: "https://meet.google.com/abc-defg-hij",
+            }),
+        ).toBeNull();
+    });
 });

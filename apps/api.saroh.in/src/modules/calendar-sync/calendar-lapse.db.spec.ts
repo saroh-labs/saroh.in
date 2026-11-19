@@ -13,11 +13,13 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
+import { setGoogleBusyGate } from "../bookings/google-busy-gate";
 import {
     GOOGLE_BUSY_FRESH_MS,
     loadPeople,
 } from "../bookings/staff-availability";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { googleBusyAllowed } from "./calendar-allowed";
 import { CalendarBusyHandler } from "./calendar-busy.handler";
 import { CalendarConnectService } from "./calendar-connect.service";
 import { CALENDAR_BUSY_TYPE } from "./calendar-jobs";
@@ -25,6 +27,7 @@ import {
     CALENDAR_LAPSED_NOTICE,
     CalendarLapseService,
 } from "./calendar-lapse.service";
+import { CalendarReleaseService } from "./calendar-release.service";
 import { FakeGoogleCalendar } from "./google/fake-google-calendar";
 import { SCOPES } from "./google/google-calendar.port";
 import { sealToken, tokenColumns } from "./sealing";
@@ -43,10 +46,18 @@ const flags = { isEnabled: jest.fn().mockResolvedValue(true) };
 let google: FakeGoogleCalendar;
 let lapses: CalendarLapseService;
 
-beforeAll(() => {
+beforeAll(async () => {
     // A throwaway key for this run only, never a value in the repo.
     mutableEnv.CALENDAR_ENC_KEY = randomBytes(32).toString("base64");
     mutableEnv.API_PUBLIC_URL = "https://api.example.com";
+    // Slot reads ask whether Google busy times count (GC-02), as the
+    // module registers at boot; the flag is on per business.
+    setGoogleBusyGate(googleBusyAllowed);
+    await prisma.featureFlag.upsert({
+        where: { key: "GOOGLE_CALENDAR" },
+        create: { key: "GOOGLE_CALENDAR", enabledByDefault: false },
+        update: {},
+    });
 });
 afterAll(async () => {
     Object.assign(mutableEnv, before);
@@ -62,6 +73,9 @@ async function connected() {
         data: { name: "Rye & Co.", slug: uniq("gcal-lapse") },
     });
     const organizationId = org.id;
+    await prisma.featureFlagOverride.create({
+        data: { flagKey: "GOOGLE_CALENDAR", organizationId, enabled: true },
+    });
     const user = await prisma.user.create({
         data: { email: `${uniq("p")}@example.com`, name: "Meera" },
     });
@@ -173,6 +187,7 @@ describe("a lapsed Google Calendar", () => {
             google,
             flags as unknown as FeatureFlagService,
             lapses,
+            new CalendarReleaseService(google, lapses),
         );
         await expect(
             service.connect(
@@ -197,6 +212,7 @@ describe("a lapsed Google Calendar", () => {
             google,
             flags as unknown as FeatureFlagService,
             lapses,
+            new CalendarReleaseService(google, lapses),
         );
         expect((await service.status(c.ctx)).behind).toBe(false);
         await prisma.googleCalendarConnection.update({

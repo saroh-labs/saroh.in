@@ -85,3 +85,25 @@ describe("renewing a claimed job's lease", () => {
         expect(second.map((j) => j.id)).not.toContain(job.id);
     });
 });
+
+describe("claiming by lane (GC-04)", () => {
+    it("gives the calendar lane only calendar jobs and the main lane the rest", async () => {
+        const due = new Date(Date.now() - 1000);
+        const cal = await queue.enqueue({
+            type: "calendar.busy",
+            payload: {},
+            runAt: due,
+        });
+        const other = await queue.enqueue({
+            type: "test.lane-main",
+            payload: {},
+            runAt: due,
+        });
+
+        const main = await queue.claimDue("worker_main", 50, "main");
+        expect(main.map((j) => j.id)).toContain(other.id);
+        expect(main.map((j) => j.id)).not.toContain(cal.id);
+        const calendar = await queue.claimDue("worker_cal", 50, "calendar");
+        expect(calendar.map((j) => j.id)).toEqual([cal.id]);
+    });
+});
