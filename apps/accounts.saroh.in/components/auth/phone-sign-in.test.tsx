@@ -21,7 +21,12 @@ import {
     type,
 } from "../billing-profiles/test-kit";
 
-import { PHONE_SIGN_IN_WORDS, PhoneSignIn, STALE_WORDS } from "./phone-sign-in";
+import {
+    NO_CODE_WORDS,
+    PHONE_SIGN_IN_WORDS,
+    PhoneSignIn,
+    STALE_WORDS,
+} from "./phone-sign-in";
 
 const api = vi.hoisted(() => ({
     startPhone: vi.fn(),
@@ -147,6 +152,64 @@ describe("signing in with a phone", () => {
             "Couldn't send on WhatsApp. Try SMS instead.",
         );
         expect(button("Get the code by SMS instead", host)).toBeTruthy();
+    });
+
+    // Owner, 19 Nov: every number hears the same answer and the send goes
+    // after it, so a failed one is invisible. SMS is the offered next step.
+    describe("no code yet", () => {
+        beforeEach(() => {
+            vi.useFakeTimers({ shouldAdvanceTime: true });
+            api.startPhone.mockResolvedValue({
+                data: { whatsapp: { resendAfterSeconds: 30 } },
+                error: null,
+            });
+        });
+        afterEach(() => vi.useRealTimers());
+
+        const waitOut = () =>
+            act(async () => {
+                vi.advanceTimersByTime(31_000);
+                await Promise.resolve();
+            });
+
+        it("offers SMS once the resend wait is over, beside Resend, and keeps the number", async () => {
+            drawIt();
+            await sendFor("98450 12345");
+            expect(text(host)).toContain("Check your WhatsApp");
+            expect(text(host)).not.toContain(NO_CODE_WORDS.line);
+            await waitOut();
+            expect(text(host)).toContain(NO_CODE_WORDS.line);
+            expect(button("Resend code", host)).toBeTruthy();
+            await press(button(NO_CODE_WORDS.action, host));
+            expect(button("Send me a code", host)).toBeTruthy();
+            expect(numberBox().value).toContain("98450");
+            await act(async () => {
+                must(host.querySelector("form")).requestSubmit();
+                await new Promise((r) => setTimeout(r, 30));
+            });
+            expect(api.startPhone).toHaveBeenLastCalledWith({
+                phone: "+919845012345",
+                channel: "sms",
+                purpose: "sign-in",
+                turnstileToken: null,
+            });
+        });
+
+        it("is offered for a number with no account too, so it says nothing about it", async () => {
+            // The API answers every number alike; the screen can't tell them apart.
+            drawIt();
+            await sendFor("90000 00001");
+            await waitOut();
+            expect(button(NO_CODE_WORDS.action, host)).toBeTruthy();
+        });
+
+        it("is not offered when the SMS widget isn't set up", async () => {
+            drawIt({ sms: false });
+            await sendFor("98450 12345");
+            await waitOut();
+            expect(text(host)).not.toContain(NO_CODE_WORDS.line);
+            expect(button("Resend code", host)).toBeTruthy();
+        });
     });
 
     it("hides the SMS link when the widget isn't set up", () => {

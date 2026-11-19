@@ -1,6 +1,7 @@
 "use client";
 
 import { VERIFICATION_OTP_LENGTH } from "@saroh/auth/constants";
+import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -55,6 +56,8 @@ const SUCCESS_HOLD_MS = 1140;
  *   A code that ran out or took too many wrong tries offers "Send a new
  *   code" at once.
  * - "Change email" goes back with the address still in the field.
+ * - `fallback`, once the resend wait is over: another way to get the code
+ *   ("No code yet? Get it by SMS instead"), above Resend.
  *
  * It never says whether the address had an account.
  */
@@ -69,6 +72,7 @@ export function CodeStep({
     onDone,
     client = codeClient,
     lead: leadOverride,
+    fallback,
 }: {
     email: string;
     kind?: CodeKind;
@@ -86,6 +90,11 @@ export function CodeStep({
     client?: CodeClient;
     /** The line under the title, when the default would claim too much. */
     lead?: string;
+    /**
+     * Another way to get the code, offered once the resend wait is over:
+     * the same to everyone, so it says nothing about the number.
+     */
+    fallback?: { line: string; action: string; onSelect: () => void };
 }) {
     const field = useRef<HTMLInputElement>(null);
     const [code, setCode] = useState("");
@@ -283,6 +292,22 @@ export function CodeStep({
             </form>
             {challenge ? (
                 <CodeChallenge onToken={(token) => void resend(token)} />
+            ) : null}
+            {fallback && wait <= 0 ? (
+                <div className="sa-rise mt-4 rounded-[9px] border px-3 py-2.5">
+                    <p className="text-muted-foreground text-[12.5px]">
+                        {fallback.line}
+                    </p>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={fallback.onSelect}
+                        disabled={sending || checking}
+                        className="coarse:h-11 mt-2 h-10 w-full rounded-[9px] text-[13.5px] font-semibold"
+                    >
+                        {fallback.action}
+                    </Button>
+                </div>
             ) : null}
             {spent ? (
                 <AuthAlt
