@@ -6,10 +6,11 @@ import {
 } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { IssuedPdf } from "../invoices/issued-invoice-pdf";
 import { IssuedInvoicePdf } from "../invoices/issued-invoice-pdf";
 import { hashPayToken } from "../invoices/pay-token";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 
 /** Downloads per caller per minute: the pay read's own allowance. */
 const CALLS_PER_WINDOW = 30;
@@ -55,12 +56,14 @@ export class PublicInvoicePdfService {
     constructor(
         private readonly pdfs: IssuedInvoicePdf,
         @Optional()
-        private readonly callLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly callLimiter: WindowLimiter = new SharedRateLimiter(
+            "invoice-pdf-reads",
             CALLS_PER_WINDOW,
             CALL_WINDOW_MS,
         ),
         @Optional()
-        private readonly drawLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly drawLimiter: WindowLimiter = new SharedRateLimiter(
+            "invoice-pdf-draws",
             DRAWS_PER_WINDOW,
             DRAW_WINDOW_MS,
         ),
@@ -70,7 +73,7 @@ export class PublicInvoicePdfService {
         const tokenHash = hashPayToken(token);
         // Keyed on the caller, as the pay read is: keyed on the token sent,
         // every guessed token would be a fresh window.
-        if (!this.callLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.callLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await prisma.invoice.findUnique({
@@ -78,7 +81,7 @@ export class PublicInvoicePdfService {
             select: { id: true, organizationId: true },
         });
         if (!found) notFound();
-        if (!this.drawLimiter.take(found.id)) throw tooManyRequests();
+        if (!(await this.drawLimiter.take(found.id))) throw tooManyRequests();
         const pdf = await runInOrgContext(found.organizationId, () =>
             this.pdfs.draw(found.organizationId, found.id),
         );

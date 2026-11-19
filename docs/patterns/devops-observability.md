@@ -215,13 +215,20 @@ here when you add a `Map`, a cache or a timer that outlives a request.
   runs to its end; move it to Redis pub/sub before scaling. The stuck-turn
   sweep (`ai/usage/stuck-turns.ts`) runs on a timer in every replica, which
   is safe: one conditional update fails each row once.
+- **Shared in Redis** (`SharedRateLimiter`, 18 Nov 2026): the limits that
+  guard money, sends or outbound work (site codes, enquiries, contact,
+  reports, the waitlist, booking requests and holds, coupon tries, share
+  cards, public pay, shop checkout, the link preview, the WhatsApp code
+  ceiling, the per-person request ceiling). With `REDIS_URL` unset or Redis
+  failing they limit in process and say `rate_limit_open` at WARN.
 - **Per process, and N times looser with N replicas** (each also starts empty
-  on every deploy): every `FixedWindowRateLimiter` (public booking, enquiry,
-  payments, reviews, tools, shop reads, …), Better Auth's own sign-in and code
-  limits (its default memory store), the site-account email-change cap
+  on every deploy): the remaining `FixedWindowRateLimiter`s (shop and site
+  page reads, reviews, tools, …), Better Auth's own sign-in and code limits
+  (its default memory store; the durable per-address code cap covers
+  sign-up and code mails), the site-account email-change cap
   (`site-accounts/email-change.service.ts`) and the sign-in code failure
-  alert (`code-delivery.ts`). Acceptable at two replicas behind the Cloudflare
-  edge rules; move one to `LimitsService` (Redis) the day it's abused.
+  alert (`code-delivery.ts`). Move one to `SharedRateLimiter` the day it's
+  abused.
 
 ## Ask AI's alarms — **Current** (DEC-220, plan 2026-11-13-001 U8)
 

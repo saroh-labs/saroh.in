@@ -103,7 +103,7 @@ export interface PendingMove {
 
 /** Why a business is read off the legacy path instead of the catalogue. */
 export type LegacyReason =
-    /** No subscription row and no plan override: the free floor. */
+    /** Not read by `resolve` since 04-F2 (no row reads Free); kept for callers' unions. */
     | "no-plan"
     /** A legacy plan key `LEGACY_PLAN_KEYS` doesn't map: its own row. */
     | "unmapped-plan"
@@ -231,10 +231,10 @@ export function newestPlanOverride(
  *    `LEGACY_PLAN_KEYS` maps it to, on the live version — so a paying
  *    customer never resolves as Free — keeping its own row's values for the
  *    keys no catalogue row sells.
- * 2. With no live subscription, Free on the live version — but only when the
- *    catalogue already reaches it: it has a catalogue subscription row
- *    (cancelled) or a live plan override. A business with neither reads
- *    {@link FREE_ENTITLEMENTS} (`reason: "no-plan"`).
+ * 2. With no live subscription, Free on the live version — with no row at
+ *    all too (04-F2): a business the Free-rows backfill missed is held to
+ *    Free, never read as unlimited. Only with no live version does it read
+ *    {@link FREE_ENTITLEMENTS} (`reason: "no-catalogue"`).
  *
  * On an older version, a row its plan has since gained on the live version
  * is its at once (DEC-186): additions only, its price unchanged.
@@ -383,15 +383,13 @@ export class CatalogueAccessService {
                 legacyRow = own;
                 fallback = own;
             }
-        } else if (
-            planOverride ||
-            subscription?.plan.key.startsWith(CATALOG_PLAN_KEY_PREFIX)
-        ) {
+        } else {
+            // No live plan of its own, with or without a row or override:
+            // Free on the live version (04-F2, 18 Nov 2026). A business the
+            // backfill missed is held to Free's rows, never let past them.
             planId = FREE_PLAN_ID;
             version = null;
             fallback = { ...FREE_ENTITLEMENTS };
-        } else {
-            return legacy("no-plan", { ...FREE_ENTITLEMENTS });
         }
 
         // The business's own edition's catalogue (stage 9, KTD1).
@@ -660,7 +658,12 @@ export class CatalogueAccessService {
     ): Promise<boolean> {
         const access = await this.resolve(organizationId, now);
         if (access.source !== "catalogue") return true;
-        return registryModuleIncluded(access.catalog, access.modules, registry);
+        return registryModuleIncluded(
+            access.catalog,
+            access.modules,
+            registry,
+            access.planId,
+        );
     }
 
     /**

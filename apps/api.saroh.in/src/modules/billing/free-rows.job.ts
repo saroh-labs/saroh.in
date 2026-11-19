@@ -15,8 +15,8 @@ import { FREE_PLAN_ID } from "./catalogue-access.service";
  * Give a business its Free subscription row when a catalogue version goes
  * live (#839). Sign-up starts a business on Free only while a version is
  * live; one that joined while the first version was scheduled, or waiting
- * on the billing provider, has no row, reads as legacy `no-plan`, and plan
- * rules skip it. This job, queued at every go-live, closes that gap.
+ * on the billing provider, has no row; it reads as Free all the same
+ * (04-F2), and this job, queued at every go-live, gives it the row.
  *
  * Who it starts is the Free-rows backfill's rule (`startMissingFreeRows`):
  * a business that joined before the first version was published is an

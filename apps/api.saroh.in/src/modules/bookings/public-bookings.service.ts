@@ -19,6 +19,8 @@ import { loadPriceTerms } from "../invoices/price-terms";
 import { takingNewActivity } from "../orders/checkout-paused";
 import { assertNotDemo } from "../organizations/organization-lifecycle.gate";
 import { PaymentsService } from "../payments/payments.service";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { qrSourceFor } from "../sites/qr-source";
 import { isValidSlotStart } from "./availability";
 import type { PublicCredit } from "./booking-credit";
@@ -72,7 +74,6 @@ import {
     publicServices,
     toPublicBooking,
 } from "./public-booking-page";
-import { FixedWindowRateLimiter } from "./rate-limiter";
 import type { BookInput, CreditChoice, ReserveWith } from "./reservation";
 import {
     alreadyBooked,
@@ -150,7 +151,9 @@ export class PublicBookingsService {
         // Not a DI provider — a per-instance default; @Optional() stops Nest
         // trying to inject it so the default (and test overrides) apply.
         @Optional()
-        private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
+        private readonly rateLimiter: WindowLimiter = new SharedRateLimiter(
+            "booking-requests",
+        ),
         @Optional() private readonly activation?: ActivationEvents,
         // Closes a let-go hold's open intent at its provider (DEC-208).
         @Optional() private readonly payments?: PaymentsService,
@@ -162,7 +165,11 @@ export class PublicBookingsService {
      * Counted per hashed IP AND token, so one payer cannot use up a limit
      * the other customers on the same network share.
      */
-    private readonly holdLimiter = new FixedWindowRateLimiter(40, 60_000);
+    private readonly holdLimiter = new SharedRateLimiter(
+        "booking-hold-reads",
+        40,
+        60_000,
+    );
 
     /**
      * And a ceiling per hashed IP, whatever the token: room for ten people
@@ -170,7 +177,11 @@ export class PublicBookingsService {
      * is checked first — the token is the caller's to make up, so only this
      * bounds a run of invented tokens, and the keys it leaves behind.
      */
-    private readonly holdIpCeiling = new FixedWindowRateLimiter(150, 60_000);
+    private readonly holdIpCeiling = new SharedRateLimiter(
+        "booking-hold-ceiling",
+        150,
+        60_000,
+    );
 
     /**
      * PUBLIC availability for a bookable service — no auth, org-agnostic. Loads
@@ -297,7 +308,7 @@ export class PublicBookingsService {
         ipHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicHold> {
-        this.takeHoldHit(token, ipHash, now);
+        await this.takeHoldHit(token, ipHash, now);
         const booking = await this.holdBooking(token);
         return {
             state: holdState(booking, now),
@@ -316,7 +327,7 @@ export class PublicBookingsService {
         ipHash: string | undefined,
         now: Date = new Date(),
     ): Promise<PublicHold> {
-        this.takeHoldHit(token, ipHash, now);
+        await this.takeHoldHit(token, ipHash, now);
         const found = await this.holdBooking(token);
         const released = await prisma.$transaction((tx) =>
             releaseHoldInTx(tx, found.id, now),
@@ -335,18 +346,21 @@ export class PublicBookingsService {
     }
 
     /** One read or release of a hold against its limits; 429 past them. */
-    private takeHoldHit(
+    private async takeHoldHit(
         token: string,
         ipHash: string | undefined,
         now: Date,
-    ): void {
+    ): Promise<void> {
         if (!ipHash) return;
         const at = now.getTime();
         // The ceiling first and on its own: a refusal there never adds a
         // per-token key.
         const allowed =
-            this.holdIpCeiling.take(ipHash, at) &&
-            this.holdLimiter.take(`${ipHash}:${hashPayToken(token)}`, at);
+            (await this.holdIpCeiling.take(ipHash, at)) &&
+            (await this.holdLimiter.take(
+                `${ipHash}:${hashPayToken(token)}`,
+                at,
+            ));
         if (!allowed) {
             throw new HttpException(
                 "Too many requests. Try again shortly.",
@@ -541,7 +555,9 @@ export class PublicBookingsService {
         // 3. Rate-limit per (service, hashed IP). Cheap abuse guard. Before
         //    the replay too, so replays cannot be used to probe for keys.
         if (ipHash) {
-            const allowed = this.rateLimiter.take(`${serviceId}:${ipHash}`);
+            const allowed = await this.rateLimiter.take(
+                `${serviceId}:${ipHash}`,
+            );
             if (!allowed) {
                 throw new HttpException(
                     "Too many booking attempts. Please slow down and try again shortly",

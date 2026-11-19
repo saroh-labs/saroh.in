@@ -222,7 +222,12 @@ export interface CreateAuthOptions {
      */
     mayMailCode?: (
         email: string,
-        challenge: { turnstileToken: string | null },
+        challenge: {
+            turnstileToken: string | null;
+            path: string;
+            /** The API address asked (`Host`), for whose edition's check it is. */
+            host: string | null;
+        },
     ) => Promise<{ retryAfterSeconds: number } | { challenge: true } | null>;
     /**
      * This instance's GitHub OAuth app. GitHub allows one callback address
@@ -232,6 +237,17 @@ export interface CreateAuthOptions {
      * provider.
      */
     github?: { clientId: string; clientSecret: string } | null;
+    /**
+     * Where the sign-in rate limit counts, shared by every API replica and
+     * kept across deploys (the host's Redis, 03-M7). Unset: Better Auth's
+     * own memory store, per process.
+     */
+    rateLimitStorage?: {
+        consume: (
+            key: string,
+            rule: { window: number; max: number },
+        ) => Promise<{ allowed: boolean; retryAfter: number | null }>;
+    };
 }
 
 /**
@@ -500,6 +516,11 @@ export const CODE_MAIL_PATHS: readonly string[] = [
     "/forget-password/email-otp",
     "/send-verification-email",
     "/request-password-reset",
+    // A sign-up mails the address a code, or the existing-account notice;
+    // a password sign-in to an unproven account mails a code again (03-M9).
+    // The host is told the path, so it counts a sign-in only when it mails.
+    "/sign-up/email",
+    "/sign-in/email",
 ];
 
 /** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
@@ -513,6 +534,8 @@ function codeMailHook(
         if (typeof email !== "string" || !email.trim()) return;
         const verdict = await mayMailCode(email.trim().toLowerCase(), {
             turnstileToken: ctx.headers?.get(CODE_CHALLENGE_HEADER) ?? null,
+            path: ctx.path,
+            host: ctx.headers?.get("host") ?? new URL(ctx.request.url).host,
         });
         if (!verdict) return;
         if ("challenge" in verdict) {
@@ -600,6 +623,9 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         // `jwt()` (AI apps' sign-in) adds a session-to-JWT `/token`: nothing
         // here hands a session out as a bearer token.
         disabledPaths: ["/token"],
+        ...(opts.rateLimitStorage
+            ? { rateLimit: { customStorage: opts.rateLimitStorage } }
+            : {}),
         trustedOrigins: getTrustedOrigins(),
         database: prismaAdapter(prisma, {
             provider: "postgresql",

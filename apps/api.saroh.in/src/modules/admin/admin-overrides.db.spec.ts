@@ -293,13 +293,18 @@ describe("business overrides (DB, U11)", () => {
         ).rejects.toMatchObject({ status: 409 });
     });
 
-    it("refuses an override for a business the catalogue doesn't reach yet", async () => {
+    // 04-F2: a business with no plan row reads Free on the live version, so
+    // an override lands on Free as it would on a Free row.
+    it("takes an override for a business with no plan row, on Free", async () => {
         const o = await org("No plan");
-        await expect(
-            service.setModuleOverride(
-                cmd(o.id, { kind: "grant", moduleKey: "invoicing" }),
-            ),
-        ).rejects.toMatchObject({ status: 409 });
+        expect(await row(o.id, "invoicing")).toMatchObject({ state: "locked" });
+        await service.setModuleOverride(
+            cmd(o.id, { kind: "grant", moduleKey: "invoicing" }),
+        );
+        expect(await row(o.id, "invoicing")).toMatchObject({
+            state: "on",
+            override: "Granted by Saroh",
+        });
     });
 
     it("sets a custom price, refuses it on a provider-managed plan, and ends it only with publish", async () => {
@@ -498,12 +503,16 @@ describe("business overrides (DB, U11)", () => {
         expect(plan.limits.find((l) => l.key === "storefronts")?.usage).toBe(1);
     });
 
-    it("offers the live plans to a business the catalogue doesn't reach yet", async () => {
+    // 04-F2: no plan row reads Free on the live version, never "no plan".
+    it("shows a business with no plan row on Free, with the live plans", async () => {
         const o = await org("No plan row");
         const page = await view.view(o.id, { canReadPii: false });
         if (page.plan.status !== "ok") throw new Error("plan panel failed");
-        expect(page.plan.data.catalogue).toBeNull();
-        expect(page.plan.data.effective).toBeNull();
+        expect(page.plan.data.catalogue).toMatchObject({
+            planId: "free",
+            basePlanId: "free",
+            version: V2,
+        });
         expect(page.plan.data.liveCatalogue?.version).toBe(V2);
     });
 });

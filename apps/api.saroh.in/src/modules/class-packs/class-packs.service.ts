@@ -11,6 +11,7 @@ import { readPending } from "../../common/drafts/draft-record";
 import { toMoneyString } from "../../common/money";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { assertPlanIncludesModule } from "../billing/module-plan";
 import {
     CANT_USE_PACKS,
     requireBookingPower,
@@ -333,6 +334,7 @@ export class ClassPacksService {
         dto: PackInputDto,
     ): Promise<PackView> {
         requireBookingPower(ctx, "pack:write");
+        await assertPlanIncludesModule(ctx.organizationId, "CLASS_PACKS");
         const kind = dto.kind ?? DEFAULT_PACK_KIND;
         const units = kind === "ONE_TO_ONE" ? "sessions" : "classes";
         if (!dto.name) fieldError("Give the pack a name", "name");
@@ -520,6 +522,9 @@ export class ClassPacksService {
         status: "ACTIVE" | "ARCHIVED",
     ): Promise<PackView> {
         requireBookingPower(ctx, "pack:write");
+        // Bringing one back puts it on sale again; archiving is always open.
+        if (status === "ACTIVE")
+            await assertPlanIncludesModule(ctx.organizationId, "CLASS_PACKS");
         await this.readPack(ctx.organizationId, id);
         await prisma.$transaction(async (tx) => {
             const was = await this.lockOutOfDraft(
@@ -562,6 +567,7 @@ export class ClassPacksService {
         dto: PackInputDto,
     ): Promise<PackEditorView> {
         requireBookingPower(ctx, "pack:write");
+        await assertPlanIncludesModule(ctx.organizationId, "CLASS_PACKS");
         const id = await createPackDraft(ctx, dto);
         return readPackEditor(ctx.organizationId, id);
     }
@@ -584,6 +590,7 @@ export class ClassPacksService {
         revision: number,
     ): Promise<PackEditorView> {
         requireBookingPower(ctx, "pack:write");
+        await assertPlanIncludesModule(ctx.organizationId, "CLASS_PACKS");
         await publishPack(ctx, id, revision);
         return readPackEditor(ctx.organizationId, id);
     }
@@ -623,6 +630,7 @@ export class ClassPacksService {
         dto: SellPackDto,
     ): Promise<PurchaseView> {
         requireBookingPower(ctx, "pack:sell");
+        await assertPlanIncludesModule(ctx.organizationId, "CLASS_PACKS");
         const organizationId = ctx.organizationId;
         // Switched off: no new sales, whatever enforcement says (E12).
         await assertClassPacksOn(prisma, organizationId);

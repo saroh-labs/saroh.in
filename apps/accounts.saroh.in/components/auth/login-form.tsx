@@ -171,6 +171,7 @@ export function LoginForm({
                 turnstileSiteKey={phone.turnstileSiteKey}
                 next={codeNext(returnTo, "sign-in")}
                 doneLine={doneLine(returnTo, "sign-in")}
+                signUpHref={withCarry("/signup", returnTo)}
                 onDone={() => {
                     window.location.href = destination;
                 }}

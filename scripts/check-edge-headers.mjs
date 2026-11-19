@@ -28,6 +28,9 @@ import { readFile } from "node:fs/promises";
 const ALLOWED = new Set([
     "apps/api.saroh.in/src/common/trust-proxy.ts",
     "apps/api.saroh.in/src/common/logging/redact.ts",
+    // pinForwardedFor() WRITES x-forwarded-for from cf-connecting-ip (03-M2);
+    // it reads no address from it.
+    "apps/api.saroh.in/src/common/client-ip.ts",
 ]);
 
 const files = execFileSync(

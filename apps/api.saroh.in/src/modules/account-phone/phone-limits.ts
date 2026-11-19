@@ -23,8 +23,13 @@ const DAY = 24 * HOUR;
 
 /** Between two starts (a WhatsApp send or the SMS widget) for one number. */
 export const START_COOLDOWN_SECONDS = 30;
+/** Starts for one number in {@link BURST_WINDOW_SECONDS}: resends space out (03-M4). */
+export const STARTS_PER_PHONE_PER_BURST = 3;
+export const BURST_WINDOW_SECONDS = 15 * MINUTE;
 /** Starts for one number in a day. */
 export const STARTS_PER_PHONE_PER_DAY = 10;
+/** Starts one signed-in person makes in a day, whatever the number (03-M1). */
+export const STARTS_PER_USER_PER_DAY = 5;
 /** Starts from one address in an hour. */
 export const STARTS_PER_ADDRESS_PER_HOUR = 20;
 /** Failed verifies for one number in a day. */
@@ -34,7 +39,9 @@ export const FAILS_PER_ADDRESS_PER_DAY = 20;
 
 export type LimitReason =
     | "phone_cooldown"
+    | "phone_burst"
     | "phone_daily"
+    | "user_daily"
     | "address_hourly"
     | "phone_failures"
     | "address_failures";
@@ -53,9 +60,11 @@ interface Rule {
 export interface LimitKeys {
     phoneHash: string;
     ipHash?: string;
+    /** The signed-in person adding a phone: counted on its own (03-M1). */
+    userId?: string;
 }
 
-function startRules({ phoneHash, ipHash }: LimitKeys): Rule[] {
+function startRules({ phoneHash, ipHash, userId }: LimitKeys): Rule[] {
     const kind: AccountPhoneEventKind = "START";
     return [
         {
@@ -66,11 +75,27 @@ function startRules({ phoneHash, ipHash }: LimitKeys): Rule[] {
             where: { kind, phoneHash, reason: null },
         },
         {
+            reason: "phone_burst",
+            max: STARTS_PER_PHONE_PER_BURST,
+            windowSeconds: BURST_WINDOW_SECONDS,
+            where: { kind, phoneHash, reason: null },
+        },
+        {
             reason: "phone_daily",
             max: STARTS_PER_PHONE_PER_DAY,
             windowSeconds: DAY,
             where: { kind, phoneHash },
         },
+        ...(userId
+            ? [
+                  {
+                      reason: "user_daily" as const,
+                      max: STARTS_PER_USER_PER_DAY,
+                      windowSeconds: DAY,
+                      where: { kind, userId },
+                  },
+              ]
+            : []),
         ...(ipHash
             ? [
                   {
@@ -140,8 +165,9 @@ async function judge(
 
 /**
  * May this number (and address) start now? If so, the START row is written
- * in the same locked transaction, so a burst can't pass together. Phone
- * before address, always, so two starts never wait on each other in a loop.
+ * in the same locked transaction, so a burst can't pass together. Phone,
+ * then person, then address, always, so two starts never wait on each other
+ * in a loop.
  */
 export function claimStart(
     keys: LimitKeys,
@@ -153,6 +179,7 @@ export function claimStart(
     return prisma.$transaction(async (tx) => {
         const locks = [
             `account-phone:${keys.phoneHash}`,
+            ...(keys.userId ? [`account-phone-user:${keys.userId}`] : []),
             ...(keys.ipHash ? [`account-phone-ip:${keys.ipHash}`] : []),
         ];
         for (const key of locks) {
@@ -165,6 +192,7 @@ export function claimStart(
                 kind: "START",
                 phoneHash: keys.phoneHash,
                 ipHash: keys.ipHash ?? null,
+                userId: keys.userId ?? null,
             },
             select: { id: true },
         });

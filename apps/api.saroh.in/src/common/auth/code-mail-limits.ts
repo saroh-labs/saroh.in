@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 
 import { visitorHashSecret } from "../../modules/analytics/visitor-hash";
 import { ChallengeVerifier } from "../../modules/site-accounts/challenge";
+import { accountsHostnames } from "../accounts-origins";
 
 /**
  * The per-address cap on the codes and links Saroh's sign-in mails
@@ -21,8 +22,8 @@ import { ChallengeVerifier } from "../../modules/site-accounts/challenge";
  * let anyone lock a person out of their codes): it needs the bot challenge
  * (Turnstile), as a site customer's does past its limit (ADR-011). With a
  * valid token it goes. With Turnstile not set up there is no challenge to
- * ask, so it goes and Saroh logs it, as phone sign-in's start does. The
- * 30-second cooldown holds either way.
+ * ask: outside production it goes and Saroh logs it; in production it waits
+ * for the hour to free up (03-H2). The 30-second cooldown holds either way.
  *
  * shortcut: rows are never swept (an index keeps the count cheap); add a sweep if the table grows large.
  */
@@ -54,12 +55,17 @@ export async function claimCodeMail(
     email: string,
     turnstileToken: string | null = null,
     now = new Date(),
-    verifier: Pick<ChallengeVerifier, "configured" | "verify"> = challenge,
+    verifier: Pick<
+        ChallengeVerifier,
+        "configured" | "failsClosed" | "verify"
+    > = challenge,
+    /** The API address asked: the token must come from its edition's accounts. */
+    apiHost: string | null = null,
 ): Promise<CodeMailVerdict> {
     const hash = emailHash(email);
     // Asked before the lock: a token is only sent after a `challenge` answer.
     const passed = turnstileToken
-        ? await verifier.verify(turnstileToken, "")
+        ? await verifier.verify(turnstileToken, "", accountsHostnames(apiHost))
         : false;
     return prisma.$transaction(async (tx) => {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`account-email:${hash}`}))`;
@@ -87,6 +93,11 @@ export async function claimCodeMail(
         if (recent.length >= CODE_MAILS_PER_ADDRESS_PER_HOUR) {
             if (verifier.configured) {
                 if (!passed) return { challenge: true } as const;
+            } else if (verifier.failsClosed) {
+                // Production with no bot check (03-H2): past the cap, wait
+                // for the hour's oldest code to age out instead.
+                const oldest = recent[recent.length - 1];
+                return wait(oldest.createdAt.getTime() + HOUR_MS);
             } else if (now.getTime() - unconfiguredWarnedAt > HOUR_MS) {
                 unconfiguredWarnedAt = now.getTime();
                 logger.error(
@@ -99,4 +110,19 @@ export async function claimCodeMail(
         });
         return null;
     });
+}
+
+/**
+ * Whether a password sign-in for `email` mails a code: only to an account
+ * whose address is not yet proven (Better Auth's `sendOnSignIn`), once the
+ * password is right. Such a sign-in counts against the address's cap like
+ * any other code (03-M9); every other sign-in mails nothing and is not
+ * counted, so a mistyped password never meets the cooldown.
+ */
+export async function mailsOnPasswordSignIn(email: string): Promise<boolean> {
+    const user = await prisma.user.findUnique({
+        where: { email },
+        select: { emailVerified: true },
+    });
+    return user !== null && !user.emailVerified;
 }

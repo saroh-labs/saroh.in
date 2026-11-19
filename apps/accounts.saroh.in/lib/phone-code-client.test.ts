@@ -156,7 +156,7 @@ describe("a code Saroh sent on WhatsApp (owner, 28 Oct)", () => {
         expect(again).toHaveBeenCalledTimes(1);
     });
 
-    it("says a refused resend in plain words", async () => {
+    it("says a refused resend with the API's wait", async () => {
         const s = await otpSender(
             { whatsapp: { resendAfterSeconds: 30 } },
             "+919845012345",
@@ -168,6 +168,45 @@ describe("a code Saroh sent on WhatsApp (owner, 28 Oct)", () => {
         );
         await expect(
             sendCode(phoneCodeClient(s, vi.fn()), { email: "+919845012345" }),
+        ).resolves.toMatchObject({ ok: false, resendAfterSeconds: 20 });
+    });
+
+    it("says a resend that couldn't reach the API in plain words", async () => {
+        const s = await otpSender(
+            { whatsapp: { resendAfterSeconds: 30 } },
+            "+919845012345",
+            vi.fn().mockRejectedValue(new Error("offline")),
+        );
+        await expect(
+            sendCode(phoneCodeClient(s, vi.fn()), { email: "+919845012345" }),
         ).resolves.toMatchObject({ ok: false, message: RESEND_FAILED });
+    });
+
+    // 03-M4: every resend asks the bot check again; its token goes with it.
+    it("asks for the bot check on a resend, then sends its token", async () => {
+        const again = vi
+            .fn()
+            .mockResolvedValueOnce({
+                data: null,
+                error: { code: "CHALLENGE", status: 400 },
+                retryAfter: null,
+            })
+            .mockResolvedValueOnce({ data: { whatsapp: {} }, error: null });
+        const s = await otpSender(
+            { whatsapp: { resendAfterSeconds: 30 } },
+            "+919845012345",
+            again,
+        );
+        const client = phoneCodeClient(s, vi.fn());
+        await expect(
+            sendCode(client, { email: "+919845012345" }),
+        ).resolves.toMatchObject({ ok: false, challenge: true });
+        await expect(
+            sendCode(client, {
+                email: "+919845012345",
+                turnstileToken: "tok",
+            }),
+        ).resolves.toMatchObject({ ok: true });
+        expect(again).toHaveBeenLastCalledWith("tok");
     });
 });

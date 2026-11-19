@@ -93,6 +93,8 @@ interface Prepared {
     system: AiSystemPart[];
     tools: AiToolDefinition[];
     messages: AiMessage[];
+    /** Messages before this turn's: a starter is free only with none (04-F5). */
+    earlierTurns: number;
 }
 
 /** How the turn is going; `outcome` is set once it has ended. */
@@ -284,7 +286,10 @@ export class TurnRunner {
             type: "done",
             turnId,
             outcome,
-            counted: countsFor(outcome, input.question),
+            counted: countsFor(outcome, input.question, {
+                earlierTurns: prepared.earlierTurns,
+                about: !!input.about,
+            }),
             usage: {
                 rounds: state.rounds,
                 inputTokens: state.tokens.inputTokens,
@@ -334,6 +339,7 @@ export class TurnRunner {
                         aboutTail(input.about),
                 },
             ],
+            earlierTurns: history.length,
         };
     }
 
@@ -545,7 +551,10 @@ export class TurnRunner {
         state: TurnState,
     ): Promise<void> {
         const outcome = state.outcome ?? "FAILED";
-        const counted = countsFor(outcome, input.question);
+        const counted = countsFor(outcome, input.question, {
+            earlierTurns: p.earlierTurns,
+            about: !!input.about,
+        });
         const cost = costMicroUsd(state.tokens, p.limits.prices);
         const t = state.tokens;
         this.logger.log(

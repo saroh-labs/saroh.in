@@ -1,4 +1,9 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+    BadRequestException,
+    HttpException,
+    HttpStatus,
+    NotFoundException,
+} from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import { Type } from "class-transformer";
@@ -15,6 +20,7 @@ import {
 import { pausedByCut } from "../billing/over-limit";
 import { overLimit } from "../billing/over-limit.service";
 import { categoryTree } from "../collections/collections.service";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { businessTracksStock, COUNTING_ROWS } from "../stock/tracking";
 import type { CatalogueNeed } from "./catalogue-needs";
 import { needsFrom } from "./catalogue-needs";
@@ -23,6 +29,14 @@ import { PRODUCT_STATUSES } from "./dto";
 import type { ProductsService } from "./products.service";
 import { listedAt, openStores } from "./products.service";
 import type { CatalogueItemDto } from "./serialize";
+
+/** Stock-sorted catalogue pages a minute, per business (04-F9). */
+export const STOCK_SORTS_PER_MINUTE = 30;
+const stockSorts = new SharedRateLimiter(
+    "catalogue-stock-sorts",
+    STOCK_SORTS_PER_MINUTE,
+    60_000,
+);
 
 /**
  * The Products list, a page at a time (#519). The catalogue read
@@ -389,6 +403,16 @@ export async function cataloguePage(
     const take = query.size ?? query.limit ?? DEFAULT_PAGE;
     const skip = query.page ? (query.page - 1) * take : 0;
     const order = catalogueOrder(query.sort);
+    // By stock reads every matching product's levels: limited per business
+    // on its own, under the per-person ceiling (04-F9).
+    if (query.sort === "stock" || query.sort === "-stock") {
+        if (!(await stockSorts.take(organizationId))) {
+            throw new HttpException(
+                "Too many stock sorts. Wait a moment, then try again.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
+    }
     // By stock: the order is a sum, worked out over every match, then the
     // page is cut from it (`take + 1` to know if there is more).
     const byStock =

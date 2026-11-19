@@ -6,7 +6,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { readLevels } from "../stock/levels-read";
 import type { StockReader } from "../stock/stock-access";
 import { StoresService } from "../stores/stores.service";
-import { cataloguePage } from "./catalogue-page";
+import { cataloguePage, STOCK_SORTS_PER_MINUTE } from "./catalogue-page";
 import { InventoryService } from "./inventory.service";
 import { ListingsService } from "./listings.service";
 import { ProductsService } from "./products.service";
@@ -242,6 +242,18 @@ describe("Catalogue page (DB)", () => {
         await expect(page({ sort: "name", cursor: draft })).rejects.toThrow(
             BadRequestException,
         );
+    });
+
+    // 04-F9: a stock sort reads every matching product's levels; a session
+    // could ask for it without limit.
+    it("limits stock-sorted pages per business, not the other sorts", async () => {
+        const other = (sort: "stock" | "name") =>
+            cataloguePage(products, otherOrgId, { limit: 50, sort });
+        for (let i = 0; i < STOCK_SORTS_PER_MINUTE; i++) {
+            await expect(other("stock")).resolves.toBeDefined();
+        }
+        await expect(other("stock")).rejects.toMatchObject({ status: 429 });
+        await expect(other("name")).resolves.toBeDefined();
     });
 
     it("refuses a cursor and a page number together", async () => {

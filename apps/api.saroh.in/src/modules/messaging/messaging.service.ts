@@ -24,6 +24,7 @@ import type {
     WhatsAppTemplateCategory,
 } from "./providers/messaging-provider.port";
 import { MESSAGING_PROVIDER } from "./providers/messaging-provider.port";
+import { MetaCloudProvider } from "./providers/meta-cloud.provider";
 
 /** Retries a send whose provider answered with a temporary failure. */
 export const MESSAGING_SEND_TYPE = "messaging.send";
@@ -147,16 +148,15 @@ export class MessagingService {
     }
 
     /**
-     * Whether {@link sendOtp} can send: the fake, or Saroh's MSG91 sender
-     * with its key, number and authentication template all set.
+     * Whether {@link sendOtp} can send: the fake, or the provider that sends
+     * WhatsApp with its own variables set ({@link whatsappReady}).
      */
     get whatsappOtpReady(): boolean {
         return (
             this.otpStandIn ||
-            Boolean(
-                env.MSG91_AUTH_KEY &&
-                env.MSG91_WHATSAPP_NUMBER &&
-                env.MSG91_WHATSAPP_TEMPLATE,
+            whatsappReady(
+                this.provider instanceof MetaCloudProvider ? "meta" : "msg91",
+                env,
             )
         );
     }
@@ -374,4 +374,39 @@ async function claimWidgetToken(accessToken: string): Promise<boolean> {
         if (prismaErrorCode(error) === "P2002") return false;
         throw error;
     }
+}
+
+/**
+ * Whether Saroh's WhatsApp sender has what it sends with (03-L4): Meta's
+ * Cloud API its number id, token and authentication template's name (the
+ * `MSG91_WHATSAPP_TEMPLATE` name, the same WhatsApp account's template);
+ * MSG91 its key, number and that template. Read for the chosen provider
+ * only, so a leftover MSG91 number never offers WhatsApp on Meta, and a
+ * missing Meta variable never offers a send that can only fail.
+ */
+export function whatsappReady(
+    provider: "meta" | "msg91",
+    source: Partial<
+        Record<
+            | "META_WA_TOKEN"
+            | "META_WA_PHONE_NUMBER_ID"
+            | "MSG91_AUTH_KEY"
+            | "MSG91_WHATSAPP_NUMBER"
+            | "MSG91_WHATSAPP_TEMPLATE",
+            string | undefined
+        >
+    >,
+): boolean {
+    if (provider === "meta") {
+        return Boolean(
+            source.META_WA_TOKEN &&
+            source.META_WA_PHONE_NUMBER_ID &&
+            source.MSG91_WHATSAPP_TEMPLATE,
+        );
+    }
+    return Boolean(
+        source.MSG91_AUTH_KEY &&
+        source.MSG91_WHATSAPP_NUMBER &&
+        source.MSG91_WHATSAPP_TEMPLATE,
+    );
 }

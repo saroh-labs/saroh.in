@@ -82,7 +82,9 @@ export function trustedProxyRanges(mode: string | undefined): string[] {
 
 /**
  * Trust proxies by address, not by count, on the Express instance under Nest
- * — what `@Ip()` and every rate limiter keyed on it see. Express walks
+ * — what `req.ip` sees. Rate limits key on `@ClientAddress()` instead, and
+ * behind Cloudflare `pinForwardedFor()` (`client-ip.ts`) first rewrites
+ * `X-Forwarded-For` to Cloudflare's own address (03-M2). Express walks
  * `X-Forwarded-For` back from the socket and stops at the first address it
  * does not trust: the client. So the answer is right whether a request came
  * through Cloudflare or straight to Traefik, and a client who skips

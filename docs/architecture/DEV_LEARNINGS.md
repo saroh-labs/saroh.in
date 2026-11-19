@@ -6826,6 +6826,28 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** turbo runs ten tasks at once by default; with nearly every package affected (a merge from development), several `tsc` and ESLint processes for the big apps at once starve the 16 GB hosted runner.
 - **Fix:** `--concurrency=4` on that step (`.github/workflows/ci.yml`), as the test step already caps itself. A job that dies with "lost communication" and no log is memory, not the code: cap the parallelism, don't re-run it again and again.
 
+### A public rate limit reset by changing one header (18 Nov 2026)
+
+- **Symptom:** the local pentest sent eight enquiries from one machine: with a fixed `X-Forwarded-For` the sixth was refused (429), and with that header changed on each request all eight went through. The same held for booking holds, share cards, public pay pages and site visits.
+- **Cause:** 22 controllers keyed their limits on Nest's `@Ip()`, which is Express's `req.ip`. Express walks `X-Forwarded-For` from the right past every trusted proxy, and Cloudflare's whole published ranges are trusted, so a request sent through anyone's own Cloudflare Worker could put any address left of the Worker's and be counted by it. `visitorAddress()` (`CF-Connecting-IP` from a Cloudflare or private peer only) already existed for exactly this, and only the keyed public API used it. Separately, nearly every limiter lived in process memory: a deploy emptied it, each replica counted on its own, and one class forgot live windows past 10,000 keys.
+- **Fix:** `@ClientAddress()` (`requestAddress()` → `visitorAddress()` behind Cloudflare) replaces `@Ip()` everywhere; `pinForwardedFor()` in `main.ts` rewrites `X-Forwarded-For` to Cloudflare's address so `req.ip` and Better Auth's own limit can't be steered either. The limits that guard money, sends or outbound work moved to `SharedRateLimiter` (Redis, in-process fallback at WARN), and the one in-memory class never drops a live window.
+- **Rule:** a limit keys on `@ClientAddress()`, never `@Ip()` or a header. Enforced by the API's ESLint config (`no-restricted-syntax` on importing `Ip` from `@nestjs/common`); pinned by `common/client-ip.spec.ts` (a forged `X-Forwarded-For` through a Cloudflare address). Pattern: `docs/patterns/backend-nestjs.md` → Cross-cutting.
+
+### Saroh paid to send sign-in codes to numbers with no account (18 Nov 2026)
+
+- **Symptom:** the WhatsApp and rate-limit review (03-H1, 03-M4) found that `POST /account-phone/start` sent a Saroh-paid WhatsApp code to any Indian mobile, account or not, from any script that set `Origin` and solved one Turnstile (solvable on a merchant site, since one key serves every site). Strangers got codes, and Meta's daily limit and quality rating on Saroh's number could be spent by someone else.
+- **Cause:** the start answered the same for every number by sending to every number; nothing tied the Turnstile token to the accounts site, and `OriginGuard` accepted any Saroh origin.
+- **Fix:** a sign-in code goes only to a number verified on an account; others get the same answer after the same work, and the send runs after the answer so timing and send failures say nothing. Turnstile's `hostname` must be an accounts host from env, and the phone start and Better Auth code-mailing routes refuse any `Origin` but accounts (`common/accounts-origins.ts`). New people sign up with email, then add the phone.
+- **Rule:** an answer that must not reveal whether something exists has to cost the same and fail the same in both cases: do the work that differs after the answer. Pinned by `account-phone.db.spec.ts` (unknown number, slow provider, failed send), `accounts-origins.spec.ts`, `code-mail-origin.spec.ts`, `challenge.spec.ts`. Pattern: `docs/patterns/backend-auth-and-access.md`.
+- **Category:** backend · security
+
+### The built API didn't boot: a package it used but never listed (18 Nov 2026)
+
+- **Symptom:** on PR #1434 every Browser E2E shard failed with "api never came up"; the stack log said `Cannot find module 'express'` from `dist/modules/messaging/meta-webhook-body.js`. Unit and integration tests, run from source under jest, passed.
+- **Cause:** the Meta webhook's own JSON parser imported `json` from `express`, which the API reaches only through `@nestjs/platform-express`. pnpm doesn't hoist it, so `node dist/main` can't resolve it.
+- **Fix:** `express` is a direct dependency of `@saroh/api` (the version Nest already brings). The API's ESLint config turns on `import/no-extraneous-dependencies` (type-only imports and the developer CLIs excepted), so the next one fails lint, not the browser shards.
+- **Category:** backend · tooling
+
 ### Launch coupons: a refused Offer blocked checkout, and "first N" wasn't N (18 Nov 2026)
 
 - **Symptom:** the 18 Nov security review found that an automatic coupon whose Razorpay Offer was refused turned every new monthly checkout on its plan into a 409 "Try without it" with nothing to leave out; that `maxRedemptions` didn't count trials or hold under a race; that unpaid day-long checkouts from throwaway businesses could hold a limited offer; that "once per business" was once per coupon (two plans' offers, Free and back, a failed renewal); and that a wrong Offer was only seen invoice by invoice.

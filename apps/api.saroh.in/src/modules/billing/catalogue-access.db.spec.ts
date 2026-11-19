@@ -31,7 +31,7 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { OrganizationOnboardingService } from "../organizations/organization-onboarding.service";
 import { CatalogueAccessService } from "./catalogue-access.service";
-import { EntitlementService, FREE_ENTITLEMENTS } from "./entitlement.service";
+import { EntitlementService } from "./entitlement.service";
 
 const tag = `${process.pid}-${Date.now()}`;
 const DAY = 24 * 60 * 60 * 1000;
@@ -302,14 +302,17 @@ describe("access from the catalogue (DB, U12)", () => {
         );
     });
 
-    it("reads a business with no row and no override as the free floor", async () => {
+    it("reads a business with no row and no override as Free, never unlimited (04-F2)", async () => {
         const o = await org("Untouched");
 
         await expect(access.resolve(o.id)).resolves.toMatchObject({
-            source: "legacy",
-            reason: "no-plan",
-            entitlements: FREE_ENTITLEMENTS,
+            source: "catalogue",
+            planId: "free",
         });
+        // Free's products cap applies to it, as to a business with a Free row.
+        await expect(entitlements.getEntitlements(o.id)).resolves.toMatchObject(
+            { products: 11 },
+        );
     });
 
     describe("module availability", () => {
@@ -500,9 +503,10 @@ describe("access from the catalogue (DB, U12)", () => {
             await expect(
                 entitlements.getEntitlements(grandfathered.id),
             ).resolves.toMatchObject({ products: 222 });
+            // No row written for it, yet it reads Free, not unlimited (04-F2).
             await expect(access.resolve(waiting.id)).resolves.toMatchObject({
-                source: "legacy",
-                reason: "no-plan",
+                source: "catalogue",
+                planId: "free",
             });
 
             const second = await backfillFreeSubscriptions(prisma, {
@@ -540,8 +544,8 @@ describe("access from the catalogue (DB, U12)", () => {
             );
             expect(rows.every((r) => r.plan.key === "catalog.free")).toBe(true);
             await expect(access.resolve(older.id)).resolves.toMatchObject({
-                source: "legacy",
-                reason: "no-plan",
+                source: "catalogue",
+                planId: "free",
             });
             await expect(access.resolve(meanwhile.id)).resolves.toMatchObject({
                 source: "catalogue",

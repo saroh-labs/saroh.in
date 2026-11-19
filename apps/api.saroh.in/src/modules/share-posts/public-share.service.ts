@@ -16,13 +16,14 @@ import {
 } from "../../common/words-format";
 import { PublicBookingsService } from "../bookings/public-bookings.service";
 import { PublicTimetableService } from "../bookings/public-timetable";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import { discountState } from "../discounts/discount-state";
 import { bpsToPercent } from "../discounts/serialize";
 import { MediaService } from "../media/media.service";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
 import { parseGridQuery } from "../products/product-grid";
 import { PublicCatalogueService } from "../products/public-catalogue.service";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { SitesService } from "../sites/sites.service";
 import { curatedFont, siteFamilies } from "./cards/card-fonts";
 import type { ShareOffer } from "./cards/card-model";
@@ -167,7 +168,8 @@ export class PublicShareService {
         @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
         // Not a DI provider: a per-instance default tests can replace.
         @Optional()
-        private readonly limiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly limiter: WindowLimiter = new SharedRateLimiter(
+            "share-card-renders",
             RENDERS_PER_WINDOW,
             RENDER_WINDOW_MS,
         ),
@@ -181,7 +183,7 @@ export class PublicShareService {
         query: ShareQuery,
         visitor: string,
     ): Promise<Buffer> {
-        this.take(visitor);
+        await this.take(visitor);
         if (!(SHARE_KINDS as readonly string[]).includes(kind)) notFound();
         const site = await this.liveSite(siteId);
         const content = await this.content(
@@ -210,7 +212,7 @@ export class PublicShareService {
         query: ShareQuery,
         visitor: string,
     ): Promise<Buffer> {
-        this.take(visitor);
+        await this.take(visitor);
         const site = await this.liveSite(await this.liveSiteId(organizationId));
         const content = await this.content(site, "book", "page", visitor, {
             headline: shareHeadlineOf(query.headline),
@@ -223,7 +225,7 @@ export class PublicShareService {
      * it has one. The id is the post's, unguessable.
      */
     async own(id: string, query: ShareQuery, visitor: string): Promise<Buffer> {
-        this.take(visitor);
+        await this.take(visitor);
         const post = await prisma.sharePost.findUnique({
             where: { id },
             select: {
@@ -311,8 +313,8 @@ export class PublicShareService {
         return live.id;
     }
 
-    private take(visitor: string): void {
-        if (!this.limiter.take(visitor)) {
+    private async take(visitor: string): Promise<void> {
+        if (!(await this.limiter.take(visitor))) {
             throw new HttpException(
                 "Too many requests. Try again shortly.",
                 429,

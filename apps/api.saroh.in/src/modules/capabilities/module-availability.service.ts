@@ -242,7 +242,9 @@ export class ModuleAvailabilityService {
      * (DEC-057 first — a module rolled out off is hidden whatever the plan
      * says), a module whose catalogue rows the business's plan all leaves
      * off is not entitled. Only behind the PLAN_ENFORCEMENT kill switch
-     * (OQ-4), and only for a module some catalogue row sits under.
+     * (OQ-4), and only for a module some catalogue row sits under; a
+     * paid-only module (Courses, Class packs) on a version without its row
+     * is on for paid plans only (05-P-02).
      */
     private async includedInPlan(
         organizationId: string,

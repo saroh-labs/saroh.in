@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Injectable,
     Logger,
     Optional,
@@ -14,6 +15,7 @@ import {
 
 import { appBase } from "../../common/app-url";
 import { sendWelcomeEmail } from "../../common/email";
+import { PhoneRequirement } from "../account-phone/phone-required";
 import { ActivationEvents } from "../analytics/activation-events";
 import {
     AuditAction,
@@ -83,6 +85,7 @@ export class OrganizationOnboardingService {
     constructor(
         private readonly audit: AuditService,
         @Optional() private readonly activation?: ActivationEvents,
+        @Optional() private readonly phone?: PhoneRequirement,
     ) {}
 
     async onboard(
@@ -108,6 +111,20 @@ export class OrganizationOnboardingService {
         const edition = editionOfHost(owner?.host ?? "") ?? "INDIA";
         refuseCountryOutsideEdition(edition, dto.profile?.country);
         const profile = editionProfile(edition);
+        // PHONE_REQUIRED_FOR_ACCOUNTS, held here too (03-M5): skipping the
+        // accounts step by opening the workspace directly no longer sets a
+        // business up. Only where phone sign-in exists (DEC-204).
+        if (
+            profile.phoneSignIn &&
+            owner &&
+            (await this.phone?.missing({ id: userId, email: owner.email }))
+        ) {
+            throw new ForbiddenException({
+                message:
+                    "Add your phone in your Saroh account first, then set up your business.",
+                details: { code: "PHONE_REQUIRED" },
+            });
+        }
         const currency =
             profile.businessCountry === "asked-at-setup"
                 ? (dto.currency ??

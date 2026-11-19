@@ -5,7 +5,6 @@ import {
     GoneException,
     Header,
     HttpCode,
-    Ip,
     Param,
     Post,
     Query,
@@ -16,6 +15,7 @@ import type { Booking } from "@saroh/database";
 import type { Response } from "express";
 
 import { hashClientIp } from "../../common/client-ip";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { edgeMayKeep } from "../../common/live-read-headers";
 import type { HoldState } from "./booking-hold";
@@ -130,7 +130,10 @@ export class PublicBookingsController {
     @Header("Cache-Control", "no-store")
     @Header("Referrer-Policy", "no-referrer")
     @Header("X-Robots-Tag", "noindex, nofollow")
-    hold(@Param("token") token: string, @Ip() ip: string): Promise<PublicHold> {
+    hold(
+        @Param("token") token: string,
+        @ClientAddress() ip: string,
+    ): Promise<PublicHold> {
         return this.bookings.publicHold(token, hashClientIp(ip));
     }
 
@@ -141,7 +144,7 @@ export class PublicBookingsController {
     @Header("Referrer-Policy", "no-referrer")
     release(
         @Param("token") token: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
     ): Promise<PublicHold> {
         return this.bookings.releasePublicHold(token, hashClientIp(ip));
     }
@@ -244,7 +247,7 @@ export class PublicBookingPageController {
     @Header("Cache-Control", "no-store")
     async todayOn(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Res({ passthrough: true }) res: Response,
     ): Promise<PublicToday> {
         const today = await this.today.read(siteId, hashClientIp(ip));
@@ -263,7 +266,7 @@ export class PublicBookingPageController {
     @Header("Cache-Control", "no-store")
     async timetableWeek(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Res({ passthrough: true }) res: Response,
         @Query("services") services?: unknown,
     ): Promise<PublicTimetable> {

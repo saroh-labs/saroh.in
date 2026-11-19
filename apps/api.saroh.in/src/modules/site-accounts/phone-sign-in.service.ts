@@ -124,7 +124,7 @@ export class PhoneSignInService {
         dto: RequestPhoneCodeDto,
     ): Promise<CodeRequested> {
         const phoneE164 = indianPhoneE164(dto.phone);
-        this.codes.takeAddress(site, relay, new Date());
+        await this.codes.takeAddress(site, relay, new Date());
         await this.codes.passChallenge(site, relay, dto.challenge);
         try {
             await this.send.sendCode({
@@ -152,7 +152,7 @@ export class PhoneSignInService {
     ): Promise<string> {
         const { organizationId } = site;
         const phoneE164 = indianPhoneE164(dto.phone);
-        this.codes.takeVerifyTry(site, relay, `phone:${phoneE164}`, now);
+        await this.codes.takeVerifyTry(site, relay, `phone:${phoneE164}`, now);
         // The newest code this business sent the number for sign-in; an
         // older one still waiting is never the one to type.
         const live = await runInOrgContext(organizationId, () =>

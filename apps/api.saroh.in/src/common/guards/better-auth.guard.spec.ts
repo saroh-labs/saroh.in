@@ -17,6 +17,7 @@ jest.mock("better-auth/node", () => ({
 }));
 
 // Imported after the mocks are registered.
+import { FixedWindowRateLimiter } from "../../modules/rate-limits/fixed-window";
 import { BetterAuthGuard } from "./better-auth.guard";
 
 function ctx(req: Record<string, unknown>): ExecutionContext {
@@ -92,5 +93,36 @@ describe("BetterAuthGuard", () => {
         };
 
         await expect(guard.canActivate(ctx(req))).resolves.toBe(true);
+    });
+
+    // 04-F9: a script holding a session cookie could load the API without limit.
+    it("refuses a person past the per-person ceiling with 429 and Retry-After", async () => {
+        getSession.mockResolvedValue({
+            session: { id: "s1" },
+            user: sessionUser,
+        });
+        guard.limiter = new FixedWindowRateLimiter(2, 60_000);
+        const headers: Record<string, string> = {};
+        const req = { method: "GET", headers: {} };
+        const context = {
+            switchToHttp: () => ({
+                getRequest: () => req,
+                getResponse: () => ({
+                    setHeader: (k: string, v: string) => (headers[k] = v),
+                }),
+            }),
+        } as unknown as ExecutionContext;
+        await expect(guard.canActivate(context)).resolves.toBe(true);
+        await expect(guard.canActivate(context)).resolves.toBe(true);
+        await expect(guard.canActivate(context)).rejects.toMatchObject({
+            status: 429,
+        });
+        expect(Number(headers["Retry-After"])).toBeGreaterThanOrEqual(1);
+        // Another person is not held up.
+        getSession.mockResolvedValue({
+            session: { id: "s2" },
+            user: { ...sessionUser, id: "user_2" },
+        });
+        await expect(guard.canActivate(context)).resolves.toBe(true);
     });
 });

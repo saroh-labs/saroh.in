@@ -1,6 +1,7 @@
-import { Body, Controller, Ip, Param, Post } from "@nestjs/common";
+import { Body, Controller, Param, Post } from "@nestjs/common";
 import { hashClientIp } from "../../common/client-ip";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { SubmitEnquiryDto } from "./dto";
 import { EnquiryService } from "./enquiry.service";
 
@@ -19,7 +20,7 @@ export class EnquiryController {
     constructor(private readonly enquiry: EnquiryService) {}
 
     /**
-     * Submit an enquiry against `:formId`. The source IP (from `@Ip()`) is
+     * Submit an enquiry against `:formId`. The source IP (from `@ClientAddress()`) is
      * immediately hashed (sha256; IPv6 by its /64, `common/client-ip.ts`) and
      * only the hash is ever passed on / stored — the raw IP never leaves this
      * handler.
@@ -28,7 +29,7 @@ export class EnquiryController {
     submit(
         @Param("formId") formId: string,
         @Body() dto: SubmitEnquiryDto,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
     ) {
         const ipHash = hashClientIp(ip);
 

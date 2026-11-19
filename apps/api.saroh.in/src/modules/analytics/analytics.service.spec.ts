@@ -180,6 +180,20 @@ describe("AnalyticsService.ingestPublic — org derived from the Site", () => {
         // The 429 short-circuits before a third write.
         expect(eventCreate).toHaveBeenCalledTimes(2);
     });
+
+    // 03-L10: the key was the raw address, so every IPv6 address in one /64
+    // was a fresh window.
+    it("counts every address in one IPv6 /64 as one caller", async () => {
+        const service = new AnalyticsService(
+            new FixedWindowRateLimiter(2, 60_000),
+        );
+        wireSite();
+        await service.ingestPublic("site_1", viewInput, "2001:db8:1:2::1");
+        await service.ingestPublic("site_1", viewInput, "2001:db8:1:2::2");
+        await expect(
+            service.ingestPublic("site_1", viewInput, "2001:db8:1:2::3"),
+        ).rejects.toMatchObject({ status: 429 });
+    });
 });
 
 describe("AnalyticsService.ingestPublic — what the visitor's browser says is not kept (U15 privacy review)", () => {

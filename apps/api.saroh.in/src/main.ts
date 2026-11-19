@@ -23,6 +23,7 @@ import { getTrustedOrigins } from "@saroh/auth";
 import helmet from "helmet";
 
 import { AppModule } from "./app.module";
+import { pinForwardedFor } from "./common/client-ip";
 import { corsDelegate } from "./common/cors";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { globalAccessGate } from "./common/global-access";
@@ -43,6 +44,10 @@ import { trustProxy } from "./common/trust-proxy";
 import { validationPipeOptions } from "./common/validation";
 import { env } from "./env";
 import { ApiKeyGuard } from "./modules/api-keys/api-key.guard";
+import {
+    META_WEBHOOK_PATH,
+    metaWebhookBody,
+} from "./modules/messaging/meta-webhook-body";
 
 /**
  * Last line of defence against a library's own timers killing the process.
@@ -109,6 +114,13 @@ async function bootstrap() {
     // The client's address from behind the proxies in front (#508), before
     // anything reads `req.ip`.
     trustProxy(app, env.TRUST_PROXY);
+    // ...and only the address Cloudflare vouches for, never one a caller
+    // wrote into X-Forwarded-For through its own Worker (03-M2).
+    app.use(pinForwardedFor(env.TRUST_PROXY));
+
+    // Meta batches webhook entries up to 3 MB; every other route keeps the
+    // API parser's default limit (03-L7).
+    app.use(META_WEBHOOK_PATH, metaWebhookBody());
 
     // Runs first so every request (incl. the mounted Better Auth handler) gets
     // a correlation id and its logs/error envelope can be traced.

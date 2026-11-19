@@ -1,8 +1,19 @@
 // What a public rate limit counts a caller by: one IPv4 address, or one
 // IPv6 /64 — the block a single subscriber can rotate through.
 import { createHash } from "node:crypto";
+import { request } from "node:http";
+import type { AddressInfo } from "node:net";
 
-import { hashClientIp, limitAddress, visitorAddress } from "./client-ip";
+import express from "express";
+
+import {
+    hashClientIp,
+    limitAddress,
+    pinForwardedFor,
+    requestAddress,
+    visitorAddress,
+} from "./client-ip";
+import { trustedProxies } from "./trust-proxy";
 
 describe("limitAddress", () => {
     it("keeps an IPv4 address as it is", () => {
@@ -103,5 +114,87 @@ describe("visitorAddress (plan 2026-11-10-001, U6)", () => {
                 "cloudflare",
             ),
         ).toBe("198.51.100.4");
+    });
+});
+
+// 03-M2 / 05-P-01: a caller who reaches the API through its own Cloudflare
+// Worker could write any address left of the Worker's in X-Forwarded-For;
+// Express trusts every Cloudflare range, so `req.ip` was the caller's pick.
+describe("pinForwardedFor", () => {
+    async function ipSeen(
+        pinned: boolean,
+        headers: Record<string, string>,
+    ): Promise<string> {
+        const app = express();
+        app.set("trust proxy", trustedProxies("cloudflare"));
+        if (pinned) app.use(pinForwardedFor("cloudflare"));
+        app.get("/", (req, res) => {
+            res.send(req.ip);
+        });
+        const server = app.listen(0, "127.0.0.1");
+        await new Promise((resolve) => server.once("listening", resolve));
+        const { port } = server.address() as AddressInfo;
+        try {
+            return await new Promise<string>((resolve, reject) => {
+                request(
+                    { host: "127.0.0.1", port, path: "/", headers },
+                    (res) => {
+                        let body = "";
+                        res.on(
+                            "data",
+                            (chunk: Buffer) => (body += chunk.toString()),
+                        );
+                        res.on("end", () => resolve(body));
+                    },
+                )
+                    .on("error", reject)
+                    .end();
+            });
+        } finally {
+            server.close();
+        }
+    }
+
+    const forged = {
+        // What Cloudflare forwards for a Worker that wrote its own header:
+        // the forged entry, then the Worker's own (Cloudflare) address.
+        "x-forwarded-for": "203.0.113.9, 2a06:98c0:3600::103",
+        "cf-connecting-ip": "2a06:98c0:3600::103",
+    };
+
+    it("without it, Express counts the address the caller wrote", async () => {
+        expect(await ipSeen(false, forged)).toBe("203.0.113.9");
+    });
+
+    it("with it, Express counts only the address Cloudflare named", async () => {
+        expect(await ipSeen(true, forged)).toBe("2a06:98c0:3600::103");
+    });
+
+    it("leaves a request with no Cloudflare header as Express reads it", async () => {
+        expect(await ipSeen(true, { "x-forwarded-for": "198.51.100.4" })).toBe(
+            "198.51.100.4",
+        );
+    });
+});
+
+describe("requestAddress", () => {
+    const req = {
+        headers: {
+            "cf-connecting-ip": "198.51.100.4",
+            "x-forwarded-for": "203.0.113.9",
+        },
+        socket: { remoteAddress: "10.0.0.2" },
+        ip: "203.0.113.9",
+    };
+
+    it("behind Cloudflare, reads CF-Connecting-IP, never X-Forwarded-For", () => {
+        expect(requestAddress(req, "cloudflare")).toBe("198.51.100.4");
+    });
+
+    it("behind a private proxy, or none, takes what Express judged", () => {
+        expect(requestAddress(req, "private")).toBe("203.0.113.9");
+        expect(requestAddress({ ...req, ip: undefined }, "none")).toBe(
+            "10.0.0.2",
+        );
     });
 });

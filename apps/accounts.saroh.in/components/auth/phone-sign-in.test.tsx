@@ -21,7 +21,7 @@ import {
     type,
 } from "../billing-profiles/test-kit";
 
-import { PhoneSignIn, STALE_WORDS } from "./phone-sign-in";
+import { PHONE_SIGN_IN_WORDS, PhoneSignIn, STALE_WORDS } from "./phone-sign-in";
 
 const api = vi.hoisted(() => ({
     startPhone: vi.fn(),
@@ -83,6 +83,20 @@ describe("signing in with a phone", () => {
         expect(onUseEmail).toHaveBeenCalled();
     });
 
+    // Owner, 18 Nov: codes only reach numbers already on an account.
+    it("says the code reaches only a number on an account, and offers sign-up by email", () => {
+        drawIt();
+        expect(text(host)).toContain(PHONE_SIGN_IN_WORDS.whatsapp);
+        expect(text(host)).toContain("New to Saroh? Sign up with email");
+        const link = must(
+            [...host.querySelectorAll<HTMLAnchorElement>("a")].find(
+                (a) => a.textContent === PHONE_SIGN_IN_WORDS.signUp,
+            ),
+            "sign-up link",
+        );
+        expect(link.getAttribute("href")).toBe("/signup");
+    });
+
     it("sends on WhatsApp first, and hands the API the typed code", async () => {
         api.startPhone.mockResolvedValue({
             data: { whatsapp: { resendAfterSeconds: 30 } },
@@ -98,9 +112,11 @@ describe("signing in with a phone", () => {
             turnstileToken: null,
         });
         expect(text(host)).toContain("Check your WhatsApp");
+        // Sent or not, the step never says the number has an account.
         expect(text(host)).toContain(
-            "We sent a 6-digit code on WhatsApp to +91",
+            "If +91 98450 12345 is on a Saroh account, a 6-digit code is on its way on WhatsApp.",
         );
+        expect(text(host)).not.toContain("We sent");
         const code = must(
             host.querySelector<HTMLInputElement>("input[name=code]"),
         );

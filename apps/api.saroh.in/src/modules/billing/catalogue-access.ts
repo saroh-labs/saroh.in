@@ -28,7 +28,11 @@ import type {
     OverrideKind,
     RegistryModuleKey,
 } from "@saroh/pricing-catalog";
-import { MODULE_MAP, OVERRIDE_KINDS } from "@saroh/pricing-catalog";
+import {
+    MODULE_MAP,
+    OVERRIDE_KINDS,
+    PAID_ONLY_REGISTRY,
+} from "@saroh/pricing-catalog";
 
 /** A row's `MODULE_MAP` entry; a row the map doesn't know governs nothing. */
 export function mapEntry(moduleId: string): ModuleMapEntry | undefined {
@@ -150,18 +154,25 @@ export function entitlementMapFor(input: {
 /**
  * Whether the business's plan includes a registry module: one of the
  * catalogue rows under it (`MODULE_MAP`) is on. A registry module with no row
- * in this version isn't the catalogue's to lock. The rollout gate (DEC-057)
- * is the caller's, and comes first.
+ * in this version isn't the catalogue's to lock — except one sold on paid
+ * plans only (`PAID_ONLY_REGISTRY`, 05-P-02), which is then on only for a
+ * plan with a price. The rollout gate (DEC-057) is the caller's, and comes
+ * first.
  */
 export function registryModuleIncluded(
     catalog: Catalog,
     access: readonly ModuleAccess[],
     registry: RegistryModuleKey,
+    planId: string,
 ): boolean {
     const rows = catalog.modules
         .map((m) => m.id)
         .filter((id) => mapEntry(id)?.registry === registry);
-    if (rows.length === 0) return true;
+    if (rows.length === 0) {
+        if (!PAID_ONLY_REGISTRY.has(registry)) return true;
+        const plan = catalog.plans.find((p) => p.id === planId);
+        return (plan?.pricePaise ?? 0) > 0;
+    }
     return access.some((a) => rows.includes(a.moduleId) && a.state === "on");
 }
 

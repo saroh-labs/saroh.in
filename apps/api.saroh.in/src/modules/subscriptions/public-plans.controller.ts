@@ -3,11 +3,11 @@ import {
     Get,
     Header,
     Headers,
-    Ip,
     Param,
     UseGuards,
 } from "@nestjs/common";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
 import type { PublicPlans } from "./public-plans.service";
@@ -36,7 +36,7 @@ export class PublicPlansController {
     @Header("Cache-Control", "no-store")
     list(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicPlans> {
         return this.plans.list(siteId, visitorKey(ip, relay));

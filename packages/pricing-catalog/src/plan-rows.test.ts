@@ -91,6 +91,8 @@ describe("plan keys", () => {
                 "ask-ai",
                 "blog",
                 "bookings",
+                "class-packs",
+                "courses",
                 "integrations",
                 "invoicing",
                 "locations",

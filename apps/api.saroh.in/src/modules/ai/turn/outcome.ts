@@ -32,6 +32,15 @@ export const isCounted = (outcome: AiTurnOutcome) => OUTCOME_COUNTED[outcome];
  * A common question the panel offers, asked as written, doesn't use one of
  * the month's questions (owner, 15 Nov); any other counts by its outcome.
  * Told by its words alone (`ASK_AI_STARTERS`), never by the browser's say-so.
+ *
+ * Free only as the first turn of a new conversation, about nothing: sent
+ * after earlier turns, the history can make it mean anything, and an
+ * `about` label is free text beside it (04-F5).
  */
-export const countsFor = (outcome: AiTurnOutcome, question: string) =>
-    isCounted(outcome) && !isAskAiStarter(question);
+export const countsFor = (
+    outcome: AiTurnOutcome,
+    question: string,
+    turn: { earlierTurns: number; about: boolean },
+) =>
+    isCounted(outcome) &&
+    !(isAskAiStarter(question) && turn.earlierTurns === 0 && !turn.about);

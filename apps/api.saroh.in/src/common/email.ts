@@ -1316,7 +1316,7 @@ export async function sendManagerSignalsEmail(
  */
 export async function sendAiOwnerAlertEmail(
     to: { email: string; name: string | null },
-    alert: { subject: string; lines: string[] },
+    alert: { subject: string; lines: string[]; path?: string },
 ): Promise<EmailOutcome> {
     if (!transporter) {
         if (env.NODE_ENV === "development") {
@@ -1334,7 +1334,7 @@ export async function sendAiOwnerAlertEmail(
                 `Hi ${to.name ?? "there"},`,
                 "",
                 ...alert.lines,
-                ...(base ? ["", `${base}/ask-ai`] : []),
+                ...(base ? ["", `${base}${alert.path ?? "/ask-ai"}`] : []),
             ].join("\n"),
         });
         return "sent";

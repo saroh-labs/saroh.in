@@ -101,7 +101,7 @@ export class EmailChangeService {
                 email,
                 now,
             );
-            const addressBusy = this.codes.takeAddress(site, relay, now);
+            const addressBusy = await this.codes.takeAddress(site, relay, now);
             return this.codes.sendCode(site, relay, email, {
                 destinationHash: changeDestinationHashFor(
                     site.organizationId,
@@ -163,7 +163,7 @@ export class EmailChangeService {
                 customer.accountId,
                 email,
             );
-            this.codes.takeVerifyTry(site, relay, destinationHash, now);
+            await this.codes.takeVerifyTry(site, relay, destinationHash, now);
             await this.codes.consumeCode(
                 site.organizationId,
                 destinationHash,

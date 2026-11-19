@@ -220,6 +220,30 @@ const input: CatalogInput = {
             },
         },
         {
+            id: "courses",
+            name: "Courses",
+            group: "selling",
+            pricing: "show",
+            what: "Courses with dated sessions that customers enrol in.",
+            cells: {
+                free: X("locked"),
+                grow: C("Included", "Courses"),
+                pro: C("Included", "Courses"),
+            },
+        },
+        {
+            id: "class-packs",
+            name: "Class packs",
+            group: "selling",
+            pricing: "show",
+            what: "Packs of classes customers buy once and use as they book.",
+            cells: {
+                free: X("locked"),
+                grow: C("Included", "Class packs"),
+                pro: C("Included", "Class packs"),
+            },
+        },
+        {
             id: "reviews",
             name: "Product reviews",
             group: "selling",

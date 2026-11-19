@@ -49,6 +49,10 @@ available it shows the full nav, so dark rollout never empties the app.
    `would_refuse` that is not a business with that module switched off
    before proceeding; shadow adds the availability lookup to each annotated
    request, so watch latency too.
+   Plans no longer wait on this switch for Courses and Class packs: their
+   services refuse Free on their own (`billing/module-plan.ts`), so a
+   `would_refuse` with `ENTITLEMENT_REQUIRED` for them should match a 403
+   the service already gave.
 4. **Internal Organization** — set `MODULE_ENFORCEMENT=1` for a controlled test
    Organization/deploy; exercise Settings → Modules, enable/disable, and the
    annotated endpoints. Each refusal now logs

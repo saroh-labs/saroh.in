@@ -1,10 +1,12 @@
 import { prisma } from "@saroh/database";
 
+import { env } from "../../env";
 import {
     claimCodeMail,
     CODE_MAIL_COOLDOWN_SECONDS,
     CODE_MAILS_PER_ADDRESS_PER_HOUR,
     emailHash,
+    mailsOnPasswordSignIn,
 } from "./code-mail-limits";
 
 /** The per-address cap on sign-in codes for Saroh accounts: past it, the bot challenge. */
@@ -15,13 +17,18 @@ describe("claimCodeMail", () => {
     // Turnstile set up, and "good" the one token it accepts.
     const verifier = {
         configured: true,
-        verify: jest.fn((token: string) => Promise.resolve(token === "good")),
+        failsClosed: false,
+        verify: jest.fn(
+            (token: string, _ip?: string, _hostnames?: readonly string[]) =>
+                Promise.resolve(token === "good"),
+        ),
     };
     const claim = (email: string, now: Date, token: string | null = null) =>
         claimCodeMail(email, token, now, verifier);
 
     beforeEach(async () => {
         verifier.configured = true;
+        verifier.failsClosed = false;
         verifier.verify.mockClear();
         await prisma.accountEmailCodeSend.deleteMany();
     });
@@ -88,6 +95,60 @@ describe("claimCodeMail", () => {
         expect(verifier.verify).not.toHaveBeenCalled();
     });
 
+    // 03-H2: production with Turnstile unset fails closed past the cap.
+    it("in production with Turnstile not set up, past the cap it waits for the hour", async () => {
+        verifier.configured = false;
+        verifier.failsClosed = true;
+        const late = await fillTheHour("asha@example.com");
+        const verdict = await claim("asha@example.com", late);
+        expect(verdict).toEqual({ retryAfterSeconds: 60 * 60 - 5 * 60 });
+        expect(verifier.verify).not.toHaveBeenCalled();
+    });
+
+    // Owner, 18 Nov: a token solved on a merchant site or saroh.tech
+    // (one Turnstile key serves them all) buys no Saroh account code.
+    it("asks Turnstile for a token solved on this API's accounts site only", async () => {
+        const before = env.ACCOUNTS_URL;
+        env.ACCOUNTS_URL = "https://accounts.example.test";
+        verifier.verify.mockImplementation(
+            (token: string, _ip?: string, hostnames?: readonly string[]) =>
+                Promise.resolve(
+                    token === "good" &&
+                        (hostnames ?? []).includes("accounts.example.test"),
+                ),
+        );
+        try {
+            const late = await fillTheHour("asha@example.com");
+            expect(
+                await claimCodeMail(
+                    "asha@example.com",
+                    "good",
+                    late,
+                    verifier,
+                    "localhost:3333",
+                ),
+            ).toBeNull();
+            expect(verifier.verify).toHaveBeenLastCalledWith("good", "", [
+                "accounts.example.test",
+            ]);
+            // Elsewhere: the same token solved on another site is refused.
+            env.ACCOUNTS_URL = "https://other.example.test";
+            expect(
+                await claimCodeMail(
+                    "asha@example.com",
+                    "good",
+                    new Date(late.getTime() + 60_000),
+                    verifier,
+                ),
+            ).toEqual({ challenge: true });
+        } finally {
+            env.ACCOUNTS_URL = before;
+            verifier.verify.mockImplementation((token: string) =>
+                Promise.resolve(token === "good"),
+            );
+        }
+    });
+
     it("a burst at once passes one, and keeps only the hash", async () => {
         const verdicts = await Promise.all(
             Array.from({ length: 8 }, () => claim("burst@example.com", t0)),
@@ -97,5 +158,24 @@ describe("claimCodeMail", () => {
         expect(rows).toHaveLength(1);
         expect(rows[0]?.emailHash).toBe(emailHash("burst@example.com"));
         expect(JSON.stringify(rows)).not.toContain("burst@");
+    });
+});
+
+// 03-M9: a password sign-in mails a code only to an unproven account, so
+// only that one counts against the address's cap.
+describe("mailsOnPasswordSignIn", () => {
+    it("is true only for an account whose address is not proven", async () => {
+        const tag = Date.now();
+        const unproven = `unproven-${tag}@example.com`;
+        const proven = `proven-${tag}@example.com`;
+        await prisma.user.create({ data: { email: unproven, name: "A" } });
+        await prisma.user.create({
+            data: { email: proven, name: "B", emailVerified: true },
+        });
+        expect(await mailsOnPasswordSignIn(unproven)).toBe(true);
+        expect(await mailsOnPasswordSignIn(proven)).toBe(false);
+        expect(await mailsOnPasswordSignIn(`nobody-${tag}@example.com`)).toBe(
+            false,
+        );
     });
 });

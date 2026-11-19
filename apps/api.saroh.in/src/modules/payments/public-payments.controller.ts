@@ -5,15 +5,15 @@ import {
     Get,
     HttpCode,
     HttpException,
-    Ip,
     Param,
     Post,
     Query,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { CreateIntentDto } from "./dto";
 import type {
     CreateIntentResult,
@@ -54,15 +54,18 @@ function tooManyRequests(): HttpException {
  */
 @Controller("public/orders")
 export class PublicPaymentsController {
-    private readonly intentsPerOrder = new FixedWindowRateLimiter(
+    private readonly intentsPerOrder = new SharedRateLimiter(
+        "pay-intents-order",
         INTENTS_PER_ORDER,
         WINDOW_MS,
     );
-    private readonly intentsPerCaller = new FixedWindowRateLimiter(
+    private readonly intentsPerCaller = new SharedRateLimiter(
+        "pay-intents-caller",
         INTENTS_PER_CALLER,
         WINDOW_MS,
     );
-    private readonly receiptsPerCaller = new FixedWindowRateLimiter(
+    private readonly receiptsPerCaller = new SharedRateLimiter(
+        "pay-receipts",
         RECEIPTS_PER_CALLER,
         WINDOW_MS,
     );
@@ -80,12 +83,12 @@ export class PublicPaymentsController {
     async createIntent(
         @Param("orderId") orderId: string,
         @Body() dto: CreateIntentDto,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
     ): Promise<CreateIntentResult> {
         const caller = hashClientIp(ip) ?? "unknown";
         if (
-            !this.intentsPerCaller.take(caller) ||
-            !this.intentsPerOrder.take(orderId)
+            !(await this.intentsPerCaller.take(caller)) ||
+            !(await this.intentsPerOrder.take(orderId))
         ) {
             throw tooManyRequests();
         }
@@ -107,9 +110,11 @@ export class PublicPaymentsController {
     async receipt(
         @Param("orderId") orderId: string,
         @Query("token") token?: string,
-        @Ip() ip?: string,
+        @ClientAddress() ip?: string,
     ): Promise<PublicReceiptResult> {
-        if (!this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown")) {
+        if (
+            !(await this.receiptsPerCaller.take(hashClientIp(ip) ?? "unknown"))
+        ) {
             throw tooManyRequests();
         }
         if (typeof token !== "string" || token.length === 0) {

@@ -22,6 +22,9 @@ describe("module map (KTD-8)", () => {
             "subscriptions",
         ]);
         expect(catalogueModulesFor("APPOINTMENTS")).toEqual(["bookings"]);
+        // Paid plans only, each its own switch row (05-P-02).
+        expect(catalogueModulesFor("COURSES")).toEqual(["courses"]);
+        expect(catalogueModulesFor("CLASS_PACKS")).toEqual(["class-packs"]);
         // A registry module no row sits under is not the catalogue's to lock.
         expect(catalogueModulesFor("CRM")).toEqual([]);
     });

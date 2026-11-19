@@ -106,8 +106,13 @@ export function usePhoneSend(
         }
         let next: OtpSender;
         try {
-            next = await otpSender(started.data, phone, () =>
-                startPhone({ phone, channel, purpose }),
+            next = await otpSender(started.data, phone, (resendToken) =>
+                startPhone({
+                    phone,
+                    channel,
+                    purpose,
+                    turnstileToken: resendToken,
+                }),
             );
         } catch {
             setBusy(false);

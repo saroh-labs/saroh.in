@@ -8,7 +8,6 @@ import {
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { toMoneyString } from "../../common/money";
-import { FixedWindowRateLimiter } from "../bookings/rate-limiter";
 import type { GstOnPrice } from "../invoices/gst-price";
 import { orderLineOnPaper } from "../invoices/line-gst-words";
 import { orderPayLinkUrlFor } from "../invoices/pay-link-url";
@@ -30,6 +29,8 @@ import {
     businessPayInstructionsOf,
 } from "../organizations/business-pay-instructions";
 import { assertOrganizationWindingDown } from "../organizations/organization-lifecycle.gate";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { parseSiteStyle, siteStyleVariables } from "../sites/site-style";
 import { orderPayOnline } from "./order-pay-online";
 import type { CreateIntentResult } from "./payments.service";
@@ -142,12 +143,14 @@ export class PublicOrderPayService {
     constructor(
         private readonly payments: PaymentsService,
         @Optional()
-        private readonly readLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly readLimiter: WindowLimiter = new SharedRateLimiter(
+            "order-pay-reads",
             READS_PER_WINDOW,
             READ_WINDOW_MS,
         ),
         @Optional()
-        private readonly payLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(
+        private readonly payLimiter: WindowLimiter = new SharedRateLimiter(
+            "order-pay-intents",
             PAYS_PER_WINDOW,
             PAY_WINDOW_MS,
         ),
@@ -160,7 +163,7 @@ export class PublicOrderPayService {
         const tokenHash = hashPayToken(token);
         // Keyed on the caller: a limiter keyed on the token the caller sent
         // throttles nothing, since every new token is a fresh window.
-        if (!this.readLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.readLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);
@@ -258,7 +261,7 @@ export class PublicOrderPayService {
     ): Promise<CreateIntentResult> {
         const { idempotencyKey, returnPath } = parseIntentBody(body);
         const tokenHash = hashPayToken(token);
-        if (!this.payLimiter.take(callerHash ?? tokenHash)) {
+        if (!(await this.payLimiter.take(callerHash ?? tokenHash))) {
             throw tooManyRequests();
         }
         const found = await this.find(tokenHash);

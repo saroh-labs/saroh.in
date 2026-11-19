@@ -4,11 +4,11 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
-    Ip,
     Post,
 } from "@nestjs/common";
 
 import { hashClientIp } from "../../common/client-ip";
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { telemetryOn } from "../../common/observability/posthog";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import { countsAsPerson } from "../sites/public-qr.service";
@@ -52,7 +52,7 @@ export class SignupFunnelController {
     @HttpCode(HttpStatus.NO_CONTENT)
     signupViewed(
         @Body() body: unknown,
-        @Ip() ip: string | undefined,
+        @ClientAddress() ip: string | undefined,
         @Headers() headers: HeaderMap,
     ): void {
         try {

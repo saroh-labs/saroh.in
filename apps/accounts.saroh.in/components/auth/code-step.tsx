@@ -68,6 +68,7 @@ export function CodeStep({
     onChangeEmail,
     onDone,
     client = codeClient,
+    lead: leadOverride,
 }: {
     email: string;
     kind?: CodeKind;
@@ -83,6 +84,8 @@ export function CodeStep({
     /** Signed in. Called once the confirmation has played. */
     onDone: () => void;
     client?: CodeClient;
+    /** The line under the title, when the default would claim too much. */
+    lead?: string;
 }) {
     const field = useRef<HTMLInputElement>(null);
     const [code, setCode] = useState("");
@@ -114,11 +117,13 @@ export function CodeStep({
         : phone
           ? { ...CODE_WORDS, ...PHONE_CODE_WORDS }
           : CODE_WORDS;
-    const lead = whatsapp
-        ? whatsappCodeLead(email)
-        : phone
-          ? phoneCodeLead(email)
-          : codeLead(email);
+    const lead =
+        leadOverride ??
+        (whatsapp
+            ? whatsappCodeLead(email)
+            : phone
+              ? phoneCodeLead(email)
+              : codeLead(email));
 
     // This step exists to take six digits, so it starts in the field.
     useEffect(() => {
@@ -190,7 +195,11 @@ export function CodeStep({
             setCode("");
             setSpent(false);
             failed.current = null;
-            setNotice(`We sent a new code to ${email}.`);
+            setNotice(
+                leadOverride
+                    ? `If ${email} is on a Saroh account, a new code is on its way.`
+                    : `We sent a new code to ${email}.`,
+            );
             field.current?.focus();
             return;
         }

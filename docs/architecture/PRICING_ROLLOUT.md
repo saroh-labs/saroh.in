@@ -176,9 +176,10 @@ into access; `EntitlementService`, module availability and
   once `pendingFrom` has passed. A catalogue row (`catalog.<plan>`) is read on
   its own version; a legacy row (`business`, `pro`, `free`) as the plan
   `LEGACY_PLAN_KEYS` maps it to, on the live version. With no live
-  subscription it is Free on the live version — if it has a cancelled
-  catalogue row or a live plan override. Otherwise (no row, no override) it
-  reads `FREE_ENTITLEMENTS`.
+  subscription it is Free on the live version, with no row at all too
+  (04-F2, 18 Nov 2026): a business the Free-rows backfill missed is held to
+  Free, never read as unlimited. Only with no live version does it read
+  `FREE_ENTITLEMENTS`.
 - **Then** its live overrides (plan, remove, grant, limit, raise) and the
   add-ons on its subscription, read from the same version: each one
   offered on the plan it is billed on, for all that is held (DEC-157).
@@ -215,9 +216,10 @@ and the admin's usage lines and impact (`ImpactService`).
   connecting a new provider; making a custom role; changing the site's
   theme; turning on "Publishing needs approval". The site's checkout is a
   soft cap: never refused, the business is told.
-- **Who is never refused:** a business the catalogue doesn't reach yet
-  (no subscription row, no plan override); any business when its plan
-  can't be read (logged `plan_meter_unresolved`).
+- **Who is never refused:** any business when no version is live or its
+  plan can't be read (logged `plan_meter_unresolved`). A business with no
+  subscription row is held to Free (04-F2), so grandfather an existing
+  business with a plan override before it would meet Free's caps.
 - **Notices:** `plan.limit.notice` at 80%, at the limit and past a soft
   cap, once each per limit and month (`backend-jobs.md`).
 - **A cap inside one thing (DEC-158):** the row `variants` caps how many

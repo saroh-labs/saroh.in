@@ -81,6 +81,7 @@ import { prisma, startOnFreePlan as startOnFreePlanFn } from "@saroh/database";
 
 import { sendWelcomeEmail as sendWelcomeEmailFn } from "../../common/email";
 
+import type { PhoneRequirement } from "../account-phone/phone-required";
 import type { AuditService } from "../audit/audit.service";
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
 import { recordManagerInTx as recordManagerInTxFn } from "./account-manager";
@@ -128,6 +129,38 @@ describe("OrganizationOnboardingService.onboard", () => {
         membershipCreate.mockResolvedValue({ id: "mem_1" });
         referringBusiness.mockResolvedValue(null);
         mockChosenBillingProfile.mockResolvedValue(null);
+    });
+
+    // 03-M5: the phone step could be skipped by opening the workspace.
+    describe("PHONE_REQUIRED_FOR_ACCOUNTS", () => {
+        const missing = jest.fn();
+        const held = new OrganizationOnboardingService(audit, undefined, {
+            missing,
+        } as unknown as PhoneRequirement);
+        const owner = { email: "asha@example.com", host: "app.saroh.in" };
+
+        it("sets up no business for a person who must add a phone first", async () => {
+            missing.mockResolvedValueOnce(true);
+            await expect(
+                held.onboard("user_1", { name: "Acme" }, owner),
+            ).rejects.toMatchObject({
+                status: 403,
+                response: { details: { code: "PHONE_REQUIRED" } },
+            });
+            expect(missing).toHaveBeenCalledWith({
+                id: "user_1",
+                email: "asha@example.com",
+            });
+            expect(orgCreate).not.toHaveBeenCalled();
+        });
+
+        it("goes on once they need nothing more", async () => {
+            missing.mockResolvedValueOnce(false);
+            await expect(
+                held.onboard("user_1", { name: "Acme" }, owner),
+            ).resolves.toBeDefined();
+            expect(orgCreate).toHaveBeenCalled();
+        });
     });
 
     describe("who Saroh bills for it (DEC-167, R6, R7)", () => {

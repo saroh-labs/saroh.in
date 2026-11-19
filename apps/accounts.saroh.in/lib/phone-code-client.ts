@@ -1,4 +1,5 @@
 import type { OtpSender } from "./otp-widget";
+import { ResendRefused } from "./otp-widget";
 import type { PhoneAnswer, PhoneProof } from "./phone-sign-in";
 import type { CodeClient } from "./sign-in-code";
 
@@ -22,11 +23,21 @@ export function phoneCodeClient(
 ): CodeClient {
     return {
         channel: sender.channel === "whatsapp" ? "whatsapp" : "phone",
-        async send() {
+        async send({ turnstileToken }) {
             try {
-                await sender.retry();
+                await sender.retry(turnstileToken);
                 return { error: null };
-            } catch {
+            } catch (error) {
+                // The API's own answer: a bot check to pass, or a wait.
+                if (error instanceof ResendRefused) {
+                    return {
+                        error: error.failure,
+                        retryAfter:
+                            error.retryAfter === null
+                                ? null
+                                : String(error.retryAfter),
+                    };
+                }
                 return { error: { words: RESEND_FAILED } };
             }
         },

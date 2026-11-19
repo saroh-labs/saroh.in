@@ -10,6 +10,8 @@ import { renewPhoneOnEmailSignIn } from "../../modules/account-phone/phone-fresh
 import { signedUp } from "../../modules/analytics/product-milestones";
 import { noticeProfilesOfDeletedOwnerInTx } from "../../modules/billing/billing-profile-owner";
 import { oauthGate } from "../../modules/mcp/oauth-gate";
+import { authLimitStorage } from "../../modules/rate-limits/auth-limit-storage";
+import { sharedRedis } from "../../modules/rate-limits/redis-client";
 import {
     sendChangeEmailConfirmationEmail,
     sendDeleteAccountEmail,
@@ -23,7 +25,8 @@ import {
     githubKeysOf,
     otherAuthAddress,
 } from "./auth-address";
-import { claimCodeMail } from "./code-mail-limits";
+import { claimCodeMail, mailsOnPasswordSignIn } from "./code-mail-limits";
+import { refusedCodeMail } from "./code-mail-origin";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
@@ -63,10 +66,16 @@ const authServices: Parameters<typeof createAuth>[0] = {
     onServerError: reportAuthServerError,
     // The sign-in rate limit counts the same client the API's `req.ip` does.
     trustedProxies: trustedProxyRanges(env.TRUST_PROXY),
+    // ...and counts it in Redis, across replicas and deploys (03-M7).
+    rateLimitStorage: authLimitStorage(sharedRedis()),
     // Per address too, not only per caller: many callers can't flood one
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
-    mayMailCode: (email, { turnstileToken }) =>
-        claimCodeMail(email, turnstileToken),
+    // A password sign-in mails only an unproven account (03-M9): any other
+    // sign-in is not a code mail and is never counted or refused here.
+    mayMailCode: async (email, { turnstileToken, path, host }) =>
+        path === "/sign-in/email" && !(await mailsOnPasswordSignIn(email))
+            ? null
+            : claimCodeMail(email, turnstileToken, undefined, undefined, host),
 };
 
 const githubWarned = new Set<Edition>();
@@ -162,6 +171,7 @@ export function authOfEdition(edition: Edition | null | undefined): Auth {
 export const mountedAuth: Auth = {
     ...auth,
     handler: async (request) =>
+        refusedCodeMail(request) ??
         (await oauthGate(request)) ??
         authFor(request.headers.get("host")).handler(request),
 };

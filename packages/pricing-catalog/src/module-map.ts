@@ -125,6 +125,18 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         limitKey: "bookingsPerMonth",
         legacyEntitlementKey: null,
     },
+    /** Courses with dated sessions: paid plans only (05-P-02). A switch. */
+    courses: {
+        registry: "COURSES",
+        limitKey: null,
+        legacyEntitlementKey: null,
+    },
+    /** Class packs: paid plans only (05-P-02). A switch. */
+    "class-packs": {
+        registry: "CLASS_PACKS",
+        limitKey: null,
+        legacyEntitlementKey: null,
+    },
     /** Invoicing needs no module (DEC-070); a row so the cards can say so. */
     invoicing: { registry: null, limitKey: null, legacyEntitlementKey: null },
     /** Media storage in GB: soft. */
@@ -237,6 +249,15 @@ export const RETIRED_MODULE_IDS: ReadonlySet<string> = new Set([
     "reviewers",
     "saroh-emails",
 ]);
+
+/**
+ * Registry modules sold on paid plans only (05-P-02, 04-F10). A catalogue
+ * version with no row under one of them doesn't leave it open: it is on
+ * only for a plan with a price, so a version published before the row was
+ * added never gives it to Free. Every other module with no row is open.
+ */
+export const PAID_ONLY_REGISTRY: ReadonlySet<RegistryModuleKey> =
+    new Set<RegistryModuleKey>(["COURSES", "CLASS_PACKS"]);
 
 /**
  * The catalogue rows that sit under one registry module, in `MODULE_MAP`'s

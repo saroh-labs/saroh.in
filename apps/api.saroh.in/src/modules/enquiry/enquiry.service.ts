@@ -12,9 +12,10 @@ import { enquirySubmittedEvent } from "../analytics/enquiry-event";
 import type { FieldType, FormField } from "../forms/dto";
 import { assertOrganizationOpen } from "../organizations/organization-lifecycle.gate";
 import { emitWebhook } from "../outbound-webhooks/emitter";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { enqueueEnquiryReply } from "./enquiry-reply";
 import { fieldsFromSnapshot } from "./live-form-fields";
-import { FixedWindowRateLimiter } from "./rate-limiter";
 
 /** The result of a successful (or idempotently-replayed) submission. */
 export interface EnquiryResult {
@@ -82,7 +83,9 @@ export class EnquiryService {
         // Not a DI provider — a per-instance default; @Optional() stops Nest
         // trying to inject it so the default (and test overrides) apply.
         @Optional()
-        private readonly rateLimiter: FixedWindowRateLimiter = new FixedWindowRateLimiter(),
+        private readonly rateLimiter: WindowLimiter = new SharedRateLimiter(
+            "enquiry-submissions",
+        ),
     ) {}
 
     /**
@@ -137,7 +140,7 @@ export class EnquiryService {
 
         // 4. Rate-limit per (form, hashed IP). Cheap per-instance abuse guard.
         if (ipHash) {
-            const allowed = this.rateLimiter.take(`${formId}:${ipHash}`);
+            const allowed = await this.rateLimiter.take(`${formId}:${ipHash}`);
             if (!allowed) {
                 throw new HttpException(
                     "Too many submissions. Wait a moment, then try again.",

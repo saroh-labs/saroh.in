@@ -3,7 +3,6 @@ import {
     Get,
     Header,
     Headers,
-    Ip,
     Param,
     Query,
     Res,
@@ -11,6 +10,7 @@ import {
 } from "@nestjs/common";
 import type { Response } from "express";
 
+import { ClientAddress } from "../../common/decorators/client-address.decorator";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
 import { edgeMayKeep } from "../../common/live-read-headers";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
@@ -57,7 +57,7 @@ export class PublicCatalogueController {
     list(
         @Param("siteId") siteId: string,
         @Query() query: RawGridQuery,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicCatalogue> {
         return this.catalogue.list(
@@ -77,7 +77,7 @@ export class PublicCatalogueController {
     @Header("Cache-Control", "no-store")
     async stock(
         @Param("siteId") siteId: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
         @Res({ passthrough: true }) res: Response,
     ): Promise<PublicShopStock> {
@@ -91,7 +91,7 @@ export class PublicCatalogueController {
     product(
         @Param("siteId") siteId: string,
         @Param("slug") slug: string,
-        @Ip() ip: string,
+        @ClientAddress() ip: string,
         @Headers(SITE_RELAY_HEADER) relay: string | undefined,
     ): Promise<PublicProduct> {
         return this.catalogue.product(siteId, slug, visitorKey(ip, relay));
