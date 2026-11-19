@@ -49,6 +49,10 @@ import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { FakeMessagingProvider } from "../messaging/providers/fake-messaging-provider";
+import {
+    MemoryHealthStore,
+    WhatsappSignInHealth,
+} from "../messaging/whatsapp-signin-health";
 import { FixedWindowRateLimiter } from "../rate-limits/fixed-window";
 import { ChallengeVerifier } from "../site-accounts/challenge";
 import { AccountPhoneService, PHONE_STALE } from "./account-phone.service";
@@ -740,6 +744,61 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         expect(sendsTo(p)).toHaveLength(2);
         await expect(codes(p)).resolves.toHaveLength(1);
         await expect(events("START", p)).resolves.toBe(2);
+    });
+
+    // Owner, 19 Nov: the person can't see a failed send, so Saroh counts it.
+    it("counts every sign-in send and each refused one, and emails owners on an account-level refusal", async () => {
+        const error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => {});
+        const send = jest.fn().mockResolvedValue(1);
+        const health = new WhatsappSignInHealth(
+            new MemoryHealthStore(),
+            { send },
+            5,
+            30,
+            "saroh_login_code",
+        );
+        service = new AccountPhoneService(
+            new MessagingService(fake),
+            challenge,
+            new FeatureFlagService(),
+            undefined,
+            health,
+        );
+        const p = phone();
+        await person(p);
+        await startWa(p);
+        // Unknown numbers send nothing, so they count nothing.
+        await startWa(phone(), { ip: "198.51.100.41" });
+        await expect(health.lastHour()).resolves.toEqual({
+            sends: 1,
+            failures: 0,
+            lastError: null,
+            failing: false,
+        });
+        expect(send).not.toHaveBeenCalled();
+
+        const q = phone();
+        await person(q);
+        fake.failNext("whatsapp_190");
+        await expect(startWa(q, { ip: "198.51.100.42" })).resolves.toEqual({
+            whatsapp: { resendAfterSeconds: 30 },
+        });
+        await expect(health.lastHour()).resolves.toMatchObject({
+            sends: 2,
+            failures: 1,
+            lastError: "whatsapp_190",
+        });
+        expect(send).toHaveBeenCalledTimes(1);
+        expect(error.mock.calls.map((c) => String(c[0])).join("\n")).toContain(
+            "account_phone_whatsapp_account_error reason=whatsapp_190",
+        );
+        // Never a number in what is logged or emailed.
+        expect(
+            JSON.stringify([error.mock.calls, send.mock.calls]),
+        ).not.toContain(q.slice(3));
+        error.mockRestore();
     });
 
     it("holds the 30s cooldown across both channels", async () => {

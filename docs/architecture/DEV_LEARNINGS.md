@@ -12,6 +12,30 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Accounts — a neutral answer hides failures: alert on the back end
+
+**Symptom**: 19 Nov 2026, the owner: phone sign-in now says "If this number
+is on a Saroh account, a code is on its way" to every number, so if Meta is
+down, the template is paused or the token has expired, nobody finds out: not
+the person waiting, not Saroh.
+**Cause**: to stop number enumeration (2d0c074b2) the WhatsApp code is sent
+after the answer and a failed send is only a WARN. A neutral answer is right
+for the person, but it took away the only place a failure was ever seen.
+**Fix**: the code step offers "No code yet? Get it by SMS instead" to every
+number once Resend is ready, so nothing leaks. The back end counts sends and
+failures (send-time refusals and Meta's `failed` statuses) in Redis and
+emails Platform owners past a threshold, on any account-level Meta code, and
+when Meta's template webhooks say the sign-in template is paused, disabled,
+rejected or RED. The admin Health board shows the last hour.
+**Rule**: whenever a screen gives one answer to hide what happened, the back
+end must count and alert on what happened, and the screen must offer a way
+on that doesn't depend on it.
+**Where it lives**: `messaging/whatsapp-signin-health.ts` and its spec,
+`meta-webhook.db.spec.ts`, `account-phone.db.spec.ts`,
+`phone-sign-in.test.tsx`; `devops-observability.md` → Account phone codes.
+
+---
+
 ## Sites — signing in during a booking lost the date and time
 
 **Symptom**: 4 Nov 2026, the owner: "we do all the steps, then we click the

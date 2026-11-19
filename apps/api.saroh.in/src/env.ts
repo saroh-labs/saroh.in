@@ -300,6 +300,13 @@ const envSchema = z.object({
     // (`account-phone/whatsapp-ceiling.ts`).
     WHATSAPP_CODES_PER_HOUR: z.string().regex(/^\d+$/).optional(),
     WHATSAPP_CODES_PER_DAY: z.string().regex(/^\d+$/).optional(),
+    // When account phone WhatsApp codes count as failing: at least this
+    // many failures, and this percent of sends, in one 15-minute window.
+    // Then `account_phone_whatsapp_failing` is logged at ERROR and Platform
+    // owners are emailed, at most once an hour. Unset: 5 and 30
+    // (`messaging/whatsapp-signin-health.ts`).
+    WHATSAPP_FAILURES_MIN: z.string().regex(/^\d+$/).optional(),
+    WHATSAPP_FAILURES_PERCENT: z.string().regex(/^\d+$/).optional(),
     // Requests a minute one signed-in person may make to the API, every
     // business together (04-F9, `common/guards/better-auth.guard.ts`).
     // Unset: 1200. 0 turns it off (the browser-test stacks, where many

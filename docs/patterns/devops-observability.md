@@ -253,6 +253,34 @@ configured` (WARN) each run and do nothing else: set them in the
   `ai_failure_alarm finished=… failed=…`, `ai_owner_alert email … for
 platformAdmin=…`, `ai_grant_end removed|failed request=…`.
 
+## Account phone codes on WhatsApp — **Current** (owner, 19 Nov 2026)
+
+Phone sign-in answers every number alike and sends the WhatsApp code after
+the answer (no number enumeration), so a send that fails tells nobody. The
+back end watches instead (`messaging/whatsapp-signin-health.ts`), counted in
+Redis per 15 minutes (per process without it), with numbers never logged:
+
+- `account_phone_whatsapp_failing failures=… sends=… window=15m top=…`
+  (ERROR): at least `WHATSAPP_FAILURES_MIN` (5) failures and
+  `WHATSAPP_FAILURES_PERCENT` (30) of sends in the window. A failure is a
+  provider refusal at send time or Meta's `failed` status on the webhook for
+  a sign-in message id (remembered a day, counted once). Platform owners are
+  emailed, at most once an hour.
+- `account_phone_whatsapp_account_error reason=…` (ERROR): any one failure
+  that stops every send (Meta's token, permission, account, payment,
+  registration or template codes, `ACCOUNT_LEVEL_CODES`, cited to Meta's
+  error code reference). Emailed once an hour per code.
+- `account_phone_whatsapp_template template=… status=…|quality=…`: Meta's
+  template webhooks for the configured sign-in template
+  (`MSG91_WHATSAPP_TEMPLATE`) only. PAUSED, DISABLED, REJECTED or quality
+  RED is ERROR and emailed once per change; other states are INFO, a
+  components change WARN. Every other template is ignored.
+- `account_phone_whatsapp_ceiling` (ERROR, `account-phone/whatsapp-ceiling.ts`):
+  the platform-wide cap on codes was crossed.
+- The admin console's Health board shows "WhatsApp sign-in codes": the last
+  hour's sends and failures and the last error code, failed past the
+  threshold.
+
 ## After a deploy — **Current** (#1192)
 
 The post-deploy watch list (sign-in pages, a merchant site, a booking, a
