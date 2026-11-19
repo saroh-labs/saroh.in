@@ -98,7 +98,10 @@ class TestChallenge extends ChallengeVerifier {
 let n = 0;
 const phone = () =>
     `+9197${String(process.pid % 1000).padStart(3, "0")}${String(++n).padStart(5, "0")}`;
-const IP = "203.0.113.9";
+// A fresh address per test: unknown numbers count toward the per-address
+// hourly limit too, so one shared address would fill it across the file.
+let IP = "203.0.113.9";
+let ipN = 0;
 
 let fake: FakeMessagingProvider;
 let challenge: TestChallenge;
@@ -106,6 +109,7 @@ let service: AccountPhoneService;
 let warn: jest.SpyInstance;
 
 beforeEach(() => {
+    IP = `198.18.0.${(++ipN % 250) + 1}`;
     fake = new FakeMessagingProvider();
     challenge = new TestChallenge();
     service = new AccountPhoneService(
