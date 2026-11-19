@@ -36,6 +36,12 @@ export const BILLING_ACTION_CODES = [
     "commission_refund_after_payout",
     // A merchant's payment webhook that failed after all its tries.
     "merchant_webhook_failed",
+    // A coupon's Razorpay Offer refused at checkout (the automatic coupon
+    // fell back to the full price), or charging another amount than Saroh
+    // invoiced (review 18 Nov 2026, F1 and F7). Not one business's: one row
+    // per coupon and Offer.
+    "billing_coupon_offer_refused",
+    "billing_coupon_offer_mismatch",
 ] as const;
 
 export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];

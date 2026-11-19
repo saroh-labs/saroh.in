@@ -20,6 +20,7 @@ import {
 } from "../admin/admin-audit.service";
 import { AdminPermission } from "../admin/admin-permissions";
 import { autopayTakes } from "../billing/autopay-currency";
+import { couponMonthPaise } from "../billing/checkout-quote";
 import { RAZORPAY_OFFER_ID } from "./dto";
 import type { PublicOffer } from "./public-catalog";
 
@@ -139,6 +140,45 @@ export function discountProblem(f: {
               field: "discountPaise",
               message: "A coupon takes an amount or a percent off, not both.",
           };
+}
+
+/**
+ * True when a save would change what a coupon takes off (amount, percent,
+ * months or plans): the Razorpay Offer it names was made for the old terms
+ * and Razorpay applies the Offer's own, so the two would no longer match
+ * (F7). Plans compare as a set.
+ */
+export function offerTermsChanged(
+    before: Pick<
+        CouponFields,
+        "discountPaise" | "percentOff" | "months" | "planIds"
+    >,
+    after: Pick<
+        CouponFields,
+        "discountPaise" | "percentOff" | "months" | "planIds"
+    >,
+): boolean {
+    const plans = (ids: string[]) => [...new Set(ids)].sort().join(",");
+    return (
+        before.discountPaise !== after.discountPaise ||
+        before.percentOff !== after.percentOff ||
+        before.months !== after.months ||
+        plans(before.planIds) !== plans(after.planIds)
+    );
+}
+
+/**
+ * True when, on a plan's yearly row ("pay for `paidMonths`, get 12"), the
+ * coupon's months' worth would leave less than one month's price to pay:
+ * a yearly charge of nothing, or nearly, is an admin slip (F11).
+ */
+export function yearlyOffTooMuch(
+    f: Pick<CouponFields, "discountPaise" | "percentOff" | "months">,
+    monthlyPaise: number,
+    paidMonths: number,
+): boolean {
+    const month = couponMonthPaise(f, monthlyPaise);
+    return month * f.months > monthlyPaise * paidMonths - monthlyPaise;
 }
 
 /**
@@ -275,6 +315,17 @@ export class CouponsService {
                         ? row.razorpayOfferId
                         : input.razorpayOfferId,
             };
+            if (
+                row.razorpayOfferId !== null &&
+                next.razorpayOfferId === row.razorpayOfferId &&
+                offerTermsChanged(row, next)
+            ) {
+                throw new BadRequestException({
+                    message:
+                        "Razorpay takes off what its Offer says, not the coupon. To change the discount, months or plans, make a new Offer in Razorpay with the new terms and paste its ID with this change.",
+                    details: { field: "razorpayOfferId" },
+                });
+            }
             await this.checkFields(edition, next, now, {
                 // An expiry already passed may stay as it is (pausing an
                 // expired coupon, say); only a new one must be ahead.
@@ -490,6 +541,15 @@ export class CouponsService {
                     details: { field: "discountPaise" },
                 });
             }
+            if (
+                check.catalog.yearly.on &&
+                yearlyOffTooMuch(f, plan.pricePaise, check.catalog.yearly.paid)
+            ) {
+                throw new BadRequestException({
+                    message: `On ${plan.name} yearly, this would take off more than the year costs less one month. Use fewer months or a smaller discount.`,
+                    details: { field: "months" },
+                });
+            }
         }
         f.planIds = ids;
     }
@@ -551,17 +611,105 @@ interface CouponAsk {
 }
 
 /**
+ * How long an open checkout holding an automatic coupon lives (and holds a
+ * place): an hour, not the day other checkouts get, so unpaid checkouts
+ * from throwaway businesses can't keep a limited launch offer from real
+ * ones for long (review 18 Nov 2026, F4). Its provider subscription expires
+ * with it, so a place it gave up can't be paid for later.
+ */
+export const AUTOMATIC_COUPON_HOLD_MS = 60 * 60 * 1000;
+
+/**
+ * The places of `couponId`'s `maxRedemptions` taken now, by businesses
+ * other than `exceptOrgId`: one per business that redeemed it, completed a
+ * checkout with it (a trial redeems only at its first charge, so it holds
+ * its place until then) or has an open checkout with it that hasn't
+ * lapsed. One count for checkout, the public offers and the re-check under
+ * the coupon's lock. Across businesses, so read outside the request's
+ * organization (`outsideOrgContext`): under row-level security a business
+ * sees only its own rows.
+ */
+export async function couponPlacesTaken(
+    couponId: string,
+    exceptOrgId: string | null,
+    now: Date,
+): Promise<number> {
+    const [redeemed, held] = await outsideOrgContext(() =>
+        Promise.all([
+            prisma.pricingCouponRedemption.findMany({
+                where: { couponId },
+                select: { organizationId: true },
+            }),
+            prisma.billingCheckout.findMany({
+                where: {
+                    couponId,
+                    OR: [
+                        { status: "COMPLETED" },
+                        { status: "OPEN", expiresAt: { gt: now } },
+                    ],
+                },
+                select: { organizationId: true },
+                distinct: ["organizationId"],
+            }),
+        ]),
+    );
+    const orgs = new Set([...redeemed, ...held].map((r) => r.organizationId));
+    if (exceptOrgId) orgs.delete(exceptOrgId);
+    return orgs.size;
+}
+
+/**
+ * Serialises everything that takes a place of one coupon (a checkout's
+ * insert, a redemption) on a transaction-scoped advisory lock, so two at
+ * once can't both see the last place free (F3).
+ */
+export async function lockCouponPlacesInTx(
+    tx: Pick<Tx, "$executeRaw">,
+    couponId: string,
+): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`pricing_coupon_places:${couponId}`}))`;
+}
+
+/**
+ * True when this business has already been a paying Saroh customer or had
+ * a launch offer: a Saroh invoice for a plan, a paid plan now (a renewal
+ * that failed restarts as NEW from there), or a redemption of any
+ * automatic coupon. Such a business never gets an automatic coupon again,
+ * whichever plan or coupon it is (F8; the rule is written in
+ * `PRICING_ROLLOUT.md`). A typed code isn't held to it.
+ */
+export async function hadPaidPlanOrLaunchOffer(
+    organizationId: string,
+): Promise<boolean> {
+    const [invoice, sub, launch] = await Promise.all([
+        prisma.sarohInvoice.findFirst({
+            // A messaging top-up is no plan.
+            where: { organizationId, source: { not: "TOPUP" } },
+            select: { id: true },
+        }),
+        prisma.subscription.findUnique({
+            where: { organizationId },
+            select: { plan: { select: { priceCents: true } } },
+        }),
+        prisma.pricingCouponRedemption.findFirst({
+            where: { organizationId, coupon: { automatic: true } },
+            select: { id: true },
+        }),
+    ]);
+    return (
+        invoice !== null || launch !== null || (sub?.plan.priceCents ?? 0) > 0
+    );
+}
+
+/**
  * Why `coupon` can't be used by this business on this plan now, or null
  * when it can: archived or another edition's, paused, expired, not for
- * this plan, used by this business already, or used up. "Used up" counts
- * the redemptions and the other businesses' checkouts waiting with it, so
- * a coupon can't be promised past `maxRedemptions` while checkouts are
- * open. Read against the live catalogue's plan id, as the coupon's own
- * checks on save are. One check for a typed code and an automatic coupon.
- *
- * Those two counts are across businesses, so they are read outside the
- * request's organization (`outsideOrgContext`): under row-level security a
- * business sees only its own redemptions and checkouts.
+ * this plan, used by this business already, used up (every place taken,
+ * {@link couponPlacesTaken}), or, for an automatic coupon, a business that
+ * has paid Saroh or had a launch offer before
+ * ({@link hadPaidPlanOrLaunchOffer}). Read against the live catalogue's
+ * plan id, as the coupon's own checks on save are. One check for a typed
+ * code and an automatic coupon.
  */
 async function couponProblem(
     coupon: PricingCoupon,
@@ -588,21 +736,18 @@ async function couponProblem(
         select: { id: true },
     });
     if (mine) return `You've used coupon ${code} already.`;
-    const [used, waiting] = await outsideOrgContext(() =>
-        Promise.all([
-            prisma.pricingCouponRedemption.count({
-                where: { couponId: coupon.id },
-            }),
-            prisma.billingCheckout.count({
-                where: {
-                    couponId: coupon.id,
-                    status: "OPEN",
-                    organizationId: { not: input.organizationId },
-                },
-            }),
-        ]),
+    if (
+        coupon.automatic &&
+        (await hadPaidPlanOrLaunchOffer(input.organizationId))
+    ) {
+        return `Coupon ${code} is for businesses starting their first paid plan.`;
+    }
+    const taken = await couponPlacesTaken(
+        coupon.id,
+        input.organizationId,
+        input.now,
     );
-    if (used + waiting >= coupon.maxRedemptions) {
+    if (taken >= coupon.maxRedemptions) {
         return `Coupon ${code} has been used up.`;
     }
     return null;
@@ -662,24 +807,26 @@ export async function automaticOffers(
     edition: Edition,
     now: Date,
 ): Promise<PublicOffer[]> {
-    // The uses are every business's: read outside any one's (RLS).
-    const rows = await outsideOrgContext(() =>
-        prisma.pricingCoupon.findMany({
-            where: {
-                edition,
-                automatic: true,
-                active: true,
-                archivedAt: null,
-                OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-            },
-            orderBy: { createdAt: "desc" },
-            include: withUses,
-        }),
-    );
+    const rows = await prisma.pricingCoupon.findMany({
+        where: {
+            edition,
+            automatic: true,
+            active: true,
+            archivedAt: null,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+        },
+        orderBy: { createdAt: "desc" },
+    });
     const seen = new Set<string>();
     const offers: PublicOffer[] = [];
     for (const row of rows) {
-        if (row._count.redemptions >= row.maxRedemptions) continue;
+        // The places checkout counts, so the page never offers what
+        // checkout would no longer give.
+        if (
+            (await couponPlacesTaken(row.id, null, now)) >= row.maxRedemptions
+        ) {
+            continue;
+        }
         for (const planId of row.planIds) {
             if (seen.has(planId)) continue;
             seen.add(planId);

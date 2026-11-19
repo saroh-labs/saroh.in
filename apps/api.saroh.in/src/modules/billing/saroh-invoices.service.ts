@@ -752,6 +752,8 @@ export class SarohInvoicesService {
                     providerPaymentId: charge.providerPaymentId,
                     totalPaise: totals.totalPaise,
                     providerAmountPaise: null,
+                    providerSubscriptionId: charge.providerSubscriptionId,
+                    discountPaise: totals.discountPaise,
                 },
                 charge.providerAmountPaise,
             );
@@ -798,6 +800,8 @@ export class SarohInvoicesService {
                 providerAmountPaise: true,
                 providerPaymentId: true,
                 providerCustomerId: true,
+                providerSubscriptionId: true,
+                discountPaise: true,
             },
         });
         // The amount only for the payment the invoice is for (DEC-166).

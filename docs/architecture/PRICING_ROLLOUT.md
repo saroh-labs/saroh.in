@@ -404,8 +404,18 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
 - **Coupons** (`?coupon=` on the quote, `coupon` on the change) apply to a
   checkout that starts a plan (`NEW`, `TRIAL`). Refused (400, field
   `coupon`): unknown or archived, paused, expired, not for the plan, used by
-  this business, or used up — redemptions plus other businesses' OPEN
-  checkouts with it, counted across businesses (`outsideOrgContext`).
+  this business, or used up. **Used up** counts places, one per other
+  business that redeemed it, completed a checkout with it (a trial holds
+  its place until its first charge redeems it) or has an open checkout with
+  it that hasn't lapsed (`couponPlacesTaken`, across businesses,
+  `outsideOrgContext`): one count for the quote, checkout and the public
+  offers. The checkout's insert re-counts under a per-coupon advisory lock
+  (`takeCouponPlaceInTx`), so two businesses at once can't both take the
+  last place; the loser's provider subscription is cancelled and a typed
+  code is refused (409 "has just been used up"). The redemption write
+  takes the same lock and logs `coupon_redeemed_past_max` if a redemption
+  ever lands past the limit (it can't be refused there: the discount is
+  charged). Known limit: a trial that ends without paying keeps its place.
   Monthly: its discount off each of its months; yearly: that many months'
   worth once, off the first yearly charge, never more than the charge. The
   checkout keeps `couponId`, `discountPaise`, `discountCharges`; the
@@ -424,15 +434,41 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
   typed (`findAutomaticCoupon`), silently skipped when this business can't
   use it; a typed code wins. One active automatic coupon per edition and
   plan (`checkOneAutomatic`, an advisory lock); India's needs its Razorpay
-  Offer. `GET /public/pricing` lists them as `offers` (never the code) and
-  the pricing cards say them in place of the trial. A coupon is an amount
-  (`discountPaise` > 0) **or** a whole percent (`percentOff` 1–90,
-  `discountPaise` 0; the CHECK `PricingCoupon_amounts_positive`). A
-  percent is worked out at checkout from the target plan's monthly price
-  before GST, half up to the paisa (`couponMonthPaise`), and then runs
-  exactly as an amount: the checkout, invoices, reminders and redemption
-  keep that amount. Yearly, it is that many months' worth of the monthly
-  price, once, capped at the charge.
+  Offer. `GET /public/pricing` lists them as `offers` (never the code), only
+  while a place is free by the same count checkout uses, and the pricing
+  cards say them in place of the trial. The quote never returns its code
+  either (`coupon.code` is null; the dialog says "Offer"). A coupon is an
+  amount (`discountPaise` > 0) **or** a whole percent (`percentOff` 1–90,
+  `discountPaise` 0; the CHECK `PricingCoupon_amounts_positive`). A percent
+  is worked out at checkout from the target plan's monthly price before GST,
+  half up to the paisa (`couponMonthPaise`), and then runs exactly as an
+  amount: the checkout, invoices, reminders and redemption keep that amount.
+  Yearly, it is that many months' worth of the monthly price, once, capped
+  at the charge.
+  Hardened after the 18 Nov 2026 review:
+    - **Once per business, across every automatic coupon.** A business that
+      has had a Saroh invoice for a plan, is on a paid plan now (a renewal
+      that failed restarts as `NEW` from there), or has redeemed any
+      automatic coupon never gets an automatic coupon again, whichever plan
+      or coupon (`hadPaidPlanOrLaunchOffer`). Typing an automatic coupon's
+      code is held to the same rule; other typed codes are not. Moving
+      from a trial to a dearer plan during the first month is on a paid
+      plan, so it gets no automatic coupon either.
+    - **Held an hour.** A checkout with an automatic coupon lapses after
+      `AUTOMATIC_COUPON_HOLD_MS` (an hour, not a day), and its provider
+      subscription's `expire_by` with it, so unpaid checkouts from
+      throwaway businesses can't hold a limited offer's places for long.
+    - **Never blocks a plan.** When the provider refuses the checkout's
+      discount (Razorpay refusing the Offer: expired, used up at Razorpay,
+      deleted, or not for this plan) or the last place went to another
+      business first, the checkout starts again at the full price, once,
+      with no coupon. The quote and checkout returned are the full price's.
+      A refusal logs `billing_automatic_coupon_refused` (WARN, the coupon,
+      the Offer and Razorpay's words) and raises one Needs-action row per
+      coupon and Offer (`billing_coupon_offer_refused`). Only the Offer
+      differs between the two calls, so a full-price call that is refused
+      too was never about the Offer and fails as any provider refusal does.
+      A typed code keeps its 409 "Try without it".
 - **Add-ons** — `GET …/billing/addons`, `PUT …/billing/addons/:id
 {quantity}` (zero removes; `billing:manage`). On a paid catalogue plan
   billed through the provider, trialing or paid up; definitions from the
@@ -531,14 +567,27 @@ flat Offer. A Razorpay _percentage_ Offer is not the answer: it is taken
 off the GST-inclusive charge and can round a paisa away from Saroh's
 invoice (unverified in test mode).
 
-There is **no check** that the two match: Razorpay documents no endpoint to
-read an Offer back (`GET /v1/offers/:id` isn't in its API reference; only
-the list `GET /v1/offers` was seen in the spike, and the shape of an
-Offer's discount fields in it is unverified). Unverified as well: that
-Razorpay refuses an unknown or expired `offer_id` with a 4xx (it would then
-read as REFUSED, the same 409), and how the Offer's discount shows on the
-`subscription.charged` amount. Check both with a test payment before the
-first real coupon.
+Saroh **can't check the two match before a charge**: Razorpay documents no
+endpoint to read an Offer back (`GET /v1/offers/:id` isn't in its API
+reference; only the list `GET /v1/offers` was seen in the spike, and the
+shape of an Offer's discount fields in it is unverified). So:
+
+- **On save**, a coupon that names an Offer can't change what it takes off
+  (amount, percent, months or plans) unless the same save pastes a new
+  Offer's ID (`offerTermsChanged`, 400 on `razorpayOfferId`): the Offer was
+  made for the old terms. A coupon whose yearly discount would leave less
+  than one month's price to pay is refused too (`yearlyOffTooMuch`).
+- **On the first discounted charge**, the invoice's amount check
+  (`keepProviderAmountInTx`) that finds the payment differs from a
+  discounted invoice also raises `billing_coupon_offer_mismatch`, once per
+  coupon and Offer: pause the coupon, then fix the Offer or paste a new
+  one's ID. Every later invoice that differs still gets its own
+  `saroh_invoice_amount_mismatch` row.
+
+Unverified: that Razorpay refuses an unknown or expired `offer_id` with a
+4xx (the adapter keeps its `error.field` and `description` for the log),
+and how the Offer's discount shows on the `subscription.charged` amount.
+Check both with a test payment before the first real coupon.
 
 ## Checkout and term (DEC-093, DEC-161)
 

@@ -206,11 +206,12 @@ describe("coupons (DB, U4)", () => {
             razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
         });
 
-        // A change to something else leaves it as it was.
+        // A change to something else leaves it as it was. (Months are the
+        // Offer's terms too: changing them needs a new Offer, below.)
         await expect(
             controller.updateCoupon(me(), c.id, {
-                months: 3,
-                reason: "fake months",
+                maxRedemptions: 4,
+                reason: "fake uses",
                 idempotencyKey: key(),
             } as never),
         ).resolves.toMatchObject({ razorpayOfferId: "offer_NOPQRSTUVWXYZ1" });
@@ -231,10 +232,85 @@ describe("coupons (DB, U4)", () => {
         expect(metadata).toEqual(
             expect.arrayContaining([
                 { code: "FAKE-111", razorpayOfferId: "offer_NOPQRSTUVWXYZ1" },
-                { code: "FAKE-111", months: 3 },
+                { code: "FAKE-111", maxRedemptions: 4 },
                 { code: "FAKE-111", razorpayOfferId: null },
             ]),
         );
+    });
+
+    it("refuses a change to what it takes off while it names the same Razorpay offer (F7)", async () => {
+        const c = await create({ razorpayOfferId: "offer_ABCDEFGHIJKLMN" });
+        for (const change of [
+            { months: 3 },
+            { discountPaise: 112 },
+            { discountPaise: 0, percentOff: 7 },
+            { planIds: ["b", "c"] },
+        ]) {
+            await expect(
+                controller.updateCoupon(me(), c.id, {
+                    ...change,
+                    reason: "fake terms",
+                    idempotencyKey: key(),
+                } as never),
+            ).rejects.toMatchObject({
+                status: 400,
+                response: { details: { field: "razorpayOfferId" } },
+            });
+        }
+        // The same values again, or plans in another order, change nothing.
+        await expect(
+            controller.updateCoupon(me(), c.id, {
+                months: 2,
+                discountPaise: 111,
+                planIds: ["b"],
+                reason: "fake same",
+                idempotencyKey: key(),
+            } as never),
+        ).resolves.toMatchObject({ months: 2 });
+        // With a new Offer made for the new terms, it saves.
+        await expect(
+            controller.updateCoupon(me(), c.id, {
+                months: 3,
+                razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+                reason: "fake new offer",
+                idempotencyKey: key(),
+            } as never),
+        ).resolves.toMatchObject({
+            months: 3,
+            razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+        });
+        // A coupon with no Offer (Global's, say) changes freely.
+        const plain = await create({ code: "FAKE-PLAIN" });
+        await expect(
+            controller.updateCoupon(me(), plain.id, {
+                months: 3,
+                reason: "fake months",
+                idempotencyKey: key(),
+            } as never),
+        ).resolves.toMatchObject({ months: 3 });
+    });
+
+    it("refuses a coupon that would take a yearly charge below one month's price (F11)", async () => {
+        const b = fakeCatalog().plans.find((p) => p.id === "b")!;
+        const paid = fakeCatalog().yearly.paid;
+        // Its months' worth leaves less than one month of the year to pay.
+        await expect(
+            create({
+                code: "FAKE-YEAR",
+                discountPaise: b.pricePaise,
+                months: paid,
+            }),
+        ).rejects.toMatchObject({
+            status: 400,
+            response: { details: { field: "months" } },
+        });
+        await expect(
+            create({
+                code: "FAKE-YEAR-OK",
+                discountPaise: b.pricePaise,
+                months: paid - 1,
+            }),
+        ).resolves.toMatchObject({ months: paid - 1 });
     });
 
     it("refuses a Razorpay offer id in another shape, on create and on update", async () => {
@@ -408,15 +484,21 @@ describe("coupons (DB, U4)", () => {
                     percentOff: 7,
                 })),
             );
-            // Back to an amount: the percent goes with it.
+            // Back to an amount: the percent goes with it. New terms need a
+            // new Offer, or the Offer-terms lock refuses the change.
             await expect(
                 controller.updateCoupon(me(), made.id, {
                     discountPaise: 111,
                     percentOff: null,
+                    razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
                     reason: "fake",
                     idempotencyKey: key(),
                 } as never),
-            ).resolves.toMatchObject({ discountPaise: 111, percentOff: null });
+            ).resolves.toMatchObject({
+                discountPaise: 111,
+                percentOff: null,
+                razorpayOfferId: "offer_NOPQRSTUVWXYZ1",
+            });
         });
 
         it("an amount or a percent, never both or neither, and the percent 1 to 90", async () => {

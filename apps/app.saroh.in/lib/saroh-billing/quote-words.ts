@@ -178,7 +178,7 @@ export function quoteSummary(
     const coupon: QuoteLine[] = q.coupon
         ? [
               {
-                  label: `Coupon ${q.coupon.code}`,
+                  label: q.coupon.code ? `Coupon ${q.coupon.code}` : "Offer",
                   value: `${planMoney(q.coupon.discountPaise)} off ${
                       q.cycle === "year"
                           ? "the first yearly charge"

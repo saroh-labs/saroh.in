@@ -6826,6 +6826,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** turbo runs ten tasks at once by default; with nearly every package affected (a merge from development), several `tsc` and ESLint processes for the big apps at once starve the 16 GB hosted runner.
 - **Fix:** `--concurrency=4` on that step (`.github/workflows/ci.yml`), as the test step already caps itself. A job that dies with "lost communication" and no log is memory, not the code: cap the parallelism, don't re-run it again and again.
 
+### Launch coupons: a refused Offer blocked checkout, and "first N" wasn't N (18 Nov 2026)
+
+- **Symptom:** the 18 Nov security review found that an automatic coupon whose Razorpay Offer was refused turned every new monthly checkout on its plan into a 409 "Try without it" with nothing to leave out; that `maxRedemptions` didn't count trials or hold under a race; that unpaid day-long checkouts from throwaway businesses could hold a limited offer; that "once per business" was once per coupon (two plans' offers, Free and back, a failed renewal); and that a wrong Offer was only seen invoice by invoice.
+- **Cause:** the coupon was checked once, before the provider call and outside the transaction that records the checkout, counting redemptions and open checkouts only; the automatic coupon reused the typed code's refusal path; nothing tied a coupon to the business's history beyond its own redemption.
+- **Fix:** one place count for quote, checkout and the public offers (`couponPlacesTaken`: redemptions, completed checkouts, unlapsed open ones), re-counted under a per-coupon advisory lock in the checkout's transaction; automatic checkouts held an hour; the automatic coupon falls back to the full price and raises `billing_coupon_offer_refused` once; `hadPaidPlanOrLaunchOffer` for every automatic coupon; a coupon's terms can't change under the same Offer, and a mismatched discounted charge raises `billing_coupon_offer_mismatch` once. Specs: `offers.db.spec.ts` → "coupon abuse refused".
+- **Rule:** a limit that a provider call sits between checking and recording is re-checked under a lock in the recording transaction; an "automatic" offer never reuses a typed code's error path (`PRICING_ROLLOUT.md` → Automatic and percent coupons).
+
 ### A check made only when connecting is not a check (18 Nov 2026)
 
 - **Symptom:** the Google Calendar review (GC-02, GC-03) found that a business moved down to Free, a person who lost `calendar:connect-own`, or one taken off the diary kept syncing for good, and the person couldn't even disconnect: only connecting asked the plan and the permission.
