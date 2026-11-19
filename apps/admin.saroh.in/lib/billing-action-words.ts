@@ -149,6 +149,8 @@ export const BILLING_ACTION_CODES = [
     "commission_line_failed",
     "commission_refund_after_payout",
     "merchant_webhook_failed",
+    "billing_coupon_offer_refused",
+    "billing_coupon_offer_mismatch",
 ] as const;
 export type BillingActionCode = (typeof BILLING_ACTION_CODES)[number];
 
@@ -331,6 +333,24 @@ const ACTION_WORDS: Record<BillingActionCode, ActionWords> = {
         fix: {
             kind: "resolve",
             label: "Replay it in Operations › Webhooks, then mark resolved",
+        },
+    },
+    billing_coupon_offer_refused: {
+        label: "Razorpay refused a coupon's Offer",
+        what: "Razorpay refused an automatic coupon's Offer, so businesses starting that plan pay the full price.",
+        tone: "warning",
+        fix: {
+            kind: "resolve",
+            label: "Fix the Offer or pause the coupon, then mark resolved",
+        },
+    },
+    billing_coupon_offer_mismatch: {
+        label: "Coupon's Offer charges another amount",
+        what: "A coupon's Razorpay Offer took off a different amount from the coupon, so the charge and Saroh's invoice differ.",
+        tone: "danger",
+        fix: {
+            kind: "resolve",
+            label: "Pause the coupon and fix its Offer, then mark resolved",
         },
     },
 };

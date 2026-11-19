@@ -109,7 +109,12 @@ export interface ChangeQuote {
      * month, and absent from an API not yet on that release.
      */
     firstMonth?: "NOW" | "AT_END" | null;
-    coupon: { code: string; discountPaise: number; charges: number } | null;
+    /** `code` is null for the plan's automatic offer: nobody typed one. */
+    coupon: {
+        code: string | null;
+        discountPaise: number;
+        charges: number;
+    } | null;
     firstChargePaise: number;
     firstChargeGstPaise: number;
     firstChargeTotalPaise: number;

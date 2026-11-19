@@ -747,8 +747,12 @@ Trials, coupons and add-ons (U16) ride the same path: a coupon is
 redeemed and its discount invoiced with the charge it comes off, never at
 checkout, and an add-on is a line on the charge after the period it covers
 (`SubscriptionAddonCharge`). The amount the provider charges and the
-invoice's lines are worked out by one rule each, so they agree. Rules in
-`PRICING_ROLLOUT.md` › "Trials, yearly, coupons and add-ons (U16)".
+invoice's lines are worked out by one rule each, so they agree. A
+coupon's places are counted one way everywhere (`couponPlacesTaken`) and
+re-counted under the coupon's advisory lock in the transaction that records
+the checkout; an automatic coupon never blocks a plan (it falls back to the
+full price). Rules in `PRICING_ROLLOUT.md` › "Trials, yearly, coupons and
+add-ons (U16)".
 
 **Saroh's plans abroad (stage 9, DEC-211, epic #1306).** Each edition
 has its own catalogue (`PricingCatalogVersion.edition`, one draft per

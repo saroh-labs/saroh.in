@@ -218,6 +218,15 @@ describe("quoteSummary (DEC-093)", () => {
         expect(values(q)).toContain("₹200 + ₹36 GST = ₹236");
     });
 
+    it("names the plan's automatic offer as an offer, never a code", () => {
+        const q = quote({
+            coupon: { code: null, discountPaise: 2_200, charges: 2 },
+        });
+        const lines = quoteSummary(q, { currentPlan: "Plan A" }).lines;
+        expect(lines.map((l) => l.label)).toContain("Offer");
+        expect(lines.map((l) => l.label).join()).not.toContain("Coupon");
+    });
+
     it("needs no payment to move to free, and nothing for no change", () => {
         expect(
             quoteSummary(

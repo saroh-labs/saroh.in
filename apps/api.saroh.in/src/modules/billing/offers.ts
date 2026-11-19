@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import type { BillingCheckout, Prisma } from "@saroh/database";
 import type { Addon, BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
@@ -9,9 +10,12 @@ import {
     validateCatalog,
 } from "@saroh/pricing-catalog";
 
+import { lockCouponPlacesInTx } from "../pricing/coupons.service";
 import { prorateDifferencePaise } from "./checkout-quote";
 
 type Tx = Prisma.TransactionClient;
+
+const logger = new Logger("Offers");
 type Db = Pick<Tx, "pricingCatalogVersion">;
 
 /**
@@ -263,9 +267,14 @@ export function addonProratedLine(input: {
  * with the first discounted charge (never at checkout), on the webhook's
  * transaction. Storing the whole discount the coupon gives, before GST. A
  * repeat (a redelivered or second event) writes nothing.
+ *
+ * Under the coupon's places lock (`lockCouponPlacesInTx`), and re-counted
+ * after: the checkout held its place when it was made, so a redemption past
+ * `maxRedemptions` can't be refused here (the discount is already charged)
+ * and is a WARN for the team to look at (F3).
  */
 export async function redeemCouponInTx(
-    tx: Pick<Tx, "pricingCouponRedemption">,
+    tx: Pick<Tx, "pricingCouponRedemption" | "pricingCoupon" | "$executeRaw">,
     checkout: Pick<
         BillingCheckout,
         "couponId" | "organizationId" | "discountPaise" | "discountCharges"
@@ -273,6 +282,7 @@ export async function redeemCouponInTx(
     subscriptionId: string,
 ): Promise<boolean> {
     if (!checkout.couponId || checkout.discountCharges <= 0) return false;
+    await lockCouponPlacesInTx(tx, checkout.couponId);
     const made = await tx.pricingCouponRedemption.createMany({
         data: [
             {
@@ -285,5 +295,20 @@ export async function redeemCouponInTx(
         ],
         skipDuplicates: true,
     });
+    if (made.count > 0) {
+        const coupon = await tx.pricingCoupon.findUnique({
+            where: { id: checkout.couponId },
+            select: {
+                code: true,
+                maxRedemptions: true,
+                _count: { select: { redemptions: true } },
+            },
+        });
+        if (coupon && coupon._count.redemptions > coupon.maxRedemptions) {
+            logger.warn(
+                `coupon_redeemed_past_max coupon=${coupon.code} uses=${coupon._count.redemptions} max=${coupon.maxRedemptions} org=${checkout.organizationId}`,
+            );
+        }
+    }
     return made.count > 0;
 }

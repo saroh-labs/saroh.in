@@ -148,6 +148,8 @@ export class BillingReconcileHandler {
                     providerPaymentId: true,
                     totalPaise: true,
                     providerAmountPaise: true,
+                    providerSubscriptionId: true,
+                    discountPaise: true,
                 },
             });
             if (invoice) {
