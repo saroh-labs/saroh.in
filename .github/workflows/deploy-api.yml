@@ -9,12 +9,13 @@ name: Build and deploy API
 # The rollout (backup, migrate, deploy, wait for readiness) lives on the host,
 # not in this public repo. CI's key is restricted to that one command, so the
 # only thing this workflow can do there is name the image tag to ship. Where the
-# host is, and its pinned host key, come from repository secrets.
+# host is, and its pinned host key, come from the GitHub environment's secrets.
 #
 # Which environment is decided here, and enforced there by which key is used:
-#   push to main         -> production   (VPS_SSH_KEY)
-#   push to development  -> development  (VPS_DEV_SSH_KEY, which cannot reach production)
-#   manual run           -> the `target` input, development unless you pick production
+#   push to main         -> production   (cloudflare-production's VPS_SSH_KEY)
+#   push to development  -> development  (cloudflare-development's VPS_SSH_KEY, which cannot reach production)
+#   manual run           -> the `target` input, development unless you pick production;
+#                           production only from main (the environment refuses other refs)
 
 on:
     push:
@@ -120,6 +121,12 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             contents: none
+        # The deploy key, host and pinned host key live only in these GitHub
+        # environments (never repo-wide): cloudflare-production opens only to
+        # main and cloudflare-development only to development, so no other
+        # branch, and no manual run from another branch, can reach a server
+        # key (security review 19 Nov 2026, T1).
+        environment: ${{ (github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development')) == 'production' && 'cloudflare-production' || 'cloudflare-development' }}
         env:
             TARGET: ${{ github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development') }}
         # One rollout per environment at a time, across every ref.
@@ -131,9 +138,10 @@ jobs:
             - name: Deploy
               env:
                   VPS_HOST: ${{ secrets.VPS_HOST }}
-                  # The key decides the environment on the host; the dev key is
-                  # forced to the development target and cannot deploy production.
-                  VPS_SSH_KEY: ${{ (github.event_name == 'workflow_dispatch' && inputs.target || (github.ref == 'refs/heads/main' && 'production' || 'development')) == 'production' && secrets.VPS_SSH_KEY || secrets.VPS_DEV_SSH_KEY }}
+                  # Each environment holds its own key; the host forces the
+                  # development key to the development target, so it cannot
+                  # deploy production.
+                  VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
                   VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
                   # Full 40 characters, matching `type=sha,format=long` above.
                   TAG: sha-${{ github.sha }}

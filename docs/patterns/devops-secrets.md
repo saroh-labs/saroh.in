@@ -65,3 +65,18 @@ values, read from `$SAROH_PRIVATE_TERMS` or
 `~/.config/saroh/private-terms.txt` (one Perl-style regex per line). That
 file lives only on the owner's machine, so the values it guards never reach
 the repo through the check itself. Without it the step says SKIP, never PASS.
+
+## Deploy keys live in GitHub environments, never repo-wide
+
+- Every secret a deploy uses (the server's SSH key, its host and pinned host
+  key, Cloudflare deploy tokens) is an **environment** secret:
+  `cloudflare-production` (opens only to `main`) or `cloudflare-development`
+  (opens only to `development`). A repo-wide secret can be read by a workflow
+  on any branch anyone can push, so it gives every pusher production
+  (security review 19 Nov 2026, T1).
+- Each environment holds its own `VPS_SSH_KEY`. The host restricts each key to
+  one command; the development key is forced to the development target.
+- A deploy job names its environment (`environment:`). Before a job switches
+  to environment secrets, set them in **both** environments first: an
+  environment without the secret falls back to a repo-wide one of the same
+  name.
