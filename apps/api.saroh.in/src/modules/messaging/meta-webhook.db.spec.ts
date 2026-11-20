@@ -283,7 +283,10 @@ describe("Meta delivery reports", () => {
             );
             expect(await inReplyWindow(numberHash(`+${from}`))).toBe(false);
         } finally {
-            env.META_WA_PHONE_NUMBER_ID = was;
+            // Under SKIP_ENV_VALIDATION (CI) `env` is process.env, where
+            // assigning undefined stores the string "undefined".
+            if (was === undefined) delete env.META_WA_PHONE_NUMBER_ID;
+            else env.META_WA_PHONE_NUMBER_ID = was;
         }
     });
 });

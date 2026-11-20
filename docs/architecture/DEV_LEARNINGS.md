@@ -36,6 +36,23 @@ on that doesn't depend on it.
 
 ---
 
+## Tests — restoring an unset `env` key in CI stored the string "undefined"
+
+**Symptom**: 20 Nov 2026, PR #1438: a new `meta-webhook.db.spec.ts` test
+passed locally and failed in both CI integration shards: Meta's `failed`
+status never reached the counter.
+**Cause**: CI sets `SKIP_ENV_VALIDATION`, so `env` is `process.env` itself.
+An earlier test restored `env.META_WA_PHONE_NUMBER_ID = was` with `was`
+undefined, and `process.env` stores that as the string `"undefined"`. Every
+later webhook in the file then read as "another number" and was dropped.
+**Fix**: restore with `delete` when the saved value was undefined.
+**Rule**: a spec that changes an `env` key puts it back with `delete` when
+it was unset. Reproduce a CI-only integration failure with
+`SKIP_ENV_VALIDATION=1`.
+**Where it lives**: `meta-webhook.db.spec.ts`.
+
+---
+
 ## Database — one business's burst of creates stalled the API for everyone
 
 **Symptom**: 20 Nov 2026, abuse test A-01: about 16 parallel `POST
