@@ -20,7 +20,7 @@ import { OrganizationLifecycleStatus } from "./organization-lifecycle.policy";
 
 type Tx = Pick<
     Prisma.TransactionClient,
-    "organization" | "user" | "$executeRaw"
+    "organization" | "user" | "$executeRaw" | "$queryRaw"
 >;
 
 export const FREE_BUSINESS_TAKEN_MESSAGE =
