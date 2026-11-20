@@ -43,8 +43,8 @@ export interface ModuleMapEntry {
     within?: LimitWithin;
 }
 
-/** What a per-item cap is counted inside. */
-export type LimitWithin = "product";
+/** What a per-item cap is counted inside: one product, or one person. */
+export type LimitWithin = "product" | "person";
 
 export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
     website: {
@@ -156,6 +156,18 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: "integrations",
         legacyEntitlementKey: null,
+    },
+    /**
+     * Google accounts one person may connect for Google Calendar (DEC-233):
+     * a cap on each person, never a count across the business. Under no
+     * registry module; Google Calendar itself rides `integrations`. A
+     * version without the row allows one, as before the row existed.
+     */
+    "google-accounts": {
+        registry: null,
+        limitKey: "googleAccountsPerPerson",
+        legacyEntitlementKey: null,
+        within: "person",
     },
     /**
      * A merchant's own trackers on their website (DEC-108): a switch, under

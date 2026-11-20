@@ -354,7 +354,7 @@ describe("Send message", () => {
                     kind: "connect",
                     title: "Connect your email to write from here.",
                     cta: "Connect email",
-                    href: "/settings/providers",
+                    href: "/settings/integrations",
                 },
                 WHATSAPP: { kind: "compose" },
             },
@@ -365,7 +365,7 @@ describe("Send message", () => {
             "Connect your email to write from here.",
         );
         expect(
-            dialog()?.querySelector('a[href="/settings/providers"]'),
+            dialog()?.querySelector('a[href="/settings/integrations"]'),
         ).not.toBe(null);
         expect(dialog()?.querySelector("textarea")).toBe(null);
         expect(button("Send message", dialog())).toBeUndefined();

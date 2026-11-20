@@ -368,7 +368,7 @@ describe("isSettingsScreen", () => {
     it("is each settings tab and what is under it", () => {
         expect(isSettingsScreen("/settings/organization")).toBe(true);
         expect(isSettingsScreen("/settings/people")).toBe(true);
-        expect(isSettingsScreen("/settings/providers/x")).toBe(true);
+        expect(isSettingsScreen("/settings/integrations/x")).toBe(true);
     });
 
     it("is nothing else", () => {

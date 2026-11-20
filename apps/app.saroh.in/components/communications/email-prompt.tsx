@@ -6,7 +6,7 @@ import type { EmailPrompt } from "@/lib/communications/email-setup";
 /**
  * The prompt to connect the business's own email (DEC-011, amended
  * 2026-10-07): what its customers miss without one, and Connect — or, on a
- * plan that can't connect one (DEC-091), See plans. Settings › Providers
+ * plan that can't connect one (DEC-091), See plans. Settings › Integrations
  * draws it above the list; Home says the same in Needs you. Shown only to
  * whoever can act (`emailPrompt`), and gone once a provider is connected.
  *

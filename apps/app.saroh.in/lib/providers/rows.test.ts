@@ -65,14 +65,14 @@ const HEALTH: ProviderHealth[] = [
         label: "Payments",
         status: "NOT_CONFIGURED",
         message: "Connect a payment provider to accept payments.",
-        actionHref: "/settings/providers",
+        actionHref: "/settings/integrations",
     },
     {
         key: "COMMUNICATIONS",
         label: "Communications",
         status: "NOT_CONFIGURED",
         message: "Connect a provider to send messages.",
-        actionHref: "/settings/providers",
+        actionHref: "/settings/integrations",
     },
     {
         key: "DOMAINS",
@@ -407,7 +407,10 @@ describe("provider rows", () => {
     it("says a SendGrid, SMTP or Twilio connection can't send, never Connected", () => {
         const view = buildProvidersView(
             input({
-                messaging: [comms("EMAIL", "SENDGRID"), comms("WHATSAPP", "TWILIO")],
+                messaging: [
+                    comms("EMAIL", "SENDGRID"),
+                    comms("WHATSAPP", "TWILIO"),
+                ],
             }),
         );
         const [sendgrid, twilio] = view.connected;

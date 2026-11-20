@@ -5,7 +5,7 @@ import { SEED_ENTRY_PLAN_ID, SEED_PLAN_ID, seedPlanId } from "./pricing";
 /**
  * Three of Asha's businesses with no email provider of their own, for
  * `email-setup-prompt.spec.ts` (#850): the prompt to connect one on Home
- * and Settings › Providers. Nothing else reads them.
+ * and Settings › Integrations. Nothing else reads them.
  *
  * - `desk` / `phone`: one per browser, since each connects an email and
  *   watches the prompt go. Plan limits aren't enforced for them, so the

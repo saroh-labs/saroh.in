@@ -512,7 +512,7 @@ describe("the readiness card", () => {
             t.indexOf("Take payments online"),
         );
         expect(html).toMatch(
-            /href="\/settings\/providers"[^>]*>Connect a provider/,
+            /href="\/settings\/integrations"[^>]*>Connect a provider/,
         );
         expect(html).toMatch(
             /href="\/sites\/site_1\/settings#sells-from"[^>]*>Turn on your shop/,
@@ -580,7 +580,7 @@ describe("Payments", () => {
     it("says Not connected and links to connect one", () => {
         const html = screen({}, "payments");
         expect(text(html)).toContain("Online payments Not connected");
-        expect(html).toMatch(/href="\/settings\/providers"/);
+        expect(html).toMatch(/href="\/settings\/integrations"/);
     });
 
     it("currency: no Editable pill; Locked only once it locks", () => {

@@ -898,7 +898,7 @@ export interface ProviderDisconnectedStateProps extends Omit<
     /** Whether the person reading may connect one. */
     canConnect?: boolean;
     /**
-     * Where it is connected. Settings › Providers unless one is closer, and
+     * Where it is connected. Settings › Integrations unless one is closer, and
      * `null` on the Providers screen itself, where the list below is the way.
      */
     href?: string | null;
@@ -909,7 +909,7 @@ export interface ProviderDisconnectedStateProps extends Omit<
  * NOT CONNECTED: payments or email has no provider, so the thing on this
  * screen can't happen yet. One wording and one action wherever it is met
  * (a page, a pay-way row, the composer, a share sheet): what is missing,
- * what that stops, and "Connect in Providers". Not a failure, and not off.
+ * what that stops, and "Connect in Integrations". Not a failure, and not off.
  */
 export function ProviderDisconnectedState({
     provider,

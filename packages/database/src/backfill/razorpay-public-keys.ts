@@ -6,7 +6,7 @@
  * optional "Public key" beside it that most merchants left empty; since D22
  * setup stores the key id as the connection's `publicKey`, and a Razorpay
  * connection without one takes no online payment and reads as needing
- * attention in Settings › Providers. This fills `publicKey` from the sealed
+ * attention in Settings › Integrations. This fills `publicKey` from the sealed
  * key id for every connection made before, so no business loses online pay.
  *
  * For each Razorpay connection, in any status: open the sealed blob, read

@@ -92,7 +92,7 @@ describe("an invoice's pay link and the provider rule (B11, D22)", () => {
         const refused = invoices.createPayLink(ctx, id);
         await expect(refused).rejects.toBeInstanceOf(ConflictException);
         await expect(refused).rejects.toThrow(
-            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Integrations.",
         );
         const stored = await prisma.invoice.findUniqueOrThrow({
             where: { id },

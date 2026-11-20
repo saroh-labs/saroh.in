@@ -70,7 +70,7 @@ const PILL: Record<ProviderRowState, { label: string; tone: StatusTone }> = {
 };
 
 /** The provider's first letter on a quiet tile — no third-party logos. */
-function Monogram({ name }: { name: string }) {
+export function Monogram({ name }: { name: string }) {
     return (
         <span
             aria-hidden

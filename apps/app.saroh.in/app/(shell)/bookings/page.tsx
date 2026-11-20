@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { PlanLimitNotice } from "@/components/billing/plan-limit-notice";
 import { BookingsViewSwitch } from "@/components/bookings/all-bookings/bookings-view-switch";
 import { CalendarScreen } from "@/components/bookings/calendar/calendar-screen";
+import { GoogleCalendarLine } from "@/components/bookings/calendar/google-calendar-line";
 import {
     NewBookingButton,
     NewBookingHost,
@@ -15,12 +16,17 @@ import {
 } from "@/components/bookings/new-booking/setup";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
-import { takesOnlinePayment } from "@/lib/billing/access";
+import { rowNotice, takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { arrivalContactId } from "@/lib/customers/prefill";
 import { readCustomerPick } from "@/lib/customers/prefill-read";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
+import {
+    googleMeetOffered,
+    readGoogleCalendar,
+} from "@/lib/google-calendar/service";
+import { bookingsCalendarLine } from "@/lib/google-calendar/words";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { readNoticeReach } from "@/lib/messages/notice-reach-read";
 import { modulesOrUnknown } from "@/lib/modules/guard";
@@ -165,7 +171,7 @@ export default async function BookingsPage({
     const monthLast = days.at(-1) ?? date;
     const first = weekFirst < monthFirst ? weekFirst : monthFirst;
     const last = weekLast > monthLast ? weekLast : monthLast;
-    const [calendar, serviceHours] = await Promise.all([
+    const [calendar, serviceHours, calendarRead, access] = await Promise.all([
         readBookingsCalendar(
             dayBounds(first, timezone).from.toISOString(),
             dayBounds(last, timezone).to.toISOString(),
@@ -174,6 +180,8 @@ export default async function BookingsPage({
         // hours: the calendar draws them, as the booking page offers them
         // (UX-023).
         readServiceHours(services, staffList),
+        readGoogleCalendar(),
+        billingAccessOrNull(),
     ]);
 
     if (!calendar) {
@@ -215,6 +223,11 @@ export default async function BookingsPage({
         canReadPacks(organization) &&
         canUsePacksOnBookings(organization) &&
         packsOn(await modulesOrUnknown());
+    // The person's own Google Calendar: Connect, or a lapsed account,
+    // held back while the plan's bookings notice is up (one at a time).
+    const gcLine = rowNotice(access, "bookings").on
+        ? null
+        : bookingsCalendarLine(calendarRead);
     const screen = (
         <CalendarScreen
             layout={layout}
@@ -228,6 +241,14 @@ export default async function BookingsPage({
             rules={rules}
             notices={notices}
             limitNotice={<PlanLimitNotice moduleId="bookings" />}
+            calendarLine={
+                gcLine ? (
+                    <GoogleCalendarLine
+                        line={gcLine}
+                        userId={session.user.id}
+                    />
+                ) : null
+            }
             serviceHours={serviceHours}
             // Cancelled bookings stay off the diary unless the address
             // asks for them, so a reload keeps the choice.
@@ -258,7 +279,7 @@ export default async function BookingsPage({
                 desk: {
                     canTake: canTakeDeskPayments(organization),
                     canLink: people.payLink,
-                    online: takesOnlinePayment(await billingAccessOrNull()),
+                    online: takesOnlinePayment(access),
                 },
             }}
             newBooking={
@@ -289,6 +310,7 @@ export default async function BookingsPage({
                         timezone: calendar.timezone || timezone,
                         showMoney: calendar.money,
                         business: organization?.name ?? null,
+                        meet: await googleMeetOffered(),
                         now,
                     }}
                     arrival={

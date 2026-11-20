@@ -147,11 +147,11 @@ const SETUP_ACTION: Record<string, string> = {
     CLASS_PACKS_NONE_ON_SALE: "Go to Class packs",
     COMMERCE_NO_CATALOG: "Add a product",
     PAYMENTS_NO_PROVIDER: "Connect a provider",
-    PAYMENTS_PROVIDER_DISABLED: "Go to Providers",
+    PAYMENTS_PROVIDER_DISABLED: "Go to Integrations",
     PAYMENTS_WEBHOOK_SECRET_MISSING: "Add webhook secret",
     PAYMENTS_KEYS_REFUSED: "Enter keys again",
     COMMUNICATIONS_NO_PROVIDER: "Connect a provider",
-    COMMUNICATIONS_PROVIDER_DISABLED: "Go to Providers",
+    COMMUNICATIONS_PROVIDER_DISABLED: "Go to Integrations",
     COMMUNICATIONS_KEYS_REFUSED: "Enter keys again",
 };
 

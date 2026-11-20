@@ -1,4 +1,4 @@
-// @covers accounts:/login app:/ app:/open app:/billing/invoices app:/billing/invoices/new app:/billing/invoices/[invoiceId] app:/customers app:/bookings app:/commerce/products app:/settings/organization app:/settings/providers app:/settings/billing app:/settings/billing/plans site:/pay/[token] site:/shop site:/shop/[productSlug] api:organizations api:invoices api:payments api:waitlist api:contacts api:bookings api:products api:stores api:sites api:capabilities api:feature-flags api:admin pkg:edition pkg:ui pkg:site-blocks
+// @covers accounts:/login app:/ app:/open app:/billing/invoices app:/billing/invoices/new app:/billing/invoices/[invoiceId] app:/customers app:/bookings app:/commerce/products app:/settings/organization app:/settings/integrations app:/settings/billing app:/settings/billing/plans site:/pay/[token] site:/shop site:/shop/[productSlug] api:organizations api:invoices api:payments api:waitlist api:contacts api:bookings api:products api:stores api:sites api:capabilities api:feature-flags api:admin pkg:edition pkg:ui pkg:site-blocks
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -174,9 +174,9 @@ test.describe("the Global app (DEC-204)", () => {
             "STRIPE_PAYMENTS",
         ]);
         await openGlobal(page, b);
-        await page.goto(app("/settings/providers"));
+        await page.goto(app("/settings/integrations"));
         await expect(
-            page.getByRole("heading", { name: "Providers", level: 1 }),
+            page.getByRole("heading", { name: "Integrations", level: 1 }),
         ).toBeVisible();
         const available = page.getByRole("region", { name: "Available" });
         await expect(

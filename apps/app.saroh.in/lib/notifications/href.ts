@@ -74,7 +74,7 @@ const HREF: Record<NoticeKind, (id: string | null, type: string) => string> = {
     // Your own domain is in the site's settings.
     domain: (id) =>
         id ? `/sites/${encodeURIComponent(id)}/settings` : "/sites",
-    providers: () => "/settings/providers",
+    providers: () => "/settings/integrations",
     team: () => "/settings/people",
     // A booking rules request, or its answer (#1038): Hours and time off,
     // on the person it is about when the row names them.

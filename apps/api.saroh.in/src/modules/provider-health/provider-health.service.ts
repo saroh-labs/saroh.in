@@ -34,7 +34,7 @@ export interface ProviderHealth {
  * provider" call to action 404'd. `scripts/check-app-routes.mjs` now fails the
  * build if a destination we emit has no page behind it.
  */
-const PROVIDERS_HREF = "/settings/providers";
+const PROVIDERS_HREF = "/settings/integrations";
 const SITES_HREF = "/sites";
 
 @Injectable()

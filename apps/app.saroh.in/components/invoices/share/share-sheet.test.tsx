@@ -415,7 +415,7 @@ describe("Email", () => {
         expect(note?.textContent).toContain(EMAIL_OWN_PROVIDER);
         const connect = note?.querySelector("a");
         expect(connect?.textContent).toBe("Connect email");
-        expect(connect?.getAttribute("href")).toBe("/settings/providers");
+        expect(connect?.getAttribute("href")).toBe("/settings/integrations");
         expect(button("Email it").disabled).toBe(true);
     });
 

@@ -107,13 +107,13 @@ const WRITTEN: {
         type: "provider.attention",
         kind: "providers",
         id: null,
-        href: "/settings/providers",
+        href: "/settings/integrations",
     },
     {
         type: "provider.back",
         kind: "providers",
         id: null,
-        href: "/settings/providers",
+        href: "/settings/integrations",
     },
     { type: "team.joined", kind: "team", id: null, href: "/settings/people" },
     // A booking rules request and its answer open Hours and time off on

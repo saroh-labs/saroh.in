@@ -75,7 +75,7 @@ describe("who may open Plan and billing, and who may change the plan", () => {
     it("knows a link to the plans from any other", () => {
         expect(isPlanHref(HREF)).toBe(true);
         expect(isPlanHref("/settings/billing/plans")).toBe(true);
-        expect(isPlanHref("/settings/providers")).toBe(false);
+        expect(isPlanHref("/settings/integrations")).toBe(false);
         expect(isPlanHref(null)).toBe(false);
     });
 });
@@ -112,7 +112,7 @@ describe("PlanWay", () => {
     it("leaves a link that isn't to the plans alone", () => {
         const html = as(
             false,
-            <PlanWay when={isPlanHref("/settings/providers")}>
+            <PlanWay when={isPlanHref("/settings/integrations")}>
                 <a href="#providers">Connect one</a>
             </PlanWay>,
         );

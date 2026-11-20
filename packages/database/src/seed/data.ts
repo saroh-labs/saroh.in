@@ -765,7 +765,7 @@ export const POSTS: readonly {
  * A second payment provider, the one Northwind takes money through.
  *
  * The RAZORPAY row the seed already writes is DISABLED, which on its own makes
- * `/settings/providers` report Payments as "Not working" — a true reading of a
+ * `/settings/integrations` report Payments as "Not working" — a true reading of a
  * merchant who has connected nothing that works. CASHFREE is a stand-in
  * connection (`stand-in-providers.ts`): CONNECTED on a throwaway database,
  * where the browser specs need Pay now, pay links and Send to work, and not

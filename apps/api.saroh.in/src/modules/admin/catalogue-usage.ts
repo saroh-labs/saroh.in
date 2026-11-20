@@ -9,6 +9,8 @@ export type UsageNote =
     | "online-only"
     /** A cap inside each product (variants, DEC-158): there is no total. */
     | "per-product"
+    /** A cap on each person (Google accounts, DEC-233): there is no total. */
+    | "per-person"
     /**
      * Team members are seats (DEC-155): people, invitations still open and
      * bookable staff with no sign-in, so it can be more than its people.
@@ -58,6 +60,7 @@ export function usageNote(
     storefronts: number,
 ): UsageNote | null {
     if (limitWithin(moduleId) === "product") return "per-product";
+    if (limitWithin(moduleId) === "person") return "per-person";
     if (meteredKeyOf(moduleId) === "teamMembers") return "seats";
     return meteredKeyOf(moduleId) === "shopLocations" &&
         usage === 0 &&

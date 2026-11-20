@@ -47,6 +47,7 @@ import { HoursField } from "./hours-field";
 import { LengthField } from "./length-field";
 import { NameQuestion, WhoComesQuestion, WhoDoesItQuestion } from "./questions";
 import { VisitsField, VisitsStorefrontNote } from "./visits-field";
+import type { MeetSetup } from "./where-field";
 import { WhereField } from "./where-field";
 
 /** What every panel's fields may need beside the draft. */
@@ -78,6 +79,8 @@ export interface PanelSetup {
     selfId: string | null;
     /** Row problems in its own hours, once they should be said. */
     hoursProblem: (index: number) => string | null;
+    /** Google Meet, when Google Calendar is on here (DEC-233). */
+    meet?: MeetSetup | null;
 }
 
 function Describe({ draft, set }: Pick<Edit, "draft" | "set">) {
@@ -320,6 +323,9 @@ export function PanelFields({
                 <WhereField
                     where={draft.where}
                     meetingUrl={draft.meetingUrl}
+                    meetingLink={draft.meetingLink}
+                    meetAccess={draft.meetAccess}
+                    meet={setup.meet ?? null}
                     onChange={set}
                     error={problem("meetingUrl")}
                     onLeave={() => leave("meetingUrl")}
@@ -378,6 +384,9 @@ export function PanelFields({
                         <WhereField
                             where={draft.where}
                             meetingUrl={draft.meetingUrl}
+                            meetingLink={draft.meetingLink}
+                            meetAccess={draft.meetAccess}
+                            meet={setup.meet ?? null}
                             onChange={set}
                             error={problem("meetingUrl")}
                             onLeave={() => leave("meetingUrl")}

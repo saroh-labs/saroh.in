@@ -41,7 +41,7 @@ export const LOCATION_TABS: readonly LocationTab[] = Object.values(
 export const LOCATION_TAB_PARAM = "section";
 
 /** Where "Connect a provider" goes, as it did from the old Checkout card. */
-export const PROVIDERS_HREF = "/settings/providers";
+export const PROVIDERS_HREF = "/settings/integrations";
 
 /**
  * The fields a readiness action can jump to and focus. Each is in its

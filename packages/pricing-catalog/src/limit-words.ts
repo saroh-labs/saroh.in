@@ -73,6 +73,13 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
         paused: "No more can be added to this one.",
         monthly: false,
     },
+    // Counted for each person, never across the business (DEC-233).
+    googleAccountsPerPerson: {
+        what: "Google accounts a person",
+        one: "Google account a person",
+        paused: "Disconnect one of yours before connecting another.",
+        monthly: false,
+    },
     ordersPerMonth: {
         what: "orders a month",
         one: "order a month",

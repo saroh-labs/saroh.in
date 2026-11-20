@@ -114,6 +114,7 @@ export class CalendarBusyHandler {
                 organizationId,
                 connection.membershipId,
                 this.flags,
+                connectionId,
             )
         ) {
             // Paused: its busy times stop blocking now, not in two hours.
@@ -135,17 +136,27 @@ export class CalendarBusyHandler {
                 );
                 const to = new Date(now.getTime() + BUSY_AHEAD_MS);
                 for (const calendarId of ids) {
-                    busy.push(
-                        ...(await this.busyOn(
-                            google,
-                            access,
-                            parts,
-                            connectionId,
-                            calendarId,
-                            now,
-                            to,
-                        )),
-                    );
+                    try {
+                        busy.push(
+                            ...(await this.busyOn(
+                                google,
+                                access,
+                                parts,
+                                connectionId,
+                                calendarId,
+                                now,
+                                to,
+                            )),
+                        );
+                    } catch (error) {
+                        // One calendar Google won't give free/busy for (a
+                        // holidays or other public calendar, or one unshared
+                        // since) must not stop the person's other calendars.
+                        if (!isGoogleError(error, "gone")) throw error;
+                        this.logger.warn(
+                            `google_calendar_busy_calendar_skipped connection=${connectionId} reason=${error.detail}`,
+                        );
+                    }
                 }
             } catch (error) {
                 if (isGoogleError(error, "lapsed")) return false;

@@ -690,7 +690,7 @@ export const CAPTURED: Record<
     },
     "help-connect-razorpay-1": {
         src: "/shots/help/help-connect-razorpay-1.webp",
-        alt: "Settings, Providers at Northwind Supply (demo shop): Razorpay disconnected, with its Connect button",
+        alt: "Settings, Integrations at Northwind Supply (demo shop): Razorpay disconnected, with its Connect button",
         width: 2048,
         height: 1120,
         mark: { x: 0.8735, y: 0.5806, w: 0.0884, h: 0.0786 },
@@ -718,7 +718,7 @@ export const CAPTURED: Record<
     },
     "help-connect-cashfree-1": {
         src: "/shots/help/help-connect-cashfree-1.webp",
-        alt: "Settings, Providers at Rye & Co. (demo bakery): Cashfree under Available, with its Connect button",
+        alt: "Settings, Integrations at Rye & Co. (demo bakery): Cashfree under Available, with its Connect button",
         width: 2048,
         height: 1120,
         mark: { x: 0.8735, y: 0.7467, w: 0.0884, h: 0.0786 },
@@ -746,7 +746,7 @@ export const CAPTURED: Record<
     },
     "help-connect-cashfree-5": {
         src: "/shots/help/help-connect-cashfree-5.webp",
-        alt: "Settings, Providers at Northwind Supply (demo shop): Cashfree connected, with no payment updates received yet",
+        alt: "Settings, Integrations at Northwind Supply (demo shop): Cashfree connected, with no payment updates received yet",
         width: 2048,
         height: 1120,
         mark: { x: 0.3818, y: 0.4392, w: 0.2206, h: 0.0835 },

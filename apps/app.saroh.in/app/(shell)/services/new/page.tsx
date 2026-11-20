@@ -1,6 +1,7 @@
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { ServiceEditor } from "@/components/services/service-editor/service-editor";
 import { rowLock } from "@/lib/billing/access";
+import { readMeetSetup } from "@/lib/google-calendar/meet-setup";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { loadEditorContext } from "@/lib/services/editor-data";
 import { requireSession } from "@/lib/session";
@@ -48,6 +49,7 @@ export default async function NewServicePage() {
     }
     return (
         <ServiceEditor
+            meet={await readMeetSetup()}
             service={null}
             rules={[]}
             staff={staff?.staff ?? null}

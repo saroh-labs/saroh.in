@@ -537,4 +537,265 @@ describe("calendar.sync", () => {
         expect(event.input.guest).toBeUndefined();
         expect(event.input.title).not.toContain("Asha");
     });
+
+    it("hands over quietly: no cancellation, the new calendar's event invites (DEC-233)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true, cal: "cal-a" });
+        const bPerson = await staff(org, { connected: true, cal: "cal-b" });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, b.id));
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: { staffId: bPerson.staffId },
+        });
+        await handler.handle(job(org, b.id));
+        const all = [...google.events.values()].flatMap((m) => [...m.values()]);
+        expect(all.find((e) => e.calendarId === "cal-a")).toMatchObject({
+            status: "cancelled",
+            quiet: true,
+        });
+        expect(all.find((e) => e.calendarId === "cal-b")).toMatchObject({
+            status: "confirmed",
+            quiet: false,
+        });
+        // A booking that is cancelled still tells the customer.
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: { status: "CANCELLED", cancelledAt: new Date() },
+        });
+        await handler.handle(job(org, b.id));
+        expect(
+            google.events
+                .get("cal-b")
+                ?.get(eventIdFor(b.id, bPerson.connectionId ?? "")),
+        ).toMatchObject({ status: "cancelled", quiet: false });
+    });
+
+    it("leaves an event on a disconnected account as it is, until someone else takes it (DEC-233)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true, cal: "cal-a" });
+        const bPerson = await staff(org, { connected: true, cal: "cal-b" });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, b.id));
+        await prisma.googleCalendarConnection.update({
+            where: { id: a.connectionId ?? "" },
+            data: {
+                status: "DISCONNECTED",
+                tokenCiphertext: null,
+                tokenIv: null,
+                tokenAuthTag: null,
+            },
+        });
+        const later = new Date(b.startAt.getTime() + 3_600_000);
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: {
+                startAt: later,
+                endAt: new Date(later.getTime() + 1_800_000),
+            },
+        });
+        google.calls.length = 0;
+        await handler.handle(job(org, b.id));
+        expect(google.calls).toHaveLength(0);
+        expect(
+            await prisma.googleCalendarEvent.findUniqueOrThrow({
+                where: { bookingId: b.id },
+            }),
+        ).toMatchObject({ connectionId: a.connectionId });
+
+        await prisma.booking.update({
+            where: { id: b.id },
+            data: { staffId: bPerson.staffId },
+        });
+        await handler.handle(job(org, b.id));
+        expect(
+            google
+                .liveEvents()
+                .map((e) => e.calendarId)
+                .sort(),
+        ).toEqual(["cal-a", "cal-b"]);
+        expect(
+            await prisma.googleCalendarEvent.findUniqueOrThrow({
+                where: { bookingId: b.id },
+            }),
+        ).toMatchObject({
+            connectionId: bPerson.connectionId,
+            calendarId: "cal-b",
+        });
+    });
+
+    it("moves a frozen booking to the new account, finding its event there first (DEC-233)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true, cal: "cal-old" });
+        const b = await booking(org, (await service(org)).id, a.staffId);
+        await handler.handle(job(org, b.id));
+        await prisma.googleCalendarConnection.update({
+            where: { id: a.connectionId ?? "" },
+            data: { status: "DISCONNECTED", tokenCiphertext: null },
+        });
+        await prisma.googleCalendarLink.updateMany({
+            where: { connectionId: a.connectionId ?? "" },
+            data: { writeTo: false },
+        });
+        // The same person's other Google account, where bookings go now.
+        const work = await prisma.googleCalendarConnection.create({
+            data: {
+                organizationId: org,
+                membershipId: a.membershipId ?? "",
+                googleEmail: "meera-work@example.com",
+                scopes: Object.values(SCOPES),
+            },
+        });
+        await prisma.googleCalendarConnection.update({
+            where: { id: work.id },
+            data: tokenColumns(
+                sealToken("refresh-work", {
+                    organizationId: org,
+                    connectionId: work.id,
+                }),
+            ),
+        });
+        await prisma.googleCalendarLink.create({
+            data: {
+                organizationId: org,
+                connectionId: work.id,
+                calendarId: "cal-new",
+                name: "Work",
+                writeTo: true,
+            },
+        });
+        // Something put it there already, under an id of its own.
+        await google.putEvent("at", "cal-new", {
+            eventId: "made-elsewhere",
+            title: "Consultation",
+            description: "",
+            startAt: b.startAt,
+            endAt: b.endAt,
+            timeZone: "Asia/Kolkata",
+            bookingId: b.id,
+        });
+
+        // Not asked to move: it stays where it is.
+        await handler.handle(job(org, b.id));
+        expect(google.liveEvents()).toHaveLength(2);
+
+        await handler.handle({
+            ...job(org, b.id),
+            payload: { bookingId: b.id, move: true },
+        } as Job);
+        expect(google.liveEvents()).toHaveLength(2);
+        expect(
+            await prisma.googleCalendarEvent.findUniqueOrThrow({
+                where: { bookingId: b.id },
+            }),
+        ).toMatchObject({
+            connectionId: work.id,
+            calendarId: "cal-new",
+            eventId: "made-elsewhere",
+        });
+    });
+
+    it("sets who may join: the booking's, the service's, else the business's (DEC-233)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        await prisma.businessProfile.create({
+            data: { organizationId: org, meetAccess: "TRUSTED" },
+        });
+        const s = await service(org, { online: true, meet: true });
+        const byBusiness = await booking(org, s.id, a.staffId);
+        await handler.handle(job(org, byBusiness.id));
+        const space = (bookingId: string) =>
+            google.spaces.get(
+                google.liveEvents().find((e) => e.input.bookingId === bookingId)
+                    ?.meetCode ?? "",
+            );
+        expect(space(byBusiness.id)).toBe("TRUSTED");
+
+        await prisma.service.update({
+            where: { id: s.id },
+            data: { meetAccess: "OPEN" },
+        });
+        const byService = await booking(org, s.id, a.staffId);
+        await handler.handle(job(org, byService.id));
+        expect(space(byService.id)).toBe("OPEN");
+
+        // The booking's own choice, applied to the Meet it has, quietly.
+        await prisma.booking.update({
+            where: { id: byService.id },
+            data: { meetAccess: "RESTRICTED" },
+        });
+        await handler.handle({
+            ...job(org, byService.id),
+            payload: { bookingId: byService.id, quietUpdate: true },
+        } as Job);
+        expect(space(byService.id)).toBe("RESTRICTED");
+        expect(
+            google.liveEvents().find((e) => e.input.bookingId === byService.id),
+        ).toMatchObject({ quiet: true });
+        expect(
+            await prisma.googleCalendarEvent.findUniqueOrThrow({
+                where: { bookingId: byService.id },
+            }),
+        ).toMatchObject({
+            meetAccessAsked: "RESTRICTED",
+            meetAccess: "RESTRICTED",
+        });
+    });
+
+    it("keeps what a personal account applied when it refuses (DEC-233)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const b = await booking(
+            org,
+            (await service(org, { online: true, meet: true })).id,
+            a.staffId,
+        );
+        google.personalAccount = true;
+        await handler.handle(job(org, b.id));
+        expect(
+            await prisma.googleCalendarEvent.findUniqueOrThrow({
+                where: { bookingId: b.id },
+            }),
+        ).toMatchObject({
+            meetAccessAsked: "RESTRICTED",
+            meetAccess: "TRUSTED",
+        });
+        // Asked once: the next pass doesn't ask Google again.
+        google.calls.length = 0;
+        await handler.handle(job(org, b.id));
+        expect(google.calls).not.toContain("setMeetAccess");
+    });
+
+    it("makes a Meet for a booking that chose one, and keeps a pasted link (DEC-233)", async () => {
+        const org = await business();
+        const a = await staff(org, { connected: true });
+        const s = await service(org);
+        const meet = await booking(org, s.id, a.staffId);
+        await prisma.booking.update({
+            where: { id: meet.id },
+            data: { meetingLink: "GOOGLE_MEET" },
+        });
+        await handler.handle(job(org, meet.id));
+        expect(
+            (await prisma.booking.findUniqueOrThrow({ where: { id: meet.id } }))
+                .meetingUrl,
+        ).toMatch(/^https:\/\/meet\./);
+
+        const pasted = await booking(org, s.id, a.staffId);
+        await prisma.booking.update({
+            where: { id: pasted.id },
+            data: {
+                meetingLink: "MANUAL",
+                meetingUrl: "https://zoom.example.com/j/1",
+            },
+        });
+        await handler.handle(job(org, pasted.id));
+        expect(
+            (
+                await prisma.booking.findUniqueOrThrow({
+                    where: { id: pasted.id },
+                })
+            ).meetingUrl,
+        ).toBe("https://zoom.example.com/j/1");
+    });
 });

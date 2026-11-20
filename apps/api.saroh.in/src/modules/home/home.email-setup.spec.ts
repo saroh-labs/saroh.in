@@ -48,7 +48,7 @@ describe("no email provider on Home", () => {
         expect(action).toMatchObject({
             code: NO_EMAIL_CODE,
             title: "Your customers get no emails from you",
-            href: "/settings/providers",
+            href: "/settings/integrations",
             tag: "To connect",
         });
         const { needs } = flattenNeeds([action as HomeAction], "Asia/Kolkata");
@@ -59,7 +59,7 @@ describe("no email provider on Home", () => {
                 sub: MISSED,
                 tag: "To connect",
                 tone: "due",
-                href: "/settings/providers",
+                href: "/settings/integrations",
             }),
         ]);
     });

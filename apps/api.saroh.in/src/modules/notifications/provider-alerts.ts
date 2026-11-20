@@ -18,7 +18,7 @@ import { enqueueTeamAlert } from "./team-alerts";
  * themselves being refused stops payments or emails until someone acts.
  *
  * **Back.** The connection works again when someone enters keys that pass
- * the provider's check (Settings › Providers), or when a live call on the
+ * the provider's check (Settings › Integrations), or when a live call on the
  * flagged connection is accepted after all (the provider let the key or the
  * sending domain back in). Either clears the flag and queues
  * `{ change: "back" }` on the same transaction.
@@ -160,14 +160,14 @@ export async function wordProvider(
         event: "failed" as const,
         eventKey: `${keyPrefix(p.providerId)}${change}:${p.since}`,
         notificationId: null,
-        path: "/settings/providers",
-        cta: "Open Providers",
+        path: "/settings/integrations",
+        cta: "Open Integrations",
         skipUserId: p.actorUserId ?? null,
     };
     const words = WORDS[p.channel][change](name);
     return {
         ...base,
-        // A page, not a record: Settings › Providers.
+        // A page, not a record: Settings › Integrations.
         ...noticeOf(
             change === "down"
                 ? PROVIDER_ATTENTION_NOTIFICATION_TYPE
@@ -194,7 +194,7 @@ const WORDS: Record<
     PAYMENTS: {
         down: (name) => ({
             heading: `${name} refused your keys`,
-            body: `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Providers. We'll tell you when it works again.`,
+            body: `Customers can't pay online until you connect ${name} again with keys that work, in Settings › Integrations. We'll tell you when it works again.`,
         }),
         back: (name) => ({
             heading: `${name} is working again`,
@@ -204,7 +204,7 @@ const WORDS: Record<
     EMAIL: {
         down: (name) => ({
             heading: `${name} refused your email keys`,
-            body: `Emails to your customers, like booking confirmations and invoices, aren't going out. Connect ${name} again with a key that works, and check your sending domain is still verified there, in Settings › Providers. We'll tell you when it works again.`,
+            body: `Emails to your customers, like booking confirmations and invoices, aren't going out. Connect ${name} again with a key that works, and check your sending domain is still verified there, in Settings › Integrations. We'll tell you when it works again.`,
         }),
         back: (name) => ({
             heading: `${name} is working again`,

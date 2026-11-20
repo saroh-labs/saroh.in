@@ -1,4 +1,4 @@
-// @covers app:/open app:/ app:/settings/providers api:communications api:home api:organizations api:capabilities api:billing
+// @covers app:/open app:/ app:/settings/integrations api:communications api:home api:organizations api:capabilities api:billing
 import type { Locator, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -15,7 +15,7 @@ import { urls } from "../playwright.config";
  * The prompt to connect the business's own email (#850, DEC-011 amended
  * 2026-10-07): with none, its customers get no emails, and see their
  * updates in their account only where Saroh posts there (U5). Its owner sees that on Home's Needs you
- * and on Settings › Providers, with Connect — or, on a plan that can't
+ * and on Settings › Integrations, with Connect — or, on a plan that can't
  * connect one (DEC-091), See plans — and it goes once a provider is
  * connected.
  *
@@ -127,9 +127,9 @@ const promptRow = (needs: Locator) =>
         .getByRole("link", { name: new RegExp(TITLE) });
 
 async function openProviders(page: Page) {
-    await page.goto("/settings/providers");
+    await page.goto("/settings/integrations");
     await expect(
-        page.getByRole("heading", { name: "Providers", level: 1 }),
+        page.getByRole("heading", { name: "Integrations", level: 1 }),
     ).toBeVisible();
 }
 
@@ -153,11 +153,11 @@ test("with no email provider, the owner is asked to connect one on Home and Prov
         const row = promptRow(needs);
         await expect(row).toBeVisible();
         await expect(row).toContainText(MISSED);
-        await expect(row).toHaveAttribute("href", "/settings/providers");
+        await expect(row).toHaveAttribute("href", "/settings/integrations");
         await expect(needs).toContainText("To connect");
         await noSideways(page);
 
-        // Settings › Providers: the same words, and Connect.
+        // Settings › Integrations: the same words, and Connect.
         await openProviders(page);
         const prompt = page.getByRole("region", { name: TITLE });
         await expect(prompt).toContainText(MISSED);

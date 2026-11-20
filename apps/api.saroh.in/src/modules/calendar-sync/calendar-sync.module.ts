@@ -2,6 +2,7 @@ import type { OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { Module } from "@nestjs/common";
 
 import { env } from "../../env";
+import { AuditModule } from "../audit/audit.module";
 import { setGoogleBusyGate } from "../bookings/google-busy-gate";
 import { FeatureFlagModule } from "../feature-flags/feature-flags.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
@@ -9,6 +10,7 @@ import { JobsModule } from "../jobs/jobs.module";
 import { setMemberLeavingHook } from "../organizations/member-leaving";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
 import { googleBusyAllowed } from "./calendar-allowed";
+import { CalendarBookingsService } from "./calendar-bookings.service";
 import {
     CALENDAR_BUSY_TYPE,
     CalendarBusyHandler,
@@ -34,11 +36,17 @@ import { googleCalendarProvider } from "./google/google-calendar.provider";
  * module: a booking write queues `calendar.sync` on its own transaction.
  */
 @Module({
-    imports: [OrganizationContextModule, FeatureFlagModule, JobsModule],
+    imports: [
+        OrganizationContextModule,
+        FeatureFlagModule,
+        JobsModule,
+        AuditModule,
+    ],
     controllers: [CalendarConnectController, CalendarCallbackController],
     providers: [
         googleCalendarProvider,
         CalendarConnectService,
+        CalendarBookingsService,
         CalendarLapseService,
         CalendarSyncHandler,
         CalendarBusyHandler,
@@ -61,9 +69,9 @@ export class CalendarSyncModule implements OnModuleInit, OnModuleDestroy {
         // Slot reads count a person's Google busy times only while allowed.
         setGoogleBusyGate(googleBusyAllowed);
         // Someone leaving the team lets go of their calendar (GC-09).
-        setMemberLeavingHook((organizationId, membershipId) =>
-            this.releases.releaseMember(organizationId, membershipId),
-        );
+        setMemberLeavingHook(async (organizationId, membershipId) => {
+            await this.releases.releaseMember(organizationId, membershipId);
+        });
         // A booking's event in Google, made, moved or deleted (U5).
         this.registry.register(CALENDAR_SYNC_TYPE, this.sync.handle);
         // A person's busy times read from Google, every 10 minutes (U6).

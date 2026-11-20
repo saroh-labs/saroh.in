@@ -140,7 +140,7 @@ a note saying so.
   queues the team's "working again" alert on the same transaction, told
   only when the stop was (#555, `notifications/provider-alerts.ts`: once
   per incident, bell and Saroh's email on the Payment failed row, fixed
-  words, Settings › Providers). Only these two live calls flag today: a
+  words, Settings › Integrations). Only these two live calls flag today: a
   checkout's provider order and an email's send. A refund, a mandate call
   or a payment look-up that gets a 401 flags nothing yet. A provider order that fails at checkout is a deliberate
   503 in the customer's words (`provider-keys-refused` or
@@ -800,12 +800,31 @@ What the review (GC-01 to GC-18) settled:
   connected connection reaches the same Google address, in any business,
   and nobody signs in with Google as that person or that address;
   otherwise only Saroh's stored token goes.
-- **Letting go clears what's to come, quietly** (GC-09). Disconnect,
-  another Google account, and leaving the team delete the upcoming events
-  Saroh made, with `sendUpdates=none` (the bookings still stand); past
-  events stay. A deleted customer's cancelled bookings and a privacy
-  removal queue a quiet `calendar.sync`; a booking that has ended is never
+- **Letting go keeps what's in Google** (DEC-233, replacing GC-09's
+  quiet delete). Disconnect and leaving the team revoke (at the last use)
+  and drop the token, and keep the row as DISCONNECTED with its event
+  records; upcoming events stay in Google, no longer updated. `calendar.sync`
+  leaves an event on an account it can't reach alone (frozen) unless the
+  booking went to someone else or the person asked to move it
+  (`move`, which first looks for it on the new calendar by
+  `sarohBookingId`). The same account connected again is the same row, so
+  the same event ids: a `quietUpdate` sync picks each back up, Meet and
+  all, with no email.
+- **One account a row, one "bookings go to"** (DEC-233). A person may have
+  as many Google accounts as the catalogue's `googleAccountsPerPerson`
+  (`google-accounts` row; none: one). Bookings go to one `writeTo`
+  calendar across all their accounts (`calendar-target.ts`); busy times
+  come from every `checkBusy` one.
+- **Google emails the customer only for what changed for them** (DEC-233).
+  A booking that still stands leaves a calendar with `sendUpdates=none`
+  and its new event invites; only a cancelled or lapsed booking's delete
+  sends Google's cancellation. A privacy removal or a deleted customer
+  queues a fully quiet `calendar.sync`; a booking that has ended is never
   deleted with an email, and never added somewhere new.
+- **Who may join a Meet**: the booking's, else the service's, else the
+  business's (`meet-access.ts`, DEC-233), set when the link is made and
+  whenever that choice changes; what Google applied is kept on the event
+  row (a personal Gmail host can't have RESTRICTED).
 - **Sign-in stays apart** (GC-08, GC-17, `packages/auth/src/server.ts`):
   Google sign-in sends `includeGrantedScopes: false`, OAuth tokens are
   stored encrypted (`encryptOAuthTokens`; rows from before read as they

@@ -52,3 +52,47 @@ export async function queueCalendarSyncInTx(
         select: { id: true },
     });
 }
+
+/**
+ * Queue `calendar.sync` for several bookings at once, outside a booking's
+ * own write (DEC-233): picking events back up after a reconnect
+ * (`quietUpdate`, no email), moving them to a new "bookings go to"
+ * calendar (`move`), or a Meet's access changed (`quietUpdate`). Answers
+ * how many bookings are on their way, queued now or already waiting.
+ */
+export async function queueCalendarSyncs(
+    db: Pick<Prisma.TransactionClient, "job">,
+    organizationId: string,
+    bookingIds: readonly string[],
+    flags: { quietUpdate?: true; move?: true } = {},
+): Promise<number> {
+    if (bookingIds.length === 0) return 0;
+    // One already waiting (not yet claimed) with the same ask does it: a
+    // repeated click doesn't pile jobs on the shared lane (M2).
+    const waiting = await db.job.findMany({
+        where: {
+            organizationId,
+            type: CALENDAR_SYNC_TYPE,
+            status: "PENDING",
+            OR: bookingIds.map((bookingId) => ({
+                payload: { equals: { bookingId, ...flags } },
+            })),
+        },
+        select: { payload: true },
+    });
+    const queued = new Set(
+        waiting.map((j) => (j.payload as { bookingId?: string }).bookingId),
+    );
+    const fresh = bookingIds.filter((id) => !queued.has(id));
+    if (fresh.length > 0) {
+        await db.job.createMany({
+            data: fresh.map((bookingId) => ({
+                organizationId,
+                type: CALENDAR_SYNC_TYPE,
+                payload: { bookingId, ...flags },
+                maxAttempts: CALENDAR_SYNC_ATTEMPTS,
+            })),
+        });
+    }
+    return bookingIds.length;
+}

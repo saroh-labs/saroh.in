@@ -829,14 +829,14 @@ describe("Website", () => {
 });
 
 describe("Payments and Communications", () => {
-    it("Turn on and connect turns it on and goes to Providers", async () => {
+    it("Turn on and connect turns it on and goes to Integrations", async () => {
         await open(["PAYMENTS"]);
         expect(text()).toContain(
             "Online payment stays off until you connect a provider.",
         );
         await press(button(/^Turn on and connect$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
-        expect(push).toHaveBeenCalledWith("/settings/providers");
+        expect(push).toHaveBeenCalledWith("/settings/integrations");
     });
 
     it("Turn on turns it on with nothing connected", async () => {
@@ -888,9 +888,9 @@ describe("on a plan that won't let the business connect (Free, UX-006)", () => {
         ).not.toBeNull();
         await press(button(/^Turn on$/));
         expect(enableModuleAction).toHaveBeenCalledWith("PAYMENTS", {});
-        // Never sent to Providers to type keys the API refuses.
+        // Never sent to Integrations to type keys the API refuses.
         expect(push).toHaveBeenCalledWith("/billing");
-        expect(push).not.toHaveBeenCalledWith("/settings/providers");
+        expect(push).not.toHaveBeenCalledWith("/settings/integrations");
     });
 
     it("the toast never asks to connect a locked provider", async () => {

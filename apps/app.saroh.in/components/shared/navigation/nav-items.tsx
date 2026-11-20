@@ -1230,6 +1230,13 @@ export interface SettingsPage {
     ownerOnly?: true;
     /** Offered to every role but the Reviewer, who holds no part of the business. */
     notForReviewer?: true;
+    /**
+     * Also opened, without `action`, where this switch is on for the
+     * person (Providers holds their own Google Calendar, 20 Nov 2026). Only
+     * the settings layout reads `switches`: the command menu and search go
+     * by `action` alone.
+     */
+    orSwitch?: "google-calendar";
 }
 
 /**
@@ -1294,11 +1301,14 @@ export const SETTINGS_PAGES = [
         action: "audit:read",
     },
     {
-        href: "/settings/providers",
-        label: "Providers",
-        description: "Hosting, email and payments behind it",
+        href: "/settings/integrations",
+        label: "Integrations",
+        description: "Payments, email, domains and your calendar",
         icon: Link2,
         action: "provider:read",
+        // A person's own Google Calendar is here too (#1047, DEC-233),
+        // behind GOOGLE_CALENDAR, which the layout asks the API about.
+        orSwitch: "google-calendar",
     },
     {
         // Every member connects their own AI assistant (plan 2026-11-10-001,
@@ -1336,13 +1346,18 @@ export const SETTINGS_PAGES = [
  * (`freeNoteShown`).
  */
 export function mayOpenSettingsPage(
-    actor: { role: NavRole | null; actions?: readonly string[] | null },
+    actor: {
+        role: NavRole | null;
+        actions?: readonly string[] | null;
+        switches?: readonly string[];
+    },
     page: SettingsPage,
 ): boolean {
     if (page.href === PLAN_PAGE_HREF && !plansShown() && !freeNoteShown()) {
         return false;
     }
-    if (page.action && !navCan(actor, page.action)) return false;
+    const switchedOn = page.orSwitch && actor.switches?.includes(page.orSwitch);
+    if (page.action && !switchedOn && !navCan(actor, page.action)) return false;
     if (page.ownerOnly && actor.role !== null && actor.role !== "OWNER") {
         return false;
     }
@@ -1362,6 +1377,7 @@ export function mayOpenSettingsPage(
 export function settingsPagesFor(actor: {
     role: NavRole | null;
     actions?: readonly string[] | null;
+    switches?: readonly string[];
 }) {
     return SETTINGS_PAGES.filter((page) => mayOpenSettingsPage(actor, page));
 }

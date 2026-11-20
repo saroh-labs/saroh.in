@@ -3,6 +3,8 @@ import { TeamScreen } from "@/components/organizations/team/team-screen";
 import { SettingsPanel } from "@/components/settings/page/settings-panel";
 import { rowLimit } from "@/lib/billing/access";
 import { pausedTeam, teamOverLimit } from "@/lib/billing/paused";
+import { readCalendarMembers } from "@/lib/google-calendar/service";
+import { calendarByUser } from "@/lib/google-calendar/team";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { diaryPeopleToInvite } from "@/lib/organizations/calendar-only";
 import { shownCatalogue } from "@/lib/organizations/catalogue-shown";
@@ -85,6 +87,15 @@ export default async function PeoplePage() {
         // Past the plan's team limit (#800): who is paused, and why.
         pausedOrNull(),
     ]);
+    // Who has connected Google Calendar (DEC-233): for whoever may change
+    // roles, while it's on here. Matched to the roster through the diary.
+    const calendarMembers = canEditRoles ? await readCalendarMembers() : null;
+    const calendar = calendarMembers
+        ? {
+              byUser: calendarByUser(calendarMembers, staff?.staff ?? null),
+              canDisconnect: true,
+          }
+        : null;
     // The plan, for whoever changes the team or its roles.
     const access =
         canManage || canEditRoles ? await billingAccessOrNull() : null;
@@ -119,6 +130,7 @@ export default async function PeoplePage() {
                 )}
                 rolesLock={canEditRoles ? rolesLock(access) : null}
                 paused={pausedPeople}
+                calendar={calendar}
                 // Over the limit (#800), the paused notes say it and link
                 // to Plan and billing; the "reached your limit" card would
                 // say it a third time, and its "everyone already on the

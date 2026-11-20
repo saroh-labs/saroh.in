@@ -15,13 +15,13 @@ import {
  */
 export async function setCustomerEmail(change: { kind: string; on: boolean }) {
     const res = await setCustomerEmailApi(change);
-    if (res.ok) revalidatePath("/settings/providers");
+    if (res.ok) revalidatePath("/settings/integrations");
     return res;
 }
 
 /** When overdue reminders go (DEC-178, #1169). Thin, as the switch is. */
 export async function setOverdueTiming(timing: OverdueTiming) {
     const res = await setOverdueTimingApi(timing);
-    if (res.ok) revalidatePath("/settings/providers");
+    if (res.ok) revalidatePath("/settings/integrations");
     return res;
 }

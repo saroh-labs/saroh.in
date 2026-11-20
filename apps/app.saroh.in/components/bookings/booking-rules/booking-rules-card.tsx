@@ -197,7 +197,7 @@ export function RulesList({
                         href={
                             onlineBlocker === "PAYMENTS_OFF"
                                 ? "/settings/modules"
-                                : "/settings/providers"
+                                : "/settings/integrations"
                         }
                     >
                         {onlineBlocker === "PAYMENTS_OFF"

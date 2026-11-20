@@ -151,9 +151,9 @@ export const providerDisconnected = {
         kind === "payment"
             ? "No payment provider is connected, so customers can't pay online."
             : "No email provider is connected, so no email is sent.",
-    action: "Connect in Providers",
-    who: "An owner or admin can connect one in Settings › Providers.",
-    href: "/settings/providers",
+    action: "Connect in Integrations",
+    who: "An owner or admin can connect one in Settings › Integrations.",
+    href: "/settings/integrations",
 } as const;
 
 /** A website that has never been published, or was taken down. */

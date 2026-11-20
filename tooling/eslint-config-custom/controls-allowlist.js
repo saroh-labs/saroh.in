@@ -29,6 +29,10 @@ export const RAW_ALLOWED = {
     "components/settings/developers/ai-apps.tsx": ["button"],
     "components/settings/developers/keys.tsx": ["button"],
     "components/settings/developers/webhooks.tsx": ["button"],
+    // button: a Google account row that opens its sheet, and Add another (GC2Accounts)
+    "components/settings/google-calendar/google-calendar-screen.tsx": [
+        "button",
+    ],
     // button: a row or card that is one button; input: a hidden form value
     "app/choose/page.tsx": ["button", "input"],
     // button: a bar of a chart, pressed to read it

@@ -728,6 +728,12 @@ model BusinessProfile {
   // home, and a business with a location customers visit shows that
   // instead. Read only while no such location has an address.
   siteShowsRegisteredAddress Boolean @default(false)
+
+  // Who may join a booking's Google Meet without knocking, for the whole
+  // business (DEC-233): RESTRICTED | TRUSTED | OPEN; a service or a booking
+  // may say otherwise. Null: RESTRICTED. CHECKed.
+  meetAccess String?
+
   // The registered address's place on Google Maps (DEC-128): what "Get
   // directions" opens on the website while that address is the one shown.
   // One canonical address on Google's own map hosts
@@ -807,8 +813,9 @@ model Membership {
   // The staff member this team member is on the diary as, if any (U3).
   staffMember StaffMember?
 
-  // Their Google Calendar in this business (#1047): at most one.
-  googleCalendarConnection GoogleCalendarConnection?
+  // Their Google accounts in this business (#1047): one a row, as many as
+  // the plan's `googleAccountsPerPerson` allows (DEC-233).
+  googleCalendarConnections GoogleCalendarConnection[]
 
   // Extra permissions for this one person, on top of their role (F17,
   // DEC-039). Action keys, like OrganizationRole.actions: unknown strings are
@@ -5823,6 +5830,9 @@ model Service {
   // `meetingUrl` above; GOOGLE_MEET, a link of its own per booking, made
   // on the Google Calendar of the person who takes it. CHECKed.
   meetingLink  String  @default("MANUAL")
+  // Who may join its Meet links without knocking (DEC-233): RESTRICTED |
+  // TRUSTED | OPEN. Null: the business's. CHECKed.
+  meetAccess   String?
 
   availabilityRules AvailabilityRule[]
   bookings          Booking[]
@@ -6015,6 +6025,13 @@ model Booking {
   // This booking's own meeting link (#1048): a Google Meet link made for it
   // alone. Null: the service's typed link in the snapshot, as before.
   meetingUrl          String?
+  // Where this booking's link comes from, when chosen for it (DEC-233):
+  // GOOGLE_MEET (a Meet of its own, whatever the service says) or MANUAL
+  // (a link pasted into `meetingUrl`). Null: the service's. CHECKed.
+  meetingLink         String?
+  // Who may join its Meet without knocking: RESTRICTED | TRUSTED | OPEN.
+  // Null: the service's, then the business's. CHECKed.
+  meetAccess          String?
   // The event Saroh keeps for it on the Google Calendar of whoever takes it.
   googleCalendarEvent GoogleCalendarEvent?
 
@@ -10569,12 +10586,15 @@ model AskAiDraft {
 // A person's Google connection in one business. Only the refresh token is
 // kept, sealed with CALENDAR_ENC_KEY (a DEC-214 ring: the key's id travels
 // in the ciphertext) and bound to this row; access tokens live in memory
-// for one job. Disconnecting deletes the row.
+// for one job. A person may have several (one Google account a row,
+// DEC-233). Disconnecting drops the token and keeps the row as
+// DISCONNECTED with its event records, so the same account connected
+// again picks its events back up.
 model GoogleCalendarConnection {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  membershipId   String       @unique
+  membershipId   String
   membership     Membership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   // The Google account it reaches, as Google said at consent.
@@ -10588,7 +10608,9 @@ model GoogleCalendarConnection {
   // The scopes Google granted; a person may untick one at consent.
   scopes String[] @default([])
 
-  // CONNECTED | LAPSED (Google refused the token: reconnect), CHECKed.
+  // CONNECTED | LAPSED (Google refused the token: reconnect) |
+  // DISCONNECTED (the person stopped it: no token, events left as they
+  // were), CHECKed.
   status   String    @default("CONNECTED")
   lapsedAt DateTime?
 
@@ -10604,7 +10626,7 @@ model GoogleCalendarConnection {
   events    GoogleCalendarEvent[]
   busy      GoogleCalendarBusy[]
 
-  @@unique([organizationId, membershipId])
+  @@unique([membershipId, googleEmail])
   @@index([organizationId])
 }
 
@@ -10643,6 +10665,15 @@ model GoogleCalendarEvent {
   calendarId String
   eventId    String
   meetUrl    String?
+  // Who may join the Meet without knocking (DEC-233): what Saroh last asked
+  // for, and what Google then said it is (a personal Gmail host may keep
+  // TRUSTED). RESTRICTED | TRUSTED | OPEN, CHECKed.
+  meetAccessAsked String?
+  meetAccess      String?
+  // The booking changed while its event sat on an account Saroh no longer
+  // reaches (disconnected or lapsed, DEC-233): the event in Google is out
+  // of date. Cleared once Saroh writes it again.
+  outOfDateAt     DateTime?
   syncedAt   DateTime @default(now())
 
   @@index([organizationId])

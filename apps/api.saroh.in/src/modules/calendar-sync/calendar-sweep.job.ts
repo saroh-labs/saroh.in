@@ -2,9 +2,14 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { env } from "../../env";
 import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
-import { businessPause, syncingMembers } from "./calendar-allowed";
+import {
+    businessPause,
+    overAllowance,
+    syncingMembers,
+} from "./calendar-allowed";
 import {
     BUSY_EVERY_MS,
     CALENDAR_BUSY_TYPE,
@@ -30,7 +35,10 @@ const CHAIN_LOCK = `job-chain:${CALENDAR_SWEEP_TYPE}`;
  *   checked, tells the person once (`calendar.behind`): slots are on
  *   Saroh's own times. Once per stale spell: not again until a read lands.
  *
- * No Google call: it only queues and tells. A connection that fails is
+ * - a disconnected account kept past `GOOGLE_CALENDAR_DISCONNECTED_KEEP_DAYS`
+ *   is deleted, with the record of its events.
+ *
+ * No Google call: it only queues, tells and deletes. A connection that fails is
  * logged and the rest go on; it throws only when the next run can't be
  * queued (one waiting run, under `job-chain:calendar.sweep`).
  */
@@ -41,6 +49,10 @@ export class CalendarSweepJob {
     readonly handle = async (_job: Job): Promise<void> => {
         const now = new Date();
         try {
+            const purged = await this.purgeDisconnected(now);
+            if (purged > 0) {
+                this.logger.log(`calendar_sweep purged_disconnected=${purged}`);
+            }
             const done = await this.sweep(now);
             if (done.started > 0 || done.told > 0) {
                 this.logger.log(
@@ -68,12 +80,20 @@ export class CalendarSweepJob {
         let told = 0;
         let cursor: string | undefined;
         // Asked once per business a run, not once per person.
-        const allowed = new Map<string, Promise<Set<string> | null>>();
+        const allowed = new Map<
+            string,
+            Promise<{ members: Set<string>; over: Set<string> } | null>
+        >();
         const allowedIn = (organizationId: string) => {
             let known = allowed.get(organizationId);
             if (!known) {
-                known = businessPause(organizationId).then((off) =>
-                    off ? null : syncingMembers(organizationId),
+                known = businessPause(organizationId).then(async (off) =>
+                    off
+                        ? null
+                        : {
+                              members: await syncingMembers(organizationId),
+                              over: await overAllowance(organizationId),
+                          },
                 );
                 allowed.set(organizationId, known);
             }
@@ -106,10 +126,16 @@ export class CalendarSweepJob {
             });
             for (const c of page) {
                 try {
-                    const members = await allowedIn(c.organizationId);
+                    const may = await allowedIn(c.organizationId);
                     const staffId = c.membership.staffMember?.id;
                     // Paused (`calendar-allowed.ts`): left until allowed.
-                    if (!members?.has(c.membershipId) || !staffId) continue;
+                    if (
+                        !may?.members.has(c.membershipId) ||
+                        may.over.has(c.id) ||
+                        !staffId
+                    ) {
+                        continue;
+                    }
                     if (c.calendars.length === 0) continue;
                     const waiting = await prisma.job.count({
                         where: {
@@ -138,6 +164,21 @@ export class CalendarSweepJob {
             cursor = page[page.length - 1]?.id;
         }
         return { started, told };
+    }
+
+    /**
+     * Delete disconnected accounts kept past their time (L1): the address
+     * and the record of the events left in Google go with the row.
+     */
+    async purgeDisconnected(now: Date): Promise<number> {
+        const keepMs = env.GOOGLE_CALENDAR_DISCONNECTED_KEEP_DAYS * 86_400_000;
+        const { count } = await prisma.googleCalendarConnection.deleteMany({
+            where: {
+                status: "DISCONNECTED",
+                updatedAt: { lt: new Date(now.getTime() - keepMs) },
+            },
+        });
+        return count;
     }
 
     /** One notice per stale spell: none since the last read (or the connect). */

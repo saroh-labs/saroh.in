@@ -198,6 +198,8 @@ export interface ReassignCandidate {
     state: "current" | "free" | "busy" | "off";
     busyFrom?: string;
     busyTo?: string;
+    /** Their bookings reach Google Calendar (DEC-233): a reassign makes a new event and Meet link. */
+    googleCalendar?: boolean;
 }
 
 /**

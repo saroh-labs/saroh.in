@@ -14,7 +14,7 @@ import type {
 import { lastUpdateLine, webhookFor } from "./webhook";
 
 /**
- * Where the email prompt's Connect jumps to on Settings › Providers: the
+ * Where the email prompt's Connect jumps to on Settings › Integrations: the
  * first email provider to connect (`connectEmailKey`).
  */
 export const CONNECT_EMAIL_ANCHOR = "connect-email";
@@ -188,7 +188,11 @@ export const CONNECTABLE_COMMS: Record<CommsChannel, readonly string[]> = {
  * A connection kept from before its provider was taken off the list
  * (SendGrid, SMTP relay, Twilio): Saroh can't send through it.
  */
-export function cantSend(c: { channel: CommsChannel; provider: string; status: string }): boolean {
+export function cantSend(c: {
+    channel: CommsChannel;
+    provider: string;
+    status: string;
+}): boolean {
     return (
         c.status === "CONNECTED" &&
         !CONNECTABLE_COMMS[c.channel].includes(c.provider.toUpperCase())
@@ -196,7 +200,10 @@ export function cantSend(c: { channel: CommsChannel; provider: string; status: s
 }
 
 /** "Not working. Saroh can't send through SendGrid. Reconnect with Resend." */
-export function cantSendNote(c: { channel: CommsChannel; provider: string }): string {
+export function cantSendNote(c: {
+    channel: CommsChannel;
+    provider: string;
+}): string {
     return `Not working. Saroh can't send through ${commsProviderName(c.provider)}. Reconnect with ${words(CONNECTABLE_COMMS[c.channel].map(commsProviderName))}.`;
 }
 
@@ -590,9 +597,7 @@ function commsEntry(
         setup: {
             kind: "messaging",
             channel: c.channel,
-            provider: unsendable
-                ? CONNECTABLE_COMMS[c.channel][0]
-                : c.provider,
+            provider: unsendable ? CONNECTABLE_COMMS[c.channel][0] : c.provider,
         },
         consequence: spec.consequence,
         // Connecting it again is a new connection: the plan's to allow.

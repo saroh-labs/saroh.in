@@ -100,6 +100,8 @@ describe("draftOf", () => {
             places: "",
             where: "IN_PERSON",
             meetingUrl: "",
+            meetingLink: "MANUAL",
+            meetAccess: null,
             price: "1200",
             deposit: "PERCENT_50",
             gstPriceMode: "",
@@ -296,6 +298,36 @@ describe("the GST rate of a GST-registered business's service", () => {
     });
 });
 
+describe("serviceInput, Google Meet (DEC-233)", () => {
+    it("sends a Meet per booking with who can join, the typed link only as a fallback", () => {
+        const draft = {
+            ...draftOf(null, [], "Asia/Kolkata"),
+            name: "Bridal look consultation",
+            minutes: "30",
+            price: "0",
+            where: "ONLINE" as const,
+            meetingUrl: "",
+            meetingLink: "GOOGLE_MEET" as const,
+            meetAccess: "OPEN" as const,
+        };
+        const input = serviceInput(draft, "INR");
+        expect(input).toMatchObject({
+            meetingLink: "GOOGLE_MEET",
+            meetAccess: "OPEN",
+            meetingUrl: null,
+        });
+        expect(input).not.toHaveProperty("meetAccess", undefined);
+        const manual = serviceInput(
+            { ...draft, meetingLink: "MANUAL", meetingUrl: "https://meet.x/y" },
+            "INR",
+        );
+        expect(manual).toMatchObject({ meetingLink: "MANUAL" });
+        expect(manual).not.toHaveProperty("meetAccess");
+        const inPerson = serviceInput({ ...draft, where: "IN_PERSON" }, "INR");
+        expect(inPerson).not.toHaveProperty("meetingLink");
+    });
+});
+
 describe("serviceInput", () => {
     it("sends the fields as the API takes them, the deposit's mode and the visits", () => {
         const input = serviceInput(
@@ -317,6 +349,7 @@ describe("serviceInput", () => {
             timezone: "Asia/Kolkata",
             locationType: "EITHER",
             meetingUrl: "https://meet.x/y",
+            meetingLink: "MANUAL",
             showOnBookingPage: true,
             bookableByTeam: true,
             depositMode: "PERCENT_50",

@@ -98,14 +98,14 @@ describe("reviewEmailNote (D11)", () => {
         expect(
             reviewEmailNote({ connected: false, canConnect: true }, may),
         ).toEqual({
-            text: "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.",
-            action: { href: "/settings/providers", label: "Connect one" },
+            text: "Review invitations go from your own email. Connect an email provider in Settings › Integrations to send them.",
+            action: { href: "/settings/integrations", label: "Connect one" },
         });
         // A plan it couldn't read still offers connecting.
         expect(
             reviewEmailNote({ connected: false, canConnect: null }, may)?.action
                 ?.href,
-        ).toBe("/settings/providers");
+        ).toBe("/settings/integrations");
     });
 
     it("on a plan that can't connect email, says it needs a paid plan and links the plans", () => {

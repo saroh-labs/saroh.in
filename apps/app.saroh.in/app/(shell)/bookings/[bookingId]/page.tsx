@@ -12,6 +12,10 @@ import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packOffer, usablePacks } from "@/lib/class-packs/balance";
 import { readPurchasesFor } from "@/lib/class-packs/service";
 import { packsOn } from "@/lib/class-packs/switched-on";
+import {
+    googleMeetOffered,
+    readBookingMeeting,
+} from "@/lib/google-calendar/service";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { permits, permitsFor } from "@/lib/organizations/permits";
@@ -96,7 +100,18 @@ export default async function BookingPage({
     const canWrite = permits(organization, "booking:write");
     // Times in the business's zone, labelled (Q10): the service's.
     const timezone = booking.service.timezone || booking.timezone;
-    const [packs, waitlist, person, staffList] = await Promise.all([
+    // Its Meet (DEC-233): asked while Google Calendar is on here, or when
+    // the booking or its service already has a Google Meet.
+    const hasMeet =
+        (booking as { meetingLink?: string | null }).meetingLink ===
+            "GOOGLE_MEET" ||
+        (booking.service as { meetingLink?: string }).meetingLink ===
+            "GOOGLE_MEET";
+    const meetingRead =
+        hasMeet || (await googleMeetOffered())
+            ? readBookingMeeting(bookingId)
+            : Promise.resolve(null);
+    const [packs, waitlist, person, staffList, meeting] = await Promise.all([
         packsFor(booking),
         waitlistFor(booking),
         // Their phone, Needs attention and how a change reaches them
@@ -108,6 +123,7 @@ export default async function BookingPage({
         // Who is on the diary: New booking's people, and the viewer's own
         // place on it for Change who (#1157).
         canWrite ? listStaff().catch(() => null) : Promise.resolve(null),
+        meetingRead,
     ]);
     const me =
         staffList?.staff.find(
@@ -130,6 +146,7 @@ export default async function BookingPage({
             waitlist={waitlist}
             person={person}
             reassign={{ any: may("service:write"), me }}
+            meeting={meeting}
         />
     );
     if (!canWrite) return view;
@@ -155,6 +172,7 @@ export default async function BookingPage({
                 timezone,
                 showMoney: may("payment:read") || canTake,
                 business: organization?.name ?? null,
+                meet: await googleMeetOffered(),
                 now,
             }}
         >

@@ -217,7 +217,7 @@ describe.each([
             "/settings/profile",
             "/settings/share",
             "/settings/activity",
-            "/settings/providers",
+            "/settings/integrations",
             "/settings/developers",
             "/settings/data",
         ]);
@@ -328,7 +328,7 @@ describe.each([
         });
         expect(planRow(action, false)).toEqual({});
         // Any other step is untouched.
-        const connect = { label: "Connect", href: "/settings/providers" };
+        const connect = { label: "Connect", href: "/settings/integrations" };
         expect(planRow(connect, true)).toEqual({ action: connect });
     });
 });

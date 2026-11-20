@@ -387,7 +387,8 @@ what the API allows.
   cancel, outcome or pay link on another's booking is a 403 ("Your role
   changes only your own bookings."), and a booking by hand is with
   themselves. They hear no business-wide booking alerts. A new booking read
-  or write spreads the same. **Seats:** they use one, as everyone does
+  or write spreads the same, in whatever module it lives (Google
+  Calendar's meeting routes call `assertOwnBooking` too). **Seats:** they use one, as everyone does
   (DEC-155); an open invite naming a diary person with no login
   is that person, counted once (`countedOnDiary` in `billing/seats.ts`, read
   by metering, the invite's meter check and Team's count line).

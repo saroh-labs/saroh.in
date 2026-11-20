@@ -22,7 +22,7 @@ describe("a provider's event Saroh couldn't apply, told to the team", () => {
             event: "failed",
             eventKey: "team:webhook:wh_1",
             title: "A refund update from Razorpay isn't in Saroh yet",
-            path: "/settings/providers",
+            path: "/settings/integrations",
         });
         expect(worded?.body).toContain("Saroh's team has been told");
     });

@@ -20,6 +20,13 @@ import {
     serviceFacts,
 } from "../audit/price-history";
 import { assertPlanTakesOnlinePayment } from "../billing/online-payments-plan";
+import type { ReassignCalendarNote } from "../calendar-sync/calendar-target";
+import {
+    hasTarget,
+    reassignNote,
+    staffWithTargets,
+} from "../calendar-sync/calendar-target";
+import { resyncMeetAccess } from "../calendar-sync/meet-access";
 import { googleMeetReady } from "../calendar-sync/meet-ready";
 import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { redeemPackInTx } from "../class-packs/redeem-pack";
@@ -400,6 +407,7 @@ export class BookingsService {
                     gstPriceMode: dto.gstPriceMode ?? null,
                     timezone: dto.timezone,
                     ...location,
+                    meetAccess: dto.meetAccess ?? null,
                     status: "ACTIVE",
                     visits: dto.visits ?? 1,
                     depositMode,
@@ -555,6 +563,7 @@ export class BookingsService {
             });
         }
         if (dto.visits !== undefined) data.visits = dto.visits;
+        if (dto.meetAccess !== undefined) data.meetAccess = dto.meetAccess;
         if (dto.showOnBookingPage !== undefined) {
             data.showOnBookingPage = dto.showOnBookingPage;
         }
@@ -616,6 +625,15 @@ export class BookingsService {
         const wasOnline =
             service.status === "ACTIVE" && service.showOnBookingPage;
         if (!wasOnline) await this.bookingPageFor(ctx, saved);
+        // Who may join changed: its upcoming Meets follow (DEC-233).
+        if (
+            dto.meetAccess !== undefined &&
+            dto.meetAccess !== service.meetAccess
+        ) {
+            await resyncMeetAccess(ctx.organizationId, {
+                serviceId: service.id,
+            });
+        }
         return toServiceView(
             saved,
             await loadPriceTerms(prisma, ctx.organizationId),
@@ -1229,7 +1247,7 @@ export class BookingsService {
         ctx: OrganizationContext,
         bookingId: string,
         input: { staffId: string; startAt?: string },
-    ): Promise<Booking> {
+    ): Promise<Booking & { googleCalendar?: ReassignCalendarNote }> {
         requireBookingPower(ctx, "booking:write");
         const booking = await this.requireOwnedBooking(ctx, bookingId);
         const person = await requireTeamPerson(
@@ -1261,7 +1279,12 @@ export class BookingsService {
                 { audience: "team" },
             );
         }
-        return moveFoundBooking(
+        const googleCalendar = await reassignNote(
+            ctx.organizationId,
+            booking.id,
+            person,
+        );
+        const moved = await moveFoundBooking(
             booking,
             service,
             startAt,
@@ -1271,6 +1294,7 @@ export class BookingsService {
                 reassign: { staffId: person.id, name: person.name },
             },
         );
+        return googleCalendar ? { ...moved, googleCalendar } : moved;
     }
 
     /**
@@ -1309,7 +1333,15 @@ export class BookingsService {
             startAt,
             opening,
         );
-        return { startAt: startAt.toISOString(), people };
+        // Whose bookings reach Google (DEC-233): the picker warns first.
+        const google = await staffWithTargets(ctx.organizationId);
+        return {
+            startAt: startAt.toISOString(),
+            people: people.map((p) => ({
+                ...p,
+                googleCalendar: google.has(p.id),
+            })),
+        };
     }
 
     /**
@@ -1377,6 +1409,7 @@ export class BookingsService {
             paidWith?: PaidWith;
             paidBy?: DeskMethod;
             subscriptionId?: string;
+            meetingLink?: "GOOGLE_MEET";
         },
     ): Promise<Booking> {
         requireBookingPower(ctx, "booking:write");
@@ -1462,6 +1495,7 @@ export class BookingsService {
 
         // A customer, an email, or a name and phone (DEC-170).
         const booker = await handBooker(ctx, dto);
+        if (dto.meetingLink) booker.meetingLink = dto.meetingLink;
 
         // Its bill goes to an email (DEC-050): a contact with none is asked
         // for one.
@@ -1491,6 +1525,20 @@ export class BookingsService {
             undefined,
             opening,
         );
+        // Where = Google Meet (DEC-233): only where a Meet can be made.
+        if (
+            dto.meetingLink === "GOOGLE_MEET" &&
+            (service.capacity > 1 ||
+                !(await hasTarget(ctx.organizationId, person.staffId)))
+        ) {
+            throw new BadRequestException({
+                message:
+                    service.capacity > 1
+                        ? "Google Meet links are made for one-to-one bookings, not a class."
+                        : "Whoever takes it hasn't connected Google Calendar here, so Saroh can't make a Meet link.",
+                details: { field: "meetingLink" },
+            });
+        }
         // Paid now with how (DEC-170): written unpaid, then paid at the
         // desk on the same transaction, which marks it paid.
         const paidBy = dto.paidBy ?? null;

@@ -10,6 +10,7 @@
  */
 
 import { formatMoney } from "@/lib/format/money";
+import type { MeetAccess } from "@/lib/google-calendar/types";
 import type { GstPriceMode, ItemModeValue } from "@/lib/gst/price-mode";
 import {
     effectiveMode,
@@ -27,6 +28,7 @@ import type {
     CreateServiceInput,
     DepositMode,
     LocationType,
+    MeetingLink,
     Service,
     UpdateServiceInput,
 } from "./service";
@@ -62,6 +64,10 @@ export interface ServiceDraft {
     places: string;
     where: LocationType;
     meetingUrl: string;
+    /** A Meet per booking, or the one link typed (DEC-233). */
+    meetingLink: MeetingLink;
+    /** Who may join its Meets; null: the business's default. */
+    meetAccess: MeetAccess | null;
     // Price
     /** As typed: "1200", "1,200", "499.50"; 0 is free, blank is unset. */
     price: string;
@@ -158,6 +164,8 @@ export function draftOf(
             places: "",
             where: "IN_PERSON",
             meetingUrl: "",
+            meetingLink: "MANUAL",
+            meetAccess: null,
             price: "",
             deposit: "NONE",
             gstPriceMode: SAME_AS_BUSINESS,
@@ -183,6 +191,8 @@ export function draftOf(
         places: isClass ? String(service.capacity) : "",
         where: service.locationType,
         meetingUrl: service.meetingUrl ?? "",
+        meetingLink: service.meetingLink ?? "MANUAL",
+        meetAccess: service.meetAccess ?? null,
         price: fromMinor(service.priceCents),
         deposit: service.depositMode,
         gstPriceMode: itemModeValue(service.gstPriceMode),
@@ -305,9 +315,11 @@ export function serviceFieldProblems(
         say("places", "A class needs at least 2 places.");
     }
     const link = draft.meetingUrl.trim();
-    if (needsMeetingLink(draft.where) && !link) {
+    // With a Meet per booking the typed link is only a fallback, and may be left out.
+    const meet = draft.meetingLink === "GOOGLE_MEET";
+    if (needsMeetingLink(draft.where) && !link && !meet) {
         say("meetingUrl", "Paste the link people join by.");
-    } else if (needsMeetingLink(draft.where) && !isHttps(link)) {
+    } else if (needsMeetingLink(draft.where) && link && !isHttps(link)) {
         say(
             "meetingUrl",
             "The link has to be a full https:// link, like https://meet.google.com/abc-defg-hij.",
@@ -414,7 +426,12 @@ export function serviceInput(
         gstPriceMode: itemModeInput(draft.gstPriceMode),
         timezone: draft.timezone.trim(),
         locationType: draft.where,
-        meetingUrl: online ? draft.meetingUrl.trim() : null,
+        meetingUrl: online ? draft.meetingUrl.trim() || null : null,
+        // Online, where its link comes from; who may join only with a Meet.
+        ...(online ? { meetingLink: draft.meetingLink } : {}),
+        ...(online && draft.meetingLink === "GOOGLE_MEET"
+            ? { meetAccess: draft.meetAccess }
+            : {}),
         showOnBookingPage: draft.showOnBookingPage,
         bookableByTeam: draft.bookableByTeam,
         depositMode: draft.deposit,
@@ -450,7 +467,16 @@ const SECTIONS: [string, (keyof ServiceDraft)[]][] = [
     ["What it is", ["name", "description", "kind", "places"]],
     [
         "Time and place",
-        ["minutes", "gap", "bufferBefore", "where", "meetingUrl", "timezone"],
+        [
+            "minutes",
+            "gap",
+            "bufferBefore",
+            "where",
+            "meetingUrl",
+            "meetingLink",
+            "meetAccess",
+            "timezone",
+        ],
     ],
     [HOURS_SECTION, ["hours"]],
     [

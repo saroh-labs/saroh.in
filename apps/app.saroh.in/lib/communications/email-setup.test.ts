@@ -38,7 +38,7 @@ describe("emailPrompt (DEC-011, 7 Oct)", () => {
             title: "Your customers get no emails from you",
             text: MISSED,
             action: {
-                href: "/settings/providers",
+                href: "/settings/integrations",
                 label: "Connect your email",
             },
         });
@@ -100,7 +100,7 @@ describe("emailRefusalNote: where a send is refused", () => {
     it("an invoice: why, and Connect one for who may", () => {
         expect(emailRefusalNote(none, all, INVOICE_EMAIL_WORDS)).toEqual({
             text: "Invoices are emailed from your own email provider, and none is connected, so this one can't be sent.",
-            action: { href: "/settings/providers", label: "Connect one" },
+            action: { href: "/settings/integrations", label: "Connect one" },
         });
         expect(
             emailRefusalNote(

@@ -353,6 +353,22 @@ const input: CatalogInput = {
             },
         },
         {
+            // A cap on each person, not the business (DEC-233). Hidden from
+            // the pricing table; the published catalogue sets each plan's.
+            id: "google-accounts",
+            name: "Google accounts a person",
+            group: "team",
+            pricing: "hidden",
+            what: "How many Google accounts one person can connect for their calendar.",
+            // Off is one account (`accountsAllowed`); a plan that allows
+            // more says how many in the published catalogue.
+            cells: {
+                free: X("locked"),
+                grow: X("hidden"),
+                pro: X("hidden"),
+            },
+        },
+        {
             // Hidden from the pricing table until the workspace section and
             // the consent banner ship (#895, #896); the cells already gate
             // saving (DEC-108).

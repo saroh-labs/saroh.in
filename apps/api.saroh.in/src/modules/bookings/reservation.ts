@@ -85,6 +85,8 @@ export interface BookInput {
      * its snapshot, its job payload or a log.
      */
     intakeNote?: string;
+    /** A Google Meet of its own (DEC-233), chosen by the team on New booking. */
+    meetingLink?: "GOOGLE_MEET";
     /**
      * The tag the booking page's address carried when a QR code's scan
      * opened it (`qr-<code>`), as the page sent it. Only ever read by
@@ -664,6 +666,7 @@ export async function reserveInTx(
                 input.locationType,
             ),
             intakeNote: intakeNoteOf(input.intakeNote),
+            meetingLink: input.meetingLink ?? null,
             customerAccountId: by.account?.accountId ?? null,
             bookedOnline,
             sourceCode: by.sourceCode ?? null,

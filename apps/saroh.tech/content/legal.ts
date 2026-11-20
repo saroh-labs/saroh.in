@@ -394,6 +394,7 @@ export const PRIVACY: readonly LegalSection[] = [
             "A message you send us through this site: 12 months.",
             "Security logs: 1 year.",
             "Recordings of use: 30 days.",
+            "A Google Calendar you disconnect: its Google address and the record of the bookings left in that calendar, so connecting it again picks them back up, for 30 days after you disconnect it.",
             "A suspended account under investigation: as long as the law requires, or while it's needed to prevent, detect or investigate an offence, even if deletion was requested.",
         ],
     },

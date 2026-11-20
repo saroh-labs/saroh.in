@@ -1,9 +1,11 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { ChipGroup } from "@saroh/ui/choice-group";
 import { Notice } from "@saroh/ui/notice";
 import { OptionSelect } from "@saroh/ui/option-select";
 import type { ComponentProps } from "react";
+import { useId } from "react";
 
 import { PayChoice } from "@/components/bookings/sheets/pay-choice";
 import { Refusal } from "@/components/shared/states/refusal";
@@ -25,7 +27,18 @@ export function CheckStep({
     packRefusal,
     packsFailed = null,
     refusal,
+    where = null,
 }: {
+    /**
+     * Where (DEC-233, board GC2NewBooking): the service's own way, or a
+     * Google Meet of this booking's own. Null while Google isn't on here.
+     */
+    where?: {
+        meet: boolean;
+        onChange: (meet: boolean) => void;
+        serviceLabel: string;
+        note: string;
+    } | null;
     rows: readonly CheckRow[];
     /** "Allergy: Latex · Medical: …"; null for nothing to say. */
     attention: string | null;
@@ -44,6 +57,7 @@ export function CheckStep({
     return (
         <div className="grid min-w-0 gap-3">
             <CheckCard rows={rows} />
+            {where ? <WhereChoice {...where} /> : null}
             {attention ? (
                 <Notice tone="error" role="note">
                     Needs attention: {attention}
@@ -80,6 +94,45 @@ export function CheckStep({
             ) : null}
             {packRefusal ? <Notice tone="error">{packRefusal}</Notice> : null}
             <Refusal>{refusal}</Refusal>
+        </div>
+    );
+}
+
+function WhereChoice({
+    meet,
+    onChange,
+    serviceLabel,
+    note,
+}: {
+    meet: boolean;
+    onChange: (meet: boolean) => void;
+    serviceLabel: string;
+    note: string;
+}) {
+    const id = useId();
+    return (
+        <div className="mt-1 grid gap-2">
+            <p
+                id={id}
+                data-ph-unmask=""
+                className="m-0 text-[13.5px] font-semibold"
+            >
+                Where
+            </p>
+            <ChipGroup
+                labelledBy={id}
+                value={meet ? "meet" : "service"}
+                onChange={(v) => onChange(v === "meet")}
+                choices={[
+                    { value: "service", label: serviceLabel },
+                    { value: "meet", label: "Google Meet" },
+                ]}
+            />
+            {meet ? (
+                <p className="m-0 text-[12.5px] text-muted-foreground">
+                    {note}
+                </p>
+            ) : null}
         </div>
     );
 }

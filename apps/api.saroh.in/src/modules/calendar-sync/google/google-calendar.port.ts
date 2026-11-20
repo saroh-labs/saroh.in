@@ -158,8 +158,13 @@ export interface EventResult {
     meetPending: boolean;
 }
 
-/** Who may join a Meet without knocking (Meet API `accessType`). */
-export type MeetAccess = "OPEN" | "TRUSTED" | "RESTRICTED";
+/**
+ * Who may join a Meet without knocking (Meet API `accessType`, DEC-233):
+ * RESTRICTED, only people invited; TRUSTED, the host's organisation and
+ * people invited; OPEN, anyone with the link.
+ */
+export const MEET_ACCESS = ["RESTRICTED", "TRUSTED", "OPEN"] as const;
+export type MeetAccess = (typeof MEET_ACCESS)[number];
 
 export interface MeetSpace {
     /** `spaces/<id>`: the name the Meet API changes it by. */
@@ -201,14 +206,25 @@ export interface GoogleCalendarPort {
     /**
      * Make the event, or, when one with its id is there already (a retry,
      * or one cancelled earlier), bring it back up to date. The guest is
-     * emailed unless `quiet` (a privacy removal blanking their name).
+     * emailed unless `quiet` (a privacy removal blanking their name);
+     * `quietUpdate` emails nobody only when the event was there already
+     * (picked back up after a reconnect, or its Meet access changed).
      */
     putEvent(
         accessToken: string,
         calendarId: string,
         event: EventInput,
-        opts?: { quiet?: boolean },
+        opts?: { quiet?: boolean; quietUpdate?: boolean },
     ): Promise<EventResult>;
+    /**
+     * The live event Saroh made for this booking on this calendar, found
+     * by its private `sarohBookingId`, whatever its id; null when none.
+     */
+    findEventByBooking(
+        accessToken: string,
+        calendarId: string,
+        bookingId: string,
+    ): Promise<EventResult | null>;
     /**
      * Delete it, emailing the guest; `quiet` emails nobody (the booking
      * still stands, only Saroh's copy goes). Already gone counts as done.

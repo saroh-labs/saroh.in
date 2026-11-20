@@ -98,7 +98,7 @@ and films can offer Pay now, make pay links and name email on Send — the
 specs stub the provider in the browser — but a real checkout there fails and
 an email sent through Northwind's own provider fails on every retry. On any
 other database (the dev environment's) the seed writes none, and removes one
-an earlier seed left; connect real test keys in Settings › Providers instead.
+an earlier seed left; connect real test keys in Settings › Integrations instead.
 
 ### Showcase (the product film's world)
 

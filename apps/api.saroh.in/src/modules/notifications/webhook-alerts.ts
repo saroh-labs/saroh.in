@@ -45,8 +45,8 @@ export async function wordWebhook(
         notificationId: null,
         // A page, not a record: the event may name none Saroh has.
         ...noticeOf(WEBHOOK_UNAPPLIED_NOTIFICATION_TYPE, {}),
-        path: "/settings/providers",
-        cta: "Open Providers",
+        path: "/settings/integrations",
+        cta: "Open Integrations",
         skipUserId: null,
         title: heading,
         body,

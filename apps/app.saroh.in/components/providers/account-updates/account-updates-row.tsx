@@ -29,7 +29,7 @@ import { Row } from "@saroh/ui/settings-rows";
 export const ACCOUNT_UPDATES_ROW_ID = "account-updates";
 
 /**
- * Settings › Providers' "Updates in Messages" (12 Oct 2026): whether Saroh
+ * Settings › Integrations' "Updates in Messages" (12 Oct 2026): whether Saroh
  * posts order, booking and invoice updates to the business's customers'
  * Messages. Read first: the row says what is saved and what that leaves
  * the customers with, and Edit opens the sheet that changes it.

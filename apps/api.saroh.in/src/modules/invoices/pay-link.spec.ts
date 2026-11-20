@@ -232,7 +232,7 @@ describe("making a pay link", () => {
                 publicKey: null,
             });
         await expect(service.createPayLink(owner, "inv_1")).rejects.toThrow(
-            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Integrations.",
         );
         expect(db.invoice.updateMany).not.toHaveBeenCalled();
     });

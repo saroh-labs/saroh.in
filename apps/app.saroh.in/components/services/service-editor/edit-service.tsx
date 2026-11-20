@@ -103,6 +103,7 @@ export function EditService(props: EditorProps & { service: Service }) {
         businessPriceMode = null,
         priceHistory,
         others = [],
+        meet = null,
         share = null,
     } = props;
     const router = useRouter();
@@ -397,6 +398,7 @@ export function EditService(props: EditorProps & { service: Service }) {
                         isSaved: true,
                         others,
                         selfId: service.id,
+                        meet,
                     }}
                     problemsOf={problemsOf}
                     onApply={(next) => apply(which, next)}

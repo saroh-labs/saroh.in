@@ -816,6 +816,12 @@ jobs:
       # callback, built from this; unset, Connect answers 503.
       API_PUBLIC_URL: http://localhost:3333
       SOCIAL_ENC_KEY: 0011223344556677889900aabbccddeeff0011223344556677889900aabbccdd # gitleaks:allow (test key, this stack only)
+      # Google Calendar on an in-memory Google (the google-calendar spec):
+      # consent comes straight back, events and Meet links are made up,
+      # nothing calls Google. Test only, as above. Its key is a throwaway
+      # that seals only this stack's test connections.
+      GOOGLE_CALENDAR_FAKE: "1"
+      CALENDAR_ENC_KEY: 2233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011 # gitleaks:allow (test key, this stack only)
 
     steps:
       - uses: actions/checkout@v4

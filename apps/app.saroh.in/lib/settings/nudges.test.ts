@@ -404,7 +404,7 @@ describe("the email nudge follows the plan (DEC-091, #850)", () => {
                 (list.extras ?? []).find((i) => i.key === "email"),
             ).toMatchObject({
                 cta: "Connect email",
-                href: "/settings/providers",
+                href: "/settings/integrations",
                 done: false,
             });
             expect(list.outside).toEqual([]);

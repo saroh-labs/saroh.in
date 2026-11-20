@@ -1,4 +1,4 @@
-// @covers app:/open app:/settings/providers site:/pay/[token] site:/pay/o/[token] site:/pay/paid site:/paid site:/book api:payments api:webhooks api:invoices api:orders api:stores api:products api:bookings api:site-accounts api:sites api:capabilities api:organizations api:feature-flags api:admin pkg:site-blocks
+// @covers app:/open app:/settings/integrations site:/pay/[token] site:/pay/o/[token] site:/pay/paid site:/paid site:/book api:payments api:webhooks api:invoices api:orders api:stores api:products api:bookings api:site-accounts api:sites api:capabilities api:organizations api:feature-flags api:admin pkg:site-blocks
 import { createHmac } from "node:crypto";
 
 import type { Browser, Page, Request, Route, TestInfo } from "@playwright/test";
@@ -922,9 +922,9 @@ test.describe("Stripe on the business's own keys, through hosted Checkout (DEC-2
         );
 
         await page.goto(`/open/${b.id}`);
-        await page.goto("/settings/providers");
+        await page.goto("/settings/integrations");
         await expect(
-            page.getByRole("heading", { name: "Providers", level: 1 }),
+            page.getByRole("heading", { name: "Integrations", level: 1 }),
         ).toBeVisible();
         const available = page.getByRole("region", { name: "Available" });
         await expect(

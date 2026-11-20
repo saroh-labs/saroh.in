@@ -1,3 +1,4 @@
+import { MEET_ACCESS_WORDS } from "@/lib/google-calendar/words";
 /**
  * The Service Editor's panels and rows (U16, #1032): which fields each
  * side panel holds, its title and sentence, More details' rows on a new
@@ -93,6 +94,21 @@ const WHERE_WORDS: Record<ServiceDraft["where"], string> = {
     ONLINE: "Online, with a link to join",
     EITHER: "In person or online, they choose",
 };
+
+/** Where, with a Google Meet per booking said as such (board GC2ServiceMeet). */
+function whereWords(draft: ServiceDraft): string {
+    if (draft.where === "IN_PERSON" || draft.meetingLink !== "GOOGLE_MEET") {
+        return WHERE_WORDS[draft.where];
+    }
+    const lead = draft.where === "ONLINE" ? "Online" : "In person or online";
+    const who =
+        draft.meetAccess === "OPEN"
+            ? " · anyone with the link joins"
+            : draft.meetAccess
+              ? ` · ${MEET_ACCESS_WORDS[draft.meetAccess].label.toLowerCase()} join`
+              : "";
+    return `${lead} · a Google Meet link for each booking${who}`;
+}
 
 const DEPOSIT_WORDS: Record<ServiceDraft["deposit"], string> = {
     NONE: "Nothing, they pay at the visit",
@@ -197,7 +213,7 @@ export function detailRows(input: RowsInput): DetailRow[] {
             label: "Break before",
             value: minutesWords(draft.bufferBefore),
         },
-        { panel: "where", label: "Where", value: WHERE_WORDS[draft.where] },
+        { panel: "where", label: "Where", value: whereWords(draft) },
         draft.kind === "class"
             ? {
                   panel: "visits",
@@ -307,7 +323,7 @@ export function editCards(input: RowsInput): Card[] {
             value: minutesWords(draft.bufferBefore),
             panel: "time",
         },
-        { label: "Where", value: WHERE_WORDS[draft.where], panel: "time" },
+        { label: "Where", value: whereWords(draft), panel: "time" },
         {
             label: "When it can be booked",
             value: whenWords(draft, names, input.hoursRead),

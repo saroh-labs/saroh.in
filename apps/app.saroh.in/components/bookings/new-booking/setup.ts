@@ -23,6 +23,12 @@ export interface NewBookingSetup {
     business?: string | null;
     /** What "now" is: the page's, so a test's clock reaches the flow. */
     now?: number;
+    /**
+     * Google Calendar is on here (DEC-233): Where offers a Google Meet of
+     * the booking's own. The API still refuses one for someone who hasn't
+     * connected, and says so.
+     */
+    meet?: boolean;
 }
 
 /**
@@ -52,6 +58,7 @@ export function flowServices(services: readonly Service[]): FlowService[] {
             currency: s.currency,
             capacity: s.capacity,
             bookableByTeam: s.bookableByTeam,
+            online: s.locationType === "ONLINE",
         }));
 }
 

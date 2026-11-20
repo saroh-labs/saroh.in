@@ -232,7 +232,9 @@ describe("AlertsGrid", () => {
             }),
         );
         expect(switchFor("New order by Email").disabled).toBe(false);
-        expect(host.querySelector('a[href="/settings/providers"]')).toBeNull();
+        expect(
+            host.querySelector('a[href="/settings/integrations"]'),
+        ).toBeNull();
         expect(host.textContent).not.toMatch(/provider/i);
     });
 

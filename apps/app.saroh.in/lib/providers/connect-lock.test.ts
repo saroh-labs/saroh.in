@@ -117,14 +117,14 @@ describe("Providers rows with the plan's locks (UX-006)", () => {
                 label: "Payments",
                 status: "NOT_CONFIGURED",
                 message: "",
-                actionHref: "/settings/providers",
+                actionHref: "/settings/integrations",
             },
             {
                 key: "COMMUNICATIONS",
                 label: "Communications",
                 status: "NOT_CONFIGURED",
                 message: "",
-                actionHref: "/settings/providers",
+                actionHref: "/settings/integrations",
             },
         ],
         payments: [],
@@ -255,14 +255,14 @@ describe("a connection whose provider refused its keys (UX-012, FB-7)", () => {
             label: "Payments",
             status: "ACTIVE" as const,
             message: "",
-            actionHref: "/settings/providers",
+            actionHref: "/settings/integrations",
         },
         {
             key: "COMMUNICATIONS" as const,
             label: "Communications",
             status: "ACTIVE" as const,
             message: "",
-            actionHref: "/settings/providers",
+            actionHref: "/settings/integrations",
         },
     ];
     const refused = {

@@ -215,7 +215,7 @@ export function fromResult(result: ReminderSendResult): RemindAllResult {
 }
 
 /** Where an email provider is connected. */
-export const PROVIDERS_HREF = "/settings/providers";
+export const PROVIDERS_HREF = "/settings/integrations";
 
 /** Remind all's state on the bills group's line. */
 export interface RemindAllState {
@@ -333,7 +333,7 @@ export function noneWords(preview: RemindAllPreview): {
     if (noProvider) {
         return {
             title: "Reminders go from your own email",
-            body: "Connect an email provider in Settings › Providers to send them.",
+            body: "Connect an email provider in Settings › Integrations to send them.",
             connect: true,
         };
     }

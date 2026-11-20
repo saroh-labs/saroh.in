@@ -117,7 +117,7 @@ describe("limitNotice", () => {
     describe("a limit with its own way out (Saroh's emails, DEC-086)", () => {
         const action = {
             label: "Connect your email",
-            href: "/settings/providers",
+            href: "/settings/integrations",
             room: "integrations",
             sentence: "Connect your own email.",
             closed: { label: "See plans", sentence: "Plan B lets you." },
@@ -130,7 +130,7 @@ describe("limitNotice", () => {
                 full: false,
                 body: "You'll be stopped at 100. Connect your own email. Or Plan B gives you more.",
                 cta: "Connect your email",
-                href: "/settings/providers",
+                href: "/settings/integrations",
             });
             const full = limitNotice(access, 100, "emails", "Stopped.", {
                 action,

@@ -1,4 +1,4 @@
-// @covers app:/settings/providers app:/open api:communications api:capabilities api:admin
+// @covers app:/settings/integrations app:/open api:communications api:capabilities api:admin
 import type { Browser, Page, TestInfo } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
@@ -10,7 +10,7 @@ import { useSession } from "../fixtures/sessions";
 import { ignoreHTTPSErrors, urls } from "../playwright.config";
 
 /**
- * Settings › Providers' "Emails to your customers" (DEC-174, U4 #1135):
+ * Settings › Integrations' "Emails to your customers" (DEC-174, U4 #1135):
  * one switch for each automatic email Saroh sends the business's
  * customers from its own email, read first in a row and changed in a side
  * sheet, each switch saved as it is flipped with Undo.
@@ -72,9 +72,9 @@ async function listed(page: Page, b: OwnBusiness): Promise<Listed> {
 
 async function openProviders(page: Page, b: OwnBusiness) {
     await page.goto(`/open/${b.id}`);
-    await page.goto("/settings/providers");
+    await page.goto("/settings/integrations");
     await expect(
-        page.getByRole("heading", { name: "Providers", level: 1 }),
+        page.getByRole("heading", { name: "Integrations", level: 1 }),
     ).toBeVisible();
 }
 

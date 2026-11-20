@@ -78,7 +78,7 @@ function email(
             label: "Enter your email keys again",
             why: "Your email provider refused its keys, so receipts and messages to customers aren't sending.",
             cta: "Enter keys again",
-            href: "/settings/providers",
+            href: "/settings/integrations",
             broken: true,
             left: true,
         };
@@ -89,7 +89,7 @@ function email(
             label: "Reconnect email",
             why: "Your email provider is disconnected, so receipts and messages to customers aren't sending.",
             cta: "Reconnect email",
-            href: "/settings/providers",
+            href: "/settings/integrations",
             broken: true,
             left: true,
         };
@@ -99,7 +99,7 @@ function email(
         label: "Connect an email provider",
         why: "So receipts and messages to customers get sent.",
         cta: "Connect email",
-        href: "/settings/providers",
+        href: "/settings/integrations",
         broken: false,
         left: attention !== null,
     };

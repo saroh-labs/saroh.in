@@ -462,6 +462,10 @@ e2e_stack() {
     # Connect's callback address, as CI; unset, Connect answers 503.
     export API_PUBLIC_URL=http://localhost:3333
     export SOCIAL_ENC_KEY=0011223344556677889900aabbccddeeff0011223344556677889900aabbccdd # gitleaks:allow (test key, this stack only)
+    # Google Calendar on an in-memory Google (the google-calendar spec), as
+    # CI: consent comes straight back and nothing calls Google. Test only.
+    export GOOGLE_CALENDAR_FAKE=1
+    export CALENDAR_ENC_KEY=2233445566778899aabbccddeeff00112233445566778899aabbccddeeff0011 # gitleaks:allow (test key, this stack only)
 
     # The run's database is a copy of a seeded template, "<name>-template",
     # when the template was seeded from the same migrations, schema and seed

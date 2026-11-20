@@ -402,11 +402,11 @@ describe("Remind all", () => {
         const text = sheet()?.textContent ?? "";
         expect(text).toContain("Reminders go from your own email");
         expect(text).toContain(
-            "Connect an email provider in Settings › Providers to send them.",
+            "Connect an email provider in Settings › Integrations to send them.",
         );
         expect(
             Array.from(sheet()?.querySelectorAll("a") ?? []).some(
-                (a) => a.getAttribute("href") === "/settings/providers",
+                (a) => a.getAttribute("href") === "/settings/integrations",
             ),
         ).toBe(true);
         expect(buttons().some((b) => b.textContent.startsWith("Send"))).toBe(

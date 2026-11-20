@@ -331,7 +331,7 @@ describe("making an order's pay link (real database)", () => {
         });
         const id = await unpaidOrder(other, other.organizationId);
         await expect(payLinks.make(ctx, id)).rejects.toThrow(
-            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Providers.",
+            "Your Razorpay connection needs its public key id before it can take a pay link. Add it in Settings › Integrations.",
         );
     });
 });

@@ -10,6 +10,6 @@ import { setAccountUpdates as setAccountUpdatesApi } from "./account-updates-ser
  */
 export async function setAccountUpdates(on: boolean) {
     const res = await setAccountUpdatesApi(on);
-    if (res.ok) revalidatePath("/settings/providers");
+    if (res.ok) revalidatePath("/settings/integrations");
     return res;
 }

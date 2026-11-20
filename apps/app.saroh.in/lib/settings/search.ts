@@ -230,10 +230,11 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     },
     { label: "Activity: who changed what", page: "/settings/activity" },
     {
-        label: "Providers: hosting, email, payments",
-        page: "/settings/providers",
+        label: "Integrations: payments, email, domains, calendar",
+        page: "/settings/integrations",
+        words: ["Providers", "Google Calendar"],
     },
-    { label: "Email and WhatsApp sender", page: "/settings/providers" },
+    { label: "Email and WhatsApp sender", page: "/settings/integrations" },
     {
         label: "API and AI apps: AI assistants, keys and notifications",
         page: "/settings/developers",
@@ -252,7 +253,7 @@ export const SETTINGS_INDEX: readonly SettingsEntry[] = [
     { label: "Download your data", page: "/settings/data" },
     {
         label: "Payment provider",
-        page: "/settings/providers",
+        page: "/settings/integrations",
         module: "PAYMENTS",
     },
 ];

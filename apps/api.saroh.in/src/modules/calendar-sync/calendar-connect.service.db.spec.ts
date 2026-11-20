@@ -21,10 +21,12 @@ import { planMeter } from "../billing/metering.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { roleDenial } from "../organizations/organization-policy";
 import { markLapsed } from "./calendar-access";
+import { overAllowance, pausedBecause } from "./calendar-allowed";
 import { CalendarConnectService } from "./calendar-connect.service";
 import { CALENDAR_BUSY_TYPE } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
 import { CalendarReleaseService } from "./calendar-release.service";
+import { CalendarSweepJob } from "./calendar-sweep.job";
 import { CalendarSyncHandler } from "./calendar-sync.handler";
 import { signState, verifyState } from "./connect-state";
 import { eventIdFor } from "./event-shape";
@@ -66,7 +68,7 @@ beforeEach(() => {
         google,
         flags as unknown as FeatureFlagService,
         lapses,
-        new CalendarReleaseService(google, lapses),
+        new CalendarReleaseService(google),
     );
 });
 
@@ -145,8 +147,10 @@ describe("connecting Google Calendar", () => {
         const status = await service.status(ctx);
         expect(status).toMatchObject({
             state: "CONNECTED",
-            googleEmail: google.grantEmail,
-            calendarsAllowed: 1,
+            accounts: [{ id: row.id, googleEmail: google.grantEmail }],
+            bookingsGoTo: { accountId: row.id, calendarId: "primary-cal" },
+            accountsAllowed: 1,
+            meetAccess: "RESTRICTED",
         });
     });
 
@@ -232,44 +236,60 @@ describe("connecting Google Calendar", () => {
             expect.objectContaining({ writeTo: false, checkBusy: true }),
         ]);
         const status = await service.status(ctx);
-        expect(status.granted).toMatchObject({ events: false, freeBusy: true });
+        expect(status.accounts[0].granted).toMatchObject({
+            events: false,
+            freeBusy: true,
+        });
         await expect(
-            service.choose(ctx, { writeTo: "primary-cal", checkBusy: [] }),
+            service.choose(ctx, row.id, {
+                writeTo: "primary-cal",
+                checkBusy: [],
+            }),
         ).rejects.toMatchObject({ status: 400 });
     });
 
-    it("refuses a second calendar at the cap of one", async () => {
+    it("checks several calendars for busy times, and writes to one (DEC-233)", async () => {
         const { ctx } = await person();
         await connectFlow(ctx);
-        await expect(
-            service.choose(ctx, {
-                writeTo: "primary-cal",
-                checkBusy: ["family-cal"],
-            }),
-        ).rejects.toMatchObject({ status: 400 });
-        const status = await service.choose(ctx, {
+        const [account] = (await service.status(ctx)).accounts;
+        const status = await service.choose(ctx, account.id, {
             writeTo: "family-cal",
-            checkBusy: ["family-cal"],
+            checkBusy: ["primary-cal", "family-cal"],
         });
-        expect(status.calendars).toEqual([
+        expect(status.accounts[0].calendars).toEqual([
             {
                 id: "family-cal",
                 name: "Family",
                 writeTo: true,
                 checkBusy: true,
             },
+            {
+                id: "primary-cal",
+                name: "Meera",
+                writeTo: false,
+                checkBusy: true,
+            },
         ]);
+        expect(status.bookingsGoTo).toMatchObject({ calendarId: "family-cal" });
+        // Absent leaves where bookings go as it is.
+        const again = await service.choose(ctx, account.id, {
+            checkBusy: ["primary-cal"],
+        });
+        expect(again.bookingsGoTo).toMatchObject({ calendarId: "family-cal" });
+        await expect(
+            service.choose(ctx, "not-an-account", { checkBusy: [] }),
+        ).rejects.toMatchObject({ status: 404 });
     });
 
     it("reconnecting after a lapse reuses the row and keeps the choices", async () => {
         const { ctx, membershipId } = await person();
         await connectFlow(ctx);
-        await service.choose(ctx, {
-            writeTo: "family-cal",
-            checkBusy: ["family-cal"],
-        });
         const row = await prisma.googleCalendarConnection.findFirstOrThrow({
             where: { organizationId: ctx.organizationId, membershipId },
+        });
+        await service.choose(ctx, row.id, {
+            writeTo: "family-cal",
+            checkBusy: ["family-cal"],
         });
         await markLapsed(row.id);
         expect((await service.status(ctx)).state).toBe("LAPSED");
@@ -287,7 +307,7 @@ describe("connecting Google Calendar", () => {
         ]);
     });
 
-    it("disconnecting revokes, deletes the row and busy times, and leaves Google's events", async () => {
+    it("disconnecting revokes, drops the token and busy times, keeps the row and Google's events", async () => {
         const { ctx, membershipId } = await person();
         await connectFlow(ctx);
         const row = await prisma.googleCalendarConnection.findFirstOrThrow({
@@ -317,13 +337,19 @@ describe("connecting Google Calendar", () => {
 
         await expect(service.disconnect(ctx)).resolves.toMatchObject({
             state: "NOT_CONNECTED",
+            accounts: [],
+            kept: { upcomingEvents: 0 },
         });
         expect(google.revoked).toHaveLength(1);
         expect(
-            await prisma.googleCalendarConnection.count({
+            await prisma.googleCalendarConnection.findUniqueOrThrow({
                 where: { id: row.id },
             }),
-        ).toBe(0);
+        ).toMatchObject({
+            status: "DISCONNECTED",
+            tokenCiphertext: null,
+            busyRefreshedAt: null,
+        });
         expect(
             await prisma.googleCalendarBusy.count({
                 where: { connectionId: row.id },
@@ -433,11 +459,15 @@ describe("connecting Google Calendar", () => {
             pausedBecause: "permission",
         });
         await expect(service.disconnect(reviewer)).resolves.toMatchObject({
-            state: "NOT_CONNECTED",
+            kept: { upcomingEvents: 0 },
         });
         expect(
             await prisma.googleCalendarConnection.count({
-                where: { organizationId: ctx.organizationId, membershipId },
+                where: {
+                    organizationId: ctx.organizationId,
+                    membershipId,
+                    status: { not: "DISCONNECTED" },
+                },
             }),
         ).toBe(0);
     });
@@ -452,7 +482,7 @@ describe("connecting Google Calendar", () => {
             await expect(service.status(ctx)).resolves.toMatchObject({
                 state: "PAUSED",
                 pausedBecause: "plan",
-                behind: false,
+                accounts: [{ state: "PAUSED", behind: false }],
             });
         } finally {
             spy.mockRestore();
@@ -471,9 +501,10 @@ describe("connecting Google Calendar", () => {
         });
     });
 
-    it("lets an owner disconnect someone else, and not a Member (GC-03)", async () => {
+    it("lets an owner disconnect someone else, audited, and not a Member (GC-03)", async () => {
         const { ctx, membershipId } = await person();
         await connectFlow(ctx);
+        const soon = await mapped(ctx, membershipId, 24);
         const owner = { ...ctx, role: "OWNER" } as OrganizationContext;
         const member = { ...ctx, role: "MEMBER" } as OrganizationContext;
         await expect(
@@ -481,63 +512,196 @@ describe("connecting Google Calendar", () => {
         ).rejects.toMatchObject({ status: 403 });
         await expect(
             service.disconnectMember(owner, membershipId),
-        ).resolves.toMatchObject({ state: "NOT_CONNECTED" });
+        ).resolves.toMatchObject({
+            kept: {
+                upcomingEvents: 1,
+                message: expect.stringContaining("their Google Calendar"),
+            },
+        });
+        expect(eventOf(soon.eventId)?.status).toBe("confirmed");
         expect(
             await prisma.googleCalendarConnection.count({
-                where: { membershipId },
+                where: { membershipId, status: { not: "DISCONNECTED" } },
             }),
         ).toBe(0);
+        const audit = await prisma.auditEvent.findFirstOrThrow({
+            where: {
+                organizationId: ctx.organizationId,
+                action: "calendar.member.disconnect",
+            },
+        });
+        expect(audit).toMatchObject({
+            targetId: membershipId,
+            metadata: { keptUpcomingEvents: 1 },
+        });
+        expect(JSON.stringify(audit.metadata)).not.toContain("@");
         await expect(
             service.disconnectMember(owner, "not-a-member"),
         ).rejects.toMatchObject({ status: 404 });
     });
 
-    it("on disconnect, takes upcoming events off quietly and leaves past ones (GC-09)", async () => {
+    it("on disconnect, keeps upcoming events in Google and says so (DEC-233)", async () => {
         const { ctx, membershipId } = await person();
         await connectFlow(ctx);
         const soon = await mapped(ctx, membershipId, 24);
         const done = await mapped(ctx, membershipId, -24);
 
-        await service.disconnect(ctx);
+        const view = await service.disconnect(ctx);
 
-        expect(eventOf(soon.eventId)).toMatchObject({
-            status: "cancelled",
-            quiet: true,
+        expect(view.kept).toEqual({
+            upcomingEvents: 1,
+            message: expect.stringContaining("stays on your Google Calendar"),
         });
+        expect(eventOf(soon.eventId)?.status).toBe("confirmed");
         expect(eventOf(done.eventId)?.status).toBe("confirmed");
-    });
-
-    it("makes no second event for a booking after a reconnect (GC-09)", async () => {
-        const { ctx, membershipId } = await person();
-        await connectFlow(ctx);
-        const { bookingId } = await mapped(ctx, membershipId, 24);
-        await service.disconnect(ctx);
-        await connectFlow(ctx);
-        await new CalendarSyncHandler(
+        expect(
+            await prisma.googleCalendarEvent.count({
+                where: { bookingId: soon.bookingId },
+            }),
+        ).toBe(1);
+        // A booking moved meanwhile leaves its event as it was: frozen.
+        const sync = new CalendarSyncHandler(
             google,
             flags as unknown as FeatureFlagService,
             new CalendarLapseService(),
-        ).sync(ctx.organizationId, { bookingId, meetTries: 0, quiet: false });
-        // The old event went at the disconnect: the booking has one event.
-        expect(google.liveEvents()).toHaveLength(1);
+        );
+        google.calls.length = 0;
+        await sync.sync(ctx.organizationId, {
+            bookingId: soon.bookingId,
+            meetTries: 0,
+            quiet: false,
+        });
+        expect(google.calls).toHaveLength(0);
     });
 
-    it("on another Google account, clears the old one's upcoming events (GC-09)", async () => {
+    it("reconnecting the same account picks its events back up, quietly, same Meet (DEC-233)", async () => {
         const { ctx, membershipId } = await person();
         await connectFlow(ctx);
-        const soon = await mapped(ctx, membershipId, 24);
-        google.grantEmail = `${uniq("meera-work")}@example.com`;
+        const row = await prisma.googleCalendarConnection.findFirstOrThrow({
+            where: { organizationId: ctx.organizationId, membershipId },
+        });
+        const { bookingId, eventId } = await mapped(ctx, membershipId, 24);
+        await prisma.service.updateMany({
+            where: { organizationId: ctx.organizationId },
+            data: { locationType: "ONLINE", meetingLink: "GOOGLE_MEET" },
+        });
+        const sync = new CalendarSyncHandler(
+            google,
+            flags as unknown as FeatureFlagService,
+            new CalendarLapseService(),
+        );
+        const payload = { bookingId, meetTries: 0, quiet: false };
+        await sync.sync(ctx.organizationId, payload);
+        const meetBefore = eventOf(eventId)?.meetCode;
+        expect(meetBefore).toBeTruthy();
+
+        await service.disconnect(ctx);
         await connectFlow(ctx);
-        expect(eventOf(soon.eventId)).toMatchObject({
-            status: "cancelled",
+
+        const again = await prisma.googleCalendarConnection.findFirstOrThrow({
+            where: { organizationId: ctx.organizationId, membershipId },
+        });
+        expect(again).toMatchObject({ id: row.id, status: "CONNECTED" });
+        const job = await prisma.job.findFirstOrThrow({
+            where: {
+                organizationId: ctx.organizationId,
+                type: "calendar.sync",
+                payload: { path: ["bookingId"], equals: bookingId },
+            },
+        });
+        expect(job.payload).toMatchObject({ quietUpdate: true });
+        await sync.sync(ctx.organizationId, {
+            ...payload,
+            quietUpdate: true,
+        });
+        expect(google.liveEvents()).toHaveLength(1);
+        expect(eventOf(eventId)).toMatchObject({
+            meetCode: meetBefore,
             quiet: true,
         });
-        expect(google.revoked).toHaveLength(1);
+    });
+
+    it("refuses another Google account past the plan's allowance (DEC-233)", async () => {
+        const { ctx, membershipId } = await person();
+        await connectFlow(ctx);
+        const first = google.grantEmail;
+        google.grantEmail = `${uniq("meera-work")}@example.com`;
+        await expect(connectFlow(ctx)).resolves.toMatch(/calendar=limit$/);
         expect(
-            await prisma.googleCalendarEvent.count({
-                where: { organizationId: ctx.organizationId },
+            await prisma.googleCalendarConnection.findMany({
+                where: { membershipId },
+                select: { googleEmail: true },
             }),
-        ).toBe(0);
+        ).toEqual([{ googleEmail: first }]);
+        // The grant Saroh won't keep is let go.
+        expect(google.revoked).toHaveLength(1);
+        // Disconnected first, the other account connects, and nothing moves.
+        await service.disconnect(ctx);
+        await expect(connectFlow(ctx)).resolves.toMatch(/calendar=connected$/);
+        const status = await service.status(ctx);
+        expect(status.accounts.map((a) => a.googleEmail)).toEqual([
+            google.grantEmail,
+        ]);
+    });
+
+    it("connects several accounts where the plan allows, one taking bookings (DEC-233)", async () => {
+        const original = planMeter.enforcedRow.bind(planMeter);
+        const spy = jest
+            .spyOn(planMeter, "enforcedRow")
+            .mockImplementation((orgId, moduleId, now) =>
+                moduleId === "google-accounts"
+                    ? Promise.resolve({
+                          moduleId,
+                          state: "on",
+                          limit: 2,
+                      } as Awaited<ReturnType<typeof original>>)
+                    : original(orgId, moduleId, now),
+            );
+        try {
+            const { ctx } = await person();
+            await connectFlow(ctx);
+            const work = `${uniq("meera-work")}@example.com`;
+            google.grantEmail = work;
+            google.accountCalendars.set(work, [
+                { id: "work-cal", name: "Work", primary: true, canWrite: true },
+            ]);
+            await expect(connectFlow(ctx)).resolves.toMatch(
+                /calendar=connected$/,
+            );
+            let status = await service.status(ctx);
+            expect(status.accountsAllowed).toBe(2);
+            expect(status.accounts).toHaveLength(2);
+            // The second reads busy times, and bookings stay with the first.
+            expect(status.accounts[1].calendars).toEqual([
+                {
+                    id: "work-cal",
+                    name: "Work",
+                    writeTo: false,
+                    checkBusy: true,
+                },
+            ]);
+            expect(status.bookingsGoTo?.accountId).toBe(status.accounts[0].id);
+            // Put them here: one across both accounts.
+            status = await service.choose(ctx, status.accounts[1].id, {
+                writeTo: "work-cal",
+                checkBusy: ["work-cal"],
+            });
+            expect(status.bookingsGoTo).toMatchObject({
+                accountId: status.accounts[1].id,
+                calendarId: "work-cal",
+            });
+            expect(
+                status.accounts[0].calendars.filter((c) => c.writeTo),
+            ).toHaveLength(0);
+            // A third is past the allowance.
+            google.grantEmail = `${uniq("third")}@example.com`;
+            await expect(connectFlow(ctx)).resolves.toMatch(/calendar=limit$/);
+            // One account disconnected; the other carries on.
+            const view = await service.disconnect(ctx, status.accounts[0].id);
+            expect(view.accounts.map((a) => a.googleEmail)).toEqual([work]);
+        } finally {
+            spy.mockRestore();
+        }
     });
 
     it("revokes only at the grant's last use (GC-06)", async () => {
@@ -565,4 +729,132 @@ describe("connecting Google Calendar", () => {
         await service.disconnect(c.ctx);
         expect(google.revoked).toHaveLength(1);
     });
+
+    // The security review's fixes (09-calendar-v2).
+    it("an Admin can't disconnect the Owner's Google Calendar (M1)", async () => {
+        const { ctx, membershipId } = await person({ role: "OWNER" });
+        await connectFlow(ctx);
+        const admin = {
+            ...ctx,
+            userId: uniq("admin"),
+            role: "ADMIN",
+        } as OrganizationContext;
+        await expect(
+            service.disconnectMember(admin, membershipId),
+        ).rejects.toMatchObject({ status: 403 });
+        expect(
+            await prisma.googleCalendarConnection.count({
+                where: { membershipId, status: "CONNECTED" },
+            }),
+        ).toBe(1);
+    });
+
+    it("after a downgrade, the accounts past the allowance read PAUSED for the plan (M3)", async () => {
+        const two = allowAccounts(2);
+        const { ctx, membershipId } = await person();
+        let status: Awaited<ReturnType<typeof service.status>>;
+        try {
+            await connectFlow(ctx);
+            google.grantEmail = `${uniq("meera-work")}@example.com`;
+            await connectFlow(ctx);
+            status = await service.status(ctx);
+            // Bookings go to the second: it is the one kept.
+            status = await service.choose(ctx, status.accounts[1].id, {
+                writeTo: "primary-cal",
+                checkBusy: ["primary-cal"],
+            });
+        } finally {
+            two.mockRestore();
+        }
+        const [first, second] = status.accounts.map((a) => a.id);
+        const one = allowAccounts(1);
+        try {
+            await expect(overAllowance(ctx.organizationId)).resolves.toEqual(
+                new Set([first]),
+            );
+            await expect(
+                pausedBecause(ctx.organizationId, membershipId, flags, first),
+            ).resolves.toBe("plan");
+            await expect(
+                pausedBecause(ctx.organizationId, membershipId, flags, second),
+            ).resolves.toBeNull();
+            const after = await service.status(ctx);
+            expect(after.accounts.map((a) => [a.id, a.state])).toEqual([
+                [first, "PAUSED"],
+                [second, "CONNECTED"],
+            ]);
+        } finally {
+            one.mockRestore();
+        }
+    });
+
+    it("two consents finishing at once can't both pass the allowance (M3)", async () => {
+        const { ctx, membershipId } = await person();
+        const twin = (email: string) => {
+            const g = new FakeGoogleCalendar();
+            g.grantEmail = email;
+            return new CalendarConnectService(
+                g,
+                flags as unknown as FeatureFlagService,
+                new CalendarLapseService(),
+                new CalendarReleaseService(g),
+            );
+        };
+        const outcomes = await Promise.all([
+            twin(`${uniq("a")}@example.com`).connect(ctx, membershipId, "c1"),
+            twin(`${uniq("b")}@example.com`).connect(ctx, membershipId, "c2"),
+        ]);
+        expect(outcomes.sort()).toEqual(["connected", "limit"]);
+        expect(
+            await prisma.googleCalendarConnection.count({
+                where: { membershipId },
+            }),
+        ).toBe(1);
+    });
+
+    it("a disconnect keeps only what a reconnect needs, and the sweep deletes it after 30 days (L1)", async () => {
+        const { ctx, membershipId } = await person();
+        await connectFlow(ctx);
+        const { bookingId } = await mapped(ctx, membershipId, 24);
+        await service.disconnect(ctx);
+        const row = await prisma.googleCalendarConnection.findFirstOrThrow({
+            where: { membershipId },
+            include: { calendars: true, events: true },
+        });
+        expect(row).toMatchObject({ status: "DISCONNECTED", scopes: [] });
+        expect(row.calendars).toEqual([]);
+        expect(row.events.map((e) => e.bookingId)).toEqual([bookingId]);
+
+        const sweep = new CalendarSweepJob();
+        await expect(sweep.purgeDisconnected(new Date())).resolves.toBe(0);
+        await prisma.googleCalendarConnection.update({
+            where: { id: row.id },
+            data: { updatedAt: new Date(Date.now() - 31 * 86_400_000) },
+        });
+        await sweep.purgeDisconnected(new Date());
+        expect(
+            await prisma.googleCalendarConnection.count({
+                where: { id: row.id },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.googleCalendarEvent.count({ where: { bookingId } }),
+        ).toBe(0);
+    });
 });
+
+/** The plan's Google accounts a person, as the catalogue would set it. */
+function allowAccounts(limit: number) {
+    const original = planMeter.enforcedRow.bind(planMeter);
+    return jest
+        .spyOn(planMeter, "enforcedRow")
+        .mockImplementation((orgId, moduleId, now) =>
+            moduleId === "google-accounts"
+                ? Promise.resolve({
+                      moduleId,
+                      state: "on",
+                      limit,
+                  } as Awaited<ReturnType<typeof original>>)
+                : original(orgId, moduleId, now),
+        );
+}

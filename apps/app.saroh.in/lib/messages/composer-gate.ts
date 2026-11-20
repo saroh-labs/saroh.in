@@ -17,7 +17,7 @@ import { planLabel, providerDisconnected } from "@saroh/ui/lib/state-copy";
  * - No connected provider for the channel: where the plan has room to
  *   connect one (the catalogue's `integrations` row, DEC-091 — the same
  *   decision as the connect's own check, `roomForOneMore`), "Connect your
- *   email to write from here" to Providers. Where it hasn't (Free, the
+ *   email to write from here" to Integrations. Where it hasn't (Free, the
  *   DEC-086 amendment), the plan that has it and See plans.
  * - Unknown (the providers or the plan couldn't be read): the composer, as
  *   before; the send's refusal is then said in merchant words
@@ -106,10 +106,10 @@ export function composerGate({
  */
 export function sendFailureWords(error: string, channel: MessageChannel) {
     if (/no connected provider/i.test(error)) {
-        return `Nothing was sent: ${NOUN[channel]} isn't connected. Connect it in Settings › Providers.`;
+        return `Nothing was sent: ${NOUN[channel]} isn't connected. Connect it in Settings › Integrations.`;
     }
     if (/is not connected/i.test(error)) {
-        return `Nothing was sent: ${NOUN[channel]} is disconnected. Reconnect it in Settings › Providers.`;
+        return `Nothing was sent: ${NOUN[channel]} is disconnected. Reconnect it in Settings › Integrations.`;
     }
     if (error.includes("MODULE_UNAVAILABLE")) {
         return "Nothing was sent: messaging is turned off for your business. Turn on Communications in Settings › Modules.";

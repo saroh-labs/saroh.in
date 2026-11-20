@@ -342,7 +342,7 @@ export async function seed(): Promise<void> {
 
     // A connected-but-disabled provider: a merchant who set Razorpay up and
     // then turned it off. Kept alongside the live Cashfree connection below so
-    // `/settings/providers` has a provider set that is genuinely mixed rather
+    // `/settings/integrations` has a provider set that is genuinely mixed rather
     // than uniformly healthy.
     await prisma.merchantPaymentProvider.upsert({
         where: {
@@ -1346,7 +1346,7 @@ async function seedWebsite(
 
 /**
  * The external services the org depends on, in three different states, so
- * `/settings/providers` shows the surface doing its job rather than three
+ * `/settings/integrations` shows the surface doing its job rather than three
  * identical cards.
  */
 async function seedProviders(
@@ -1364,7 +1364,7 @@ async function seedProviders(
     });
     if (!standIns) {
         console.log(
-            "[seed] not this machine's database: no stand-in provider connections (connect real test keys in Settings › Providers)",
+            "[seed] not this machine's database: no stand-in provider connections (connect real test keys in Settings › Integrations)",
         );
     }
     await seedStandInCommunicationProvider(prisma, {

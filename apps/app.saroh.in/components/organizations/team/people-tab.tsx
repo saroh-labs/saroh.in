@@ -28,12 +28,28 @@ import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { useLocalPages } from "@saroh/ui/page-sizes";
 import { Info } from "lucide-react";
+
+import type { CalendarMember } from "@/lib/google-calendar/types";
+import { teamCalendarWords } from "@/lib/google-calendar/words";
+
+import { GoogleCalendarCell } from "./google-calendar-cell";
 import { LastActiveLine } from "./last-active-line";
 import { LeaveBusiness } from "./leave-business";
 import { ExtrasCell, ExtrasLine } from "./member-extras";
 import { PendingInvites } from "./pending-invites";
 import type { RoleBook } from "./role-book";
 import { nameOf } from "./role-book";
+
+const XL_COLS: Record<string, string> = {
+    "minmax(170px,1.3fr)_112px_150px":
+        "xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]",
+    "minmax(170px,1.3fr)_112px_minmax(0,210px)_150px":
+        "xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]",
+    "minmax(170px,1.3fr)_112px_minmax(0,190px)_150px":
+        "xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,190px)_150px]",
+    "minmax(170px,1.3fr)_112px_minmax(0,210px)_minmax(0,190px)_150px":
+        "xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_minmax(0,190px)_150px]",
+};
 
 export function PeopleTab({
     organizationName,
@@ -45,7 +61,17 @@ export function PeopleTab({
     onRemove,
     notice,
     paused,
+    calendar = null,
 }: {
+    /**
+     * Who has connected Google Calendar (DEC-233), by user id, for whoever
+     * may change roles while Google Calendar is on here; null draws no
+     * column.
+     */
+    calendar?: {
+        byUser: Record<string, CalendarMember>;
+        canDisconnect: boolean;
+    } | null;
     organizationName: string;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
@@ -66,9 +92,17 @@ export function PeopleTab({
     const withExtras = anyoneHasExtras(members);
     // The only owner can't leave: no button on their row, and why below.
     const onlyOwner = isOnlyOwner(members) === true;
-    const grid = withExtras
-        ? "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_minmax(0,210px)_150px]"
-        : "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 xl:grid-cols-[minmax(170px,1.3fr)_112px_150px]";
+    const cols = [
+        "minmax(170px,1.3fr)",
+        "112px",
+        withExtras ? "minmax(0,210px)" : null,
+        calendar ? "minmax(0,190px)" : null,
+        "150px",
+    ]
+        .filter(Boolean)
+        .join("_");
+    // Tailwind reads whole class names from the source: each layout is spelled out.
+    const grid = `grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 ${XL_COLS[cols] ?? ""}`;
     const rowButton = "text-[12.5px]";
     // A page of people at a time, at the size this list was last shown at.
     const { rows: paged, paging } = useLocalPages("team", members, {
@@ -97,6 +131,9 @@ export function PeopleTab({
                     <span data-ph-unmask="">Role</span>
                     {withExtras ? (
                         <span data-ph-unmask="">Extra permissions</span>
+                    ) : null}
+                    {calendar ? (
+                        <span data-ph-unmask="">Google Calendar</span>
                     ) : null}
                     <span />
                 </ListTableHead>
@@ -176,6 +213,18 @@ export function PeopleTab({
                                             </span>
                                         </p>
                                         <ExtrasLine labels={extras} />
+                                        {calendar ? (
+                                            <p className="mt-px truncate text-[11.5px] text-muted-foreground xl:hidden">
+                                                Google Calendar:{" "}
+                                                {
+                                                    teamCalendarWords(
+                                                        calendar.byUser[
+                                                            m.userId
+                                                        ] ?? null,
+                                                    ).state
+                                                }
+                                            </p>
+                                        ) : null}
                                         <LastActiveLine at={m.lastActiveAt} />
                                     </div>
                                 </div>
@@ -188,6 +237,19 @@ export function PeopleTab({
                                 {withExtras ? (
                                     <div className="hidden min-w-0 xl:block">
                                         <ExtrasCell labels={extras} />
+                                    </div>
+                                ) : null}
+                                {calendar ? (
+                                    <div className="hidden min-w-0 xl:block">
+                                        <GoogleCalendarCell
+                                            member={
+                                                calendar.byUser[m.userId] ??
+                                                null
+                                            }
+                                            canDisconnect={
+                                                calendar.canDisconnect
+                                            }
+                                        />
                                     </div>
                                 ) : null}
                                 <div className="flex flex-wrap justify-end gap-1.5">

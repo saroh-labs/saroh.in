@@ -26,7 +26,7 @@ export interface RowPlanLock {
 /**
  * The steps that are only "connect a provider" (none yet, or the one it had
  * disabled): on a plan that won't let it connect one, the lock is the
- * answer, never "Go to Providers" beside it (UX-017).
+ * answer, never "Go to Integrations" beside it (UX-017).
  */
 const CONNECT_STEPS = new Set([
     "PAYMENTS_NO_PROVIDER",

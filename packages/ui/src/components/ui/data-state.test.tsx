@@ -455,8 +455,8 @@ describe("ProviderDisconnectedState and NotPublishedNotice", () => {
                 screen.getByRole("heading", { name: title }),
             ).toBeInTheDocument();
             expect(
-                screen.getByRole("link", { name: "Connect in Providers" }),
-            ).toHaveAttribute("href", "/settings/providers");
+                screen.getByRole("link", { name: "Connect in Integrations" }),
+            ).toHaveAttribute("href", "/settings/integrations");
         },
     );
 
@@ -476,7 +476,7 @@ describe("ProviderDisconnectedState and NotPublishedNotice", () => {
         expect(screen.queryByRole("link")).toBeNull();
         expect(
             screen.getByText(
-                "An owner or admin can connect one in Settings › Providers.",
+                "An owner or admin can connect one in Settings › Integrations.",
             ),
         ).toBeInTheDocument();
     });
