@@ -94,7 +94,7 @@ test.describe("the Website area's shell", () => {
         const siteId = await northwindSite(page.request);
         await page.goto(`/sites/${siteId}/posts`);
         test.skip(
-            !/\/writing/.test(page.url()),
+            !page.url().includes("/writing"),
             "NEXT_PUBLIC_WEBSITE_AREA is off: Posts is still a tab",
         );
         await expect(
