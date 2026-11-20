@@ -9,7 +9,8 @@ import { env } from "@/env";
  * there checks today's screens. It hides; it protects nothing.
  *
  * Readers: `/sites`, the site layout (`[siteId]/(tabs)/layout.tsx`), the
- * Overview and Writing routes, the Posts tab's forward, and the command
+ * Overview and Writing routes, the Posts tab's forward, Version history's
+ * restore (`restoresAsDraft`), and the command
  * menu's site rows. Removed with today's `WebsiteHeader` once the area has
  * been on in production for a release (00-universal §15).
  */
@@ -24,4 +25,13 @@ export function websiteAreaOnFor(
 /** {@link websiteAreaOnFor} for this build. Client-safe: both are public. */
 export function websiteAreaOn(): boolean {
     return websiteAreaOnFor(env.NEXT_PUBLIC_WEBSITE_AREA, env.NODE_ENV);
+}
+
+/**
+ * The one choice between the two restores (owner, 20 Nov 2026): on, a
+ * version is restored as the draft (`restore-version.tsx`); off, it goes
+ * live again as it always did (`versions/legacy/`).
+ */
+export function restoresAsDraft(): boolean {
+    return websiteAreaOn();
 }

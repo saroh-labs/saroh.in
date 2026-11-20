@@ -1639,6 +1639,49 @@ export async function getPublication(
     );
 }
 
+/**
+ * Put a past version back. Appends a new publication rather than deleting the
+ * ones after it, so this can itself be undone. Parked for the Website area
+ * off (`restoresAsDraft`, owner 20 Nov 2026).
+ */
+export async function restorePublication(
+    siteId: string,
+    publicationId: string,
+    /** An owner's restore past "Publishing needs approval" (DEC-071, Q3). */
+    override = false,
+): Promise<SitesResult<{ publicationId: string; bypassed: boolean }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/${siteId}/publications/${publicationId}/restore`,
+        {
+            method: "POST",
+            ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+        },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        publicationId?: string;
+        bypassed?: boolean;
+        message?: string;
+        error?: string;
+    } | null;
+    if (res.ok && data?.publicationId) {
+        return {
+            ok: true,
+            data: {
+                publicationId: data.publicationId,
+                // Whether this restore went live past a change request (#279).
+                bypassed: data.bypassed === true,
+            },
+        };
+    }
+    return { ok: false, ...readError(data, "Couldn't restore that version.") };
+}
+
 /** What "Use this look with its starter content" did (DEC-182). */
 export interface StarterContentCopy {
     /** What its Undo puts back. */

@@ -3106,6 +3106,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: Restore in the editor's History and on Version history put an old version live at once, as a new publish.
 - Decision: **Restore <date> as the draft** copies the version's pages and sections into the current draft. Nothing goes live until Publish, which asks for approval like any publish. Each section it changes is stamped with the person restoring, so the Publish sheet lists every change as theirs. It needs the editor's own write (`section:write`), not `site:publish`; a reader can't restore. The confirm says "This replaces your draft with this version. It goes live only when you publish." A page removed since is skipped; a page added since stays; page settings, the menu and the look are not part of it.
 - Consequences: `POST …/sites/:siteId/publications/:publicationId/restore-draft` (revision checked for the open page, 409 when stale; audited as `site.version.restored_as_draft`). The editor reloads on History after a restore. The old make-it-live endpoint (`…/publications/:id/restore`) stays in the API, where the live pointer's `restore` source and its specs use it; the app no longer calls it.
+- Behind the Website area switch (owner, 20 Nov 2026): with `NEXT_PUBLIC_WEBSITE_AREA` off, Version history and a past version keep today's restore, which puts the version live again (`components/sites/versions/legacy/`, chosen by `restoresAsDraft()`).
 
 ## DEC-233 A post's approval is a change unit; Publish post becomes Send for approval when the switch is on
 
