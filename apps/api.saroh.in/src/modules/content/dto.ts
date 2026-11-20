@@ -233,6 +233,43 @@ export class SchedulePostDto {
     at!: string;
 }
 
+/**
+ * Send for approval (O7): words for whoever approves, and a day to go live
+ * once approved (absent: as soon as it is approved).
+ */
+export class PostApprovalRequestDto {
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(500, { message: "Keep the note under 500 characters." })
+    note?: string | null;
+
+    @IsOptional()
+    @IsISO8601(
+        { strict: true },
+        { message: "Pick a date and time for it to go live" },
+    )
+    at?: string;
+}
+
+/** Approve a post (O7): the fingerprint the approver read, when sent. */
+export class ApprovePostDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    fingerprint?: string;
+}
+
+/** Ask for changes on a post, saying what (UX-043). */
+export class AskPostChangesDto extends ApprovePostDto {
+    @Transform(trim)
+    @IsString({ message: "Say what needs changing." })
+    @MinLength(3, { message: "Say what needs changing." })
+    @MaxLength(500, { message: "Keep it under 500 characters." })
+    reason!: string;
+}
+
 // ---- Post categories ----
 
 export class CreatePostCategoryDto {

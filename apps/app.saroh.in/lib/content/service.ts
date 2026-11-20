@@ -72,6 +72,42 @@ export interface PostDetail {
     oldSlugs?: string[];
     /** What the public reads, for diffs against the draft; null when not live. */
     liveCopy?: PostLiveCopy | null;
+    /** "Publishing needs approval" as it applies to this post (O7). */
+    approval?: PostApproval;
+}
+
+/** Who may approve a post. */
+export interface PostApprover {
+    id: string;
+    name: string;
+    role: "REVIEWER" | "OWNER" | "ADMIN";
+}
+
+/**
+ * A post's approval (O7) as the caller sees it: whether their Publish post
+ * is Send for approval, whether they may approve, the open request and the
+ * verdict standing on the post as it is now.
+ */
+export interface PostApproval {
+    on: boolean;
+    mustAsk: boolean;
+    canApprove: boolean;
+    state: "not-needed" | "approved" | "asked" | "waiting";
+    /** What an approval binds to; sent back with Approve. */
+    fingerprint: string;
+    lastEditorId: string | null;
+    verdict: {
+        by: { id: string; name: string } | null;
+        at: string | null;
+        reason: string | null;
+    } | null;
+    request: {
+        by: { id: string; name: string } | null;
+        note: string | null;
+        at: string;
+    } | null;
+    /** Everyone who may approve it but its last editor. */
+    approvers: PostApprover[];
 }
 
 /** The live copy of a post, as its current publication holds it (U17a). */
@@ -93,7 +129,13 @@ export interface PostLiveCopy {
 
 /** Why a revision was kept (U17a). */
 export type PostRevisionReason =
-    "autosave" | "published" | "restored" | "ask_ai" | "not_published";
+    | "autosave"
+    | "published"
+    | "restored"
+    | "ask_ai"
+    | "not_published"
+    | "sent"
+    | "approved";
 
 /** One row of a post's History, newest first. */
 export interface PostRevisionRow {
@@ -335,4 +377,53 @@ export async function restorePostRevision(
         `${base}/posts/${postId}/revisions/${revisionId}/restore`,
         "POST",
     );
+}
+
+/** Send for approval (O7): a note, and a day to go live once approved. */
+export async function requestPostApproval(
+    siteId: string,
+    postId: string,
+    input: { note: string | null; at?: string },
+) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg<{ id: string; scheduledAt: string | null }>();
+    return mutate<{ id: string; scheduledAt: string | null }>(
+        `${base}/posts/${postId}/approval-request`,
+        "POST",
+        input,
+    );
+}
+
+/** What Approve did: published now, or left for the writer's day. */
+export interface PostApproved {
+    published: boolean;
+    scheduledAt: string | null;
+}
+
+/** Approve a post (O7): it goes live now, or on its writer's day. */
+export async function approvePost(
+    siteId: string,
+    postId: string,
+    fingerprint: string,
+) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg<PostApproved>();
+    return mutate<PostApproved>(`${base}/posts/${postId}/approve`, "POST", {
+        fingerprint,
+    });
+}
+
+/** Ask for changes on a post, with a reason (UX-043). */
+export async function askPostChanges(
+    siteId: string,
+    postId: string,
+    reason: string,
+    fingerprint: string,
+) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg();
+    return mutate(`${base}/posts/${postId}/ask`, "POST", {
+        reason,
+        fingerprint,
+    });
 }

@@ -28,6 +28,12 @@ import { queueReviewAlert } from "./review-alert-queue";
 
 export type ChangeVerdict = "APPROVED" | "CHANGES_REQUESTED";
 
+/**
+ * What a verdict binds to: a site's change unit, or a whole post
+ * (`post:<postId>`, O7, KTD-E6), which publishes on its own.
+ */
+export type ApprovalUnit = Pick<ChangeUnit, "key" | "fingerprint" | "editedBy">;
+
 export const OWN_CHANGE_MESSAGE =
     "You can't approve a change you made. Someone else on the team can.";
 
@@ -60,7 +66,7 @@ export interface UnitVerdictRow {
  * ids of the business's owners and admins.
  */
 export function unitApprovals(
-    units: readonly ChangeUnit[],
+    units: readonly ApprovalUnit[],
     rows: readonly UnitVerdictRow[],
     leads: ReadonlySet<string>,
 ): Map<string, UnitApproval> {
@@ -136,7 +142,7 @@ export async function readUnitVerdicts(
     return { rows, leads: new Set(members.map((m) => m.userId)) };
 }
 
-export function editorsOf(units: readonly ChangeUnit[]): string[] {
+export function editorsOf(units: readonly ApprovalUnit[]): string[] {
     return [
         ...new Set(
             units.map((u) => u.editedBy).filter((id): id is string => !!id),
@@ -155,7 +161,7 @@ export async function heldForApproval(
         organizationId: string;
         siteId: string;
         userId: string;
-        units: readonly ChangeUnit[];
+        units: readonly ApprovalUnit[];
     },
 ): Promise<string[]> {
     const { rows, leads } = await readUnitVerdicts(tx, {
@@ -214,7 +220,7 @@ export async function recordUnitVerdicts(
     ctx: OrganizationContext,
     input: {
         siteId: string;
-        units: readonly ChangeUnit[];
+        units: readonly ApprovalUnit[];
         keys: readonly string[];
         outcome: ChangeVerdict;
         reason?: string | null;
@@ -228,7 +234,7 @@ export async function recordUnitVerdicts(
             details: { reason: "changeGone" },
         });
     }
-    const units = chosen as ChangeUnit[];
+    const units = chosen as ApprovalUnit[];
     if (units.some((u) => u.editedBy === ctx.userId)) {
         throw new ForbiddenException({
             message: OWN_CHANGE_MESSAGE,

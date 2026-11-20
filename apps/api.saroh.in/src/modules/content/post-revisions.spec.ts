@@ -19,12 +19,16 @@ const state: RevisionState = {
     authorId: "user-1",
 };
 
-function fakeTx(lastAt: Date | null) {
+function fakeTx(lastAt: Date | null, lastBy = "user-1") {
     return {
         postRevision: {
             findFirst: jest
                 .fn()
-                .mockResolvedValue(lastAt ? { createdAt: lastAt } : null),
+                .mockResolvedValue(
+                    lastAt
+                        ? { createdAt: lastAt, savedByUserId: lastBy }
+                        : null,
+                ),
             create: jest.fn().mockResolvedValue({}),
         },
     };
@@ -55,10 +59,23 @@ describe("revisions after a save (U17a)", () => {
         expect(tx.postRevision.create).not.toHaveBeenCalled();
     });
 
+    it("keeps an autosave by someone else, so the last editor is known (O7)", async () => {
+        const tx = fakeTx(new Date("2026-11-20T09:30:00Z"), "user-2");
+        await save(tx);
+        expect(tx.postRevision.create).toHaveBeenCalledWith({
+            select: { id: true },
+            data: expect.objectContaining({
+                reason: "autosave",
+                savedByUserId: "user-1",
+            }),
+        });
+    });
+
     it("always keeps an Ask AI save, named", async () => {
         const tx = fakeTx(new Date("2026-11-20T09:59:00Z"));
         await save(tx, "ask_ai");
         expect(tx.postRevision.create).toHaveBeenCalledWith({
+            select: { id: true },
             data: expect.objectContaining({
                 reason: "ask_ai",
                 organizationId: "org-1",

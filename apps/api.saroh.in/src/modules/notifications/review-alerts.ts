@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import { approverIdsOf } from "../content/post-approval";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import { noticeOf } from "./notice-target";
@@ -51,6 +52,8 @@ export async function wordReview(
             return wordRelease(tx, organizationId, p.testReleaseId);
         case "change":
             return wordChangeAsk(tx, organizationId, p);
+        case "post":
+            return wordPostAsk(tx, organizationId, p.revisionId);
     }
 }
 
@@ -330,12 +333,15 @@ async function wordChangeAsk(
         select: {
             id: true,
             siteId: true,
+            unitKey: true,
             byUserId: true,
             reason: true,
             site: { select: { name: true } },
         },
     });
     if (!a) return null;
+    // A post's verdict (O7) opens the post; a site change, its pages.
+    const postId = a.unitKey.startsWith("post:") ? a.unitKey.slice(5) : null;
     const by = await tx.user.findUnique({
         where: { id: a.byUserId },
         select: { name: true, email: true },
@@ -359,10 +365,73 @@ async function wordChangeAsk(
             heading: `${mailName(by?.name, "Someone on the team")} asked for changes to your work on ${mailName(a.site.name, "your website")}`,
             body: "Open the site in Saroh to read what they asked.",
         },
-        path: `/sites/${a.siteId}/pages`,
+        path: postId
+            ? `/sites/${a.siteId}/write/${postId}`
+            : `/sites/${a.siteId}/pages`,
         skipUserId: a.byUserId,
         forUserId: p.editorUserId,
         alwaysUserId: p.editorUserId,
+    };
+}
+
+/**
+ * A post sent for approval (O7): emailed to everyone who may approve it
+ * (the site's reviewers, the admins and the owner) but the writer. Says
+ * nothing once the post has gone live since. The note is team free text:
+ * the email leaves it and the title out.
+ */
+async function wordPostAsk(
+    tx: Tx,
+    organizationId: string,
+    revisionId: string,
+): Promise<WordedAlert | null> {
+    const r = await tx.postRevision.findFirst({
+        where: { id: revisionId, organizationId, reason: "sent" },
+        select: {
+            postId: true,
+            createdAt: true,
+            savedByUserId: true,
+            post: {
+                select: {
+                    title: true,
+                    siteId: true,
+                    site: { select: { name: true } },
+                },
+            },
+            savedBy: { select: { name: true, email: true } },
+        },
+    });
+    if (!r) return null;
+    const since = await tx.postRevision.count({
+        where: {
+            postId: r.postId,
+            reason: "published",
+            createdAt: { gt: r.createdAt },
+        },
+    });
+    if (since > 0) return null;
+    const approvers = (
+        await approverIdsOf(tx, organizationId, r.post.siteId)
+    ).filter((id) => id !== r.savedByUserId);
+    if (approvers.length === 0) return null;
+    const who = r.savedBy ? nameOf(r.savedBy) : "Someone on the team";
+    const body = "Read it, then approve it or ask for changes.";
+    return {
+        event: "site",
+        eventKey: `team:review-post:${revisionId}`,
+        notificationId: null,
+        type: "site.review.requested",
+        title: `${who} asked you to approve ${r.post.title}`,
+        body,
+        mail: {
+            heading: `${mailName(r.savedBy?.name, "Someone on the team")} asked you to approve a post on ${mailName(r.post.site.name, "your website")}`,
+            body,
+        },
+        path: `/sites/${r.post.siteId}/write/${r.postId}`,
+        skipUserId: r.savedByUserId,
+        noBell: true,
+        emailUserIds: approvers,
+        cta: "Open the post",
     };
 }
 

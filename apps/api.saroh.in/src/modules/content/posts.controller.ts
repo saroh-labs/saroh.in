@@ -16,7 +16,15 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
-import { CreatePostDto, SchedulePostDto, UpdatePostDto } from "./dto";
+import {
+    ApprovePostDto,
+    AskPostChangesDto,
+    CreatePostDto,
+    PostApprovalRequestDto,
+    SchedulePostDto,
+    UpdatePostDto,
+} from "./dto";
+import { PostApprovalService } from "./post-approval.service";
 import { PostRevisionsService } from "./post-revisions.service";
 import { PostsService } from "./posts.service";
 
@@ -37,6 +45,7 @@ export class PostsController {
     constructor(
         private readonly posts: PostsService,
         private readonly revisions: PostRevisionsService,
+        private readonly approval: PostApprovalService,
     ) {}
 
     @Get()
@@ -116,6 +125,48 @@ export class PostsController {
         @Param("postId") postId: string,
     ) {
         return this.posts.unschedule(ctx, siteId, postId);
+    }
+
+    /**
+     * Send for approval (O7): `{ note?, at? }`. `section:write`. Alerts
+     * whoever may approve it.
+     */
+    @Post(":postId/approval-request")
+    @HttpCode(200)
+    requestApproval(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: PostApprovalRequestDto,
+    ) {
+        return this.approval.request(ctx, siteId, postId, dto);
+    }
+
+    /**
+     * Approve the post (O7): `site:approve`, never its last editor (403).
+     * Publishes it now, or on the day its writer picked.
+     */
+    @Post(":postId/approve")
+    @HttpCode(200)
+    approve(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: ApprovePostDto,
+    ) {
+        return this.approval.approve(ctx, siteId, postId, dto);
+    }
+
+    /** Ask for changes on the post, with a reason (UX-043). Same rules. */
+    @Post(":postId/ask")
+    @HttpCode(200)
+    askForChanges(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: AskPostChangesDto,
+    ) {
+        return this.approval.askForChanges(ctx, siteId, postId, dto);
     }
 
     /** History (U17a): newest first, who and why, no bodies. */

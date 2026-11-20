@@ -821,6 +821,7 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
             return (p.about === "approval" && str("approvalId")) ||
                 (p.about === "note" && str("commentId")) ||
                 (p.about === "release" && str("testReleaseId")) ||
+                (p.about === "post" && str("revisionId")) ||
                 (p.about === "change" &&
                     str("changeApprovalId") &&
                     str("editorUserId"))

@@ -21,6 +21,8 @@ import {
 } from "../history/post-history-panel";
 import { PhonePostEditor } from "../phone/phone-post-editor";
 import { usePublishPost } from "../publish/publish-post";
+import { ApprovalBand } from "../review/approval-band";
+import { approvalStatus } from "../review/approval-words";
 import type { DetailsRow } from "./details-tab";
 import type { InspectorTab } from "./post-inspector";
 import { PostInspector } from "./post-inspector";
@@ -140,20 +142,25 @@ export function PostShell({
         [draft.live, draft.fields, category, liveCopy],
     );
     const scheduledAt = post?.scheduledAt ?? null;
+    const approval = post?.approval ?? null;
     const model: PostEditorModel = {
         data,
         draft,
         liveCopy,
         scheduledAt,
+        approval,
         waiting,
-        status: postStatusLabel({
-            live: draft.live,
-            waiting,
-            scheduledFor:
-                scheduledAt && !draft.live
-                    ? formatDateTime(scheduledAt, zone)
-                    : null,
-        }),
+        // "Waiting for Kavya's approval" while approval stands in the way (O7).
+        status:
+            approvalStatus(approval) ??
+            postStatusLabel({
+                live: draft.live,
+                waiting,
+                scheduledFor:
+                    scheduledAt && !draft.live
+                        ? formatDateTime(scheduledAt, zone)
+                        : null,
+            }),
         needsTitle: () => {
             if (draft.fields.title.trim()) return false;
             setTitleError(true);
@@ -245,6 +252,7 @@ export function PostShell({
                 onDiscard={onDiscard}
             />
             <PostBanner model={model} />
+            <ApprovalBand model={model} />
             <div className="flex min-h-0 flex-1">
                 {previewing ? null : (
                     <>

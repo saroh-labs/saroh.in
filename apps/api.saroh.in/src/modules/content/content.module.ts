@@ -6,6 +6,7 @@ import { CapabilitiesModule } from "../capabilities/capabilities.module";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
+import { PostApprovalService } from "./post-approval.service";
 import { PostCategoriesController } from "./post-categories.controller";
 import { PostCategoriesService } from "./post-categories.service";
 import { POST_GO_LIVE_TYPE, PostGoLiveHandler } from "./post-go-live.handler";
@@ -32,6 +33,7 @@ import { PostsService } from "./posts.service";
         PostsService,
         PostCategoriesService,
         PostRevisionsService,
+        PostApprovalService,
         PostGoLiveHandler,
         OrganizationGuard,
     ],

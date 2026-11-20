@@ -2,11 +2,14 @@
 
 import type { PostCategoryInput, PostInput, Result } from "./service";
 import {
+    approvePost as approvePostApi,
+    askPostChanges as askPostChangesApi,
     createPost as createPostApi,
     createPostCategory as createPostCategoryApi,
     deletePost as deletePostApi,
     deletePostCategory as deletePostCategoryApi,
     publishPost as publishPostApi,
+    requestPostApproval as requestPostApprovalApi,
     restorePostRevision as restorePostRevisionApi,
     schedulePost as schedulePostApi,
     unpublishPost as unpublishPostApi,
@@ -88,4 +91,32 @@ export async function restorePostRevision(
     revisionId: string,
 ) {
     return restorePostRevisionApi(siteId, postId, revisionId);
+}
+
+/** Send for approval (O7). */
+export async function requestPostApproval(
+    siteId: string,
+    postId: string,
+    input: { note: string | null; at?: string },
+) {
+    return requestPostApprovalApi(siteId, postId, input);
+}
+
+/** Approve a post (O7). */
+export async function approvePost(
+    siteId: string,
+    postId: string,
+    fingerprint: string,
+) {
+    return approvePostApi(siteId, postId, fingerprint);
+}
+
+/** Ask for changes on a post (O7, UX-043). */
+export async function askPostChanges(
+    siteId: string,
+    postId: string,
+    reason: string,
+    fingerprint: string,
+) {
+    return askPostChangesApi(siteId, postId, reason, fingerprint);
 }

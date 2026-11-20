@@ -5,10 +5,14 @@ import type { Prisma } from "@saroh/database";
  * reads. One an hour while it is being written, plus one for each named
  * event. Appended, never updated.
  *
- * Approval (O7) is not built. When it is, it adds `sent` (the request's
- * words in `note`) and `approved` here; the verdict itself is a
+ * Approval (O7, `post-approval.ts`): `sent` holds the request's words in
+ * `note`, `approved` who approved it. The verdict itself is a
  * `SiteChangeApproval` on unit `post:<postId>`, and "publish on a date" is
  * `Post.scheduledAt`, so it needs no table of its own.
+ *
+ * An autosave by someone other than whoever saved the last revision always
+ * writes one: the newest edit revision names the post's last editor, whom
+ * approval binds to (nobody approves their own writing).
  */
 export const REVISION_REASONS = [
     "autosave",
@@ -16,6 +20,8 @@ export const REVISION_REASONS = [
     "restored",
     "ask_ai",
     "not_published",
+    "sent",
+    "approved",
 ] as const;
 export type RevisionReason = (typeof REVISION_REASONS)[number];
 
@@ -80,8 +86,9 @@ export async function writeRevision(
         /** Set when two are written on one transaction, to keep their order. */
         at?: Date;
     },
-): Promise<void> {
-    await tx.postRevision.create({
+): Promise<{ id: string }> {
+    return tx.postRevision.create({
+        select: { id: true },
         data: {
             ...input.state,
             organizationId: input.organizationId,
@@ -113,9 +120,14 @@ export async function revisionAfterSave(
         const last = await tx.postRevision.findFirst({
             where: { postId: input.postId },
             orderBy: { createdAt: "desc" },
-            select: { createdAt: true },
+            select: { createdAt: true, savedByUserId: true },
         });
-        if (!autosaveDue(last?.createdAt, input.now ?? new Date())) return;
+        if (
+            last?.savedByUserId === input.savedByUserId &&
+            !autosaveDue(last.createdAt, input.now ?? new Date())
+        ) {
+            return;
+        }
     }
     await writeRevision(tx, {
         organizationId: input.organizationId,

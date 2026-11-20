@@ -15,6 +15,7 @@ import {
     PostHistoryPanel,
 } from "../history/post-history-panel";
 import { PostFeedback } from "../post-feedback";
+import { ApprovalBand } from "../review/approval-band";
 import { DetailsSheet } from "./details-sheet";
 import { AddMenu, MoreMenu } from "./phone-menus";
 import { PhonePostBar } from "./phone-post-bar";
@@ -110,6 +111,7 @@ export function PhonePostEditor({
                 />
             )}
             <PostBanner model={model} />
+            {previewing ? null : <ApprovalBand model={model} />}
             <div ref={setHost} className="relative min-h-0 flex-1">
                 <main
                     aria-label="Post"

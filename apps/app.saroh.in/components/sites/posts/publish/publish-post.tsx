@@ -1,11 +1,13 @@
 "use client";
 
+import { Avatar, AvatarFallback, avatarInitials } from "@saroh/ui/avatar";
 import { Button } from "@saroh/ui/button";
 import { RadioCards } from "@saroh/ui/choice-group";
 import { CopyButton } from "@saroh/ui/copy-button";
 import { DatePicker } from "@saroh/ui/date-picker";
 import { FormSheet } from "@saroh/ui/form-sheet";
 import { Label } from "@saroh/ui/label";
+import { Textarea } from "@saroh/ui/textarea";
 import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { AlertCircle, Check, MessageCircle, Share2 } from "lucide-react";
@@ -15,7 +17,11 @@ import { useId, useState } from "react";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { runAction } from "@/lib/api/run-action";
-import { schedulePost, unschedulePost } from "@/lib/content/actions";
+import {
+    requestPostApproval,
+    schedulePost,
+    unschedulePost,
+} from "@/lib/content/actions";
 import { wallClockToIso } from "@/lib/courses/sessions";
 import { formatDateTime } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
@@ -26,6 +32,11 @@ import { nextSlot, whenIn, zoneName } from "@/lib/sites/zone-time";
 
 import type { PostEditorModel } from "../editor/post-model";
 import type { PostFields } from "../editor/use-post-draft";
+import {
+    approversLine,
+    approversNote,
+    firstName,
+} from "../review/approval-words";
 
 /** One line of "Checked": done, or what to do about it. */
 export interface PostCheck {
@@ -146,6 +157,10 @@ export function PublishPostSheet({
     const [timeError, setTimeError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [live, setLive] = useState(false);
+    const [note, setNote] = useState("");
+    // O7: a teammate's Publish post is Send for approval (WXYApproval).
+    const asking = model.approval?.mustAsk ?? false;
+    const approvers = model.approval?.approvers ?? [];
 
     const url = postUrl(model);
     const shown = url?.replace(/^https?:\/\//, "") ?? null;
@@ -207,6 +222,50 @@ export function PublishPostSheet({
         onClose();
     }
 
+    /** Save first if needed, so what is approved is what they see. */
+    async function savedId(): Promise<string | null> {
+        const postId =
+            draft.dirty || !draft.postId
+                ? await runAction(() => draft.save({ silent: true }))
+                : draft.postId;
+        return postId ?? null;
+    }
+
+    async function sendForApproval() {
+        if (when === "later" && !at) {
+            setTimeError("Pick a day for it to go live.");
+            return;
+        }
+        setBusy(true);
+        const postId = await savedId();
+        if (!postId) {
+            setBusy(false);
+            return;
+        }
+        const res = await runAction(
+            () =>
+                requestPostApproval(data.siteId, postId, {
+                    note: note.trim() || null,
+                    ...(when === "later" && at ? { at } : {}),
+                }),
+            { setBusy },
+        );
+        if (!res) return;
+        if (!res.ok) {
+            if (res.field === "at") setTimeError(res.error);
+            else showError(res.error);
+            return;
+        }
+        const names = approvers.map((a) => firstName(a.name));
+        showSuccess(
+            names.length > 0
+                ? `Sent for approval. ${names.join(" and ")} ${names.length === 1 ? "hears" : "hear"} about it now.`
+                : "Sent for approval.",
+        );
+        draft.refresh();
+        onClose();
+    }
+
     async function unschedule() {
         if (!draft.postId) return;
         const postId = draft.postId;
@@ -228,27 +287,89 @@ export function PublishPostSheet({
         <FormSheet
             open
             bottomOnPhone
-            title="Publish this post"
-            description="Only this post goes live. Other changes on your site keep waiting until you publish them."
+            title={asking ? "Send for approval" : "Publish this post"}
+            description={
+                asking
+                    ? "Posts on this site go live once a reviewer, an admin or the owner approves them. Any one of them is enough. Nothing changes on the site until then."
+                    : "Only this post goes live. Other changes on your site keep waiting until you publish them."
+            }
             dirty={false}
             pending={busy || draft.publishing}
-            saveLabel={when === "now" ? "Publish post" : "Schedule"}
-            savingLabel={when === "now" ? "Publishing…" : "Scheduling…"}
+            saveLabel={
+                asking
+                    ? "Send for approval"
+                    : when === "now"
+                      ? "Publish post"
+                      : "Schedule"
+            }
+            savingLabel={
+                asking
+                    ? "Sending…"
+                    : when === "now"
+                      ? "Publishing…"
+                      : "Scheduling…"
+            }
             footNote={
-                // O7 (post approval) is not decided. When "Publishing needs
-                // approval" is on for a teammate who isn't the owner or an
-                // admin, this foot becomes "Send for approval" (WXWPublish's
-                // variant, WXYApproval's sheet). Nothing of it is built.
-                when === "now"
-                    ? "Goes live now, on its own. Site changes waiting stay waiting."
-                    : at
-                      ? `Goes live ${whenIn(at, zone)}, on its own. Until then the live copy stays as it is.`
-                      : "Goes live on the day you pick, on its own."
+                // O7: a teammate's request (WXWPublish's variant, WXYApproval).
+                asking
+                    ? "You can keep writing. Changes after you send go for approval too."
+                    : when === "now"
+                      ? "Goes live now, on its own. Site changes waiting stay waiting."
+                      : at
+                        ? `Goes live ${whenIn(at, zone)}, on its own. Until then the live copy stays as it is.`
+                        : "Goes live on the day you pick, on its own."
             }
             onClose={onClose}
-            onSubmit={when === "now" ? publishNow : publishLater}
+            onSubmit={
+                asking
+                    ? sendForApproval
+                    : when === "now"
+                      ? publishNow
+                      : publishLater
+            }
             fieldsClassName="gap-5"
         >
+            {asking ? (
+                <section data-approvers="" className="grid gap-3">
+                    <div className="flex items-center gap-3 rounded-xl border bg-card p-3">
+                        <span aria-hidden className="flex shrink-0 -space-x-2">
+                            {approvers.slice(0, 3).map((a) => (
+                                <Avatar key={a.id} size="list">
+                                    <AvatarFallback>
+                                        {avatarInitials(a.name)}
+                                    </AvatarFallback>
+                                </Avatar>
+                            ))}
+                        </span>
+                        <span className="min-w-0 text-[0.8125rem] text-muted-foreground">
+                            <b className="block text-sm text-foreground">
+                                {approvers.length > 0
+                                    ? approversLine(approvers)
+                                    : "A reviewer, an admin or the owner"}
+                            </b>
+                            {approversNote(approvers.length)}
+                        </span>
+                    </div>
+                    <div className="grid gap-1.5">
+                        <Label
+                            htmlFor={`${id}-note`}
+                            className="flex items-baseline justify-between"
+                        >
+                            Note for whoever approves
+                            <span className="text-xs font-normal text-muted-foreground">
+                                Optional
+                            </span>
+                        </Label>
+                        <Textarea
+                            id={`${id}-note`}
+                            rows={3}
+                            maxLength={500}
+                            value={note}
+                            onChange={(e) => setNote(e.target.value)}
+                        />
+                    </div>
+                </section>
+            ) : null}
             <div className="flex items-center gap-3.5 rounded-xl border bg-card p-3">
                 {fields.image.trim() ? (
                     // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL
@@ -355,18 +476,31 @@ export function PublishPostSheet({
                         setWhen(v);
                         setTimeError(null);
                     }}
-                    options={[
-                        {
-                            value: "now",
-                            label: "Now",
-                            note: "Visitors see it in a minute or two.",
-                        },
-                        {
-                            value: "later",
-                            label: "Later",
-                            note: "Pick a day and time. The live copy stays as it is until then.",
-                        },
-                    ]}
+                    options={
+                        asking
+                            ? [
+                                  {
+                                      value: "now",
+                                      label: "As soon as it is approved",
+                                  },
+                                  {
+                                      value: "later",
+                                      label: "After approval, on a day I pick",
+                                  },
+                              ]
+                            : [
+                                  {
+                                      value: "now",
+                                      label: "Now",
+                                      note: "Visitors see it in a minute or two.",
+                                  },
+                                  {
+                                      value: "later",
+                                      label: "Later",
+                                      note: "Pick a day and time. The live copy stays as it is until then.",
+                                  },
+                              ]
+                    }
                 />
                 {when === "later" ? (
                     <div className="grid gap-2">

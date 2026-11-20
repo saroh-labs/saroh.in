@@ -140,6 +140,8 @@ module.exports = {
         // Posts in the redesigned editor (U17a): old links and revisions, DB-free.
         "<rootDir>/src/modules/content/post-old-slugs.spec.ts",
         "<rootDir>/src/modules/content/post-revisions.spec.ts",
+        // Post approval (O7): the unit, its fingerprint and the gate, DB-free.
+        "<rootDir>/src/modules/content/post-approval.spec.ts",
         // S3-003 jobs: nextBackoff (pure), PrismaJobQueue.fail branch selection
         // (mocked prisma.job), the worker dispatch loop (in-memory FakeJobQueue
         // + real registry), and the registry — all DB-free / timer-free.

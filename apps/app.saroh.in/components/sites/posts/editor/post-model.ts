@@ -1,4 +1,9 @@
-import type { Post, PostCategory, PostLiveCopy } from "@/lib/content/service";
+import type {
+    Post,
+    PostApproval,
+    PostCategory,
+    PostLiveCopy,
+} from "@/lib/content/service";
 import type { ShareSetup } from "@/lib/share-item/share";
 import type { SiteCommentView } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
@@ -57,6 +62,8 @@ export interface PostEditorModel {
     liveCopy: PostLiveCopy | null;
     /** Publish post › Later: when it goes live, or null. */
     scheduledAt: string | null;
+    /** "Publishing needs approval" for this post (O7); null for a new one. */
+    approval: PostApproval | null;
     /** The parts that differ from the live copy (`postChanges`). */
     waiting: number;
     /** The chip's words (RULES §2). */

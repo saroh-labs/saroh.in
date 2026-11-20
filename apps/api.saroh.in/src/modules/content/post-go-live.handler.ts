@@ -3,6 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { schedulerStanding } from "../sites/go-live.handler";
+import { isLead, postHeldForApproval } from "./post-approval";
 import { assertPostEditable } from "./post-paused";
 import { publishPostInTx } from "./post-publish";
 import {
@@ -23,6 +24,8 @@ export type PostGoLiveRun =
     | { outcome: "skipped" };
 
 const AGAIN = "Publish it now, or schedule it again.";
+export const NOT_APPROVED =
+    "It wasn't approved by then, or it changed after it was approved. Send it for approval again.";
 
 /**
  * Consumer for `post.go_live` (editor redesign U17a): Publish post › Later,
@@ -40,8 +43,9 @@ const AGAIN = "Publish it now, or schedule it again.";
  * retries. A transient failure throws and the worker retries; the last
  * attempt records the no-go first, so a post never hangs as scheduled.
  *
- * Approval (O7) is not built: when it is, the re-check goes beside the
- * scheduler's, as `site.go_live` re-checks a test release's.
+ * Approval (O7) is re-checked beside the scheduler's, as `site.go_live`
+ * re-checks a test release's: a teammate's post goes live only if it was
+ * approved as it is now.
  */
 @Injectable()
 export class PostGoLiveHandler {
@@ -130,6 +134,17 @@ export async function runScheduledPost(
         return no(
             `${scheduler.name}, who scheduled it, can no longer publish posts. ${AGAIN}`,
         );
+    }
+    if (
+        await postHeldForApproval(tx, {
+            organizationId,
+            siteId: post.siteId,
+            postId: payload.postId,
+            userId: post.scheduledByUserId,
+            lead: await isLead(tx, organizationId, post.scheduledByUserId),
+        })
+    ) {
+        return no(NOT_APPROVED);
     }
 
     try {

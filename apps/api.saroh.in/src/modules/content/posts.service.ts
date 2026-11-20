@@ -18,6 +18,11 @@ import type {
     SchedulePostDto,
     UpdatePostDto,
 } from "./dto";
+import {
+    assertPostApproved,
+    isLeadRole,
+    readPostApproval,
+} from "./post-approval";
 import { assertPostEditable } from "./post-paused";
 import { publishPostInTx } from "./post-publish";
 import {
@@ -103,6 +108,7 @@ export class PostsService {
                 currentPublication: {
                     select: { publishedAt: true, snapshot: true },
                 },
+                authorId: true,
                 author: { select: { name: true } },
             },
         });
@@ -111,8 +117,15 @@ export class PostsService {
         }
         const { author, currentPublicationId, currentPublication, ...rest } =
             post;
+        // O7: the band, the request and Send for approval read this.
+        const approval = await readPostApproval(prisma, ctx, {
+            siteId,
+            postId,
+            state: revisionStateOf(post),
+        });
         return {
             ...rest,
+            approval,
             author: author?.name ?? null,
             live: currentPublicationId !== null,
             liveAt: currentPublication?.publishedAt ?? null,
@@ -303,14 +316,22 @@ export class PostsService {
         await this.requireSite(ctx, siteId);
         // Republishing a live post the plan paused is an edit (#800).
         await assertPostEditable(ctx.organizationId, postId);
-        const live = await prisma.$transaction((tx) =>
-            publishPostInTx(tx, {
+        const live = await prisma.$transaction(async (tx) => {
+            // O7: a teammate's post goes live once approved (409 until).
+            await assertPostApproved(tx, {
+                organizationId: ctx.organizationId,
+                siteId,
+                postId,
+                userId: ctx.userId,
+                lead: isLeadRole(ctx),
+            });
+            return publishPostInTx(tx, {
                 organizationId: ctx.organizationId,
                 siteId,
                 postId,
                 actorUserId: ctx.userId,
-            }),
-        );
+            });
+        });
         // Only the job passes `onlyIfScheduledAt`, so this always publishes.
         if (!live) throw new NotFoundException("Post not found");
         return live;
@@ -340,14 +361,22 @@ export class PostsService {
         }
         await this.requirePost(siteId, postId);
         await assertPostEditable(ctx.organizationId, postId);
-        await prisma.$transaction((tx) =>
-            schedulePostInTx(tx, {
+        await prisma.$transaction(async (tx) => {
+            // O7: a teammate picks a day in Send for approval instead.
+            await assertPostApproved(tx, {
+                organizationId: ctx.organizationId,
+                siteId,
+                postId,
+                userId: ctx.userId,
+                lead: isLeadRole(ctx),
+            });
+            await schedulePostInTx(tx, {
                 organizationId: ctx.organizationId,
                 postId,
                 at,
                 byUserId: ctx.userId,
-            }),
-        );
+            });
+        });
         return { id: postId, scheduledAt: at };
     }
 

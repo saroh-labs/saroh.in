@@ -14,6 +14,10 @@ export function revisionWhy(row: PostRevisionRow): string {
             return "Ask AI suggestion accepted";
         case "not_published":
             return row.note ?? "didn't go live";
+        case "sent":
+            return "sent for approval";
+        case "approved":
+            return "approved";
     }
 }
 
