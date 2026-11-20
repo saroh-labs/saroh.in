@@ -695,7 +695,6 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
         const start = (orgId: string) =>
             prisma.$transaction(async (tx) => {
                 await holdPayerOffersInTx(tx, orgId, true, new Date());
-                await new Promise((r) => setTimeout(r, 50));
                 const plan = await tx.plan.findFirstOrThrow({
                     where: { version: HARD },
                 });
