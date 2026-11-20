@@ -10,9 +10,17 @@ import type { AdminPermission } from "../../modules/admin/admin-permissions";
 import { IDENTITY_ONLY } from "../decorators/identity-only.decorator";
 import type { PlatformAdminInfo } from "../decorators/platform-admin-context.decorator";
 import { REQUIRE_ADMIN_PERMISSIONS } from "../decorators/require-admin-permission.decorator";
+import {
+    adminStepUpMaxAge,
+    assertSessionFresh,
+    isMutating,
+    STEP_UP_PERMISSIONS,
+} from "./admin-session";
 
 interface PermissionRequest {
+    method?: string;
     platformAdmin?: PlatformAdminInfo;
+    session?: { createdAt?: Date | string };
 }
 
 /**
@@ -60,9 +68,8 @@ export class PlatformPermissionGuard implements CanActivate {
             );
         }
 
-        const staff = context
-            .switchToHttp()
-            .getRequest<PermissionRequest>().platformAdmin;
+        const request = context.switchToHttp().getRequest<PermissionRequest>();
+        const staff = request.platformAdmin;
         if (!staff) {
             throw new UnauthorizedException(
                 "Platform administrator context required",
@@ -71,6 +78,13 @@ export class PlatformPermissionGuard implements CanActivate {
 
         const granted = new Set(staff.permissions);
         if (required.every((permission) => granted.has(permission))) {
+            // A dangerous write needs a recent sign-in (review A2).
+            if (
+                isMutating(request.method) &&
+                required.some((p) => STEP_UP_PERMISSIONS.has(p))
+            ) {
+                assertSessionFresh(request.session, adminStepUpMaxAge());
+            }
             return true;
         }
 

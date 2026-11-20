@@ -99,7 +99,7 @@ beforeEach(async () => {
     await prisma.job.deleteMany({});
     await wipeCommission();
     await prisma.sarohInvoice.deleteMany({});
-    await prisma.adminAuditEvent.deleteMany({});
+    await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
 });
 
 let seq = 0;

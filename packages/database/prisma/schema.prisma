@@ -3001,7 +3001,8 @@ model PlatformAdmin {
   id String @id @default(cuid())
 
   userId String @unique
-  user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
+  // Restrict: deleting a staff account must not erase its grant history (review B, A5).
+  user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Restrict)
 
   roleAssignments PlatformAdminRoleAssignment[]
   accessSessions  AdminAccessSession[]
@@ -3533,6 +3534,10 @@ model AdminAuditEvent {
   reason         String?
   outcome        String
   correlationId  String?
+  // Where the request came from (review B1): address, browser, session.
+  ipAddress      String?
+  userAgent      String?
+  sessionId      String?
   // Optional because read events are not commands. Mutation events always set
   // this key so retries become transactionally idempotent.
   idempotencyKey String? @unique
@@ -3546,6 +3551,7 @@ model AdminAuditEvent {
   @@index([actorUserId, createdAt])
   @@index([organizationId, createdAt])
   @@index([targetType, targetId, createdAt])
+  @@index([sessionId])
 }
 
 // An operator's note on one Organization, written in the admin console and

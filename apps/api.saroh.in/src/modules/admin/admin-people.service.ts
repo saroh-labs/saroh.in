@@ -10,6 +10,7 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { ORG_ACTIONS } from "../organizations/organization-actions";
+import type { InTxLedger } from "../organizations/organization-members.service";
 import { OrganizationMembersService } from "../organizations/organization-members.service";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { peopleWhere as inEditionWhere, viaBusiness } from "./admin-edition";
@@ -284,19 +285,18 @@ export class AdminPeopleService {
         reason: string;
     }) {
         const reason = requireReason(input.reason);
-        const result = await this.members.updateRole(
+        return this.members.updateRole(
             operatorContext(input.staff, input.organizationId),
             input.userId,
             { role: input.role },
+            this.record(input.staff, input.organizationId, {
+                action: "person.role.changed",
+                targetType: "membership",
+                targetId: input.userId,
+                reason,
+                metadata: { role: input.role },
+            }),
         );
-        await this.record(input.staff, input.organizationId, {
-            action: "person.role.changed",
-            targetType: "membership",
-            targetId: input.userId,
-            reason,
-            metadata: { role: input.role },
-        });
-        return result;
     }
 
     async removeMember(input: {
@@ -306,17 +306,16 @@ export class AdminPeopleService {
         reason: string;
     }) {
         const reason = requireReason(input.reason);
-        const result = await this.members.remove(
+        return this.members.remove(
             operatorContext(input.staff, input.organizationId),
             input.userId,
+            this.record(input.staff, input.organizationId, {
+                action: "person.removed",
+                targetType: "membership",
+                targetId: input.userId,
+                reason,
+            }),
         );
-        await this.record(input.staff, input.organizationId, {
-            action: "person.removed",
-            targetType: "membership",
-            targetId: input.userId,
-            reason,
-        });
-        return result;
     }
 
     /** Send an invitation again, with a fresh link; the old link stops working. */
@@ -345,13 +344,13 @@ export class AdminPeopleService {
                 role: invitation.role,
                 siteIds: invitation.siteIds,
             },
+            this.record(input.staff, input.organizationId, {
+                action: "person.invitation.resent",
+                targetType: "invitation",
+                targetId: input.invitationId,
+                reason,
+            }),
         );
-        await this.record(input.staff, input.organizationId, {
-            action: "person.invitation.resent",
-            targetType: "invitation",
-            targetId: input.invitationId,
-            reason,
-        });
         return { resent: true };
     }
 
@@ -362,24 +361,22 @@ export class AdminPeopleService {
         reason: string;
     }) {
         const reason = requireReason(input.reason);
-        const result = await this.members.revokeInvitation(
+        return this.members.revokeInvitation(
             operatorContext(input.staff, input.organizationId),
             input.invitationId,
+            this.record(input.staff, input.organizationId, {
+                action: "person.invitation.withdrawn",
+                targetType: "invitation",
+                targetId: input.invitationId,
+                reason,
+            }),
         );
-        await this.record(input.staff, input.organizationId, {
-            action: "person.invitation.withdrawn",
-            targetType: "invitation",
-            targetId: input.invitationId,
-            reason,
-        });
-        return result;
     }
 
     /**
-     * The admin ledger entry for a people change. The members service commits
-     * the change and the business's own audit entry together; this lands just
-     * after. If it cannot be written the request fails loudly, so an operator
-     * never sees success for a change the admin ledger does not show.
+     * The admin ledger entry for a people change, written inside the members
+     * service's transaction (review B3): neither commits without the other.
+     * The before-value the service passes (`from`, `role`) lands in metadata.
      */
     private record(
         staff: PlatformAdminInfo,
@@ -391,14 +388,16 @@ export class AdminPeopleService {
             reason: string;
             metadata?: Record<string, unknown>;
         },
-    ) {
-        return this.audit.write(prisma, {
-            actorUserId: staff.userId,
-            permission: AdminPermission.OrganizationPeopleWrite,
-            organizationId,
-            outcome: AdminAuditOutcome.Success,
-            ...entry,
-        });
+    ): InTxLedger {
+        return (tx, detail) =>
+            this.audit.write(tx, {
+                actorUserId: staff.userId,
+                permission: AdminPermission.OrganizationPeopleWrite,
+                organizationId,
+                outcome: AdminAuditOutcome.Success,
+                ...entry,
+                metadata: { ...entry.metadata, ...detail },
+            });
     }
 }
 

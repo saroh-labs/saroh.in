@@ -24,6 +24,7 @@ import { AdminPermission } from "../../admin/admin-permissions";
 import { AdminRoutes } from "../../admin/admin-routes.decorator";
 import { OperatorReasonDto } from "../../admin/dto";
 import { AiReportsService } from "../reports/ai-reports.service";
+import type { LedgerIn } from "../requests/ai-requests.service";
 import { AiOpsAdminService } from "./ai-ops-admin.service";
 
 class SetAiSettingDto extends OperatorReasonDto {
@@ -229,8 +230,12 @@ export class AdminAskAiController {
         @Param("requestId") requestId: string,
         @Body() dto: OperatorReasonDto,
     ): Promise<void> {
-        await this.ops.grant(requestId, staff.userId, dto.reason);
-        await this.decided(staff, requestId, "ai.request.grant", dto);
+        await this.ops.grant(
+            requestId,
+            staff.userId,
+            dto.reason,
+            this.decided(staff, requestId, "ai.request.grant", dto),
+        );
     }
 
     @Post("ask-ai/requests/:requestId/decline")
@@ -241,8 +246,12 @@ export class AdminAskAiController {
         @Param("requestId") requestId: string,
         @Body() dto: OperatorReasonDto,
     ): Promise<void> {
-        await this.ops.decline(requestId, staff.userId, dto.reason);
-        await this.decided(staff, requestId, "ai.request.decline", dto);
+        await this.ops.decline(
+            requestId,
+            staff.userId,
+            dto.reason,
+            this.decided(staff, requestId, "ai.request.decline", dto),
+        );
     }
 
     @Get("ask-ai/reports")
@@ -297,41 +306,43 @@ export class AdminAskAiController {
         @Param("reportId") reportId: string,
         @Body() dto: OperatorReasonDto,
     ): Promise<void> {
-        const { organizationId } = await this.reports.resolve(
+        await this.reports.resolve(
             reportId,
             staff.userId,
+            new Date(),
+            (tx, organizationId) =>
+                this.adminAudit.write(tx, {
+                    actorUserId: staff.userId,
+                    permission: AdminPermission.AiReportsRead,
+                    action: "ai.report.resolve",
+                    targetType: "ai_report",
+                    targetId: reportId,
+                    organizationId,
+                    reason: dto.reason,
+                    outcome: AdminAuditOutcome.Success,
+                    idempotencyKey: dto.idempotencyKey,
+                }),
         );
-        await this.adminAudit.recordRead({
-            actorUserId: staff.userId,
-            permission: AdminPermission.AiReportsRead,
-            action: "ai.report.resolve",
-            targetType: "ai_report",
-            targetId: reportId,
-            organizationId,
-            reason: dto.reason,
-            outcome: AdminAuditOutcome.Success,
-            idempotencyKey: dto.idempotencyKey,
-        });
     }
 
-    /** A grant or decline on the ledger, once it's done. */
-    private async decided(
+    /** A grant or decline's ledger row, written in its transaction. */
+    private decided(
         staff: PlatformAdminInfo,
         requestId: string,
         action: string,
         dto: OperatorReasonDto,
-    ): Promise<void> {
-        await this.adminAudit.recordRead({
-            actorUserId: staff.userId,
-            permission: AdminPermission.AiSettingsWrite,
-            action,
-            targetType: "ai_request",
-            targetId: requestId,
-            organizationId:
-                (await this.ops.requestBusiness(requestId)) ?? undefined,
-            reason: dto.reason,
-            outcome: AdminAuditOutcome.Success,
-            idempotencyKey: dto.idempotencyKey,
-        });
+    ): LedgerIn {
+        return (tx, organizationId) =>
+            this.adminAudit.write(tx, {
+                actorUserId: staff.userId,
+                permission: AdminPermission.AiSettingsWrite,
+                action,
+                targetType: "ai_request",
+                targetId: requestId,
+                organizationId,
+                reason: dto.reason,
+                outcome: AdminAuditOutcome.Success,
+                idempotencyKey: dto.idempotencyKey,
+            });
     }
 }

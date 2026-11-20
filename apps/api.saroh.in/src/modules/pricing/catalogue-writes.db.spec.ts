@@ -55,6 +55,7 @@ const controller = new AdminPricingController(
     writes,
     new CouponsService(audit),
     new IdempotencyService(),
+    audit,
 );
 
 let n = 0;
@@ -99,7 +100,7 @@ async function wipe() {
     await prisma.pricingCatalogDraft.deleteMany({});
     await prisma.pricingCatalogVersion.deleteMany({});
     await prisma.plan.deleteMany({});
-    await prisma.adminAuditEvent.deleteMany({});
+    await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
     await prisma.idempotencyRecord.deleteMany({});
 }
 

@@ -20,9 +20,14 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
-import type { OrganizationMembersService } from "../organizations/organization-members.service";
+import type {
+    InTxLedger,
+    OrganizationMembersService,
+} from "../organizations/organization-members.service";
 import type { AdminAuditService } from "./admin-audit.service";
 import { AdminPeopleService } from "./admin-people.service";
+
+const TX = {} as never;
 
 const staff: PlatformAdminInfo = {
     userId: "staff_1",
@@ -35,11 +40,18 @@ const staff: PlatformAdminInfo = {
 
 function build() {
     const members = {
-        updateRole: jest.fn(async () => ({
-            userId: "u1",
-            role: "ADMIN",
-            siteIds: [],
-        })),
+        // Each runs the admin ledger write inside its own transaction.
+        updateRole: jest.fn(
+            async (
+                _ctx: unknown,
+                _userId: string,
+                _dto: unknown,
+                ledger?: InTxLedger,
+            ) => {
+                await ledger?.(TX, { from: "MEMBER", to: "ADMIN" });
+                return { userId: "u1", role: "ADMIN", siteIds: [] };
+            },
+        ),
         remove: jest.fn(async () => ({ removed: true })),
         invite: jest.fn(),
         revokeInvitation: jest.fn(async () => ({ revoked: true })),
@@ -107,11 +119,12 @@ describe("AdminPeopleService", () => {
         expect(ctx.organizationId).toBe("org_1");
         expect(ctx.actions.has("member:role:update")).toBe(true);
         expect(audit.write).toHaveBeenCalledWith(
-            prisma,
+            TX,
             expect.objectContaining({
                 action: "person.role.changed",
                 organizationId: "org_1",
                 reason: "Owner asked by email",
+                metadata: { role: "ADMIN", from: "MEMBER", to: "ADMIN" },
             }),
         );
     });
@@ -148,6 +161,7 @@ describe("AdminPeopleService", () => {
         expect(members.invite).toHaveBeenCalledWith(
             expect.objectContaining({ userId: "staff_1" }),
             { email: "new@example.test", role: "MEMBER", siteIds: [] },
+            expect.any(Function),
         );
     });
 

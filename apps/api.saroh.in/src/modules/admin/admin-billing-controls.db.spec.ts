@@ -54,6 +54,11 @@ jest.mock("../../common/guards/better-auth.guard", () => {
                     );
                 }
                 request.user = user;
+                // A fresh sign-in, as the admin guard asks (review A2).
+                (request as { session?: unknown }).session = {
+                    id: `sess-${String(id)}`,
+                    createdAt: new Date(),
+                };
                 return true;
             }
         },
@@ -235,6 +240,7 @@ function post(
         headers: {
             "content-type": "application/json",
             ...(as ? { "x-test-user": as } : {}),
+            "sec-fetch-site": "same-origin",
             ...headers,
         },
         body: JSON.stringify(body),

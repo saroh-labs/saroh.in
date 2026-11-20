@@ -34,6 +34,7 @@ const controller = new AdminPricingController(
     new CatalogueWritesService(audit),
     new CouponsService(audit),
     new IdempotencyService(),
+    audit,
 );
 
 let n = 0;
@@ -81,7 +82,7 @@ describe("coupons (DB, U4)", () => {
     beforeEach(async () => {
         await prisma.pricingCouponRedemption.deleteMany({});
         await prisma.pricingCoupon.deleteMany({});
-        await prisma.adminAuditEvent.deleteMany({});
+        await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
     });
 
     it("stores the code upper-cased, paused by default, and audits it", async () => {

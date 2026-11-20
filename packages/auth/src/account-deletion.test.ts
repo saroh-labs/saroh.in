@@ -9,9 +9,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const memberships = vi.fn<() => Promise<unknown[]>>();
 const owners = vi.fn<() => Promise<number>>();
+const staffGrant = vi.fn<() => Promise<unknown>>();
 vi.mock("@saroh/database", () => ({
     prisma: {
         membership: { findMany: () => memberships(), count: () => owners() },
+        platformAdmin: { findUnique: () => staffGrant() },
     },
 }));
 
@@ -30,10 +32,18 @@ function beforeDelete(onUserDeleting?: (u: { id: string }) => unknown) {
 beforeEach(() => {
     memberships.mockReset().mockResolvedValue([]);
     owners.mockReset().mockResolvedValue(1);
+    staffGrant.mockReset().mockResolvedValue(null);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
 });
 
 describe("beforeDelete", () => {
+    it("refuses a Saroh staff account, so its grant history stays (A5)", async () => {
+        staffGrant.mockResolvedValue({ id: "pa_1" });
+        const told = vi.fn();
+        await expect(beforeDelete(told)).rejects.toThrow(/Saroh's team/);
+        expect(told).not.toHaveBeenCalled();
+    });
+
     it("tells the host who is being deleted, by id", async () => {
         const told = vi.fn();
         await beforeDelete(told);

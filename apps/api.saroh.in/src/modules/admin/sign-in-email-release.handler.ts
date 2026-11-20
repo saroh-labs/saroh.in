@@ -5,6 +5,7 @@ import type { Edition } from "@saroh/edition";
 import { isEdition } from "@saroh/edition";
 
 import { SignInCodeSender } from "../../common/auth/sign-in-code-sender";
+import { isSarohStaff } from "../account-phone/saroh-staff";
 
 /**
  * `people.sign-in-email.release`: the end of a sign-in email change's hold
@@ -44,6 +45,14 @@ export class SignInEmailReleaseHandler {
         });
         if (!change || change.confirmedAt || change.codeSentAt) return;
         if (change.user.email !== change.newEmail) return;
+        // A staff account is never released by the clock (review A1): a
+        // second staff member confirms it, or it stays held.
+        if (await isSarohStaff({ id: change.userId, email: change.newEmail })) {
+            this.logger.warn(
+                `Change ${change.id} is on a staff account; not auto-released.`,
+            );
+            return;
+        }
         if (change.codeHeldUntil.getTime() > Date.now()) {
             // Run early (a clock or a manual retry): try again later.
             throw new Error("The hold has not ended yet.");

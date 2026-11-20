@@ -469,7 +469,20 @@ export class AdminLifecycleService {
                         ? "organization.trial.extended"
                         : "organization.trial.started",
                 targetType: "subscription",
-                metadata: { days: command.days, endsAt: endsAt.toISOString() },
+                metadata: {
+                    days: command.days,
+                    endsAt: endsAt.toISOString(),
+                    // The before-value (review B1).
+                    from: existing
+                        ? {
+                              status: existing.status,
+                              planId: existing.planId,
+                              endsAt:
+                                  existing.currentPeriodEnd?.toISOString() ??
+                                  null,
+                          }
+                        : null,
+                },
             });
             return { ok: true, endsAt };
         });

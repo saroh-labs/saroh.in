@@ -17,7 +17,17 @@ Signing in needs a staff grant or an address on the API's `ADMIN_ALLOWLIST`
 screen with **Make me Platform owner** (`components/break-glass-banner.tsx`,
 `POST /admin/staff/me/platform-owner`, `staff:grant`): an `OperatorDialog`
 that records the grant on the audit trail, offered only while they have no
-recorded grant (the API refuses it otherwise).
+recorded grant (the API refuses it otherwise). Break-glass works only while
+no active Platform owner grant exists, and each session using it is on the
+ledger (`staff.break-glass.used`).
+
+The API refuses `/admin` for a session signed in more than
+`ADMIN_SESSION_MAX_AGE_MINUTES` ago, and a dangerous write (grants, people,
+sign-in help, flags, overrides, deploys) one older than
+`ADMIN_STEP_UP_MAX_AGE_MINUTES` (401 `reauth_required`, `NotAuthorized`
+`signInAgain`). Writes need an Origin (`adminFetch` sends it). Role changes
+and removals need an open support session for the business: the API checks
+it, and `people-actions.ts` sends the business's access cookie.
 
 ## Rules that bite here
 

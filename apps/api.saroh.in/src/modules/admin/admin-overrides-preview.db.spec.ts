@@ -151,9 +151,7 @@ describe("custom offers: the dry run and its confirm (DB, admin U5)", () => {
         await prisma.auditEvent.deleteMany({
             where: { organizationId: { in: ids } },
         });
-        await prisma.adminAuditEvent.deleteMany({
-            where: { organizationId: { in: ids } },
-        });
+        await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
         await prisma.job.deleteMany({ where: { organizationId: { in: ids } } });
         await prisma.organization.deleteMany({
             where: { slug: { endsWith: tag } },

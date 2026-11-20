@@ -66,6 +66,8 @@ jest.mock("../../common/guards/better-auth.guard", () => ({
 }));
 jest.mock("../../common/guards/platform-admin.guard", () => ({
     PlatformAdminGuard: class PlatformAdminGuard {},
+    // Sign-in help asks whether its target is staff (review A1).
+    isBootstrapAdmin: () => false,
 }));
 
 import type { ExecutionContext } from "@nestjs/common";
@@ -866,5 +868,74 @@ describe("sign-in help routes refuse without the permission (U9)", () => {
         expect(guard.canActivate(context("history", [Roles.Support]))).toBe(
             true,
         );
+    });
+});
+
+describe("sign-in help on a Saroh staff account (review A1)", () => {
+    async function staffPerson(label: string) {
+        const user = await person(label);
+        await prisma.platformAdmin.create({ data: { userId: user.id } });
+        return user;
+    }
+
+    it("refuses Support on a staff target, every action, and logs it", async () => {
+        const target = await staffPerson("staff-target");
+        const why = "Lost their mailbox";
+        expect(
+            await statusOf(
+                help.changeEmail({
+                    staff: supportStaff,
+                    userId: target.id,
+                    email: address("taken-over"),
+                    reason: why,
+                }),
+            ),
+        ).toBe(403);
+        expect(
+            await statusOf(help.sendCode(supportStaff, target.id, why)),
+        ).toBe(403);
+        expect(
+            await statusOf(help.markVerified(supportStaff, target.id, why)),
+        ).toBe(403);
+        const [denied] = await ledger(SignInHelpAction.EmailChanged, target.id);
+        expect(denied).toEqual(
+            expect.objectContaining({
+                outcome: "DENIED",
+                metadata: { staffTarget: true },
+            }),
+        );
+        const after = await prisma.user.findUniqueOrThrow({
+            where: { id: target.id },
+        });
+        expect(after.email).toBe(target.email);
+    });
+
+    it("refuses a Platform owner on their own account", async () => {
+        const self = await staffPerson("po-self");
+        const me = as(self.id, [Roles.PlatformOwner]);
+        expect(await statusOf(help.sendCode(me, self.id, "my own code"))).toBe(
+            403,
+        );
+    });
+
+    it("lets a Platform owner change it, but the clock never releases it", async () => {
+        const target = await staffPerson("staff-held");
+        const to = address("staff-new");
+        const { changeId } = await help.changeEmail({
+            staff: ownerStaff,
+            userId: target.id,
+            email: to,
+            reason: "Moved mailbox",
+        });
+        await prisma.signInEmailChange.update({
+            where: { id: changeId },
+            data: { codeHeldUntil: new Date(Date.now() - 1000) },
+        });
+        await release.handle(await releaseJobFor(changeId));
+        expect(codesTo(to)).toHaveLength(0);
+        const change = await prisma.signInEmailChange.findUniqueOrThrow({
+            where: { id: changeId },
+        });
+        expect(change.codeSentAt).toBeNull();
     });
 });

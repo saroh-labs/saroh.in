@@ -19,6 +19,11 @@ export interface RequestContext {
      * before it is logged or sent anywhere.
      */
     path?: string;
+    /** The client's address (`req.ip`, through the trusted proxies). */
+    ip?: string;
+    userAgent?: string;
+    /** The signed-in session, set by `BetterAuthGuard`. */
+    sessionId?: string;
 }
 
 /**

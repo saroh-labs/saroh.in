@@ -17,6 +17,7 @@ import {
     OperatorReasonDto,
     SearchPeopleDto,
 } from "./dto";
+import { RequireOrganizationAccessSession } from "./organization-access-session.guard";
 
 /**
  * People across the instance (admin console U6; Users, U9). Every route
@@ -248,6 +249,9 @@ export class AdminPeopleController {
         AdminPermission.OrganizationPiiRead,
         AdminPermission.OrganizationPeopleWrite,
     )
+    // Who runs a business changes only inside an open support session
+    // for it, enforced here, not only on the screen (review A4).
+    @RequireOrganizationAccessSession("READ")
     changeRole(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("organizationId") organizationId: string,
@@ -278,6 +282,9 @@ export class AdminPeopleController {
         AdminPermission.OrganizationPiiRead,
         AdminPermission.OrganizationPeopleWrite,
     )
+    // Who runs a business changes only inside an open support session
+    // for it, enforced here, not only on the screen (review A4).
+    @RequireOrganizationAccessSession("READ")
     removeMember(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("organizationId") organizationId: string,

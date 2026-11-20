@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { StaffIdentity } from "./control-plane";
 
 const getStaffIdentity = vi.fn<() => Promise<StaffIdentity | null>>();
-const editionNotGranted = vi.fn<() => Promise<boolean>>();
+const refusalReason = vi.fn<() => Promise<string | null>>();
 
 vi.mock("./session", () => ({
     requireSession: () =>
@@ -11,7 +11,7 @@ vi.mock("./session", () => ({
 }));
 vi.mock("./control-plane", () => ({
     getStaffIdentity: () => getStaffIdentity(),
-    editionNotGranted: () => editionNotGranted(),
+    refusalReason: () => refusalReason(),
 }));
 vi.mock("@/components/not-authorized", () => ({
     NotAuthorized: () => null,
@@ -30,8 +30,8 @@ const support: StaffIdentity = {
 
 beforeEach(() => {
     getStaffIdentity.mockReset();
-    editionNotGranted.mockReset();
-    editionNotGranted.mockResolvedValue(false);
+    refusalReason.mockReset();
+    refusalReason.mockResolvedValue(null);
 });
 
 describe("requireStaff", () => {
@@ -64,13 +64,25 @@ describe("requireStaff", () => {
 
     it("says it's the console, when the grant leaves out this edition", async () => {
         getStaffIdentity.mockResolvedValue(null);
-        editionNotGranted.mockResolvedValue(true);
+        refusalReason.mockResolvedValue("edition_not_granted");
         const gate = await requireStaff("audit:read");
         expect(gate.ok).toBe(false);
         if (gate.ok) return;
         expect(gate.screen.props).toEqual({
             email: "caller@example.com",
             wrongConsole: true,
+        });
+    });
+
+    it("asks to sign in again when the API says the session is too old", async () => {
+        getStaffIdentity.mockResolvedValue(null);
+        refusalReason.mockResolvedValue("reauth_required");
+        const gate = await requireStaff();
+        expect(gate.ok).toBe(false);
+        if (gate.ok) return;
+        expect(gate.screen.props).toEqual({
+            email: "caller@example.com",
+            signInAgain: true,
         });
     });
 });

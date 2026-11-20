@@ -1,10 +1,20 @@
-import { ExecutionContext, ForbiddenException } from "@nestjs/common";
+import {
+    ExecutionContext,
+    ForbiddenException,
+    UnauthorizedException,
+} from "@nestjs/common";
 
 jest.mock("@saroh/database", () => ({
-    prisma: { platformAdmin: { findUnique: jest.fn() } },
+    prisma: {
+        platformAdmin: { findUnique: jest.fn() },
+        platformAdminRoleAssignment: { findFirst: jest.fn() },
+        adminAuditEvent: { findFirst: jest.fn(), create: jest.fn() },
+    },
 }));
 
-jest.mock("../../env", () => ({ env: { ADMIN_ALLOWLIST: undefined } }));
+jest.mock("../../env", () => ({
+    env: { ADMIN_ALLOWLIST: undefined, ADMIN_SESSION_MAX_AGE_MINUTES: 720 },
+}));
 
 import { prisma } from "@saroh/database";
 
@@ -16,10 +26,15 @@ import {
 import { PlatformAdminGuard } from "./platform-admin.guard";
 
 const findUnique = prisma.platformAdmin.findUnique as jest.Mock;
+const findOwner = prisma.platformAdminRoleAssignment.findFirst as jest.Mock;
+const auditSeen = prisma.adminAuditEvent.findFirst as jest.Mock;
+const auditCreate = prisma.adminAuditEvent.create as jest.Mock;
 const mutableEnv = env as { ADMIN_ALLOWLIST?: string };
 
 interface TestRequest {
-    headers?: { host?: string };
+    method?: string;
+    headers?: Record<string, string>;
+    session?: { id: string; createdAt: Date };
     user?: { id: string; email: string };
     platformAdmin?: {
         userId: string;
@@ -32,6 +47,10 @@ interface TestRequest {
 }
 
 function contextFor(request: TestRequest): ExecutionContext {
+    // A fresh session unless the test says otherwise.
+    if (request.user && !request.session) {
+        request.session = { id: "sess_1", createdAt: new Date() };
+    }
     return {
         switchToHttp: () => ({ getRequest: () => request }),
     } as unknown as ExecutionContext;
@@ -44,6 +63,9 @@ describe("PlatformAdminGuard", () => {
         jest.clearAllMocks();
         mutableEnv.ADMIN_ALLOWLIST = undefined;
         findUnique.mockResolvedValue(null);
+        findOwner.mockResolvedValue(null);
+        auditSeen.mockResolvedValue(null);
+        auditCreate.mockResolvedValue({});
     });
 
     it("admits a user with an ACTIVE PlatformAdmin grant", async () => {
@@ -267,6 +289,88 @@ describe("PlatformAdminGuard", () => {
                 }),
             ),
         ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("closes break-glass once an active Platform owner grant exists (A3)", async () => {
+        mutableEnv.ADMIN_ALLOWLIST = "ops@saroh.in";
+        findOwner.mockResolvedValue({ id: "ra_1" });
+        await expect(
+            guard.canActivate(
+                contextFor({ user: { id: "user_4", email: "ops@saroh.in" } }),
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it("writes one break-glass ledger row per session (A3)", async () => {
+        mutableEnv.ADMIN_ALLOWLIST = "ops@saroh.in";
+        await guard.canActivate(
+            contextFor({ user: { id: "user_4", email: "ops@saroh.in" } }),
+        );
+        expect(auditCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "staff.break-glass.used",
+                actorUserId: "user_4",
+            }),
+        });
+        auditCreate.mockClear();
+        auditSeen.mockResolvedValue({ id: "row" });
+        await guard.canActivate(
+            contextFor({ user: { id: "user_4", email: "ops@saroh.in" } }),
+        );
+        expect(auditCreate).not.toHaveBeenCalled();
+    });
+
+    it("records a refused caller on the ledger, at most once an hour (B4)", async () => {
+        await guard
+            .canActivate(
+                contextFor({ user: { id: "user_9", email: "x@acme.test" } }),
+            )
+            .catch(() => undefined);
+        expect(auditCreate).toHaveBeenCalledWith({
+            data: expect.objectContaining({
+                action: "admin.access.refused",
+                outcome: "DENIED",
+            }),
+        });
+    });
+
+    it("asks a staff member to sign in again when the session is old (A2)", async () => {
+        findUnique.mockResolvedValue({
+            id: "pa_1",
+            revokedAt: null,
+            editions: [],
+            roleAssignments: [
+                { role: AdminRole.Support, expiresAt: null, revokedAt: null },
+            ],
+        });
+        const old = new Date(Date.now() - 13 * 60 * 60 * 1000);
+        await expect(
+            guard.canActivate(
+                contextFor({
+                    user: { id: "user_1", email: "staff@saroh.in" },
+                    session: { id: "s", createdAt: old },
+                }),
+            ),
+        ).rejects.toBeInstanceOf(UnauthorizedException);
+    });
+
+    it("refuses an admin write with no origin at all (A7)", async () => {
+        mutableEnv.ADMIN_ALLOWLIST = "ops@saroh.in";
+        const write = (headers: Record<string, string>) =>
+            guard.canActivate(
+                contextFor({
+                    method: "POST",
+                    headers,
+                    user: { id: "user_4", email: "ops@saroh.in" },
+                }),
+            );
+        await expect(write({})).rejects.toThrow("request origin");
+        await expect(write({ "sec-fetch-site": "same-site" })).resolves.toBe(
+            true,
+        );
+        await expect(write({ origin: "https://admin.saroh.in" })).resolves.toBe(
+            true,
+        );
     });
 
     it("rejects an unauthenticated request (guard misordering)", async () => {

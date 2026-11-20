@@ -8,19 +8,30 @@ import {
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { editionOfHost } from "@saroh/edition";
+import type { IncomingHttpHeaders } from "node:http";
 
 import { env } from "../../env";
+import { AdminAuditOutcome } from "../../modules/admin/admin-audit.service";
 import {
+    AdminPermission,
     AdminRole,
     isAdminRole,
     permissionsFor,
 } from "../../modules/admin/admin-permissions";
 import type { PlatformAdminInfo } from "../decorators/platform-admin-context.decorator";
 import type { AuthUser } from "../types/store-context";
+import {
+    adminSessionMaxAge,
+    assertAdminWriteOrigin,
+    assertSessionFresh,
+    auditOnce,
+} from "./admin-session";
 
 interface PlatformAdminRequest {
-    headers?: { host?: string };
+    method?: string;
+    headers?: IncomingHttpHeaders;
     user?: AuthUser;
+    session?: { id: string; createdAt?: Date | string };
     platformAdmin?: PlatformAdminInfo;
 }
 
@@ -40,8 +51,14 @@ interface PlatformAdminRequest {
  *      request; nothing is cached.
  *   2. `ADMIN_ALLOWLIST` — break-glass only. It seeds the first admin (before
  *      any row can be granted) and recovers access if every grant is revoked by
- *      mistake. Use of this path is logged at WARN precisely because it bypasses
- *      the grant record: config is not an audit trail.
+ *      mistake, so it works only while no active Platform owner grant exists
+ *      (review A3). Each session that uses it writes `staff.break-glass.used`
+ *      to the ledger: config is not an audit trail.
+ *
+ * Before either (review A2, A7): a write must carry its origin, and the
+ * session must be signed in within `ADMIN_SESSION_MAX_AGE_MINUTES`. A
+ * staff session's first `/admin` request, and a refused caller (once an
+ * hour), are on the ledger (B4).
  *
  * Runs AFTER `BetterAuthGuard`, which sets `request.user`.
  */
@@ -58,6 +75,7 @@ export class PlatformAdminGuard implements CanActivate {
         if (!user) {
             throw new UnauthorizedException("Authentication required");
         }
+        assertAdminWriteOrigin(request.method, request.headers);
 
         // Unlike a business's, the console's edition is its address (DEC-204
         // item 6). The Host is the caller's to set, so the grant below decides
@@ -99,6 +117,7 @@ export class PlatformAdminGuard implements CanActivate {
                         details: { reason: "edition_not_granted" },
                     });
                 }
+                assertSessionFresh(request.session, adminSessionMaxAge());
                 request.platformAdmin = {
                     userId: user.id,
                     platformAdminId: grant.id,
@@ -107,11 +126,13 @@ export class PlatformAdminGuard implements CanActivate {
                     viaBootstrap: false,
                     edition,
                 };
+                await noteSession(request, "staff.session.started");
                 return true;
             }
         }
 
-        if (isBootstrapAdmin(user.email)) {
+        if (isBootstrapAdmin(user.email) && !(await hasActiveOwner())) {
+            assertSessionFresh(request.session, adminSessionMaxAge());
             this.logger.warn(
                 `Platform admin access granted to ${user.email} via ADMIN_ALLOWLIST bootstrap (no PlatformAdmin grant).`,
             );
@@ -124,14 +145,63 @@ export class PlatformAdminGuard implements CanActivate {
                 viaBootstrap: true,
                 edition,
             };
+            await noteSession(request, "staff.break-glass.used");
             return true;
         }
+
+        await auditOnce(
+            {
+                actorUserId: user.id,
+                permission: AdminPermission.PlatformRead,
+                action: "admin.access.refused",
+                targetType: "admin",
+                outcome: AdminAuditOutcome.Denied,
+            },
+            { actorUserId: user.id },
+        );
 
         // Deliberately identical message whether the user has a revoked grant or
         // never had one: the control plane should not confirm who used to be
         // staff.
         throw new ForbiddenException("Platform administrator access required");
     }
+}
+
+/** One ledger row per session for `action` (sign-in seen, or break-glass). */
+async function noteSession(
+    request: PlatformAdminRequest,
+    action: string,
+): Promise<void> {
+    const staff = request.platformAdmin;
+    const sessionId = request.session?.id;
+    if (!staff || !sessionId) return;
+    await auditOnce(
+        {
+            actorUserId: staff.userId,
+            permission: AdminPermission.PlatformRead,
+            action,
+            targetType: "session",
+            targetId: sessionId,
+            outcome: AdminAuditOutcome.Success,
+            metadata: { viaBootstrap: staff.viaBootstrap },
+        },
+        { sessionId },
+    );
+}
+
+/** A3: break-glass closes once a recorded, active Platform owner exists. */
+async function hasActiveOwner(): Promise<boolean> {
+    const now = new Date();
+    const owner = await prisma.platformAdminRoleAssignment.findFirst({
+        where: {
+            role: AdminRole.PlatformOwner,
+            revokedAt: null,
+            OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+            platformAdmin: { revokedAt: null },
+        },
+        select: { id: true },
+    });
+    return owner !== null;
 }
 
 interface RoleAssignment {

@@ -57,7 +57,19 @@ export function correlationIdMiddleware(
     // The method and the path ride along for an error reported from outside
     // Nest (Better Auth's handler, `common/auth/report-auth-error.ts`).
     const path = (req.originalUrl || req.url || "").split("?")[0];
-    correlationStorage.run({ correlationId, method: req.method, path }, () => {
-        next();
-    });
+    // Address and browser ride along for the admin ledger (review B1).
+    // The admin console calls server-side and names its visitor; kept beside
+    // the address the request really came from, never instead of it.
+    const userAgent = req.headers["user-agent"]?.slice(0, 512);
+    const named = req.headers["x-admin-client-ip"];
+    const ip =
+        typeof named === "string" && path.startsWith("/admin")
+            ? `${named.slice(0, 64)} via ${req.ip ?? "unknown"}`
+            : req.ip;
+    correlationStorage.run(
+        { correlationId, method: req.method, path, ip, userAgent },
+        () => {
+            next();
+        },
+    );
 }
