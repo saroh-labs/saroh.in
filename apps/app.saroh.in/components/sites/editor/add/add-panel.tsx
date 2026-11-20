@@ -66,7 +66,6 @@ type ServicesRead = { ok: true; services: PickerService[] } | { ok: false };
  */
 export function AddPanel({ model, phone = false }: AddPanelProps) {
     const { add, draft, active, page } = model;
-    const router = useRouter();
     const [query, setQuery] = useState("");
     const [pageSheet, setPageSheet] = useState<PageStart | null>(null);
     const [picking, setPicking] = useState(false);
@@ -126,22 +125,6 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
         );
         setPicking(false);
     };
-
-    function opened(next: SitePage) {
-        setPageSheet(null);
-        showSuccess(`Added ${next.title}.`);
-        const blocked = leavePageMessage(
-            model.unsaved,
-            draft.onlyHeldBack ? unfinishedPhrase(draft.heldBack) : undefined,
-        );
-        if (blocked !== null) {
-            showError(blocked);
-            router.refresh();
-            return;
-        }
-        router.push(`/sites/${model.siteId}?page=${next.id}`);
-        router.refresh();
-    }
 
     if (picking && services?.ok) {
         return (
@@ -366,19 +349,59 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
                 )}
             </div>
             {pageSheet !== null ? (
-                <AddPageSheet
+                <AddPageFor
                     key={pageSheet}
-                    open
-                    siteId={model.siteId}
-                    address={model.address}
-                    offers={offers}
-                    page={page}
+                    model={model}
                     start={pageSheet}
                     onClose={() => setPageSheet(null)}
-                    onAdded={opened}
                 />
             ) : null}
         </section>
+    );
+}
+
+/**
+ * Add a page (`fix/WXBAddPage`) for this editor: Add's own entries and the
+ * Pages tree's "Add a page" (U46e) open the same sheet. A page that went
+ * in opens, unless unsaved work would be lost by leaving this one.
+ */
+export function AddPageFor({
+    model,
+    start,
+    onClose,
+}: {
+    model: EditorModel;
+    start: PageStart;
+    onClose: () => void;
+}) {
+    const router = useRouter();
+    const { draft } = model;
+    function opened(next: SitePage) {
+        onClose();
+        showSuccess(`Added ${next.title}.`);
+        const blocked = leavePageMessage(
+            model.unsaved,
+            draft.onlyHeldBack ? unfinishedPhrase(draft.heldBack) : undefined,
+        );
+        if (blocked !== null) {
+            showError(blocked);
+            router.refresh();
+            return;
+        }
+        router.push(`/sites/${model.siteId}?page=${next.id}`);
+        router.refresh();
+    }
+    return (
+        <AddPageSheet
+            open
+            siteId={model.siteId}
+            address={model.address}
+            offers={addPageOffers(model.addablePageKinds)}
+            page={model.page}
+            start={start}
+            onClose={onClose}
+            onAdded={opened}
+        />
     );
 }
 

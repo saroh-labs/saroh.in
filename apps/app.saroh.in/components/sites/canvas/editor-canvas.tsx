@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
 import type { Device } from "@/components/sites/editor/editor-constants";
 import { DEVICE_WIDTH } from "@/components/sites/editor/editor-constants";
+import { changedSinceLine } from "@/components/sites/editor/save-failed";
 import type {
     EditorInspectorTab,
     EditorRailTab,
@@ -137,7 +138,13 @@ export function EditorCanvas({
     heldBack,
     blockTools,
     textEdit,
+    conflictBy = null,
+    saveFailed = null,
 }: {
+    /** Who saved the page since this editor opened it (C12), if known. */
+    conflictBy?: string | null;
+    /** Couldn't save, with Try again (`SaveFailedNotice`), over the page. */
+    saveFailed?: ReactNode;
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
     /** Typing on the page (U47d): the selected section's words' host. */
@@ -274,9 +281,17 @@ export function EditorCanvas({
              * one, so it is offered, never done automatically.
              */}
             {conflict ? (
-                <Notice tone="error" className="mx-auto mb-4 max-w-xl">
+                <Notice
+                    tone="error"
+                    className="mx-auto mb-4 max-w-xl"
+                    data-save-conflict=""
+                >
                     <p className="font-medium">
-                        Someone else saved this page while you were editing.
+                        {changedSinceLine(
+                            conflictBy,
+                            pages.find((p) => p.id === pageId)?.title ??
+                                "this page",
+                        )}
                     </p>
                     <p className="mt-1 text-muted-foreground">
                         Nothing you have written has been lost, and nothing more
@@ -294,7 +309,9 @@ export function EditorCanvas({
                         Reload the latest
                     </Button>
                 </Notice>
-            ) : null}
+            ) : (
+                saveFailed
+            )}
 
             {/*
              * The first-run nudge (spec §5), in the spec's own words.

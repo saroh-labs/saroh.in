@@ -1,5 +1,7 @@
 "use client";
 
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
+import { readOnlyLine } from "@/components/shared/states/who-can-change";
 import { ComponentStyleList } from "@/components/sites/looks/component-styles";
 import { ROW_NAMES } from "@/components/sites/looks/look-changes";
 import { lookName } from "@/components/sites/looks/look-picker";
@@ -16,7 +18,13 @@ export function BrandReadOnly({
     options,
     looks,
     template,
+    denied = false,
 }: {
+    /**
+     * An editor whose role can't change the look (C11, `fix/WXKStates` "No
+     * access to Brand"): the shared note says so and who can change it.
+     */
+    denied?: boolean;
     style: SiteStyle;
     options: SiteStyleOptions;
     /** The Look row is drawn, as the owner's is (`SITE_LOOKS`). */
@@ -74,7 +82,16 @@ export function BrandReadOnly({
         },
     ];
     return (
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        <div
+            className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4"
+            data-brand-read-only={denied ? "denied" : "reader"}
+        >
+            {denied ? (
+                <ReadOnlyNote className="mb-0">
+                    {readOnlyLine("the look")} You can still change words and
+                    photos on every page.
+                </ReadOnlyNote>
+            ) : null}
             {groups
                 .filter((g) => g.rows.length > 0)
                 .map((g) => (
@@ -106,9 +123,11 @@ export function BrandReadOnly({
                     disabled
                 />
             </section>
-            <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
-                You can see the look. Owners and admins change it.
-            </p>
+            {denied ? null : (
+                <p className="border-t pt-3 text-xs leading-relaxed text-muted-foreground">
+                    You can see the look. Owners and admins change it.
+                </p>
+            )}
         </div>
     );
 }

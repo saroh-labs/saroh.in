@@ -85,4 +85,6 @@ export interface EditorModel {
     scrollToSection: (index: number) => void;
     /** Start the editor afresh (a look's starter content, a restore). */
     reloadDraft?: (pageId?: string) => void;
+    /** The business's phone, for the link picker's Call and WhatsApp (U47d). */
+    businessPhone: string | null;
 }

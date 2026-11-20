@@ -83,7 +83,9 @@ export function SiteInspector({
 }) {
     const { siteId, pageId, pages, page, active, selection, draft, review } =
         model;
-    const services = useServicesForPicker();
+    // A price saved in the price sheet reads the From Services rows again.
+    const [servicesRead, setServicesRead] = useState(0);
+    const services = useServicesForPicker(servicesRead);
     const actions = sectionActions(model);
     const [own, setOwn] =
         useState<Exclude<InspectorTab, "feedback">>("content");
@@ -249,6 +251,7 @@ export function SiteInspector({
                 siteId={siteId}
                 serviceId={priceFor}
                 onClose={() => setPriceFor(null)}
+                onSaved={() => setServicesRead((n) => n + 1)}
             />
         </aside>
     );

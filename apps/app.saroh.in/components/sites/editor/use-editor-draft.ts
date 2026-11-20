@@ -53,6 +53,7 @@ export function useEditorDraft({
     recordSaved: (
         sections: number | null,
         site: SiteChangeKind[] | null,
+        units?: number | null,
     ) => void;
     /** Flags settle after a save, not per keystroke. */
     refreshFlags: () => Promise<void>;
@@ -86,6 +87,8 @@ export function useEditorDraft({
      */
     const [revision, setRevision] = useState(initialRevision);
     const [conflict, setConflict] = useState(false);
+    // Who saved the page since this editor opened it (C12), if the API said.
+    const [conflictBy, setConflictBy] = useState<string | null>(null);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const sectionsJson = JSON.stringify(sections);
@@ -228,8 +231,9 @@ export function useEditorDraft({
      */
     const failedJson = useRef<string | null>(null);
 
-    async function onSave(auto = false) {
-        if (readOnly) return;
+    /** Save now; true once the server holds what is on screen. */
+    async function onSave(auto = false): Promise<boolean> {
+        if (readOnly) return false;
         setSaving(true);
         setErrorIndex(null);
         setErrorMessage(null);
@@ -258,7 +262,7 @@ export function useEditorDraft({
             // Recorded like any other failed save, so the autosave does not
             // send the same draft again every 1.5s with a fresh toast.
             failedJson.current = JSON.stringify(sections);
-            return;
+            return false;
         }
         // Stamp ONLY the new formIds onto what is on screen now (#281).
         const found = newFormIds(sections, synced.sections);
@@ -296,7 +300,7 @@ export function useEditorDraft({
             setSaving(false);
             failedJson.current = null;
             setSaveError(false);
-            return;
+            return true;
         }
         const res = await saveDraftSections(
             siteId,
@@ -321,6 +325,7 @@ export function useEditorDraft({
             recordSaved(
                 res.data.pendingSectionChanges ?? null,
                 res.data.pendingSiteChanges ?? null,
+                res.data.pendingChanges,
             );
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
@@ -332,7 +337,7 @@ export function useEditorDraft({
              * would make editing feel slower for no benefit.
              */
             void refreshFlags();
-            return;
+            return true;
         }
         failedJson.current = JSON.stringify(synced.sections);
         setSaveError(true);
@@ -340,6 +345,7 @@ export function useEditorDraft({
             // Stops the autosave loop from retrying a save that can only lose
             // one side's work. The banner offers the reload instead.
             setConflict(true);
+            setConflictBy(res.by ?? null);
         }
         if ("index" in res && typeof res.index === "number") {
             // The server counts positions in what was SENT; the editor's list
@@ -348,6 +354,7 @@ export function useEditorDraft({
             setErrorMessage(res.error);
         }
         showError(res.error);
+        return false;
     }
 
     /*
@@ -404,8 +411,14 @@ export function useEditorDraft({
         saveError,
         lastSavedAt,
         conflict,
+        conflictBy,
         errorIndex,
         errorMessage,
+        /**
+         * Couldn't save's Try again (RULES §4): the same save, now. Never
+         * after a conflict, where it could only lose one side's work.
+         */
+        retry: () => (conflict ? Promise.resolve(false) : onSave()),
         heldBack,
         onlyHeldBack,
         heldBackAt,

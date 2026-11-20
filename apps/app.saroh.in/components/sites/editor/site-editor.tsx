@@ -9,8 +9,12 @@ import {
     EditorCanvas,
 } from "@/components/sites/canvas/editor-canvas";
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
+import { lookChoices } from "@/components/sites/looks/look-picker";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
-import { BrandSheetActions } from "@/components/sites/looks/style-panel";
+import {
+    BrandAside,
+    BrandSheetActions,
+} from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
 import type { PublishMore } from "@/components/sites/publish/publish-more";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
@@ -58,6 +62,7 @@ import { SiteInspector } from "./inspector/site-inspector";
 import { historyAfterReload } from "./panels/history-panel";
 import { PhoneShell } from "./phone/phone-shell";
 import { EditorReadOnly, EditorReviewCan } from "./read-only";
+import { SaveFailedNotice } from "./save-failed";
 import type { EditorModel, TrailKey } from "./shell/editor-model";
 import { EditorShell } from "./shell/editor-shell";
 import type { SiteEditorProps } from "./site-editor-props";
@@ -94,6 +99,7 @@ export function SiteEditor({
     unreadableSections,
     initialPendingChanges,
     initialPendingSiteChanges,
+    initialPendingUnits = null,
     initialSections,
     initialRevision,
     siteName,
@@ -120,6 +126,8 @@ export function SiteEditor({
     initialSheet = null,
     webAddressFix = null,
     askAi = false,
+    siteIcon = null,
+    businessPhone = null,
 }: SiteEditorProps) {
     // Read-only (DEC-200) takes the owner's powers away whatever was sent.
     const canUpdateSite = canUpdateSiteProp && !readOnly;
@@ -151,6 +159,7 @@ export function SiteEditor({
         initialNeverPublished,
         initialPendingChanges,
         initialPendingSiteChanges,
+        initialPendingUnits,
         refreshReview: review.refreshReview,
         initialNeedsApproval: publishNeedsApproval,
         canOverride,
@@ -240,6 +249,18 @@ export function SiteEditor({
         dirty || draft.saving || siteStyle.styleDirty || chrome.chromeDirty;
     // A link out waits for the editor's own save, and asks only when the
     // work can't save by itself.
+    // The chip's words (RULES §2), from Overview's number: the API's
+    // change units (KTD-E3), the two counts only when it sent none.
+    const status = siteStatus(
+        {
+            currentPublicationId: publish.neverPublished ? null : "live",
+            pendingSectionChanges: publish.pendingChanges,
+            pendingSiteChanges: publish.pendingSiteChanges,
+            pendingChanges: publish.pendingUnits,
+            hasUnpublishedChanges: false,
+        },
+        { reader: readOnly },
+    );
     const leaveGuard = useEditorLeave({
         unsaved,
         stuck:
@@ -247,6 +268,12 @@ export function SiteEditor({
             draft.conflict ||
             draft.saveError ||
             chrome.chromeFailed,
+        waiting: status.waiting,
+        // The page's save failed: Save and leave tries it once more.
+        save:
+            draft.saveError && !draft.conflict
+                ? () => draft.retry()
+                : undefined,
     });
 
     const add = useAddBlock({
@@ -440,16 +467,7 @@ export function SiteEditor({
         siteName: chrome.displayName,
         ...{ readOnly, canUpdateSite, canPublish, askAi: askAi && !readOnly },
         unsaved,
-        // The chip's words (RULES §2), from the counts the bar has always read.
-        status: siteStatus(
-            {
-                currentPublicationId: publish.neverPublished ? null : "live",
-                pendingSectionChanges: publish.pendingChanges,
-                pendingSiteChanges: publish.pendingSiteChanges,
-                hasUnpublishedChanges: false,
-            },
-            { reader: readOnly },
-        ),
+        status,
         styleOptions,
         canvasChrome,
         addablePageKinds: addablePageKinds ?? [],
@@ -468,6 +486,7 @@ export function SiteEditor({
         trail,
         scrollToSection: scrollToBlock,
         reloadDraft: reloadDraft ? (page) => reloadDraft(page) : undefined,
+        businessPhone: readOnly ? null : businessPhone,
     };
 
     // The selected section's toolbar on the desk canvas (U47), each with Undo.
@@ -510,6 +529,27 @@ export function SiteEditor({
                   )
             : undefined;
 
+    /*
+     * Brand on a desk (`WXBBrand`, `WXBBrandLocked`): "On your plan" and
+     * "Changes to the look" with Reset stand where the inspector is.
+     */
+    const brandAside =
+        desk && trail === "brand" && canUpdateSite ? (
+            <BrandAside
+                style={style}
+                options={styleOptions}
+                rules={styleRules}
+                looksOffered={
+                    lookChoices({
+                        available: looksAvailable,
+                        draftLook: style.look ?? null,
+                        liveLook,
+                    }).length > 0
+                }
+                changes={siteStyle.lookChanges}
+                onReset={() => edits.resetStyle()}
+            />
+        ) : null;
     const railEl = (
         <EditorRail
             hideTabs={desk}
@@ -541,6 +581,12 @@ export function SiteEditor({
                 },
             }}
             styleRules={styleRules}
+            // Logo and tab icon (U24b): only for whoever may change the site.
+            siteIcon={canUpdateSite && siteIcon ? siteIcon : undefined}
+            // On a desk Brand's aside stands in the inspector's place.
+            asideHosted={brandAside !== null}
+            // Not a reader, and the look is refused to this role (C11).
+            styleDenied={!readOnly && !canUpdateSite}
             // The site's template (DEC-216): changed by
             // whoever may change the site, read by others.
             templateRow={
@@ -584,9 +630,19 @@ export function SiteEditor({
             neverPublished={publish.neverPublished}
             canvasChrome={canvasChrome}
             notesByKey={review.notesByKey}
+            saveFailed={
+                <SaveFailedNotice
+                    draft={draft}
+                    className="mx-auto mb-4 max-w-xl"
+                />
+            }
         />
     );
-    const inspectorEl = desk ? (
+    const inspectorEl = brandAside ? (
+        <aside aria-label="Inspector" className="min-h-0 overflow-y-auto p-4">
+            {brandAside}
+        </aside>
+    ) : desk ? (
         // The Website area's inspector (U47); off, or on a phone, today's.
         <SiteInspector
             model={model}
@@ -684,7 +740,7 @@ export function SiteEditor({
             overlayOpen={publish.checking}
             openNotes={review.openNotes}
             brandActions={
-                readOnly ? undefined : (
+                !canUpdateSite ? undefined : (
                     <BrandSheetActions
                         saving={siteStyle.styleSaving}
                         dirty={siteStyle.styleDirty}

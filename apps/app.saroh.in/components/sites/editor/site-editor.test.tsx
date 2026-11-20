@@ -25,6 +25,7 @@ import type {
 } from "@/lib/sites/service";
 import type { SiteStyleOptions } from "@/lib/sites/style";
 import { SiteEditor } from "./site-editor";
+import { leaveLost } from "./use-editor-leave";
 
 // `vi.mock` is hoisted above the imports, so the editor gets these.
 const push = vi.fn();
@@ -1061,19 +1062,66 @@ describe("SiteEditor shell", () => {
         actions.saveDraftSections.mockResolvedValue({
             ok: false,
             conflict: true,
+            by: "Ritika Sharma",
             error: "Someone else saved.",
         });
         render();
         click(button(/Visible$/));
         await wait(1500);
         expect(toast.showError).toHaveBeenCalledWith("Someone else saved.");
+        // C12: who changed it, never live presence.
         expect($("[role=alert]")?.textContent).toContain(
-            "Someone else saved this page while you were editing.",
+            "Ritika Sharma changed Home since you opened it.",
         );
+        // Not also "Couldn't save": one message at a time.
+        expect($("[data-save-failed]")).toBeNull();
         expect(button("Reload the latest")).toBeTruthy();
         click(button(/Hidden$/));
         await wait(5000);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+    });
+
+    it("couldn't save keeps the words, and Try again sends the save now (RULES §4)", async () => {
+        actions.saveDraftSections.mockResolvedValueOnce({
+            ok: false,
+            error: "Couldn't reach Saroh.",
+        });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        const notice = $("[data-save-failed]");
+        expect(notice?.textContent).toContain("Couldn't save.");
+        expect(notice?.textContent).toContain(
+            "Your words are kept here. Check your connection, then try again.",
+        );
+        // Not again by itself: the same draft waits for Try again.
+        await wait(5000);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+        await press(button("Try again"));
+        await wait(0);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        expect($("[data-save-failed]")).toBeNull();
+    });
+
+    it("leaving says only the unsaved words are at risk; saved changes wait", () => {
+        expect(leaveLost(5)).toBe(
+            "Your other 5 changes are saved and wait for Publish. Only what you changed since the last save would be lost.",
+        );
+        expect(leaveLost(1)).toContain(
+            "Your other change is saved and waits for Publish.",
+        );
+        expect(leaveLost(0)).toBe(
+            "Your latest changes to this site haven't saved, and will be lost if you leave now.",
+        );
+    });
+
+    it("Brand reads, with who can change it, for a role without site:update (C11)", () => {
+        render({ canUpdateSite: false });
+        click(button("Brand"));
+        expect($("[data-brand-read-only=denied]")?.textContent).toContain(
+            "Your role can read the look but not change it.",
+        );
+        expect($("[data-brand-panel]")).toBeNull();
     });
 
     it("names what goes live in the Publish sheet, and reads Published after", async () => {

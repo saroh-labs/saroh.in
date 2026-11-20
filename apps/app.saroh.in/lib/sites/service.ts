@@ -920,6 +920,8 @@ export interface PageDraft {
     /** What publishing would change, site-wide, as of this read (#190). */
     pendingSectionChanges: number | null;
     pendingSiteChanges: SiteChangeKind[] | null;
+    /** The change units waiting (U7): the one number every surface shows. */
+    pendingChanges?: number | null;
 }
 
 export interface CreateSiteInput {
@@ -948,6 +950,8 @@ export type SitesResult<T> =
            * else's work — so the screen offers to reload rather than to retry.
            */
           conflict?: boolean;
+          /** With `conflict`: who saved the draft since (C12), if known. */
+          by?: string | null;
           /**
            * An address to offer instead of one the API refused (G14's
            * `details.suggestion`): taken, or one of the site's own routes.
@@ -1347,6 +1351,7 @@ export async function saveDraftSections(
         revision?: number;
         pendingSectionChanges?: number | null;
         pendingSiteChanges?: SiteChangeKind[] | null;
+        pendingChanges?: number | null;
     }>
 > {
     const base = await sitesBase();
@@ -1367,10 +1372,12 @@ export async function saveDraftSections(
         revision?: number;
         pendingSectionChanges?: number | null;
         pendingSiteChanges?: SiteChangeKind[] | null;
+        pendingChanges?: number | null;
         message?: string;
         error?: string;
         code?: string;
         index?: number;
+        by?: string | null;
     } | null;
     if (res.status === 409) {
         /*
@@ -1381,6 +1388,8 @@ export async function saveDraftSections(
         return {
             ok: false,
             conflict: true,
+            // Who saved it since (C12); null when the API can't say.
+            by: data?.by ?? null,
             ...readError(
                 data,
                 "Someone else saved this page while you were editing.",
@@ -1400,6 +1409,7 @@ export async function saveDraftSections(
                  */
                 pendingSectionChanges: data?.pendingSectionChanges ?? null,
                 pendingSiteChanges: data?.pendingSiteChanges ?? null,
+                pendingChanges: data?.pendingChanges ?? null,
             },
         };
     }

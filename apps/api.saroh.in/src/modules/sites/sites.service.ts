@@ -2394,12 +2394,34 @@ export class SitesService {
                 dto.revision !== undefined &&
                 dto.revision !== version.revision
             ) {
+                /*
+                 * Who saved it since (C12): the last other person to edit
+                 * a section of this draft. Said by name, never as presence.
+                 */
+                const [last] = await tx.section.findMany({
+                    where: {
+                        pageVersionId: version.id,
+                        lastEditedByUserId: { not: ctx.userId },
+                    },
+                    orderBy: { lastEditedAt: "desc" },
+                    take: 1,
+                    select: { lastEditedByUserId: true },
+                });
+                const byId = last?.lastEditedByUserId ?? null;
+                const [user] = byId
+                    ? await prisma.user.findMany({
+                          where: { id: byId },
+                          select: { name: true, email: true },
+                      })
+                    : [];
+                const by = user ? (user.name ?? user.email) : null;
                 throw new ConflictException({
                     message:
                         "Someone else saved this page while you were editing. Reload to see their version.",
                     code: "DRAFT_REVISION_MISMATCH",
                     yours: dto.revision,
                     current: version.revision,
+                    by,
                 });
             }
 

@@ -53,7 +53,7 @@ export function PagesTree({
     model: EditorModel;
     /** The site's flags on this page, by section: the rows' dots. */
     flagsBySection: Map<number, Flag[]>;
-    /** Add a page (the page menu's, until U46e's sheet). */
+    /** Add a page: Add's own sheet (U46e). */
     onAddPage: () => void;
     /** Add a section below the selected one (Rail › Add). */
     onAddSection: () => void;

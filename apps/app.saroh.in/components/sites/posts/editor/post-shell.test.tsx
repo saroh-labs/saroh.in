@@ -380,3 +380,85 @@ describe("postTrailTabs", () => {
         ).toEqual(["Posts", "Feedback"]);
     });
 });
+
+/**
+ * The plan's post editor table ("Capabilities kept", U51): every control
+ * the old editor had is reachable in the new one. Rows the cases above
+ * reach (Details, search and sharing, categories, autosave and ⌘S, the
+ * Ask AI draft, a reader's Feedback) are not asked again here.
+ */
+describe("the post capability table, row by row (U51)", () => {
+    const menuItems = () =>
+        Array.from(document.querySelectorAll("[role=menuitem]")).map((m) =>
+            m.textContent.replace("⌘S", "").trim(),
+        );
+    function openMore() {
+        const trigger = named(
+            "More: save now, more formatting, take off the site, delete",
+        );
+        if (!trigger) throw new Error("No More");
+        act(() => {
+            trigger.focus();
+            trigger.dispatchEvent(
+                new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+            );
+        });
+    }
+
+    it("title, body, Written by, Share as a post and Publish post are on the page", () => {
+        act(() =>
+            root.render(
+                <PostShell
+                    data={data({
+                        share: {
+                            setup: {} as never,
+                            url: "https://gulmohar.saroh.app/blog/bridal-trial",
+                        },
+                    })}
+                    post={post}
+                />,
+            ),
+        );
+        expect(field("Post title").value).toBe("Bridal trial");
+        expect(field("Post body")).toBeDefined();
+        expect(container.textContent).toContain("Written by");
+        expect(named("Share")).toBeDefined();
+        expect(named("Publish post")).toBeDefined();
+    });
+
+    it("More: Save now, More formatting, Take off the site and Delete", () => {
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        openMore();
+        expect(menuItems()).toEqual([
+            "Save now",
+            "More formatting",
+            "Take off the site…",
+            "Delete this post…",
+        ]);
+    });
+
+    it("couldn't save keeps the writing, and Try again saves again", async () => {
+        updatePost.mockResolvedValueOnce({ ok: false, error: "Offline." });
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        act(() => type(field("Post title"), "Bridal trial, again"));
+        await settle(() => vi.advanceTimersByTime(2600));
+        expect(container.textContent).toContain(
+            "Couldn't save your latest changes.",
+        );
+        expect(field("Post title").value).toBe("Bridal trial, again");
+        updatePost.mockResolvedValue({ ok: true, data: { id: "p1" } });
+        await settle(() => named("Try again")?.click());
+        expect(updatePost).toHaveBeenCalledTimes(2);
+    });
+
+    it("a paused post reads: More offers nothing that saves", () => {
+        act(() =>
+            root.render(
+                <PostShell data={data({ paused: true })} post={post} />,
+            ),
+        );
+        openMore();
+        expect(menuItems()).not.toContain("Save now");
+        expect(menuItems()).toContain("Delete this post…");
+    });
+});

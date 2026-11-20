@@ -25,8 +25,9 @@ export default function Error({
         <SectionError
             error={error}
             retry={retry}
-            things="the editor"
-            reassurance="Your published site is unaffected."
+            // `fix/WXKStates` "Couldn't load this page", in the shared words.
+            things="this page"
+            reassurance="Nothing you made is lost, and your live site is unaffected."
             backHref="/sites"
             place="Website"
         />

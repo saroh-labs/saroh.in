@@ -13,6 +13,7 @@ jest.mock("@saroh/database", () => {
                 createMany: jest.fn(),
                 findMany: jest.fn(),
             },
+            user: { findMany: jest.fn() },
             $transaction: jest.fn(),
         },
     };
@@ -34,6 +35,7 @@ const db = prisma as unknown as {
         createMany: jest.Mock;
         findMany: jest.Mock;
     };
+    user: { findMany: jest.Mock };
     $transaction: jest.Mock;
 };
 
@@ -126,6 +128,27 @@ describe("saving a draft against the revision it was read at (#285)", () => {
             code: "DRAFT_REVISION_MISMATCH",
             yours: 1,
             current: 3,
+        });
+    });
+
+    it("names who saved it since, by their last edit (C12)", async () => {
+        db.section.findMany.mockResolvedValueOnce([
+            { lastEditedByUserId: "user_2" },
+        ]);
+        db.user.findMany.mockResolvedValue([
+            { id: "user_2", name: "Ritika Sharma", email: "r@example.com" },
+        ]);
+        const error = await service
+            .replaceDraftSections(ctx, "site_1", "page_1", {
+                sections: [HERO],
+                revision: 1,
+            })
+            .catch((e: ConflictException) => e.getResponse());
+
+        expect(error).toMatchObject({ by: "Ritika Sharma" });
+        expect(db.section.findMany.mock.calls[0][0].where).toEqual({
+            pageVersionId: "ver_1",
+            lastEditedByUserId: { not: "user_1" },
         });
     });
 

@@ -50,6 +50,7 @@ export function usePublish({
     initialNeverPublished,
     initialPendingChanges,
     initialPendingSiteChanges,
+    initialPendingUnits = null,
     refreshReview,
     initialNeedsApproval = false,
     canOverride = false,
@@ -61,6 +62,11 @@ export function usePublish({
     initialNeverPublished: boolean;
     initialPendingChanges: number | null;
     initialPendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * The change units waiting (U7), the number Overview and the chip show
+     * (RULES §2, KTD-E3). Absent or null: the two counts above, summed.
+     */
+    initialPendingUnits?: number | null;
     /** Publishing moves the review state too; the review hook re-reads it. */
     refreshReview: () => Promise<void>;
     /**
@@ -108,6 +114,21 @@ export function usePublish({
     const [pendingSiteChanges, setPendingSiteChanges] = useState<
         SiteChangeKind[] | null
     >(initialPendingSiteChanges);
+    /*
+     * The status chip's number (KTD-E3): the API's count of change units,
+     * the one Overview reads. Each save answers it; a site setting saved
+     * on its own clock is read again from `…/changes`, never guessed.
+     */
+    const [pendingUnits, setPendingUnits] = useState<number | null>(
+        initialPendingUnits,
+    );
+    const unitsRequest = useRef(0);
+    const refreshUnits = useCallback(async () => {
+        const request = ++unitsRequest.current;
+        const read = await readSiteChanges(siteId).catch(() => null);
+        if (request !== unitsRequest.current) return;
+        setPendingUnits(read ? read.units.length : null);
+    }, [siteId]);
     const [checking, setChecking] = useState(false);
     /*
      * Whether anything is live yet (#288).
@@ -175,9 +196,14 @@ export function usePublish({
     function recordSaved(
         sections: number | null,
         site: SiteChangeKind[] | null,
+        units?: number | null,
     ) {
         setPendingChanges(sections);
         setPendingSiteChanges(site);
+        if (typeof units === "number") {
+            unitsRequest.current++;
+            setPendingUnits(units);
+        } else void refreshUnits();
     }
 
     /**
@@ -186,11 +212,15 @@ export function usePublish({
      * pill read "Published" (review). Stable, so the autosaves can depend on
      * it. The next section save recounts, and its answer replaces this.
      */
-    const markSitePending = useCallback((kind: SiteChangeKind) => {
-        setPendingSiteChanges((prev) =>
-            prev === null || prev.includes(kind) ? prev : [...prev, kind],
-        );
-    }, []);
+    const markSitePending = useCallback(
+        (kind: SiteChangeKind) => {
+            setPendingSiteChanges((prev) =>
+                prev === null || prev.includes(kind) ? prev : [...prev, kind],
+            );
+            void refreshUnits();
+        },
+        [refreshUnits],
+    );
     const markStylePending = useCallback(
         () => markSitePending("style"),
         [markSitePending],
@@ -302,6 +332,8 @@ export function usePublish({
             setPendingChanges(0);
             // The site-level settings went live too.
             setPendingSiteChanges([]);
+            unitsRequest.current++;
+            setPendingUnits(0);
         } else {
             // What was left out still waits: counted afresh, never guessed.
             await recountLeftOut();
@@ -329,17 +361,20 @@ export function usePublish({
         setNeverPublished(false);
         setPendingChanges(pending?.sections ?? null);
         setPendingSiteChanges(pending?.site ?? null);
-        await Promise.all([refreshFlags(), refreshReview()]);
+        await Promise.all([refreshFlags(), refreshReview(), refreshUnits()]);
     }
 
     /** After a publish that left some out: the count is what still waits. */
     async function recountLeftOut() {
         const left = await readSiteChanges(siteId).catch(() => null);
+        unitsRequest.current++;
         if (!left) {
             setPendingChanges(null);
             setPendingSiteChanges(null);
+            setPendingUnits(null);
             return;
         }
+        setPendingUnits(left.units.length);
         const kinds = new Set<string>(SITE_CHANGE_KINDS);
         setPendingChanges(left.units.filter((u) => u.kind !== "site").length);
         setPendingSiteChanges(
@@ -363,6 +398,7 @@ export function usePublish({
         setSiteAddress,
         pendingChanges,
         pendingSiteChanges,
+        pendingUnits,
         closeCheck,
         needsApproval,
         canOverride,

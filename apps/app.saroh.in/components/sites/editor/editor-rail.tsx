@@ -15,6 +15,7 @@ import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
+import type { SiteIconSource } from "@/components/sites/looks/brand-groups";
 import type { LookChanges } from "@/components/sites/looks/look-changes";
 import type { LookChoices } from "@/components/sites/looks/look-picker";
 import { StylePanel } from "@/components/sites/looks/style-panel";
@@ -78,7 +79,19 @@ export function EditorRail({
     templateName,
     hideTabs = false,
     lookChanges,
+    siteIcon,
+    asideHosted = false,
+    styleDenied = false,
 }: {
+    /** The site and its tab icon: Brand draws Logo and tab icon (U24b). */
+    siteIcon?: SiteIconSource;
+    /** The desk inspector draws Brand's aside (`BrandAside`). */
+    asideHosted?: boolean;
+    /**
+     * Not a reader, but the API refuses this person's look changes (no
+     * `site:update`, C11): Brand reads, and says who can change it.
+     */
+    styleDenied?: boolean;
     /** This visit's changes to the look, each with Undo (U24b). */
     lookChanges?: LookChanges;
     /**
@@ -167,12 +180,13 @@ export function EditorRail({
                     onSelect={selectTab}
                 />
             )}
-            {tab === "brand" && readOnly ? (
+            {tab === "brand" && (readOnly || styleDenied) ? (
                 <BrandReadOnly
                     style={style}
                     options={styleOptions}
                     looks={looks?.available === true}
                     template={templateName}
+                    denied={!readOnly && styleDenied}
                 />
             ) : tab === "brand" ? (
                 <StylePanel
@@ -189,6 +203,8 @@ export function EditorRail({
                     phoneTabs={phone}
                     templateRow={templateRow}
                     changes={lookChanges}
+                    siteIcon={siteIcon}
+                    asideHosted={asideHosted}
                 />
             ) : (
                 <>

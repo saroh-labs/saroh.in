@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { PANEL_DEFAULT, RAIL_DEFAULT } from "@/lib/sites/editor-prefs";
 import type { Flag } from "@/lib/sites/service";
 
-import { AddPanel } from "../add/add-panel";
+import { AddPageFor, AddPanel } from "../add/add-panel";
 import type { EditorTopBarProps } from "../editor-bar";
 import type { EditorPanelsProps } from "../editor-panels";
 import { EditorPanels } from "../editor-panels";
@@ -67,9 +67,9 @@ export function EditorShell({
     trailTabs,
 }: EditorShellProps) {
     const [findOpen, setFindOpen] = useState(false);
-    // The page picker: the tree's Add a page opens it, where Add a page is
-    // today (U46e's Add a page sheet replaces this).
     const [pickerOpen, setPickerOpen] = useState(false);
+    // The tree's Add a page opens Add's own sheet (U46e, `fix/WXBAddPage`).
+    const [addingPage, setAddingPage] = useState(false);
     const { viewport } = model;
 
     // ⌘K opens Find once it is built (U46c).
@@ -98,7 +98,7 @@ export function EditorShell({
             <PagesTree
                 model={model}
                 flagsBySection={flagsBySection}
-                onAddPage={() => setPickerOpen(true)}
+                onAddPage={() => setAddingPage(true)}
                 onAddSection={() => model.openRail("add")}
             />
         );
@@ -183,6 +183,13 @@ export function EditorShell({
                 open={findOpen}
                 onOpenChange={setFindOpen}
             />
+            {addingPage ? (
+                <AddPageFor
+                    model={model}
+                    start="blank"
+                    onClose={() => setAddingPage(false)}
+                />
+            ) : null}
         </>
     );
 }

@@ -1855,3 +1855,123 @@ describe("the one phone editor (U49)", () => {
         expect($("[data-phone-bar]")).toBeNull();
     });
 });
+
+/**
+ * The plan's "Capabilities kept" table (U51, 00-universal §15), row by row,
+ * for what the earlier units' cases don't already reach: every control
+ * the editor had stays reachable with the Website area on, desk and phone.
+ * The other rows are asserted above, each where its unit built it: the
+ * bar and More (U46), the rail and the tree, History, Preview (U46b/f),
+ * the inspector's tabs and toolbar (U47), the phone bar, its sheets and
+ * the page picker sheet (U49).
+ */
+describe("the capability table, row by row (U51)", () => {
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        askAi: true,
+        initialPendingChanges: 2,
+        initialPendingSiteChanges: [],
+        siteIcon: {
+            siteId: "site",
+            siteName: "Flour & Ferment",
+            saved: { own: null, businessLogoUrl: null },
+        },
+    };
+    beforeEach(() => {
+        area.on = true;
+    });
+    const sheetTitled = (title: string) =>
+        Array.from(document.querySelectorAll("[role=dialog] h2")).some(
+            (h) => h.textContent === title,
+        );
+
+    describe("desk (1920)", () => {
+        beforeEach(() => atWidth(1920));
+
+        it("the page picker: switch page, Page settings, Add a page", () => {
+            render(owner);
+            click(button("Page: Home. Choose another page to edit"));
+            expect(has(/^Settings for Home/)).toBe(true);
+            expect(has("Add a page")).toBe(true);
+            expect(has(/About/)).toBe(true);
+        });
+
+        it("the Pages tree's Add a page opens Add's own sheet (U46e)", () => {
+            render(owner);
+            const add = Array.from(
+                document.querySelectorAll<HTMLElement>(
+                    "[data-pages-tree] button",
+                ),
+            ).find((b) => nameOf(b) === "Add a page");
+            if (!add) throw new Error("No Add a page in the tree");
+            click(add);
+            expect(sheetTitled("Add a page")).toBe(true);
+        });
+
+        it("Rail › Add › Add a page opens the same sheet", () => {
+            render(owner);
+            click(button("Add"));
+            click(button("Blank page"));
+            expect(sheetTitled("Add a page")).toBe(true);
+        });
+
+        it("Brand: Logo and tab icon in the panel, the aside where the inspector is", () => {
+            render(owner);
+            click(button("Brand"));
+            expect($("[data-brand-panel]")?.textContent).toContain(
+                "Logo and tab icon",
+            );
+            // `BrandAside` once, in the inspector's place (U24b).
+            expect(
+                document.querySelectorAll("[data-brand-aside]"),
+            ).toHaveLength(1);
+            expect(
+                $("[data-inspector-frame] [data-brand-aside]"),
+            ).not.toBeNull();
+        });
+
+        it("the dividers still resize both panels", () => {
+            render(owner);
+            for (const label of [
+                "Resize the block list",
+                "Resize the inspector",
+            ]) {
+                expect(
+                    document.querySelector(`[aria-label="${label}"]`),
+                    label,
+                ).not.toBeNull();
+            }
+        });
+
+        it("the chip's number is Overview's: the API's change units (KTD-E3)", () => {
+            render({ ...owner, initialPendingUnits: 3 });
+            expect($("[data-status-chip]")?.textContent).toBe(
+                "Live · 3 changes waiting",
+            );
+        });
+    });
+
+    describe("phone (390)", () => {
+        beforeEach(() => atWidth(390));
+
+        it("Add sheet › A page opens Add a page", () => {
+            render(owner);
+            click(button("Add"));
+            click(button("Blank page"));
+            expect(sheetTitled("Add a page")).toBe(true);
+        });
+
+        it("Brand sheet: Logo and tab icon is a group", () => {
+            render(owner);
+            click(button("Brand"));
+            expect(has("Logo")).toBe(true);
+        });
+
+        it("the Publish badge is the chip's number (KTD-E3)", () => {
+            render({ ...owner, initialPendingUnits: 3 });
+            expect($("[data-publish-count]")?.textContent).toBe("3");
+        });
+    });
+});

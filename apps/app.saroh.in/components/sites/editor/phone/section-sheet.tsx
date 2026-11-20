@@ -40,6 +40,7 @@ import { StyleTab } from "../inspector/style-tab";
 import { VisibilityTab } from "../inspector/visibility-tab";
 import { linkPlaces } from "../link-picker";
 import { FeedbackPanel } from "../panels/feedback-panel";
+import { SaveFailedNotice } from "../save-failed";
 import { PriceSheet } from "../sheets/price-sheet";
 import type { EditorModel } from "../shell/editor-model";
 import type { TextField } from "./text-sheet";
@@ -85,7 +86,9 @@ export function SectionSheet({
 }) {
     const { siteId, pageId, pages, active, selection, draft, review } = model;
     const readOnly = model.readOnly;
-    const services = useServicesForPicker();
+    // A price saved in the price sheet reads the From Services rows again.
+    const [servicesRead, setServicesRead] = useState(0);
+    const services = useServicesForPicker(servicesRead);
     const act = sectionActions(model);
     const keyboard = useKeyboardUp();
     const [own, setOwn] =
@@ -294,6 +297,8 @@ export function SectionSheet({
                     onFocusCapture={(e) => openText(e, title)}
                     onClickCapture={(e) => openText(e, title)}
                 >
+                    {/* The page behind is covered: Couldn't save says it here. */}
+                    <SaveFailedNotice draft={draft} />
                     <ContentTab
                         siteId={siteId}
                         section={section}
@@ -405,6 +410,7 @@ export function SectionSheet({
                 siteId={siteId}
                 serviceId={priceFor}
                 onClose={() => setPriceFor(null)}
+                onSaved={() => setServicesRead((n) => n + 1)}
             />
             <TextSheet
                 field={text}
@@ -413,6 +419,7 @@ export function SectionSheet({
                     places: linkPlaces(pages, pageId, draft.sections),
                     services:
                         services.status === "ready" ? services.services : [],
+                    businessPhone: model.businessPhone,
                 }}
                 onClose={() => {
                     returned.current = text?.el ?? null;
