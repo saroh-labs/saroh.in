@@ -25,6 +25,7 @@ import {
     CreatePreviewLinkDto,
     CreateSiteFromTemplateDto,
     GoLiveOptionsDto,
+    PublishOptionsDto,
     RequestReviewDto,
     ReviewTargetQueryDto,
     SetCommentResolvedDto,
@@ -485,15 +486,19 @@ export class SitesController {
      * Publish the site: snapshot its pages' current drafts into a new immutable
      * Publication (sanitizing rich fields) and repoint the live pointer.
      * Requires `site:publish`. With "Publishing needs approval" on, 409
-     * unless an owner sends `override` (DEC-071, R10).
+     * unless an owner sends `override` (DEC-071, R10). `leaveOut` keeps
+     * named changes in the draft and live as they are (U8).
      */
     @Post(":siteId/publish")
     @HttpCode(200)
     publish(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
-        @Body() dto: GoLiveOptionsDto,
+        @Body() dto: PublishOptionsDto,
     ) {
-        return this.sites.publishSite(ctx, siteId, { override: dto.override });
+        return this.sites.publishSite(ctx, siteId, {
+            override: dto.override,
+            leaveOut: dto.leaveOut,
+        });
     }
 }

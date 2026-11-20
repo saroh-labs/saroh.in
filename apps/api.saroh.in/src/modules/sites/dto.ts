@@ -596,6 +596,19 @@ export class GoLiveOptionsDto {
     override?: boolean;
 }
 
+/**
+ * Publish (U8): `leaveOut` names change units (`GET …/changes` keys) that
+ * stay in the draft and go live as they are live now.
+ */
+export class PublishOptionsDto extends GoLiveOptionsDto {
+    @IsOptional()
+    @IsArray({ message: "leaveOut must be a list of changes" })
+    @ArrayMaxSize(500, { message: "leaveOut is too long" })
+    @IsString({ each: true, message: "leaveOut must be a list of changes" })
+    @MaxLength(300, { each: true, message: "leaveOut has a key too long" })
+    leaveOut?: string[];
+}
+
 /** Mint a preview link (#198). The choices are the ones the design offers. */
 export class CreatePreviewLinkDto {
     @IsIn([1, 7, 30], { message: "A preview link lasts 1, 7 or 30 days" })

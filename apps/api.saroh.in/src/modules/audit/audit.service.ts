@@ -118,6 +118,11 @@ export const AuditAction = {
     // the publication. Metadata: how it went live (`source`), and the test
     // release when it was one. The target is the new publication.
     SitePublishOverride: "site.publish_approval.override",
+    // A publish that kept some changes in the draft (website area U8,
+    // KTD-5), written by `putLive` with the publication. Metadata: the
+    // site and `leftOut`, the change unit keys (ids, never content). The
+    // target is the new publication.
+    SitePublishLeftOut: "site.publish.left_out",
     // A site's draft brought up to its template's newest version by Saroh
     // (DEC-141, `sites/template-upgrade.ts`), written in the upgrade's own
     // transaction with the site as the target and `system:template-upgrade`

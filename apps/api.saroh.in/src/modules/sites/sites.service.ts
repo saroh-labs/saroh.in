@@ -46,6 +46,7 @@ import {
     carryStamps,
     changeUnits,
     groupByPerson,
+    leaveOutOf,
     readDraftEditors,
 } from "./change-units";
 import { domainPausedHere } from "./domain-paused";
@@ -401,6 +402,11 @@ export interface PublishResult {
     overridden: boolean;
     /** Which route this publish took (#278). */
     route: ReviewRoute;
+    /**
+     * Changes left out with the ones asked because they need them (U8): a
+     * new page's sections, a menu linking to a left-out page.
+     */
+    alsoLeftOut?: string[];
 }
 
 /**
@@ -2531,7 +2537,15 @@ export class SitesService {
          * unless an owner overrides, and the override is recorded. 403
          * from anyone else.
          */
-        options: { override?: boolean; confirm?: ConfirmDraft } = {},
+        options: {
+            override?: boolean;
+            confirm?: ConfirmDraft;
+            /**
+             * Change units that stay in the draft and go out as they are
+             * live (U8, KTD-5): `leaveOutOf`.
+             */
+            leaveOut?: readonly string[];
+        } = {},
     ): Promise<PublishResult> {
         authorize(ctx, "site:publish");
         assertOverrideAllowed(ctx, options.override);
@@ -2546,34 +2560,63 @@ export class SitesService {
         }
 
         const publishedAt = new Date();
-        const snapshot = this.buildSnapshot(site, publishedAt);
+        const draftSnapshot = this.buildSnapshot(site, publishedAt);
+        const leaveOut = options.leaveOut ?? [];
         /*
          * A template's note to the owner never goes live (DEC-141): the
          * first starters put "Say what you do and where, in one line." under
          * every headline, and customers read it. Refused in the words the
          * pre-publish check uses, which names the block.
          */
-        if (hasOwnerNote(snapshot.pages)) {
-            throw new ConflictException({
-                message: OWNER_NOTE_MESSAGE,
-                details: { reason: "ownerNote" },
-            });
-        }
-        /*
-         * Approval gates nothing, and says so (#199, #278). The epic's rule: if
-         * a review was asked for and has not been answered for THIS draft,
-         * publishing is RECORDED as a bypass, not prevented.
-         *
-         * The fingerprint is of the snapshot about to be written, so an
-         * approval of an earlier draft does not cover this one.
-         */
-        const fingerprint = draftFingerprint(snapshot);
+        const refuseOwnerNote = (pages: SiteSnapshot["pages"]) => {
+            if (hasOwnerNote(pages)) {
+                throw new ConflictException({
+                    message: OWNER_NOTE_MESSAGE,
+                    details: { reason: "ownerNote" },
+                });
+            }
+        };
+        if (leaveOut.length === 0) refuseOwnerNote(draftSnapshot.pages);
 
         const published = await prisma.$transaction(async (tx) => {
-            if (options.confirm) {
+            if (options.confirm || leaveOut.length > 0) {
                 await lockSite(tx, site.id);
-                await options.confirm(tx, site);
             }
+            if (options.confirm) await options.confirm(tx, site);
+            /*
+             * Leave out (U8): composed against the live version under the
+             * lock, so a publish that lands meanwhile is what left-out
+             * changes keep.
+             */
+            let snapshot = draftSnapshot;
+            let leftOut: string[] = [];
+            let alsoLeftOut: string[] = [];
+            if (leaveOut.length > 0) {
+                const current = await tx.site.findUniqueOrThrow({
+                    where: { id: site.id },
+                    select: {
+                        currentPublication: { select: { snapshot: true } },
+                    },
+                });
+                const composed = leaveOutOf(
+                    draftSnapshot,
+                    current.currentPublication?.snapshot ?? null,
+                    leaveOut,
+                );
+                snapshot = composed.snapshot as unknown as SiteSnapshot;
+                leftOut = composed.leftOut;
+                alsoLeftOut = composed.alsoLeftOut;
+                refuseOwnerNote(snapshot.pages);
+            }
+            /*
+             * Approval gates nothing, and says so (#199, #278). The epic's
+             * rule: if a review was asked for and has not been answered for
+             * THIS draft, publishing is RECORDED as a bypass, not prevented.
+             *
+             * The fingerprint is of the snapshot about to be written, so an
+             * approval of an earlier draft does not cover this one.
+             */
+            const fingerprint = draftFingerprint(snapshot);
             /*
              * No web address, no publish (DEC-069, L5): the one pre-publish
              * flag that blocks (`checkAddress`). Asked here, beside the
@@ -2608,6 +2651,7 @@ export class SitesService {
                 fingerprint,
                 template: publicationTemplate(site),
                 publishedAt,
+                leftOut,
             });
             return {
                 publicationId: live.publicationId,
@@ -2616,6 +2660,7 @@ export class SitesService {
                 bypassed: live.bypassed,
                 overridden: live.overridden,
                 route: live.route,
+                alsoLeftOut,
             };
         });
         // The first time one of the business's websites went live

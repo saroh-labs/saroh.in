@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 
+import { BadRequestException } from "@nestjs/common";
+
 import type { SectionType } from "@saroh/block-contract";
 import { blockHeading, SECTION_TYPES } from "@saroh/block-contract";
 
@@ -608,5 +610,295 @@ export function carryStamps(
                 : { lastEditedByUserId: by.userId, lastEditedAt: by.at };
         }),
         removed: previous.map((s) => s.key).filter((k) => !nextKeys.has(k)),
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Leave out (U8, KTD-5)
+// ---------------------------------------------------------------------------
+
+export const LEAVE_OUT_GONE_MESSAGE = "That change isn't waiting any more";
+export const NOTHING_TO_PUBLISH_MESSAGE = "Nothing to publish";
+export const LEAVE_OUT_FIRST_MESSAGE =
+    "A site's first publish goes out whole: nothing can be left out yet";
+export const LEAVE_OUT_CLASH_MESSAGE =
+    "That change can't be left out on its own: another change needs it";
+
+/** The snapshot fields each site kind publishes (`look`, `styleVariables`
+ * are built from `style`, so they follow it). */
+const KIND_FIELDS: Record<
+    Exclude<SiteChangeKind, "pages" | "redirects">,
+    readonly string[]
+> = {
+    name: ["name", "slug"],
+    search: ["seoTitle", "seoDescription"],
+    shareImage: ["socialImageUrl", "socialImage"],
+    icon: ["icon"],
+    posts: ["postsPrefix"],
+    style: ["style", "styleVariables", "look"],
+    footer: ["footer"],
+    menu: ["navigation"],
+};
+
+const NO_STAMPS: ChangeStamps = {
+    sections: new Map(),
+    pages: new Map(),
+    redirects: new Map(),
+    draftEditors: {},
+};
+
+function refuse(message: string, reason: string): BadRequestException {
+    return new BadRequestException({ message, details: { reason } });
+}
+
+interface Section {
+    key: string;
+    section: unknown;
+}
+
+/** A page's sections with left-out ones as they are live (KTD-5). */
+function composeSections(
+    pageId: string,
+    d: SnapshotPage,
+    l: SnapshotPage,
+    out: ReadonlySet<string>,
+): Section[] {
+    const draftKeys = d.keys ?? d.sections.map((_, i) => `@${i}`);
+    const left = (key: string) => out.has(`section:${pageId}:${key}`);
+    if (!l.keys) {
+        // A live page from before keys: by place, as its units are.
+        const shared = Math.min(d.sections.length, l.sections.length);
+        const seq: Section[] = [];
+        draftKeys.forEach((key, i) => {
+            if (i < shared) {
+                seq.push({
+                    key,
+                    section: left(key) ? l.sections[i] : d.sections[i],
+                });
+            } else if (!left(key)) {
+                seq.push({ key, section: d.sections[i] });
+            }
+        });
+        for (let i = shared; i < l.sections.length; i += 1) {
+            // Kept under its place key, so it is the same unit next time.
+            if (left(`@${i}`))
+                seq.push({ key: `@${i}`, section: l.sections[i] });
+        }
+        return seq;
+    }
+    const liveKeys = l.keys;
+    // Left out: a new one is absent; an edited, moved or removed one goes
+    // back to its live place with its live content.
+    const seq: Section[] = draftKeys
+        .map((key, i) => ({ key, section: d.sections[i] }))
+        .filter((s) => !left(s.key));
+    liveKeys.forEach((key, i) => {
+        if (!left(key)) return;
+        let at = 0;
+        for (let j = i - 1; j >= 0; j -= 1) {
+            const idx = seq.findIndex((s) => s.key === liveKeys[j]);
+            if (idx >= 0) {
+                at = idx + 1;
+                break;
+            }
+        }
+        seq.splice(at, 0, { key, section: l.sections[i] });
+    });
+    return seq;
+}
+
+function menuHrefs(site: Record<string, unknown>): string[] {
+    const nav = Array.isArray(site.navigation) ? site.navigation : [];
+    return (
+        nav
+            .map((item) => asObject(item).href)
+            // "/#anchor" is a place on the home page, not a page.
+            .filter(
+                (h): h is string =>
+                    typeof h === "string" &&
+                    h.startsWith("/") &&
+                    !h.startsWith("/#"),
+            )
+            .map((h) => h.split(/[#?]/)[0])
+    );
+}
+
+/**
+ * The snapshot a publish writes when `leaveOut` units stay in the draft
+ * (U8, KTD-5): the draft snapshot with each left-out unit as it is live. A
+ * new section or page left out is absent; a removed one is kept at its live
+ * place; a page's settings left out keep its live link and the old links
+ * that forward to it. Leaving out a unit leaves out every unit that requires
+ * it, and a menu that would link to a page this publish doesn't serve
+ * (`alsoLeftOut`). The draft itself is never touched, so every left-out unit
+ * is still waiting afterwards.
+ *
+ * shortcut: a button inside a published section that links to a left-out
+ * new page is not checked; add it if the Publish sheet shows it happening.
+ */
+export function leaveOutOf(
+    draft: unknown,
+    live: unknown,
+    requested: readonly string[],
+): {
+    snapshot: Record<string, unknown>;
+    leftOut: string[];
+    alsoLeftOut: string[];
+} {
+    if (live === null || live === undefined) {
+        throw refuse(LEAVE_OUT_FIRST_MESSAGE, "firstPublish");
+    }
+    const units = changeUnits(draft, live, NO_STAMPS);
+    const keys = new Set(units.map((u) => u.key));
+    if (requested.some((k) => !keys.has(k))) {
+        throw refuse(LEAVE_OUT_GONE_MESSAGE, "changeGone");
+    }
+    const out = new Set(requested);
+    for (let grew = true; grew;) {
+        grew = false;
+        for (const u of units) {
+            if (!out.has(u.key) && u.requires.some((r) => out.has(r))) {
+                out.add(u.key);
+                grew = true;
+            }
+        }
+    }
+
+    const draftShape = asObject(draft);
+    const liveShape = asObject(live);
+    const liveSite = asObject(liveShape.site);
+    const draftPages = readPages(draft);
+    const livePages = readPages(live);
+    const liveHasIds = livePages.some((p) => p.id !== null);
+
+    interface Composed {
+        entry: Record<string, unknown>;
+        keys: { id: string; sections: string[] } | null;
+        live: SnapshotPage | null;
+    }
+    const pages: Composed[] = [];
+    // The page unit each live page and each draft link belongs to.
+    const liveUnit = new Map<SnapshotPage, string>();
+    const draftUnit = new Map<string, string>();
+    for (const d of draftPages) {
+        const pageId = d.id ?? `@${d.path}`;
+        const pageKey = `page:${pageId}`;
+        draftUnit.set(d.path, pageKey);
+        const l =
+            livePages.find((p) =>
+                liveHasIds ? p.id === d.id : p.path === d.path,
+            ) ?? null;
+        if (l) liveUnit.set(l, pageKey);
+        if (!l && out.has(pageKey)) continue;
+        const sections = l
+            ? composeSections(pageId, d, l, out)
+            : (d.keys ?? d.sections.map((_, i) => `@${i}`))
+                  .map((key, i) => ({ key, section: d.sections[i] }))
+                  .filter((s) => !out.has(`section:${pageId}:${s.key}`));
+        const { sections: _drop, ...head } =
+            l && out.has(pageKey) ? l.entry : d.entry;
+        pages.push({
+            entry: { ...head, sections: sections.map((s) => s.section) },
+            keys: d.id
+                ? { id: d.id, sections: sections.map((s) => s.key) }
+                : null,
+            live: l,
+        });
+    }
+    // A removed or hidden page left out stays at its live place.
+    livePages.forEach((l, i) => {
+        if (liveUnit.has(l)) return;
+        const pageKey = `page:${l.id ?? `@${l.path}`}`;
+        liveUnit.set(l, pageKey);
+        if (!out.has(pageKey)) return;
+        let at = 0;
+        for (let j = i - 1; j >= 0; j -= 1) {
+            const idx = pages.findIndex((p) => p.live === livePages[j]);
+            if (idx >= 0) {
+                at = idx + 1;
+                break;
+            }
+        }
+        pages.splice(at, 0, {
+            entry: l.entry,
+            keys: l.id
+                ? {
+                      id: l.id,
+                      sections: l.keys ?? l.sections.map((_, k) => `@${k}`),
+                  }
+                : null,
+            live: l,
+        });
+    });
+
+    const served = new Set(pages.map((p) => p.entry.path as string));
+    const homes = (list: { isHome?: unknown }[]) =>
+        list.filter((p) => p.isHome === true).length;
+    if (
+        served.size !== pages.length ||
+        homes(pages.map((p) => p.entry)) !==
+            homes(draftPages.map((p) => p.entry))
+    ) {
+        throw refuse(LEAVE_OUT_CLASH_MESSAGE, "leaveOutClash");
+    }
+
+    // Old links follow their page's unit (KTD-3).
+    const byFrom = new Map<string, SnapshotRedirect>();
+    for (const r of readRedirects(draft)) {
+        const unit = draftUnit.get(r.to);
+        if (unit && !out.has(unit)) byFrom.set(r.from, r);
+    }
+    for (const r of readRedirects(live)) {
+        const l = livePages.find((p) => p.path === r.to);
+        const unit = l ? liveUnit.get(l) : undefined;
+        if (unit && out.has(unit) && !byFrom.has(r.from)) byFrom.set(r.from, r);
+    }
+    const redirects = [...byFrom.values()]
+        .filter((r) => served.has(r.to) && !served.has(r.from))
+        .sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
+
+    const site = { ...asObject(draftShape.site) };
+    const takeLive = (kind: keyof typeof KIND_FIELDS) => {
+        for (const field of KIND_FIELDS[kind]) {
+            if (field in liveSite) site[field] = liveSite[field];
+            else delete site[field];
+        }
+    };
+    for (const kind of Object.keys(
+        KIND_FIELDS,
+    ) as (keyof typeof KIND_FIELDS)[]) {
+        if (out.has(`site:${kind}`)) takeLive(kind);
+    }
+    // A menu that would link to a page this publish doesn't serve goes out
+    // as it is live, if that one doesn't either.
+    if (menuHrefs(site).some((h) => !served.has(h)) && keys.has("site:menu")) {
+        out.add("site:menu");
+        takeLive("menu");
+    }
+    if (menuHrefs(site).some((h) => !served.has(h))) {
+        throw refuse(LEAVE_OUT_CLASH_MESSAGE, "leaveOutClash");
+    }
+    if (units.every((u) => out.has(u.key))) {
+        throw refuse(NOTHING_TO_PUBLISH_MESSAGE, "nothingToPublish");
+    }
+
+    const { redirects: _r, ...rest } = draftShape;
+    const snapshot: Record<string, unknown> = {
+        ...rest,
+        site,
+        pages: pages.map((p) => p.entry),
+        ...(redirects.length > 0 ? { redirects } : {}),
+        keys: Object.fromEntries(
+            pages
+                .filter((p) => p.keys)
+                .map((p) => [p.entry.path as string, p.keys]),
+        ),
+    };
+    const asked = new Set(requested);
+    const leftOut = [...out];
+    return {
+        snapshot,
+        leftOut,
+        alsoLeftOut: leftOut.filter((k) => !asked.has(k)),
     };
 }

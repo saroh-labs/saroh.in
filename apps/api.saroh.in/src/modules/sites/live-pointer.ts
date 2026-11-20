@@ -152,6 +152,11 @@ export interface PutLiveInput {
      * it, so the draft's own review never reads a release's go-live.
      */
     testReleaseId?: string | null;
+    /**
+     * Change unit keys a publish kept in the draft (U8): recorded in an
+     * audit event with the publication.
+     */
+    leftOut?: readonly string[];
 }
 
 export interface PutLiveResult {
@@ -284,6 +289,25 @@ export async function putLive(
                 outcome: "BYPASSED",
                 publicationId: publication.id,
                 ...releaseClosing(input),
+            },
+            select: { id: true },
+        });
+    }
+
+    if (input.leftOut && input.leftOut.length > 0) {
+        await tx.auditEvent.create({
+            data: {
+                action: AuditAction.SitePublishLeftOut,
+                actorUserId: actor.userId,
+                organizationId: site.organizationId,
+                targetType: "publication",
+                targetId: publication.id,
+                outcome: AuditOutcome.Success,
+                metadata: auditMetadata(undefined, {
+                    siteId: site.id,
+                    source: input.source,
+                    leftOut: [...input.leftOut],
+                }),
             },
             select: { id: true },
         });

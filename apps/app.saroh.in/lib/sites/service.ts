@@ -1347,20 +1347,37 @@ export async function publishSite(
      * refused from anyone else, and recorded when it goes through.
      */
     override = false,
-): Promise<SitesResult<{ publicationId?: string; bypassed: boolean }>> {
+    /**
+     * Change unit keys to keep out of this publish (U8): they go live as
+     * they are live now and stay waiting in the draft.
+     */
+    leaveOut: string[] = [],
+): Promise<
+    SitesResult<{
+        publicationId?: string;
+        bypassed: boolean;
+        /** Units left out with them because they needed them. */
+        alsoLeftOut: string[];
+    }>
+> {
     const base = await sitesBase();
     if (!base)
         return {
             ok: false,
             error: "No business is open. Choose one and try again.",
         };
+    const body = {
+        ...(override ? { override: true } : {}),
+        ...(leaveOut.length > 0 ? { leaveOut } : {}),
+    };
     const res = await apiFetch(`${base}/${siteId}/publish`, {
         method: "POST",
-        ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+        ...(Object.keys(body).length > 0 ? { body: JSON.stringify(body) } : {}),
     });
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
         bypassed?: boolean;
+        alsoLeftOut?: string[];
         message?: string;
         error?: string;
     } | null;
@@ -1370,6 +1387,7 @@ export async function publishSite(
             data: {
                 publicationId: data?.publicationId,
                 bypassed: data?.bypassed === true,
+                alsoLeftOut: data?.alsoLeftOut ?? [],
             },
         };
     }

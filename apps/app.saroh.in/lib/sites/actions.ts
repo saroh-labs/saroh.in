@@ -143,9 +143,16 @@ export async function requestReview(siteId: string, testReleaseId?: string) {
     return requestReviewApi(siteId, testReleaseId);
 }
 
-/** `override`: an owner past "Publishing needs approval" (DEC-071). */
-export async function publishSite(siteId: string, override = false) {
-    return publishSiteApi(siteId, override);
+/**
+ * `override`: an owner past "Publishing needs approval" (DEC-071).
+ * `leaveOut`: change unit keys that stay in the draft (U8).
+ */
+export async function publishSite(
+    siteId: string,
+    override = false,
+    leaveOut: string[] = [],
+) {
+    return publishSiteApi(siteId, override, leaveOut);
 }
 
 export async function updateSiteSettings(
