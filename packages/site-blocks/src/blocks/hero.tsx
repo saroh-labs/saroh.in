@@ -1,6 +1,7 @@
 import type { LookId, RenderedHero } from "@saroh/block-contract";
 import { LOOKS, resolveVariant } from "@saroh/block-contract";
 
+import { EditableText } from "../editable-text";
 import type { PublicVisit } from "../lib/public-visit";
 import type { LookProps } from "../look-context";
 import { AnswerRow, VisitStamp } from "./answer-row";
@@ -267,7 +268,7 @@ function CompactHeading({
                         : "sr-only"
                 }
             >
-                {content.heading}
+                <EditableText field="heading">{content.heading}</EditableText>
             </HeroHeading>
             {content.subheading ? (
                 <p

@@ -3,6 +3,7 @@
 import type { RenderedHero } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import { EditableText } from "../editable-text";
 import { openState, openStateText } from "../lib/opening-hours";
 import type { PublicVisit } from "../lib/public-visit";
 import { siteImage } from "../lib/site-image";
@@ -132,7 +133,9 @@ export default function FullBleedHero({
                         level={level}
                         className="font-site-heading text-balance text-[clamp(calc(40px*var(--site-heading-scale)),8vw,calc(var(--site-display-size,76px)*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]"
                     >
-                        {content.heading}
+                        <EditableText field="heading">
+                            {content.heading}
+                        </EditableText>
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-4 max-w-[46ch] text-pretty text-base leading-[1.55] opacity-90 sm:text-lg">

@@ -1,6 +1,7 @@
 import type { RenderedFeatures } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { FeaturesBand } from "./features-band";
@@ -50,7 +51,9 @@ export default function FeaturesSection({
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
             <FeaturesIntro content={content} />
@@ -141,10 +144,12 @@ function FeaturesIntro({ content }: { content: RenderedFeatures }) {
     if (!content.intro) return null;
     return content.introStyle === "display" ? (
         <p className="font-site-heading text-site-fg mt-4 max-w-[40ch] text-pretty text-[calc(1.5625rem*var(--site-heading-scale))] font-normal leading-snug tracking-[-0.01em]">
-            {content.intro}
+            <EditableText field="intro">{content.intro}</EditableText>
         </p>
     ) : (
-        <p className="text-site-body mt-3 max-w-2xl text-lg">{content.intro}</p>
+        <p className="text-site-body mt-3 max-w-2xl text-lg">
+            <EditableText field="intro">{content.intro}</EditableText>
+        </p>
     );
 }
 
@@ -175,7 +180,9 @@ function FactsRow({ content }: { content: RenderedFeatures }) {
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
             <FeaturesIntro content={content} />

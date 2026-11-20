@@ -7,6 +7,7 @@ import type { RenderedHero } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { dateText } from "../booking-flow/model";
+import { EditableText } from "../editable-text";
 import { clockWords } from "../lib/clock";
 import type { OpeningHoursDay } from "../lib/opening-hours";
 import { isOpeningWeek, openState, openStateText } from "../lib/opening-hours";
@@ -342,7 +343,9 @@ function SplitHero({
                         level={level}
                         className="font-site-heading text-balance text-[clamp(calc(38px*var(--site-heading-scale)),9vw,calc(64px*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]"
                     >
-                        {content.heading}
+                        <EditableText field="heading">
+                            {content.heading}
+                        </EditableText>
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-3.5 max-w-[44ch] text-pretty text-base leading-[1.55] opacity-75">

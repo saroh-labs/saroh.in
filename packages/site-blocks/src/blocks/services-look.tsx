@@ -4,6 +4,7 @@ import type { LookId, RenderedServicesList } from "@saroh/block-contract";
 import { sectionFrameOf } from "@saroh/block-contract";
 
 import { destructiveAlertClasses } from "../alert";
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import { LookIcon } from "../look-icons";
 import { useQrSource, withQrSource } from "../qr-source";
@@ -112,7 +113,7 @@ export default function LookServices({
                 <LookEyebrow content={content} look={look} />
                 {heading ? (
                     <h2 data-site-title="" className={type.h2}>
-                        {heading}
+                        <EditableText field="heading">{heading}</EditableText>
                     </h2>
                 ) : null}
                 {intro ? (
@@ -122,7 +123,7 @@ export default function LookServices({
                             look === "quiet" && "min-[700px]:mx-auto",
                         )}
                     >
-                        {intro}
+                        <EditableText field="intro">{intro}</EditableText>
                     </p>
                 ) : null}
             </div>

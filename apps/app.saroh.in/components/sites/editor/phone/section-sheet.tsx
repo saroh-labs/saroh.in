@@ -38,11 +38,12 @@ import { frameOf } from "../inspector/section-frame";
 import type { InspectorTab } from "../inspector/site-inspector";
 import { StyleTab } from "../inspector/style-tab";
 import { VisibilityTab } from "../inspector/visibility-tab";
+import { linkPlaces } from "../link-picker";
 import { FeedbackPanel } from "../panels/feedback-panel";
 import { PriceSheet } from "../sheets/price-sheet";
 import type { EditorModel } from "../shell/editor-model";
 import type { TextField } from "./text-sheet";
-import { TextSheet } from "./text-sheet";
+import { richEditorOf, TextSheet } from "./text-sheet";
 
 /**
  * A tapped section on a phone (U49, `fix/WXEEditorPhone`, `fix/WXNSection`):
@@ -92,7 +93,7 @@ export function SectionSheet({
     const [priceFor, setPriceFor] = useState<string | null>(null);
     const [text, setText] = useState<TextField | null>(null);
     // The field the text sheet just gave back focus to: not reopened.
-    const returned = useRef<HTMLTextAreaElement | null>(null);
+    const returned = useRef<HTMLElement | null>(null);
 
     /*
      * The section as it was when the sheet opened, for Cancel. Taken while
@@ -137,8 +138,13 @@ export function SectionSheet({
 
     /** A longer field (a textarea) opens full screen to be written in. */
     const openText = (e: FocusEvent | MouseEvent, sectionName: string) => {
-        const el = e.target;
-        if (!(el instanceof HTMLTextAreaElement) || el.disabled || readOnly) {
+        if (readOnly || !(e.target instanceof HTMLElement)) return;
+        // A textarea, or a rich text editor's page (U47d: Bold and Link).
+        const rich = richEditorOf(e.target)
+            ? e.target.closest<HTMLElement>(".ProseMirror")
+            : null;
+        const el = rich ?? e.target;
+        if (!rich && (!(el instanceof HTMLTextAreaElement) || el.disabled)) {
             return;
         }
         if (e.type === "focus" && returned.current === el) {
@@ -147,7 +153,12 @@ export function SectionSheet({
         }
         const label =
             [
-                Array.from(el.labels).at(0)?.textContent.trim(),
+                el instanceof HTMLTextAreaElement
+                    ? Array.from(el.labels).at(0)?.textContent.trim()
+                    : el
+                          .closest("[data-slot=field]")
+                          ?.querySelector("label")
+                          ?.textContent.trim(),
                 el.getAttribute("aria-label"),
             ].find(Boolean) ?? "Text";
         setText({ el, label, section: sectionName });
@@ -398,6 +409,11 @@ export function SectionSheet({
             <TextSheet
                 field={text}
                 container={frame}
+                links={{
+                    places: linkPlaces(pages, pageId, draft.sections),
+                    services:
+                        services.status === "ready" ? services.services : [],
+                }}
                 onClose={() => {
                     returned.current = text?.el ?? null;
                     setText(null);

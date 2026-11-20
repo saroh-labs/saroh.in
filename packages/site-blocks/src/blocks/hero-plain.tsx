@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { RenderedHero } from "@saroh/block-contract";
 import { resolveVariant } from "@saroh/block-contract";
 
+import { EditableText } from "../editable-text";
 import { siteImage } from "../lib/site-image";
 import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
@@ -100,7 +101,9 @@ export default function PlainHero({
                             level={level}
                             className="font-site-heading text-balance text-[calc(clamp(2.25rem,6vw_+_0.75rem,var(--site-display-size,3.75rem))*var(--site-heading-scale))] font-bold leading-[1.05] tracking-[-0.03em]"
                         >
-                            {content.heading}
+                            <EditableText field="heading">
+                                {content.heading}
+                            </EditableText>
                         </HeroHeading>
                         {content.subheading ? (
                             <p className="mt-5 max-w-[54ch] text-pretty text-[length:calc(var(--site-body-size,1rem)*1.125)] leading-relaxed sm:text-[length:calc(var(--site-body-size,1rem)*1.25)]">

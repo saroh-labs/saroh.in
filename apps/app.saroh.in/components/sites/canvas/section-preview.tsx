@@ -2,10 +2,12 @@
 
 import { pagePathResolver, toRendered } from "@saroh/block-contract";
 import type {
+    EditableTextHost,
     Section as RenderedSection,
     SiteFooterContent,
 } from "@saroh/site-blocks";
 import {
+    EditableTextContext,
     lookOf,
     lookScope,
     ModulePageTop,
@@ -101,9 +103,16 @@ export function DraftPreview({
     onFormBlocked,
     page: current = null,
     blockTools,
+    textEdit,
 }: {
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
+    /**
+     * Typing on the page (U47d): the host the selected section's marked
+     * words write through. Absent, or for a section it has none for, the
+     * words are only drawn.
+     */
+    textEdit?: (index: number) => EditableTextHost | undefined;
     /**
      * The page being drawn. A module page's title (DEC-073 #9) is drawn
      * above its blocks as the live site draws it, and its rich-text intro
@@ -252,6 +261,8 @@ export function DraftPreview({
                 );
                 if (!editing) return <div key={index}>{rendered}</div>;
                 const label = SECTION_LABELS[section.type];
+                const host =
+                    selectedIndex === index ? textEdit?.(index) : undefined;
                 return (
                     <CanvasBlock
                         key={index}
@@ -272,7 +283,13 @@ export function DraftPreview({
                                 : undefined
                         }
                     >
-                        {rendered}
+                        {host ? (
+                            <EditableTextContext.Provider value={host}>
+                                {rendered}
+                            </EditableTextContext.Provider>
+                        ) : (
+                            rendered
+                        )}
                     </CanvasBlock>
                 );
             })

@@ -8,6 +8,7 @@ import { resolveVariant } from "@saroh/block-contract";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import { quietFill } from "../booking-flow/styles";
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { useQrSource } from "../qr-source";
@@ -205,11 +206,15 @@ export default function ServicesListSection({
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
             {content.intro ? (
-                <p className="text-site-body mt-3 text-lg">{content.intro}</p>
+                <p className="text-site-body mt-3 text-lg">
+                    <EditableText field="intro">{content.intro}</EditableText>
+                </p>
             ) : null}
 
             {state.kind === "loading" ? (
@@ -459,12 +464,16 @@ function PriceCardSection({
                                 data-site-title=""
                                 className="font-site-heading text-[calc(1.6875rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
                             >
-                                {heading}
+                                <EditableText field="heading">
+                                    {heading}
+                                </EditableText>
                             </h2>
                         ) : null}
                         {intro ? (
                             <p className="text-site-body mt-3 max-w-[var(--site-measure,62ch)] whitespace-pre-line text-[length:var(--site-body-size,1rem)] leading-relaxed">
-                                {intro}
+                                <EditableText field="intro">
+                                    {intro}
+                                </EditableText>
                             </p>
                         ) : null}
                         {includes.length > 0 ? (

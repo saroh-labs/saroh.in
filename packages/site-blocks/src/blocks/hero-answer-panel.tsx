@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 
 import { DEFAULT_API_URL } from "../api-url";
 import { dateText } from "../booking-flow/model";
+import { EditableText } from "../editable-text";
 import { clockWords } from "../lib/clock";
 import { gstOnPriceOf } from "../lib/gst-price";
 import { phoneText } from "../lib/phone";
@@ -134,7 +135,9 @@ export default function AnswerHero(props: AnswerHeroProps) {
                         level={level}
                         className="font-site-heading text-balance text-[calc(clamp(2.25rem,5vw_+_0.75rem,3.75rem)*var(--site-heading-scale,1))] font-semibold leading-[1.04] tracking-[-0.03em] [overflow-wrap:anywhere]"
                     >
-                        {content.heading}
+                        <EditableText field="heading">
+                            {content.heading}
+                        </EditableText>
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="max-w-[52ch] text-pretty text-[17px] leading-[1.55] min-[700px]:text-[18px]">

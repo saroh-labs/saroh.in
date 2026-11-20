@@ -2,6 +2,7 @@ import type { LookId, RenderedHero } from "@saroh/block-contract";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { EditableText } from "../editable-text";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LiveToday } from "../live/next-free";
@@ -131,7 +132,9 @@ export default function LookHero({
                     level={level}
                     className={cn(HEADING[look], "[overflow-wrap:anywhere]")}
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </HeroHeading>
             </>
         ),

@@ -39,6 +39,10 @@ export {
 } from "./section-empty";
 // Server-safe: the town in an address, for the hero's Stamp.
 export { townOf } from "./blocks/stamp";
+// Typing on the page in the editor (U47d): the editor provides the host;
+// with none, a marker draws its words and nothing else.
+export { EditableTextContext } from "./editable-text";
+export type { EditableTextHost } from "./editable-text";
 export type { FeedsFor, SectionFeeds } from "./section-empty";
 
 export {

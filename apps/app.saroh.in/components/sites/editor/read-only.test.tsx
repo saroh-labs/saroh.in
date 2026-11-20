@@ -1549,6 +1549,44 @@ describe("the inspector with the Website area on (U47)", () => {
         expect(tree()).not.toContain("Hidden on phone");
     });
 
+    /** The selected section's words on the canvas, marked by site-blocks. */
+    const onPage = (field: string) =>
+        $(`[data-block-index] [data-edit-field=${field}]`);
+    const headingInput = () =>
+        Array.from(
+            inspector()?.querySelectorAll<HTMLInputElement>("input") ?? [],
+        ).find((i) => i.value.startsWith("Welcome"));
+
+    it("typing on the page is the inspector's field, and Esc puts it back (U47d)", () => {
+        render(owner);
+        // Not selected: the words are only drawn.
+        click(button("Close, nothing selected"));
+        expect(onPage("heading")).toBeNull();
+        click(button("Welcome in"));
+        const words = onPage("heading");
+        if (!words) throw new Error("No heading to type in");
+        expect(words.textContent).toBe("Welcome in");
+        act(() => words.focus());
+        act(() => {
+            words.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+            words.textContent = "Welcome back";
+            words.dispatchEvent(new InputEvent("input", { bubbles: true }));
+        });
+        // One draft field, two inputs.
+        expect(headingInput()?.value).toBe("Welcome back");
+        key("Escape");
+        expect(headingInput()?.value).toBe("Welcome in");
+        expect(words.textContent).toBe("Welcome in");
+    });
+
+    it("a reader cannot type on the page (U47d, DEC-200)", () => {
+        render();
+        click(button("Welcome in"));
+        expect(onPage("heading")).toBeNull();
+        expect($("[data-block-index] [contenteditable]")).toBeNull();
+        expectReadOnly("shell, reader, the selected section's words");
+    });
+
     it("the header: on every page, with the banner over the canvas", () => {
         render(owner);
         click(button(/^Header/));

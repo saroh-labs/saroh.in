@@ -1,5 +1,6 @@
 import type { RenderedFeatures } from "@saroh/block-contract";
 
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 
 /**
@@ -30,12 +31,12 @@ export function FeaturesBand({ content }: { content: RenderedFeatures }) {
                         data-site-title=""
                         className="font-site-heading text-[calc(1.875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.01em]"
                     >
-                        {heading}
+                        <EditableText field="heading">{heading}</EditableText>
                     </h2>
                 ) : null}
                 {intro ? (
                     <p className="mt-3 max-w-2xl text-[17px] leading-relaxed">
-                        {intro}
+                        <EditableText field="intro">{intro}</EditableText>
                     </p>
                 ) : null}
                 <ul

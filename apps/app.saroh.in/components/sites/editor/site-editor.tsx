@@ -31,6 +31,7 @@ import {
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { useTestReleases } from "@/components/sites/test-releases/use-test-releases";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
+import type { Section } from "@/lib/sites/service";
 import { siteStatus } from "@/lib/sites/site-status";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
@@ -38,6 +39,7 @@ import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import type { LookId } from "@saroh/block-contract";
+import type { EditableTextHost } from "@saroh/site-blocks";
 import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import { BlockToolbar } from "./block-toolbar";
@@ -494,6 +496,20 @@ export function SiteEditor({
               }
             : undefined;
 
+    /*
+     * Typing on the page (U47d, `fix/WXKText`): the selected section's
+     * marked words on the desk canvas write the same draft field the
+     * inspector's input does, so the save, the change count and Undo
+     * are the inspector's. Never for a reader (DEC-200), never on a phone.
+     */
+    const textEdit =
+        desk && !readOnly
+            ? (index: number) =>
+                  inPlaceText(sections[index], (next) =>
+                      draft.replaceAt(index, next),
+                  )
+            : undefined;
+
     const railEl = (
         <EditorRail
             hideTabs={desk}
@@ -559,6 +575,7 @@ export function SiteEditor({
                 styleOptions,
             }}
             blockTools={deskTools ?? blockTools}
+            textEdit={textEdit}
             // A typeface being tried draws on the page unsaved.
             style={siteStyle.trying ?? style}
             trying={triedFace(siteStyle.trying, styleOptions)}
@@ -875,6 +892,40 @@ function publishMore(
                       : {}),
               }
             : {}),
+    };
+}
+
+/**
+ * The fields a section's words may be typed into on the canvas (U47d): only
+ * those whose block draws the field as written, through an `EditableText`
+ * marker in `@saroh/site-blocks`. Anything else a marker sends is ignored.
+ */
+export const IN_PLACE_FIELDS: Partial<
+    Record<Section["type"], readonly string[]>
+> = {
+    hero: ["heading"],
+    faq: ["heading", "intro"],
+    features: ["heading", "intro"],
+    servicesList: ["heading", "intro"],
+    contact: ["heading", "intro"],
+    testimonials: ["heading"],
+};
+
+/** The host the canvas hands a section's markers, or none for its kind. */
+export function inPlaceText(
+    section: Section | undefined,
+    replace: (next: Section) => void,
+): EditableTextHost | undefined {
+    const fields = section ? IN_PLACE_FIELDS[section.type] : undefined;
+    if (!section || !fields) return undefined;
+    return {
+        onText: (field, text) => {
+            if (!fields.includes(field)) return;
+            replace({
+                ...section,
+                content: { ...section.content, [field]: text },
+            } as Section);
+        },
     };
 }
 
