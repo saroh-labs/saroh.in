@@ -67,9 +67,15 @@ describe("the Website area's four groups (RULES §3)", () => {
         expect(siteGroups("s1", reader).map((g) => g.id)).toEqual([
             "pages-and-posts",
         ]);
-        expect(hrefs(reader)).toEqual(["/sites/s1/writing"]);
+        // Pages reads read-only (U5, WXSStates).
+        expect(hrefs(reader)).toEqual(["/sites/s1/pages", "/sites/s1/writing"]);
         expect(hrefs({ ...reader, mayReadForms: true, mayTeam: true })).toEqual(
-            ["/sites/s1/writing", "/sites/s1/forms", "/settings/people"],
+            [
+                "/sites/s1/pages",
+                "/sites/s1/writing",
+                "/sites/s1/forms",
+                "/settings/people",
+            ],
         );
     });
 

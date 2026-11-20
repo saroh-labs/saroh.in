@@ -178,6 +178,38 @@ describe("SiteOverviewService.read", () => {
         );
     });
 
+    it("names a page's last editor when its settings were the last edit", async () => {
+        const read = siteFindFirst.getMockImplementation();
+        siteFindFirst.mockResolvedValueOnce({
+            ...(await read?.()),
+            pages: [
+                {
+                    id: "p_about",
+                    title: "About",
+                    path: "/about",
+                    hidden: false,
+                    kind: "FREE",
+                    inMenu: true,
+                    noindex: false,
+                    seoDescription: "x",
+                    shareImageUrl: null,
+                    shareImageMediaId: null,
+                    settingsEditedAt: new Date("2026-11-15T09:00:00Z"),
+                    settingsEditedByUserId: "u_ritika",
+                    versions: [{ revision: 0, updatedAt: NOW, sections: [] }],
+                },
+            ],
+        });
+        const o = await service.read(ctx(), "site_1", NOW);
+        expect(o.pageEdits).toEqual([
+            {
+                pageId: "p_about",
+                at: "2026-11-15T09:00:00.000Z",
+                by: "Ritika Sharma",
+            },
+        ]);
+    });
+
     it("reads results, what needs doing and activity, newest first", async () => {
         const o = await service.read(ctx(), "site_1", NOW);
         expect(o.results).toMatchObject({
@@ -205,6 +237,10 @@ describe("SiteOverviewService.read", () => {
             at: "2026-11-14T06:00:00.000Z",
             by: "Mohit Mehta",
         });
+        // A section save after Ritika's settings change: unnamed until batch 2.
+        expect(o.pageEdits).toEqual([
+            { pageId: "p_home", at: "2026-11-16T08:00:00.000Z", by: null },
+        ]);
         // The business's last 7 days, as UTC day buckets.
         expect(aggFindMany.mock.calls[0]?.[0].where).toMatchObject({
             siteId: "site_1",

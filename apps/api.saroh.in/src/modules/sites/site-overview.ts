@@ -74,6 +74,12 @@ export interface SiteOverview {
     needsDoing: PageHealth[];
     activity: ActivityEntry[];
     lastPublished: { at: string; by: string | null } | null;
+    /**
+     * Each page's last edit, for Pages' "Last edited" (U5): `by` is named
+     * only when the newest edit was to its settings, the one edit stamped
+     * with a person until batch 2. Pages never changed are left out.
+     */
+    pageEdits: { pageId: string; at: string; by: string | null }[];
 }
 
 /** All sites' card: visits and the last thing done (U3's `SiteSummary`). */
@@ -351,6 +357,24 @@ export class SiteOverviewService {
                 site,
             ),
             activity: newestFirst(entries),
+            pageEdits: site.pages.flatMap((page) => {
+                const draft =
+                    page.versions.length > 0 ? page.versions[0] : null;
+                const saved =
+                    draft && draft.revision > 0 ? draft.updatedAt : null;
+                const settings = page.settingsEditedAt;
+                const named =
+                    settings !== null && (saved === null || settings >= saved);
+                const at = named ? settings : saved;
+                if (!at) return [];
+                return [
+                    {
+                        pageId: page.id,
+                        at: at.toISOString(),
+                        by: named ? nameOf(page.settingsEditedByUserId) : null,
+                    },
+                ];
+            }),
             lastPublished: site.currentPublication
                 ? {
                       at: site.currentPublication.publishedAt.toISOString(),

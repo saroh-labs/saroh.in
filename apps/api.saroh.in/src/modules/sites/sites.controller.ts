@@ -293,6 +293,19 @@ export class SitesController {
     }
 
     /**
+     * Copy a page's draft under `<link>-copy`, hidden and out of the menu
+     * (website area U5). Requires `site:update`.
+     */
+    @Post(":siteId/pages/:pageId/duplicate")
+    duplicatePage(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("pageId") pageId: string,
+    ) {
+        return this.sites.duplicatePage(ctx, siteId, pageId);
+    }
+
+    /**
      * Delete a page and its versions/sections. Requires `site:update`. The home
      * page cannot be deleted.
      */

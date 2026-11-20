@@ -16,6 +16,7 @@ import {
     repeatedAnchor,
 } from "@saroh/database";
 import type { LookId } from "@saroh/templates";
+import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -104,6 +105,7 @@ import {
     assertSiteInOrg,
     getOrCreateDraftVersion,
     reviewerScope,
+    suggestFreePath,
 } from "./site-access";
 import type { SiteDefaults } from "./site-address";
 import { siteDefaults } from "./site-address";
@@ -3878,6 +3880,89 @@ export class SitesService {
                     // sheet's "changed by" (KTD-4).
                     settingsEditedByUserId: ctx.userId,
                     settingsEditedAt: new Date(),
+                },
+                select: PAGE_VIEW_SELECT,
+            });
+        });
+    }
+
+    /**
+     * Copy a page (plan 2026-11-18-001 U5): its draft sections, under a new
+     * link `<link>-copy` (the next free one), hidden and out of the menu so
+     * nothing new shows until the merchant opens it and publishes. The copy
+     * is always a free-form page: a second Shop or Book page would answer
+     * no route. Requires `site:update`.
+     */
+    async duplicatePage(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<PageView> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+        const page = await prisma.page.findFirst({
+            where: { id: pageId, siteId, organizationId: ctx.organizationId },
+            select: {
+                title: true,
+                path: true,
+                versions: {
+                    where: { status: "DRAFT" },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: {
+                        sections: {
+                            orderBy: { order: "asc" },
+                            select: {
+                                type: true,
+                                contractVersion: true,
+                                content: true,
+                                hidden: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!page) {
+            throw new NotFoundException(`Page "${pageId}" not found`);
+        }
+        const base = page.path === "/" ? "/home" : page.path;
+        const path = await suggestFreePath(siteId, [`${base}-copy`]);
+        const sections = page.versions[0]?.sections ?? [];
+        return prisma.$transaction(async (tx) => {
+            // A page now has this link: it wins over an old link's forward.
+            await dropRedirectsAt(tx, siteId, path);
+            return tx.page.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    path,
+                    title: `${page.title} (copy)`.slice(0, 200),
+                    isHome: false,
+                    hidden: true,
+                    inMenu: false,
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: new Date(),
+                    versions: {
+                        create: {
+                            organizationId: ctx.organizationId,
+                            status: "DRAFT",
+                            createdByUserId: ctx.userId,
+                            sections: {
+                                create: sections.map((section, order) => ({
+                                    organizationId: ctx.organizationId,
+                                    // New keys: notes stay on the original.
+                                    key: randomUUID(),
+                                    type: section.type,
+                                    contractVersion: section.contractVersion,
+                                    order,
+                                    content:
+                                        section.content as Prisma.InputJsonValue,
+                                    hidden: section.hidden,
+                                })),
+                            },
+                        },
+                    },
                 },
                 select: PAGE_VIEW_SELECT,
             });

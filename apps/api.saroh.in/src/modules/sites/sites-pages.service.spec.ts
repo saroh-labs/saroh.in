@@ -552,6 +552,103 @@ describe("SitesService.deletePage", () => {
     });
 });
 
+describe("SitesService.duplicatePage (website area U5)", () => {
+    const bridal = {
+        title: "Bridal",
+        path: "/bridal",
+        versions: [
+            {
+                sections: [
+                    {
+                        type: "hero",
+                        contractVersion: 1,
+                        content: { heading: "Your day" },
+                        hidden: false,
+                    },
+                    {
+                        type: "faq",
+                        contractVersion: 2,
+                        content: { items: [] },
+                        hidden: true,
+                    },
+                ],
+            },
+        ],
+    };
+
+    it("copies the draft's sections to <link>-copy, hidden and out of the menu", async () => {
+        pageFindFirst.mockResolvedValue(bridal);
+        pageFindMany.mockResolvedValue([{ path: "/" }, { path: "/bridal" }]);
+        pageCreate.mockImplementation(({ data }) => ({
+            id: "page_9",
+            ...data,
+        }));
+
+        await service.duplicatePage(ctx(), "site_1", "page_2");
+
+        const data = pageCreate.mock.calls[0][0].data;
+        expect(data).toMatchObject({
+            siteId: "site_1",
+            organizationId: "org_1",
+            path: "/bridal-copy",
+            title: "Bridal (copy)",
+            isHome: false,
+            hidden: true,
+            inMenu: false,
+            ...STAMP,
+        });
+        // A free-form page: the copy never claims a module's route.
+        expect(data.kind).toBeUndefined();
+        const copied = data.versions.create.sections.create;
+        expect(copied).toEqual([
+            expect.objectContaining({
+                type: "hero",
+                order: 0,
+                hidden: false,
+                content: { heading: "Your day" },
+            }),
+            expect.objectContaining({ type: "faq", order: 1, hidden: true }),
+        ]);
+        // Fresh keys, so a note stays on the section it was left on.
+        expect(copied[0].key).toEqual(expect.any(String));
+    });
+
+    it("takes the next free link when -copy is used", async () => {
+        pageFindFirst.mockResolvedValue(bridal);
+        pageFindMany.mockResolvedValue([
+            { path: "/bridal" },
+            { path: "/bridal-copy" },
+        ]);
+        pageCreate.mockImplementation(({ data }) => data);
+
+        await service.duplicatePage(ctx(), "site_1", "page_2");
+        expect(pageCreate.mock.calls[0][0].data.path).toBe("/bridal-copy-2");
+    });
+
+    it("copies the home page to /home-copy", async () => {
+        pageFindFirst.mockResolvedValue({
+            ...bridal,
+            title: "Home",
+            path: "/",
+        });
+        pageCreate.mockImplementation(({ data }) => data);
+
+        await service.duplicatePage(ctx(), "site_1", "page_1");
+        expect(pageCreate.mock.calls[0][0].data.path).toBe("/home-copy");
+    });
+
+    it("404s a page of another site, and denies site:update to a MEMBER", async () => {
+        pageFindFirst.mockResolvedValue(null);
+        await expect(
+            service.duplicatePage(ctx(), "site_1", "nope"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.duplicatePage(ctx({ role: "MEMBER" }), "site_1", "page_2"),
+        ).rejects.toMatchObject({ response: roleDenial("site:update") });
+        expect(pageCreate).not.toHaveBeenCalled();
+    });
+});
+
 describe("SitesService.updatePage: old links and the page's own head (KTD-3, KTD-7)", () => {
     const siteFindUnique = prisma.site.findUnique as jest.Mock;
     const redirectFindMany = prisma.siteRedirect.findMany as jest.Mock;

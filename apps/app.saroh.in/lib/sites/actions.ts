@@ -33,6 +33,7 @@ import {
     createSiteRedirect as createSiteRedirectApi,
     deleteComment as deleteCommentApi,
     deletePage as deletePageApi,
+    duplicatePage as duplicatePageApi,
     fillDetails as fillDetailsApi,
     getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
@@ -224,6 +225,10 @@ export async function updatePage(
 
 export async function deletePage(siteId: string, pageId: string) {
     return deletePageApi(siteId, pageId);
+}
+
+export async function duplicatePage(siteId: string, pageId: string) {
+    return duplicatePageApi(siteId, pageId);
 }
 
 /** Re-read the site's flags. Called after a save, so the dots settle with it. */

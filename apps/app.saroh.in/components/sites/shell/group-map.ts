@@ -88,17 +88,9 @@ export function siteGroups(siteId: string, access: SiteAccess): SiteGroup[] {
             id: "pages-and-posts",
             label: "Pages and posts",
             sections: [
-                // A reader reads pages in the editor, read-only (DEC-200):
-                // the header's Open editor is their way in.
-                ...(author
-                    ? [
-                          {
-                              id: "pages" as const,
-                              label: "Pages",
-                              href: `${base}/pages`,
-                          },
-                      ]
-                    : []),
+                // A reader reads the list and each page's settings,
+                // read-only (DEC-200, WXSStates).
+                { id: "pages", label: "Pages", href: `${base}/pages` },
                 {
                     id: "writing",
                     label: "Blog and other writing",

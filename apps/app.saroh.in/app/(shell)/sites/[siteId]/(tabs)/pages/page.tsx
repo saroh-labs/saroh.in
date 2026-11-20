@@ -3,9 +3,10 @@ import { Button } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/data-state";
 import { FileText, Plug } from "lucide-react";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound, redirect, unstable_rethrow } from "next/navigation";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { PagesArea } from "@/components/sites/pages-area/pages-area";
 import {
     liveAiApps,
     offersAssistantWayIn,
@@ -14,13 +15,23 @@ import { listAiConnections } from "@/lib/ai-connections/service";
 import { formatList } from "@/lib/home/needs";
 import { requireSession } from "@/lib/session";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
+import { businessAddress } from "@/lib/sites/default-site";
 import {
     describePendingChanges,
     pendingChangeCount,
 } from "@/lib/sites/pending";
-import { getSite } from "@/lib/sites/service";
+import {
+    getSite,
+    getSiteOverview,
+    listSiteRedirects,
+} from "@/lib/sites/service";
+import {
+    readWebAddressLinks,
+    RENDERER_APEX,
+} from "@/lib/sites/share-links-read";
 import { pageState } from "@/lib/sites/site-state";
 import { pageUpdatedIso } from "@/lib/sites/updated";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { ListCard, ListRow } from "@saroh/ui/list-card";
 import { Notice } from "@saroh/ui/notice";
 
@@ -48,6 +59,8 @@ export default async function SitePagesPage({
 }) {
     const { siteId } = await params;
     const session = await requireSession();
+    if (websiteAreaOn())
+        return <WebsitePages siteId={siteId} userId={session.user.id} />;
     const site = await getSite(siteId);
     if (!site) notFound();
     // A reader reads the pages in the editor, read-only (DEC-200).
@@ -73,14 +86,7 @@ export default async function SitePagesPage({
     const pages = [...site.pages].sort(
         (a, b) => Number(b.isHome) - Number(a.isHome),
     );
-    // A way into AI apps (release visibility U14): a line, never a notice,
-    // so it can't stack with "Waiting to be published". Read softly.
-    const wayIn =
-        apiAreaOn() &&
-        offersAssistantWayIn(
-            await listAiConnections().catch(() => null),
-            session.user.id,
-        );
+    const wayIn = await aiWayIn(session.user.id);
     const waiting = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
@@ -175,31 +181,93 @@ export default async function SitePagesPage({
                     );
                 })}
             </ListCard>
-            {wayIn ? (
-                // Saroh's own words and its list of AI apps: read in a recording.
-                <p
-                    data-ph-unmask=""
-                    className="-mt-1.5 flex items-start gap-2 text-[13px] leading-normal text-foreground/80"
-                >
-                    <Plug
-                        aria-hidden
-                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                    />
-                    <span>
-                        <Link
-                            href="/settings/developers/ai"
-                            className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px] coarse:inline-block coarse:py-2.5"
-                        >
-                            Edit your site from your AI assistant
-                        </Link>
-                        <span className="text-muted-foreground">
-                            {" · Works with "}
-                            {formatList(liveAiApps().map((app) => app.name))}.
-                            Changes stay a draft until you publish.
-                        </span>
-                    </span>
-                </p>
-            ) : null}
+            {wayIn ? <AiWayIn /> : null}
         </div>
+    );
+}
+
+/**
+ * A way into AI apps (release visibility U14): a line, never a notice, so
+ * it can't stack with "Waiting to be published". Read softly.
+ */
+async function aiWayIn(userId: string): Promise<boolean> {
+    return (
+        apiAreaOn() &&
+        offersAssistantWayIn(
+            await listAiConnections().catch(() => null),
+            userId,
+        )
+    );
+}
+
+function AiWayIn() {
+    return (
+        // Saroh's own words and its list of AI apps: read in a recording.
+        <p
+            data-ph-unmask=""
+            className="-mt-1.5 flex items-start gap-2 text-[13px] leading-normal text-foreground/80"
+        >
+            <Plug
+                aria-hidden
+                className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+            />
+            <span>
+                <Link
+                    href="/settings/developers/ai"
+                    className="font-semibold text-foreground underline decoration-border-strong underline-offset-[3px] coarse:inline-block coarse:py-2.5"
+                >
+                    Edit your site from your AI assistant
+                </Link>
+                <span className="text-muted-foreground">
+                    {" · Works with "}
+                    {formatList(liveAiApps().map((app) => app.name))}. Changes
+                    stay a draft until you publish.
+                </span>
+            </span>
+        </p>
+    );
+}
+
+/**
+ * Pages in the Website area (plan 2026-11-18-001 U5): the list with its
+ * page health and last edits, and each page's settings sheet. The health
+ * and the edits come from the Overview's read, so the Needs fixing count
+ * is Overview's; when it fails the list still loads, without them.
+ */
+async function WebsitePages({
+    siteId,
+    userId,
+}: {
+    siteId: string;
+    userId: string;
+}) {
+    const [site, overview, redirects, webAddress, wayIn] = await Promise.all([
+        getSite(siteId),
+        getSiteOverview(siteId).catch((error: unknown): null => {
+            unstable_rethrow(error);
+            return null;
+        }),
+        listSiteRedirects(siteId).catch(() => null),
+        readWebAddressLinks(),
+        aiWayIn(userId),
+    ]);
+    if (!site) notFound();
+    return (
+        <PagesArea
+            siteId={site.id}
+            siteName={site.name}
+            pages={site.pages}
+            host={
+                businessAddress(site, webAddress, RENDERER_APEX)?.host ?? null
+            }
+            live={site.currentPublicationId !== null}
+            siteImageUrl={site.socialImageUrl ?? null}
+            canUpdate={site.can.manageSettings}
+            addableKinds={site.addablePageKinds}
+            health={overview?.needsDoing ?? null}
+            edits={overview?.pageEdits ?? null}
+            redirects={redirects}
+            footer={wayIn ? <AiWayIn /> : null}
+        />
     );
 }

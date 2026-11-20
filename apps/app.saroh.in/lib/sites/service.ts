@@ -725,6 +725,16 @@ export interface SitePage {
      * saved (#908). Absent from an API older than #908.
      */
     updatedAt?: string;
+    /**
+     * The page's own Google title and text, share image and "Show on
+     * Google" off (KTD-7); null falls back to the site's. Absent from an
+     * API older than the website area's U1.
+     */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageMediaId?: string | null;
+    shareImageUrl?: string | null;
+    noindex?: boolean;
 }
 
 /**
@@ -1115,6 +1125,8 @@ export interface SiteOverview {
         subject: string | null;
     }[];
     lastPublished: { at: string; by: string | null } | null;
+    /** Each page's last edit, named when it was its settings (Pages, U5). */
+    pageEdits?: { pageId: string; at: string; by: string | null }[];
 }
 
 /** Null on a 404 / no active org; throws on a real failure. */
@@ -2307,6 +2319,14 @@ export interface UpdatePageInput {
     hidden?: boolean;
     /** "Show in menu" (G14). */
     inMenu?: boolean;
+    /** Null (or blank) clears it, and the site's own is used. */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    /** A library photo; null clears the share image. */
+    shareImageMediaId?: string | null;
+    shareImageUrl?: string | null;
+    /** "Show on Google" off. */
+    noindex?: boolean;
 }
 
 /**
@@ -2357,6 +2377,26 @@ export async function updatePage(
         (Partial<SitePage> & { message?: string; error?: string }) | null;
     if (res.ok && data?.id) return { ok: true, data: data as SitePage };
     return { ok: false, ...readError(data, "Couldn't update the page.") };
+}
+
+/** Copy a page's draft to `<link>-copy`, hidden and out of the menu (U5). */
+export async function duplicatePage(
+    siteId: string,
+    pageId: string,
+): Promise<SitesResult<SitePage>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}/duplicate`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SitePage> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SitePage };
+    return { ok: false, ...readError(data, "Couldn't copy the page.") };
 }
 
 /** Delete a page and everything on it. The home page cannot be deleted. */

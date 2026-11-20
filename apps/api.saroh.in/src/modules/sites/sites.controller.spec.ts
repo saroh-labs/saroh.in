@@ -249,6 +249,15 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE, PAGE, DTO],
     },
     {
+        handler: "duplicatePage",
+        method: RequestMethod.POST,
+        path: ":siteId/pages/:pageId/duplicate",
+        target: "sites",
+        call: "duplicatePage",
+        args: [ctx, SITE, PAGE],
+        expect: [ctx, SITE, PAGE],
+    },
+    {
         handler: "deletePage",
         method: RequestMethod.DELETE,
         path: ":siteId/pages/:pageId",
