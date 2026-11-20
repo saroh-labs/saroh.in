@@ -409,7 +409,7 @@ describe("what each count asks", () => {
             1.24,
         );
         expect(tx.media.aggregate).toHaveBeenCalledWith({
-            where: { organizationId: "org", status: "READY" },
+            where: { organizationId: "org", status: { not: "FAILED" } },
             _sum: { sizeBytes: true },
         });
         tx.media.aggregate.mockResolvedValue({ _sum: { sizeBytes: null } });
@@ -537,7 +537,21 @@ describe("crossing a notice's line", () => {
         expect(limitNoticeWords(row, "teamMembers", 2, 2, "full").title).toBe(
             "You've reached your 2 team members on Plan A",
         );
+        // Past a hard orders cap only a payment confirmed late takes it
+        // there (DEC-227); a soft one kept taking orders.
         expect(limitNoticeWords(row, "ordersPerMonth", 2, 3, "over")).toEqual({
+            title: "You're past your 2 orders a month on Plan A",
+            body: "Your site isn't taking more orders until the count starts again. Plan B raises the limit.",
+        });
+        expect(
+            limitNoticeWords(
+                { ...row, soft: true },
+                "ordersPerMonth",
+                2,
+                3,
+                "over",
+            ),
+        ).toEqual({
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",
         });

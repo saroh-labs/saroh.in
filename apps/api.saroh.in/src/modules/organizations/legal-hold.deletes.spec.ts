@@ -35,6 +35,8 @@ const HOLD_AWARE: Record<string, string> = {
         "Leaves a held business's events out of the read and of the delete.",
     "ai/history/retention.job.ts":
         "Leaves a held business's Ask AI conversations out of the read and of the delete.",
+    "media/pending-upload-sweep.job.ts":
+        "Leaves a held business's unconfirmed uploads out of the read and of the delete.",
 };
 
 /**

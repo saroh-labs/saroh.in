@@ -196,7 +196,7 @@ describe("MediaService.completeUpload", () => {
         });
     });
 
-    it("soft-meters the plan's storage with the file's size in GB (U13)", async () => {
+    it("meters the plan's storage with only what the real size adds past the stated one (DEC-227)", async () => {
         const withRoom = jest.spyOn(planMeter, "withRoom");
         const service = new MediaService(
             fakeStorage({
@@ -224,7 +224,7 @@ describe("MediaService.completeUpload", () => {
             "org_1",
             "storage",
             expect.any(Function),
-            { soft: true, adding: 0.25 },
+            { adding: (250_000_000 - 1234) / 1_000_000_000 },
         );
         // Confirming again adds nothing it hadn't counted.
         findUnique.mockResolvedValue({
@@ -235,7 +235,7 @@ describe("MediaService.completeUpload", () => {
             status: "READY",
         });
         await service.completeUpload(ctx(), "media_1");
-        expect(withRoom.mock.calls[1][3]).toEqual({ soft: true, adding: 0 });
+        expect(withRoom.mock.calls[1][3]).toEqual({ adding: 0 });
         withRoom.mockRestore();
     });
 
