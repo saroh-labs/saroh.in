@@ -99,6 +99,25 @@ describe("the catalogue schema", () => {
         expect(c.modules[0].pricing).toBe("show");
     });
 
+    it("takes a fraction of a GB on storage only (owner, 20 Nov 2026)", () => {
+        const withStorage = fixtureInput();
+        withStorage.modules.push({
+            id: "storage",
+            name: "Photos and videos",
+            group: "g1",
+            cells: {
+                a: { inc: true, text: "Half", limit: 2.5 },
+            },
+        });
+        expect(errorsOf(withStorage)).toEqual([]);
+        const things = fixtureInput();
+        const cell = things.modules[1].cells.a;
+        if (cell.inc) cell.limit = 2.5;
+        expect(errorsOf(things)).toContain(
+            "modules.1.cells.a.limit: Things's limit must be a whole number",
+        );
+    });
+
     it("reads a missing cell as excluded and locked", () => {
         const c = edit(fixture(), (x) => {
             delete x.modules[0].cells.c;

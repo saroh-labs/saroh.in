@@ -18,6 +18,7 @@ import {
     LIMIT_WORDS,
     limitWordsFor,
     parseCatalog,
+    pausedWords,
 } from "@saroh/pricing-catalog";
 
 import type { FaqId } from "@/content/faq";
@@ -233,7 +234,9 @@ export function freeUsage(
         const label =
             cell.card ||
             `${cell.limit.toLocaleString("en-US")} ${countedWhat(words.what, cell.limit)}`;
-        return indiaOnly(label) ? [] : [{ label, at: words.paused }];
+        return indiaOnly(label)
+            ? []
+            : [{ label, at: pausedWords(words, cell.soft) }];
     });
     return rows.length ? rows : null;
 }

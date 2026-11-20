@@ -40,6 +40,12 @@ export interface LimitWords {
     one: string;
     /** What stops at the limit, the notice's first sentence. */
     paused: string;
+    /**
+     * Said instead of `paused` where the plan's cell is soft (counts and
+     * tells, never refuses): storage, which a cell may make either (owner,
+     * 20 Nov 2026). Read through {@link pausedWords}.
+     */
+    softPaused?: string;
     /** Counted per month (billing period, else calendar month: DEC-219), not in total. */
     monthly: boolean;
     /** The notice's primary action, before an upgrade; none offers an add-on. */
@@ -108,7 +114,9 @@ export const LIMIT_WORDS: Readonly<Record<string, LimitWords>> = {
     storageGb: {
         what: "GB of photos and videos",
         one: "GB of photos and videos",
-        paused: "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
+        paused: "You can't upload more photos or videos. What you've uploaded stays.",
+        softPaused:
+            "Nothing is blocked: your uploads keep working, and we'll be in touch about the space you need.",
         monthly: false,
     },
     visitsPerMonth: {
@@ -188,6 +196,11 @@ export function countedWhat(what: string, count: number): string {
  */
 export function quietAtLimit(words: LimitWords, limit: number): boolean {
     return limit <= 1 && !words.monthly;
+}
+
+/** What stops at the limit, as the plan's cell has it: soft or hard. */
+export function pausedWords(words: LimitWords, soft: boolean): string {
+    return soft ? (words.softPaused ?? words.paused) : words.paused;
 }
 
 /** The words for a catalogue row's limit, or null for a row nothing counts. */

@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { limitNotice } from "./limit-notice";
-import { countedWhat, LIMIT_WORDS, limitWordsFor } from "./limit-words";
+import {
+    countedWhat,
+    LIMIT_WORDS,
+    limitWordsFor,
+    pausedWords,
+} from "./limit-words";
 import { MODULE_MAP } from "./module-map";
 
 describe("limit words", () => {
@@ -23,7 +28,14 @@ describe("limit words", () => {
     });
 
     it("says nothing is blocked for the soft allowances", () => {
-        expect(limitWordsFor("storage")?.paused).toMatch(/^Nothing is blocked/);
+        const storage = limitWordsFor("storage");
+        expect(storage && pausedWords(storage, true)).toMatch(
+            /^Nothing is blocked/,
+        );
+        // A hard storage cell (owner, 20 Nov 2026) says uploads stop.
+        expect(storage && pausedWords(storage, false)).toMatch(
+            /^You can't upload more/,
+        );
         expect(limitWordsFor("visits")?.paused).toMatch(/^Nothing is blocked/);
         expect(limitWordsFor("visits")?.monthly).toBe(true);
         expect(limitWordsFor("locations")?.what).toBe("places customers visit");

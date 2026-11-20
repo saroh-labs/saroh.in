@@ -4,6 +4,7 @@ import {
     limitNotice,
     limitWordsFor,
     MODULE_MAP,
+    pausedWords,
     quietAtLimit,
 } from "@saroh/pricing-catalog";
 import { planLabel } from "@saroh/ui/lib/state-copy";
@@ -36,7 +37,7 @@ export interface ModuleAccessView {
     limit: number | null;
     per: "" | "month";
     /**
-     * A soft cap counts and tells the business, and never refuses (storage,
+     * A soft cap counts and tells the business, and never refuses (storage where the cell says so,
      * site visits). Absent from an API that predates it: a hard cap.
      */
     soft?: boolean;
@@ -173,7 +174,7 @@ export function rowLimit(
         },
         row.usage,
         words.what,
-        words.paused,
+        pausedWords(words, row.soft === true),
         // Saroh's emails lead with "Connect your email" where the plan has
         // room to connect one, and with a higher plan where it hasn't (DEC-086).
         {
