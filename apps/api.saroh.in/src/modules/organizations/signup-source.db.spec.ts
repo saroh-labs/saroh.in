@@ -21,7 +21,12 @@ const uniq = (label: string) => `${label}${process.pid}x${++seq}`;
 
 async function person(): Promise<string> {
     const user = await prisma.user.create({
-        data: { email: `${uniq("src-")}@example.com`, emailVerified: true },
+        // A second business stays on Free here: staff's exception (DEC-227).
+        data: {
+            email: `${uniq("src-")}@example.com`,
+            emailVerified: true,
+            extraFreeBusinesses: 5,
+        },
         select: { id: true },
     });
     return user.id;

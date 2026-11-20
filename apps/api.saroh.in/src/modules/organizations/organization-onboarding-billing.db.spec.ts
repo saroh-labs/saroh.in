@@ -40,7 +40,12 @@ beforeEach(async () => {
 
 async function person() {
     return prisma.user.create({
-        data: { email: `${uniq("owner-")}@example.com`, name: "Asha Rao" },
+        // Later businesses stay on Free here: staff's exception (DEC-227).
+        data: {
+            email: `${uniq("owner-")}@example.com`,
+            name: "Asha Rao",
+            extraFreeBusinesses: 5,
+        },
     });
 }
 

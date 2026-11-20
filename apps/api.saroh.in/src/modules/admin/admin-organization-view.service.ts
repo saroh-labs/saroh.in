@@ -119,7 +119,7 @@ export interface CatalogueModuleRow {
     /** The cap now, null for none or when off. */
     limit: number | null;
     per: LimitPeriod;
-    /** A soft cap: counted and told, never refused (storage, visits). */
+    /** A soft cap: counted and told, never refused (visits; storage where its cell says). */
     soft: boolean;
     /** Its plan's own cell, before any override or add-on. */
     planState: AccessState;

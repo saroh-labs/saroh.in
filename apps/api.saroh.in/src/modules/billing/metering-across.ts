@@ -24,7 +24,7 @@ import {
     siteViewTotals,
     standingBookings,
     standingOrders,
-    STORED,
+    STORED_MEDIA,
     windowFor,
 } from "./metering";
 
@@ -330,7 +330,7 @@ export async function countUsageAcross(
         case "storageGb": {
             const rows = await db.media.groupBy({
                 by: ["organizationId"],
-                where: { organizationId: { in: ids }, status: STORED },
+                where: { organizationId: { in: ids }, ...STORED_MEDIA },
                 _sum: { sizeBytes: true },
             });
             const out = new Map<string, number>();

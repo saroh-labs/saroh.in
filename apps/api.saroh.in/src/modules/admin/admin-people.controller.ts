@@ -16,6 +16,7 @@ import {
     ChangeSignInEmailDto,
     OperatorReasonDto,
     SearchPeopleDto,
+    SetExtraFreeBusinessesDto,
 } from "./dto";
 import { RequireOrganizationAccessSession } from "./organization-access-session.guard";
 
@@ -241,6 +242,34 @@ export class AdminPeopleController {
             },
             { userId, reason: dto.reason },
             () => this.people.endSessions(staff, userId, dto.reason),
+        );
+    }
+
+    /** Let them own more businesses on Free than their one (DEC-227). */
+    @Put("people/:userId/free-businesses")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.OrganizationPeopleWrite,
+    )
+    setExtraFreeBusinesses(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+        @Body() dto: SetExtraFreeBusinessesDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.free-businesses",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { userId, extra: dto.extra, reason: dto.reason },
+            () =>
+                this.people.setExtraFreeBusinesses(
+                    staff,
+                    userId,
+                    dto.extra,
+                    dto.reason,
+                ),
         );
     }
 

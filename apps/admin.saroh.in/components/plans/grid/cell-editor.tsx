@@ -24,10 +24,14 @@ import { FIELD, SMALL_FIELD } from "../plans/fields";
 
 export type CellChoice = { inc: false } | { inc: true; limit?: number | null };
 
-/** A cap as typed: a whole number above 0, else refused. */
+/**
+ * A cap as typed: a number above 0, else refused. Up to two decimal places,
+ * for storage's GB (half a GB); the catalogue's check refuses a fraction on
+ * any other row.
+ */
 function readLimit(text: string): number | undefined {
     const t = text.trim();
-    if (!/^\d{1,9}$/.test(t)) return undefined;
+    if (!/^\d{1,9}(\.\d{1,2})?$/.test(t)) return undefined;
     const n = Number(t);
     return n > 0 ? n : undefined;
 }

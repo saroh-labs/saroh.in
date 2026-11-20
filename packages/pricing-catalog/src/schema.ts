@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { RETIRED_MODULE_IDS } from "./module-map";
+import { MODULE_MAP, RETIRED_MODULE_IDS } from "./module-map";
 
 /**
  * The pricing catalogue: one snapshot of plans, the module-by-plan matrix and
@@ -95,13 +95,16 @@ export const includedCellSchema = z.object({
     text: z.string(),
     /** The plan card's line; empty means the card leaves it out. */
     card: z.string().default(""),
-    /** A cap, or null for no cap. */
-    limit: z.number().int().positive().nullable().default(null),
+    /**
+     * A cap, or null for no cap. A whole number, except storage's GB, which
+     * may have a fraction (half a GB): checked across the catalogue below.
+     */
+    limit: z.number().positive().nullable().default(null),
     per: z.enum(LIMIT_PERIODS).default(""),
     /**
      * A soft cap counts and tells the business when it's reached, and never
-     * refuses: storage and site visits, where turning a customer away is worse
-     * than a conversation about the bill.
+     * refuses: site visits, where turning a customer away is worse than a
+     * conversation about the bill. Storage is hard or soft as its cell says.
      */
     soft: z.boolean().default(false),
 });
@@ -371,6 +374,26 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
                     i,
                     "cells",
                     planId,
+                ]);
+            }
+        }
+        // Only storage counts in a unit with fractions (GB).
+        const fractional =
+            Object.prototype.hasOwnProperty.call(MODULE_MAP, m.id) &&
+            MODULE_MAP[m.id].limitKey === "storageGb";
+        for (const [planId, cell] of Object.entries(m.cells)) {
+            if (
+                cell.inc &&
+                cell.limit !== null &&
+                !fractional &&
+                !Number.isInteger(cell.limit)
+            ) {
+                issue(`${m.name}'s limit must be a whole number`, [
+                    "modules",
+                    i,
+                    "cells",
+                    planId,
+                    "limit",
                 ]);
             }
         }

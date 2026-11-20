@@ -665,14 +665,15 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "sites")).toBe(1);
     });
 
-    it("sums checked uploads in GB, rounded up to the hundredth", async () => {
+    it("sums checked and in-progress uploads in GB, rounded up to the hundredth", async () => {
         const { orgId } = await business("free");
         await media(orgId, 1_000_000_000, "READY");
         await media(orgId, 200_000_001, "READY");
-        // Not stored: still uploading, or not what its type said.
+        // Still uploading holds its space (DEC-227, M-5).
         await media(orgId, 900_000_000, "PENDING");
+        // Not stored: not what its type said, its object deleted.
         await media(orgId, 900_000_000, "FAILED");
-        expect(await countUsage(prisma, orgId, "storageGb")).toBe(1.21);
+        expect(await countUsage(prisma, orgId, "storageGb")).toBe(2.11);
     });
 
     it("counts this month's site views from the rollup's org-wide total", async () => {

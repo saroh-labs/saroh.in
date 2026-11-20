@@ -12,6 +12,7 @@ import {
 
 import { lockCouponPlacesInTx } from "../pricing/coupons.service";
 import { prorateDifferencePaise } from "./checkout-quote";
+import { samePayer } from "./same-payer";
 
 type Tx = Prisma.TransactionClient;
 
@@ -53,21 +54,43 @@ export async function catalogueOfVersion(
 }
 
 /**
- * A business may have one free trial: never again once a trial checkout of
- * its own was completed, whatever happened after (KTD-18's "the client
- * names a plan, the server decides"). It is the offer of the plan the
- * business first started with one (DEC-159): a plan with no offer starts
- * at its full price and uses nothing up.
+ * A person may have one free trial (DEC-227, M-2): never again once a trial
+ * checkout was completed by this business or by any that shares its payer
+ * (`same-payer.ts`: an owner, a billing profile's person, a GSTIN),
+ * whatever happened after (KTD-18's "the client names a plan, the server
+ * decides"). It is the offer of the plan first started with one (DEC-159):
+ * a plan with no offer starts at its full price and uses nothing up.
+ *
+ * "this": this business had it; "other": a business sharing its payer did
+ * (said at checkout); null: none has.
  */
+export async function trialTakenBy(
+    db: Pick<Tx, "billingCheckout" | "organization">,
+    organizationId: string,
+): Promise<"this" | "other" | null> {
+    const trial = (ids: string[]) =>
+        db.billingCheckout.findFirst({
+            where: {
+                organizationId: { in: ids },
+                kind: "TRIAL",
+                status: "COMPLETED",
+            },
+            select: { id: true },
+        });
+    if (await trial([organizationId])) return "this";
+    return (await trial(await samePayer(db, organizationId))) ? "other" : null;
+}
+
+/** Said at checkout when the trial went to a business sharing this one's payer. */
+export const TRIAL_USED_ELSEWHERE =
+    "The free trial is once per person, and you've already had one with another business.";
+
+/** {@link trialTakenBy}, as a yes or no. */
 export async function hadTrial(
-    db: Pick<Tx, "billingCheckout">,
+    db: Pick<Tx, "billingCheckout" | "organization">,
     organizationId: string,
 ): Promise<boolean> {
-    const done = await db.billingCheckout.findFirst({
-        where: { organizationId, kind: "TRIAL", status: "COMPLETED" },
-        select: { id: true },
-    });
-    return Boolean(done);
+    return (await trialTakenBy(db, organizationId)) !== null;
 }
 
 /**

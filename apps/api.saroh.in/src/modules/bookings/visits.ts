@@ -8,6 +8,7 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { planMeter } from "../billing/metering.service";
 import { normaliseEmail } from "../customer-workspace/duplicates";
 import { rateToBps } from "../invoices/gst";
 import { priceTermsOf } from "../invoices/gst-price";
@@ -247,10 +248,24 @@ async function treatmentCustomerInTx(
  */
 export async function startTreatmentInTx(
     tx: Tx,
-    input: { service: Service; booking: Booking; storeId: string },
+    input: {
+        service: Service;
+        booking: Booking;
+        storeId: string;
+        /**
+         * The refusal at a hard monthly orders cap: the booking page's
+         * (no plan words); absent, the team's `PLAN_LIMIT_REACHED`.
+         */
+        refuse?: () => Error;
+    },
 ): Promise<{ orderId: string; orderItemId: string; orderNumber: string }> {
     const { service, booking, storeId } = input;
     const organizationId = service.organizationId;
+    // The treatment's order is an order: the plan's monthly orders cell
+    // holds it as it holds every other (DEC-227), under the same lock.
+    await planMeter.roomInTx(tx, organizationId, "orders", {
+        refuse: input.refuse,
+    });
     const email = treatmentEmail(booking.bookerEmail);
     const customerId = await treatmentCustomerInTx(tx, {
         organizationId,

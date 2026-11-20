@@ -21,6 +21,7 @@ import {
 import { AdminPermission } from "../admin/admin-permissions";
 import { autopayTakes } from "../billing/autopay-currency";
 import { couponMonthPaise } from "../billing/checkout-quote";
+import { samePayer } from "../billing/same-payer";
 import { RAZORPAY_OFFER_ID } from "./dto";
 import type { PublicOffer } from "./public-catalog";
 
@@ -671,35 +672,55 @@ export async function lockCouponPlacesInTx(
 }
 
 /**
- * True when this business has already been a paying Saroh customer or had
- * a launch offer: a Saroh invoice for a plan, a paid plan now (a renewal
- * that failed restarts as NEW from there), or a redemption of any
- * automatic coupon. Such a business never gets an automatic coupon again,
- * whichever plan or coupon it is (F8; the rule is written in
- * `PRICING_ROLLOUT.md`). A typed code isn't held to it.
+ * Whether this business, or one sharing its payer (DEC-227, M-3:
+ * `billing/same-payer.ts` — an owner, a billing profile's person, a
+ * GSTIN), has already been a paying Saroh customer or had a launch offer:
+ * a Saroh invoice for a plan, a paid plan now (a renewal that failed
+ * restarts as NEW from there), or a redemption of any automatic coupon.
+ * Such a business never gets an automatic coupon again, whichever plan or
+ * coupon it is (F8; the rule is written in `PRICING_ROLLOUT.md`). A typed
+ * code isn't held to it. "this": this business itself; "other": one
+ * sharing its payer; null: neither.
  */
 export async function hadPaidPlanOrLaunchOffer(
     organizationId: string,
-): Promise<boolean> {
-    const [invoice, sub, launch] = await Promise.all([
-        prisma.sarohInvoice.findFirst({
-            // A messaging top-up is no plan.
-            where: { organizationId, source: { not: "TOPUP" } },
-            select: { id: true },
-        }),
-        prisma.subscription.findUnique({
-            where: { organizationId },
-            select: { plan: { select: { priceCents: true } } },
-        }),
-        prisma.pricingCouponRedemption.findFirst({
-            where: { organizationId, coupon: { automatic: true } },
-            select: { id: true },
-        }),
-    ]);
-    return (
-        invoice !== null || launch !== null || (sub?.plan.priceCents ?? 0) > 0
-    );
+): Promise<"this" | "other" | null> {
+    const had = async (ids: string[]) => {
+        const [invoice, paid, launch] = await Promise.all([
+            prisma.sarohInvoice.findFirst({
+                // A messaging top-up is no plan.
+                where: {
+                    organizationId: { in: ids },
+                    source: { not: "TOPUP" },
+                },
+                select: { id: true },
+            }),
+            prisma.subscription.findFirst({
+                where: {
+                    organizationId: { in: ids },
+                    plan: { priceCents: { gt: 0 } },
+                },
+                select: { id: true },
+            }),
+            prisma.pricingCouponRedemption.findFirst({
+                where: {
+                    organizationId: { in: ids },
+                    coupon: { automatic: true },
+                },
+                select: { id: true },
+            }),
+        ]);
+        return invoice !== null || paid !== null || launch !== null;
+    };
+    if (await had([organizationId])) return "this";
+    return (await had(await samePayer(prisma, organizationId)))
+        ? "other"
+        : null;
 }
+
+/** Said when a launch offer was had by a business sharing this one's payer. */
+export const LAUNCH_OFFER_USED_ELSEWHERE =
+    "The launch discount is once per person, and you've already had it, or paid for a plan, with another business.";
 
 /**
  * Why `coupon` can't be used by this business on this plan now, or null
@@ -726,22 +747,25 @@ async function couponProblem(
     if (!coupon.planIds.includes(input.planId)) {
         return `Coupon ${code} doesn't apply to ${input.planName}.`;
     }
-    const mine = await prisma.pricingCouponRedemption.findUnique({
+    if (coupon.automatic) {
+        const had = await hadPaidPlanOrLaunchOffer(input.organizationId);
+        if (had === "other") return LAUNCH_OFFER_USED_ELSEWHERE;
+        if (had) {
+            return `Coupon ${code} is for businesses starting their first paid plan.`;
+        }
+    }
+    // Once per person (DEC-227): a business sharing this one's payer
+    // having used it counts as this one having used it.
+    const mine = await prisma.pricingCouponRedemption.findFirst({
         where: {
-            couponId_organizationId: {
-                couponId: coupon.id,
-                organizationId: input.organizationId,
+            couponId: coupon.id,
+            organizationId: {
+                in: await samePayer(prisma, input.organizationId),
             },
         },
         select: { id: true },
     });
     if (mine) return `You've used coupon ${code} already.`;
-    if (
-        coupon.automatic &&
-        (await hadPaidPlanOrLaunchOffer(input.organizationId))
-    ) {
-        return `Coupon ${code} is for businesses starting their first paid plan.`;
-    }
     const taken = await couponPlacesTaken(
         coupon.id,
         input.organizationId,
@@ -784,6 +808,17 @@ export async function findUsableCoupon(
 export async function findAutomaticCoupon(
     input: CouponAsk,
 ): Promise<PricingCoupon | null> {
+    return (await automaticCouponFor(input)).coupon;
+}
+
+/**
+ * {@link findAutomaticCoupon}, with why the plan's automatic coupon isn't
+ * given when there is one: `elsewhere` when it went to a business sharing
+ * this one's payer (DEC-227), which checkout says.
+ */
+export async function automaticCouponFor(
+    input: CouponAsk,
+): Promise<{ coupon: PricingCoupon | null; elsewhere: boolean }> {
     const coupon = await prisma.pricingCoupon.findFirst({
         where: {
             automatic: true,
@@ -794,8 +829,11 @@ export async function findAutomaticCoupon(
         },
         orderBy: { createdAt: "desc" },
     });
-    if (!coupon) return null;
-    return (await couponProblem(coupon, input)) ? null : coupon;
+    if (!coupon) return { coupon: null, elsewhere: false };
+    const problem = await couponProblem(coupon, input);
+    return problem
+        ? { coupon: null, elsewhere: problem === LAUNCH_OFFER_USED_ELSEWHERE }
+        : { coupon, elsewhere: false };
 }
 
 /**

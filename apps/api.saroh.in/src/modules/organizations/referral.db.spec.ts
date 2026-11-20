@@ -35,6 +35,8 @@ async function person(
         data: {
             email: input.email ?? `${uniq("ref-")}@example.com`,
             emailVerified: input.emailVerified ?? true,
+            // A second business of theirs stays on Free here (DEC-227).
+            extraFreeBusinesses: 5,
         },
         select: { id: true },
     });

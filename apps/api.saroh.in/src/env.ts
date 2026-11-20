@@ -324,6 +324,9 @@ const envSchema = z.object({
     // Unset: 1200. 0 turns it off (the browser-test stacks, where many
     // workers share one seeded login).
     MEMBER_REQUESTS_PER_MINUTE: z.string().regex(/^\d+$/).optional(),
+    // Businesses one person may set up a day (M-4, DEC-227,
+    // `organizations/free-business.ts`). Unset: 5. 0 turns it off.
+    BUSINESS_CREATES_PER_DAY: z.string().regex(/^\d+$/).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never

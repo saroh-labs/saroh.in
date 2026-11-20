@@ -57,6 +57,14 @@ jest.mock("@saroh/database", () => {
     };
 });
 
+// One business on Free per person (DEC-227) has its db spec
+// (`billing/plan-limits-hardening.db.spec.ts`); here it lets every set-up by.
+jest.mock("./free-business", () => ({
+    ...jest.requireActual<typeof import("./free-business")>("./free-business"),
+    assertMayOwnAnotherFreeInTx: jest.fn().mockResolvedValue(undefined),
+    businessCreationLimiter: () => null,
+}));
+
 // The welcome email's transport: never a real one in a unit test.
 jest.mock("../../common/email", () => ({
     sendWelcomeEmail: jest.fn().mockResolvedValue("sent"),

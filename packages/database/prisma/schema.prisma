@@ -56,6 +56,11 @@ model User {
   phoneE164       String?   @unique
   phoneVerifiedAt DateTime?
 
+  // Businesses on Free this person may own beyond their one (DEC-227): an
+  // exception staff grant from the console, audited there. Zero for
+  // everyone else.
+  extraFreeBusinesses Int @default(0)
+
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
@@ -979,6 +984,8 @@ model Media {
   sharePosts     SharePost[]       @relation("SharePostMedia")
 
   @@index([organizationId])
+  // The sweep of uploads never confirmed (M-5, DEC-227).
+  @@index([status, createdAt])
 }
 
 // "Download your data" (owner, 9 Oct, DEC-120): one zip of a business's

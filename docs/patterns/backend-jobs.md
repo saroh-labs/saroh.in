@@ -154,6 +154,8 @@ waits while holding one.
 | `webhooks:<organizationId>`               | Making a business's webhook endpoints (U13): the count under `webhooks.max` and the insert, so two at once can't both fit the last place                                                                                                                                                                                                 | `outbound-webhooks/endpoints.service.ts` (`create`)                                 |
 | `calendar-busy:<connectionId>`            | Leaving one waiting `calendar.busy` run per Google Calendar connection (#1047): "is one waiting? if not, add one", so a reconnect, a status read and the run's own next run can't make two; one waiting for later is brought forward (GC-13)                                                                                             | `calendar-sync/calendar-jobs.ts` (`scheduleBusy`)                                   |
 | `job-chain:calendar.sweep`                | Leaving one waiting run of the hourly calendar sweep (GC-14), as the manager link sweep does                                                                                                                                                                                                                                             | `calendar-sync/calendar-sweep.job.ts` (`schedule`)                                  |
+| `job-chain:media.pending-sweep`           | Leaving one waiting run of the hourly sweep of uploads never confirmed (DEC-227, M-5), as the manager link sweep does                                                                                                                                                                                                                    | `media/pending-upload-sweep.job.ts` (`schedule`)                                    |
+| `free-business:<userId>`                  | One person's set-ups and moves to Free, so two at once can't both pass "one business on Free" (DEC-227); bounded wait (`holdXactLock`)                                                                                                                                                                                                   | `organizations/free-business.ts` (`assertMayOwnAnotherFreeInTx`)                    |
 
 Race tests wait on an advisory lock with `waitUntilAdvisoryBlockedBy`
 (`test/lock-wait.ts`).
@@ -275,6 +277,16 @@ nobody was told. Round-2 A14 closed it (`bookings/booking-notify.handler.ts`).
   ledger (`system:organization-deletion`, `organization.deleted`) and the
   business's own history in that transaction; the log line carries counts
   and ids only.
+
+## Unconfirmed uploads — **Current** (DEC-227)
+
+- **`media.pending-sweep`** is hourly and self-rescheduling (one waiting run
+  under `job-chain:media.pending-sweep`, restarted by `MediaModule` every six
+  hours). An upload holds its space against the plan's storage from its
+  start; one still PENDING two hours on (`PENDING_UPLOAD_STALE_MS`, well past
+  the signed URL's ten minutes) loses its object and its row, each in its own
+  transaction that takes the row only while it is still PENDING. READY and
+  FAILED rows are never touched; a business on legal hold is left out.
 
 ## Retention — **Current** (DEC-122)
 

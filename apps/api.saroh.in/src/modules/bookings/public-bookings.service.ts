@@ -13,6 +13,7 @@ import { Prisma, prisma } from "@saroh/database";
 import { prismaErrorCode } from "../../common/prisma-errors";
 import { ActivationEvents } from "../analytics/activation-events";
 import { notTakingOrders } from "../billing/paused-errors";
+import { bookingsPaused } from "../billing/plan-limit-errors";
 import { suggestFromBookingNoteInTx } from "../customer-workspace/attention-suggest";
 import { hashPayToken } from "../invoices/pay-token";
 import { loadPriceTerms } from "../invoices/price-terms";
@@ -687,6 +688,7 @@ export class PublicBookingsService {
                           service,
                           booking,
                           storeId: treatmentStore.id,
+                          refuse: bookingsPaused,
                       })
                     : null;
                 if (!price || !booking.contactId) return;

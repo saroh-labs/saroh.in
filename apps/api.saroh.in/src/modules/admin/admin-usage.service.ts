@@ -8,7 +8,7 @@ import {
     BYTES_PER_GB,
     bytesToGb,
     meteredKeyOf,
-    STORED,
+    NOT_STORED,
 } from "../billing/metering";
 
 export const USAGE_PAGE_SIZE = 25;
@@ -76,7 +76,7 @@ interface RawRow {
  * never a file, its name or who uploaded it.
  *
  * What counts is what the plan's `storageGb` counts (`billing/metering.ts`):
- * READY media only. A business with nothing stored is listed at 0, so
+ * READY media and uploads in progress. A business with nothing stored is listed at 0, so
  * "least" reads as the businesses that have uploaded nothing.
  */
 @Injectable()
@@ -113,7 +113,7 @@ export class AdminUsageService {
                     COALESCE(SUM(m."sizeBytes"), 0) AS "bytes"
                 FROM "Organization" o
                 LEFT JOIN "Media" m
-                    ON m."organizationId" = o."id" AND m."status" = ${STORED}
+                    ON m."organizationId" = o."id" AND m."status" <> ${NOT_STORED}
                 WHERE ${inEdition}
                 GROUP BY o."id"
                 ORDER BY "bytes" ${direction}, o."name" ASC, o."id" ASC
@@ -127,7 +127,7 @@ export class AdminUsageService {
                         WHERE ${inEdition}) AS "total",
                     (SELECT COALESCE(SUM(m."sizeBytes"), 0) FROM "Media" m
                         JOIN "Organization" o ON o."id" = m."organizationId"
-                        WHERE m."status" = ${STORED} AND ${inEdition}) AS "bytes"`,
+                        WHERE m."status" <> ${NOT_STORED} AND ${inEdition}) AS "bytes"`,
             ),
         ]);
 

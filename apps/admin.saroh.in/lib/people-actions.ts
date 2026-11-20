@@ -65,6 +65,22 @@ export async function endSessionsAction(userId: string, input: Reasoned) {
     );
 }
 
+/** How many businesses on Free they may own beyond their one (DEC-227). */
+export async function setExtraFreeBusinessesAction(
+    userId: string,
+    input: Reasoned & { extra: number },
+) {
+    return refreshUser(
+        userId,
+        await adminWrite<{ extraFreeBusinesses: number }>(
+            `${person(userId)}/free-businesses`,
+            "PUT",
+            input,
+            "Could not change their free businesses.",
+        ),
+    );
+}
+
 /** Send a sign-in code through the API's Better Auth (U9). */
 export async function sendSignInCodeAction(userId: string, input: Reasoned) {
     return refreshUser(

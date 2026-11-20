@@ -591,10 +591,16 @@ adding)` (`billing/item-limits.ts`), under that thing's own lock. It is
   never capped, and the booking page reads `paused` before its form,
   DEC-095), in the business's
   month in its zone (many businesses at once: `billing/metering-across.ts`,
-  the same rules). The site's checkout is never refused (a soft cap,
-  OQ-8); a payment once captured never is (OQ-7). A catalogue cell marked
-  `soft` (storage, site visits) is soft wherever it's checked — counted and
-  told, never refused — whatever the call site passes. Websites (`sites`)
+  the same rules). Every path that makes an order (by hand, the site's
+  checkout, the storefront API, a treatment's visit order) follows the
+  orders cell: hard refuses past it, the site's customer told only that the
+  shop isn't taking more orders this month (`ORDERS_PAUSED`); soft counts
+  and tells (DEC-227). A payment once captured is never refused (OQ-7).
+  Storage follows its cell too, checked when an upload starts (at its
+  stated size, held while PENDING) and again at confirm (DEC-227). A
+  catalogue cell marked `soft` (site visits, and storage where a plan says
+  so) is soft wherever it's checked — counted and told, never refused —
+  and no call site makes a hard cell soft. Websites (`sites`)
   and places customers visit (`locations` → `shopLocations`, metered when a
   storefront's kind becomes SHOP) are the catalogue's where `enforcedRow`
   answers for the row; elsewhere the old one-website and `storefronts`
