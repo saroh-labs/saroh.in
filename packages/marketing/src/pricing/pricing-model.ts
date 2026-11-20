@@ -111,7 +111,11 @@ export interface PricingPageModel {
     /** True when there is no catalogue to show: every price is the placeholder. */
     placeholder: boolean;
     /** The Monthly/Yearly switch, only when the catalogue offers yearly. */
-    yearly: { freeMonths: number } | null;
+    yearly: {
+        freeMonths: number;
+        /** The switch's yearly side ("Yearly · save up to X%" with an offer). */
+        label: string;
+    } | null;
     /** The site's own tax toggle, if it has one, and whether it starts ticked. */
     tax: { toggle: boolean; initial: boolean };
     views: Record<ViewKey, PricingView>;

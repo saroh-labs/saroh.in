@@ -49,7 +49,10 @@ describe("pricingPageModel", () => {
 
     it("yearly: pay for the paid months, about … a month + GST", () => {
         const model = pricingPageModel(fakeCatalog());
-        expect(model.yearly).toEqual({ freeMonths: 2 });
+        expect(model.yearly).toEqual({
+            freeMonths: 2,
+            label: "Yearly · 2 months free",
+        });
         const y = model.views["year-excl"];
         expect(y.plans[1]).toMatchObject({
             price: formatInr(111_000),

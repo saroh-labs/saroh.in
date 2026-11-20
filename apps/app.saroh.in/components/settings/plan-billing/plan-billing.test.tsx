@@ -247,7 +247,13 @@ describe("PlanChooser", () => {
     it("offers Monthly or Yearly only when the catalogue has yearly billing", () => {
         expect(chooser(rows)).not.toMatch(/yearly/i);
         expect(
-            chooser(rows, { yearly: { on: true, freeMonths: 2 } }),
+            chooser(rows, {
+                yearly: {
+                    on: true,
+                    freeMonths: 2,
+                    label: "Yearly · 2 months free",
+                },
+            }),
         ).toContain("Yearly · 2 months free");
     });
 

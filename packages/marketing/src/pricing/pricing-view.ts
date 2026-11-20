@@ -8,6 +8,7 @@ import {
     offeredPlans,
     regularYearlyPaise,
     trialFirstPaise,
+    yearlySwitchLabel,
 } from "@saroh/pricing-catalog";
 
 import type {
@@ -228,7 +229,12 @@ export function pricingPageModel(
     }
     return {
         placeholder: false,
-        yearly: yearlyOn ? { freeMonths: 12 - catalog.yearly.paid } : null,
+        yearly: yearlyOn
+            ? {
+                  freeMonths: 12 - catalog.yearly.paid,
+                  label: yearlySwitchLabel(catalog),
+              }
+            : null,
         tax: site.tax
             ? { toggle: true, initial: catalog.gst.show === "incl" }
             : { toggle: false, initial: false },

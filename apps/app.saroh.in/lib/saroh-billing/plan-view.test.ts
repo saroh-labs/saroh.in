@@ -875,7 +875,11 @@ describe("pickerRows", () => {
             amount: "₹1,110",
             per: "a year + GST",
         });
-        expect(yearlyOffer(CATALOG)).toEqual({ on: true, freeMonths: 2 });
+        expect(yearlyOffer(CATALOG)).toEqual({
+            on: true,
+            freeMonths: 2,
+            label: "Yearly · 2 months free",
+        });
         expect(
             yearlyOffer({ ...CATALOG, yearly: { on: false, paid: 10 } }),
         ).toEqual({ on: false });

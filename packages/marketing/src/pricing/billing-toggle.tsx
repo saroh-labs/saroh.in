@@ -8,24 +8,26 @@ import { ring } from "../ring";
 import { nextIndex } from "../roving";
 
 /**
- * The Pricing design's Monthly / "Yearly · N months free" switch: a
+ * The Pricing design's Monthly / "Yearly · N months free" (or "save up
+ * to X%" with a yearly offer, DEC-231) switch: a
  * radiogroup on white, the chosen side in Ink. Shown only when the
  * catalogue offers yearly billing. One tab stop; the arrow keys move
  * between the two and choose as they go (WAI-ARIA radio group).
  */
 export function BillingToggle({
     yearly,
-    freeMonths,
+    label,
     onChange,
 }: {
     yearly: boolean;
-    freeMonths: number;
+    /** The yearly side's words, from the model. */
+    label: string;
     onChange: (yearly: boolean) => void;
 }) {
     const refs = useRef<(HTMLButtonElement | null)[]>([]);
     const options = [
         { yearly: false, label: "Monthly" },
-        { yearly: true, label: `Yearly · ${freeMonths} months free` },
+        { yearly: true, label },
     ];
 
     const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {

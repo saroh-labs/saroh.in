@@ -6,6 +6,7 @@ import {
     offeredPlans,
     planPricePaise,
     trialFirstPaise,
+    yearlySwitchLabel,
 } from "@saroh/pricing-catalog";
 
 import type { BillingAccessView } from "@/lib/billing/access";
@@ -266,12 +267,19 @@ export function priceWords(pricePaise: number, cycle: Cycle): string {
     return pricePaise > 0 ? `${planMoney(pricePaise)} ${per(cycle)}` : "₹0";
 }
 
-/** Whether the picker offers yearly, and how many months it gives free. */
+/**
+ * Whether the picker offers yearly, how many months it gives free, and the
+ * switch's words ("save up to X%" while a plan has a yearly offer, DEC-231).
+ */
 export function yearlyOffer(
     catalog: Catalog | null,
-): { on: false } | { on: true; freeMonths: number } {
+): { on: false } | { on: true; freeMonths: number; label: string } {
     if (!catalog?.yearly.on) return { on: false };
-    return { on: true, freeMonths: Math.max(0, 12 - catalog.yearly.paid) };
+    return {
+        on: true,
+        freeMonths: Math.max(0, 12 - catalog.yearly.paid),
+        label: yearlySwitchLabel(catalog),
+    };
 }
 
 /** The catalogue plan the business is billed for: its row, else Free. */

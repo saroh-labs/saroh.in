@@ -89,6 +89,40 @@ export function chargedYearlyPaise(
 export const NO_REFUNDS_LINE =
     "We don't refund payments, including a yearly plan cancelled early. If you're ever charged twice, the extra charge is refunded on its own.";
 
+/**
+ * The most a yearly offer saves across the plans still offered, against 12
+ * months at the regular monthly price, rounded down to a whole percent
+ * (DEC-231). Null when no paid plan has a yearly offer.
+ */
+export function yearlySavePercent(
+    catalog: Pick<Catalog, "yearly" | "plans">,
+): number | null {
+    let best: number | null = null;
+    for (const p of catalog.plans) {
+        if (p.retired || p.pricePaise <= 0) continue;
+        if (p.yearlyOfferPaise === undefined) continue;
+        const months = 12 * p.pricePaise;
+        const save = Math.floor(
+            (100 * (months - chargedYearlyPaise(catalog, p))) / months,
+        );
+        best = Math.max(best ?? 0, save);
+    }
+    return best;
+}
+
+/**
+ * The Monthly/Yearly switch's yearly side: the best saving while a plan
+ * has a yearly offer (DEC-231), else the months the regular rule gives free.
+ */
+export function yearlySwitchLabel(
+    catalog: Pick<Catalog, "yearly" | "plans">,
+): string {
+    const save = yearlySavePercent(catalog);
+    return save !== null
+        ? `Yearly · save up to ${save}%`
+        : `Yearly · ${Math.max(0, 12 - catalog.yearly.paid)} months free`;
+}
+
 /** A plan's charged price before GST for a billing cycle. */
 export function planPricePaise(
     catalog: Pick<Catalog, "yearly">,
