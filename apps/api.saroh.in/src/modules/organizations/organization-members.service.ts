@@ -6,6 +6,7 @@ import {
     Logger,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
 
@@ -320,7 +321,11 @@ export class OrganizationMembersService {
      * invitation in place — role, sites, token and expiry — rather than
      * stacking rows, so the newest email is the one that works.
      */
-    async invite(ctx: OrganizationContext, dto: InviteMemberDto) {
+    async invite(
+        ctx: OrganizationContext,
+        dto: InviteMemberDto,
+        ledger?: InTxLedger,
+    ) {
         authorize(ctx, "member:invite");
         // Someone on the diary given a login (#868): checked first, and
         // Calendar only unless another role was picked.
@@ -360,8 +365,8 @@ export class OrganizationMembersService {
         const invitation = await planMeter.withRoom(
             ctx.organizationId,
             "members",
-            (tx) =>
-                tx.organizationInvitation.upsert({
+            async (tx) => {
+                const row = await tx.organizationInvitation.upsert({
                     where: {
                         organizationId_email: {
                             organizationId: ctx.organizationId,
@@ -396,7 +401,10 @@ export class OrganizationMembersService {
                         role: true,
                         expiresAt: true,
                     },
-                }),
+                });
+                await ledger?.(tx, {});
+                return row;
+            },
             {
                 // A live invitation already counts this person.
                 addingIn: async (tx) => {
@@ -457,7 +465,11 @@ export class OrganizationMembersService {
     }
 
     /** Withdraw an invitation that has not been accepted. */
-    async revokeInvitation(ctx: OrganizationContext, invitationId: string) {
+    async revokeInvitation(
+        ctx: OrganizationContext,
+        invitationId: string,
+        ledger?: InTxLedger,
+    ) {
         authorize(ctx, "member:invite");
 
         const invitation = await prisma.organizationInvitation.findFirst({
@@ -470,12 +482,15 @@ export class OrganizationMembersService {
 
         // The token hash goes with it: a revoked invitation's link must not
         // work, and the row is kept only to say the invitation happened.
-        await prisma.organizationInvitation.update({
-            where: { id: invitation.id },
-            data: {
-                status: "REVOKED",
-                tokenHash: `revoked:${invitation.id}`,
-            },
+        await prisma.$transaction(async (tx) => {
+            await tx.organizationInvitation.update({
+                where: { id: invitation.id },
+                data: {
+                    status: "REVOKED",
+                    tokenHash: `revoked:${invitation.id}`,
+                },
+            });
+            await ledger?.(tx, {});
         });
         return { revoked: true };
     }
@@ -718,6 +733,7 @@ export class OrganizationMembersService {
         ctx: OrganizationContext,
         userId: string,
         dto: UpdateMemberRoleDto,
+        ledger?: InTxLedger,
     ) {
         authorize(ctx, "member:role:update");
 
@@ -789,6 +805,7 @@ export class OrganizationMembersService {
                         update: {},
                     });
                 }
+                await ledger?.(tx, { from: membership.role, to: dto.role });
             },
             { isolationLevel: "Serializable" },
         );
@@ -977,7 +994,11 @@ export class OrganizationMembersService {
      * refused removal leaves every storefront role where it was. Their
      * storefront invitations still pending are revoked with them.
      */
-    async remove(ctx: OrganizationContext, userId: string) {
+    async remove(
+        ctx: OrganizationContext,
+        userId: string,
+        ledger?: InTxLedger,
+    ) {
         authorize(ctx, "member:remove");
 
         const membership = await this.requireMembership(ctx, userId);
@@ -990,6 +1011,7 @@ export class OrganizationMembersService {
             userId,
             membership.role,
             "remove",
+            ledger ? (tx) => ledger(tx, { role: membership.role }) : undefined,
         );
 
         await this.audit.record({
@@ -1067,6 +1089,7 @@ export class OrganizationMembersService {
         userId: string,
         role: string,
         what: "remove" | "leave",
+        inTx?: (tx: Prisma.TransactionClient) => Promise<void>,
     ): Promise<{ revokedLinks: number; storefrontRoles: number }> {
         if (role === "OWNER") {
             await this.assertNotLastOwner(organizationId, userId, what);
@@ -1149,6 +1172,7 @@ export class OrganizationMembersService {
                         data: { status: "REVOKED" },
                     });
                 }
+                await inTx?.(tx);
                 return {
                     revokedLinks: count,
                     storefrontRoles: storefronts.count,
@@ -1396,3 +1420,13 @@ function toRole(role: string): OrgRole {
         ? role
         : "MEMBER";
 }
+
+/**
+ * A caller's own record of the change (the admin ledger), written inside
+ * the change's transaction so neither commits alone (review B3). `detail`
+ * carries the before-value where there is one.
+ */
+export type InTxLedger = (
+    tx: Prisma.TransactionClient,
+    detail: Record<string, unknown>,
+) => Promise<void>;

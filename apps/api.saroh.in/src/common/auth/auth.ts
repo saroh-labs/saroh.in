@@ -30,6 +30,7 @@ import { refusedCodeMail } from "./code-mail-origin";
 import { clearStaffVerification } from "./email-verification";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
+import { noteFailedStaffSignIn } from "./staff-sign-in-failed";
 import { deliverVerificationOtp } from "./verification-otp";
 
 /**
@@ -61,6 +62,9 @@ const authServices: Parameters<typeof createAuth>[0] = {
             noticeProfilesOfDeletedOwnerInTx(tx, deletionLogger, id),
         );
     },
+    // A refused sign-in to a Saroh staff account is on the admin ledger
+    // (review B4), at most once in ten minutes per account.
+    onSignInFailed: noteFailedStaffSignIn,
     // A 5xx inside Better Auth, which answers /api/auth/* itself and so
     // never reaches AllExceptionsFilter. Never a 4xx.
     onServerError: reportAuthServerError,

@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { NotAuthorized } from "@/components/not-authorized";
 
 import type { AdminPermission, StaffIdentity } from "./control-plane";
-import { editionNotGranted, getStaffIdentity } from "./control-plane";
+import { getStaffIdentity, refusalReason } from "./control-plane";
 import { requireSession } from "./session";
 
 /**
@@ -27,11 +27,13 @@ export async function requireStaff(
     const session = await requireSession();
     const staff = await getStaffIdentity();
     if (!staff) {
+        const reason = await refusalReason();
         return {
             ok: false,
             screen: createElement(NotAuthorized, {
                 email: session.user.email,
-                ...((await editionNotGranted()) && { wrongConsole: true }),
+                ...(reason === "edition_not_granted" && { wrongConsole: true }),
+                ...(reason === "reauth_required" && { signInAgain: true }),
             }),
         };
     }

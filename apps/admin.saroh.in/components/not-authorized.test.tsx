@@ -67,6 +67,14 @@ describe("NotAuthorized on the wrong console", () => {
     });
 });
 
+describe("NotAuthorized when the session is too old", () => {
+    it("asks them to sign in again, with Sign out", () => {
+        render(<NotAuthorized email="support@example.com" signInAgain />);
+        expect(screen.getByText("Sign in again")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
+    });
+});
+
 describe("NoAccessPanel", () => {
     it("says nothing about why and points to Home", () => {
         render(<NoAccessPanel email="support@example.com" />);

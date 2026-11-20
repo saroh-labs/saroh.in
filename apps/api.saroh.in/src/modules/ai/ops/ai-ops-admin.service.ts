@@ -5,6 +5,7 @@ import type { Edition } from "@saroh/edition";
 import { DateTime } from "luxon";
 
 import { viaBusiness } from "../../admin/admin-edition";
+import type { LedgerIn } from "../requests/ai-requests.service";
 import { AiRequestsService } from "../requests/ai-requests.service";
 import { AI_SETTING_KEYS } from "../settings/ai-setting-keys";
 import type {
@@ -185,23 +186,35 @@ export class AiOpsAdminService {
     }
 
     /** One pack, this period only (owner, 13 Nov 2026). */
-    grant(requestId: string, staffUserId: string, reason: string) {
-        return this.requests.grant(requestId, staffUserId, 1, reason);
-    }
-
-    decline(requestId: string, staffUserId: string, reason: string) {
-        return this.requests.decline(requestId, staffUserId, reason);
-    }
-
-    /** The business a request is from, for the ledger; null when there's none. */
-    async requestBusiness(requestId: string): Promise<string | null> {
-        const row = await outsideOrgContext(() =>
-            prisma.aiRequest.findUnique({
-                where: { id: requestId },
-                select: { organizationId: true },
-            }),
+    grant(
+        requestId: string,
+        staffUserId: string,
+        reason: string,
+        audit?: LedgerIn,
+    ) {
+        return this.requests.grant(
+            requestId,
+            staffUserId,
+            1,
+            reason,
+            new Date(),
+            audit,
         );
-        return row?.organizationId ?? null;
+    }
+
+    decline(
+        requestId: string,
+        staffUserId: string,
+        reason: string,
+        audit?: LedgerIn,
+    ) {
+        return this.requests.decline(
+            requestId,
+            staffUserId,
+            reason,
+            new Date(),
+            audit,
+        );
     }
 
     async summary(now: Date = new Date()): Promise<AiOpsSummary> {

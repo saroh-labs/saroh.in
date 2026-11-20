@@ -96,9 +96,7 @@ beforeEach(async () => {
         new SarohInvoicesService(SELLER),
     );
     await prisma.job.deleteMany({});
-    await prisma.adminAuditEvent.deleteMany({
-        where: { actorUserId: BILLING_NOTE_AUTHOR },
-    });
+    await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
     await prisma.adminOrganizationNote.deleteMany({
         where: { authorUserId: BILLING_NOTE_AUTHOR },
     });

@@ -15,6 +15,10 @@ import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-c
 import { PlatformAdminContext } from "../../common/decorators/platform-admin-context.decorator";
 import { RequireAdminPermission } from "../../common/decorators/require-admin-permission.decorator";
 import { IdempotencyService } from "../../common/idempotency/idempotency.service";
+import {
+    AdminAuditOutcome,
+    AdminAuditService,
+} from "../admin/admin-audit.service";
 import { AdminPermission } from "../admin/admin-permissions";
 import { AdminRoutes } from "../admin/admin-routes.decorator";
 import type {
@@ -70,6 +74,7 @@ export class AdminPricingController {
         private readonly writes: CatalogueWritesService,
         private readonly coupons: CouponsService,
         private readonly idempotency: IdempotencyService,
+        private readonly adminAudit: AdminAuditService,
     ) {}
 
     @Get("pricing")
@@ -90,15 +95,30 @@ export class AdminPricingController {
 
     @Post("pricing/preview-token")
     @RequireAdminPermission(AdminPermission.PricingRead)
-    pricingPreviewToken(
+    async pricingPreviewToken(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
         @ServedEdition() served: Edition | null,
         @Body() dto: PreviewTokenDto,
     ): Promise<PreviewTokenResult> {
-        return this.catalogue.mintPreviewToken(
+        const minted = await this.catalogue.mintPreviewToken(
             catalogueOf(served),
             dto.revision,
             new Date(),
         );
+        // A link to unreleased prices is on the ledger (review B10).
+        await this.adminAudit.recordRead({
+            actorUserId: staff.userId,
+            permission: AdminPermission.PricingRead,
+            action: "pricing.preview-link.minted",
+            targetType: "pricing_catalogue",
+            targetId: catalogueOf(served),
+            outcome: AdminAuditOutcome.Success,
+            metadata: {
+                revision: minted.revision,
+                expiresAt: minted.expiresAt,
+            },
+        });
+        return minted;
     }
 
     // ── The shared draft ────────────────────────────────────────────────

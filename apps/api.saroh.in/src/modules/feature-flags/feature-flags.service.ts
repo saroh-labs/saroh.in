@@ -131,8 +131,14 @@ export class FeatureFlagService {
             });
 
             if (controlPlaneAudit) {
+                // The before-value beside the new one (review B1).
                 await tx.adminAuditEvent.create({
-                    data: createAdminAuditData(controlPlaneAudit),
+                    data: createAdminAuditData(
+                        withFrom(
+                            controlPlaneAudit,
+                            existing?.enabledByDefault ?? null,
+                        ),
+                    ),
                 });
             }
         });
@@ -218,8 +224,11 @@ export class FeatureFlagService {
             });
 
             if (controlPlaneAudit) {
+                // The before-value beside the new one (review B1).
                 await tx.adminAuditEvent.create({
-                    data: createAdminAuditData(controlPlaneAudit),
+                    data: createAdminAuditData(
+                        withFrom(controlPlaneAudit, existing?.enabled ?? null),
+                    ),
                 });
             }
         });
@@ -289,8 +298,11 @@ export class FeatureFlagService {
             });
 
             if (controlPlaneAudit) {
+                // The before-value beside the new one (review B1).
                 await tx.adminAuditEvent.create({
-                    data: createAdminAuditData(controlPlaneAudit),
+                    data: createAdminAuditData(
+                        withFrom(controlPlaneAudit, existing.enabled),
+                    ),
                 });
             }
         });
@@ -365,4 +377,11 @@ async function wasAlreadyAudited(
         select: { id: true },
     });
     return existing !== null;
+}
+
+function withFrom(
+    audit: AdminAuditInput,
+    from: boolean | null,
+): AdminAuditInput {
+    return { ...audit, metadata: { ...audit.metadata, from } };
 }

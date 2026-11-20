@@ -21,6 +21,8 @@ import { EDITION, EDITION_LABEL } from "@/lib/edition";
  *   and they are never stranded on a page whose only way out is Sign out.
  * - **Not staff at all** (no grant, not on the allowlist) keep the bare page:
  *   there is no menu to show them.
+ * - **Staff whose session is too old for the console** (`signInAgain`): the
+ *   API asks for a recent sign-in (review A2); they sign out and back in.
  * - **Staff whose grant leaves out this console's edition** (`wrongConsole`)
  *   get the bare page saying so: the API told them, and every read here would
  *   be refused too, so there is no menu either.
@@ -33,10 +35,12 @@ export function NotAuthorized({
     email,
     staff,
     wrongConsole = false,
+    signInAgain = false,
 }: {
     email: string;
     staff?: StaffIdentity | null;
     wrongConsole?: boolean;
+    signInAgain?: boolean;
 }) {
     if (staff) {
         return (
@@ -56,14 +60,18 @@ export function NotAuthorized({
                 </div>
                 <EmptyState
                     title={
-                        wrongConsole
-                            ? "Your access doesn't include this console"
-                            : "Not authorized"
+                        signInAgain
+                            ? "Sign in again"
+                            : wrongConsole
+                              ? "Your access doesn't include this console"
+                              : "Not authorized"
                     }
                     description={
-                        wrongConsole
-                            ? `This is the ${EDITION_LABEL[EDITION]} console. ${email} is on Saroh's team, but not for this one. A Platform owner can add it from Team.`
-                            : `${email} does not have access to this area.`
+                        signInAgain
+                            ? `The console asks for a recent sign-in. Sign out, then sign back in as ${email}.`
+                            : wrongConsole
+                              ? `This is the ${EDITION_LABEL[EDITION]} console. ${email} is on Saroh's team, but not for this one. A Platform owner can add it from Team.`
+                              : `${email} does not have access to this area.`
                     }
                     action={<SignOutButton />}
                 />

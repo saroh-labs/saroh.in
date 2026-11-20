@@ -16,6 +16,7 @@ import { openHoldFor } from "../../common/auth/sign-in-holds";
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
 import { sendSignInEmailChangedNotice } from "../../common/email";
 import { prismaErrorCode } from "../../common/prisma-errors";
+import { isSarohStaff } from "../account-phone/saroh-staff";
 import { maskEmail } from "../waitlist/waitlist-keys";
 import { AdminAuditOutcome, AdminAuditService } from "./admin-audit.service";
 import { AdminPermission, AdminRole } from "./admin-permissions";
@@ -70,6 +71,12 @@ export class AdminSignInHelpService {
     async sendCode(staff: PlatformAdminInfo, userId: string, reason: string) {
         const why = requireReason(reason);
         const user = await findPerson(userId);
+        await this.refuseStaffTarget(
+            staff,
+            user,
+            SignInHelpAction.CodeSent,
+            why,
+        );
         const hold = await openHoldFor(userId);
         if (hold) {
             throw new ConflictException(HELD_MESSAGE);
@@ -155,7 +162,13 @@ export class AdminSignInHelpService {
         reason: string,
     ) {
         const why = requireReason(reason);
-        await findPerson(userId);
+        const person = await findPerson(userId);
+        await this.refuseStaffTarget(
+            staff,
+            person,
+            SignInHelpAction.MarkedVerified,
+            why,
+        );
         if (await openHoldFor(userId)) {
             throw new ConflictException(
                 "Their sign-in email was just changed and is held. Mark it verified once the hold ends or a second staff member confirms.",
@@ -209,6 +222,12 @@ export class AdminSignInHelpService {
         const why = requireReason(input.reason);
         const email = input.email.trim().toLowerCase();
         const user = await findPerson(userId);
+        await this.refuseStaffTarget(
+            staff,
+            user,
+            SignInHelpAction.EmailChanged,
+            why,
+        );
         if (email === user.email.toLowerCase()) {
             throw new BadRequestException(
                 "That is already their sign-in email.",
@@ -333,7 +352,13 @@ export class AdminSignInHelpService {
         reason: string,
     ) {
         const why = requireReason(reason);
-        await findPerson(userId);
+        const person = await findPerson(userId);
+        await this.refuseStaffTarget(
+            staff,
+            person,
+            SignInHelpAction.EmailConfirmed,
+            why,
+        );
         const hold = await openHoldFor(userId);
         if (!hold) {
             throw new ConflictException(
@@ -386,6 +411,41 @@ export class AdminSignInHelpService {
                 );
             });
         return { confirmed: true, to: maskEmail(hold.newEmail) };
+    }
+
+    /**
+     * Sign-in help on a Saroh staff account is how a lower tier becomes
+     * Platform owner (review A1): only a Platform owner may act on staff,
+     * and never on their own account through this path.
+     */
+    private async refuseStaffTarget(
+        staff: PlatformAdminInfo,
+        target: { id: string; email: string },
+        action: string,
+        reason: string,
+    ): Promise<void> {
+        if (!(await isSarohStaff(target))) return;
+        if (
+            staff.roles.includes(AdminRole.PlatformOwner) &&
+            staff.userId !== target.id
+        ) {
+            return;
+        }
+        await this.audit.write(prisma, {
+            actorUserId: staff.userId,
+            permission: AdminPermission.PeopleSignInHelp,
+            action,
+            targetType: "user",
+            targetId: target.id,
+            reason,
+            outcome: AdminAuditOutcome.Denied,
+            metadata: { staffTarget: true },
+        });
+        throw new ForbiddenException(
+            staff.userId === target.id
+                ? "You can't use sign-in help on your own account."
+                : "They are Saroh staff. Only a Platform owner can give them sign-in help.",
+        );
     }
 }
 

@@ -85,6 +85,13 @@ export interface AdminAuditEvent {
     reason: string | null;
     outcome: "SUCCESS" | "FAILURE" | "DENIED";
     correlationId: string | null;
+    /** Where it came from (review B1); absent on an older API. */
+    ipAddress?: string | null;
+    userAgent?: string | null;
+    sessionId?: string | null;
+    metadata?: unknown;
+    actorName?: string | null;
+    organizationName?: string | null;
     createdAt: string;
 }
 
@@ -99,6 +106,10 @@ export interface AdminAuditQuery {
     actorUserId?: string;
     organizationId?: string;
     action?: string;
+    /** Part of a staff member's name or email. */
+    actor?: string;
+    /** Part of a business's name. */
+    business?: string;
 }
 
 export interface StaffIdentity {
@@ -196,10 +207,22 @@ export async function adminFetch(
             "content-type": "application/json",
             cookie,
             ...(origin ? { origin } : {}),
+            // For the admin ledger (review B1): who is behind this server call.
+            ...forwardedClient(incoming),
             ...(init?.headers ?? {}),
         },
         cache: "no-store",
     });
+}
+
+function forwardedClient(incoming: Headers): Record<string, string> {
+    const out: Record<string, string> = {};
+    const agent = incoming.get("user-agent");
+    if (agent) out["user-agent"] = agent;
+    // Cloudflare's own header; a visitor can't set it past the edge.
+    const ip = incoming.get("cf-connecting-ip");
+    if (ip) out["x-admin-client-ip"] = ip;
+    return out;
 }
 
 /** Read a control-plane resource. `null` when the caller is not staff (403). */
@@ -232,12 +255,21 @@ export function getStaffIdentity(): Promise<StaffIdentity | null> {
  * console's edition, rather than because they aren't staff.
  */
 export async function editionNotGranted(): Promise<boolean> {
+    return (await refusalReason()) === "edition_not_granted";
+}
+
+/**
+ * Why `/me` was refused, when the API says: `edition_not_granted`, or
+ * `reauth_required` (the session is too old for the console; sign in again).
+ */
+export async function refusalReason(): Promise<string | null> {
     const res = await adminFetch("/me");
-    if (res.status !== 403) return false;
+    if (res.status !== 401 && res.status !== 403) return null;
     const body = (await res.json().catch(() => null)) as {
         error?: { details?: { reason?: unknown } };
     } | null;
-    return body?.error?.details?.reason === "edition_not_granted";
+    const reason = body?.error?.details?.reason;
+    return typeof reason === "string" ? reason : null;
 }
 
 export function getMetrics(): Promise<PlatformMetrics | null> {
@@ -262,10 +294,12 @@ export async function adminWrite<T = unknown>(
     method: "POST" | "PUT" | "PATCH" | "DELETE",
     body: unknown,
     fallback: string,
+    extraHeaders?: Record<string, string>,
 ): Promise<ControlPlaneResult<T>> {
     const res = await adminFetch(path, {
         method,
         body: body === undefined ? undefined : JSON.stringify(body),
+        ...(extraHeaders ? { headers: extraHeaders } : {}),
     });
     if (!res.ok) {
         const body = (await res
@@ -322,6 +356,8 @@ export function listAudit(
         search.set("organizationId", query.organizationId);
     }
     if (query.action) search.set("action", query.action);
+    if (query.actor) search.set("actor", query.actor);
+    if (query.business) search.set("business", query.business);
     const suffix = search.size > 0 ? `?${search.toString()}` : "";
     return getJson<AdminAuditPage>(`/audit${suffix}`);
 }

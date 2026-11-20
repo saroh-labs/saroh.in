@@ -447,6 +447,21 @@ const envSchema = z.object({
     // should normally hold one break-glass address or be empty. Unset = nobody,
     // and the guard still fails closed.
     ADMIN_ALLOWLIST: z.string().optional(),
+    // The admin console's session (review A2): `/admin` refuses a session
+    // signed in longer ago than this many minutes (default 720, 12 hours),
+    // and a dangerous admin write (grants, people, sign-in help, flags,
+    // overrides, deploys) one older than ADMIN_STEP_UP_MAX_AGE_MINUTES
+    // (default 60). The console sends the person to sign in again.
+    ADMIN_SESSION_MAX_AGE_MINUTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(720),
+    ADMIN_STEP_UP_MAX_AGE_MINUTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(60),
 
     // Set automatically by npm/pnpm run scripts; used for the health probe.
     // Background job worker (S3-003 — durable JobQueue outbox + worker).

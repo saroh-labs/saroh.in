@@ -1,3 +1,10 @@
+jest.mock("../../env", () => ({
+    env: {
+        ADMIN_SESSION_MAX_AGE_MINUTES: 720,
+        ADMIN_STEP_UP_MAX_AGE_MINUTES: 60,
+    },
+}));
+
 import type { ExecutionContext } from "@nestjs/common";
 import { ForbiddenException, UnauthorizedException } from "@nestjs/common";
 import type { Reflector } from "@nestjs/core";
@@ -144,5 +151,30 @@ describe("PlatformPermissionGuard", () => {
         };
 
         expect(guard.canActivate(contextFor(owner))).toBe(true);
+    });
+
+    it("asks for a recent sign-in before a dangerous write, not before a read (A2)", () => {
+        const guard = build([AdminPermission.StaffGrant]);
+        const at = (method: string, minutesAgo: number) =>
+            ({
+                getHandler: () => () => undefined,
+                getClass: () => class {},
+                switchToHttp: () => ({
+                    getRequest: () => ({
+                        method,
+                        platformAdmin: staff([AdminPermission.StaffGrant]),
+                        session: {
+                            createdAt: new Date(
+                                Date.now() - minutesAgo * 60_000,
+                            ),
+                        },
+                    }),
+                }),
+            }) as unknown as ExecutionContext;
+        expect(() => guard.canActivate(at("POST", 90))).toThrow(
+            UnauthorizedException,
+        );
+        expect(guard.canActivate(at("POST", 5))).toBe(true);
+        expect(guard.canActivate(at("GET", 90))).toBe(true);
     });
 });

@@ -159,9 +159,7 @@ describe("business overrides (DB, U11)", () => {
         await prisma.auditEvent.deleteMany({
             where: { organizationId: { in: ids } },
         });
-        await prisma.adminAuditEvent.deleteMany({
-            where: { organizationId: { in: ids } },
-        });
+        await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
         // The usage tests make storefronts (UX-089); they block the delete.
         await prisma.store.deleteMany({
             where: { organizationId: { in: ids } },

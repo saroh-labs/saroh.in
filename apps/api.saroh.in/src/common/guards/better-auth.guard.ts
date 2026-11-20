@@ -16,6 +16,7 @@ import { env } from "../../env";
 import type { WindowLimiter } from "../../modules/rate-limits/shared-window";
 import { SharedRateLimiter } from "../../modules/rate-limits/shared-window";
 import { auth } from "../auth/auth";
+import { getRequestContext } from "../logging/request-context";
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
@@ -67,6 +68,8 @@ export class BetterAuthGuard implements CanActivate {
 
         request.user = result.user;
         request.session = result.session;
+        const requestContext = getRequestContext();
+        if (requestContext) requestContext.sessionId = result.session.id;
         await this.limitMember(context, result.user.id);
         return true;
     }

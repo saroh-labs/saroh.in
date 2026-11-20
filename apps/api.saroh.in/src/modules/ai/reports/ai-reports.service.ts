@@ -5,7 +5,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
-import type { AiReportReason, AiReportStatus } from "@saroh/database";
+import type { AiReportReason, AiReportStatus, Prisma } from "@saroh/database";
 import { outsideOrgContext, prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
@@ -227,25 +227,34 @@ export class AiReportsService {
         id: string,
         staffUserId: string,
         now: Date = new Date(),
+        audit?: (
+            tx: Prisma.TransactionClient,
+            organizationId: string,
+        ) => Promise<void>,
     ): Promise<{ organizationId: string }> {
-        return outsideOrgContext(async () => {
-            const { count } = await prisma.aiReport.updateMany({
-                where: { id, status: "OPEN" },
-                data: {
-                    status: "RESOLVED",
-                    resolvedByUserId: staffUserId,
-                    resolvedAt: now,
-                },
-            });
-            const r = await prisma.aiReport.findUnique({
-                where: { id },
-                select: { organizationId: true },
-            });
-            if (!r) throw new NotFoundException("No such report.");
-            if (count === 0) {
-                throw new ConflictException("That report is already resolved.");
-            }
-            return r;
-        });
+        return outsideOrgContext(() =>
+            prisma.$transaction(async (tx) => {
+                const { count } = await tx.aiReport.updateMany({
+                    where: { id, status: "OPEN" },
+                    data: {
+                        status: "RESOLVED",
+                        resolvedByUserId: staffUserId,
+                        resolvedAt: now,
+                    },
+                });
+                const r = await tx.aiReport.findUnique({
+                    where: { id },
+                    select: { organizationId: true },
+                });
+                if (!r) throw new NotFoundException("No such report.");
+                if (count === 0) {
+                    throw new ConflictException(
+                        "That report is already resolved.",
+                    );
+                }
+                await audit?.(tx, r.organizationId);
+                return r;
+            }),
+        );
     }
 }
