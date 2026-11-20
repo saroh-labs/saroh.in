@@ -1,5 +1,6 @@
 "use client";
 
+import { openAskAi } from "@/components/ask-ai/open";
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
@@ -40,13 +41,18 @@ import type { LookId } from "@saroh/block-contract";
 import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import { BlockToolbar } from "./block-toolbar";
-import { SECTION_LABELS } from "./editor-constants";
+import { SECTION_LABELS, sectionTitle } from "./editor-constants";
 import type { EditorPanelsProps } from "./editor-panels";
 import { EditorPanels } from "./editor-panels";
 import { EditorRail, railTabFor, selectRailTab } from "./editor-rail";
 import type { EditorTopBarProps } from "./editor-top-bar";
 import { EditorTopBar } from "./editor-top-bar";
 import { InspectorHost } from "./inspector-host";
+import { EverywhereBanner } from "./inspector/everywhere-banner";
+import { sectionActions } from "./inspector/section-actions";
+import { frameOf } from "./inspector/section-frame";
+import { SectionToolbar } from "./inspector/section-toolbar";
+import { SiteInspector } from "./inspector/site-inspector";
 import { PhoneShell } from "./phone/phone-shell";
 import { EditorReadOnly, EditorReviewCan } from "./read-only";
 import type { EditorModel, TrailKey } from "./shell/editor-model";
@@ -460,6 +466,32 @@ export function SiteEditor({
         reloadDraft: reloadDraft ? (page) => reloadDraft(page) : undefined,
     };
 
+    // The selected section's toolbar on the desk canvas (U47), each with Undo.
+    const deskTools =
+        desk && !readOnly
+            ? (index: number) => {
+                  const section = sections[index];
+                  const act = sectionActions(model);
+                  return (
+                      <SectionToolbar
+                          label={sectionTitle(section)}
+                          index={index}
+                          count={sections.length}
+                          hiddenOnPhone={frameOf(section).hideOn === "phone"}
+                          onMove={(delta) => {
+                              edits.move(index, delta);
+                              setSelectedIndex(index + delta);
+                              scrollToBlock(index + delta);
+                          }}
+                          onDuplicate={() => act.duplicate(index)}
+                          onHideOnPhone={(hide) => act.hideOnPhone(index, hide)}
+                          onDelete={() => edits.removeAt(index)}
+                          onAskAi={model.askAi ? openAskAi : undefined}
+                      />
+                  );
+              }
+            : undefined;
+
     const railEl = (
         <EditorRail
             hideTabs={desk}
@@ -524,7 +556,7 @@ export function SiteEditor({
                 pages,
                 styleOptions,
             }}
-            blockTools={blockTools}
+            blockTools={deskTools ?? blockTools}
             // A typeface being tried draws on the page unsaved.
             style={siteStyle.trying ?? style}
             trying={triedFace(siteStyle.trying, styleOptions)}
@@ -535,7 +567,15 @@ export function SiteEditor({
             notesByKey={review.notesByKey}
         />
     );
-    const inspectorEl = (
+    const inspectorEl = desk ? (
+        // The Website area's inspector (U47); off, or on a phone, today's.
+        <SiteInspector
+            model={model}
+            activeFlags={activeFlags}
+            unreadableSections={unreadableSections}
+            onShowFlag={(flag) => jumpToFlag(flag.pageId, flag.sectionIndex)}
+        />
+    ) : (
         <InspectorHost
             {...{ siteId, pageId, pages, styleOptions }}
             {...selection}
@@ -665,7 +705,24 @@ export function SiteEditor({
                             model={model}
                             bar={topBar.props}
                             panels={panels.props}
-                            canvas={canvasEl}
+                            canvas={
+                                selection.selectedChrome ? (
+                                    // Header or footer: it changes every page.
+                                    <div className="grid min-h-0 grid-rows-[auto_minmax(0,1fr)]">
+                                        <EverywhereBanner
+                                            pages={pages}
+                                            onSeePages={() => openRail("pages")}
+                                            onBack={() => {
+                                                setSelectedIndex(null);
+                                                openRail("pages");
+                                            }}
+                                        />
+                                        {canvasEl}
+                                    </div>
+                                ) : (
+                                    canvasEl
+                                )
+                            }
                             inspector={inspectorEl}
                             brand={railEl}
                             flagsBySection={flagsBySection}

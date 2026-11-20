@@ -53,9 +53,12 @@ const BANDS = [
 export function SectionFrameFields({
     section,
     onChange,
+    band: showBand = true,
 }: {
     section: Section;
     onChange: (next: Section) => void;
+    /** The band; the new inspector's Style › Background replaces it (U47). */
+    band?: boolean;
 }) {
     const content = section.content as Record<string, unknown>;
     const anchor = section.content.anchor ?? "";
@@ -144,24 +147,31 @@ export function SectionFrameFields({
                         ? `A button can link here with #${anchor}.`
                         : "Give the block a link name to jump to it from a button or the menu.")}
             </p>
-            <Field label="Background">
-                <Select value={band} onValueChange={(id) => set({ band: id })}>
-                    <SelectTrigger>
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {BANDS.map((b) => (
-                            <SelectItem key={b.id} value={b.id}>
-                                {b.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-            </Field>
-            {chosen ? (
-                <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                    {chosen.note}
-                </p>
+            {showBand ? (
+                <>
+                    <Field label="Background">
+                        <Select
+                            value={band}
+                            onValueChange={(id) => set({ band: id })}
+                        >
+                            <SelectTrigger>
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {BANDS.map((b) => (
+                                    <SelectItem key={b.id} value={b.id}>
+                                        {b.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </Field>
+                    {chosen ? (
+                        <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
+                            {chosen.note}
+                        </p>
+                    ) : null}
+                </>
             ) : null}
         </div>
     );

@@ -319,6 +319,9 @@ const ALLOWED: RegExp[] = [
     /^Page settings$/,
     /^Test links\d*$/,
     /^Theme: switch to (light|dark)$/,
+    // The new inspector (U47): its tabs, and the whole site's notes.
+    /^(Content|Style|Visibility)$/,
+    /^All notes on this site$/,
 ];
 
 /** The page's options in the page picker: switching page writes nothing. */
@@ -1295,9 +1298,9 @@ describe("the desk shell for an owner (U46)", () => {
     it("Undo waits for something to undo; Redo puts it back", () => {
         render(owner);
         expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
-        // Remove the selected section from the inspector, as today.
+        // Delete the selected section from its canvas toolbar (U47).
         click(button("Welcome in"));
-        click(button("Remove"));
+        click(button("Delete"));
         expect((button("Undo") as HTMLButtonElement).disabled).toBe(false);
         click(button("Undo"));
         expect($("[data-pages-tree]")?.textContent).toContain("Welcome in");
@@ -1318,5 +1321,104 @@ describe("the desk shell for an owner (U46)", () => {
         expect(has("Test release")).toBe(true);
         expect(has("In review")).toBe(true);
         expect($("[data-status-chip]")).toBeNull();
+    });
+});
+
+describe("the inspector with the Website area on (U47)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(1920);
+    });
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        initialPendingChanges: 0,
+        initialPendingSiteChanges: [],
+    };
+    const inspector = () => $("aside[aria-label=Inspector]");
+    const tree = () => $("[data-pages-tree]")?.textContent ?? "";
+
+    it("a reader: the selected section's tabs read, nothing writes, no toolbar", () => {
+        render();
+        click(button("Welcome in"));
+        for (const tab of ["Content", "Style", "Visibility", /^Feedback/]) {
+            click(button(tab));
+            expectReadOnly(`shell, reader, ${String(tab)} tab`);
+        }
+        expect($("[data-section-toolbar]")).toBeNull();
+    });
+
+    it("nothing selected: the page, its settings card and its checks", () => {
+        render(owner);
+        // The first section opens selected; Close leaves the page at rest.
+        click(button("Close, nothing selected"));
+        expect(inspector()?.textContent).toContain("Page · Nothing selected");
+        expect($("[data-page-at-rest]")?.textContent).toContain(
+            "Who can see itPublic · anyone with the link",
+        );
+        expect($("[data-pre-publish-checks]")).not.toBeNull();
+        expect(inspector()?.textContent).toContain(
+            "Opens Page settings, the same one as Website › Pages.",
+        );
+    });
+
+    it("a section: its name, kind and place, Content first, and every old control", () => {
+        render(owner);
+        click(button("Welcome in"));
+        expect(inspector()?.querySelector("h2")?.textContent).toBe(
+            "Welcome in",
+        );
+        expect(inspector()?.textContent).toContain("Hero section · 1 of 2");
+        expect(button("Content").getAttribute("aria-selected")).toBe("true");
+        // The canvas toolbar holds what the old inspector's foot did.
+        for (const kept of ["Move", "Duplicate", "Hide on phone", "Delete"]) {
+            expect(has(kept), kept).toBe(true);
+        }
+        click(button("Visibility"));
+        expect(inspector()?.textContent).toContain("Hidden when published");
+    });
+
+    it("Style: spacing is one change from the look, and Reset takes it back", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Style"));
+        expect($("[data-style-changes]")).toBeNull();
+        click(button("Airy"));
+        expect($("[data-style-changes]")?.textContent).toContain(
+            "1 change from the site look",
+        );
+        click(button(/^Reset to /));
+        expect($("[data-style-changes]")).toBeNull();
+    });
+
+    it("Duplicate puts a copy below, and Undo takes it away", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Duplicate"));
+        expect(tree().match(/Welcome in/g)).toHaveLength(2);
+        expect(inspector()?.textContent).toContain("Hero section · 2 of 3");
+        click(button("Undo"));
+        expect(tree().match(/Welcome in/g)).toHaveLength(1);
+    });
+
+    it("Hide on phone marks the tree row, with Undo", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Hide on phone"));
+        expect(tree()).toContain("Hidden on phone");
+        click(button("Undo"));
+        expect(tree()).not.toContain("Hidden on phone");
+    });
+
+    it("the header: on every page, with the banner over the canvas", () => {
+        render(owner);
+        click(button(/^Header/));
+        expect(inspector()?.textContent).toContain("On every page · 2 pages");
+        expect($("[data-everywhere-banner]")?.textContent).toContain(
+            "Changes here show on all 2 pages · Home and About",
+        );
+        click(button("Back to this page's sections"));
+        expect($("[data-everywhere-banner]")).toBeNull();
     });
 });

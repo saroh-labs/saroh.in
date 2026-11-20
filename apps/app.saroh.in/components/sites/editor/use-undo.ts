@@ -216,6 +216,25 @@ export function useUndo({
                 },
             );
         },
+        /**
+         * Any other change to the sections, with Undo (U47: Duplicate, Hide
+         * on phone). `select` is the section selected after it and after
+         * its Undo.
+         */
+        changeWithUndo(
+            message: string,
+            next: Section[],
+            select?: { after: number; undone: number },
+        ) {
+            if (readOnly) return;
+            const before = sections;
+            restoreSections(next);
+            if (select) setSelectedIndex(select.after);
+            hold(message, "sections", before, () => {
+                restoreSections(before);
+                if (select) setSelectedIndex(select.undone);
+            });
+        },
         moveTo: moveWithUndo,
         move: (index: number, delta: number) =>
             moveWithUndo(index, index + delta),
