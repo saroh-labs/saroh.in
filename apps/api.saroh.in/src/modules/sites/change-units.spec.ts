@@ -253,6 +253,43 @@ describe("change units", () => {
         ]);
     });
 
+    describe("a renamed page is one unit", () => {
+        const renamed = (path: string, sections = BRIDAL_LIVE.sections) =>
+            snapshot([{ ...BRIDAL_LIVE, path, sections }], {
+                redirects:
+                    path === "/bridal" ? [] : [{ from: "/bridal", to: path }],
+            });
+        const keys = (draft: unknown, withKeys: boolean) =>
+            changeUnits(
+                draft,
+                snapshot([BRIDAL_LIVE], { withKeys }),
+                stamps(),
+            ).map((u) => [u.key, u.label]);
+
+        it.each([true, false])("live with keys: %s", (withKeys) => {
+            expect(keys(renamed("/bridal-makeup"), withKeys)).toEqual([
+                ["page:p_bridal", "Page link changed"],
+            ]);
+            // Renamed twice: chains collapse to one forward from the live link.
+            expect(keys(renamed("/bridal-looks"), withKeys)).toEqual([
+                ["page:p_bridal", "Page link changed"],
+            ]);
+            expect(keys(renamed("/bridal"), withKeys)).toEqual([]);
+        });
+
+        it("keeps a section edit its own unit on a page from before keys", () => {
+            const sections = [
+                BRIDAL_LIVE.sections[0]!,
+                { key: "k1", section: text("Intro", "Rewritten") },
+                BRIDAL_LIVE.sections[2]!,
+            ];
+            expect(keys(renamed("/bridal-makeup", sections), false)).toEqual([
+                ["page:p_bridal", "Page link changed"],
+                ["section:p_bridal:k1", "Changed · Intro"],
+            ]);
+        });
+    });
+
     it("names who added an old link when that is all that changed", () => {
         const units = changeUnits(
             snapshot([BRIDAL_LIVE], {

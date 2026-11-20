@@ -206,6 +206,31 @@ describe("publish with leave out", () => {
         expect(waiting(draft, out.snapshot)).toEqual(["page:p_about"]);
     });
 
+    it("keeps a renamed page at its live link on a site from before keys", () => {
+        const book = (path: string): Page => ({
+            id: "p_book",
+            path,
+            title: "Book a walkthrough",
+            sections: [["k5", B]],
+        });
+        const live = snap([home([["k1", A]]), book("/book")], {
+            withKeys: false,
+        });
+        const draft = snap([home([["k1", A2]]), book("/book-a-walkthrough")], {
+            redirects: [{ from: "/book", to: "/book-a-walkthrough" }],
+        });
+        expect(waiting(draft, live)).toEqual([
+            "page:p_book",
+            "section:p_home:k1",
+        ]);
+        const out = leaveOutOf(draft, live, ["page:p_book"]);
+        const pages = out.snapshot.pages as { path: string }[];
+        expect(pages.map((p) => p.path)).toEqual(["/", "/book"]);
+        expect(out.snapshot.redirects).toBeUndefined();
+        expect(out.alsoLeftOut).toEqual([]);
+        expect(waiting(draft, out.snapshot)).toEqual(["page:p_book"]);
+    });
+
     it("leaves a new page's sections out with it, and says so", () => {
         const live = snap([home([["k1", A]])]);
         const draft = snap([

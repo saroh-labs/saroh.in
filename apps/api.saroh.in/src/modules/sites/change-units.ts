@@ -242,6 +242,39 @@ function inPlace(a: readonly string[], b: readonly string[]): Set<string> {
     return kept;
 }
 
+/**
+ * The live page each draft page is, if any. Live pages written with ids
+ * match by id. Older ones match by link, and a live link the draft has no
+ * page at follows the draft's forward from it: a page renamed since that
+ * publish is still the same page. Forwards never chain (`planPageMove`), so
+ * one hop is enough, even for a page renamed twice.
+ */
+function matchPages(
+    draftPages: readonly SnapshotPage[],
+    livePages: readonly SnapshotPage[],
+    draftRedirects: readonly SnapshotRedirect[],
+): Map<SnapshotPage, SnapshotPage> {
+    const pairs = new Map<SnapshotPage, SnapshotPage>();
+    if (livePages.some((p) => p.id !== null)) {
+        for (const d of draftPages) {
+            const l = livePages.find((p) => p.id === d.id);
+            if (l) pairs.set(d, l);
+        }
+        return pairs;
+    }
+    const livePaths = new Set(livePages.map((p) => p.path));
+    for (const l of livePages) {
+        let d = draftPages.find((p) => p.path === l.path);
+        if (!d) {
+            const to = draftRedirects.find((r) => r.from === l.path)?.to;
+            // Only a draft page with no live page of its own at its link.
+            d = draftPages.find((p) => p.path === to && !livePaths.has(p.path));
+        }
+        if (d && !pairs.has(d)) pairs.set(d, l);
+    }
+    return pairs;
+}
+
 function newest(
     stamps: (ChangeStamp | null | undefined)[],
 ): ChangeStamp | null {
@@ -264,9 +297,8 @@ export function changeUnits(
     const livePages = readPages(live);
     const draftRedirects = readRedirects(draft);
     const liveRedirects = readRedirects(live);
-    // Live pages written with ids match by id; older ones by link.
-    const liveHasIds = livePages.some((p) => p.id !== null);
-    const matched = new Set<SnapshotPage>();
+    const pairs = matchPages(draftPages, livePages, draftRedirects);
+    const matched = new Set(pairs.values());
 
     const unit = (
         u: Omit<ChangeUnit, "editedBy" | "editedAt" | "fingerprint"> & {
@@ -294,10 +326,7 @@ export function changeUnits(
         const pageId = d.id ?? `@${d.path}`;
         const pageKey = `page:${pageId}`;
         const pageStamp = d.id ? stamps.pages.get(d.id) : undefined;
-        const l = livePages.find((p) =>
-            liveHasIds ? p.id === d.id : p.path === d.path,
-        );
-        if (l) matched.add(l);
+        const l = pairs.get(d);
         const draftKeys = d.keys ?? d.sections.map((_, i) => `@${i}`);
         const sectionStamp = (key: string) =>
             stamps.sections.get(`${pageId}:${key}`)?.stamp ??
@@ -769,7 +798,7 @@ export function leaveOutOf(
     const liveSite = asObject(liveShape.site);
     const draftPages = readPages(draft);
     const livePages = readPages(live);
-    const liveHasIds = livePages.some((p) => p.id !== null);
+    const pairs = matchPages(draftPages, livePages, readRedirects(draft));
 
     interface Composed {
         entry: Record<string, unknown>;
@@ -784,10 +813,7 @@ export function leaveOutOf(
         const pageId = d.id ?? `@${d.path}`;
         const pageKey = `page:${pageId}`;
         draftUnit.set(d.path, pageKey);
-        const l =
-            livePages.find((p) =>
-                liveHasIds ? p.id === d.id : p.path === d.path,
-            ) ?? null;
+        const l = pairs.get(d) ?? null;
         if (l) liveUnit.set(l, pageKey);
         if (!l && out.has(pageKey)) continue;
         const sections = l
