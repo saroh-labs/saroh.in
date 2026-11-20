@@ -589,6 +589,10 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
                 cycle: "month",
                 kind: "TRIAL",
                 status: "COMPLETED",
+                // The migrations' CHECKs: a trial starts on a date, a
+                // completed one says when.
+                startAt: new Date(),
+                completedAt: new Date(),
                 provider: "razorpay",
                 providerSubscriptionId: uniq("sub"),
                 providerPlanId: uniq("plan"),
