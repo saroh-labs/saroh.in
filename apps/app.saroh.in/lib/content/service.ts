@@ -61,6 +61,63 @@ export interface PostDetail {
     live: boolean;
     /** When the live copy was published, or null. */
     liveAt: string | null;
+    /** The cover's description, and its own search and share fields (U17a). */
+    imageAlt?: string | null;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageUrl?: string | null;
+    /** Publish post › Later: when it goes live, or null. */
+    scheduledAt?: string | null;
+    /** Links it was live at before; each forwards to the current one. */
+    oldSlugs?: string[];
+    /** What the public reads, for diffs against the draft; null when not live. */
+    liveCopy?: PostLiveCopy | null;
+}
+
+/** The live copy of a post, as its current publication holds it (U17a). */
+export interface PostLiveCopy {
+    title: string;
+    slug: string;
+    excerpt: string | null;
+    content: string;
+    image: string | null;
+    imageAlt: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    shareImageUrl: string | null;
+    /** The category's name when it was published. */
+    category: string | null;
+    path: string | null;
+    publishedAt: string | null;
+}
+
+/** Why a revision was kept (U17a). */
+export type PostRevisionReason =
+    "autosave" | "published" | "restored" | "ask_ai" | "not_published";
+
+/** One row of a post's History, newest first. */
+export interface PostRevisionRow {
+    id: string;
+    reason: PostRevisionReason;
+    /** Why, in words: a schedule that didn't go live says why. */
+    note: string | null;
+    title: string;
+    slug: string;
+    createdAt: string;
+    savedBy: { id: string; name: string | null } | null;
+}
+
+/** One revision in full, for Compare. */
+export interface PostRevision extends PostRevisionRow {
+    content: string;
+    excerpt: string | null;
+    image: string | null;
+    imageAlt: string | null;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    shareImageUrl: string | null;
+    categoryId: string | null;
+    authorId: string | null;
 }
 
 export interface PostInput {
@@ -72,6 +129,13 @@ export interface PostInput {
     featured?: boolean;
     image?: string | null;
     status?: PostStatus;
+    /** Absent leaves it alone; null clears it (U17a). */
+    imageAlt?: string | null;
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageUrl?: string | null;
+    /** A save that takes an Ask AI draft: always kept in History. */
+    event?: "ask_ai";
 }
 
 export interface PostCategory {
@@ -86,7 +150,7 @@ export interface PostCategoryInput {
     slug?: string;
 }
 
-const RESULT_FIELDS = ["title", "slug", "name", "categoryId"] as const;
+const RESULT_FIELDS = ["title", "slug", "name", "categoryId", "at"] as const;
 
 export type ResultField = (typeof RESULT_FIELDS)[number];
 
@@ -212,4 +276,63 @@ export async function unpublishPost(siteId: string, postId: string) {
     const base = await siteBase(siteId);
     if (!base) return noOrg();
     return mutate(`${base}/posts/${postId}/publish`, "DELETE");
+}
+
+/** Publish post › Later (U17a): `at` is an ISO instant, 5+ minutes away. */
+export async function schedulePost(siteId: string, postId: string, at: string) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg<{ id: string; scheduledAt: string }>();
+    return mutate<{ id: string; scheduledAt: string }>(
+        `${base}/posts/${postId}/schedule`,
+        "PUT",
+        { at },
+    );
+}
+
+/** Don't publish it later after all. */
+export async function unschedulePost(siteId: string, postId: string) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg();
+    return mutate(`${base}/posts/${postId}/schedule`, "DELETE");
+}
+
+/** A post's History, newest first (U17a). Empty when it can't be read. */
+export async function listPostRevisions(
+    siteId: string,
+    postId: string,
+): Promise<PostRevisionRow[]> {
+    const base = await siteBase(siteId);
+    if (!base) return [];
+    const body = await getJson<{ revisions: PostRevisionRow[] }>(
+        `${base}/posts/${postId}/revisions`,
+    );
+    return body?.revisions ?? [];
+}
+
+/** One revision in full, for Compare, or null. */
+export async function getPostRevision(
+    siteId: string,
+    postId: string,
+    revisionId: string,
+): Promise<PostRevision | null> {
+    const base = await siteBase(siteId);
+    return base
+        ? getJson<PostRevision>(
+              `${base}/posts/${postId}/revisions/${revisionId}`,
+          )
+        : null;
+}
+
+/** Make a revision the draft; the draft as it was is kept first. */
+export async function restorePostRevision(
+    siteId: string,
+    postId: string,
+    revisionId: string,
+) {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg();
+    return mutate(
+        `${base}/posts/${postId}/revisions/${revisionId}/restore`,
+        "POST",
+    );
 }

@@ -13,6 +13,7 @@ import {
 
 import { hashClientIp } from "../../common/client-ip";
 import { PublicSiteOnlineGuard } from "../../common/guards/public-site-online.guard";
+import { postMovedTo } from "../content/post-old-slugs";
 import { FixedWindowRateLimiter } from "../enquiry/rate-limiter";
 import type { PublicContact } from "../organizations/business-contact";
 import { SITE_RELAY_HEADER, visitorKey } from "../site-accounts/site-relay";
@@ -179,6 +180,15 @@ export class PublicSitesController {
     @Get(":siteId/posts")
     posts(@Param("siteId") siteId: string) {
         return this.sites.getPublicPosts(siteId);
+    }
+
+    /**
+     * Where an old post link forwards (U17a): `{ to }`, the post's live
+     * slug, or 404. The renderer asks only after a post read missed.
+     */
+    @Get(":siteId/posts/:slug/moved")
+    postMoved(@Param("siteId") siteId: string, @Param("slug") slug: string) {
+        return postMovedTo(siteId, slug);
     }
 
     /** One live post by slug (#232). 404 when it is not live. */

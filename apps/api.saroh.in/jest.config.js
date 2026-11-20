@@ -137,6 +137,9 @@ module.exports = {
         // The category refusal's words (UX-066); the rest of content's
         // specs read the dev database.
         "<rootDir>/src/modules/content/post-categories.slug.spec.ts",
+        // Posts in the redesigned editor (U17a): old links and revisions, DB-free.
+        "<rootDir>/src/modules/content/post-old-slugs.spec.ts",
+        "<rootDir>/src/modules/content/post-revisions.spec.ts",
         // S3-003 jobs: nextBackoff (pure), PrismaJobQueue.fail branch selection
         // (mocked prisma.job), the worker dispatch loop (in-memory FakeJobQueue
         // + real registry), and the registry — all DB-free / timer-free.

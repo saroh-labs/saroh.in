@@ -59,6 +59,8 @@ model User {
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
+  // Post revisions they saved (editor redesign U17a).
+  postRevisionsSaved PostRevision[] @relation("PostRevisionSavedBy")
   storeMembers StoreMembers[] // Staff positions
 
   // Project-level access (S1-010): team memberships and direct project grants
@@ -330,6 +332,7 @@ model Organization {
   siteLinks            SiteLink[]
   siteRedirects        SiteRedirect[]
   siteChangeApprovals  SiteChangeApproval[]
+  postRevisions        PostRevision[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
   qrScanDays           QrScanDay[]
@@ -2404,12 +2407,72 @@ model Post {
   // Reviewers' notes on it (DEC-200 U8), not the public's `comments`.
   reviewNotes SiteComment[]
 
+  // The cover's description for people who can't see it, and the post's own
+  // Google title, Google text and share image (editor redesign U17a). Null
+  // falls back to the title, the short description and the cover.
+  imageAlt       String?
+  seoTitle       String?
+  seoDescription String?
+  shareImageUrl  String?
+
+  // Publish post › Later: when the `post.go_live` job puts the draft live,
+  // and who asked (it publishes as them). Cleared when it runs, is cancelled,
+  // or the post is published or taken off by hand.
+  scheduledAt       DateTime?
+  scheduledByUserId String?
+
+  // Links this post was live at before its link changed. Each forwards (308)
+  // to the current one while no live post holds it (page links do the same
+  // through SiteRedirect, KTD-3).
+  oldSlugs String[] @default([])
+
+  revisions PostRevision[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([siteId, slug])
   @@index([siteId])
   @@index([authorId])
+}
+
+/**
+ * A post as it stood at one moment (editor redesign U17a): one an hour while
+ * it is being written, plus one for each named event (`reason`), for History
+ * and Compare. Restore makes one the draft. Appended, never updated.
+ * Approval (O7, not built) adds reasons `sent`/`approved`, with the request's
+ * words in `note`; the verdict itself is a SiteChangeApproval on `post:<id>`.
+ */
+model PostRevision {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  title          String
+  content        String  @db.Text
+  excerpt        String?
+  image          String?
+  imageAlt       String?
+  seoTitle       String?
+  seoDescription String?
+  shareImageUrl  String?
+  slug           String
+  categoryId     String?
+  authorId       String?
+
+  savedByUserId String?
+  savedBy       User?    @relation("PostRevisionSavedBy", fields: [savedByUserId], references: [id], onDelete: SetNull)
+  // autosave | published | restored | ask_ai | not_published (`post-revisions.ts`).
+  reason        String
+  // Why, in words: a schedule that didn't go live says why here.
+  note          String?
+  createdAt     DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@index([organizationId])
 }
 
 /**
@@ -4302,6 +4365,10 @@ model SiteComment {
   postId    String?
   post      Post?   @relation(fields: [postId], references: [id], onDelete: SetNull)
   postTitle String?
+
+  // The words on the page the note is pinned to, as they were when it was
+  // written (editor redesign U17a). Null: about the whole section or post.
+  quote String?
 
   @@index([siteId, resolvedAt])
   @@index([pageId, sectionKey])

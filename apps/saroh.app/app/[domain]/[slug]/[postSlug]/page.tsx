@@ -6,6 +6,7 @@ import {
     PostNeighbours,
     postNeighbours,
 } from "@/components/post-view";
+import { postMovedTo } from "@/lib/post-moved";
 import {
     findRedirect,
     getPublishedPost,
@@ -44,17 +45,20 @@ export async function generateMetadata({
     if (!post) return null;
 
     const name = resolved.snapshot.site.name;
-    const description = post.excerpt?.trim() ? post.excerpt : undefined;
-    // The post's own picture is its share card when it has one; otherwise the
-    // site's, so a post is never shared with no card at all.
-    const images = post.image
-        ? [post.image]
-        : shareImages(resolved.snapshot.site);
+    // Its own Google title and text (U17a), else the title and the short
+    // description. Blank is "not written".
+    const own = (text: string | null | undefined) =>
+        text?.trim() ? text.trim() : undefined;
+    const description = own(post.seoDescription) ?? own(post.excerpt);
+    // Its own share image, else its cover, else the site's, so a post is
+    // never shared with no card at all.
+    const image = own(post.shareImageUrl) ?? own(post.image);
+    const images = image ? [image] : shareImages(resolved.snapshot.site);
 
     return shareable(resolved, {
         // "‹Post› · ‹Business›" in the tab and in search; the share card
         // keeps the post's own title, with the site's name beside it.
-        title: titled(post.title, name),
+        title: titled(own(post.seoTitle) ?? post.title, name),
         description,
         openGraph: {
             title: post.title,
@@ -89,7 +93,7 @@ export default async function PostPage({
 
     // The prefix is the whole reason this route exists; a different first
     // segment is not a post address, but may be an old page link that
-    // forwards (KTD-3). A post's own address never does (batch 3).
+    // forwards (KTD-3). An old post link forwards below (U17a).
     if (slug !== postsPrefix(resolved.snapshot)) {
         const to = findRedirect(resolved.snapshot, `/${slug}/${postSlug}`);
         if (to) permanentRedirect(withQuery(to, (await searchParams) ?? {}));
@@ -102,7 +106,16 @@ export default async function PostPage({
         // read keeps the page out of the cache.
         readPublishedPosts(resolved.siteId),
     ]);
-    if (!post) notFound();
+    if (!post) {
+        // A link the post was live at before its link changed (U17a).
+        const to = await postMovedTo(resolved.siteId, postSlug);
+        if (to) {
+            permanentRedirect(
+                withQuery(`/${slug}/${to}`, (await searchParams) ?? {}),
+            );
+        }
+        notFound();
+    }
 
     return (
         <>

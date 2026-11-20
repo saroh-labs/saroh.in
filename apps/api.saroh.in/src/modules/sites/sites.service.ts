@@ -2999,7 +2999,12 @@ export class SitesService {
         const post = await prisma.post.findFirst({
             where: {
                 siteId,
-                slug,
+                // The link it is LIVE at (U17a): a draft's new link isn't
+                // served until it is published, and the live one keeps
+                // working until then.
+                currentPublication: {
+                    snapshot: { path: ["post", "slug"], equals: slug },
+                },
                 currentPublicationId: { not: null },
                 // Offline with its business (#921).
                 site: {
@@ -3150,6 +3155,7 @@ export class SitesService {
                     // The live title while the post exists (DEC-200 U8).
                     post: { select: { title: true } },
                     body: true,
+                    quote: true,
                     resolvedAt: true,
                     createdAt: true,
                     author: { select: { id: true, name: true, email: true } },
@@ -3204,6 +3210,7 @@ export class SitesService {
             postId: c.postId,
             postTitle: c.post?.title ?? c.postTitle ?? null,
             body: c.body,
+            quote: c.quote,
             resolvedAt: c.resolvedAt,
             createdAt: c.createdAt,
             author: {
@@ -3518,6 +3525,7 @@ export class SitesService {
             sectionKey: target.sectionKey,
             authorUserId: ctx.userId,
             body: dto.body,
+            quote: dto.quote ?? null,
             ...(release ? { testReleaseId: release.id } : {}),
         });
     }
@@ -3555,6 +3563,7 @@ export class SitesService {
             postTitle: post.title,
             authorUserId: ctx.userId,
             body: dto.body,
+            quote: dto.quote ?? null,
         });
     }
 

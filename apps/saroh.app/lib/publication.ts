@@ -672,6 +672,12 @@ export interface PublishedPost {
     /** Sanitized at publish, like richText and the footer. */
     content: string;
     image?: string | null;
+    /** The cover's description (U17a); absent on posts published before. */
+    imageAlt?: string | null;
+    /** The post's own Google title, Google text and share image (U17a). */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageUrl?: string | null;
     featured?: boolean;
     category?: { name: string; slug: string } | null;
     author?: string | null;

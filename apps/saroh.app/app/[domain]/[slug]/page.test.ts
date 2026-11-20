@@ -31,6 +31,9 @@ vi.mock("@/lib/test-metadata", () => ({
     shareable: vi.fn((_resolved: unknown, metadata: unknown) => metadata),
 }));
 vi.mock("@/lib/site-contact", () => ({ getSiteContact: vi.fn() }));
+vi.mock("@/lib/post-moved", () => ({
+    postMovedTo: vi.fn(() => Promise.resolve(null)),
+}));
 vi.mock("@/components/published-page", () => ({ PublishedPage: vi.fn() }));
 vi.mock("@/components/post-view", () => ({
     PostIndex: vi.fn(),

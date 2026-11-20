@@ -376,6 +376,16 @@ export class CreateCommentDto {
     @MaxLength(64)
     postId?: string;
 
+    /**
+     * The words on the page the note is pinned to (U17a), as they read now.
+     * Absent: the note is about the whole section or post.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(500, { message: "Keep the quoted words to 500 characters" })
+    quote?: string;
+
     /** The test release the note is about (DEC-071, T8). Absent: the draft. */
     @IsOptional()
     @IsString({ message: "testReleaseId must be an id" })

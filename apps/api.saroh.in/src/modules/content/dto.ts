@@ -3,15 +3,24 @@ import { Transform } from "class-transformer";
 import {
     IsBoolean,
     IsIn,
+    IsISO8601,
     IsOptional,
     IsString,
     Matches,
     MaxLength,
     MinLength,
+    ValidateIf,
 } from "class-validator";
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === "string" ? value.trim() : value;
+
+/** Blank is "not written", the same as null. */
+const trimOrNull = ({ value }: { value: unknown }) => {
+    if (typeof value !== "string") return value;
+    const trimmed = value.trim();
+    return trimmed === "" ? null : trimmed;
+};
 
 const SLUG_RE = /^[a-z0-9-]+$/;
 
@@ -83,6 +92,43 @@ export class CreatePostDto {
         message: "Status must be DRAFT, PUBLISHED, or ARCHIVED",
     })
     status?: PostStatus;
+
+    // ---- Search and sharing (editor redesign U17a). Absent leaves alone;
+    // null clears, and the title, short description and cover stand in. ----
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(300, {
+        message: "Keep the photo's description to 300 characters",
+    })
+    imageAlt?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(70, { message: "Keep the Google title to 70 characters" })
+    seoTitle?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(300, { message: "Keep the Google text to 300 characters" })
+    seoDescription?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(2000)
+    @Matches(IMAGE_URL_RE, {
+        message:
+            "The share image must be a web address starting with http:// or https://",
+    })
+    shareImageUrl?: string | null;
 }
 
 // Standalone (not `extends CreatePostDto`): an inherited @IsOptional() on slug
@@ -134,6 +180,57 @@ export class UpdatePostDto {
         message: "Status must be DRAFT, PUBLISHED, or ARCHIVED",
     })
     status?: PostStatus;
+
+    // ---- Search and sharing (editor redesign U17a). Absent leaves alone;
+    // null clears, and the title, short description and cover stand in. ----
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(300, {
+        message: "Keep the photo's description to 300 characters",
+    })
+    imageAlt?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(70, { message: "Keep the Google title to 70 characters" })
+    seoTitle?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(300, { message: "Keep the Google text to 300 characters" })
+    seoDescription?: string | null;
+
+    @IsOptional()
+    @ValidateIf((_o, v) => v !== null)
+    @Transform(trimOrNull)
+    @IsString()
+    @MaxLength(2000)
+    @Matches(IMAGE_URL_RE, {
+        message:
+            "The share image must be a web address starting with http:// or https://",
+    })
+    shareImageUrl?: string | null;
+
+    /** A save that takes an Ask AI draft: always kept as a revision. */
+    @IsOptional()
+    @IsIn(["ask_ai"], { message: "event must be ask_ai" })
+    event?: "ask_ai";
+}
+
+/** Publish post › Later: the instant it goes live. */
+export class SchedulePostDto {
+    @IsISO8601(
+        { strict: true },
+        { message: "Pick a date and time for it to go live" },
+    )
+    at!: string;
 }
 
 // ---- Post categories ----

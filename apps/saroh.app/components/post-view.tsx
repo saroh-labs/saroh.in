@@ -15,6 +15,8 @@ export interface PostViewModel {
     excerpt?: string | null;
     content: string;
     image?: string | null;
+    /** The cover's description (U17a). Absent: the cover is decorative. */
+    imageAlt?: string | null;
     category?: { name: string; slug: string } | null;
     author?: string | null;
     publishedAt: string | null;
@@ -85,7 +87,7 @@ export function PostArticle({ post }: { post: PostViewModel }) {
                 // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL, not a project asset
                 <img
                     src={post.image}
-                    alt=""
+                    alt={post.imageAlt?.trim() ?? ""}
                     {...siteImage("above", {
                         src: post.image,
                         sizes: "(min-width: 768px) 768px, 100vw",

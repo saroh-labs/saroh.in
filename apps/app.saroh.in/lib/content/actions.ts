@@ -7,7 +7,10 @@ import {
     deletePost as deletePostApi,
     deletePostCategory as deletePostCategoryApi,
     publishPost as publishPostApi,
+    restorePostRevision as restorePostRevisionApi,
+    schedulePost as schedulePostApi,
     unpublishPost as unpublishPostApi,
+    unschedulePost as unschedulePostApi,
     updatePost as updatePostApi,
     updatePostCategory as updatePostCategoryApi,
 } from "./service";
@@ -66,4 +69,23 @@ export async function publishPost(siteId: string, postId: string) {
 /** Take it off the site, keeping its history (#232). */
 export async function unpublishPost(siteId: string, postId: string) {
     return unpublishPostApi(siteId, postId);
+}
+
+/** Publish post › Later (U17a). */
+export async function schedulePost(siteId: string, postId: string, at: string) {
+    return schedulePostApi(siteId, postId, at);
+}
+
+/** Don't publish it later after all (U17a). */
+export async function unschedulePost(siteId: string, postId: string) {
+    return unschedulePostApi(siteId, postId);
+}
+
+/** Make a revision the draft (U17a). */
+export async function restorePostRevision(
+    siteId: string,
+    postId: string,
+    revisionId: string,
+) {
+    return restorePostRevisionApi(siteId, postId, revisionId);
 }
