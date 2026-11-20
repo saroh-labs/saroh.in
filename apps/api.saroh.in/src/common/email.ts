@@ -527,6 +527,48 @@ export function signInEmailChangedEmail(maskedNewEmail: string): string {
 </div>`;
 }
 
+/**
+ * Saroh staff added or removed an Owner of a business (review F3). Sent to
+ * each of its Owners from before the change, once a second staff member
+ * confirmed it, so a takeover through support can't go unseen.
+ */
+export function sendOwnerChangedNotice(
+    to: string,
+    change: { business: string; person: string; added: boolean },
+    /** The business's edition: whose sender it goes from (KTD6). */
+    edition: Edition,
+): Promise<void> {
+    const html = ownerChangedEmail(change);
+    if (!transporter) {
+        console.info(`[Owner changed] (no SMTP) notice to ${to}`);
+        return Promise.resolve();
+    }
+    sendQuietly(edition, {
+        to,
+        subject: change.added
+            ? `A new Owner was added to ${change.business}`
+            : `An Owner was removed from ${change.business}`,
+        html,
+    });
+    return Promise.resolve();
+}
+
+/** The notice's body; the names are the business's own, so escaped. */
+export function ownerChangedEmail(change: {
+    business: string;
+    person: string;
+    added: boolean;
+}): string {
+    const what = change.added
+        ? `made ${esc(change.person)} an Owner of ${esc(change.business)}`
+        : `removed ${esc(change.person)} as an Owner of ${esc(change.business)}`;
+    return `<div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+  <h2>${change.added ? "A new Owner was added" : "An Owner was removed"}</h2>
+  <p>Saroh support ${what}. Two people at Saroh approved it.</p>
+  <p>If nobody at your business asked for this, reply to this email or write to Saroh support straight away.</p>
+</div>`;
+}
+
 /** Confirm account deletion. Irreversible, so it always requires this link. */
 export function sendDeleteAccountEmail(
     to: string,

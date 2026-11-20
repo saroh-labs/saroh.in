@@ -508,6 +508,7 @@ describe("EnquiryService.submit — the auto-reply (U15)", () => {
         wireHappyPath();
         providerFind.mockResolvedValue({
             status: "CONNECTED",
+            channel: "EMAIL",
             provider: "RESEND",
         });
 
@@ -536,6 +537,7 @@ describe("EnquiryService.submit — the auto-reply (U15)", () => {
         wireHappyPath();
         providerFind.mockResolvedValue({
             status: "CONNECTED",
+            channel: "EMAIL",
             provider: "RESEND",
         });
 

@@ -33,6 +33,16 @@ export const STEP_UP_PERMISSIONS: ReadonlySet<AdminPermission> = new Set([
     AdminPermission.CommissionRates,
     AdminPermission.SarohBillingAct,
     AdminPermission.AiSettingsWrite,
+    // Review F10: money (a 100%-off coupon, prices), what a business can
+    // use, mail sent in Saroh's name, replays and retries, and opening a
+    // support session onto a business's personal data.
+    AdminPermission.CouponsManage,
+    AdminPermission.PricingEdit,
+    AdminPermission.OrganizationModulesWrite,
+    AdminPermission.WaitlistInvite,
+    AdminPermission.WebhooksReplay,
+    AdminPermission.JobsRetry,
+    AdminPermission.OrganizationViewAs,
 ]);
 
 export function isMutating(method: string | undefined): boolean {

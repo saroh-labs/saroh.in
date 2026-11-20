@@ -3,11 +3,13 @@
 import { ChangedRow } from "@/components/changed-row";
 import {
     ChangeRole,
+    ConfirmOwnerChange,
     InvitationActions,
     RemoveMember,
 } from "@/components/people/person-actions";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { ROLE_CHOICES, roleCan } from "@/lib/business-words";
+import type { OwnerChangeRow } from "@/lib/businesses";
 import { formatDate, plural } from "@/lib/format";
 import { memberRole } from "@/lib/overview-words";
 import { changeMemberRoleAction } from "@/lib/people-actions";
@@ -49,16 +51,31 @@ export function TeamRows({
     businessName,
     members,
     invitations = [],
+    ownerChanges = [],
+    staffUserId,
     canChange,
 }: {
     organizationId: string;
     businessName: string;
     members: TeamMemberRow[];
     invitations?: TeamInvitationRow[];
+    /** Owner changes waiting for a second staff member (review F3). */
+    ownerChanges?: OwnerChangeRow[];
+    /** Who is looking: the one who asked for a change can't confirm it. */
+    staffUserId?: string;
     /** Holds `organization:people:write` and `organization:pii:read`. */
     canChange: boolean;
 }) {
     const feedback = useChangeFeedback();
+    const asked = () =>
+        feedback.report({
+            message: "Asked. A second staff member has to confirm it.",
+            description: "Nothing changes until they do.",
+        });
+    const nameOf = (userId: string) => {
+        const member = members.find((m) => m.userId === userId);
+        return member?.name ?? member?.email ?? "this person";
+    };
 
     if (members.length === 0 && invitations.length === 0) {
         return (
@@ -116,6 +133,7 @@ export function TeamRows({
                                         role={member.role}
                                         trigger="Change role…"
                                         roles={ROLE_CHOICES}
+                                        onPending={asked}
                                         onChanged={({ from, to, reason }) => {
                                             if (from === to) return;
                                             feedback.report({
@@ -152,6 +170,7 @@ export function TeamRows({
                                         name={label}
                                         business={businessName}
                                         trigger="Remove…"
+                                        onPending={asked}
                                         onRemoved={() =>
                                             feedback.report({
                                                 message: `${label} removed from ${businessName}.`,
@@ -164,6 +183,52 @@ export function TeamRows({
                     );
                 })}
             </ul>
+            {ownerChanges.length > 0 && (
+                <div className="grid gap-2">
+                    <p className="text-sm font-medium">
+                        Waiting for a second staff member
+                    </p>
+                    <ul className="grid gap-1.5">
+                        {ownerChanges.map((change) => {
+                            const name = nameOf(change.userId);
+                            const what =
+                                change.kind === "REMOVE"
+                                    ? `Remove ${name}, an Owner`
+                                    : change.role === "OWNER"
+                                      ? `Make ${name} an Owner`
+                                      : `Make ${name} ${memberRole(change.role ?? "")}, not an Owner`;
+                            return (
+                                <li
+                                    key={change.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                                >
+                                    <span className="min-w-0 break-words">
+                                        {what} · asked{" "}
+                                        {formatDate(change.createdAt)} ·{" "}
+                                        <span className="text-muted-foreground">
+                                            {change.reason}
+                                        </span>
+                                    </span>
+                                    {canChange &&
+                                        (change.requestedByUserId ===
+                                        staffUserId ? (
+                                            <span className="text-[13px] text-muted-foreground">
+                                                You asked: another staff member
+                                                confirms
+                                            </span>
+                                        ) : (
+                                            <ConfirmOwnerChange
+                                                organizationId={organizationId}
+                                                requestId={change.id}
+                                                what={what}
+                                            />
+                                        ))}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            )}
             {invitations.length > 0 && (
                 <div className="grid gap-2">
                     <p className="text-sm font-medium">

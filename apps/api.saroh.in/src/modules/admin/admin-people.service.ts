@@ -1,12 +1,16 @@
 import {
     BadRequestException,
+    ConflictException,
+    ForbiddenException,
     Injectable,
+    Logger,
     NotFoundException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import { sendOwnerChangedNotice } from "../../common/email";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PLATFORM_OPERATOR_ROLE_KEY } from "../audit/audit.service";
 import { ORG_ACTIONS } from "../organizations/organization-actions";
@@ -30,6 +34,38 @@ import { AdminPermission } from "./admin-permissions";
 import type { PeopleFilter } from "./sign-in-help-rules";
 
 export type { PersonRow } from "./admin-people-reads";
+
+const OWNER = "OWNER";
+
+/** How long an Owner change waits for a second staff member (F3). */
+export const OWNER_CHANGE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const ownerRace = () =>
+    new ConflictException(
+        "They became an Owner a moment ago. Try again: a change to an Owner needs a second staff member.",
+    );
+
+/** Owner changes waiting for a second staff member, newest first (F3). */
+export function pendingOwnerChanges(organizationId: string) {
+    return prisma.ownerChangeRequest.findMany({
+        where: {
+            organizationId,
+            confirmedAt: null,
+            createdAt: { gt: new Date(Date.now() - OWNER_CHANGE_TTL_MS) },
+        },
+        select: {
+            id: true,
+            userId: true,
+            kind: true,
+            role: true,
+            fromRole: true,
+            reason: true,
+            requestedByUserId: true,
+            createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+    });
+}
 
 /** Rows the Users list shows at once, searched or not. */
 export const LIST_LIMIT = 50;
@@ -87,6 +123,8 @@ export interface PersonDetail extends PersonRow {
  */
 @Injectable()
 export class AdminPeopleService {
+    private readonly logger = new Logger(AdminPeopleService.name);
+
     constructor(
         private readonly members: OrganizationMembersService,
         private readonly audit: AdminAuditService,
@@ -277,6 +315,11 @@ export class AdminPeopleService {
         });
     }
 
+    /**
+     * Change someone's role. Making an Owner, or moving an Owner off the
+     * role, waits for a second staff member (review F3): it is recorded as
+     * a request, and `confirmOwnerChange` applies it.
+     */
     async changeRole(input: {
         staff: PlatformAdminInfo;
         organizationId: string;
@@ -285,20 +328,40 @@ export class AdminPeopleService {
         reason: string;
     }) {
         const reason = requireReason(input.reason);
+        const from = await this.currentRole(input.organizationId, input.userId);
+        if (input.role === OWNER || from === OWNER) {
+            if (input.role === from) {
+                throw new BadRequestException("They are already an Owner.");
+            }
+            return this.requestOwnerChange(input.staff, {
+                organizationId: input.organizationId,
+                userId: input.userId,
+                kind: "ROLE",
+                role: input.role,
+                fromRole: from,
+                reason,
+            });
+        }
+        const record = this.record(input.staff, input.organizationId, {
+            action: "person.role.changed",
+            targetType: "membership",
+            targetId: input.userId,
+            reason,
+            metadata: { role: input.role },
+        });
         return this.members.updateRole(
             operatorContext(input.staff, input.organizationId),
             input.userId,
             { role: input.role },
-            this.record(input.staff, input.organizationId, {
-                action: "person.role.changed",
-                targetType: "membership",
-                targetId: input.userId,
-                reason,
-                metadata: { role: input.role },
-            }),
+            async (tx, detail) => {
+                // Made an Owner since it was read: that needs two (F3).
+                if (detail.from === OWNER) throw ownerRace();
+                await record(tx, detail);
+            },
         );
     }
 
+    /** Remove someone; an Owner waits for a second staff member (F3). */
     async removeMember(input: {
         staff: PlatformAdminInfo;
         organizationId: string;
@@ -306,16 +369,207 @@ export class AdminPeopleService {
         reason: string;
     }) {
         const reason = requireReason(input.reason);
+        const from = await this.currentRole(input.organizationId, input.userId);
+        if (from === OWNER) {
+            return this.requestOwnerChange(input.staff, {
+                organizationId: input.organizationId,
+                userId: input.userId,
+                kind: "REMOVE",
+                role: null,
+                fromRole: from,
+                reason,
+            });
+        }
+        const record = this.record(input.staff, input.organizationId, {
+            action: "person.removed",
+            targetType: "membership",
+            targetId: input.userId,
+            reason,
+        });
         return this.members.remove(
             operatorContext(input.staff, input.organizationId),
             input.userId,
-            this.record(input.staff, input.organizationId, {
-                action: "person.removed",
-                targetType: "membership",
-                targetId: input.userId,
-                reason,
-            }),
+            async (tx, detail) => {
+                if (detail.role === OWNER) throw ownerRace();
+                await record(tx, detail);
+            },
         );
+    }
+
+    /**
+     * A second, different staff member confirms an Owner change: it applies
+     * through the business's own rules, the request is marked and the
+     * confirmation is on the ledger in that same transaction, and the
+     * business's Owners from before the change are emailed.
+     */
+    async confirmOwnerChange(input: {
+        staff: PlatformAdminInfo;
+        organizationId: string;
+        requestId: string;
+        reason: string;
+    }) {
+        const { staff, organizationId, requestId } = input;
+        const reason = requireReason(input.reason);
+        const request = await prisma.ownerChangeRequest.findFirst({
+            where: {
+                id: requestId,
+                organizationId,
+                confirmedAt: null,
+                createdAt: { gt: new Date(Date.now() - OWNER_CHANGE_TTL_MS) },
+            },
+        });
+        if (!request) {
+            throw new NotFoundException(
+                "There is no Owner change waiting to be confirmed. It may have expired after a day.",
+            );
+        }
+        if (request.requestedByUserId === staff.userId) {
+            await this.audit.write(prisma, {
+                actorUserId: staff.userId,
+                permission: AdminPermission.OrganizationPeopleWrite,
+                organizationId,
+                action: "person.owner-change.confirmed",
+                targetType: "membership",
+                targetId: request.userId,
+                reason,
+                outcome: AdminAuditOutcome.Denied,
+                metadata: { requestId, selfConfirm: true },
+            });
+            throw new ForbiddenException(
+                "You asked for this change. A second staff member has to confirm it.",
+            );
+        }
+        const owners = await prisma.membership.findMany({
+            where: { organizationId, role: OWNER },
+            select: { user: { select: { email: true } } },
+        });
+        const record = this.record(staff, organizationId, {
+            action:
+                request.kind === "REMOVE"
+                    ? "person.removed"
+                    : "person.role.changed",
+            targetType: "membership",
+            targetId: request.userId,
+            reason,
+            metadata: {
+                ...(request.role ? { role: request.role } : {}),
+                requestId,
+                requestedBy: request.requestedByUserId,
+                requestReason: request.reason,
+            },
+        });
+        const confirmInTx: InTxLedger = async (tx, detail) => {
+            const marked = await tx.ownerChangeRequest.updateMany({
+                where: { id: requestId, confirmedAt: null },
+                data: {
+                    confirmedByUserId: staff.userId,
+                    confirmedAt: new Date(),
+                },
+            });
+            if (marked.count === 0) {
+                throw new ConflictException(
+                    "That change was confirmed a moment ago.",
+                );
+            }
+            await record(tx, detail);
+        };
+        const ctx = operatorContext(staff, organizationId);
+        const result =
+            request.kind === "REMOVE"
+                ? await this.members.remove(ctx, request.userId, confirmInTx)
+                : await this.members.updateRole(
+                      ctx,
+                      request.userId,
+                      { role: request.role ?? "" },
+                      confirmInTx,
+                  );
+        await this.tellOwners(organizationId, request, owners);
+        return result;
+    }
+
+    private async currentRole(organizationId: string, userId: string) {
+        const membership = await prisma.membership.findUnique({
+            where: { organizationId_userId: { organizationId, userId } },
+            select: { role: true },
+        });
+        if (!membership) {
+            throw new NotFoundException("That person isn't in this business.");
+        }
+        return membership.role;
+    }
+
+    private async requestOwnerChange(
+        staff: PlatformAdminInfo,
+        change: {
+            organizationId: string;
+            userId: string;
+            kind: "ROLE" | "REMOVE";
+            role: string | null;
+            fromRole: string;
+            reason: string;
+        },
+    ) {
+        return prisma.$transaction(async (tx) => {
+            const request = await tx.ownerChangeRequest.create({
+                data: { ...change, requestedByUserId: staff.userId },
+                select: { id: true },
+            });
+            await this.audit.write(tx, {
+                actorUserId: staff.userId,
+                permission: AdminPermission.OrganizationPeopleWrite,
+                organizationId: change.organizationId,
+                action: "person.owner-change.requested",
+                targetType: "membership",
+                targetId: change.userId,
+                reason: change.reason,
+                outcome: AdminAuditOutcome.Success,
+                metadata: {
+                    requestId: request.id,
+                    kind: change.kind,
+                    from: change.fromRole,
+                    ...(change.role ? { role: change.role } : {}),
+                },
+            });
+            return { pending: true as const, requestId: request.id };
+        });
+    }
+
+    /** Best effort: the change stands and the ledger has it. */
+    private async tellOwners(
+        organizationId: string,
+        request: { userId: string; kind: string; role: string | null },
+        owners: { user: { email: string } }[],
+    ) {
+        try {
+            const [business, person] = await Promise.all([
+                prisma.organization.findUnique({
+                    where: { id: organizationId },
+                    select: { name: true, edition: true },
+                }),
+                prisma.user.findUnique({
+                    where: { id: request.userId },
+                    select: { name: true, email: true },
+                }),
+            ]);
+            const change = {
+                business: business?.name ?? "your business",
+                person: person?.name ?? person?.email ?? "Someone",
+                added: request.kind === "ROLE" && request.role === OWNER,
+            };
+            for (const owner of owners) {
+                await sendOwnerChangedNotice(
+                    owner.user.email,
+                    change,
+                    business?.edition ?? "INDIA",
+                );
+            }
+        } catch (error) {
+            this.logger.error(
+                `The owners of ${organizationId} could not be told of an Owner change: ${
+                    error instanceof Error ? error.name : "unknown error"
+                }`,
+            );
+        }
     }
 
     /** Send an invitation again, with a fresh link; the old link stops working. */

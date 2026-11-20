@@ -11,6 +11,7 @@ import {
 } from "../audit/audit.service";
 import { ModuleAvailabilityService } from "../capabilities/module-availability.service";
 import type { ModuleKey } from "../capabilities/module-registry";
+import { sendable } from "../communications/providers/provider.port";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { allows } from "../organizations/organization-policy";
@@ -283,11 +284,11 @@ export class NotificationPreferencesService {
                 status: "CONNECTED",
                 channel: "WHATSAPP",
             },
-            select: { channel: true },
+            select: { status: true, channel: true, provider: true },
         });
         const input = {
             seesInbox: allows(ctx, "notification:read"),
-            whatsappConnected: whatsapp.some((p) => p.channel === "WHATSAPP"),
+            whatsappConnected: whatsapp.some(sendable),
         };
         return Object.fromEntries(
             ALERT_CHANNELS.map((channel) => [

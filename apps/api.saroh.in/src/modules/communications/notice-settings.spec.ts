@@ -85,7 +85,7 @@ function modules(off: string[] = [], rolledOut: string[] = []) {
 
 function email(status: string | null) {
     db.communicationProvider.findUnique.mockResolvedValue(
-        status ? { status } : null,
+        status ? { status, channel: "EMAIL", provider: "RESEND" } : null,
     );
 }
 

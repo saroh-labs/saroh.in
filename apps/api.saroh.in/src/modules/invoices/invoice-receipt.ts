@@ -1,5 +1,6 @@
 import type { Prisma } from "@saroh/database";
 
+import { sendable } from "../communications/providers/provider.port";
 import { isReservedContactEmail } from "../contacts/contact-email";
 
 type Tx = Prisma.TransactionClient;
@@ -55,9 +56,9 @@ export async function receiptCanGo(
 ): Promise<boolean> {
     const provider = await tx.communicationProvider.findUnique({
         where: { organizationId_channel: { organizationId, channel: "EMAIL" } },
-        select: { status: true },
+        select: { status: true, channel: true, provider: true },
     });
-    if (provider?.status !== "CONNECTED") return false;
+    if (!sendable(provider)) return false;
     const invoice = await tx.invoice.findFirst({
         where: { id: invoiceId, organizationId },
         select: { billToEmail: true, contactId: true },

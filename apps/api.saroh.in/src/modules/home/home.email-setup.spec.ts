@@ -18,7 +18,11 @@ function db(status: string | null) {
         communicationProvider: {
             findUnique: jest
                 .fn()
-                .mockResolvedValue(status === null ? null : { status }),
+                .mockResolvedValue(
+                    status === null
+                        ? null
+                        : { status, channel: "EMAIL", provider: "RESEND" },
+                ),
         },
     } as unknown as Pick<Prisma.TransactionClient, "communicationProvider">;
 }

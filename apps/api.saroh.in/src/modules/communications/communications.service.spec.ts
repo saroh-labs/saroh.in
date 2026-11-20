@@ -754,6 +754,7 @@ describe("CommunicationsService.queueTransactional (D17)", () => {
         });
         accountFindFirst.mockResolvedValue(null);
         providerFindUnique.mockResolvedValue({
+            channel: "EMAIL",
             provider: "RESEND",
             status: "CONNECTED",
         });
@@ -942,6 +943,7 @@ describe("CommunicationsService.queueTransactional — review invitation", () =>
         });
         linkFindFirst.mockResolvedValue({ contactId: "contact_1" });
         providerFindUnique.mockResolvedValue({
+            channel: "EMAIL",
             provider: "RESEND",
             status: "CONNECTED",
         });

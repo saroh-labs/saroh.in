@@ -3,6 +3,7 @@ import { prisma } from "@saroh/database";
 
 import { PERMISSION_MISSING } from "../../common/providers/provider-attention";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { sendable } from "../communications/providers/provider.port";
 import { authorize } from "../organizations/organization-policy";
 
 /**
@@ -66,7 +67,12 @@ export class ProviderHealthService {
             }),
             this.db.communicationProvider.findMany({
                 where,
-                select: { status: true, attentionAt: true },
+                select: {
+                    status: true,
+                    attentionAt: true,
+                    channel: true,
+                    provider: true,
+                },
             }),
             this.db.domain.findMany({ where, select: { status: true } }),
         ]);
@@ -76,7 +82,12 @@ export class ProviderHealthService {
             connectedHealth({
                 key: "COMMUNICATIONS",
                 label: "Communications",
-                statuses: comms.map(statusOf),
+                // A SendGrid, SMTP or Twilio row can't send: reconnect it (F2).
+                statuses: comms.map((row) =>
+                    row.status === "CONNECTED" && !sendable(row)
+                        ? "REFUSED"
+                        : statusOf(row),
+                ),
                 notConfigured: "Connect a provider to send messages.",
                 active: "Messaging is ready.",
                 degraded:

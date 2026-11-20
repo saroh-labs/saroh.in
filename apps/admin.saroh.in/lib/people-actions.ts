@@ -157,6 +157,24 @@ export async function removeMemberAction(
     );
 }
 
+/** A second, different staff member confirms an Owner change (F3). */
+export async function confirmOwnerChangeAction(
+    organizationId: string,
+    requestId: string,
+    input: Reasoned,
+) {
+    return refresh(
+        [`/businesses/${organizationId}`],
+        await adminWrite(
+            `${org(organizationId)}/owner-changes/${encodeURIComponent(requestId)}/confirm`,
+            "POST",
+            input,
+            "Couldn't confirm the change.",
+            await accessSession(organizationId),
+        ),
+    );
+}
+
 export async function resendInvitationAction(
     organizationId: string,
     invitationId: string,

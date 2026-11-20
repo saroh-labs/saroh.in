@@ -71,7 +71,11 @@ function modules(off: string[] = [], rolledOut: string[] = []) {
 
 function providers(...channels: string[]) {
     db.communicationProvider.findMany.mockResolvedValue(
-        channels.map((channel) => ({ channel })),
+        channels.map((channel) => ({
+            status: "CONNECTED",
+            channel,
+            provider: channel === "WHATSAPP" ? "META" : "RESEND",
+        })),
     );
 }
 

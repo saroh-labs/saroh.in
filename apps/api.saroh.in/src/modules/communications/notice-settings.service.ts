@@ -33,6 +33,7 @@ import {
     overdueTiming,
     overdueTimingProblem,
 } from "./overdue-timing";
+import { sendable } from "./providers/provider.port";
 
 /** One switch, as the workspace draws it. */
 export interface NoticeSettingView {
@@ -302,13 +303,13 @@ export class NoticeSettingsService {
                         channel: "EMAIL",
                     },
                 },
-                select: { status: true },
+                select: { status: true, channel: true, provider: true },
             }),
         ]);
         const on = new Map(states);
         const has = {
             moduleOn: (key: ModuleKey) => on.get(key) === true,
-            emailConnected: provider?.status === "CONNECTED",
+            emailConnected: sendable(provider),
         };
         const offers = NOTICE_KINDS.flatMap((kind) => {
             const offer = noticeOffer(kind, has);
