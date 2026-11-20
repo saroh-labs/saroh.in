@@ -33,6 +33,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { setStatementTimeout } from "../org-context";
 import type { TransactionClient } from "../transaction";
 
 type Kind = "category" | "option" | "field" | "allergen";
@@ -123,6 +124,7 @@ export async function backfillCatalogueSettings(
         report.organizations += 1;
         await db.$transaction(
             async (tx) => {
+                await setStatementTimeout(tx, 120_000);
                 const stores = await tx.store.findMany({
                     where: { organizationId: org.id },
                     orderBy: [{ createdAt: "asc" }, { id: "asc" }],

@@ -42,6 +42,25 @@ describe("WhatsappCommsProvider keys", () => {
         ).resolves.toBe("REJECTED");
     });
 
+    // 07 F12: a token that may send but not read the number answers 10 or
+    // 200; it is a working token, not a refused one.
+    it.each([
+        [403, 10],
+        [403, 200],
+        [400, 200],
+    ])(
+        "accepts a send-only token (HTTP %i, Meta code %i)",
+        async (status, code) => {
+            answer(status, { error: { code } });
+            await expect(
+                new WhatsappCommsProvider().verifyCredentials({
+                    provider: "META",
+                    credentials,
+                }),
+            ).resolves.toBe("ACCEPTED");
+        },
+    );
+
     it("is unsure when Meta is down", async () => {
         answer(503);
         await expect(

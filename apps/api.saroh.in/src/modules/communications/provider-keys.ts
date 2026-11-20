@@ -48,9 +48,11 @@ export async function assertCommsKeysAccepted(
     if (check === null || check === "ACCEPTED") return;
     const label = LABELS[input.provider] ?? input.provider;
     if (check === "REJECTED") {
+        // WhatsApp's form names its key the access token (07 F12).
+        const meta = input.provider === "META";
         throw new BadRequestException({
-            message: `${label} didn't accept this API key. Copy it from your ${label} dashboard again.`,
-            field: "apiKey",
+            message: `${label} didn't accept this ${meta ? "access token" : "API key"}. Copy it from your ${meta ? "Meta" : label} dashboard again.`,
+            field: meta ? "accessToken" : "apiKey",
         });
     }
     if (check === "DOMAIN_UNVERIFIED") {

@@ -34,7 +34,11 @@ import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
 import { countUsage, firstDayOf, meterWindow, monthWindow } from "./metering";
 import { countUsageAcross } from "./metering-across";
-import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
+import {
+    MeteringService,
+    PLAN_LIMIT_NOTICE_TYPE,
+    holdXactLock,
+} from "./metering.service";
 import {
     PLAN_LIMIT_NOTIFICATION_TYPE,
     PlanLimitNoticeHandler,
@@ -1130,5 +1134,20 @@ describe("usage on GET …/billing/access (DB, U13)", () => {
         // A switch isn't counted; a row the plan leaves off shows no usage.
         expect(row("review")?.usage).toBeNull();
         expect(row("roles")?.usage).toBeNull();
+    });
+});
+
+// 07 F8: RESET dropped a lock_timeout the caller set earlier in the
+// transaction (billing-customer.ts), so its later locks waited unbounded.
+describe("the meter lock's wait (DB, A-01)", () => {
+    it("puts the caller's own lock_timeout back after the lock", async () => {
+        const after = await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT set_config('lock_timeout', '30s', true)`;
+            await holdXactLock(tx, `f8-${Date.now()}`);
+            const [row] = await tx.$queryRaw<{ t: string }[]>`
+                SELECT current_setting('lock_timeout') AS t`;
+            return row?.t;
+        });
+        expect(after).toBe("30s");
     });
 });

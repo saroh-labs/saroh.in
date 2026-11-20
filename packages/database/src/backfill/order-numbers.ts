@@ -32,6 +32,7 @@ import {
     formatOrderNumber,
     orderNumberTaken,
 } from "../order-number";
+import { setStatementTimeout } from "../org-context";
 import type { TransactionClient } from "../transaction";
 
 export interface RenumberedOrder {
@@ -84,6 +85,7 @@ export async function backfillOrderNumbers(
         try {
             await db.$transaction(
                 async (tx) => {
+                    await setStatementTimeout(tx, 120_000);
                     part = await renumberOrganization(tx, organizationId);
                     if (dryRun) throw new DryRunRollback();
                 },

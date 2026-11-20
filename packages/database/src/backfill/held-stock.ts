@@ -37,6 +37,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { setStatementTimeout } from "../org-context";
 import type { TransactionClient } from "../transaction";
 
 export const OPEN_ORDER_STATUSES = ["PENDING", "PROCESSING"] as const;
@@ -211,6 +212,7 @@ export async function reconcileHeldStock(
             try {
                 await db.$transaction(
                     async (tx) => {
+                        await setStatementTimeout(tx, 120_000);
                         await reconcileOrganization(tx, organizationId, part);
                         if (dryRun) throw new DryRunRollback();
                     },

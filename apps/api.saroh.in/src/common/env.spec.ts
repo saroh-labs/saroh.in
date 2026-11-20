@@ -48,10 +48,26 @@ describe("the API's environment", () => {
             "APP_URL",
             "EMAIL_FROM",
             "ANALYTICS_IP_SALT",
-            "SMTP_HOST",
             "SMTP_USER",
             "SMTP_PASS",
         ]);
+    });
+
+    // 07 F11: the mailer also reads the older names, and sends through
+    // Gmail with no host; an environment that mails today must still boot.
+    it("boots in production with the mailer's older names, and no host", () => {
+        expect(
+            missing({
+                ...DEPLOYED,
+                EMAIL_FROM: undefined,
+                SENDER_EMAIL_ID: "noreply@example.test",
+                SMTP_HOST: undefined,
+                SMTP_USER: undefined,
+                SMTP_PASS: undefined,
+                USER_ACCOUNT: "user",
+                USER_PASSWORD: "pass",
+            }),
+        ).toEqual([]);
     });
 
     // 03-L8: a base URL left set would send Saroh's provider keys there.

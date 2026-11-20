@@ -514,6 +514,26 @@ describe("team members (DB, U13)", () => {
         });
         await expect(invite(asha)).resolves.toBeDefined();
     });
+
+    // 07 F4: a refused invite used to use up the mail budget too.
+    it("counts no invitation send for an invite the seats refuse", async () => {
+        const b = await business("free");
+        const sends = { take: jest.fn(() => Promise.resolve()) };
+        const counted = new OrganizationMembersService(
+            new AuditService(),
+            sends as never,
+        );
+        const invite = (email: string) =>
+            counted.invite(b.owner, { email, role: "MEMBER" } as never);
+        await invite(`${uniq("asha")}@example.test`);
+        await refused(invite(`${uniq("ravi")}@example.test`));
+        expect(sends.take).toHaveBeenCalledTimes(1);
+        expect(sends.take).toHaveBeenCalledWith(
+            b.orgId,
+            b.ownerId,
+            expect.stringContaining("asha"),
+        );
+    });
 });
 
 describe("bookable staff use team seats (DB, DEC-111, UX-053)", () => {

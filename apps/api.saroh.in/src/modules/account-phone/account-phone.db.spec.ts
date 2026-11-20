@@ -626,6 +626,12 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         });
         expect(answer).toEqual({ whatsapp: { resendAfterSeconds: 30 } });
         expect(sendsTo(p)).toHaveLength(0);
+        // 07 F1: with the send still in flight, a wrong code answers as it
+        // does for an unknown number, not "expired".
+        await expect(withCode(p, "000000")).rejects.toMatchObject({
+            status: 400,
+            response: { details: { code: "NOT_VERIFIED" } },
+        });
         finish();
         await service.settled();
         expect(sendsTo(p)).toHaveLength(1);

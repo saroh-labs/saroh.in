@@ -200,19 +200,25 @@ export class AccountPhoneService {
         const { eventId } = verdict;
         if (input.channel === "whatsapp") {
             await this.underCeiling(keys, eventId);
+            const code = newCode();
             if (input.purpose === "add") {
-                return this.sendWhatsapp(input, keys, eventId);
+                return this.sendWhatsapp(input, keys, eventId, code);
             }
             const account = await accountOf(input.phoneE164);
+            // The row is saved before anything is sent, known number or not,
+            // so a wrong code straight after start answers the same (02 A-1,
+            // 07 F1). For an unknown number no one is ever sent it.
+            await saveCode({
+                phoneHash: keys.phoneHash,
+                code,
+                purpose: "SIGN_IN",
+            });
             if (account) {
                 this.inBackground(
-                    this.sendWhatsapp(input, keys, eventId, account),
+                    this.sendWhatsapp(input, keys, eventId, code, account),
                 );
             } else {
                 this.blocked("start", "no_account", keys);
-                // A code row no one is sent, so the code step answers an
-                // unknown number as it answers a known one (02 A-1).
-                this.inBackground(decoyCode(keys));
             }
             return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
@@ -517,7 +523,8 @@ export class AccountPhoneService {
     }
 
     /**
-     * Make a code, send it from Saroh's number, keep its hash. A send that
+     * Send a code from Saroh's number (signing in, its hash is saved before
+     * the call; adding a phone, after it succeeds). A send that
      * fails is still a start for the daily and address caps, but not for
      * the 30-second cooldown: it was our failure, not the person's.
      * Signing in (`account` given), Saroh staff get nothing (DEC-198).
@@ -526,14 +533,14 @@ export class AccountPhoneService {
         input: { phoneE164: string; purpose: PhonePurpose; userId?: string },
         keys: Keys,
         eventId: string,
+        code: string,
         account?: { id: string; email: string },
     ): Promise<PhoneStart> {
         if (account && (await isSarohStaff(account))) {
+            // The saved row stands as the decoy no one is sent.
             this.blocked("start", "staff", keys);
-            await decoyCode(keys);
             return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
-        const code = newCode();
         let reason: string;
         try {
             const result = await this.messaging.sendOtp({
@@ -551,11 +558,9 @@ export class AccountPhoneService {
         }
         if (reason) {
             this.blocked("start", `whatsapp_${reason}`, keys);
-            if (account) {
-                // Signing in, the failure must look like an unknown number:
-                // the cooldown holds and a decoy code stands (02 A-1, A-2).
-                await decoyCode(keys);
-            } else {
+            // Signing in, the failure must look like an unknown number: the
+            // cooldown holds and the saved row stands as a decoy (02 A-1, A-2).
+            if (!account) {
                 // Our own failure doesn't hold the cooldown; it still counts.
                 await releaseStart(eventId, `whatsapp_${reason}`);
             }
@@ -564,12 +569,16 @@ export class AccountPhoneService {
                 details: { code: "WHATSAPP_FAILED" },
             });
         }
-        await saveCode({
-            phoneHash: keys.phoneHash,
-            code,
-            purpose: input.purpose === "add" ? "ADD" : "SIGN_IN",
-            userId: input.purpose === "add" ? input.userId : undefined,
-        });
+        if (!account) {
+            // Adding a phone: kept only once sent, so a failed resend
+            // doesn't hide the code already sent.
+            await saveCode({
+                phoneHash: keys.phoneHash,
+                code,
+                purpose: "ADD",
+                userId: input.userId,
+            });
+        }
         return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
     }
 
@@ -602,15 +611,6 @@ function accountOf(phoneE164: string) {
 interface Keys {
     phoneHash: string;
     ipHash?: string;
-}
-
-/** A sign-in code row that is never sent: the code step can't tell numbers apart. */
-function decoyCode(keys: Keys) {
-    return saveCode({
-        phoneHash: keys.phoneHash,
-        code: newCode(),
-        purpose: "SIGN_IN",
-    });
 }
 
 /** A claimed start that sent nothing: noted, so it doesn't hold the cooldown. */

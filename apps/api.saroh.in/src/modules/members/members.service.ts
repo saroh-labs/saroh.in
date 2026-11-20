@@ -200,7 +200,7 @@ export class MembersService {
         }
 
         // Every send counts, from the business's one budget (A-02).
-        await this.sends.take(ctx.organizationId, email);
+        await this.sends.take(ctx.organizationId, callerId, email);
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);

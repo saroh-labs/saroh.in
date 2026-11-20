@@ -14,8 +14,10 @@ const TEN_MINUTES_MS = 10 * 60 * 1000;
  * failed sign-in is not the admin ledger's business.
  */
 export async function noteFailedStaffSignIn(email: string): Promise<void> {
-    const user = await prisma.user.findFirst({
-        where: { email: { equals: email, mode: "insensitive" } },
+    // Better Auth keeps addresses lower-cased, and the hook passes one so:
+    // an exact match uses the unique index (07 F6).
+    const user = await prisma.user.findUnique({
+        where: { email },
         select: { id: true, email: true },
     });
     if (!user || !(await isSarohStaff(user))) return;

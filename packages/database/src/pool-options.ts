@@ -21,6 +21,15 @@ function ms(
  * Every wait is bounded (A-01, 19 Nov M-2): taking a connection from a full
  * pool, one statement, and a transaction left idle. Without them a burst that
  * drained the pool held every other request until the host gave up.
+ *
+ * A job whose transaction may run longer than the statement limit raises it
+ * for that transaction with `setStatementTimeout` (the retention erase, the
+ * backfills); a one-off container may set `DB_STATEMENT_TIMEOUT_MS=0`.
+ *
+ * shortcut: node-postgres sends these as startup parameters, which PgBouncer
+ * and some poolers (Neon's pooled host) refuse; every DATABASE_URL today is a
+ * direct connection. Before pointing one at a pooler, set them with
+ * `SET` after connect (or per transaction) instead.
  */
 export function poolOptions(
     source: Record<string, string | undefined> = process.env,

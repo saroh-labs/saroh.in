@@ -362,9 +362,6 @@ export class OrganizationMembersService {
             });
         }
 
-        // Every send counts, a live invite sent again too (A-02).
-        await this.sends.take(ctx.organizationId, dto.email);
-
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
         // The plan's team seats count everyone and every open invitation,
@@ -376,6 +373,14 @@ export class OrganizationMembersService {
             ctx.organizationId,
             "members",
             async (tx) => {
+                // Every send counts, a live invite sent again too (A-02);
+                // taken once the seat check passed, so a refusal costs
+                // nothing (07 F4), and refused here it writes nothing.
+                await this.sends.take(
+                    ctx.organizationId,
+                    ctx.userId,
+                    dto.email,
+                );
                 const row = await tx.organizationInvitation.upsert({
                     where: {
                         organizationId_email: {

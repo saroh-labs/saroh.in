@@ -29,10 +29,13 @@ const tag = `${process.pid}-${Date.now()}`;
 const audit = { record: jest.fn() } as unknown as AuditService;
 const members = new OrganizationMembersService(
     audit,
-    new InviteSendLimit(
-        new FixedWindowRateLimiter(100, 60_000),
-        new FixedWindowRateLimiter(3, 60_000),
-    ),
+    new InviteSendLimit({
+        business: new FixedWindowRateLimiter(100, 60_000),
+        businessAddress: new FixedWindowRateLimiter(3, 60_000),
+        address: new FixedWindowRateLimiter(100, 60_000),
+        inviter: new FixedWindowRateLimiter(100, 60_000),
+        overall: new FixedWindowRateLimiter(1000, 60_000),
+    }),
 );
 const contexts = new OrganizationContextService();
 

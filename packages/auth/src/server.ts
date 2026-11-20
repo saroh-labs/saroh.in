@@ -223,7 +223,8 @@ export interface CreateAuthOptions {
     /**
      * A sign-in with an email and a password or code was refused. The host
      * records it where it matters (a Saroh staff account, admin review B4).
-     * Never the sign-in's problem: a failure here is swallowed.
+     * Run in the background, never awaited by the response; a failure here
+     * is swallowed.
      */
     onSignInFailed?: (email: string) => Promise<void>;
     mayMailCode?: (
@@ -622,6 +623,7 @@ const SIGN_IN_PATHS: readonly string[] = [
 function signInFailedHook(
     told: NonNullable<CreateAuthOptions["onSignInFailed"]>,
 ) {
+    // eslint-disable-next-line @typescript-eslint/require-await -- the hook must return a promise; the work is left running on purpose (07 F6)
     return createAuthMiddleware(async (ctx) => {
         if (!SIGN_IN_PATHS.includes(ctx.path)) return;
         // A refusal comes back as an APIError (by name across copies).
@@ -630,11 +632,12 @@ function signInFailedHook(
         const email: unknown = (ctx.body as { email?: unknown } | undefined)
             ?.email;
         if (typeof email !== "string" || !email.trim()) return;
-        try {
-            await told(email.trim().toLowerCase());
-        } catch {
-            // Never a sign-in's problem.
-        }
+        // In the background: awaited, the extra lookups for a known or staff
+        // account would show in the response time (07 F6). Never a
+        // sign-in's problem if it fails.
+        void Promise.resolve()
+            .then(() => told(email.trim().toLowerCase()))
+            .catch(() => undefined);
     });
 }
 

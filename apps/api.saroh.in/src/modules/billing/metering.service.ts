@@ -84,7 +84,7 @@ export function meterBusy(): HttpException {
  * is bounded ({@link holdXactLock}).
  */
 export async function lockMeter(
-    tx: Pick<MeterTx, "$executeRaw">,
+    tx: Pick<MeterTx, "$executeRaw" | "$queryRaw">,
     organizationId: string,
     key: MeteredLimitKey,
 ): Promise<void> {
@@ -95,12 +95,17 @@ export async function lockMeter(
  * Take a transaction advisory lock, waiting at most `PLAN_METER_LOCK_WAIT_MS`
  * and then refusing with {@link meterBusy}, rather than waiting on it
  * unbounded while holding a pool connection (A-01). The wait is Postgres's
- * own `lock_timeout`, set for the lock only and reset after.
+ * own `lock_timeout`, set for the lock only, then the caller's own put back.
  */
 export async function holdXactLock(
-    tx: Pick<MeterTx, "$executeRaw">,
+    tx: Pick<MeterTx, "$executeRaw" | "$queryRaw">,
     lock: string,
 ): Promise<void> {
+    // The caller may have set its own earlier in the transaction
+    // (billing-customer.ts), which RESET would drop (07 F8).
+    const [{ prev } = { prev: "0" }] = await tx.$queryRaw<
+        { prev: string }[]
+    >`SELECT current_setting('lock_timeout') AS prev`;
     await tx.$executeRaw`SELECT set_config('lock_timeout', ${String(meterLockWaitMs())}, true)`;
     try {
         await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
@@ -110,8 +115,7 @@ export async function holdXactLock(
             throw meterBusy();
         throw err;
     }
-    // Back to the connection's own setting for the rest of the transaction.
-    await tx.$executeRaw`RESET lock_timeout`;
+    await tx.$executeRaw`SELECT set_config('lock_timeout', ${prev}, true)`;
 }
 
 /**

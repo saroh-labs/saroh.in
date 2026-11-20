@@ -254,6 +254,28 @@ describe("CommunicationsService.connectProvider — the key checked first (UX-01
         });
     });
 
+    // 07 F12: WhatsApp's form has no API key field; the refusal goes under
+    // the access token it does have.
+    it("refuses a WhatsApp token under the access token field", async () => {
+        const { service } = serviceAnswering("REJECTED");
+
+        const err = await service
+            .connectProvider(ctx(), {
+                channel: "whatsapp",
+                provider: "meta",
+                credentials: { accessToken: SECRET, phoneNumberId: "123" },
+            })
+            .catch((e: unknown) => e);
+
+        expect((err as BadRequestException).getResponse()).toEqual({
+            message: expect.stringContaining(
+                "WhatsApp didn't accept this access token",
+            ),
+            field: "accessToken",
+        });
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
     it("refuses a sending address whose domain Resend hasn't verified, under that field", async () => {
         const { service } = serviceAnswering("DOMAIN_UNVERIFIED");
 

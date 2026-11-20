@@ -532,20 +532,25 @@ const envSchema = z.object({
  * at boot, so a missing one stops the deploy instead (plan
  * 2026-10-05-001, KTD-2).
  */
-const REQUIRED_IN_PRODUCTION = [
+type EnvKey = keyof z.infer<typeof envSchema>;
+
+const REQUIRED_IN_PRODUCTION: readonly (EnvKey | readonly EnvKey[])[] = [
     "RENDERER_URL",
     "APP_URL",
-    "EMAIL_FROM",
+    // A list is one setting under any name the code reads; the first is the
+    // one named when all are missing.
+    ["EMAIL_FROM", "SENDER_EMAIL_ID"],
     // Keys every phone and address hash the durable limits count by: unset,
     // they were random per process, so phone-code limits started over on
     // every deploy and a code sent before one could never be checked (03-M3).
     "ANALYTICS_IP_SALT",
     // Saroh's own email (review 04 H3): unset, every sign-in code and
-    // reset link was written to the log and the screen said "sent".
-    "SMTP_HOST",
-    "SMTP_USER",
-    "SMTP_PASS",
-] as const;
+    // reset link was written to the log and the screen said "sent". Under
+    // either name `common/email.ts` reads (07 F11); with no host it sends
+    // through Gmail, so the host is not required.
+    ["SMTP_USER", "USER_ACCOUNT"],
+    ["SMTP_PASS", "USER_PASSWORD"],
+];
 
 /**
  * Test-only switches: a deployed API refuses to boot with any of them set,
@@ -588,11 +593,12 @@ const checkedSchema = envSchema.superRefine((value, ctx) => {
             });
         }
     }
-    for (const key of REQUIRED_IN_PRODUCTION) {
-        if (!value[key]) {
+    for (const required of REQUIRED_IN_PRODUCTION) {
+        const names = typeof required === "string" ? [required] : required;
+        if (!names.some((name) => value[name])) {
             ctx.addIssue({
                 code: "custom",
-                path: [key],
+                path: [names[0] ?? ""],
                 message: "required when NODE_ENV=production",
             });
         }

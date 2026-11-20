@@ -39,7 +39,8 @@ export class WhatsappCommsProvider implements CommsProvider {
     /**
      * Meta's token, checked on connect (review 04 H4) by reading the
      * phone number it should send from: a token Meta refuses, or a number
-     * it can't reach, is REJECTED; anything else Meta says is UNSURE.
+     * it can't reach, is REJECTED; a permission error (the token may send
+     * but not read) is ACCEPTED; anything else Meta says is UNSURE.
      */
     async verifyCredentials(
         input: CommsVerifyInput,
@@ -61,9 +62,12 @@ export class WhatsappCommsProvider implements CommsProvider {
             return "UNSURE";
         }
         if (res.ok) return "ACCEPTED";
-        // 400 code 100: no such number for this token.
         const code = await errorCode(res);
-        if (refusesKeys(res.status) || code === 190 || code === 100) {
+        // 10 and 200 are permission errors: a token that can send but not
+        // read the number's details is a working token (07 F12).
+        if (code === 10 || code === 200) return "ACCEPTED";
+        // 190: the token itself is bad; 100: no such number for it.
+        if (res.status === 401 || code === 190 || code === 100) {
             return "REJECTED";
         }
         this.logger.warn(`WhatsApp key check answered HTTP ${res.status}`);
