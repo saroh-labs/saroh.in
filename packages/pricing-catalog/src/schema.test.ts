@@ -125,8 +125,8 @@ describe("the catalogue schema", () => {
             name: "Photos and videos",
             group: "g1",
             cells: {
-                a: { inc: true, text: "1 GB", limit: 1 },
-                b: { inc: true, text: "5 GB", limit: 5, soft: false },
+                a: { inc: true, text: "3 GB", limit: 3 },
+                b: { inc: true, text: "7 GB", limit: 7, soft: false },
             },
         });
         const storage = parseCatalog(input).modules.find(
