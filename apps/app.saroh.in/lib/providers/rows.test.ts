@@ -159,7 +159,6 @@ describe("provider rows", () => {
         expect(names(view.available)).toEqual([
             "Razorpay",
             "Meta (WhatsApp Cloud)",
-            "Twilio",
         ]);
 
         const [cashfree, resend] = view.connected;
@@ -223,8 +222,8 @@ describe("provider rows", () => {
         const all = names(view.available);
         expect(all).not.toContain("Cashfree");
         expect(all).not.toContain("Meta (WhatsApp Cloud)");
-        // With nothing live on WhatsApp, the other provider can be connected.
-        expect(all).toContain("Twilio");
+        // Twilio can't send (review 20 Nov), so it is never offered.
+        expect(all).not.toContain("Twilio");
     });
 
     it("names the storefronts that charge through each payment provider", () => {
