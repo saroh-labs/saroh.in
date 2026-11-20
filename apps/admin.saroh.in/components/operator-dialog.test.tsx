@@ -8,6 +8,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { OperatorSubmit } from "./operator-dialog";
 import { OperatorDialog } from "./operator-dialog";
 
 afterEach(cleanup);
@@ -20,7 +21,7 @@ describe("OperatorDialog", () => {
             effect: <p>Everyone gets it.</p>,
             submitLabel: "Turn on for everyone",
             onSubmit,
-            onOpenChange: () => {},
+            onOpenChange: vi.fn(),
         };
         const { rerender } = render(<OperatorDialog {...props} open={false} />);
         rerender(<OperatorDialog {...props} open />);
@@ -31,6 +32,7 @@ describe("OperatorDialog", () => {
             screen.getByRole("button", { name: "Turn on for everyone" }),
         );
         await waitFor(() => expect(onSubmit).toHaveBeenCalled());
-        expect(onSubmit.mock.calls[0][0].idempotencyKey).toMatch(/\S{8,}/);
+        const [input] = onSubmit.mock.calls[0] as [OperatorSubmit];
+        expect(input.idempotencyKey).toMatch(/\S{8,}/);
     });
 });
