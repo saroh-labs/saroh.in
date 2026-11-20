@@ -2,6 +2,7 @@ import type { ShopListingCard } from "@saroh/site-blocks";
 import {
     formatAmount,
     formatDuration,
+    POST_EMBED_CARD,
     servicePriceWords,
 } from "@saroh/site-blocks";
 
@@ -61,13 +62,13 @@ const escape = (text: string) =>
             })[c] ?? c,
     );
 
-const CARD =
-    "not-prose my-6 flex min-w-0 items-center gap-4 rounded-[calc(var(--site-radius)*1.4)] border border-site-border bg-site-surface p-4 text-site-fg";
-const NAME =
-    "m-0 font-site-heading text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight [overflow-wrap:anywhere]";
-const LINE = "m-0 mt-1 text-sm tabular-nums text-site-body";
-const BUTTON =
-    "coarse:h-11 inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg no-underline hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-fg";
+const {
+    card: CARD,
+    name: NAME,
+    line: LINE,
+    button: BUTTON,
+    image: IMAGE,
+} = POST_EMBED_CARD;
 
 function card(
     body: { name: string; line: string; image?: ShopListingCard["image"] },
@@ -75,7 +76,7 @@ function card(
     words: string,
 ): string {
     const img = body.image
-        ? `<img src="${escape(body.image.url)}" alt="${escape(body.image.alt)}" loading="lazy" class="m-0 size-16 shrink-0 rounded-[var(--site-radius)] object-cover">`
+        ? `<img src="${escape(body.image.url)}" alt="${escape(body.image.alt)}" loading="lazy" class="${IMAGE}">`
         : "";
     return `<div class="${CARD}" data-post-card="">${img}<div class="min-w-0 flex-1"><p class="${NAME}">${escape(body.name)}</p><p class="${LINE}">${escape(body.line)}</p></div><a href="${escape(href)}" class="${BUTTON}" aria-label="${escape(`${words}: ${body.name}`)}">${escape(words)}</a></div>`;
 }

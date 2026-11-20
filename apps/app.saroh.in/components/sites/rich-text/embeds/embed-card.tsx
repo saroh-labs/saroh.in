@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDuration } from "@saroh/site-blocks";
+import { formatDuration, POST_EMBED_CARD } from "@saroh/site-blocks";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Skeleton } from "@saroh/ui/skeleton";
@@ -30,14 +30,12 @@ export function EmbedCard({
         <NodeViewWrapper
             data-post-card={kind}
             className={cn(
-                "not-prose my-6 flex min-w-0 items-center gap-4 rounded-[calc(var(--site-radius)*1.4)] border border-site-border bg-site-surface p-4 font-site-body text-site-fg",
+                POST_EMBED_CARD.card,
+                "font-site-body",
                 selected && "ring-2 ring-ring ring-offset-2",
             )}
         >
-            <span
-                aria-hidden
-                className="grid size-12 shrink-0 place-items-center rounded-[var(--site-radius)] bg-site-fg/5 text-site-muted"
-            >
+            <span aria-hidden className={POST_EMBED_CARD.tile}>
                 {kind === "service" ? (
                     <Tag className="size-5" />
                 ) : (
@@ -68,13 +66,11 @@ function Words({ name, line }: { name: string; line: string }) {
         <>
             <b
                 data-ph-mask=""
-                className="block truncate font-site-heading text-lg font-semibold"
+                className={cn(POST_EMBED_CARD.name, "block truncate")}
             >
                 {name}
             </b>
-            <span className="block text-sm tabular-nums text-site-body">
-                {line}
-            </span>
+            <span className={cn(POST_EMBED_CARD.line, "block")}>{line}</span>
         </>
     );
 }

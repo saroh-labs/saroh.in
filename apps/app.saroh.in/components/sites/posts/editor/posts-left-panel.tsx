@@ -19,8 +19,13 @@ export function headingsOf(html: string): { level: number; text: string }[] {
     const found: { level: number; text: string }[] = [];
     const re = /<h([1-4])[^>]*>([\s\S]*?)<\/h\1>/gi;
     for (let m = re.exec(html); m; m = re.exec(html)) {
-        const text = m[2]
-            .replace(/<[^>]+>/g, "")
+        let bare = m[2];
+        // Until nothing changes: `<scr<b>ipt>` is a tag again after one pass.
+        for (let before = ""; before !== bare;) {
+            before = bare;
+            bare = bare.replace(/<[^>]+>/g, "");
+        }
+        const text = bare
             .replace(/&nbsp;/g, " ")
             .replace(/&amp;/g, "&")
             .trim();

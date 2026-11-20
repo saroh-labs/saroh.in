@@ -255,6 +255,14 @@ const SITE_LAYER_ALLOWED = new Set([
     // here would put a reviewer's notes on a rendering the live site never
     // makes, which is the whole failure #189 was.
     "apps/app.saroh.in/components/sites/review/section-review.tsx",
+    // The post editor's writing page, at the desk and on a phone (U15,
+    // U15b): the post as it will read, on the merchant's page ground and in
+    // the site's type, the editor's twin of saroh.app's post-view.tsx above.
+    // It draws no block; a card from the business is the package's own
+    // classes (POST_EMBED_CARD).
+    "apps/app.saroh.in/components/sites/posts/editor/writing-surface.tsx",
+    "apps/app.saroh.in/components/sites/posts/phone/phone-surface.tsx",
+    "apps/app.saroh.in/components/sites/rich-text/rich-text-editor.tsx",
 ]);
 
 /**
