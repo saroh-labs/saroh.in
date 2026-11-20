@@ -57,6 +57,16 @@ export const PHONE_SEND_WORDS = {
 } as const;
 
 /**
+ * On the WhatsApp code step once Resend is ready, for every number alike
+ * (owner, 19 Nov): a send that failed after the answer is otherwise
+ * invisible, so SMS is offered as the next step, not left to be thought of.
+ */
+export const NO_CODE_WORDS = {
+    line: "No code yet?",
+    action: "Get it by SMS instead",
+} as const;
+
+/**
  * "Use phone instead" on Sign in (DEC-196). A phone is a second way in for
  * an account that added one; it never makes an account, so the page says
  * so before anything is sent, and offers sign-up by email beside it. The number, the bot challenge, then the code
@@ -130,6 +140,11 @@ export function PhoneSignIn({
                 onChangeEmail={() => flow.reset()}
                 onDone={onDone}
                 client={client}
+                fallback={
+                    onWhatsapp && sms
+                        ? { ...NO_CODE_WORDS, onSelect: flow.toSms }
+                        : undefined
+                }
             />
         );
     }

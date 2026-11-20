@@ -7,6 +7,7 @@ import {
     Header,
     Headers,
     HttpCode,
+    Optional,
     Post,
     Query,
     RawBodyRequest,
@@ -18,9 +19,21 @@ import type { Request } from "express";
 import { env } from "../../env";
 import { applyInbound, applyStatus } from "./delivery-reports";
 import { WalletService } from "./wallet.service";
+import { WhatsappSignInHealth } from "./whatsapp-signin-health";
 
 /** Meta's signature header: `sha256=<hex HMAC-SHA256 of the raw body under the app secret>`. */
 export const META_SIGNATURE_HEADER = "x-hub-signature-256";
+
+/**
+ * Meta's template webhooks on Saroh's WhatsApp account (owner subscribed,
+ * 19 Nov): only the sign-in template's are acted on
+ * ({@link WhatsappSignInHealth.templateEvent}).
+ */
+const TEMPLATE_FIELDS = new Set([
+    "message_template_status_update",
+    "message_template_quality_update",
+    "message_template_components_update",
+]);
 
 /** The parts of Meta's `messages` webhook we read; each is checked as read. */
 interface MetaValue {
@@ -42,10 +55,17 @@ interface MetaValue {
  *   raw bytes under the app secret, checked before the body is read; else
  *   401. A signed body we can't read or match is a 200 no-op, as Meta
  *   retries anything else for days.
+ * - Template status, quality and components changes go to
+ *   {@link WhatsappSignInHealth}; any other field is a 200 no-op.
  */
 @Controller("public/webhooks/meta")
 export class MetaWebhookController {
-    constructor(private readonly wallet: WalletService) {}
+    constructor(
+        private readonly wallet: WalletService,
+        // Not a DI provider: a per-instance default tests can replace.
+        @Optional()
+        private readonly health: WhatsappSignInHealth = new WhatsappSignInHealth(),
+    ) {}
 
     @Get()
     @Header("Content-Type", "text/plain")
@@ -82,6 +102,12 @@ export class MetaWebhookController {
             return { ok: true };
         }
         for (const value of values(body)) await this.apply(value);
+        for (const change of changes(body)) {
+            const field = text(change.field);
+            if (TEMPLATE_FIELDS.has(field)) {
+                await this.health.templateEvent(field, change.value);
+            }
+        }
         return { ok: true };
     }
 
@@ -94,15 +120,20 @@ export class MetaWebhookController {
             const [code] = list<{ code?: unknown }>(s.errors).map(
                 (e) => e.code,
             );
+            // Only Meta's numeric code is kept; its words can carry the number.
+            const failureReason =
+                typeof code === "number" || /^\d{1,8}$/.test(text(code))
+                    ? `whatsapp_${String(code)}`
+                    : "undelivered";
             await applyStatus(this.wallet, {
                 ids: [text(s.id)],
                 status: text(s.status),
-                // Only Meta's numeric code is kept; its words can carry the number.
-                failureReason:
-                    typeof code === "number" || /^\d{1,8}$/.test(text(code))
-                        ? `whatsapp_${String(code)}`
-                        : "undelivered",
+                failureReason,
             });
+            // An account sign-in code Meta couldn't deliver (counted once).
+            if (text(s.status).toLowerCase() === "failed") {
+                await this.health.deliveryFailed(text(s.id), failureReason);
+            }
         }
         for (const m of list<{
             id?: unknown;
@@ -123,13 +154,19 @@ export class MetaWebhookController {
  * our reply window.
  */
 function values(body: unknown): MetaValue[] {
-    const entry = (body as { entry?: unknown } | null)?.entry;
     const ours = env.META_WA_PHONE_NUMBER_ID;
-    return list<{ changes?: unknown }>(entry)
-        .flatMap((e) => list<{ field?: unknown; value?: unknown }>(e.changes))
+    return changes(body)
         .filter((c) => c.field === "messages")
         .flatMap((c) => list<MetaValue>([c.value]))
         .filter((v) => !ours || v.metadata?.phone_number_id === ours);
+}
+
+/** Every `entry[].changes[]`, whatever its field. */
+function changes(body: unknown): { field?: unknown; value?: unknown }[] {
+    const entry = (body as { entry?: unknown } | null)?.entry;
+    return list<{ changes?: unknown }>(entry).flatMap((e) =>
+        list<{ field?: unknown; value?: unknown }>(e.changes),
+    );
 }
 
 /** The objects in `value` when it is an array; anything else is none. */

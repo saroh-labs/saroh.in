@@ -12,6 +12,47 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Accounts — a neutral answer hides failures: alert on the back end
+
+**Symptom**: 19 Nov 2026, the owner: phone sign-in now says "If this number
+is on a Saroh account, a code is on its way" to every number, so if Meta is
+down, the template is paused or the token has expired, nobody finds out: not
+the person waiting, not Saroh.
+**Cause**: to stop number enumeration (2d0c074b2) the WhatsApp code is sent
+after the answer and a failed send is only a WARN. A neutral answer is right
+for the person, but it took away the only place a failure was ever seen.
+**Fix**: the code step offers "No code yet? Get it by SMS instead" to every
+number once Resend is ready, so nothing leaks. The back end counts sends and
+failures (send-time refusals and Meta's `failed` statuses) in Redis and
+emails Platform owners past a threshold, on any account-level Meta code, and
+when Meta's template webhooks say the sign-in template is paused, disabled,
+rejected or RED. The admin Health board shows the last hour.
+**Rule**: whenever a screen gives one answer to hide what happened, the back
+end must count and alert on what happened, and the screen must offer a way
+on that doesn't depend on it.
+**Where it lives**: `messaging/whatsapp-signin-health.ts` and its spec,
+`meta-webhook.db.spec.ts`, `account-phone.db.spec.ts`,
+`phone-sign-in.test.tsx`; `devops-observability.md` → Account phone codes.
+
+---
+
+## Tests — restoring an unset `env` key in CI stored the string "undefined"
+
+**Symptom**: 20 Nov 2026, PR #1438: a new `meta-webhook.db.spec.ts` test
+passed locally and failed in both CI integration shards: Meta's `failed`
+status never reached the counter.
+**Cause**: CI sets `SKIP_ENV_VALIDATION`, so `env` is `process.env` itself.
+An earlier test restored `env.META_WA_PHONE_NUMBER_ID = was` with `was`
+undefined, and `process.env` stores that as the string `"undefined"`. Every
+later webhook in the file then read as "another number" and was dropped.
+**Fix**: restore with `delete` when the saved value was undefined.
+**Rule**: a spec that changes an `env` key puts it back with `delete` when
+it was unset. Reproduce a CI-only integration failure with
+`SKIP_ENV_VALIDATION=1`.
+**Where it lives**: `meta-webhook.db.spec.ts`.
+
+---
+
 ## Database — one business's burst of creates stalled the API for everyone
 
 **Symptom**: 20 Nov 2026, abuse test A-01: about 16 parallel `POST
