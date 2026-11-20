@@ -9,8 +9,10 @@ import { showSuccess } from "@saroh/ui/toast";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ReadOnlyNote } from "@/components/shared/states/read-only-note";
 import { SAVE_LINES } from "@/components/sites/shell/save-footer";
 import { runAction } from "@/lib/api/run-action";
+import { UNREACHED } from "@/lib/api/unreached";
 import { formatMoney } from "@/lib/format/money";
 import { updateService } from "@/lib/services/actions";
 import { fromMinor, toMinor } from "@/lib/services/service-editor";
@@ -20,12 +22,11 @@ import type { ServiceUsesRead } from "@/lib/sites/service-uses-read";
 import { readServiceUses } from "@/lib/sites/service-uses-read";
 
 /**
- * O1 (plan "Needs owner yes"): the sheet writes the price to Services
- * straight away. Off until the owner says yes; then this one line turns the
- * read-only sheet with its "Edit in Services" link into `fix/WXKPrice`'s
- * Price field and Save price.
+ * O1 (owner yes, 20 Nov 2026): the sheet writes the price to Services
+ * straight away. The read-only sheet with its link to Services stays as
+ * the view for a role without `service:write`; off, it is everyone's.
  */
-export const PRICE_WRITES_ON = false as boolean;
+export const PRICE_WRITES_ON = true as boolean;
 
 export interface PriceSheetProps {
     siteId: string;
@@ -38,9 +39,9 @@ export interface PriceSheetProps {
 
 /**
  * A service's price from the editor (U48, `fix/WXKPrice`, `fix/WXNPrice`):
- * what it costs, where on the site it shows, and the way to change it.
- * Until O1 that way is the service itself in Services; the price is never
- * written from here, and never counts as a change waiting to publish.
+ * what it costs, where on the site it shows, and a Price field that saves
+ * it to Services at once (O1) through the service's own update, so its
+ * price history records it. It never counts as a change waiting to publish.
  */
 export function PriceSheet({
     siteId,
@@ -56,6 +57,8 @@ export function PriceSheet({
     const [attempt, setAttempt] = useState(0);
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
+    /** The save never got an answer: the number stays, with Try again. */
+    const [failed, setFailed] = useState(false);
     const [saving, setSaving] = useState(false);
 
     // A new service or a Try again reads afresh; until then it is loading.
@@ -73,6 +76,7 @@ export function PriceSheet({
             if (!live) return;
             setLoaded({ key, service: s, uses: u });
             setError(null);
+            setFailed(false);
             if (s.ok) setTyped(fromMinor(s.data.priceCents));
         });
         return () => {
@@ -87,23 +91,28 @@ export function PriceSheet({
     const was = data ? formatMoney(data.priceCents, data.currency) : null;
     const length = data ? `${data.durationMinutes} min` : "";
     const editHref = serviceId ? `/services/${serviceId}` : "/services";
-    const writes = PRICE_WRITES_ON && data !== null;
+    const writes = PRICE_WRITES_ON && data?.canWrite === true;
 
     async function save() {
         if (!serviceId || !data) return;
         const minor = toMinor(typed);
         if (minor === null || Number.isNaN(minor)) {
-            setError("Type a price, like 1,500.");
+            setError("Type a price of 0 or more, like 1,500.");
             return;
         }
         setError(null);
+        setFailed(false);
         // The number stays in the field when the save fails.
         const res = await runAction(
             () => updateService(serviceId, { priceCents: minor }),
-            { setBusy: setSaving },
+            { setBusy: setSaving, quiet: true },
         );
-        if (!res) return;
+        if (!res || (!res.ok && res.error === UNREACHED)) {
+            setFailed(true);
+            return;
+        }
         if (!res.ok) {
+            // Refused (a deposit on no price, a role): the API's words.
             setError(res.error);
             return;
         }
@@ -143,19 +152,40 @@ export function PriceSheet({
                           : "Couldn't read the price."}
                 </Notice>
             ) : writes ? (
-                <Field
-                    holdsData
-                    label="Price"
-                    error={error}
-                    hint={`Was ${was ?? "no price"} · ${length} · from Services`}
-                >
-                    <MoneyInput
-                        currency={data.currency ?? "INR"}
-                        value={typed}
-                        onValueChange={setTyped}
-                        autoComplete="off"
-                    />
-                </Field>
+                <div className="grid gap-3">
+                    <Field
+                        holdsData
+                        label="Price"
+                        error={error}
+                        hint={`Was ${was ?? "no price"} · ${length} · from Services`}
+                    >
+                        <MoneyInput
+                            currency={data.currency ?? "INR"}
+                            value={typed}
+                            onValueChange={setTyped}
+                            autoComplete="off"
+                        />
+                    </Field>
+                    {failed ? (
+                        <Notice
+                            tone="error"
+                            action={
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={saving}
+                                    onClick={() => void save()}
+                                >
+                                    Try again
+                                </Button>
+                            }
+                        >
+                            Couldn&apos;t save the price. Your number is still
+                            here.
+                        </Notice>
+                    ) : null}
+                </div>
             ) : (
                 <div className="grid gap-1">
                     <p className="text-sm font-medium">Price</p>
@@ -165,6 +195,11 @@ export function PriceSheet({
                     <p className="text-sm text-muted-foreground">
                         {length} · from Services
                     </p>
+                    {data && !data.canWrite ? (
+                        <ReadOnlyNote className="mb-0 mt-2">
+                            Your role can read this price but not change it.
+                        </ReadOnlyNote>
+                    ) : null}
                 </div>
             )}
 
@@ -220,7 +255,11 @@ export function PriceSheet({
             doneLabel="Close"
             extra={
                 <Button asChild>
-                    <Link href={editHref}>Edit in Services</Link>
+                    <Link href={editHref}>
+                        {data && !data.canWrite
+                            ? "Open in Services"
+                            : "Edit in Services"}
+                    </Link>
                 </Button>
             }
         >

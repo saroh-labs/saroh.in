@@ -48,8 +48,9 @@ export function compareUnits(
  * drawn from its stored snapshot as it was served (`PastVersionPreview`),
  * the draft as Preview draws it, both at desktop width scaled to their
  * column; the differences between them (`changes?against=`, U47a) are
- * numbered above. Restore is today's (`RestoreVersion`): that version goes
- * live again as a new entry, and the draft is left alone.
+ * numbered above. "Restore <date> as the draft" (`RestoreVersion`, owner
+ * 20 Nov 2026) copies that version into the draft; nothing goes live until
+ * Publish.
  */
 export function HistoryCompare({
     model,
@@ -137,17 +138,18 @@ export function HistoryCompare({
                         ? ` · ${count(units.length, "difference")}`
                         : ""}
                 </span>
-                {model.canPublish && !model.readOnly ? (
+                {!model.readOnly ? (
                     <RestoreVersion
                         siteId={siteId}
                         publicationId={version.id}
+                        publishedAt={version.publishedAt}
+                        pageId={pageId}
+                        revision={model.draft.revision}
                         isCurrent={version.isCurrent}
                         renderable={
                             loaded.state !== "ready" ||
                             loaded.detail.renderability.renderable
                         }
-                        needsApproval={model.publish.needsApproval}
-                        canOverride={model.publish.canOverride}
                         onRestored={onRestored}
                     />
                 ) : null}

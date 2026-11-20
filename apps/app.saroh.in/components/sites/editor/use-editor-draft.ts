@@ -406,6 +406,8 @@ export function useEditorDraft({
 
     return {
         sections,
+        /** The draft revision this editor holds (#285), for a restore's 409. */
+        revision,
         dirty,
         saving,
         saveError,

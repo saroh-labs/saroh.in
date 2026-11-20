@@ -76,6 +76,7 @@ export function BoundServices({
                             {onPrice ? (
                                 <Button
                                     data-ph-mask=""
+                                    data-price-of={s.id}
                                     type="button"
                                     variant="outline"
                                     size="sm"

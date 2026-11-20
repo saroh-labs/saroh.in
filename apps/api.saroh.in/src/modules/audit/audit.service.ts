@@ -211,6 +211,10 @@ export const AuditAction = {
     // editor plan U47a). Metadata: the site, the change's key, kind and what
     // it was; never a line of the site's text.
     SiteChangeReverted: "site.change.reverted",
+    // A published version copied into the draft, History's "Restore <date>
+    // as the draft" (owner, 20 Nov 2026). Metadata: the site, the version
+    // and how many pages changed; never a line of the site's text.
+    SiteVersionRestoredAsDraft: "site.version.restored_as_draft",
     // An owner made, renamed, edited, rolled or revoked an API key (plan
     // 2026-11-10-001, U5), with the key as the target. Metadata: its kind,
     // name and display prefix; for a rename the name before; for an edit

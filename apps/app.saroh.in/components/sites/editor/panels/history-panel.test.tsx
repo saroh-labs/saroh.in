@@ -38,11 +38,13 @@ vi.mock("@/lib/sites/change-revert-actions", () => ({
         revertChange(id, input) as unknown,
 }));
 const saveDraftSections = vi.fn();
-const restorePublication = vi.fn();
 vi.mock("@/lib/sites/actions", () => ({
     saveDraftSections: (...a: unknown[]) => saveDraftSections(...a) as unknown,
-    restorePublication: (...a: unknown[]) =>
-        restorePublication(...a) as unknown,
+}));
+const restoreVersionAsDraft = vi.fn();
+vi.mock("@/lib/sites/version-restore-actions", () => ({
+    restoreVersionAsDraft: (...a: unknown[]) =>
+        restoreVersionAsDraft(...a) as unknown,
 }));
 const toast = vi.hoisted(() => ({
     showUndo: vi.fn(),
@@ -147,7 +149,7 @@ function model(over: Partial<EditorModel> = {}) {
         canPublish: true,
         unsaved: false,
         status: { label: "Live · 3 changes waiting", tone: "info", waiting: 3 },
-        draft: { sections },
+        draft: { sections, revision: 4 },
         siteStyle: { style: {} },
         styleOptions: {},
         canvasChrome: { name: "Sample", navigation: [], footer: null },
@@ -310,16 +312,23 @@ describe("HistoryPanel (U46b)", () => {
         ).toHaveLength(2);
         expect(document.querySelector("[data-version]")).not.toBeNull();
         expect(document.querySelector("[data-draft]")).not.toBeNull();
-        // Today's restore, with its confirm, then the editor restarts.
-        restorePublication.mockResolvedValue({ ok: true, data: {} });
-        await click(buttons("Restore this version")[0]);
-        await click(buttons("Yes, restore")[0]);
-        expect(restorePublication).toHaveBeenCalledWith(
-            "site_1",
-            "pub_1",
-            false,
+        // Restore as the draft (owner, 20 Nov 2026): its confirm says it
+        // goes live only on Publish, then the editor restarts on History.
+        restoreVersionAsDraft.mockResolvedValue({
+            ok: true,
+            data: { publicationId: "pub_1", restored: 1, draft: null },
+        });
+        await click(buttons(/^Restore .*9 Nov.* as the draft$/)[0]);
+        expect(text()).toContain(
+            "This replaces your draft with this version. It goes live only when you publish.",
         );
+        await click(buttons("Restore as the draft")[0]);
+        expect(restoreVersionAsDraft).toHaveBeenCalledWith("site_1", "pub_1", {
+            pageId: m.pageId,
+            revision: 4,
+        });
         expect(m.reloadDraft).toHaveBeenCalled();
+        expect(historyAfterReload()).toBe("history");
         await click(buttons("Close compare")[0]);
         expect(document.querySelector("[data-history-compare]")).toBeNull();
     });
@@ -346,7 +355,7 @@ describe("HistoryPanel (U46b)", () => {
         expect(buttons("Undo")).toHaveLength(0);
         await click(buttons(/^Compare /)[1]);
         expect(document.querySelector("[data-history-compare]")).not.toBeNull();
-        expect(buttons("Restore this version")).toHaveLength(0);
+        expect(buttons(/^Restore /)).toHaveLength(0);
     });
 });
 

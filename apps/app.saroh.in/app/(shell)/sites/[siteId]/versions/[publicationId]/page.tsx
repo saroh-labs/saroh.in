@@ -134,14 +134,13 @@ export default async function PastVersionPage({
                 </PartialNotice>
             )}
 
-            {site.can.publish ? (
+            {site.can.edit ? (
                 <RestoreVersion
                     siteId={siteId}
                     publicationId={publication.id}
+                    publishedAt={publication.publishedAt}
                     isCurrent={isCurrent}
                     renderable={renderable}
-                    needsApproval={site.publishNeedsApproval === true}
-                    canOverride={site.canOverride === true}
                 />
             ) : null}
 

@@ -7,7 +7,7 @@ import { PageContainer } from "@/components/shared/page/page-container";
 import type { ScheduledGoLives } from "@/components/sites/versions/site-versions";
 import { SiteVersions } from "@/components/sites/versions/site-versions";
 import { requireSession } from "@/lib/session";
-import { getReviewState, getSite, listPublications } from "@/lib/sites/service";
+import { getSite, listPublications } from "@/lib/sites/service";
 import { readTestReleases } from "@/lib/sites/test-releases-api";
 
 /**
@@ -27,12 +27,9 @@ export default async function SiteVersionsPage({
     const { siteId } = await params;
     await requireSession();
 
-    const [site, publications, review, releases] = await Promise.all([
+    const [site, publications, releases] = await Promise.all([
         getSite(siteId),
         listPublications(siteId),
-        // So the restore confirm can say a change request is outstanding
-        // before a restore goes live past it (#279).
-        getReviewState(siteId),
         // Go-lives that are scheduled and haven't happened (T12). Never
         // throws: `off` while test releases are off, and `failed` is said.
         readTestReleases(siteId),
@@ -75,10 +72,7 @@ export default async function SiteVersionsPage({
             <SiteVersions
                 siteId={siteId}
                 publications={publications}
-                changesRequested={review.outstanding}
-                canRestore={site.can.publish}
-                needsApproval={site.publishNeedsApproval === true}
-                canOverride={site.canOverride === true}
+                canRestore={site.can.edit}
                 scheduled={scheduled}
             />
         </PageContainer>

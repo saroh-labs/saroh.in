@@ -4,8 +4,6 @@ import {
     frozenSections,
     releaseTitle,
     releaseVerdictLine,
-    RESTORE_NEEDS_OWNER,
-    restoreGate,
     reviewSubject,
     versionRowCopy,
 } from "./release-review";
@@ -184,24 +182,5 @@ describe("a frozen page's sections", () => {
             ["0", "hero"],
             ["2", "richText"],
         ]);
-    });
-});
-
-describe("restore while publishing needs approval (Q3)", () => {
-    it("is open as before while the setting is off", () => {
-        expect(restoreGate({})).toEqual({ kind: "go" });
-        expect(
-            restoreGate({ publishNeedsApproval: false, canOverride: true }),
-        ).toEqual({ kind: "go" });
-    });
-
-    it("is an owner's override while it is on, and blocked with the reason for anyone else", () => {
-        expect(
-            restoreGate({ publishNeedsApproval: true, canOverride: true }),
-        ).toEqual({ kind: "override" });
-        expect(restoreGate({ publishNeedsApproval: true })).toEqual({
-            kind: "blocked",
-            why: RESTORE_NEEDS_OWNER,
-        });
     });
 });

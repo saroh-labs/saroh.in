@@ -1,5 +1,7 @@
 "use server";
 
+import { permits } from "@/lib/organizations/permits";
+import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { readService } from "@/lib/services/service";
 
 /**
@@ -13,6 +15,11 @@ export interface ServicePrice {
     priceCents: number | null;
     currency: string | null;
     durationMinutes: number;
+    /**
+     * This person's role may change it (`service:write`, O1). Only what the
+     * sheet draws; the API refuses the save on its own.
+     */
+    canWrite: boolean;
 }
 
 export type ServicePriceRead =
@@ -22,7 +29,10 @@ export type ServicePriceRead =
 export async function readServicePrice(
     serviceId: string,
 ): Promise<ServicePriceRead> {
-    const read = await readService(serviceId);
+    const [read, organization] = await Promise.all([
+        readService(serviceId),
+        activeOrganizationOnce().catch(() => null),
+    ]);
     if (!read.ok) return read;
     const s = read.service;
     return {
@@ -32,6 +42,7 @@ export async function readServicePrice(
             priceCents: s.priceCents,
             currency: s.currency,
             durationMinutes: s.durationMinutes,
+            canWrite: permits(organization, "service:write"),
         },
     };
 }

@@ -46,6 +46,8 @@ import { StarterContentController } from "./starter-content.controller";
 import { TemplatePreviewController } from "./template-preview.controller";
 import { TestReleasesController } from "./test-releases.controller";
 import { TestReleasesService } from "./test-releases.service";
+import { VersionRestoreService } from "./version-restore";
+import { VersionRestoreController } from "./version-restore.controller";
 
 /**
  * Org-owned publishing sites (S2-003). Imports {@link OrganizationsModule} for
@@ -86,6 +88,7 @@ import { TestReleasesService } from "./test-releases.service";
         PageResultsController,
         ServiceUsesController,
         ChangeRevertController,
+        VersionRestoreController,
         PublicSitesController,
         PublicQrController,
         // "Your booking page" in Bookings (DEC-175).
@@ -111,6 +114,7 @@ import { TestReleasesService } from "./test-releases.service";
         PageResultsService,
         ServiceUsesService,
         ChangeRevertService,
+        VersionRestoreService,
         QrPrintService,
         PublicQrService,
         GoLiveHandler,

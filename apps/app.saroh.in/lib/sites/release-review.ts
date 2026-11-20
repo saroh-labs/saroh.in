@@ -185,32 +185,3 @@ export function frozenSections(
               ],
     );
 }
-
-// ---------------------------------------------------------------------------
-// Restoring while "Publishing needs approval" is on
-// ---------------------------------------------------------------------------
-
-/**
- * Whether Restore is open to this person (DEC-071, Q3): with the setting on,
- * a restore is refused unless an owner overrides, and the override is
- * recorded (T9). Anyone else sees why beside the control.
- */
-export type RestoreGate =
-    { kind: "go" } | { kind: "override" } | { kind: "blocked"; why: string };
-
-export const RESTORE_NEEDS_OWNER =
-    "Publishing needs approval, so only an approved test release can go live. Only an owner can restore a version without approval.";
-
-/** What an owner's restore past the setting leaves behind, said first. */
-export const RESTORE_OVERRIDE_LINE =
-    "Publishing needs approval on this site. As an owner you can restore without it, and it's recorded as gone live without approval: in version history, in the review history and in the business's activity log.";
-
-export function restoreGate(site: {
-    publishNeedsApproval?: boolean;
-    canOverride?: boolean;
-}): RestoreGate {
-    if (site.publishNeedsApproval !== true) return { kind: "go" };
-    return site.canOverride === true
-        ? { kind: "override" }
-        : { kind: "blocked", why: RESTORE_NEEDS_OWNER };
-}

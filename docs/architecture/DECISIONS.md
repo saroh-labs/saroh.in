@@ -3090,3 +3090,19 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: the redesigned Website area draws a web address per site and an All sites list, but the code keeps one web address per business, and how a business will add more sites is planned but not settled.
 - Decision: for now the Website area shows **one web address: the business's default**, the one it selected. The All sites list and site switcher show one site until adding sites ships. When a business can add more sites, it **chooses which site keeps the default address**, and the other sites get addresses of their own.
 - Consequences: no per-site address field yet; the web address screen edits the business's default address. The site header, Overview and Links read that one address. Per-site addresses and "make this the default" are designed and built with the multi-site work.
+
+## DEC-231 The editor's price sheet changes the price in Services at once
+
+**Status: Accepted — 2026-11-20** · owner (O1) · website editor plan 2026-11-20-002, U48
+
+- Context: the editor's From Services list shows each service's price beside its section. A price drafted on the page and waiting for Publish would differ from the price bookings and bills charge, which is the wrong price the publish checks exist to catch.
+- Decision: tapping a price opens a sheet that **saves the price to the service in Services straight away**, through the service's own update, so the price history records who changed it and when. The sheet says "Changes it in Services and everywhere it shows" and "Bookings already made keep the price they were made at". It needs `service:write`; any other role sees the price read-only with who can change it. The price never appears in the Publish sheet and is never a change waiting to publish.
+- Consequences: `PRICE_WRITES_ON` is on in `price-sheet.tsx`; the read-only sheet with its link to Services stays as the view without `service:write`. The sheet's footer reads "Saved in Services · shows here at once". The pages, booking page and new bills all read the new price at once.
+
+## DEC-232 Restoring a version puts it back as the draft, not live
+
+**Status: Accepted — 2026-11-20** · owner · website editor plan 2026-11-20-002, U46b · changes #194's restore
+
+- Context: Restore in the editor's History and on Version history put an old version live at once, as a new publish.
+- Decision: **Restore <date> as the draft** copies the version's pages and sections into the current draft. Nothing goes live until Publish, which asks for approval like any publish. Each section it changes is stamped with the person restoring, so the Publish sheet lists every change as theirs. It needs the editor's own write (`section:write`), not `site:publish`; a reader can't restore. The confirm says "This replaces your draft with this version. It goes live only when you publish." A page removed since is skipped; a page added since stays; page settings, the menu and the look are not part of it.
+- Consequences: `POST …/sites/:siteId/publications/:publicationId/restore-draft` (revision checked for the open page, 409 when stale; audited as `site.version.restored_as_draft`). The editor reloads on History after a restore. The old make-it-live endpoint (`…/publications/:id/restore`) stays in the API, where the live pointer's `restore` source and its specs use it; the app no longer calls it.

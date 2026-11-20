@@ -47,7 +47,6 @@ import {
     recordPageView as recordPageViewApi,
     removeSiteRedirect as removeSiteRedirectApi,
     requestReview as requestReviewApi,
-    restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
     rollbackDraft as rollbackDraftApi,
     saveDraftSections as saveDraftSectionsApi,
@@ -176,18 +175,6 @@ export async function updateSiteSettings(
 /** Set the site's own icon from the library, or take it off (null). */
 export async function saveSiteIcon(siteId: string, mediaId: string | null) {
     return saveSiteIconApi(siteId, mediaId);
-}
-
-/**
- * `override`: an owner's restore past "Publishing needs approval"
- * (DEC-071, Q3), recorded as one.
- */
-export async function restorePublication(
-    siteId: string,
-    publicationId: string,
-    override = false,
-) {
-    return restorePublicationApi(siteId, publicationId, override);
 }
 
 /**
