@@ -1135,10 +1135,7 @@ describe("add-ons are always paid for (review 19 Nov 2026, H-1 and M-1)", () => 
         const r = await checkout.changePlan(ctx, { plan: "b", cycle: "year" });
         if (r.kind === "TO_FREE") throw new Error("expected a checkout");
         const yearOrder = fake.orders.created.at(-1)!;
-        await orderPaid(
-            r.checkout.providerSubscriptionId,
-            yearOrder.amountPaise,
-        );
+        await orderPaid(`fake_order_${r.checkout.id}`, yearOrder.amountPaise);
         expect(await sub(ctx.organizationId)).toMatchObject({
             status: "ACTIVE",
             billingCycle: "year",

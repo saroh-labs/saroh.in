@@ -34,6 +34,8 @@ const MIGRATIONS = [
     "20261021100000_pricing_catalogue",
     "20261021170000_coupon_razorpay_offer",
     "20270201100000_pricing_catalogue_edition",
+    // Replaces `PricingCoupon_amounts_positive` with the percent-off shape.
+    "20270217120000_coupon_automatic",
 ].map((name) =>
     path.resolve(
         __dirname,
@@ -48,15 +50,17 @@ async function ensureMigrationChecks(): Promise<number> {
         .replace(/--[^\n]*/g, "")
         .split(";")
         .map((s) => s.trim());
-    // A CHECK a later migration drops is not the schema's any more.
-    const dropped = new Set(
-        all.flatMap((s) => /DROP CONSTRAINT "(\w+)"/.exec(s)?.[1] ?? []),
-    );
-    const statements = all.filter(
-        (s) =>
-            /ADD CONSTRAINT "\w+"\s+CHECK/.test(s) &&
-            !dropped.has(/ADD CONSTRAINT "(\w+)"/.exec(s)![1]!),
-    );
+    // In migration order: a later ADD replaces a CHECK, a DROP removes it.
+    // Adding one a later migration replaced would leave the old CHECK for
+    // the next spec on this database.
+    const checks = new Map<string, string>();
+    for (const s of all) {
+        const added = /ADD CONSTRAINT "(\w+)"\s+CHECK/.exec(s)?.[1];
+        const dropped = /DROP CONSTRAINT "(\w+)"/.exec(s)?.[1];
+        if (added) checks.set(added, s);
+        else if (dropped) checks.delete(dropped);
+    }
+    const statements = [...checks.values()];
     for (const sql of statements) {
         const name = /ADD CONSTRAINT "(\w+)"/.exec(sql)![1]!;
         const [has] = await prisma.$queryRawUnsafe<{ n: bigint }[]>(

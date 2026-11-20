@@ -79,8 +79,12 @@ export function assertSessionFresh(
     });
 }
 
-export const adminSessionMaxAge = () => env.ADMIN_SESSION_MAX_AGE_MINUTES;
-export const adminStepUpMaxAge = () => env.ADMIN_STEP_UP_MAX_AGE_MINUTES;
+// Number(...) || default: under SKIP_ENV_VALIDATION the value arrives raw and
+// the schema's defaults are gone, which refused every admin session.
+export const adminSessionMaxAge = () =>
+    Number(env.ADMIN_SESSION_MAX_AGE_MINUTES) || 720;
+export const adminStepUpMaxAge = () =>
+    Number(env.ADMIN_STEP_UP_MAX_AGE_MINUTES) || 60;
 
 /**
  * Write a ledger row unless one with the same action already exists for
