@@ -38,9 +38,15 @@ export function AddBlockPanel({
     shopOpen = false,
     packsOpen = false,
     search = false,
+    query: searched,
 }: {
     /** A search over the blocks' names and lines (a phone's sheet, DEC-185). */
     search?: boolean;
+    /**
+     * Search results only, for a query typed elsewhere (Rail › Add's own
+     * search, U46e): no search box, no Browse button, no Every page group.
+     */
+    query?: string;
     /** A block was chosen. `looks` says whether a look still has to be picked. */
     onPick: (type: SectionType, looks: number) => void;
     /**
@@ -53,7 +59,9 @@ export function AddBlockPanel({
     /** Class packs is rolled out and on: its block is offered (DEC-057). */
     packsOpen?: boolean;
 }) {
-    const [query, setQuery] = useState("");
+    const [own, setQuery] = useState("");
+    const results = searched !== undefined;
+    const query = searched ?? own;
     const q = query.trim().toLowerCase();
     const families = addableFamilies(shopOpen, packsOpen, q);
     // A family sits in the group of its leading layout.
@@ -67,23 +75,25 @@ export function AddBlockPanel({
 
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">
-            {search ? (
+            {search && !results ? (
                 <ListSearch
                     placeholder="Search blocks"
                     onSearch={setQuery}
                     shortcut={false}
                 />
             ) : null}
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full gap-1.5"
-                onClick={onBrowse}
-            >
-                <LayoutGrid aria-hidden className="size-4" />
-                Browse with previews
-            </Button>
+            {results ? null : (
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5"
+                    onClick={onBrowse}
+                >
+                    <LayoutGrid aria-hidden className="size-4" />
+                    Browse with previews
+                </Button>
+            )}
             {q !== "" && structure.length + business.length === 0 ? (
                 <p className="px-2 text-sm text-muted-foreground">
                     No block matches “{query.trim()}”.
@@ -121,7 +131,7 @@ export function AddBlockPanel({
     );
 }
 
-function Group({
+export function Group({
     label,
     children,
 }: {
@@ -141,7 +151,7 @@ function Group({
  * names the section ("Visit us · Talk to us" when a search found only it);
  * a family lists its layouts under its name.
  */
-function FamilyEntry({
+export function FamilyEntry({
     family,
     onPick,
 }: {
@@ -203,7 +213,7 @@ function FamilyEntry({
 }
 
 /** One block to add. Without `onClick` it is shown disabled, with its hint as the reason. */
-function Entry({
+export function Entry({
     icon: Icon,
     label,
     hint,

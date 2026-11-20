@@ -12,8 +12,8 @@ export const SAVE_LINES = {
     "changed-waits": "Changed · goes live when you publish",
     "post-goes-live-alone": "Goes live now, on its own",
     "from-your-code": "Goes live from your code",
-    "goes-live-now":
-        "Changes the price everywhere now, also in bookings and bills",
+    // The price sheet (U48, O1): a price lives on the service, not the draft.
+    "goes-live-now": "Saved in Services · shows here at once",
     "shows-now": "Shows on your site now",
 } as const;
 

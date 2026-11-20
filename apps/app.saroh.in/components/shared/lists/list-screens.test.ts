@@ -158,6 +158,10 @@ describe("a list draws the one toolbar", () => {
                     "the product editor's search over a long variants list, inside a section card that has no list toolbar",
                 "components/sites/blocks/add-block-panel.tsx":
                     "a phone's Add a block sheet: a search over the blocks to add, in a sheet with no list toolbar (DEC-185)",
+                "components/sites/editor/add/add-panel.tsx":
+                    "the editor's Add panel: one search over pages and sections to add, in a side panel with no list toolbar (U46e)",
+                "components/sites/editor/add/from-your-business.tsx":
+                    "Add › A service: a search over services to pick, inside the Add panel (U46e)",
             },
         );
     });

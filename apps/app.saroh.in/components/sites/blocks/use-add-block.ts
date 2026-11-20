@@ -31,10 +31,16 @@ export function useAddBlock({
 
     /**
      * Add a block after the selected one (or at the end), select it, and
-     * bring it into view (#337).
+     * bring it into view (#337). `fill` runs with its index first, so a
+     * section from your business goes in already bound (U46e).
      */
-    function addSection(type: SectionType, variant?: string) {
+    function addSection(
+        type: SectionType,
+        variant?: string,
+        fill?: (at: number) => void,
+    ) {
         const at = insertSection(type, variant);
+        fill?.(at);
         setSelectedIndex(at);
         setAdding(false);
         setInspector("block");
