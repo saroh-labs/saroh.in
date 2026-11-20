@@ -117,7 +117,7 @@ const SECTION_WORDS: Partial<Record<string, string>> = {
     hero: "Top of the page",
 };
 
-interface SnapshotPage {
+export interface SnapshotPage {
     path: string;
     title: string;
     entry: Record<string, unknown>;
@@ -139,7 +139,7 @@ function asObject(value: unknown): Record<string, unknown> {
 }
 
 /** A snapshot's pages with their ids and section keys; forgiving of old ones. */
-function readPages(snapshot: unknown): SnapshotPage[] {
+export function readPages(snapshot: unknown): SnapshotPage[] {
     const shape = asObject(snapshot);
     const keys = asObject(shape.keys);
     const pages = Array.isArray(shape.pages) ? shape.pages : [];
@@ -927,4 +927,57 @@ export function leaveOutOf(
         leftOut,
         alsoLeftOut: leftOut.filter((k) => !asked.has(k)),
     };
+}
+
+// ---------------------------------------------------------------------------
+// Undo one change (website editor plan U47a)
+// ---------------------------------------------------------------------------
+
+/** A draft section as a save sends it. */
+export interface RevertableSection {
+    key: string;
+    type: string;
+    contractVersion: number;
+    content: unknown;
+    hidden: boolean;
+}
+
+/**
+ * A page's draft sections with one section put back as it is live: the
+ * inverse of leaving it out (U8). A section added since is taken away; an
+ * edited, moved or hidden one gets its live content at its live place,
+ * shown; a removed one comes back at its live place. Every other section is
+ * left as it is. `live` is the live page (null when the page is new);
+ * its sections must carry keys. Pure.
+ */
+export function revertSection(
+    draft: readonly RevertableSection[],
+    live: SnapshotPage | null,
+    key: string,
+): RevertableSection[] {
+    const out = draft.filter((s) => s.key !== key);
+    const liveKeys = live?.keys ?? [];
+    const at = liveKeys.indexOf(key);
+    if (!live || at < 0) return out;
+    const section = asObject(live.sections[at]);
+    // After the nearest section before it on the live page that is still here.
+    let place = 0;
+    for (let j = at - 1; j >= 0; j -= 1) {
+        const idx = out.findIndex((s) => s.key === liveKeys[j]);
+        if (idx >= 0) {
+            place = idx + 1;
+            break;
+        }
+    }
+    out.splice(place, 0, {
+        key,
+        type: String(section.type),
+        contractVersion:
+            typeof section.contractVersion === "number"
+                ? section.contractVersion
+                : 1,
+        content: section.content,
+        hidden: false,
+    });
+    return out;
 }

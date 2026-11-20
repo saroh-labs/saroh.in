@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { blockFixture, blockVariantIds } from "./fixtures";
 import {
     ctaHref,
     getSectionContract,
@@ -9,6 +10,7 @@ import {
     requiresSanitization,
     SAME_DAY_CALL_WORDS,
     SECTION_TYPES,
+    sectionFrameSettingsOf,
 } from "./section-contract";
 
 describe("section-contract registry", () => {
@@ -809,5 +811,70 @@ describe("phase 2 block fields (U15)", () => {
                 images: [{ src: "/a.jpg", link: { kind: "url", href: "/" } }],
             }),
         ).toBe(false);
+    });
+});
+
+describe("a section's frame (KTD-E5)", () => {
+    const hero = { heading: "Bridal makeup in Pune" };
+
+    it("leaves a section without a frame exactly as it was", () => {
+        const parsed = parseSectionContent("hero", 1, hero);
+        expect(parsed.success).toBe(true);
+        if (parsed.success) expect(parsed.data).not.toHaveProperty("frame");
+    });
+
+    it("keeps a frame through a save, on every block", () => {
+        const frame = { hideOn: "phone", tone: "dark", spacing: "airy" };
+        const checked = new Set<string>();
+        for (const type of SECTION_TYPES) {
+            for (const variant of blockVariantIds(type)) {
+                const content = blockFixture(type, variant);
+                const plain = parseSectionContent(type, 1, content);
+                if (!plain.success) continue;
+                const framed = parseSectionContent(type, 1, {
+                    ...(content as object),
+                    frame,
+                });
+                expect(framed.success, `${type}/${variant}`).toBe(true);
+                if (framed.success) {
+                    expect((framed.data as { frame?: unknown }).frame).toEqual(
+                        frame,
+                    );
+                }
+                checked.add(type);
+                break;
+            }
+        }
+        expect(checked.size).toBeGreaterThan(SECTION_TYPES.length / 2);
+    });
+
+    it("drops an empty frame, so {} is never a change", () => {
+        const parsed = parseSectionContent("hero", 1, { ...hero, frame: {} });
+        expect(parsed.success).toBe(true);
+        if (parsed.success) expect(parsed.data).not.toHaveProperty("frame");
+    });
+
+    it.each([
+        [{ tone: "neon" }],
+        [{ spacing: "huge" }],
+        [{ hideOn: "desk" }],
+        [{ colour: "red" }],
+        ["dark"],
+    ])("refuses %j", (frame) => {
+        const parsed = parseSectionContent("hero", 1, { ...hero, frame });
+        expect(parsed.success).toBe(false);
+        if (!parsed.success && parsed.error.code === "INVALID_CONTENT") {
+            expect(parsed.error.issues[0]?.path[0]).toBe("frame");
+        } else {
+            throw new Error("expected INVALID_CONTENT");
+        }
+    });
+
+    it("reads forgivingly for the renderer", () => {
+        expect(sectionFrameSettingsOf({ frame: { tone: "tint" } })).toEqual({
+            tone: "tint",
+        });
+        expect(sectionFrameSettingsOf({ frame: { tone: "neon" } })).toEqual({});
+        expect(sectionFrameSettingsOf(null)).toEqual({});
     });
 });

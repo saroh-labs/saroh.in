@@ -112,8 +112,10 @@ export class SitesController {
     changes(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        // History's Compare (U47a): the units between that version and the draft.
+        @Query("against") against?: string,
     ) {
-        return this.sites.getChanges(ctx, siteId);
+        return this.sites.getChanges(ctx, siteId, against);
     }
 
     /**

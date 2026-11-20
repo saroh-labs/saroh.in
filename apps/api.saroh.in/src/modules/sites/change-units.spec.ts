@@ -3,7 +3,10 @@ import {
     carryStamps,
     changeUnits,
     groupByPerson,
+    leaveOutOf,
     readDraftEditors,
+    readPages,
+    revertSection,
     sectionLabel,
 } from "./change-units";
 import type { PublishablePage } from "./pending-changes";
@@ -542,5 +545,150 @@ describe("readDraftEditors", () => {
             }),
         ).toEqual({ "site:footer": MOHIT });
         expect(readDraftEditors(null)).toEqual({});
+    });
+});
+
+describe("revertSection (Undo one change, U47a)", () => {
+    const live: Page = {
+        id: "p_bridal",
+        path: "/bridal",
+        title: "Bridal packages",
+        sections: [
+            { key: "k0", section: HERO },
+            { key: "k1", section: text("Packages") },
+            { key: "k2", section: text("Trial") },
+        ],
+    };
+    const row = (
+        key: string,
+        section: ReturnType<typeof text>,
+        hidden = false,
+    ) => ({
+        key,
+        ...section,
+        hidden,
+    });
+    const livePage = readPages(snapshot([live]))[0];
+    /** The units left once the draft rows are what a save writes. */
+    const unitsAfter = (rows: ReturnType<typeof row>[]) =>
+        changeUnits(
+            snapshot([
+                {
+                    ...live,
+                    sections: rows
+                        .filter((r) => !r.hidden)
+                        .map((r) => ({
+                            key: r.key,
+                            section: {
+                                type: r.type,
+                                contractVersion: r.contractVersion,
+                                content: r.content,
+                            },
+                        })),
+                },
+            ]),
+            snapshot([live]),
+            stamps(),
+        ).map((u) => u.key);
+
+    it("puts an edited section back as it is live, the others untouched", () => {
+        const draft = [
+            row("k0", HERO as ReturnType<typeof text>),
+            row("k1", text("Packages, now cheaper")),
+            row("k2", text("Trial, edited too")),
+        ];
+        const out = revertSection(draft, livePage, "k1");
+        expect(out[1]).toMatchObject({
+            key: "k1",
+            content: text("Packages").content,
+        });
+        expect(out[2]).toEqual(draft[2]);
+        expect(unitsAfter(out)).toEqual(["section:p_bridal:k2"]);
+    });
+
+    it("takes away a section added since", () => {
+        const draft = [
+            row("k0", HERO as ReturnType<typeof text>),
+            row("k1", text("Packages")),
+            row("new", text("Monsoon offer")),
+            row("k2", text("Trial")),
+        ];
+        const out = revertSection(draft, livePage, "new");
+        expect(out.map((s) => s.key)).toEqual(["k0", "k1", "k2"]);
+        expect(unitsAfter(out)).toEqual([]);
+    });
+
+    it("puts a removed section back at its live place", () => {
+        const draft = [
+            row("k0", HERO as ReturnType<typeof text>),
+            row("k2", text("Trial")),
+        ];
+        const out = revertSection(draft, livePage, "k1");
+        expect(out.map((s) => s.key)).toEqual(["k0", "k1", "k2"]);
+        expect(unitsAfter(out)).toEqual([]);
+    });
+
+    it("shows a hidden one again and moves a moved one back", () => {
+        const draft = [
+            row("k2", text("Trial")),
+            row("k0", HERO as ReturnType<typeof text>),
+            row("k1", text("Packages"), true),
+        ];
+        const shown = revertSection(draft, livePage, "k1");
+        expect(shown.find((s) => s.key === "k1")?.hidden).toBe(false);
+        const back = revertSection(shown, livePage, "k2");
+        expect(back.map((s) => s.key)).toEqual(["k0", "k1", "k2"]);
+        expect(unitsAfter(back)).toEqual([]);
+    });
+
+    it("on a new page, takes the section away", () => {
+        expect(revertSection([row("a", text("Hello"))], null, "a")).toEqual([]);
+    });
+});
+
+describe("a section's frame is content (KTD-E5)", () => {
+    it("a frame change is one change unit", () => {
+        const framed = {
+            ...text("Packages"),
+            content: {
+                ...text("Packages").content,
+                frame: { hideOn: "phone" },
+            },
+        };
+        const live: Page = {
+            id: "p",
+            path: "/",
+            title: "Home",
+            sections: [
+                { key: "k1", section: text("Packages") },
+                { key: "k2", section: text("Trial") },
+            ],
+        };
+        const draft = {
+            ...live,
+            sections: [{ key: "k1", section: framed }, live.sections[1]],
+        };
+        const units = changeUnits(
+            snapshot([draft]),
+            snapshot([live]),
+            stamps(),
+        );
+        expect(units.map((u) => [u.key, u.change])).toEqual([
+            ["section:p:k1", "changed"],
+        ]);
+        // Left out beside another change, it publishes as it is live.
+        const both = {
+            ...draft,
+            sections: [
+                draft.sections[0],
+                { key: "k2", section: text("Trial, new") },
+            ],
+        };
+        const out = leaveOutOf(snapshot([both]), snapshot([live]), [
+            "section:p:k1",
+        ]);
+        const pages = out.snapshot.pages as { sections: unknown[] }[];
+        expect(pages[0].sections[0]).toEqual(text("Packages"));
+        expect(pages[0].sections[1]).toEqual(text("Trial, new"));
     });
 });

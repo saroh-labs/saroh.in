@@ -61,6 +61,10 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/site-redirects.controller.ts": "WEBSITE",
     // A site's Overview (website area U4).
     "sites/site-overview.controller.ts": "WEBSITE",
+    // The editor's page results, service uses and Undo one change (U47a).
+    "sites/page-results.controller.ts": "WEBSITE",
+    "sites/service-uses.controller.ts": "WEBSITE",
+    "sites/change-revert.controller.ts": "WEBSITE",
     "share-posts/share-posts.controller.ts": "WEBSITE",
     // The booking page's card with the sheet's headline (#1375).
     "share-posts/share-cards.controller.ts": "WEBSITE",

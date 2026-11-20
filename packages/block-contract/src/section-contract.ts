@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { COMPONENT_STYLE_OPTIONS } from "./component-styles";
 import { parseSectionFrame } from "./section-frame";
 
 /**
@@ -66,6 +67,47 @@ import { parseSectionFrame } from "./section-frame";
  * setting, which is the sane degradation.
  */
 const paddingOverride = z.number().int().min(24).max(96).optional();
+
+/**
+ * A section's frame (website editor plan KTD-E5): hidden on a phone, the
+ * ground it sits on, and its spacing, set from the inspector's Visibility
+ * and Style tabs. One optional `frame` object beside every block's own
+ * fields, read for every block at once by `parseSectionContent` (as the
+ * anchor and band are, `section-frame.ts`), so no schema repeats it and a
+ * block added later can't strip it. ABSENT is exactly today's page.
+ *
+ * - `hideOn: "phone"`: left out below the phone width by CSS alone, so the
+ *   page stays one HTML document for every screen (and for Google).
+ * - `tone`: `page` is the page's own ground; `tint`, `brand` and `dark` are
+ *   the existing `--site-*` bands (surface, accent, inverse).
+ * - `spacing`: the site look's own spacing choices, applied to this section.
+ *
+ * Strict: an unknown key or value is refused, never quietly dropped.
+ */
+export const SECTION_TONES = ["page", "tint", "brand", "dark"] as const;
+export type SectionTone = (typeof SECTION_TONES)[number];
+
+export const sectionFrameSettingsSchema = z
+    .object({
+        hideOn: z.literal("phone").optional(),
+        tone: z.enum(SECTION_TONES).optional(),
+        spacing: z.enum(COMPONENT_STYLE_OPTIONS.spacing).optional(),
+    })
+    .strict();
+export type SectionFrameSettings = z.infer<typeof sectionFrameSettingsSchema>;
+
+/**
+ * The `frame` a section's raw content carries, as the renderer may use it:
+ * whatever fails the schema is dropped, never thrown (the content is a
+ * published snapshot, checked when it was saved).
+ */
+export function sectionFrameSettingsOf(content: unknown): SectionFrameSettings {
+    if (content === null || typeof content !== "object") return {};
+    const parsed = sectionFrameSettingsSchema.safeParse(
+        (content as { frame?: unknown }).frame,
+    );
+    return parsed.success ? parsed.data : {};
+}
 
 /**
  * Which of the block's looks this section wears (#254).
@@ -1946,10 +1988,38 @@ export function parseSectionContent(
             },
         };
     }
+    // The `frame` object (KTD-E5), read off the raw content the same way.
+    // Absent or empty is no frame, so `{}` never counts as a change.
+    const rawSettings = (content as { frame?: unknown }).frame;
+    const settings =
+        rawSettings === undefined || rawSettings === null
+            ? null
+            : sectionFrameSettingsSchema.safeParse(rawSettings);
+    if (settings && !settings.success) {
+        return {
+            success: false,
+            error: {
+                code: "INVALID_CONTENT",
+                type,
+                version,
+                issues: settings.error.issues.map((issue) => ({
+                    ...issue,
+                    path: ["frame", ...issue.path],
+                })),
+                message: `Invalid frame for section "${type}" v${version}`,
+            },
+        };
+    }
+    const own =
+        settings && Object.keys(settings.data).length > 0
+            ? { frame: settings.data }
+            : {};
+
     const parsed: unknown = result.data;
+    const extra = { ...frame.frame, ...own };
     const data: unknown =
-        Object.keys(frame.frame).length > 0
-            ? { ...(parsed as Record<string, unknown>), ...frame.frame }
+        Object.keys(extra).length > 0
+            ? { ...(parsed as Record<string, unknown>), ...extra }
             : parsed;
 
     return { success: true, data, contract };

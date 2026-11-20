@@ -117,8 +117,9 @@ const ROUTES: Route[] = [
         path: ":siteId/changes",
         target: "sites",
         call: "getChanges",
-        args: [ctx, SITE],
-        expect: [ctx, SITE],
+        // `?against=` a past version (History's Compare, U47a).
+        args: [ctx, SITE, "pub_1"],
+        expect: [ctx, SITE, "pub_1"],
     },
     {
         handler: "listComments",

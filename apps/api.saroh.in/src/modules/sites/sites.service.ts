@@ -1237,6 +1237,8 @@ export class SitesService {
      */
     private async pendingSectionChanges(
         siteIds: string[],
+        /** The version to diff against instead of each site's live one. */
+        against?: { snapshot: unknown },
     ): Promise<Map<string, PendingChanges | null>> {
         const byId = new Map<string, PendingChanges | null>();
         if (siteIds.length === 0) return byId;
@@ -1254,11 +1256,11 @@ export class SitesService {
         });
 
         for (const site of sites) {
-            if (site.currentPublication === null) {
+            const live = against?.snapshot ?? site.currentPublication?.snapshot;
+            if (live === undefined || live === null) {
                 byId.set(site.id, null);
                 continue;
             }
-            const live = site.currentPublication.snapshot;
             const visible = visibleDraft(site);
             const pages = toPendingPages(visible.pages);
             // Lenient: counting is a read, and one stale section must not
@@ -1391,6 +1393,11 @@ export class SitesService {
     async getChanges(
         ctx: OrganizationContext,
         siteId: string,
+        /**
+         * A past version to diff the draft against instead of the live one
+         * (History's Compare, website editor plan U47a). Not this site's: 404.
+         */
+        against?: string,
     ): Promise<SiteChangesView> {
         authorize(ctx, "site:read");
         const site = await prisma.site.findFirst({
@@ -1407,10 +1414,28 @@ export class SitesService {
             },
         });
         if (!site) throw new NotFoundException(`Site "${siteId}" not found`);
+        let version: { snapshot: unknown } | undefined;
+        if (against !== undefined) {
+            const found = await prisma.publication.findFirst({
+                where: {
+                    id: against,
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    ...SITE_VERSION,
+                },
+                select: { snapshot: true },
+            });
+            if (!found) {
+                throw new NotFoundException(
+                    `Publication "${against}" not found`,
+                );
+            }
+            version = found;
+        }
 
         const [pending, posts, approvalRequired, approvers] = await Promise.all(
             [
-                this.pendingSectionChanges([siteId]),
+                this.pendingSectionChanges([siteId], version),
                 // Posts publish on their own (not units): those not live yet.
                 // shortcut: a live post edited since is not listed; add it when
                 // posts get draft-vs-live state (batch 3).

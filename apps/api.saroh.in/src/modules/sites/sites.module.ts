@@ -12,9 +12,13 @@ import { MediaStorageModule } from "../media/media-storage.module";
 import { OrganizationsModule } from "../organizations/organizations.module";
 import { BookingPageController } from "./booking-page.controller";
 import { BookingPageService } from "./booking-page.service";
+import { ChangeRevertService } from "./change-revert";
+import { ChangeRevertController } from "./change-revert.controller";
 import { GoLiveHandler, SITE_GO_LIVE_TYPE } from "./go-live.handler";
 import { SITE_PAGES_REVALIDATE_TYPE } from "./page-cache-revalidate";
 import { PageCacheRevalidateHandler } from "./page-cache.job";
+import { PageResultsService } from "./page-results";
+import { PageResultsController } from "./page-results.controller";
 import { PublicContactService } from "./public-contact.service";
 import { PublicFooterService } from "./public-footer.service";
 import { PublicHeadService } from "./public-head.service";
@@ -25,6 +29,8 @@ import { PublicVisitService } from "./public-visit.service";
 import { QrCodesController } from "./qr-codes.controller";
 import { QrCodesService } from "./qr-codes.service";
 import { QrPrintService } from "./qr-print.service";
+import { ServiceUsesService } from "./service-uses";
+import { ServiceUsesController } from "./service-uses.controller";
 import { SiteIconController } from "./site-icon.controller";
 import { SiteIconService } from "./site-icon.service";
 import { SiteOverviewService } from "./site-overview";
@@ -76,6 +82,10 @@ import { TestReleasesService } from "./test-releases.service";
         SiteRedirectsController,
         // A site's Overview (website area U4).
         SiteOverviewController,
+        // The editor's page results, service uses and Undo one change (U47a).
+        PageResultsController,
+        ServiceUsesController,
+        ChangeRevertController,
         PublicSitesController,
         PublicQrController,
         // "Your booking page" in Bookings (DEC-175).
@@ -98,6 +108,9 @@ import { TestReleasesService } from "./test-releases.service";
         QrCodesService,
         SiteRedirectsService,
         SiteOverviewService,
+        PageResultsService,
+        ServiceUsesService,
+        ChangeRevertService,
         QrPrintService,
         PublicQrService,
         GoLiveHandler,

@@ -207,6 +207,10 @@ export const AuditAction = {
     SiteDetailsFilled: "site.starter_content.filled",
     SiteDraftRolledBack: "site.draft.rolled_back",
     SiteSectionBroughtIn: "site.draft.section_brought_in",
+    // One waiting change put back as it is live, History's Undo (website
+    // editor plan U47a). Metadata: the site, the change's key, kind and what
+    // it was; never a line of the site's text.
+    SiteChangeReverted: "site.change.reverted",
     // An owner made, renamed, edited, rolled or revoked an API key (plan
     // 2026-11-10-001, U5), with the key as the target. Metadata: its kind,
     // name and display prefix; for a rename the name before; for an edit

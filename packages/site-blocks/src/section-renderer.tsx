@@ -20,11 +20,15 @@ import type {
     RenderedTestimonials,
     RenderedTimetable,
     RenderedVisitUs,
+    SectionTone,
 } from "@saroh/block-contract";
 import {
+    COMPONENT_VALUES,
+    componentDefaults,
     isSectionType,
     resolveVariant,
     sectionFrameOf,
+    sectionFrameSettingsOf,
 } from "@saroh/block-contract";
 
 import BookingSection from "./blocks/booking";
@@ -459,6 +463,57 @@ function paddingOverride(content: unknown): React.CSSProperties | undefined {
     return { "--site-section-padding": `${px}px` } as React.CSSProperties;
 }
 
+/** A frame `tone` as the band `SiteTheme` already colours (KTD-E5). */
+const TONE_BANDS: Record<SectionTone, string | undefined> = {
+    page: undefined,
+    tint: "surface",
+    brand: "accent",
+    dark: "inverse",
+};
+
+/**
+ * What a section's `frame` (KTD-E5) adds to its wrapper: its band, a class
+ * that leaves it out below the phone width (CSS only, so the page is one HTML
+ * document for every screen), and its spacing. Spacing scales the section
+ * padding its children read, by the option's factor over the look's default,
+ * as the site-wide choice does (`component-theme.ts`). Absent adds nothing.
+ *
+ * shortcut: the factor is over the look's default, not the site's own
+ * spacing choice, so on a site that changed its spacing a section's option
+ * lands relative to that; pass the site's choice in when the inspector shows
+ * the difference.
+ */
+export function frameOf(
+    content: unknown,
+    look: LookId | undefined,
+    band: string | undefined,
+): { band?: string; className?: string; style?: React.CSSProperties } {
+    const frame = sectionFrameSettingsOf(content);
+    const classes: string[] = [];
+    if (frame.hideOn === "phone") classes.push("max-sm:hidden");
+    let style: React.CSSProperties | undefined;
+    if (frame.spacing) {
+        const f =
+            COMPONENT_VALUES.spacing[frame.spacing] /
+            COMPONENT_VALUES.spacing[componentDefaults(look).spacing];
+        if (f !== 1) {
+            // Read off the wrapper's own padding, then handed to its children:
+            // one property can't scale itself without a cycle.
+            style = {
+                "--site-frame-padding": `calc(var(--site-section-padding) * ${f})`,
+            } as React.CSSProperties;
+            classes.push(
+                "[&>*]:[--site-section-padding:var(--site-frame-padding)]",
+            );
+        }
+    }
+    return {
+        band: frame.tone ? TONE_BANDS[frame.tone] : band,
+        className: classes.length > 0 ? classes.join(" ") : undefined,
+        style,
+    };
+}
+
 /**
  * Whether a section is a full-bleed hero (U2), which the site header lies
  * over when it opens the page. `PageSections` marks the first section's
@@ -508,8 +563,9 @@ export function withLookVariant(section: Section, look?: LookId): unknown {
  * wrapper's `id`, so a header entry or a button can jump to it, and its band
  * as `data-site-band`, whose colours `SiteTheme` writes. `data-site-section`
  * marks every wrapper, for the rules that apply inside sections only (a
- * template's column width, definition lists). A section that sets none of it
- * gets no id and no band: the page is what it was.
+ * template's column width, definition lists). Its `frame` ({@link frameOf})
+ * adds the hide-on-phone class, a tone's band and its spacing. A section that
+ * sets none of it gets no id, no band and no class: the page is what it was.
  *
  * A section known on the server to draw nothing (a feed-backed block with
  * nothing in its feed, `section-empty.ts`) gets no wrapper, so no anchor. A
@@ -645,9 +701,17 @@ export function PageSections({
                 // left its entry out of the menu, and the header drops one
                 // whose target is missing.
                 if (nothing(i) || (i > 0 && joinsPacks(i - 1))) return null;
-                const style = paddingOverride(section.content);
+                const own = frameOf(section.content, lookId, frame.band);
+                const padding = paddingOverride(section.content);
+                const style =
+                    padding || own.style
+                        ? { ...padding, ...own.style }
+                        : undefined;
                 // Close under the page's title, not a section's padding away.
-                const className = top && i === 0 ? "[&>*]:!pt-5" : undefined;
+                const className =
+                    [top && i === 0 ? "[&>*]:!pt-5" : "", own.className ?? ""]
+                        .join(" ")
+                        .trim() || undefined;
                 const rendered = (
                     <SectionRenderer
                         section={section}
@@ -699,7 +763,7 @@ export function PageSections({
                         className={className}
                         style={style}
                         data-site-section=""
-                        data-site-band={frame.band}
+                        data-site-band={own.band}
                         data-site-first-hero={
                             !top && i === 0 && opensOverPhoto(section, look)
                                 ? "fullBleed"
