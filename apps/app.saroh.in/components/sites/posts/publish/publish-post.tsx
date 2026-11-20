@@ -237,7 +237,7 @@ export function PublishPostSheet({
             return;
         }
         setBusy(true);
-        const postId = await savedId();
+        const postId = await runAction(savedId);
         if (!postId) {
             setBusy(false);
             return;

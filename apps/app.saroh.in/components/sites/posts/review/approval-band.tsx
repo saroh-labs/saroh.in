@@ -139,7 +139,7 @@ export function ApprovalBand({ model }: { model: PostEditorModel }) {
                     busyLabel="Approving…"
                     keepLabel="Back to feedback"
                     onConfirm={async () => {
-                        if (await approve()) setConfirming(false);
+                        if (await runAction(approve)) setConfirming(false);
                     }}
                 />
             </section>
