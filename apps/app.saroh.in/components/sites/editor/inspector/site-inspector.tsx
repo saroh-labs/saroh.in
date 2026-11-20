@@ -12,6 +12,9 @@ import { count } from "@/lib/format/plural";
 import type { Flag } from "@/lib/sites/service";
 
 import { SECTION_LABELS, sectionTitle } from "../editor-constants";
+import type { PhotoTarget } from "../sheets/photo-sheet";
+import { PhotoSheet } from "../sheets/photo-sheet";
+import { PhotoSheetOpener } from "../sheets/photo-sheet-opener";
 import { PriceSheet } from "../sheets/price-sheet";
 import type { EditorModel } from "../shell/editor-model";
 import { ContentTab } from "./content-tab";
@@ -85,6 +88,7 @@ export function SiteInspector({
     const [own, setOwn] =
         useState<Exclude<InspectorTab, "feedback">>("content");
     const [priceFor, setPriceFor] = useState<string | null>(null);
+    const [photoFor, setPhotoFor] = useState<PhotoTarget | null>(null);
     const tab: InspectorTab =
         selection.inspector === "feedback" ? "feedback" : own;
     const openTab = (next: InspectorTab) => {
@@ -175,24 +179,34 @@ export function SiteInspector({
                     onWholeSite={() => model.openRail("feedback")}
                 />
             ) : (
-                <ContentTab
-                    siteId={siteId}
-                    section={section}
-                    pages={pages}
-                    services={services}
-                    flags={activeFlags}
-                    unreadable={
-                        section.key !== undefined &&
-                        unreadableSections.includes(section.key)
+                <PhotoSheetOpener
+                    value={
+                        model.readOnly
+                            ? null
+                            : (field) => setPhotoFor({ index, field })
                     }
-                    error={
-                        draft.errorIndex === index ? draft.errorMessage : null
-                    }
-                    heldBack={draft.heldBackAt(index)}
-                    onChange={onChange}
-                    onPrice={setPriceFor}
-                    onAddNote={() => openTab("feedback")}
-                />
+                >
+                    <ContentTab
+                        siteId={siteId}
+                        section={section}
+                        pages={pages}
+                        services={services}
+                        flags={activeFlags}
+                        unreadable={
+                            section.key !== undefined &&
+                            unreadableSections.includes(section.key)
+                        }
+                        error={
+                            draft.errorIndex === index
+                                ? draft.errorMessage
+                                : null
+                        }
+                        heldBack={draft.heldBackAt(index)}
+                        onChange={onChange}
+                        onPrice={setPriceFor}
+                        onAddNote={() => openTab("feedback")}
+                    />
+                </PhotoSheetOpener>
             );
     } else if (page) {
         header = (
@@ -226,6 +240,11 @@ export function SiteInspector({
             {header}
             {tabs}
             <div className="min-h-0 flex-1 overflow-y-auto p-4">{body}</div>
+            <PhotoSheet
+                model={model}
+                target={photoFor}
+                onClose={() => setPhotoFor(null)}
+            />
             <PriceSheet
                 siteId={siteId}
                 serviceId={priceFor}

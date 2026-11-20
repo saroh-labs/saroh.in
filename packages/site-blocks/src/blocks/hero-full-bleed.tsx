@@ -99,6 +99,7 @@ export default function FullBleedHero({
                         src,
                         width: content.image?.width,
                         sizes: "100vw",
+                        focus: content.image?.focus,
                     })}
                     className="absolute inset-0 -z-20 size-full object-cover"
                 />

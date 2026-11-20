@@ -1,6 +1,7 @@
 "use client";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { PhotoSheetButton } from "@/components/sites/editor/sheets/photo-sheet-opener";
 import type { HeroPanelKind } from "@saroh/block-contract";
 import { resolveVariant, SAME_DAY_CALL_WORDS } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
@@ -369,6 +370,10 @@ export function HeroFields({
                     placeholder="or paste an image address"
                     aria-label="Image address"
                     className="mt-1.5"
+                />
+                <PhotoSheetButton
+                    field="image"
+                    hasPhoto={Boolean(c.image?.src)}
                 />
                 <ImageBrief
                     brief={c.imageBrief}

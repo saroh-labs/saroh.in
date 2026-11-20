@@ -12,7 +12,7 @@ import { describePhoto } from "@/lib/sites/actions";
 import type { Flag } from "@/lib/sites/service";
 
 /** How long a description may run: a sentence, not a caption. */
-const DESCRIBE_MAX = 250;
+export const DESCRIBE_MAX = 250;
 
 /**
  * "Describe it" (plan U10): one field, so a dialog (one sheet, one dialog,

@@ -210,6 +210,7 @@ export default function LookHero({
                         src: src.src,
                         width: src.width,
                         sizes,
+                        focus: src.focus,
                     })}
                     className={cn(
                         "rounded-site-photo bg-site-surface block w-full object-cover",

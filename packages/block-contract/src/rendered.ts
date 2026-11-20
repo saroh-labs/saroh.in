@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import type { SectionType } from "./section-contract";
-import { SECTION_TYPES } from "./section-contract";
+import { imageFocusSchema, SECTION_TYPES } from "./section-contract";
 
 /**
  * The RENDERED shape of a block (#252).
@@ -117,6 +117,8 @@ export const renderedImageSchema = z.object({
     alt: z.string().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    /** Its focus point (U46d); absent on every photo published before. */
+    focus: imageFocusSchema.optional(),
 });
 
 const renderedHero = z.object({

@@ -394,6 +394,13 @@ const ALLOWED: RegExp[] = [
     /^(Sections on this page|Done)$/,
     // Preview at three sizes (U46f): which sizes, and scrolling together.
     /^(All three|Desktop|Tablet|Phone|Scroll together)$/,
+    // Find (U46c): opening it, its box, and what a reader finds there:
+    // the page's sections, the header and footer, the other pages.
+    /^Find⌘K$/,
+    /^Find or do anything$/,
+    /^(Welcome in|Our story) section/,
+    /^(Header|Footer)On every page/,
+    /^About\/about/,
 ];
 
 /** The page's options in the page picker: switching page writes nothing. */
@@ -1253,6 +1260,21 @@ describe("the desk shell with the Website area on (U46)", () => {
             expect(items, gone).not.toContain(gone);
         }
         expectReadOnly("shell, reader, More open");
+    });
+
+    it("a reader's Find: only On this site, and no photo sheet (U46c, U46d)", () => {
+        render();
+        key("k", { metaKey: true });
+        const find = $("[data-editor-find]");
+        expect(find).not.toBeNull();
+        const headings = Array.from(
+            document.querySelectorAll("[cmdk-group-heading]"),
+        ).map((h) => h.textContent);
+        expect(headings).toEqual(["On this site"]);
+        expect(find?.textContent).toContain("Welcome in section");
+        expect(find?.textContent).not.toContain("Page settings");
+        expect(has(/^Replace, focus and describe/)).toBe(false);
+        expectReadOnly("shell, reader, Find open");
     });
 
     it("a reader who may not approve has no verdict", () => {

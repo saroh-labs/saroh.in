@@ -283,11 +283,24 @@ export function ctaHref(
     }
 }
 
+/**
+ * The photo's focus point (U46d, `fix/WXKMedia`): the place, in percent
+ * from the left and the top, that stays in view however a screen crops
+ * it. Drawn as `object-position`; absent, the photo is centred as before.
+ */
+export const imageFocusSchema = z.object({
+    x: z.number().min(0).max(100),
+    y: z.number().min(0).max(100),
+});
+
+export type ImageFocus = z.infer<typeof imageFocusSchema>;
+
 const imageSchema = z.object({
     src: z.string().min(1),
     alt: z.string().default(""),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    focus: imageFocusSchema.optional(),
 });
 
 /** How long an image brief may run (KTD-5). */

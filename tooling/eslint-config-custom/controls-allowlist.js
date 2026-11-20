@@ -267,6 +267,8 @@ export const RAW_ALLOWED = {
     "components/sites/editor/top-bar-actions.tsx": ["button"],
     // input: a file picker
     "components/shared/fields/media-picker.tsx": ["input"],
+    // button: a photo in the library, one button; input: a file picker (U46d)
+    "components/sites/editor/sheets/photo-sheet.tsx": ["button", "input"],
     // button: a row or card that is one button, an option in a list
     "components/sites/pages/pages-panel.tsx": ["button"],
     // button: a colour swatch in the toolbar; input: a field its screen draws itself

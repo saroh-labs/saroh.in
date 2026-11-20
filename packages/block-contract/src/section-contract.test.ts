@@ -93,6 +93,23 @@ describe("hero v1", () => {
         ).toBe(false);
     });
 
+    it("keeps a photo's focus point, and leaves one without it as it was (U46d)", () => {
+        const at = (image: object) =>
+            parseSectionContent("hero", 2, { heading: "W", image });
+        const kept = at({ src: "/a.png", focus: { x: 30, y: 20 } });
+        expect(
+            kept.success &&
+                (kept.data as { image: { focus?: object } }).image.focus,
+        ).toEqual({ x: 30, y: 20 });
+        const plain = at({ src: "/a.png" });
+        expect(
+            plain.success && "focus" in (plain.data as { image: object }).image,
+        ).toBe(false);
+        expect(at({ src: "/a.png", focus: { x: 120, y: 0 } }).success).toBe(
+            false,
+        );
+    });
+
     it("rejects a hero missing its heading", () => {
         const result = parseSectionContent("hero", 1, { subheading: "Sub" });
         expect(result.success).toBe(false);
