@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import type { ComponentStyles } from "@saroh/block-contract";
 import {
+    brandPalette,
     COMPONENT_KINDS,
     COMPONENT_LABELS,
     isComponentOption,
@@ -72,6 +73,7 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         type?: unknown;
         look?: unknown;
         components?: unknown;
+        brandColour?: unknown;
     };
 
     if (raw.colours !== undefined) {
@@ -128,12 +130,35 @@ export function parseSiteStyle(input: unknown): SiteStyle {
         if (raw.fontPair !== DEFAULT_FONT_PAIR) base.fontPair = raw.fontPair;
     }
 
+    // One brand colour (U24b): refused unless `#RRGGBB`; null clears it.
+    // Its palette is derived here on every save, whatever palette came
+    // with it, so a client's colours never reach a page unchecked.
+    if (raw.brandColour !== undefined && raw.brandColour !== null) {
+        const palette =
+            typeof raw.brandColour === "string"
+                ? brandPalette(raw.brandColour)
+                : null;
+        if (!palette) {
+            throw new BadRequestException({
+                message: "Your brand colour must be written #RRGGBB",
+                details: { field: "brandColour" },
+            });
+        }
+        base.brandColour = (raw.brandColour as string).toUpperCase();
+        base.palette = palette;
+    }
+
     // A template's palette and type scale (DEC-090): refused with every
     // failing field named, never coerced. Null clears either, as absent.
     // WHETHER this site may carry them is the offer's rule, checked where a
     // merchant saves (`assertTemplateLookOffered`); this is only whether
     // they are well formed and legible.
-    if (raw.palette !== undefined && raw.palette !== null) {
+    // A brand colour's palette wins over one sent with it.
+    if (
+        base.brandColour === undefined &&
+        raw.palette !== undefined &&
+        raw.palette !== null
+    ) {
         const parsed = parsePalette(raw.palette);
         if (!parsed.ok) throw styleProblems(parsed.problems);
         base.palette = parsed.palette;

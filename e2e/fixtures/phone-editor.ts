@@ -57,7 +57,7 @@ export async function openMore(page: Page): Promise<Locator> {
 /** A tab of the phone's Brand sheet, opened with the sheet if need be. */
 export async function brandTab(
     page: Page,
-    name: "Template" | "Look" | "Type" | "Colour" | "Spacing",
+    name: "Look" | "Colours" | "Fonts" | "Logo" | "Buttons and shapes",
 ): Promise<Locator> {
     const sheet = await openFromPill(page, "Brand");
     const tab = sheet.getByRole("tab", { name, exact: true });
@@ -69,8 +69,8 @@ export async function brandTab(
 }
 
 /**
- * The looks to choose from: behind the Look card's Change on a desk, the
- * Look tab itself on a phone (DEC-185).
+ * The looks to choose from: the cards in Brand's Look group on a desk,
+ * the Look tab on a phone (U24b).
  */
 export async function lookGallery(
     page: Page,
@@ -78,21 +78,17 @@ export async function lookGallery(
 ): Promise<Locator> {
     if (phone) {
         const sheet = await brandTab(page, "Look");
-        return sheet.getByRole("group", { name: "Change look" });
+        return sheet.getByRole("radiogroup", { name: "Look" });
     }
-    const dialog = page.getByRole("dialog", { name: "Change look" });
-    if (!(await dialog.isVisible())) {
-        await page.locator("[data-look-change]").click();
-    }
-    return dialog;
+    return page.getByRole("radiogroup", { name: "Look" });
 }
 
-/** The typefaces: behind Change on a desk, the Type tab on a phone. */
+/** The font pairs: behind the Fonts row on a desk, the Fonts tab on a phone. */
 export async function typefaces(page: Page, phone: boolean): Promise<Locator> {
     if (phone) {
-        const sheet = await brandTab(page, "Type");
-        return sheet.getByRole("group", { name: "Typeface" });
+        const sheet = await brandTab(page, "Fonts");
+        return sheet.getByRole("group", { name: "Fonts" });
     }
     await page.locator("[data-typeface-change]").click();
-    return page.getByRole("dialog", { name: "Typeface" });
+    return page.getByRole("dialog", { name: "Fonts" });
 }

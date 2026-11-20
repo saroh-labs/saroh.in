@@ -221,6 +221,14 @@ export interface SiteStyle {
      * default is kept, and only "Reset to <look>" removes the object.
      */
     components?: ComponentStyles;
+    /**
+     * The merchant's one brand colour (U24b, "Colours from my brand
+     * colour"), `#RRGGBB`. When present, `palette` is the one
+     * `brandPalette` derives from it: the API re-derives it on every save
+     * and never keeps a palette a client sent with it. ABSENT for today's
+     * sites, for the reason `look` is.
+     */
+    brandColour?: string;
 }
 
 /** The look a site has before anyone chooses anything: today's appearance. */

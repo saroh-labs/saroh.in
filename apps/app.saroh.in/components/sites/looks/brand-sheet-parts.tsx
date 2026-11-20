@@ -2,11 +2,14 @@
 
 import { Button } from "@saroh/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, Undo2 } from "lucide-react";
 import type { ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import type { LookId } from "@saroh/block-contract";
 import { ChipGroup } from "@saroh/ui/choice-group";
+
+import { lookName } from "./look-picker";
 
 /*
  * The Brand tab's own pieces beside the panel (`style-panel.tsx`): Reset
@@ -17,23 +20,37 @@ import { ChipGroup } from "@saroh/ui/choice-group";
 /** How long "Saved." closes the loop before the line is its hint again. */
 const SAVED_MS = 2000;
 
-export const RESET_TITLE = "Reset colours, typeface and spacing?";
-export const RESET_BODY =
-    "They go back to Classic’s own. Your look, pages and words stay. You can undo it.";
+/** "Reset to Classic?": the ask before Reset to <look>. */
+export function resetTitle(look: LookId | null | undefined): string {
+    return `Reset to ${lookName(look)}?`;
+}
+
+/** What Reset to <look> brings back, said beside it and in the ask. */
+export function resetBody(look: LookId | null | undefined): string {
+    return `Brings back ${lookName(look)}’s own colours, fonts, buttons and shapes. Your pages and words stay. You can undo it.`;
+}
 
 /**
- * "Reset style…" (22 Oct 2026): it moves every colour, the typeface and
- * the sliders at once, so it asks first, keeping the style the safe way
- * out; once done, Undo puts it all back in one press (`useUndo`).
+ * "Reset to <look>…" (U24b): it moves every colour, the fonts, the
+ * buttons and shapes and any stored spacing at once, so it asks first,
+ * keeping the style the safe way out; once done, Undo puts it all back in
+ * one press (`useUndo`).
  */
 export function ResetStyle({
     onReset,
     menu = false,
+    look,
+    wide = false,
 }: {
     onReset: () => void;
-    /** Behind ⋯ in a phone's Brand sheet: "Reset style…" first. */
+    /** Behind ⋯ in a phone's Brand sheet: "Reset to <look>…" first. */
     menu?: boolean;
+    /** The look it resets to; Classic when absent. */
+    look?: LookId | null;
+    /** The full-width button under "Changes to the look". */
+    wide?: boolean;
 }) {
+    const label = `Reset to ${lookName(look)}`;
     const [open, setOpen] = useState(false);
     const [asking, setAsking] = useState(!menu);
     const titleId = useId();
@@ -61,10 +78,12 @@ export function ResetStyle({
                     <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                        size={wide ? "default" : "sm"}
                         aria-haspopup="dialog"
+                        className={wide ? "w-full" : undefined}
                     >
-                        Reset style…
+                        <Undo2 aria-hidden />
+                        {label}…
                     </Button>
                 )}
             </PopoverTrigger>
@@ -78,13 +97,13 @@ export function ResetStyle({
                     className="w-[300px] max-w-[calc(100vw-24px)] rounded-xl p-3.5"
                 >
                     <p id={titleId} className="text-sm font-semibold">
-                        {RESET_TITLE}
+                        {resetTitle(look)}
                     </p>
                     <p
                         id={bodyId}
                         className="mb-3 mt-1.5 text-[0.78125rem] leading-normal text-muted-foreground"
                     >
-                        {RESET_BODY}
+                        {resetBody(look)}
                     </p>
                     <div className="flex justify-end gap-2">
                         <Button
@@ -104,7 +123,7 @@ export function ResetStyle({
                                 onReset();
                             }}
                         >
-                            Reset style
+                            {label}
                         </Button>
                     </div>
                 </PopoverContent>
@@ -116,7 +135,7 @@ export function ResetStyle({
                         className="w-full justify-start"
                         onClick={() => setAsking(true)}
                     >
-                        Reset style…
+                        {label}…
                     </Button>
                 </PopoverContent>
             )}
@@ -207,10 +226,13 @@ export function BrandSheetActions({
     saving,
     dirty,
     onReset,
+    look,
 }: {
     saving: boolean;
     dirty: boolean;
     onReset: () => void;
+    /** The look Reset goes back to; Classic when absent. */
+    look?: LookId | null;
 }) {
     const savedNow = useSavedNow(saving, dirty);
     return (
@@ -222,7 +244,7 @@ export function BrandSheetActions({
             >
                 {saving ? "Saving…" : savedNow ? "Saved" : null}
             </span>
-            <ResetStyle onReset={onReset} menu />
+            <ResetStyle onReset={onReset} menu look={look} />
         </>
     );
 }

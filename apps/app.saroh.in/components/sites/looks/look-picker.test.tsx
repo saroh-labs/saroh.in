@@ -116,22 +116,9 @@ function renderPicker(
     return onChoose;
 }
 
-/** The gallery behind the card's Change (DEC-184), opened if it isn't. */
-function openGallery() {
-    if (document.querySelector('[data-brand-picker][data-state="open"]')) {
-        return;
-    }
-    const change = host.querySelector<HTMLElement>("[data-look-change]");
-    if (change) act(() => change.click());
-}
-const inGallery = () => {
-    openGallery();
-    return Array.from(
-        document.querySelectorAll<HTMLElement>(
-            '[data-brand-picker][data-state="open"] [data-look-choice]',
-        ),
-    );
-};
+/** The four looks, drawn as cards in the panel (U24b, `WXBBrand`). */
+const inGallery = () =>
+    Array.from(document.querySelectorAll<HTMLElement>("[data-look-choice]"));
 const choices = () => inGallery().map((el) => el.dataset.lookChoice);
 const choice = (id: string) => {
     const el = inGallery().find((e) => e.dataset.lookChoice === id);
@@ -230,9 +217,8 @@ describe("choosing", () => {
 
     it("moves with the arrow keys, one tab stop", () => {
         const onChoose = renderPicker(classic);
-        openGallery();
         const stops = document.querySelectorAll(
-            '[data-brand-picker] [role="radio"][tabindex="0"]',
+            '[data-look-choice][role="radio"][tabindex="0"]',
         );
         expect(stops).toHaveLength(1);
         act(() => {
@@ -248,12 +234,11 @@ describe("choosing", () => {
 
     it("draws each look's phone in the business's colours and the look's corners", () => {
         renderPicker(classic);
-        openGallery();
         const quiet = document.querySelector<HTMLElement>(
-            '[data-brand-picker] [data-look-thumbnail="quiet"]',
+            '[data-look-thumbnail="quiet"]',
         );
         const folio = document.querySelector<HTMLElement>(
-            '[data-brand-picker] [data-look-thumbnail="folio"]',
+            '[data-look-thumbnail="folio"]',
         );
         expect(quiet?.getAttribute("aria-hidden")).toBe("true");
         // Quiet's button is a pill, Folio's square.
@@ -336,19 +321,21 @@ describe("Website › Style with the Look row", () => {
         renderPanel(inLook(classic, "quiet"), facts);
         expect(headings()).toEqual([
             "Look",
-            "Typeface",
-            "Colour",
-            "Spacing and shape",
+            "Colours",
+            "Fonts",
+            "Changes to the look",
         ]);
-        expect(host.querySelector("#style-cornerRadius")).not.toBeNull();
-        expect(host.textContent).toContain("Reset style…");
+        // The sliders are gone (U24b); spacing is in Buttons and shapes.
+        expect(host.querySelector('input[type="range"]')).toBeNull();
+        expect(host.textContent).toContain("Buttons and shapes");
+        expect(host.textContent).toContain("Reset to Quiet…");
     });
 
     it("draws no Look row without one to offer", () => {
         renderPanel(classic, { ...facts, available: false });
-        expect(headings()[0]).toBe("Typeface");
+        expect(headings()[0]).toBe("Colours");
         renderPanel(classic);
-        expect(headings()[0]).toBe("Typeface");
+        expect(headings()[0]).toBe("Colours");
     });
 });
 

@@ -216,9 +216,10 @@ test.describe("the phone editor without bottom tabs", () => {
 
     test("Brand is one sheet with its tabs", async ({ page }) => {
         await openEditor(page);
-        const sheet = await brandTab(page, "Spacing");
-        await expect(sheet.locator("input[type=range]").first()).toBeVisible();
-        await brandTab(page, "Colour");
+        // One group at a time (U24b, WXBBrandPhone); no sliders.
+        const sheet = await brandTab(page, "Buttons and shapes");
+        await expect(sheet.locator("input[type=range]")).toHaveCount(0);
+        await brandTab(page, "Colours");
         await expect(
             sheet.getByRole("radiogroup", { name: "Colour" }),
         ).toBeVisible();

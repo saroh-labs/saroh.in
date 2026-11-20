@@ -251,6 +251,15 @@ describe("assertTemplateLookOffered", () => {
         ).not.toThrow();
     });
 
+    it("lets any site take the palette its brand colour makes (U24b)", () => {
+        expect(() =>
+            assertTemplateLookOffered(
+                parseSiteStyle({ brandColour: "#E8A0B4" }),
+                { stored: null, template: null },
+            ),
+        ).not.toThrow();
+    });
+
     it("refuses a palette that is legible but not offered, on the field", () => {
         const own = parseSiteStyle({
             palette: { ...GREEN, accent: "#123456" },

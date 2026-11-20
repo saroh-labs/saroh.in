@@ -19,14 +19,14 @@ import { changedComponents, withComponents } from "@/lib/sites/style";
 import { BrandPicker, PickerHeader } from "./brand-picker";
 import { lookName } from "./look-picker";
 
-/** "Folio’s defaults, 2 changed · Free on every plan" (SBCustomise). */
+/** "Folio’s defaults, 2 changed · on every plan" (`WXBBrand`). */
 export function componentsLine(style: SiteStyle): string {
     const n = changedComponents(style).length;
-    return `${lookName(style.look)}’s defaults${n > 0 ? `, ${n} changed` : ""} · Free on every plan`;
+    return `${lookName(style.look)}’s defaults${n > 0 ? `, ${n} changed` : ""} · on every plan`;
 }
 
 /**
- * The Brand tab's "Customise components" (DEC-227, plan U2): a row that
+ * The Brand tab's "Buttons and shapes" (DEC-227, plan U2): a row that
  * opens the list beside the rail on a desk; in a phone's Brand sheet the
  * list itself (`BrandPicker`). Free on every plan, so nothing here asks
  * the plan.
@@ -45,11 +45,11 @@ export function ComponentStylesRow({
             <BrandPicker
                 open={open}
                 onOpenChange={setOpen}
-                title="Customise components"
+                title="Buttons and shapes"
                 className="w-[360px] max-w-[calc(100vw-24px)]"
                 header={
                     <PickerHeader
-                        title="Customise components"
+                        title="Buttons and shapes"
                         onClose={() => setOpen(false)}
                     />
                 }
@@ -66,7 +66,7 @@ export function ComponentStylesRow({
                     >
                         <span className="min-w-0 flex-1">
                             <span className="block text-sm font-semibold">
-                                Customise components
+                                Buttons and shapes
                             </span>
                             <span className="block text-xs text-muted-foreground">
                                 {line}

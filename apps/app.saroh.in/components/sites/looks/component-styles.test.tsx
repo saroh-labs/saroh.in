@@ -10,7 +10,7 @@ import { changedComponents, resolveStyleVariables } from "@/lib/sites/style";
 import { ComponentStyleList, componentsLine } from "./component-styles";
 
 /**
- * Brand › Customise components (DEC-227, plan U2, board SBCustomise): each
+ * Brand › Buttons and shapes (DEC-227, plan U2, board SBCustomise): each
  * component's options, the look's default chosen until the owner picks; a
  * pick is kept even when it equals the look's own (KD1); Undo per row and
  * "Reset to <look>" take choices away.
@@ -68,7 +68,7 @@ const undo = (kind: string, label: string) =>
 const last = (fn: ReturnType<typeof renderList>) =>
     found(fn.mock.calls.at(-1)?.[0], "change");
 
-describe("Customise components", () => {
+describe("Buttons and shapes", () => {
     it("labels each group and chooses the look's defaults when nothing is set", () => {
         renderList({ ...base, look: "folio" });
         const group = row("buttons").querySelector('[role="radiogroup"]');
@@ -80,9 +80,7 @@ describe("Customise components", () => {
         expect(option("cards", "flat").getAttribute("aria-checked")).toBe(
             "true",
         );
-        expect(host.textContent).toContain(
-            "Folio’s defaults · Free on every plan",
-        );
+        expect(host.textContent).toContain("Folio’s defaults · on every plan");
         expect(host.querySelector("[data-component-changed]")).toBeNull();
         expect(host.querySelector("[data-components-reset]")).toBeNull();
     });
@@ -111,7 +109,7 @@ describe("Customise components", () => {
         expect(changedComponents(style)).toEqual(["buttons", "cards"]);
         const onChange = renderList(style);
         expect(host.textContent).toContain(
-            "Folio’s defaults, 2 changed · Free on every plan",
+            "Folio’s defaults, 2 changed · on every plan",
         );
         expect(row("buttons").textContent).toContain("Changed from Folio");
         expect(row("images").textContent).not.toContain("Changed from");
@@ -173,8 +171,6 @@ describe("Customise components", () => {
     });
 
     it("names the look in the line, Classic for none", () => {
-        expect(componentsLine(base)).toBe(
-            "Classic’s defaults · Free on every plan",
-        );
+        expect(componentsLine(base)).toBe("Classic’s defaults · on every plan");
     });
 });

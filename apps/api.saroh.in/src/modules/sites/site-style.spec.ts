@@ -428,3 +428,58 @@ describe("component styles (DEC-227, KD1)", () => {
         }
     });
 });
+
+describe("one brand colour (U24b)", () => {
+    it("derives the palette from the colour, never the one sent with it", () => {
+        const style = parseSiteStyle({
+            brandColour: "#e8a0b4",
+            palette: {
+                bg: "#FFFFFF",
+                fg: "#FFFFFF",
+                accent: "#FFFFFF",
+                accentFg: "#FFFFFF",
+            },
+        });
+        expect(style.brandColour).toBe("#E8A0B4");
+        expect(style.palette?.bg).not.toBe("#FFFFFF");
+        expect(style.palette?.fg).not.toBe("#FFFFFF");
+    });
+
+    it("refuses a brand colour that is not #RRGGBB, naming the field", () => {
+        for (const bad of ["pink", "#12345", 7]) {
+            try {
+                parseSiteStyle({ brandColour: bad });
+                throw new Error("accepted");
+            } catch (e) {
+                expect(e).toBeInstanceOf(BadRequestException);
+                expect((e as BadRequestException).getResponse()).toMatchObject({
+                    details: { field: "brandColour" },
+                });
+            }
+        }
+    });
+
+    it("leaves a style without one as it was", () => {
+        expect(parseSiteStyle({}).brandColour).toBeUndefined();
+        expect(parseSiteStyle({ brandColour: null }).palette).toBeUndefined();
+    });
+});
+
+describe("stored spacing after the sliders went (U24b)", () => {
+    it("keeps reading a stored site's scalars, so it renders the same", () => {
+        const stored = {
+            scalars: {
+                pageMargin: 24,
+                sectionPadding: 80,
+                gridGap: 14,
+                cornerRadius: 12,
+                headingScale: 1.2,
+            },
+        };
+        const vars = siteStyleVariables(parseSiteStyle(stored));
+        expect(vars["--site-page-margin"]).toBe("24px");
+        expect(vars["--site-section-padding"]).toBe("80px");
+        expect(vars["--site-radius"]).toBe("12px");
+        expect(vars["--site-heading-scale"]).toBe("1.2");
+    });
+});

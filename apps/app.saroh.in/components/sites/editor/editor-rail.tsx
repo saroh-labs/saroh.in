@@ -15,6 +15,7 @@ import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
+import type { LookChanges } from "@/components/sites/looks/look-changes";
 import type { LookChoices } from "@/components/sites/looks/look-picker";
 import { StylePanel } from "@/components/sites/looks/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
@@ -76,7 +77,10 @@ export function EditorRail({
     templateRow = null,
     templateName,
     hideTabs = false,
+    lookChanges,
 }: {
+    /** This visit's changes to the look, each with Undo (U24b). */
+    lookChanges?: LookChanges;
     /**
      * The new shell's rail of tabs (U46) chooses the panel, so this draws
      * none of its own.
@@ -184,6 +188,7 @@ export function EditorRail({
                     heroInText={heroDrawsInText(sections, style.look)}
                     phoneTabs={phone}
                     templateRow={templateRow}
+                    changes={lookChanges}
                 />
             ) : (
                 <>

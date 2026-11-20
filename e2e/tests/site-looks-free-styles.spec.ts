@@ -74,7 +74,7 @@ async function openEditor(page: Page, siteId: string, phone: boolean) {
     await openBrand(page, phone);
 }
 
-/** The looks' gallery behind the Look card's Change (DEC-184). */
+/** The look cards in Brand (U24b). */
 async function gallery(page: Page) {
     const looks = await lookGallery(
         page,
@@ -139,23 +139,16 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
             const classic = looks.locator('[data-look-choice="classic"]');
             const quiet = looks.locator('[data-look-choice="quiet"]');
             await expect(classic).toHaveAttribute("aria-checked", "true");
-            // One "Paid plans" mark for the group, in the gallery's foot.
-            await expect(classic).not.toContainText("Paid plans");
-            await expect(looks).toContainText(/Paid plans.*Quiet/);
+            // Each paid card says so under its name (U24b).
+            await expect(classic).not.toContainText("paid plans");
+            await expect(quiet).toContainText("paid plans");
 
             await quiet.click();
-            // Refused: the gallery stays open, Classic chosen, the line in
-            // its foot.
+            // Refused in place: Classic stays chosen, one line under the
+            // cards says why.
             await expect(quiet).toHaveAttribute("aria-checked", "false");
             await expect(classic).toHaveAttribute("aria-checked", "true");
             const line = page.locator("[data-paid-refusal]");
-            await expect(line).toHaveCount(1);
-            await expect(looks.locator("[data-paid-refusal]")).toContainText(
-                "Quiet comes with a paid plan",
-            );
-            // Closed, the same line sits under the Look card.
-            await page.keyboard.press("Escape");
-            await expect(looks).toHaveCount(0);
             await expect(line).toHaveCount(1);
             await expect(line).toContainText("Quiet comes with a paid plan");
             await expect(lookCard(page)).toHaveAttribute(

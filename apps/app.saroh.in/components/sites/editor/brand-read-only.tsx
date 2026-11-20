@@ -1,14 +1,15 @@
 "use client";
 
 import { ComponentStyleList } from "@/components/sites/looks/component-styles";
+import { ROW_NAMES } from "@/components/sites/looks/look-changes";
 import { lookName } from "@/components/sites/looks/look-picker";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { activeColourway } from "@/lib/sites/style";
 
 /**
- * The Brand tab for a Reviewer (DEC-200, RVD2): the same choices the owner
- * sees, as plain rows. No pickers, no sliders, no Reset: they can see the
- * look, and owners and admins change it.
+ * Brand for a Reviewer (DEC-200, RVD2; groups as U24b names them): the
+ * same choices the owner sees, as plain rows. No pickers, no Reset: they
+ * can see the look, and owners and admins change it.
  */
 export function BrandReadOnly({
     style,
@@ -31,53 +32,45 @@ export function BrandReadOnly({
         pairs.find((p) => p.key === style.fontPair) ?? pairs.at(0)
     )?.name;
     const colourway = activeColourway(style, options.colourways)?.name;
+    const started: [string, string][] =
+        template === undefined
+            ? []
+            : [
+                  template
+                      ? ["Started from", template]
+                      : ["Started from", "Your own pages"],
+              ];
     const groups: { title: string; rows: [string, string][] }[] = [
         {
-            title: "Template",
-            rows:
-                template === undefined
-                    ? []
-                    : template
-                      ? [[template, "Your site started from it"]]
-                      : [
-                            [
-                                "Your own pages",
-                                "Not made from a template we can show",
-                            ],
-                        ],
+            title: "Look",
+            rows: [
+                ...(looks || style.look
+                    ? [[lookName(style.look), "Now"] as [string, string]]
+                    : []),
+                ...started,
+            ],
         },
         {
-            title: "Look",
-            rows:
-                looks || style.look
+            title: "Colours",
+            rows: [
+                ...(colourway || style.brandColour
                     ? [
                           [
-                              lookName(style.look),
-                              colourway ?? "Your own fonts and colours",
-                          ],
+                              "Colours",
+                              colourway ?? "Made from your brand colour",
+                          ] as [string, string],
                       ]
-                    : colourway
-                      ? [["Colours", colourway]]
-                      : [],
+                    : []),
+                ...options.rows.map((row): [string, string] => [
+                    ROW_NAMES[row.key] ?? row.label,
+                    row.swatches.find((s) => s.key === style.colours[row.key])
+                        ?.label ?? "Not set",
+                ]),
+            ],
         },
         {
-            title: "Typeface",
+            title: "Fonts",
             rows: typeface ? [["Headings and text", typeface]] : [],
-        },
-        {
-            title: "Colour",
-            rows: options.rows.map((row) => [
-                row.label,
-                row.swatches.find((s) => s.key === style.colours[row.key])
-                    ?.label ?? "Not set",
-            ]),
-        },
-        {
-            title: "Spacing and shape",
-            rows: options.scalars.map((sc) => [
-                sc.label,
-                `${style.scalars[sc.key] ?? sc.default}${sc.unit}`,
-            ]),
         },
     ];
     return (
@@ -104,8 +97,8 @@ export function BrandReadOnly({
                         </dl>
                     </section>
                 ))}
-            <section aria-label="Components">
-                <h3 className="label pb-1">Components</h3>
+            <section aria-label="Buttons and shapes">
+                <h3 className="label pb-1">Buttons and shapes</h3>
                 {/* The owner's choices, drawn off (DEC-200, DEC-227). */}
                 <ComponentStyleList
                     style={style}

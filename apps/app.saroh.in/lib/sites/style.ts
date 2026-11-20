@@ -97,6 +97,8 @@ export interface SiteStyle {
      * default is kept, and only "Reset to <look>" removes the object.
      */
     components?: ComponentStyles;
+    /** One brand colour (U24b); `palette` is the one the API derives from it. */
+    brandColour?: string;
 }
 
 /**
@@ -162,7 +164,7 @@ export function inColourway(
     style: SiteStyle,
     colourway: StyleColourway,
 ): SiteStyle {
-    const { palette: _p, type: _t, ...rest } = style;
+    const { palette: _p, type: _t, brandColour: _b, ...rest } = style;
     return {
         ...rest,
         colours: { ...colourway.style.colours },

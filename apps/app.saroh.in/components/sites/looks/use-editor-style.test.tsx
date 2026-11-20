@@ -76,6 +76,7 @@ function Harness({
             onChange={style.setStyle}
             onReset={style.resetStyle}
             saving={style.styleSaving}
+            changes={style.lookChanges}
             looks={{
                 available: true,
                 liveLook,
@@ -116,14 +117,9 @@ function render(
     );
 }
 
-/** Choose a look in the gallery behind the card's Change (DEC-184). */
+/** Choose one of the look cards (U24b). */
 function pick(id: string) {
-    const change = host.querySelector<HTMLElement>("[data-look-change]");
-    if (!change) throw new Error("No Change");
-    act(() => change.click());
-    const el = document.querySelector<HTMLElement>(
-        `[data-brand-picker][data-state="open"] [data-look-choice="${id}"]`,
-    );
+    const el = host.querySelector<HTMLElement>(`[data-look-choice="${id}"]`);
     if (!el) throw new Error(`No look "${id}"`);
     act(() => el.click());
 }
@@ -237,7 +233,7 @@ describe("component styles and the look (DEC-227)", () => {
         components: { buttons: "rounded" },
     };
 
-    it("keeps the choices through a look switch, and through Reset style", () => {
+    it("keeps the choices through a look switch; Reset to the look takes them away", () => {
         render(customised);
         act(() => seen.current?.chooseLook("live"));
         expect(seen.current?.style).toMatchObject({
@@ -245,7 +241,8 @@ describe("component styles and the look (DEC-227)", () => {
             components: { buttons: "rounded" },
         });
         act(() => seen.current?.resetStyle());
-        expect(seen.current?.style.components).toEqual({ buttons: "rounded" });
+        expect(seen.current?.style).not.toHaveProperty("components");
+        expect(seen.current?.style.look).toBe("live");
     });
 
     it("drops them for the new look's own", () => {
@@ -269,5 +266,64 @@ describe("component styles and the look (DEC-227)", () => {
             "site-1",
             expect.objectContaining({ components: { cards: "flat" } }),
         );
+    });
+});
+
+describe("Changes to the look and Reset (U24b)", () => {
+    const withSpacing: SiteStyle = {
+        colours: { pageGround: "paper" },
+        scalars: { pageMargin: 24 },
+    };
+    const spacingOptions = {
+        scalars: [
+            {
+                key: "pageMargin",
+                label: "Page margin",
+                min: 16,
+                max: 80,
+                step: 1,
+                unit: "px",
+                default: 38,
+            },
+        ],
+    };
+
+    it("puts stored spacing back with Reset, and lists it with an Undo", () => {
+        options.scalars = spacingOptions.scalars;
+        try {
+            render(withSpacing);
+            act(() => seen.current?.resetStyle());
+            expect(seen.current?.style.scalars).toEqual({ pageMargin: 38 });
+            const list = seen.current?.lookChanges.list ?? [];
+            expect(list[0]).toMatchObject({
+                part: "Look",
+                words: "Reset to Classic",
+            });
+            act(() => seen.current?.lookChanges.undo(list[0].id));
+            expect(seen.current?.style.scalars).toEqual({ pageMargin: 24 });
+            expect(seen.current?.lookChanges.list).toEqual([]);
+        } finally {
+            options.scalars = [];
+        }
+    });
+
+    it("lists each change newest first, and Undo puts back only its own", () => {
+        render();
+        act(() => seen.current?.chooseLook("quiet"));
+        act(() =>
+            seen.current?.setStyle({
+                ...classic,
+                look: "quiet",
+                components: { cards: "flat" },
+            }),
+        );
+        const list = seen.current?.lookChanges.list ?? [];
+        expect(list.map((c) => c.part)).toEqual(["Buttons and shapes", "Look"]);
+        expect(list[1].words).toBe("Classic to Quiet");
+        act(() => seen.current?.lookChanges.undo(list[1].id));
+        expect(seen.current?.style.look).toBeUndefined();
+        expect(seen.current?.style.components).toEqual({ cards: "flat" });
+        expect(host.textContent).toContain("Changes to the look");
+        expect(host.querySelectorAll("[data-look-changes] li")).toHaveLength(1);
     });
 });

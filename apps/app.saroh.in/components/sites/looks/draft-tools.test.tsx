@@ -93,14 +93,17 @@ describe("DraftTools", () => {
     it("brings the details in", async () => {
         const s = starter();
         render(s);
+        // Inside Versions (U24b).
+        await press(button("Versions"));
         await press(button("Bring in my details"));
         expect(s.fillDetails).toHaveBeenCalledTimes(1);
     });
 
-    it("waits while the editor has changes not saved yet", () => {
+    it("waits while the editor has changes not saved yet", async () => {
         render(starter({ blocked: "Your last changes aren't saved yet." }));
+        await press(button("Versions"));
         expect(button("Bring in my details").disabled).toBe(true);
-        expect(host.textContent).toContain(
+        expect(document.body.textContent).toContain(
             "Your last changes aren't saved yet.",
         );
     });
@@ -108,7 +111,7 @@ describe("DraftTools", () => {
     it("lists the previous versions and rolls back only after its confirm", async () => {
         const s = starter();
         render(s);
-        await press(button("Previous versions"));
+        await press(button("Versions"));
         expect(s.listVersions).toHaveBeenCalled();
         expect(sheet()?.textContent).toContain(
             "Before the starter content · Classic",
@@ -126,7 +129,7 @@ describe("DraftTools", () => {
     it("brings one section of a version in, named by its heading or its kind", async () => {
         const s = starter();
         render(s);
-        await press(button("Previous versions"));
+        await press(button("Versions"));
         await press(button("Bring in a section"));
         expect(sheet()?.textContent).toContain("Our story");
         expect(sheet()?.textContent).toContain("Services list");
@@ -142,7 +145,7 @@ describe("DraftTools", () => {
             }),
         });
         render(s);
-        await press(button("Previous versions"));
+        await press(button("Versions"));
         await press(button("Roll back"));
         await press(button("Roll back to this version"));
         expect(sheet()?.querySelector('[role="alert"]')?.textContent).toBe(
@@ -158,7 +161,7 @@ describe("DraftTools", () => {
                     .mockResolvedValue({ ok: true, versions: [] }),
             }),
         );
-        await press(button("Previous versions"));
+        await press(button("Versions"));
         expect(sheet()?.textContent).toContain("No previous versions yet.");
     });
 });

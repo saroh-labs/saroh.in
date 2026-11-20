@@ -6,6 +6,7 @@ import { updateSiteStyle } from "@/lib/sites/actions";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { inLook } from "@/lib/sites/style";
 import type { LookId } from "@saroh/block-contract";
+import { useLookChanges } from "./look-changes";
 import { lookName } from "./look-picker";
 
 /**
@@ -38,6 +39,8 @@ export function useEditorStyle({
     const [lookError, setLookError] = useState<string | null>(null);
     // A style drawn on the page but not saved: a typeface being tried.
     const [trying, tryStyle] = useState<SiteStyle | null>(null);
+    // This visit's changes, each with its own Undo (U24b).
+    const lookChanges = useLookChanges(style, setStyle, styleOptions);
 
     /*
      * A style change that is unsaved or still saving counts as unpublished
@@ -146,12 +149,17 @@ export function useEditorStyle({
         const start = styleOptions.colourways?.find(
             (c) => c.id === styleOptions.startColourway,
         );
-        // Reset is colours, type and spacing: the look stays as chosen
-        // (U16), since Classic is its own choice in the Look row.
+        // Reset to <look> (U24b) is colours, fonts, buttons and shapes and
+        // any spacing a slider stored before the sliders went: the look
+        // stays as chosen (U16), since Classic is its own choice in the
+        // Look row. A template's colourway keeps its own spacing, which is
+        // the look it started in, not a merchant's.
         const look = style.look ?? null;
-        // Component choices have their own "Reset to <look>" (DEC-227).
-        const keep = (next: SiteStyle): SiteStyle =>
-            style.components ? { ...next, components: style.components } : next;
+        lookChanges.nameNext("Look", `Reset to ${lookName(look)}`);
+        const keep = (next: SiteStyle): SiteStyle => {
+            const { components: _c, brandColour: _b, ...rest } = next;
+            return rest;
+        };
         if (start) {
             setStyle(keep(inLook(start.style, look)));
             return;
@@ -186,6 +194,7 @@ export function useEditorStyle({
         savedLook,
         trying,
         tryStyle,
+        lookChanges,
     };
 }
 

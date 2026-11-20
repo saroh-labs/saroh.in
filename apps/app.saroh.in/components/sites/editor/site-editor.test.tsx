@@ -665,8 +665,8 @@ describe("SiteEditor shell", () => {
         const { siteId } = render();
         click(button("Brand"));
         expect(button("Brand").getAttribute("aria-selected")).toBe("true");
-        // The typeface in force (KTD-2), the default, named in the rail.
-        expect(host.textContent).toContain("Typeface");
+        // The fonts in force (KTD-2), the default, named in the rail.
+        expect(host.textContent).toContain("Fonts");
         expect(
             host.querySelector<HTMLElement>("[data-typeface-current]")?.dataset
                 .typefaceCurrent,
@@ -1856,12 +1856,21 @@ describe("SiteEditor narrow and phone (G4)", () => {
                 "[role=tablist][aria-label=Brand] [role=tab]",
             ) ?? [],
         ).map((t) => t.textContent);
-        // No look to offer here, so no Look tab.
-        expect(tabs).toEqual(["Type", "Colour", "Components", "Spacing"]);
-        // Type: each face itself, a tap is the choice; no search on a phone.
+        // No look to offer here, so no Look tab (U24b, WXBBrandPhone).
+        expect(tabs).toEqual(["Colours", "Fonts", "Buttons and shapes"]);
+        // Fonts: each face itself, a tap is the choice; no search on a phone.
+        const fonts = Array.from(
+            sheet()?.querySelectorAll<HTMLElement>("[role=tab]") ?? [],
+        ).find((t) => t.textContent === "Fonts");
+        act(() => {
+            fonts?.dispatchEvent(
+                new MouseEvent("mousedown", { bubbles: true, button: 0 }),
+            );
+            fonts?.click();
+        });
         expect(sheet()?.textContent).toContain("Newsreader");
         expect(
-            sheet()?.querySelector("input[aria-label='Search typefaces']"),
+            sheet()?.querySelector("input[aria-label='Search fonts']"),
         ).toBeNull();
         expect(button("More: Reset style")).toBeTruthy();
         expect(button("Close Brand")).toBeTruthy();

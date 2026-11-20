@@ -168,7 +168,7 @@ test.describe("merchant sites load no Saroh font", () => {
             "system",
         );
         await page.locator("[data-typeface-change]").click();
-        const typeface = page.getByRole("dialog", { name: "Typeface" });
+        const typeface = page.getByRole("dialog", { name: "Fonts" });
         await expect(
             typeface.getByRole("option", {
                 name: /Your visitor's system font/,
