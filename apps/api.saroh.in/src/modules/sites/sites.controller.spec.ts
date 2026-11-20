@@ -112,6 +112,15 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE],
     },
     {
+        handler: "changes",
+        method: RequestMethod.GET,
+        path: ":siteId/changes",
+        target: "sites",
+        call: "getChanges",
+        args: [ctx, SITE],
+        expect: [ctx, SITE],
+    },
+    {
         handler: "listComments",
         method: RequestMethod.GET,
         path: ":siteId/comments",

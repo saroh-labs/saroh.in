@@ -19,6 +19,7 @@ export function siteStatus(
         | "currentPublicationId"
         | "pendingSectionChanges"
         | "pendingSiteChanges"
+        | "pendingChanges"
         | "hasUnpublishedChanges"
     >,
     { reader = false }: { reader?: boolean } = {},
@@ -30,6 +31,7 @@ export function siteStatus(
     const waiting = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
+        site.pendingChanges,
     );
     if (waiting > 0) {
         return {

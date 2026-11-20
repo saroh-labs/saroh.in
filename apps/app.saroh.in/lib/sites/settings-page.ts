@@ -200,7 +200,10 @@ export interface PublishWaiting {
 export function publishWaiting(
     site: Pick<
         SiteDetail,
-        "currentPublication" | "pendingSectionChanges" | "pendingSiteChanges"
+        | "currentPublication"
+        | "pendingSectionChanges"
+        | "pendingSiteChanges"
+        | "pendingChanges"
     > & { hasUnpublishedChanges?: boolean },
 ): PublishWaiting | null {
     if (!site.currentPublication) {
@@ -211,6 +214,7 @@ export function publishWaiting(
     const count = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
+        site.pendingChanges,
     );
     const what = describePendingChanges(
         site.pendingSectionChanges,

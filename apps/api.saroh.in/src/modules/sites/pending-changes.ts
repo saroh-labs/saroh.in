@@ -130,7 +130,7 @@ export function toPublishableSection(
  * "6 sections changed" on a site they have not touched, which is the exact
  * failure this count exists to prevent: a number nobody believes.
  */
-function canonical(value: unknown): string {
+export function canonical(value: unknown): string {
     if (value === undefined) return "null";
     if (value === null || typeof value !== "object") {
         return JSON.stringify(value);

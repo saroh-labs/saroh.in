@@ -102,6 +102,18 @@ export class SitesController {
     }
 
     /**
+     * What publishing would change, one unit each, by who changed it
+     * (change units, U7). `site:read`, reviewer-scoped in the service.
+     */
+    @Get(":siteId/changes")
+    changes(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+    ) {
+        return this.sites.getChanges(ctx, siteId);
+    }
+
+    /**
      * Every note on the draft, with the section each is about resolved against
      * the current draft; or, with `?testReleaseId=`, every note on that test
      * release, against its frozen pages. Requires `site:read`.

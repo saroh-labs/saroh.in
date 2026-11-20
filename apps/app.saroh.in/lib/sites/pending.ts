@@ -104,11 +104,18 @@ export function shortPendingChanges(
     return parts.length > 0 ? parts.join(", ") : null;
 }
 
-/** How many things publishing would change: sections plus site-level settings. */
+/**
+ * How many things publishing would change. The API's change-unit count
+ * (`pendingChanges`, U7) when it sent one, so every surface shows the
+ * Publish sheet's number; else, from an older API, sections plus
+ * site-level settings.
+ */
 export function pendingChangeCount(
     sections: number | null | undefined,
     site: readonly string[] | null | undefined,
+    units?: number | null,
 ): number {
+    if (typeof units === "number") return units;
     return (sections ?? 0) + (site ?? []).filter(isKind).length;
 }
 

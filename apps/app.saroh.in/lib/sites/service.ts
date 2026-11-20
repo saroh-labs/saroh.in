@@ -659,6 +659,12 @@ export interface SiteSummary {
      * first publish. Described through `describePendingChanges`.
      */
     pendingSiteChanges?: SiteChangeKind[] | null;
+    /**
+     * How many things publishing would change, one per change unit (U7):
+     * the number the status chip, Overview, phone bar and All sites show.
+     * Null before the first publish; absent from an older API.
+     */
+    pendingChanges?: number | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
     /**
@@ -1127,6 +1133,52 @@ export interface SiteOverview {
     lastPublished: { at: string; by: string | null } | null;
     /** Each page's last edit, named when it was its settings (Pages, U5). */
     pageEdits?: { pageId: string; at: string; by: string | null }[];
+}
+
+/** One thing publishing would change (API `change-units.ts`, U7). */
+export interface ChangeUnit {
+    /** `section:<pageId>:<sectionKey>`, `page:<pageId>` or `site:<kind>`. */
+    key: string;
+    kind: "section" | "page" | "site";
+    change: "added" | "changed" | "moved" | "removed" | "hidden";
+    /** "Changed · Top of the page". */
+    label: string;
+    /** The page's title, or "Every page". */
+    where: string;
+    pageId: string | null;
+    fingerprint: string;
+    /** Null: "Earlier changes". */
+    editedBy: string | null;
+    editedAt: string | null;
+    /** Units that go out, or are left out, with this one. */
+    requires: string[];
+}
+
+/** What publishing would change, by who changed it (U7). */
+export interface SiteChanges {
+    siteId: string;
+    livePublishedAt: string | null;
+    /** `units.length`; null before the first publish. */
+    count: number | null;
+    units: ChangeUnit[];
+    /** Newest first; `userId` null is "Earlier changes". */
+    groups: {
+        userId: string | null;
+        name: string | null;
+        you: boolean;
+        units: string[];
+    }[];
+    /** Posts not live yet: each goes live with its own Publish post. */
+    posts: { id: string; title: string; updatedAt: string }[];
+}
+
+/** Null on a 404 / no active org; throws on a real failure. */
+export async function getSiteChanges(
+    siteId: string,
+): Promise<SiteChanges | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    return getJson<SiteChanges>(`${base}/${siteId}/changes`);
 }
 
 /** Null on a 404 / no active org; throws on a real failure. */
@@ -2256,7 +2308,12 @@ export type FlagType =
     // A Product grid (G12) naming products that aren't on sale there.
     | "productsNotOnSale"
     // The site has no web address (DEC-069, L5): the one flag that blocks.
-    | "addressMissing";
+    | "addressMissing"
+    // Check before publish (U10): a typed price that isn't Services', a
+    // "free" that isn't, a photo with no description.
+    | "priceMismatch"
+    | "freeClaim"
+    | "photoNoDescription";
 
 export interface Flag {
     type: FlagType;
@@ -2266,6 +2323,8 @@ export interface Flag {
     field: string | null;
     /** The API refuses to publish until this is fixed (only `addressMissing`). */
     blocking?: boolean;
+    /** `photoNoDescription`: the photo, so "Describe it" can show it. */
+    photoSrc?: string;
 }
 
 export interface SiteFlags {

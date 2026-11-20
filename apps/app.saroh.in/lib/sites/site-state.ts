@@ -59,6 +59,7 @@ export function siteState(
     const pending = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
+        site.pendingChanges,
     );
     if (pending > 0) {
         return {

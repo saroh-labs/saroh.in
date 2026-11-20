@@ -2,6 +2,10 @@
 // detectors themselves are covered by site-flags.spec.ts; what is proven here
 // is what the service feeds them — in particular whether "there are edits
 // visitors cannot see yet" is true, which depends on two different reads.
+// The checks before publish (U10) have their own spec; here they add nothing.
+jest.mock("./publish-checks", () => ({
+    publishCheckFlags: jest.fn().mockResolvedValue([]),
+}));
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     return {

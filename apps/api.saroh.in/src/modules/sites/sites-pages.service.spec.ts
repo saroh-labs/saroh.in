@@ -19,6 +19,8 @@ jest.mock("@saroh/database", () => {
             updateMany: jest.fn(),
             create: jest.fn(),
         },
+        // Who deleted a page (change units, U7).
+        $executeRaw: jest.fn().mockResolvedValue(1),
         // A page write and its forwards run in one transaction.
         $transaction: jest.fn((fn: (tx: unknown) => unknown) => fn(prisma)),
     };

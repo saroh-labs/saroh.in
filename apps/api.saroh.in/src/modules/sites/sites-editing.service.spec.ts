@@ -49,6 +49,8 @@ jest.mock("@saroh/database", () => {
         },
         // putLive's lock on the site row (KTD-14).
         $queryRaw: jest.fn().mockResolvedValue([]),
+        // Who changed what (change units, U7).
+        $executeRaw: jest.fn().mockResolvedValue(1),
     };
     return {
         ...actual,

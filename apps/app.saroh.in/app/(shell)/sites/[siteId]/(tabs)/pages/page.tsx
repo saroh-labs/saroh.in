@@ -90,6 +90,7 @@ export default async function SitePagesPage({
     const waiting = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
+        site.pendingChanges,
     );
 
     return (

@@ -7,6 +7,7 @@ import type { LookId } from "@saroh/block-contract";
 
 import type { GridCatalogueRead } from "./grid-catalogue";
 import { readGridCatalogue } from "./grid-catalogue";
+import { withPhotoDescription } from "./photo-description";
 import { savePublishNeedsApproval } from "./publish-approval-read";
 import type { SearchTrackingSave } from "./search-tracking";
 import { saveSearchTracking as saveSearchTrackingApi } from "./search-tracking-read";
@@ -35,6 +36,7 @@ import {
     deletePage as deletePageApi,
     duplicatePage as duplicatePageApi,
     fillDetails as fillDetailsApi,
+    getPageDraft,
     getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
     listComments as listCommentsApi,
@@ -80,6 +82,32 @@ export async function saveDraftSections(
     revision?: number,
 ) {
     return saveDraftSectionsApi(siteId, pageId, sections, revision);
+}
+
+/**
+ * "Describe it" (plan U10): write one photo's description into the page's
+ * draft through the same save the editor uses, against the revision just
+ * read, so it waits for Publish like any edit and a teammate's newer save
+ * is never overwritten.
+ */
+export async function describePhoto(
+    siteId: string,
+    pageId: string,
+    sectionIndex: number,
+    path: string,
+    alt: string,
+) {
+    const draft = await getPageDraft(siteId, pageId);
+    const sections = draft
+        ? withPhotoDescription(draft.sections, sectionIndex, path, alt)
+        : null;
+    if (!draft || !sections) {
+        return {
+            ok: false as const,
+            error: "This photo has moved or gone since the check. Open the page to describe it there.",
+        };
+    }
+    return saveDraftSectionsApi(siteId, pageId, sections, draft.revision);
 }
 
 /** Leave a note on a section (#277). */

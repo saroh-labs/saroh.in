@@ -4099,6 +4099,13 @@ model Site {
   // succeed only for an approved test release, unless an owner overrides,
   // and the override is recorded. Only an owner turns it on or off.
   publishNeedsApproval Boolean        @default(false)
+
+  // Who last changed each part of the draft that has no row of its own to
+  // carry it (change units, website area U7): `{ "<unit key>": { userId, at } }`
+  // for site settings ("site:footer"), removed sections and deleted pages.
+  // Null = nothing stamped yet ("Earlier changes").
+  draftEditors Json?
+
   // Who may review this site (#276).
   reviewers            SiteReviewer[]
 
@@ -4507,6 +4514,12 @@ model Section {
   // its copy in the draft, and is simply left OUT of the published snapshot.
   // That is what lets a merchant park a section without deleting the work.
   hidden Boolean @default(false)
+
+  // Who last changed this section's content, place or visibility, and when
+  // (change units, website area U7). Carried by `key` across the
+  // delete-and-recreate of every save; a plain id, as on `Page`.
+  lastEditedByUserId String?
+  lastEditedAt       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

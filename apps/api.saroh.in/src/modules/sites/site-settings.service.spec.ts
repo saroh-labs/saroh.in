@@ -15,6 +15,8 @@ jest.mock("@saroh/database", () => {
         },
         store: { findFirst: jest.fn() },
         auditEvent: { create: jest.fn() },
+        // Who changed which setting (change units, U7).
+        $executeRaw: jest.fn().mockResolvedValue(1),
         // The setting and its audit event are one transaction, on the same
         // mocked client, so every write is seen here.
         $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(client)),

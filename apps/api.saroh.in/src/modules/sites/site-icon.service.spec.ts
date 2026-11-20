@@ -8,6 +8,8 @@ jest.mock("../../env", () => ({
 jest.mock("@saroh/database", () => ({
     prisma: {
         site: { findFirst: jest.fn(), updateMany: jest.fn() },
+        // Who changed the tab icon (change units, U7).
+        $executeRaw: jest.fn().mockResolvedValue(1),
         businessProfile: { findUnique: jest.fn() },
         job: { create: jest.fn() },
     },

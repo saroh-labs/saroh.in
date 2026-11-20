@@ -222,7 +222,11 @@ describe("a section the save does not change is not re-validated", () => {
             sections: [HERO],
             revision: 3,
         });
-        // Only the read-back after the write, not a lookup before it.
-        expect(db.section.findMany).toHaveBeenCalledTimes(1);
+        // Only who changed what, read inside the write (U7), and the
+        // read-back after it: not a lookup before validating.
+        expect(db.section.findMany).toHaveBeenCalledTimes(2);
+        expect(db.section.findMany.mock.calls[0][0].select).toHaveProperty(
+            "lastEditedByUserId",
+        );
     });
 });

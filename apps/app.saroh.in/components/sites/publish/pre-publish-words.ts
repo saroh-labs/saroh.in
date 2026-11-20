@@ -1,6 +1,8 @@
 import { formatDate } from "@/lib/format/datetime";
+import { count, plural } from "@/lib/format/plural";
 import type {
     ApprovalOutcome,
+    Flag,
     FlagType,
     ReviewState,
 } from "@/lib/sites/service";
@@ -28,6 +30,9 @@ export const TYPE_LABEL: Record<FlagType, string> = {
     shopCantTakeOrders: "Can't take orders online",
     productsNotOnSale: "Products not on sale",
     addressMissing: "No web address",
+    priceMismatch: "Price doesn't match Services",
+    freeClaim: "Says free, but it has a price",
+    photoNoDescription: "Photo has no description",
 };
 
 /**
@@ -114,6 +119,9 @@ export const FIX_WORD: Record<FlagType, string> = {
     shopCantTakeOrders: "Show me",
     productsNotOnSale: "Show me",
     addressMissing: "Choose address",
+    priceMismatch: "Show me",
+    freeClaim: "Show me",
+    photoNoDescription: "Describe it",
 };
 
 /**
@@ -142,4 +150,66 @@ export function oneAreaWords(summary: string): string {
     return summary === "the style"
         ? "the style (look, colours and type)"
         : summary;
+}
+
+/** One row of "Checked before you publish" (plan U10, WXMPublish). */
+export interface CheckRow {
+    key: "prices" | "free" | "links" | "photos";
+    ok: boolean;
+    title: string;
+    /** The flags behind a row that isn't ok, each with its fix. */
+    flags: Flag[];
+}
+
+/**
+ * The checks as rows: a tick when it checks out, else what is wrong and
+ * how many. A "free" claim has a row only when there is one; when there
+ * is none, "Prices match Services" says it too.
+ */
+export function checkRows(flags: readonly Flag[]): CheckRow[] {
+    const of = (type: FlagType) => flags.filter((f) => f.type === type);
+    const prices = of("priceMismatch");
+    const free = of("freeClaim");
+    const links = of("brokenLink");
+    const photos = of("photoNoDescription");
+    const rows: CheckRow[] = [
+        {
+            key: "prices",
+            ok: prices.length === 0,
+            title:
+                prices.length === 0
+                    ? "Prices match Services"
+                    : `${count(prices.length, "price")} ${plural(prices.length, "doesn’t", "don’t")} match Services`,
+            flags: prices,
+        },
+    ];
+    if (free.length > 0) {
+        rows.push({
+            key: "free",
+            ok: false,
+            title: `${count(free.length, "“free”", "“free”s")} where Services has a price`,
+            flags: free,
+        });
+    }
+    rows.push(
+        {
+            key: "links",
+            ok: links.length === 0,
+            title:
+                links.length === 0
+                    ? "Every link works"
+                    : `${count(links.length, "link")} ${plural(links.length, "goes", "go")} nowhere`,
+            flags: links,
+        },
+        {
+            key: "photos",
+            ok: photos.length === 0,
+            title:
+                photos.length === 0
+                    ? "Every photo has a description"
+                    : `${count(photos.length, "photo")} ${plural(photos.length, "has", "have")} no description`,
+            flags: photos,
+        },
+    );
+    return rows;
 }

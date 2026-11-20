@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { stampDraftEditors } from "./draft-editors";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { MediaService } from "../media/media.service";
@@ -88,6 +89,8 @@ export class SiteIconService {
             },
             data,
         });
+        // Who changed it, for the Publish sheet (change units, U7).
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:icon"]);
         return {
             id: siteId,
             icon: await siteIconView(ctx.organizationId, data),

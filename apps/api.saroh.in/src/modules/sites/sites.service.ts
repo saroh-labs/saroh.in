@@ -18,6 +18,7 @@ import {
 import type { LookId } from "@saroh/templates";
 import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { publishCheckFlags } from "./publish-checks";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
@@ -35,7 +36,20 @@ import {
     authorize,
     ROLE_DENIED,
 } from "../organizations/organization-policy";
+import type {
+    ChangeGroup,
+    ChangeStamp,
+    ChangeStamps,
+    ChangeUnit,
+} from "./change-units";
+import {
+    carryStamps,
+    changeUnits,
+    groupByPerson,
+    readDraftEditors,
+} from "./change-units";
 import { domainPausedHere } from "./domain-paused";
+import { stampDraftEditors } from "./draft-editors";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -62,7 +76,6 @@ import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
-    countPendingSectionChanges,
     pageHead,
     pagePathResolver,
     pendingSiteChanges,
@@ -353,6 +366,25 @@ export interface PageDraftView {
      * image, style, menu, footer, page list. Null before the first publish.
      */
     pendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * How many things publishing would change, one per change unit (U7):
+     * the number every surface shows. Null before the first publish.
+     */
+    pendingChanges: number | null;
+}
+
+/** What `GET …/sites/:siteId/changes` answers (change units, U7). */
+export interface SiteChangesView {
+    siteId: string;
+    /** When the version visitors see went live; null before the first. */
+    livePublishedAt: Date | null;
+    /** `units.length`; null before the first publish (nothing to diff). */
+    count: number | null;
+    units: ChangeUnit[];
+    /** By person, newest first; `userId` null is "Earlier changes". */
+    groups: (ChangeGroup & { name: string | null; you: boolean })[];
+    /** Posts not live yet: each has its own Publish post. */
+    posts: { id: string; title: string; updatedAt: Date }[];
 }
 
 /** What a publish returns: the new immutable Publication + the live pointer. */
@@ -585,6 +617,11 @@ export interface SiteDetailView {
      */
     pendingSiteChanges: SiteChangeKind[] | null;
     /**
+     * How many things publishing would change, one per change unit (U7):
+     * the number every surface shows. Null before the first publish.
+     */
+    pendingChanges: number | null;
+    /**
      * The template the site was made from and the style chosen with it
      * (KTD-7). Null for a site made before that was recorded.
      */
@@ -781,6 +818,8 @@ const draftSiteSelect = {
                             type: true,
                             contractVersion: true,
                             content: true,
+                            // Into `snapshot.keys` (change units, U7).
+                            key: true,
                         },
                     },
                 },
@@ -788,6 +827,143 @@ const draftSiteSelect = {
         },
     },
 } satisfies Prisma.SiteSelect;
+
+/**
+ * The draft as {@link draftSiteSelect} loads it, with hidden pages and
+ * sections and who changed each (change units, U7). Hidden ones are kept so
+ * "Hidden" can be told from "Removed"; {@link visibleDraft} drops them again
+ * before a snapshot is built.
+ */
+const changesSiteSelect = {
+    ...draftSiteSelect,
+    draftEditors: true,
+    currentPublication: { select: { snapshot: true } },
+    redirects: {
+        where: { removedAt: null },
+        select: {
+            fromPath: true,
+            toPath: true,
+            createdByUserId: true,
+            createdAt: true,
+        },
+    },
+    pages: {
+        orderBy: { path: "asc" },
+        select: {
+            ...draftSiteSelect.pages.select,
+            hidden: true,
+            settingsEditedByUserId: true,
+            settingsEditedAt: true,
+            versions: {
+                where: { status: "DRAFT" },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: {
+                    sections: {
+                        orderBy: { order: "asc" },
+                        select: {
+                            type: true,
+                            contractVersion: true,
+                            content: true,
+                            key: true,
+                            hidden: true,
+                            lastEditedByUserId: true,
+                            lastEditedAt: true,
+                        },
+                    },
+                },
+            },
+        },
+    },
+} satisfies Prisma.SiteSelect;
+
+type ChangesSite = Prisma.SiteGetPayload<{ select: typeof changesSiteSelect }>;
+
+/** A {@link ChangesSite} as publish would see it: hidden pages and sections out. */
+function visibleDraft(site: ChangesSite): DraftSite {
+    return {
+        ...site,
+        pages: site.pages
+            .filter((p) => !p.hidden)
+            .map((p) => ({
+                ...p,
+                versions: p.versions.map((v) => ({
+                    sections: v.sections.filter((x) => !x.hidden),
+                })),
+            })),
+    };
+}
+
+/** A stamp from a user id and a time, or null when either is missing. */
+function stampOf(
+    userId: string | null | undefined,
+    at: Date | null | undefined,
+): ChangeStamp | null {
+    return userId && at ? { userId, at: at.toISOString() } : null;
+}
+
+/** The setting units a settings save touches (U7). */
+function settingsUnitKeys(data: Record<string, unknown>): string[] {
+    const has = (...fields: string[]) =>
+        fields.some((f) => data[f] !== undefined);
+    return [
+        has("name") ? "site:name" : null,
+        has("seoTitle", "seoDescription") ? "site:search" : null,
+        has(
+            "socialImageUrl",
+            "socialImageWidth",
+            "socialImageHeight",
+            "socialImageBytes",
+        )
+            ? "site:shareImage"
+            : null,
+        has("postsPrefix") ? "site:posts" : null,
+    ].filter((k): k is string => k !== null);
+}
+
+/** Who added each old link, by the link it forwards from. */
+function redirectStamps(
+    // Defaulted for a draft loaded by an older select (spec fixtures).
+    rows: ChangesSite["redirects"] = [],
+): Map<string, ChangeStamp | null> {
+    return new Map(
+        rows.map((r) => [r.fromPath, stampOf(r.createdByUserId, r.createdAt)]),
+    );
+}
+
+/** Who changed what in a draft, for {@link changeUnits}. */
+function changeStamps(site: ChangesSite): ChangeStamps {
+    const sections = new Map<
+        string,
+        { stamp: ChangeStamp | null; hidden: boolean }
+    >();
+    const pages = new Map<
+        string,
+        { stamp: ChangeStamp | null; hidden: boolean; title: string }
+    >();
+    for (const page of site.pages) {
+        pages.set(page.id, {
+            stamp: stampOf(page.settingsEditedByUserId, page.settingsEditedAt),
+            hidden: page.hidden,
+            title: page.title,
+        });
+        for (const section of page.versions[0]?.sections ?? []) {
+            sections.set(`${page.id}:${section.key}`, {
+                stamp: stampOf(
+                    section.lastEditedByUserId,
+                    section.lastEditedAt,
+                ),
+                hidden: section.hidden,
+            });
+        }
+    }
+    return {
+        sections,
+        pages,
+        redirects: redirectStamps(site.redirects),
+        draftEditors: readDraftEditors(site.draftEditors),
+    };
+}
 
 /** A site as {@link draftSiteSelect} loads it. */
 export type DraftSite = Prisma.SiteGetPayload<{
@@ -806,8 +982,14 @@ export type ConfirmDraft = (
 
 /** What publishing a site would change (#190, #282). */
 interface PendingChanges {
-    /** How many sections would be added, removed or changed. */
+    /**
+     * How many sections would be added, removed, changed or moved: the
+     * section units among `units`, so "2 blocks" and "N changes waiting"
+     * are counted alike.
+     */
     sections: number;
+    /** Everything publishing would change, one unit each (U7). */
+    units: ChangeUnit[];
     /** Which site-level settings differ from what is live. */
     site: SiteChangeKind[];
     /** The look the live site is in; null for Classic (U16). */
@@ -978,6 +1160,7 @@ export class SitesService {
                 lastActivity: extras.get(site.id)?.lastActivity ?? null,
                 pendingSectionChanges,
                 pendingSiteChanges,
+                pendingChanges: changes?.units.length ?? null,
                 /*
                  * Derived from the diff, not from a timestamp.
                  *
@@ -1021,14 +1204,13 @@ export class SitesService {
         const sites = await prisma.site.findMany({
             where: { id: { in: siteIds } },
             /*
-             * Exactly what publish loads (#282). The site block is then built by
-             * the same code publish runs, so this diff compares the bytes
-             * publishing would actually write, sections and settings alike.
+             * Exactly what publish loads (#282), plus hidden pages and
+             * sections and who changed what (U7). The site block is then
+             * built by the same code publish runs, so this diff compares the
+             * bytes publishing would actually write, sections and settings
+             * alike.
              */
-            select: {
-                ...draftSiteSelect,
-                currentPublication: { select: { snapshot: true } },
-            },
+            select: changesSiteSelect,
         });
 
         for (const site of sites) {
@@ -1037,14 +1219,17 @@ export class SitesService {
                 continue;
             }
             const live = site.currentPublication.snapshot;
-            const pages = toPendingPages(site.pages);
+            const visible = visibleDraft(site);
+            const pages = toPendingPages(visible.pages);
             // Lenient: counting is a read, and one stale section must not
             // make the sites list throw.
-            const draft = this.buildSnapshot(site, new Date(0), {
+            const draft = this.buildSnapshot(visible, new Date(0), {
                 lenient: true,
             });
+            const units = changeUnits(draft, live, changeStamps(site));
             byId.set(site.id, {
-                sections: countPendingSectionChanges(pages, live),
+                sections: units.filter((u) => u.kind === "section").length,
+                units,
                 site: pendingSiteChanges(
                     draft.site,
                     pages,
@@ -1055,6 +1240,74 @@ export class SitesService {
             });
         }
         return byId;
+    }
+
+    /**
+     * What publishing would change, one unit at a time, who changed each and
+     * the posts that go live on their own (change units, U7). Every count of
+     * "changes waiting" is this list's length. `site:read`; a reviewer sees
+     * only a site they review.
+     */
+    async getChanges(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<SiteChangesView> {
+        authorize(ctx, "site:read");
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+                ...reviewerScope(ctx),
+            },
+            select: {
+                id: true,
+                currentPublication: { select: { publishedAt: true } },
+            },
+        });
+        if (!site) throw new NotFoundException(`Site "${siteId}" not found`);
+
+        const [pending, posts] = await Promise.all([
+            this.pendingSectionChanges([siteId]),
+            // Posts publish on their own (not units): those not live yet.
+            // shortcut: a live post edited since is not listed; add it when
+            // posts get draft-vs-live state (batch 3).
+            prisma.post.findMany({
+                where: {
+                    siteId,
+                    currentPublicationId: null,
+                    status: { not: "ARCHIVED" },
+                },
+                orderBy: { updatedAt: "desc" },
+                take: 20,
+                select: { id: true, title: true, updatedAt: true },
+            }),
+        ]);
+        const units = pending.get(siteId)?.units ?? null;
+        const groups = groupByPerson(units ?? []);
+        const people = groups
+            .map((g) => g.userId)
+            .filter((id): id is string => id !== null);
+        const users =
+            people.length > 0
+                ? await prisma.user.findMany({
+                      where: { id: { in: people } },
+                      select: { id: true, name: true, email: true },
+                  })
+                : [];
+        const names = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+        return {
+            siteId,
+            livePublishedAt: site.currentPublication?.publishedAt ?? null,
+            count: units?.length ?? null,
+            units: units ?? [],
+            groups: groups.map((g) => ({
+                ...g,
+                name: g.userId ? (names.get(g.userId) ?? null) : null,
+                you: g.userId === ctx.userId,
+            })),
+            posts,
+        };
     }
 
     /**
@@ -1188,6 +1441,7 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            pendingChanges: pending.get(site.id)?.units.length ?? null,
             icon: await siteIconView(ctx.organizationId, {
                 iconUrl,
                 iconMediaId,
@@ -1338,6 +1592,13 @@ export class SitesService {
                 postsPrefix: true,
             },
         });
+        // Who changed which setting, for the Publish sheet (U7).
+        await stampDraftEditors(
+            prisma,
+            siteId,
+            ctx.userId,
+            settingsUnitKeys(data),
+        );
         return {
             ...site,
             publishNeedsApproval: await approvalApplies(
@@ -1383,6 +1644,7 @@ export class SitesService {
             data: { style: style as unknown as Prisma.InputJsonValue },
             select: { id: true },
         });
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:style"]);
         return { id: siteId, style };
     }
 
@@ -1433,6 +1695,7 @@ export class SitesService {
             },
             select: { id: true },
         });
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:footer"]);
         return { id: siteId, footer };
     }
 
@@ -1459,6 +1722,7 @@ export class SitesService {
             },
             select: { id: true },
         });
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:menu"]);
         return { id: siteId, navigation };
     }
 
@@ -1771,6 +2035,7 @@ export class SitesService {
             // The editor's first read of the count, before any autosave.
             pendingSectionChanges: pending.get(siteId)?.sections ?? null,
             pendingSiteChanges: pending.get(siteId)?.site ?? null,
+            pendingChanges: pending.get(siteId)?.units.length ?? null,
         };
     }
 
@@ -1932,12 +2197,34 @@ export class SitesService {
                 });
             }
 
+            /*
+             * Who changed what (change units, U7): read before the rows go,
+             * so a section this save leaves as it was keeps its stamp and
+             * only what changed is stamped with this person.
+             */
+            const previous = await tx.section.findMany({
+                where: { pageVersionId: version.id },
+                select: {
+                    key: true,
+                    type: true,
+                    contractVersion: true,
+                    content: true,
+                    hidden: true,
+                    lastEditedByUserId: true,
+                    lastEditedAt: true,
+                },
+            });
+            const carried = carryStamps(previous, validated, {
+                userId: ctx.userId,
+                at: new Date(),
+            });
+
             await tx.section.deleteMany({
                 where: { pageVersionId: version.id },
             });
             if (validated.length > 0) {
                 await tx.section.createMany({
-                    data: validated.map((s) => ({
+                    data: validated.map((s, i) => ({
                         pageVersionId: version.id,
                         organizationId: ctx.organizationId,
                         type: s.type,
@@ -1946,9 +2233,17 @@ export class SitesService {
                         content: s.content as Prisma.InputJsonValue,
                         hidden: s.hidden,
                         key: s.key,
+                        ...carried.stamps[i],
                     })),
                 });
             }
+            // A removed section has no row left to say who removed it.
+            await stampDraftEditors(
+                tx,
+                siteId,
+                ctx.userId,
+                carried.removed.map((key) => `section:${pageId}:${key}`),
+            );
             const sections = await tx.section.findMany({
                 where: { pageVersionId: version.id },
                 orderBy: { order: "asc" },
@@ -1990,6 +2285,7 @@ export class SitesService {
             ...draft,
             pendingSectionChanges: pending.get(siteId)?.sections ?? null,
             pendingSiteChanges: pending.get(siteId)?.site ?? null,
+            pendingChanges: pending.get(siteId)?.units.length ?? null,
         };
     }
 
@@ -2187,6 +2483,23 @@ export class SitesService {
             },
             pages,
             ...(redirects.length > 0 ? { redirects } : {}),
+            /*
+             * Each page's id and its sections' keys, by link (change units,
+             * U7): what lets the next draft be diffed section by section and
+             * a change be left out (U8). Not content: left out of the draft
+             * fingerprint, so an approval still covers the same work.
+             */
+            keys: Object.fromEntries(
+                site.pages.map((page) => [
+                    page.path,
+                    {
+                        id: page.id,
+                        sections: page.versions.flatMap((v) =>
+                            v.sections.map((x) => x.key),
+                        ),
+                    },
+                ]),
+            ),
             publishedAt: publishedAt.toISOString(),
         };
         return snapshot;
@@ -3697,6 +4010,8 @@ export class SitesService {
 
         // No web address (L5): the one flag that blocks, so it comes first.
         flags.unshift(...checkAddress(site.subdomain));
+        // Checks before publish (U10): advice only, after the site is read and authorized.
+        flags.push(...(await publishCheckFlags(ctx.organizationId, siteId)));
 
         // The two unimplementable types travel with the result so the editor
         // can say what is NOT being checked rather than implying nine.
@@ -4044,6 +4359,8 @@ export class SitesService {
         }
 
         await prisma.page.delete({ where: { id: pageId } });
+        // The page row is gone; who removed it is kept on the site (U7).
+        await stampDraftEditors(prisma, siteId, ctx.userId, [`page:${pageId}`]);
         return { deleted: true };
     }
 }

@@ -31,6 +31,19 @@ describe("siteStatus (the Website area's status words)", () => {
         );
     });
 
+    it("shows the change units' count when the API sends it (U7)", () => {
+        // Two pages renamed are one site kind but two changes: the Publish
+        // sheet lists two, so every surface says two.
+        expect(
+            siteStatus({
+                ...live,
+                pendingSectionChanges: 0,
+                pendingSiteChanges: ["pages"],
+                pendingChanges: 2,
+            }).label,
+        ).toBe("Live · 2 changes waiting");
+    });
+
     it("never invents a number, and says Live when nothing waits", () => {
         expect(siteStatus({ ...live, hasUnpublishedChanges: true }).label).toBe(
             "Live · changes waiting",

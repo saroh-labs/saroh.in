@@ -74,7 +74,12 @@ export type FlagType =
     // picked, because what it names isn't on sale at the storefront.
     | "productsNotOnSale"
     // The site has no web address (DEC-069, L5): the one flag that blocks.
-    | "addressMissing";
+    | "addressMissing"
+    // Check before publish (U10, `publish-checks.ts`): a typed price that
+    // isn't Services', a "free" that isn't, a photo with no description.
+    | "priceMismatch"
+    | "freeClaim"
+    | "photoNoDescription";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
@@ -103,6 +108,8 @@ export interface Flag {
      * it; every other flag is advisory and leaves it out.
      */
     blocking?: true;
+    /** `photoNoDescription`: the photo, so "Describe it" can show it. */
+    photoSrc?: string;
 }
 
 /** One page's sections as the checks need them. */
