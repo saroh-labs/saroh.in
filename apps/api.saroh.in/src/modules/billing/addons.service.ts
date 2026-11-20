@@ -33,11 +33,12 @@ import {
     queueAddonChargesInTx,
 } from "./addon-charges";
 import { autopayTakes, planTaxOf } from "./autopay-currency";
-import { assertBillingMayStart } from "./business-closing";
+import { assertBillingMayStart, renewsAtProvider } from "./business-closing";
 import { billedByProvider, periodEnd, periodStart } from "./checkout-quote";
 import { CheckoutService } from "./checkout.service";
 import type { AddonChargeLine } from "./offers";
 import {
+    addonInvoiceName,
     addonPeriodLine,
     addonProblem,
     addonProratedLine,
@@ -113,6 +114,8 @@ const SUB_SELECT = {
     currentPeriodEnd: true,
     pendingPlanId: true,
     pendingFrom: true,
+    cancelAtPeriodEnd: true,
+    pendingPlan: { select: { priceCents: true } },
     billingCycle: true,
     plan: {
         select: {
@@ -221,6 +224,12 @@ export class AddonsService {
                 "This business pays one month at a time, so Saroh can't add this for it yet.",
             );
         }
+        // A year paid once has no charge to add it to (review 19 Nov, H-1).
+        if (!(await renewsAtProvider(prisma, sub))) {
+            throw new ConflictException(
+                "This business pays for its year in one payment, so Saroh can't add this for it yet.",
+            );
+        }
         await this.change(
             { organizationId, userId: staffUserId, role: "OWNER" },
             addon.id,
@@ -294,6 +303,8 @@ export class AddonsService {
             // More is a charge: never for a closing or deleted business
             // (#921), nor a suspended one (its route is `lower-charges`).
             if (quantity > held) {
+                const leaving = leavingWhy(sub);
+                if (leaving) throw new ConflictException(leaving);
                 await assertBillingMayStart(tx, ctx.organizationId);
                 await assertWorkspaceWrite(ctx.organizationId, "new");
             }
@@ -309,21 +320,26 @@ export class AddonsService {
                 });
             }
 
-            // More on a plan paid one month at a time: one whole month of
-            // what is added, paid now on an order of its own, and held
-            // once it's paid (owner, 8 Nov 2026). Nothing changes here yet.
-            if (quantity > held && !autopayTakes(sub.plan.currency)) {
-                const start = now;
+            // More on a plan with no provider charge to ride on (a month
+            // paid on its own, or a year paid once): paid now on an order of
+            // its own, and held once it's paid (owner, 8 Nov 2026; review
+            // 19 Nov, H-1). A month: one whole month; a year: what is left
+            // of it, prorated, as autopay's add-ons are. Nothing changes here yet.
+            if (quantity > held && !(await renewsAtProvider(tx, sub))) {
+                const line =
+                    sub.billingCycle === "year"
+                        ? restOfYearLine(addon, quantity - held, sub, now)
+                        : addonPeriodLine(
+                              addon,
+                              quantity - held,
+                              "month",
+                              now,
+                              periodEnd(now, "month"),
+                          );
                 toPay.buy = {
                     subscriptionId: sub.id,
                     currency: sub.plan.currency,
-                    line: addonPeriodLine(
-                        addon,
-                        quantity - held,
-                        "month",
-                        start,
-                        periodEnd(start, "month"),
-                    ),
+                    line,
                 };
                 return null;
             }
@@ -434,7 +450,7 @@ export class AddonsService {
     }
 
     private async view(sub: Sub | null, now: Date): Promise<AddonsView> {
-        const why = cantBuy(sub, now);
+        const why = cantBuy(sub, now) ?? (sub && leavingWhy(sub));
         const catalog = sub?.plan.key.startsWith(CATALOG_PLAN_KEY_PREFIX)
             ? await catalogueOfVersion(prisma, sub.plan.version)
             : null;
@@ -484,6 +500,47 @@ function addonViews(
                 why: problem,
             };
         });
+}
+
+/**
+ * More can't be bought once the plan is moving to Free: there is no charge
+ * after the period for it to be billed on (review 19 Nov, M-1). Less can.
+ */
+function leavingWhy(sub: Sub): string | null {
+    return sub.cancelAtPeriodEnd || sub.pendingPlan?.priceCents === 0
+        ? "Your plan is moving to Free, so no more add-ons can be added. Keep your plan to add more."
+        : null;
+}
+
+/** More bought on a year paid once: what is left of the year, per add-on. */
+function restOfYearLine(
+    addon: Catalog["addons"][number],
+    added: number,
+    sub: Sub,
+    now: Date,
+): AddonChargeLine {
+    const end = sub.currentPeriodEnd;
+    // One unit prorated, so the paid order holds `added` (onAddonOrder).
+    const one =
+        end &&
+        addonProratedLine({
+            addon,
+            added: 1,
+            cycle: "year",
+            periodStart: periodStart(end, "year"),
+            periodEnd: end,
+            now,
+        });
+    if (!one) {
+        throw new ConflictException(
+            "This year of your plan is ending. Add it once the next year starts.",
+        );
+    }
+    return {
+        ...one,
+        quantity: added,
+        description: `${addonInvoiceName(addon, "year")}, from the day it was bought`,
+    };
 }
 
 /**
