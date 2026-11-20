@@ -10,7 +10,7 @@ import { RESOURCE_PAGES } from "./resources";
  * pages (`lib/site-pages.ts`). Change it with the words:
  * `pnpm check:content-dates` fails a batch that doesn't.
  */
-export const UPDATED = "2026-11-14";
+export const UPDATED = "2026-11-20";
 
 /**
  * The Integrations pages (Resources plan U3): what connects today, what is
@@ -272,7 +272,7 @@ export const liveIntegrations: readonly LiveIntegration[] = [
         slug: "email",
         name: "Your own email",
         category: "Email",
-        line: "Invoices and reminders sent through your own Resend, SendGrid or SMTP relay, from an address you choose.",
+        line: "Invoices and reminders sent through your own Resend account, from an address you choose.",
         cta: "See email",
         connect: "Connect in Settings › Providers",
         href: "/integrations/email",

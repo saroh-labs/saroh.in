@@ -565,7 +565,7 @@ describe("integrations (DB, U13)", () => {
         const body = await refused(
             comms.connectProvider(b.owner, {
                 channel: "WHATSAPP",
-                provider: "TWILIO",
+                provider: "META",
                 credentials: { apiKey: "fake-key" },
             }),
         );

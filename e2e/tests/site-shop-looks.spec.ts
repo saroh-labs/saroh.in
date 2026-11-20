@@ -250,7 +250,11 @@ test.describe("the shop in each look", { tag: "@serial" }, () => {
                 ).toBeVisible();
                 await expect(
                     page.locator(`[data-look-placed="${id}"]`),
-                ).toContainText("We'll email you when it's ready for pick-up.");
+                ).toContainText(
+                    // "We'll email you" only when the business's own email
+                    // sends it (review 04 H2); else the business is named.
+                    /(We'll email you|will be in touch) when it's ready for pick-up\./,
+                );
             } finally {
                 await look.restore();
                 await nw.patch(`/storefronts/${storeId}`, {

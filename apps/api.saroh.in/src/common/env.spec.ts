@@ -14,6 +14,9 @@ const DEPLOYED = {
     APP_URL: "https://app.saroh.in",
     EMAIL_FROM: "Saroh <noreply@saroh.in>",
     ANALYTICS_IP_SALT: "a-test-salt",
+    SMTP_HOST: "email-smtp.example.test",
+    SMTP_USER: "user",
+    SMTP_PASS: "pass",
 };
 
 const missing = (source: Record<string, string | undefined>) => {
@@ -36,12 +39,18 @@ describe("the API's environment", () => {
                 APP_URL: undefined,
                 EMAIL_FROM: undefined,
                 ANALYTICS_IP_SALT: undefined,
+                SMTP_HOST: undefined,
+                SMTP_USER: undefined,
+                SMTP_PASS: undefined,
             }),
         ).toEqual([
             "RENDERER_URL",
             "APP_URL",
             "EMAIL_FROM",
             "ANALYTICS_IP_SALT",
+            "SMTP_HOST",
+            "SMTP_USER",
+            "SMTP_PASS",
         ]);
     });
 

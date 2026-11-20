@@ -1,9 +1,16 @@
 import { Logger } from "@nestjs/common";
 
+import type { CredentialCheck } from "../../../common/providers/provider-attention";
+import {
+    ProviderKeysRefusedError,
+    refusesKeys,
+} from "../../../common/providers/provider-attention";
+import { providerCallSignal } from "../../payments/providers/provider-call";
 import type {
     CommsProvider,
     CommsSendInput,
     CommsSendResult,
+    CommsVerifyInput,
 } from "./provider.port";
 import { relayBase } from "./relay-base";
 
@@ -29,6 +36,40 @@ export class WhatsappCommsProvider implements CommsProvider {
         return this.providers.includes(provider);
     }
 
+    /**
+     * Meta's token, checked on connect (review 04 H4) by reading the
+     * phone number it should send from: a token Meta refuses, or a number
+     * it can't reach, is REJECTED; anything else Meta says is UNSURE.
+     */
+    async verifyCredentials(
+        input: CommsVerifyInput,
+    ): Promise<CredentialCheck | null> {
+        const { accessToken, phoneNumberId, apiVersion, baseUrl } =
+            input.credentials as Record<string, string | undefined>;
+        if (input.provider !== "META" || baseUrl) return null;
+        if (!accessToken || !phoneNumberId) return "REJECTED";
+        let res: Response;
+        try {
+            res = await fetch(
+                `${GRAPH}/${apiVersion ?? VERSION}/${encodeURIComponent(phoneNumberId)}?fields=id`,
+                {
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                    signal: providerCallSignal(),
+                },
+            );
+        } catch {
+            return "UNSURE";
+        }
+        if (res.ok) return "ACCEPTED";
+        // 400 code 100: no such number for this token.
+        const code = await errorCode(res);
+        if (refusesKeys(res.status) || code === 190 || code === 100) {
+            return "REJECTED";
+        }
+        this.logger.warn(`WhatsApp key check answered HTTP ${res.status}`);
+        return "UNSURE";
+    }
+
     async send(input: CommsSendInput): Promise<CommsSendResult> {
         const { to, body, credentials } = input;
 
@@ -45,8 +86,8 @@ export class WhatsappCommsProvider implements CommsProvider {
                 "WhatsApp send failed: provider credentials are incomplete",
             );
         }
-        const version = apiVersion ?? "v19.0";
-        const origin = await relayBase(baseUrl, "https://graph.facebook.com");
+        const version = apiVersion ?? VERSION;
+        const origin = await relayBase(baseUrl, GRAPH);
 
         let res: Response;
         try {
@@ -73,7 +114,13 @@ export class WhatsappCommsProvider implements CommsProvider {
 
         if (!res.ok) {
             this.logger.warn(`WhatsApp send failed with HTTP ${res.status}`);
-            throw new Error(`WhatsApp send failed (HTTP ${res.status})`);
+            const message = `WhatsApp send failed (HTTP ${res.status})`;
+            // A revoked or expired token (401/403, or Meta's 400 code 190):
+            // the connection needs reconnecting, not only a retry.
+            if (refusesKeys(res.status) || (await errorCode(res)) === 190) {
+                throw new ProviderKeysRefusedError(message, res.status);
+            }
+            throw new Error(message);
         }
 
         const payload = (await res.json()) as {
@@ -86,5 +133,18 @@ export class WhatsappCommsProvider implements CommsProvider {
             );
         }
         return { providerMessageId };
+    }
+}
+
+const GRAPH = "https://graph.facebook.com";
+const VERSION = "v19.0";
+
+/** Meta's `error.code` in a refusal, or null; never the body itself. */
+async function errorCode(res: Response): Promise<number | null> {
+    try {
+        const body = (await res.json()) as { error?: { code?: unknown } };
+        return typeof body.error?.code === "number" ? body.error.code : null;
+    } catch {
+        return null;
     }
 }

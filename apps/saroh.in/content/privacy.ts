@@ -17,7 +17,10 @@
  * WhatsApp number, 31 Oct (plan 2026-10-31-002 U9), NOT YET in the owner's
  * doc: a minimal factual addition for the owner to review; how fast pages
  * load, 6 Nov (DEC-160), NOT YET in the owner's doc: a minimal factual
- * addition for the owner to review). Published VERBATIM at
+ * addition for the owner to review; every sub-processor named, Google's
+ * Limited Use statement and Meta's data deletion steps, 20 Nov (review
+ * 2026-11-20 04 H5, M1), NOT YET in the owner's doc: for the owner to
+ * review). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -69,20 +72,43 @@ We use your data to give you the service you signed up for, to meet the law (tax
 
 ## Who we share it with
 
-Only the companies that help us run Saroh, each for its own job, and only what that job needs:
+Only the companies that help us run Saroh, each for its own job, and only what that job needs. The full list is under Sub-processors below. We don't sell personal data. We share it with authorities only when the law requires it.
 
-| Company | What for |
-| --- | --- |
-| Razorpay | Billing you for Saroh: we register your business with Razorpay when you sign up (business and billing name, owner's email, phone, GSTIN and billing address) and keep it up to date, and Razorpay takes your payments to Saroh. Your own Razorpay or Cashfree account takes your customers' payments to you |
-| Cashfree | Your customers' payments, when you connect it |
-| Amazon Web Services (SES) | Sending the emails Saroh sends, from India |
-| Google (Workspace) | Our mailboxes, when you write to us |
-| Hostinger | Running our servers and database |
-| Cloudflare | Serving our websites and apps, network security and speed |
-| Google Analytics | Visits to saroh.in |
-| PostHog | Finding and fixing errors in Saroh, seeing which setup steps businesses complete, and keeping the recordings of use. Stored in the EU |
+## Sub-processors
 
-We don't sell personal data. We share it with authorities only when the law requires it.
+Every company that receives personal data from Saroh, what it gets and why. A row that says "when you turn it on" receives nothing until your business switches that part on or connects that account.
+
+| Company | What it gets | Why |
+| --- | --- | --- |
+| Razorpay | Your business and billing name, owner's email, phone, GSTIN and billing address | Billing you for Saroh: we register your business with Razorpay when you sign up and keep it up to date, and Razorpay takes your payments to Saroh. Your own Razorpay or Cashfree account takes your customers' payments to you |
+| Cashfree | Your customers' payment details | Your customers' payments, when you connect it |
+| Amazon Web Services (SES) | Email addresses and the emails Saroh sends | Sending the emails Saroh sends, from India |
+| MSG91 | Phone numbers and one-time codes | Sending sign-in codes by SMS or WhatsApp, when someone signs in with a phone number |
+| Meta (WhatsApp Cloud API) | Phone numbers, one-time codes and the message sent | Sending sign-in codes and notices on WhatsApp from Saroh's own number |
+| Meta (Facebook, Instagram) and Threads | The posts you schedule, and your Page's or profile's name and access | Posting for your business, when you turn on Saroh Social and connect those accounts |
+| Anthropic | The question you type in Ask AI and the business records needed to answer it. Processed outside India | Answering Ask AI questions, when your business turns it on |
+| Google (sign-in) | Your name, email and Google account ID | Signing you in with Google, when you choose it |
+| Google (Calendar and Meet) | The bookings Saroh adds to your calendar, your calendars' busy times and Meet link settings | Putting bookings on your calendar, keeping busy times free and adding Meet links, when you connect Google Calendar |
+| GitHub | Your name, email and GitHub account ID | Signing you in with GitHub, when you choose it |
+| Google (Workspace) | What you write to us | Our mailboxes, when you write to us |
+| Hostinger | Everything stored in Saroh | Running our servers and database, in India |
+| Cloudflare | Photos and files you upload; visitors' IP addresses and browser details | Serving our websites and apps, storing uploaded files, network security and speed, and Turnstile, which checks a form is filled in by a person and not a bot |
+| Google Analytics | Pages visited on saroh.in, rough location and device | Visits to saroh.in |
+| PostHog | Errors, setup steps and recordings of use, as under What we collect | Finding and fixing errors in Saroh, seeing which setup steps businesses complete, and keeping the recordings of use. Stored in the EU |
+
+Some of these you connect yourself, with your own account: your Razorpay or Cashfree account, your own email provider (Resend) and your own WhatsApp Business number on Meta. What they receive is your customers' data, sent for your business, under that company's terms with you.
+
+## Google user data
+
+When you connect Google Calendar, Saroh reads and writes only the calendar events it makes for your bookings, your calendars' list and busy times, and Meet settings for the links it adds. Saroh's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy (developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements. We don't use it for advertising, don't sell it, don't let people read it unless you ask us to for support or the law requires it, and don't use it to train AI models. Disconnect Google Calendar at any time, or remove Saroh in your Google account's settings, and we stop using it.
+
+## Deleting data a Meta app connected
+
+If you connected Facebook, Instagram or Threads to Saroh, you can have us delete what we hold from them in any of these ways:
+
+- In Saroh, open Social and disconnect the account.
+- In Facebook, Instagram or Threads, open Settings › Apps and websites, remove Saroh and ask for your data to be deleted. Meta tells us, we delete it, and you get a confirmation code. The page at app.saroh.in/social/deletion/‹your code› shows what was deleted and when.
+- Write to contact@saroh.in.
 
 ## Where it's stored
 

@@ -6,6 +6,7 @@ import { PhoneClip, PhoneFold } from "../kit/phone-fold";
 import { StickyBar } from "../kit/sticky-bar";
 import { TimeStamp } from "../kit/time-stamp";
 import { Container } from "../layout/container";
+import { Pill } from "../links/pill";
 import { TextLink } from "../links/text-link";
 import { Section } from "../sections/section";
 
@@ -821,6 +822,14 @@ export function WebsiteView({
                             className="m-0 font-display text-mk-kit-h2 font-bold"
                         >
                             {w.ask.title}
+                            {aiApps ? null : (
+                                <>
+                                    {" "}
+                                    <Pill tone="soon" className="align-middle">
+                                        Coming soon
+                                    </Pill>
+                                </>
+                            )}
                         </h2>
                         <p className="m-0 mt-3.5 text-[16px] leading-normal text-mk-copy">
                             <TimeStamp at={w.ask.at} className="text-[15px]" />

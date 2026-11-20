@@ -505,6 +505,11 @@ const REQUIRED_IN_PRODUCTION = [
     // they were random per process, so phone-code limits started over on
     // every deploy and a code sent before one could never be checked (03-M3).
     "ANALYTICS_IP_SALT",
+    // Saroh's own email (review 04 H3): unset, every sign-in code and
+    // reset link was written to the log and the screen said "sent".
+    "SMTP_HOST",
+    "SMTP_USER",
+    "SMTP_PASS",
 ] as const;
 
 /**
