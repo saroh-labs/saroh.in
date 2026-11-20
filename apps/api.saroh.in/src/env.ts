@@ -202,6 +202,12 @@ const envSchema = z.object({
     // (below), and honoured only in a test run, as STRIPE_FAKE is
     // (`calendar-sync/google/google-calendar.provider.ts`).
     GOOGLE_CALENDAR_FAKE: z.enum(["1"]).optional(),
+    // LOCAL ONLY. Google won't take `https://api.saroh.localhost` as a
+    // redirect address, so a laptop registers `http://localhost:<PORT>` +
+    // the callback path and sets it here; that bare-port hit (no session
+    // cookie there) is bounced to API_PUBLIC_URL's callback. Refused at boot
+    // under NODE_ENV=production (below).
+    GOOGLE_CALENDAR_LOCAL_REDIRECT: z.string().url().optional(),
     // TEST ONLY. `1`: a business's email or WhatsApp keys are taken without
     // asking Resend or Meta (the email-setup browser spec connects one).
     // Refused at boot under NODE_ENV=production (below), and honoured only in
@@ -571,6 +577,7 @@ const TEST_ONLY = [
     "AI_PROVIDER_FAKE",
     "SOCIAL_FAKE",
     "GOOGLE_CALENDAR_FAKE",
+    "GOOGLE_CALENDAR_LOCAL_REDIRECT",
     "COMMS_KEYS_FAKE",
     // Where Saroh's Meta token and MSG91 key are sent: a value left in
     // production would hand them to that host (03-L8).
