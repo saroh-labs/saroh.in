@@ -2398,7 +2398,7 @@ export class SitesService {
                  * Who saved it since (C12): the last other person to edit
                  * a section of this draft. Said by name, never as presence.
                  */
-                const [last] = await tx.section.findMany({
+                const edits = await tx.section.findMany({
                     where: {
                         pageVersionId: version.id,
                         lastEditedByUserId: { not: ctx.userId },
@@ -2407,14 +2407,16 @@ export class SitesService {
                     take: 1,
                     select: { lastEditedByUserId: true },
                 });
-                const byId = last?.lastEditedByUserId ?? null;
-                const [user] = byId
+                const byId =
+                    edits.length > 0 ? edits[0].lastEditedByUserId : null;
+                const users = byId
                     ? await prisma.user.findMany({
                           where: { id: byId },
                           select: { name: true, email: true },
                       })
                     : [];
-                const by = user ? (user.name ?? user.email) : null;
+                const by =
+                    users.length > 0 ? (users[0].name ?? users[0].email) : null;
                 throw new ConflictException({
                     message:
                         "Someone else saved this page while you were editing. Reload to see their version.",
