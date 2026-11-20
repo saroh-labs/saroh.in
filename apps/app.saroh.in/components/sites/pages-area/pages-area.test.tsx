@@ -111,11 +111,40 @@ describe("Pages (WXPPages)", () => {
         expect(html).toContain("All good");
         expect(html).toContain("From your products");
         expect(html).toContain("Hidden");
-        // All 4, In menu 3 (Home always), Needs fixing 1: Overview's count.
-        expect(html).toMatch(/All[^]*?4/);
-        expect(html).toMatch(/In menu[^]*?3/);
-        expect(html).toMatch(/Needs fixing[^]*?1/);
+        // One toolbar row: no tabs; Needs fixing 1 is Overview's count.
+        expect(html).not.toContain('role="tab"');
+        expect(html).toContain('aria-label="In the menu"');
+        expect(html).toContain('aria-label="Who can see it"');
+        expect(html).toMatch(/aria-pressed="false"[^>]*>Needs fixing[^]*?1/);
+        expect(html).toContain("4 pages");
+        expect(html).toContain('aria-label="Sort"');
         expect(html).toContain("New page");
+    });
+
+    it("lands with Needs fixing on from Overview's link, and counts what shows", () => {
+        query.value = "view=fix";
+        const html = render();
+        query.value = "";
+        expect(html).toMatch(/aria-pressed="true"[^>]*>Needs fixing/);
+        expect(html).toContain("1 of 4");
+        expect(html).toContain('data-page-row="/bridal"');
+        expect(html).not.toContain('data-page-row="/shop"');
+        expect(html).toContain("Clear filters");
+    });
+
+    it("shows Status only once the changes were read, and Edited by behind Filters", () => {
+        expect(render()).not.toContain('aria-label="Status"');
+        const html = render({ changes: [] });
+        expect(html).toContain('aria-label="Status"');
+        expect(html).toContain("data-more-filters");
+    });
+
+    it("says what to do when nothing matches", () => {
+        query.value = "q=nothing-like-this";
+        const html = render();
+        query.value = "";
+        expect(html).toContain("No page matches");
+        expect(html).toContain("Try another word, or clear the search.");
     });
 
     it("says a changed link waits for Publish, and who changed it", () => {

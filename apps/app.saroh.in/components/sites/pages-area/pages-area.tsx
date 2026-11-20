@@ -6,9 +6,15 @@ import { EmptyState } from "@saroh/ui/empty-state";
 import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { ListTable, ListTableHead, listTable } from "@saroh/ui/list-table";
-import { ListToolbar } from "@saroh/ui/list-toolbar";
+import {
+    AttentionToggle,
+    ListFilter,
+    ListToolbar,
+    MoreFilters,
+    NARROWED,
+} from "@saroh/ui/list-toolbar";
+import { OptionSelect } from "@saroh/ui/option-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { TabStrip } from "@saroh/ui/tabs";
 import { showSuccess } from "@saroh/ui/toast";
 import { Plus } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -19,6 +25,7 @@ import { ViewerDate } from "@/components/shared/dates/viewer-date";
 import { AddPagePanel } from "@/components/sites/pages/add-page-panel";
 import { addPageOffers } from "@/lib/sites/page-menu";
 import type {
+    ChangeUnit,
     ModulePageKind,
     SiteOverview,
     SitePage,
@@ -28,8 +35,24 @@ import type {
 import { PageRowMenu } from "./page-row-menu";
 import { PageSheet } from "./page-sheet";
 import { hiddenWords, issueWords, madeFrom, pageLink } from "./page-words";
+import type {
+    MenuFilter,
+    PagesQuery,
+    PagesSort,
+    StatusFilter,
+    WhoFilter,
+} from "./pages-filter";
+import {
+    cleared,
+    filterPages,
+    narrowed,
+    pageStatus,
+    pagesCount,
+    readPagesQuery,
+    writePagesQuery,
+} from "./pages-filter";
 
-type Filter = "all" | "menu" | "fix";
+const ALL_EDITORS = "all";
 
 /** Desk columns: Page, In menu, Who can see it, To fix, Last edited, menu. */
 const COLS =
@@ -39,7 +62,10 @@ const COLS =
  * Website › Pages (plan 2026-11-18-001 U5, WXPPages): every page, read
  * first, with its link, whether it is in the menu, who can see it, what
  * it still needs (the Overview's page health, so the two counts agree) and
- * who last changed it. All, In menu and Needs fixing, and Find a page.
+ * who last changed it. One toolbar row (the house list anatomy): Find a
+ * page, In the menu, Who can see it, Status (the Publish sheet's change
+ * units), Edited by behind Filters, the Needs fixing toggle, the sort and
+ * the count, all in the address (`?view=fix` and the rest).
  *
  * A page's settings open in a side sheet from its row, its menu or the
  * address (`?page=<id>`: Overview's fix links land here), and close back
@@ -59,6 +85,7 @@ export function PagesArea({
     edits,
     lastPublishedAt = null,
     redirects,
+    changes = null,
     footer,
 }: {
     siteId: string;
@@ -75,14 +102,18 @@ export function PagesArea({
     /** When the site last went live; null when never or unknown. */
     lastPublishedAt?: string | null;
     redirects: readonly SiteRedirect[] | null;
+    /**
+     * What publishing would change (U7's units, the status chip's count);
+     * null when it couldn't be read: no Status filter then.
+     */
+    changes?: readonly ChangeUnit[] | null;
     /** A line under the list (the AI way in). */
     footer?: ReactNode;
 }) {
     const router = useRouter();
     const pathname = usePathname();
     const params = useSearchParams();
-    const [filter, setFilter] = useState<Filter>("all");
-    const [term, setTerm] = useState("");
+    const query = readPagesQuery(params);
     const [adding, setAdding] = useState(false);
 
     const healthOf = new Map((health ?? []).map((h) => [h.pageId, h]));
@@ -98,14 +129,28 @@ export function PagesArea({
     );
     const inMenu = (p: SitePage) => p.isHome || p.inMenu !== false;
     const needs = (p: SitePage) => (healthOf.get(p.id)?.issues.length ?? 0) > 0;
-    const needle = term.trim().toLowerCase();
-    const shown = sorted.filter(
-        (p) =>
-            (filter === "all" || (filter === "menu" ? inMenu(p) : needs(p))) &&
-            (needle === "" ||
-                p.title.toLowerCase().includes(needle) ||
-                p.path.toLowerCase().includes(needle)),
-    );
+    const facts = sorted.map((page) => {
+        const edit = edited.get(page.id);
+        return {
+            page,
+            inMenu: inMenu(page),
+            hidden: page.hidden,
+            needsFix: health ? needs(page) : null,
+            status: changes ? pageStatus(page, changes, live) : null,
+            editedBy: edit?.by ?? null,
+            editedAt: edit?.at ?? page.updatedAt ?? null,
+            title: page.title,
+            path: page.path,
+        };
+    });
+    const shown = filterPages(facts, query).map((f) => f.page);
+    const editors = Array.from(
+        new Set(facts.flatMap((f) => (f.editedBy ? [f.editedBy] : []))),
+    ).sort();
+    const setQuery = (patch: Partial<PagesQuery>) => {
+        const q = writePagesQuery(params, { ...query, ...patch }).toString();
+        router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+    };
 
     // Edited since the site last went live, or its link changed since.
     const waits = (p: SitePage) => {
@@ -128,23 +173,8 @@ export function PagesArea({
     const url = (p: SitePage) =>
         host ? `https://${pageLink(host, p.path)}` : null;
 
-    const tabs = [
-        { value: "all" as const, label: "All", count: pages.length },
-        {
-            value: "menu" as const,
-            label: "In menu",
-            count: pages.filter(inMenu).length,
-        },
-        ...(health
-            ? [
-                  {
-                      value: "fix" as const,
-                      label: "Needs fixing",
-                      count: pages.filter(needs).length,
-                  },
-              ]
-            : []),
-    ];
+    const statusCount = (status: StatusFilter) =>
+        facts.filter((f) => f.status === status).length;
 
     return (
         <div className="flex min-w-0 flex-col gap-4">
@@ -189,27 +219,150 @@ export function PagesArea({
             </div>
 
             <ListToolbar
-                tabs={
-                    <TabStrip
-                        label="Pages"
-                        tabs={tabs}
-                        value={filter}
-                        onValueChange={setFilter}
-                    />
-                }
                 search={
                     <ListSearch
                         placeholder="Find a page"
-                        defaultValue={term}
-                        onSearch={setTerm}
+                        defaultValue={query.q}
+                        onSearch={(q) => {
+                            if (q !== query.q) setQuery({ q });
+                        }}
                     />
                 }
-                onClear={needle ? () => setTerm("") : undefined}
-                clearLabel="Clear search"
+                filters={
+                    <>
+                        <ListFilter<MenuFilter>
+                            label="In the menu"
+                            value={query.menu}
+                            onValueChange={(menu) => setQuery({ menu })}
+                            options={[
+                                { value: "all", label: "All pages" },
+                                {
+                                    value: "in",
+                                    label: "In the menu",
+                                    count: facts.filter((f) => f.inMenu).length,
+                                },
+                                {
+                                    value: "out",
+                                    label: "Not in the menu",
+                                    count: facts.filter((f) => !f.inMenu)
+                                        .length,
+                                },
+                            ]}
+                        />
+                        <ListFilter<WhoFilter>
+                            label="Who can see it"
+                            value={query.who}
+                            onValueChange={(who) => setQuery({ who })}
+                            options={[
+                                { value: "all", label: "Public and hidden" },
+                                {
+                                    value: "public",
+                                    label: "Everyone",
+                                    count: facts.filter((f) => !f.hidden)
+                                        .length,
+                                },
+                                {
+                                    value: "hidden",
+                                    label: "Hidden",
+                                    count: facts.filter((f) => f.hidden).length,
+                                },
+                                // TODO(batch 7): "Customers who sign in".
+                            ]}
+                        />
+                        {changes ? (
+                            <ListFilter<StatusFilter>
+                                label="Status"
+                                value={query.status}
+                                onValueChange={(status) => setQuery({ status })}
+                                options={[
+                                    { value: "all", label: "All statuses" },
+                                    {
+                                        value: "live",
+                                        label: "Live",
+                                        count: statusCount("live"),
+                                    },
+                                    {
+                                        value: "waiting",
+                                        label: "Changes waiting",
+                                        count: statusCount("waiting"),
+                                    },
+                                    {
+                                        value: "new",
+                                        label: "Not live yet",
+                                        count: statusCount("new"),
+                                    },
+                                ]}
+                            />
+                        ) : null}
+                    </>
+                }
+                more={
+                    editors.length > 0 ? (
+                        <MoreFilters
+                            title="Filter pages"
+                            count={query.by ? 1 : 0}
+                        >
+                            {/* Teammates' names: masked in a recording. */}
+                            <span data-ph-mask="" className="grid">
+                                <OptionSelect<string>
+                                    aria-label="Edited by"
+                                    value={query.by || ALL_EDITORS}
+                                    onValueChange={(v) =>
+                                        setQuery({
+                                            by: v === ALL_EDITORS ? "" : v,
+                                        })
+                                    }
+                                    className={cn(
+                                        "w-full",
+                                        query.by && NARROWED,
+                                    )}
+                                    options={[
+                                        {
+                                            value: ALL_EDITORS,
+                                            label: "All editors",
+                                        },
+                                        ...editors.map((name) => ({
+                                            value: name,
+                                            label: `Edited by ${name}`,
+                                        })),
+                                    ]}
+                                />
+                            </span>
+                        </MoreFilters>
+                    ) : null
+                }
+                attention={
+                    health ? (
+                        <AttentionToggle
+                            label="Needs fixing"
+                            count={pages.filter(needs).length}
+                            on={query.fix}
+                            onToggle={() => setQuery({ fix: !query.fix })}
+                        />
+                    ) : null
+                }
+                onClear={
+                    narrowed(query) ? () => setQuery(cleared(query)) : undefined
+                }
+                end={
+                    <ListFilter<PagesSort>
+                        // A sort narrows nothing.
+                        narrowed={false}
+                        label="Sort"
+                        value={query.sort}
+                        onValueChange={(sort) => setQuery({ sort })}
+                        options={[
+                            { value: "menu", label: "Menu order" },
+                            { value: "edited", label: "Last edited" },
+                            { value: "name", label: "Name A to Z" },
+                        ]}
+                    />
+                }
+                count={pagesCount(shown.length, pages.length)}
             />
 
             {shown.length === 0 ? (
-                filter === "fix" && needle === "" ? (
+                query.fix && !narrowed({ ...query, fix: false }) ? (
                     <EmptyState
                         size="inline"
                         title={`All ${pages.length} pages look good`}
@@ -219,7 +372,11 @@ export function PagesArea({
                     <EmptyState
                         size="inline"
                         title="No page matches"
-                        description="Try another word, or clear the search."
+                        description={
+                            query.q.trim()
+                                ? "Try another word, or clear the search."
+                                : "Try another filter, or clear the filters."
+                        }
                     />
                 )
             ) : (

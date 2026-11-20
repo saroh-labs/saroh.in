@@ -22,6 +22,7 @@ import {
 } from "@/lib/sites/pending";
 import {
     getSite,
+    getSiteChanges,
     getSiteOverview,
     listSiteRedirects,
 } from "@/lib/sites/service";
@@ -242,16 +243,22 @@ async function WebsitePages({
     siteId: string;
     userId: string;
 }) {
-    const [site, overview, redirects, webAddress, wayIn] = await Promise.all([
-        getSite(siteId),
-        getSiteOverview(siteId).catch((error: unknown): null => {
-            unstable_rethrow(error);
-            return null;
-        }),
-        listSiteRedirects(siteId).catch(() => null),
-        readWebAddressLinks(),
-        aiWayIn(userId),
-    ]);
+    const [site, overview, redirects, webAddress, wayIn, changes] =
+        await Promise.all([
+            getSite(siteId),
+            getSiteOverview(siteId).catch((error: unknown): null => {
+                unstable_rethrow(error);
+                return null;
+            }),
+            listSiteRedirects(siteId).catch(() => null),
+            readWebAddressLinks(),
+            aiWayIn(userId),
+            // The Status filter's source, the status chip's units; without it the list loads, without Status.
+            getSiteChanges(siteId).catch((error: unknown): null => {
+                unstable_rethrow(error);
+                return null;
+            }),
+        ]);
     if (!site) notFound();
     return (
         <PagesArea
@@ -269,6 +276,7 @@ async function WebsitePages({
             edits={overview?.pageEdits ?? null}
             lastPublishedAt={overview?.lastPublished?.at ?? null}
             redirects={redirects}
+            changes={changes?.units ?? null}
             footer={wayIn ? <AiWayIn /> : null}
         />
     );

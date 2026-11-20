@@ -146,7 +146,7 @@ describe("Overview (WXHOverview)", () => {
         expect(out).toContain("Review and publish");
         expect(out).toContain("What the site brought in, last 7 days");
         expect(out).toContain("6 bookings started");
-        expect(out).toContain('href="/sites/s1/pages?page=p_bridal"');
+        expect(out).toContain('href="/sites/s1/pages?view=fix&page=p_bridal"');
         expect(out).toContain("Mohit published the site");
     });
 
@@ -190,7 +190,7 @@ describe("Overview (WXHOverview)", () => {
         );
         expect(out).toContain("2 pages have no text for Google");
         expect(out).not.toContain("Review and publish");
-        expect(out).not.toContain("/pages?page=");
+        expect(out).not.toContain("/pages?view=fix");
         expect(out).not.toContain("What the site brought in");
     });
 

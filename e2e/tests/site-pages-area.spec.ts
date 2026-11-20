@@ -140,9 +140,11 @@ test.describe("Pages", () => {
             (await page.getByPlaceholder("Find a page").count()) === 0,
             "NEXT_PUBLIC_WEBSITE_AREA is off",
         );
-        const fix = page.getByRole("tab", { name: /Needs fixing/ });
+        const fix = page.getByRole("button", { name: /Needs fixing/ });
         await fix.click();
-        await expect(fix).toHaveAttribute("aria-selected", "true");
+        await expect(fix).toHaveAttribute("aria-pressed", "true");
+        // The toggle is in the address, so Overview's fix links land on it.
+        await expect(page).toHaveURL(/[?&]view=fix/);
         // Each row left says what it needs, or the list says all is well.
         await expect(
             page

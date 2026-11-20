@@ -10,13 +10,14 @@ import { needsDoingItems } from "./overview-words";
 
 /**
  * Where an item is fixed: a page's Google text and share photo in its page
- * settings on Pages (U5 opens the sheet from `?page=`), a link in the
+ * settings on Pages with Needs fixing on (U5 opens the sheet from
+ * `?page=`, and the list behind it is the pages to fix), a link in the
  * editor on that page.
  */
 export function fixHref(siteId: string, item: NeedsDoingItem): string {
     return item.issue === "brokenLink"
         ? `/sites/${siteId}?page=${item.pageId}`
-        : `/sites/${siteId}/pages?page=${item.pageId}`;
+        : `/sites/${siteId}/pages?view=fix&page=${item.pageId}`;
 }
 
 /**

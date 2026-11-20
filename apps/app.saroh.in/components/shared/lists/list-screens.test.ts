@@ -366,7 +366,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             'an attention toggle is for "Needs …": anything else is a ListFilter',
             (code) =>
                 toggles(code) === 1 &&
-                !/<AttentionToggle\b[\s\S]*?label="Needs (?:you|attention)"/.test(
+                !/<AttentionToggle\b[\s\S]*?label="Needs (?:you|attention|fixing)"/.test(
                     code,
                 ),
         );

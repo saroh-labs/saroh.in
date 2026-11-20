@@ -553,7 +553,7 @@
       words in it included, a quiet "Clear filters" ends the row
       (`onClear`).
     - **At most ONE chip: `AttentionToggle`.** An on/off filter for what
-      needs the merchant now ("Needs you 4", "Needs attention") may sit
+      needs the merchant now ("Needs you 4", "Needs attention", Website › Pages' "Needs fixing") may sit
       in the row after the dropdowns, its count in the attention tone
       while it is above zero. It is a one-press shortcut: one per list,
       never on a row of its own. A filter that mixes two ideas splits:
