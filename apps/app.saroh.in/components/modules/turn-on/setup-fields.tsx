@@ -332,7 +332,7 @@ export function WebsiteFields({
 
 /**
  * Payments' or Communications' choice where the sheet asks for more than
- * one module: connect a provider now (Settings › Providers, once saved) or
+ * one module: connect a provider now (Settings › Integrations, once saved) or
  * later. Alone, the sheet's two buttons ask it instead.
  */
 export function ConnectChoice({

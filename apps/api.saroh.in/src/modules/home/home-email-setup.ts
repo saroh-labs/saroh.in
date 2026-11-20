@@ -67,7 +67,7 @@ export async function noEmailProvider(
         code: NO_EMAIL_CODE,
         title: EMAIL_SETUP_TITLE,
         sub: noEmailSub(setup.accountUpdates, false),
-        href: "/settings/providers",
+        href: "/settings/integrations",
         severity: "ATTENTION",
         moduleKey: "COMMUNICATIONS",
         tag: "To connect",

@@ -8,7 +8,7 @@ import { composerGate, sendFailureWords } from "./composer-gate";
 /**
  * The lead composer's gate per plan (UX-067): Free, whose plan locks the
  * business's own email (DEC-091), is led to the plan that has it; Grow,
- * with room, to Providers; an unread plan reads as room; Communications off
+ * with room, to Integrations; an unread plan reads as room; Communications off
  * hides the composer. Plan names and figures are made up.
  */
 const row = (over: Partial<ModuleAccessView>): ModuleAccessView => ({
@@ -80,13 +80,13 @@ describe("composerGate", () => {
         });
     });
 
-    it("Grow with room and no email: connect it in Providers", () => {
+    it("Grow with room and no email: connect it in Integrations", () => {
         const gate = composerGate({ ...base, providers: [], access: GROW });
         expect(gate).toEqual({
             kind: "connect",
             title: "No email provider is connected, so no email is sent.",
-            cta: "Connect in Providers",
-            href: "/settings/providers",
+            cta: "Connect in Integrations",
+            href: "/settings/integrations",
         });
     });
 
@@ -136,7 +136,7 @@ describe("composerGate", () => {
         expect(gate).toMatchObject({
             kind: "connect",
             title: "WhatsApp isn't connected, so nothing is sent from here.",
-            cta: "Connect in Providers",
+            cta: "Connect in Integrations",
         });
     });
 
@@ -180,7 +180,7 @@ describe("sendFailureWords", () => {
                 "EMAIL",
             ),
         ).toBe(
-            "Nothing was sent: your email isn't connected. Connect it in Settings › Providers.",
+            "Nothing was sent: your email isn't connected. Connect it in Settings › Integrations.",
         );
         expect(
             sendFailureWords(
@@ -188,7 +188,7 @@ describe("sendFailureWords", () => {
                 "WHATSAPP",
             ),
         ).toBe(
-            "Nothing was sent: WhatsApp is disconnected. Reconnect it in Settings › Providers.",
+            "Nothing was sent: WhatsApp is disconnected. Reconnect it in Settings › Integrations.",
         );
     });
 

@@ -9,7 +9,7 @@ import { planLabel } from "@saroh/ui/lib/state-copy";
  * there only where Saroh posts them (U5, #1136). This is what the
  * workspace says about it, and to whom:
  *
- * - **The prompt** (`emailPrompt`): Settings › Providers, and Home's Needs
+ * - **The prompt** (`emailPrompt`): Settings › Integrations, and Home's Needs
  *   you (worded by the API, `home-email-setup.ts`, in the same sentences).
  *   Only to someone who can act: `comms:manage` to connect one, or, where
  *   the plan can't (Free, DEC-091), `billing:read` to see the plans.
@@ -67,7 +67,7 @@ export function emailPromptMissed(
 export const EMAIL_PROMPT_PLAN =
     "Connecting your own email comes with a paid plan.";
 
-export const CONNECT_EMAIL_HREF = "/settings/providers";
+export const CONNECT_EMAIL_HREF = "/settings/integrations";
 export const SEE_PLANS_HREF = "/settings/billing/plans";
 
 export interface EmailAction {
@@ -91,7 +91,7 @@ export interface EmailPrompt extends EmailNote {
  * The prompt to connect the business's own email, or null: connected,
  * unread, or nothing this person can do about it here. `connectHref` is
  * where Connect goes from here; null when there is nowhere to connect one
- * (Settings › Providers offering no email provider: Communications off, or
+ * (Settings › Integrations offering no email provider: Communications off, or
  * the one it had is disconnected and its own row says so), and then the
  * connect prompt isn't drawn.
  */

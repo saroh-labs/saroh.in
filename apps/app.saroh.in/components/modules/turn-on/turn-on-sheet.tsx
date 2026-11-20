@@ -50,7 +50,7 @@ import { useTurnOn } from "./use-turn-on";
  *
  * Payments or Communications with nothing else to fill in turns on with
  * nothing connected. "Turn on and connect" is the quieter second way: it
- * goes on to Settings › Providers once it is on, because connecting a
+ * goes on to Settings › Integrations once it is on, because connecting a
  * provider is a sheet of keys of its own and not something to nest here.
  */
 export function TurnOnSheet({
@@ -325,7 +325,7 @@ function TurnOnBody({
                                 className="text-pretty text-[12.5px] leading-normal text-muted-foreground"
                             >
                                 It turns on with nothing connected. Turn on and
-                                connect goes on to Settings › Providers once
+                                connect goes on to Settings › Integrations once
                                 it&apos;s on.
                             </p>
                         ) : null}

@@ -128,13 +128,13 @@ describe('a location\'s "Not taking orders on your plan" row', () => {
             key: "provider",
             action: {
                 label: "Connect",
-                href: "/settings/providers",
+                href: "/settings/integrations",
                 inPage: false,
             },
         };
         expect(rowOf(providers, false, jump, false).action).toEqual({
             label: "Connect",
-            href: "/settings/providers",
+            href: "/settings/integrations",
         });
     });
 });

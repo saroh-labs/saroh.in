@@ -31,7 +31,7 @@ describe("what happens when a service is booked online (DEC-088, DEC-089, #821)"
         }
     });
 
-    it("Both, a deposit with no provider: paid at the desk for now, linking to Settings › Providers (DEC-089)", () => {
+    it("Both, a deposit with no provider: paid at the desk for now, linking to Settings › Integrations (DEC-089)", () => {
         const problem = onlineBookingProblem(
             svc("PERCENT_50"),
             view("BOTH", "NO_PROVIDER"),
@@ -41,8 +41,8 @@ describe("what happens when a service is booked online (DEC-088, DEC-089, #821)"
             text: "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book.",
             line: "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book.",
             fix: {
-                href: "/settings/providers",
-                label: "Connect one in Settings › Providers",
+                href: "/settings/integrations",
+                label: "Connect one in Settings › Integrations",
             },
         });
     });
@@ -84,8 +84,8 @@ describe("what happens when a service is booked online (DEC-088, DEC-089, #821)"
             text: "People can't book this online: it takes payment when they book, and no payment provider is connected.",
             line: "Can't be booked online: it takes payment when they book, and no payment provider is connected.",
             fix: {
-                href: "/settings/providers",
-                label: "Connect one in Settings › Providers",
+                href: "/settings/integrations",
+                label: "Connect one in Settings › Integrations",
             },
         });
         expect(

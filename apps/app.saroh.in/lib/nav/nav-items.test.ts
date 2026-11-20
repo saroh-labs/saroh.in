@@ -204,7 +204,7 @@ describe("what each role is offered", () => {
             "/settings/profile",
             "/settings/share",
             "/settings/activity",
-            "/settings/providers",
+            "/settings/integrations",
             "/settings/developers",
             "/settings/data",
         ]);
@@ -1297,10 +1297,20 @@ describe("settings tabs — owner only, and everyone's", () => {
             "Your profile",
             "Share",
             "Activity",
-            "Providers",
+            "Integrations",
             "API and AI apps",
             "Your data",
         ]);
+    });
+
+    it("opens Providers to anyone whose Google Calendar is switched on (DEC-233)", () => {
+        expect(tabsFor({ role: "MEMBER" })).not.toContain(
+            "/settings/integrations",
+        );
+        expect(
+            tabsFor({ role: "MEMBER", switches: ["google-calendar"] }),
+        ).toContain("/settings/integrations");
+        expect(tabsFor({ role: "OWNER" })).toContain("/settings/integrations");
     });
 
     it("offers API and AI apps to every member but a Reviewer (plan 2026-11-10-001)", () => {

@@ -20,7 +20,7 @@ export interface FakeEvent {
     input: EventInput;
     status: "confirmed" | "cancelled";
     meetCode: string | null;
-    /** Deleted with no email to the guest. */
+    /** Its last write (made, updated or deleted) emailed nobody. */
     quiet?: boolean;
 }
 
@@ -29,7 +29,9 @@ export interface FakeEvent {
  * `GOOGLE_CALENDAR_FAKE` (never a deployed API). It keeps events, busy
  * times and Meet spaces, and can be told to fail an operation, to answer
  * a Meet link as pending for a while, or to refuse to tighten a Meet (a
- * personal Gmail host).
+ * personal Gmail host). Several Google accounts: each grant's tokens name
+ * the account (`grantEmail` at the exchange), and `accountCalendars` gives
+ * an account calendars of its own.
  */
 export class FakeGoogleCalendar implements GoogleCalendarPort {
     /** Calendar id → events by id. */
@@ -52,6 +54,8 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
     meetPendingReads = 0;
     /** Refuse RESTRICTED, as a personal Gmail host's Meet does. */
     personalAccount = false;
+    /** An account's own calendars, by its email; else `calendars`. */
+    readonly accountCalendars = new Map<string, GoogleCalendarEntry[]>();
 
     private readonly failures = new Map<Op, GoogleErrorKind[]>();
     private readonly pending = new Map<string, number>();
@@ -81,8 +85,8 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
     exchangeCode(code: string): Promise<Grant> {
         return this.answer("exchangeCode", () => {
             return {
-                refreshToken: `refresh-${code}`,
-                accessToken: `access-${code}`,
+                refreshToken: `refresh-${code}|${this.grantEmail}`,
+                accessToken: `access|${this.grantEmail}`,
                 scopes: [...this.grantScopes],
                 email: this.grantEmail,
             };
@@ -91,7 +95,7 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
 
     refresh(refreshToken: string): Promise<string> {
         return this.answer("refresh", () => {
-            return `access-for-${refreshToken.length}`;
+            return `access|${refreshToken.split("|")[1] ?? ""}`;
         });
     }
 
@@ -101,9 +105,11 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
         });
     }
 
-    listCalendars(): Promise<GoogleCalendarEntry[]> {
+    listCalendars(accessToken: string): Promise<GoogleCalendarEntry[]> {
         return this.answer("listCalendars", () => {
-            return this.calendars.map((c) => ({ ...c }));
+            const email = accessToken.split("|")[1] ?? "";
+            const list = this.accountCalendars.get(email) ?? this.calendars;
+            return list.map((c) => ({ ...c }));
         });
     }
 
@@ -163,7 +169,7 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
         _accessToken: string,
         calendarId: string,
         input: EventInput,
-        opts: { quiet?: boolean } = {},
+        opts: { quiet?: boolean; quietUpdate?: boolean } = {},
     ): Promise<EventResult> {
         return this.answer("putEvent", () => {
             const calendar =
@@ -182,9 +188,29 @@ export class FakeGoogleCalendar implements GoogleCalendarPort {
                 input,
                 status: "confirmed",
                 meetCode,
-                quiet: opts.quiet === true,
+                quiet: before
+                    ? opts.quiet === true || opts.quietUpdate === true
+                    : opts.quiet === true,
             });
             return this.resultOf(input.eventId, meetCode);
+        });
+    }
+
+    findEventByBooking(
+        _accessToken: string,
+        calendarId: string,
+        bookingId: string,
+    ): Promise<EventResult | null> {
+        return this.answer("findEventByBooking", () => {
+            const live = [
+                ...(this.events.get(calendarId)?.values() ?? []),
+            ].find(
+                (e) =>
+                    e.status === "confirmed" && e.input.bookingId === bookingId,
+            );
+            return live
+                ? this.resultOf(live.input.eventId, live.meetCode)
+                : null;
         });
     }
 

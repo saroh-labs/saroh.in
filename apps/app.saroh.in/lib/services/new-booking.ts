@@ -62,6 +62,8 @@ export interface FlowService {
     capacity: number;
     /** False: only customers book it, on the booking page (Q5). */
     bookableByTeam?: boolean;
+    /** Online with its own link: Where's first choice says so. */
+    online?: boolean;
 }
 
 /** Someone who takes bookings, as New booking needs them. */

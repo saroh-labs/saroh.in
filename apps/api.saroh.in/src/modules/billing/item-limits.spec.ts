@@ -82,9 +82,13 @@ function meterFor(
 }
 
 describe("which rows cap inside one thing", () => {
-    it("is the variants row, and no other", () => {
-        expect(ITEM_LIMIT_KEYS).toEqual(["variantsPerProduct"]);
+    it("is the variants row and Google accounts (DEC-233), and no other", () => {
+        expect(ITEM_LIMIT_KEYS).toEqual([
+            "variantsPerProduct",
+            "googleAccountsPerPerson",
+        ]);
         expect(itemKeyOf("variants")).toBe("variantsPerProduct");
+        expect(itemKeyOf("google-accounts")).toBe("googleAccountsPerPerson");
         for (const id of ["products", "orders", "members", "roles", "nope"]) {
             expect(itemKeyOf(id)).toBeNull();
         }

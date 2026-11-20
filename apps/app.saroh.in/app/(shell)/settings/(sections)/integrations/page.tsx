@@ -6,6 +6,7 @@ import { EmailPromptBlock } from "@/components/communications/email-prompt";
 import { AccountUpdatesBlock } from "@/components/providers/account-updates/account-updates-row";
 import { ProviderList } from "@/components/providers/connections/provider-list";
 import { CustomerEmailsBlock } from "@/components/providers/customer-emails/customer-emails-row";
+import { GoogleCalendarRow } from "@/components/providers/google-calendar/google-calendar-row";
 import {
     SettingsPanel,
     SettingsPanelHeader,
@@ -16,6 +17,8 @@ import { readCustomerEmails } from "@/lib/communications/customer-emails-service
 import { emailPrompt } from "@/lib/communications/email-setup";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
 import { listOrgDomains } from "@/lib/domains/service";
+import { readGoogleCalendar } from "@/lib/google-calendar/service";
+import { calendarProviderRow } from "@/lib/google-calendar/words";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listProviderHealth } from "@/lib/provider-health/service";
 import { connectLocksOf } from "@/lib/providers/connect-lock";
@@ -37,8 +40,12 @@ import { Plug } from "lucide-react";
  * each is connected, what it is called at the provider's end, and the way to
  * connect, manage or disconnect it. No credentials are ever shown; the API is
  * OWNER/ADMIN-only.
+ *
+ * And the person's own Google Calendar (20 Nov 2026), its own group, for
+ * anyone it is switched on for: someone who may not manage the business's
+ * providers sees only that, not a refusal.
  */
-export const metadata = { title: "Providers · Settings" };
+export const metadata = { title: "Integrations · Settings" };
 
 export default async function ProvidersSettingsPage() {
     await requireSession();
@@ -46,10 +53,12 @@ export default async function ProvidersSettingsPage() {
     // read beside everything else. Anyone in the business may read them;
     // never throws, and null draws no row.
     const customerEmailsRead = readCustomerEmails();
-    const [result, org] = await Promise.all([
+    const [result, org, calendar] = await Promise.all([
         listProviderHealth(),
         resolveActiveOrganization(),
+        readGoogleCalendar(),
     ]);
+    const calendarRow = calendarProviderRow(calendar);
     const may = (action: string) =>
         org?.actions
             ? org.actions.includes(action)
@@ -118,24 +127,31 @@ export default async function ProvidersSettingsPage() {
         <SettingsPanel
             header={
                 <SettingsPanelHeader
-                    title="Providers"
-                    description="The services that keep your site, email and payments running."
+                    title="Integrations"
+                    description="Payments, email, domains and your calendar: the services your business runs on."
                 />
             }
         >
             {/* No email of its own: its customers get no emails (DEC-011). */}
             {prompt ? <EmailPromptBlock prompt={prompt} /> : null}
-            <PlanLimitNotice moduleId="integrations" />
-            {/* A plan without online payments: no first connection, no
-                payment links, no checkout — said here, before Connect. */}
-            <OnlinePaymentsLockNotice what="payments" />
+            {result.status === "denied" ? null : (
+                <>
+                    <PlanLimitNotice moduleId="integrations" />
+                    {/* A plan without online payments: no first connection,
+                        no payment links, no checkout — said here, before
+                        Connect. */}
+                    <OnlinePaymentsLockNotice what="payments" />
+                </>
+            )}
             {/* Three outcomes, three states. "Nothing to show" was previously
                 rendered for both a denial and an empty list, which are
                 different facts about the same screen (#177, §30). */}
             {result.status === "denied" ? (
-                <PermissionDeniedState
-                    {...whoCanChange({ thing: "Providers" })}
-                />
+                calendarRow ? null : (
+                    <PermissionDeniedState
+                        {...whoCanChange({ thing: "Integrations" })}
+                    />
+                )
             ) : !view?.any ? (
                 <EmptyState
                     icon={<Plug />}
@@ -150,6 +166,7 @@ export default async function ProvidersSettingsPage() {
                     webhooks={webhooks}
                 />
             )}
+            {calendarRow ? <GoogleCalendarRow row={calendarRow} /> : null}
             {/* The business's own choice about Saroh's posts in its
                 customers' Messages: drawn only while it can have an effect. */}
             {accountUpdates?.offered ? (

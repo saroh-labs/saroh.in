@@ -27,19 +27,19 @@ describe("ComposerNotice", () => {
         expect(html).not.toContain("Connect");
     });
 
-    it("Grow: Connect email to Providers", () => {
+    it("Grow: Connect email to Integrations", () => {
         const html = renderToStaticMarkup(
             <ComposerNotice
                 gate={{
                     kind: "connect",
                     title: "Connect your email to write from here.",
                     cta: "Connect email",
-                    href: "/settings/providers",
+                    href: "/settings/integrations",
                 }}
             />,
         );
         expect(html).toContain("Connect your email to write from here.");
-        expect(html).toContain('href="/settings/providers"');
+        expect(html).toContain('href="/settings/integrations"');
     });
 
     it("Communications off: a line for a manager, nothing for anyone else", () => {

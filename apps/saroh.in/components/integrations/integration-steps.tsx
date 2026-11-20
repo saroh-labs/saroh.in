@@ -16,7 +16,7 @@ import { ring } from "@saroh/marketing/ring";
  * script too.
  *
  * The drawing is words and boxes, not a screenshot: it says "Settings ›
- * Providers" and the fields' own labels, so it reads the same as the app.
+ * Integrations" and the fields' own labels, so it reads the same as the app.
  */
 export function IntegrationSteps({
     steps,

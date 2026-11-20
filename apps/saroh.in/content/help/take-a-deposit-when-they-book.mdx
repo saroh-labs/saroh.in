@@ -35,13 +35,13 @@
 #   DESK  apps/app.saroh.in/lib/services/booking-money.ts paidLine ("Deposit …
 #         paid · … due at the visit"); components/bookings/booking-page/take-payment.tsx
 #         ("Take …", "What's left after the deposit … paid online.")
-#   PROV  nav-items.tsx (Settings › Providers)
+#   PROV  nav-items.tsx (Settings › Integrations)
 #   WARN  apps/app.saroh.in/lib/services/online-booking.ts ("Paid at the
 #         desk for now: no payment provider is connected, so nothing is
 #         taken when people book."; "Paid at the desk: your booking rules
 #         take payment at the desk only, …"; under Online only "People can't
 #         book this online: it takes payment when they book, and …"; "Connect
-#         one in Settings › Providers", "Change it in Booking rules"), shown
+#         one in Settings › Integrations", "Change it in Booking rules"), shown
 #         under At booking, they pay (deposit-field.tsx); only the Online
 #         only case is marked "Can't be booked online: …" on the Services
 #         row (services-screen.tsx); DEC-088, DEC-089, #821
@@ -100,7 +100,7 @@ steps:
       marker: Pay the deposit now
     # PAY, PROV.
     - title: Connect a payment provider
-      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Providers, with How people pay when they book, in your booking rules under Bookings › Hours and time off, set to Online or Both. With Payments off, no provider connected, or At the desk chosen, the deposit isn't taken: the booking page books the time to pay at the desk, and the customer pays when they come. If your booking rules take payment online only, it can't do that: the booking page tells the customer to get in touch with you to book, and Bookings › Services marks the service Can't be booked online, with the way to fix it."
+      body: "A deposit is paid online, through your own Razorpay or Cashfree account, connected under Settings › Integrations, with How people pay when they book, in your booking rules under Bookings › Hours and time off, set to Online or Both. With Payments off, no provider connected, or At the desk chosen, the deposit isn't taken: the booking page books the time to pay at the desk, and the customer pays when they come. If your booking rules take payment online only, it can't do that: the booking page tells the customer to get in touch with you to book, and Bookings › Services marks the service Can't be booked online, with the way to fix it."
       shot: help-take-deposit-5
       caption: "The booking page of Kavi Dental (demo clinic), with no payment provider connected: the root canal is paid at the desk."
       marker: Pay at the desk

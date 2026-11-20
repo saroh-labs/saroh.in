@@ -390,13 +390,13 @@ export class ModuleReadinessRegistry {
                         return attention(
                             PAYMENTS_KEYS_REFUSED,
                             "Your payment provider refused its keys. Enter them again to take payments.",
-                            "/settings/providers",
+                            "/settings/integrations",
                         );
                     if (rows.length > 0 && rows.every(lacksWebhookSecret))
                         return attention(
                             PAYMENTS_WEBHOOK_SECRET_MISSING,
                             "Payments can't be confirmed. Add the webhook signing secret to your payment provider's connection.",
-                            "/settings/providers",
+                            "/settings/integrations",
                         );
                     return active();
                 }
@@ -404,7 +404,7 @@ export class ModuleReadinessRegistry {
                     return attention(
                         "PAYMENTS_PROVIDER_DISABLED",
                         "A connected provider is disabled. Re-enable it to take payments.",
-                        "/settings/providers",
+                        "/settings/integrations",
                     );
                 // On a plan without online payments (catalogue row
                 // `payments`), Payments is the offline kind: invoices,
@@ -420,7 +420,7 @@ export class ModuleReadinessRegistry {
                 return setup(
                     "PAYMENTS_NO_PROVIDER",
                     "Connect a payment provider to accept payments.",
-                    "/settings/providers",
+                    "/settings/integrations",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),
@@ -464,7 +464,7 @@ export class ModuleReadinessRegistry {
                         return attention(
                             COMMUNICATIONS_KEYS_REFUSED,
                             "Your messaging provider refused its keys. Enter them again to send messages.",
-                            "/settings/providers",
+                            "/settings/integrations",
                         );
                     return active();
                 }
@@ -472,12 +472,12 @@ export class ModuleReadinessRegistry {
                     return attention(
                         "COMMUNICATIONS_PROVIDER_DISABLED",
                         "A connected provider is disabled. Re-enable it to send messages.",
-                        "/settings/providers",
+                        "/settings/integrations",
                     );
                 return setup(
                     "COMMUNICATIONS_NO_PROVIDER",
                     "Connect a provider to send messages.",
-                    "/settings/providers",
+                    "/settings/integrations",
                 );
             },
             deactivationBlockers: () => Promise.resolve([]),

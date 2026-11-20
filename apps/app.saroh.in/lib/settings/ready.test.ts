@@ -102,7 +102,7 @@ const fresh = {
             blockers: [
                 {
                     code: "PAYMENTS_NO_PROVIDER",
-                    actionHref: "/settings/providers",
+                    actionHref: "/settings/integrations",
                 },
             ],
         }),
@@ -203,7 +203,7 @@ describe("readyChecklist", () => {
         expect(r.done).toBe(0);
         expect(r.total).toBe(5);
         expect(r.steps.map((s) => [s.key, s.label, s.href])).toEqual([
-            ["payments", "Connect payments", "/settings/providers"],
+            ["payments", "Connect payments", "/settings/integrations"],
             [
                 "address",
                 "Add your registered address",
@@ -305,7 +305,7 @@ describe("readyChecklist", () => {
             blockers: [
                 {
                     code: "PAYMENTS_NO_PROVIDER",
-                    actionHref: "/settings/providers",
+                    actionHref: "/settings/integrations",
                 },
             ],
         });
@@ -375,7 +375,7 @@ describe("readyChecklist", () => {
         });
         expect(paid.left.find((i) => i.key === "payments")).toMatchObject({
             label: "Connect payments",
-            href: "/settings/providers",
+            href: "/settings/integrations",
         });
         expect(paid.outside).toEqual([]);
     });
@@ -424,7 +424,7 @@ describe("readyChecklist", () => {
                     blockers: [
                         {
                             code: "PAYMENTS_PROVIDER_DISABLED",
-                            actionHref: "/settings/providers",
+                            actionHref: "/settings/integrations",
                         },
                     ],
                 }),
@@ -446,7 +446,7 @@ describe("readyChecklist", () => {
                     blockers: [
                         {
                             code: "PAYMENTS_WEBHOOK_SECRET_MISSING",
-                            actionHref: "/settings/providers",
+                            actionHref: "/settings/integrations",
                         },
                     ],
                 }),
@@ -458,7 +458,7 @@ describe("readyChecklist", () => {
             key: "payments",
             label: "Finish connecting payments",
             cta: "Add webhook secret",
-            href: "/settings/providers",
+            href: "/settings/integrations",
             broken: true,
         });
         // Not "switched off": nobody turned it off.
@@ -1225,7 +1225,7 @@ describe("keys a provider refused (UX-012, FB-7)", () => {
                     blockers: [
                         {
                             code: "PAYMENTS_KEYS_REFUSED",
-                            actionHref: "/settings/providers",
+                            actionHref: "/settings/integrations",
                         },
                     ],
                 }),
@@ -1234,7 +1234,7 @@ describe("keys a provider refused (UX-012, FB-7)", () => {
         expect(r.left.find((i) => i.key === "payments")).toMatchObject({
             label: "Enter your payment keys again",
             broken: true,
-            href: "/settings/providers",
+            href: "/settings/integrations",
         });
     });
 });

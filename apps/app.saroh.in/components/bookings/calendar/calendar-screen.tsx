@@ -73,6 +73,7 @@ export function CalendarScreen({
     newBooking,
     notices = null,
     limitNotice = null,
+    calendarLine = null,
     serviceHours = null,
     showCancelled = false,
     person: askedPerson = EVERYONE,
@@ -117,6 +118,12 @@ export function CalendarScreen({
     notices?: NoticeChannels | null;
     /** The plan's bookings-a-month notice at 80% and 100% (U14). */
     limitNotice?: ReactNode;
+    /**
+     * The person's own Google Calendar, Connect or a lapsed account
+     * (`GoogleCalendarLine`): shown only while the page says nothing else.
+     * Null while the plan's notice is up.
+     */
+    calendarLine?: ReactNode;
     /**
      * With nobody on the diary, the services' own hours (UX-023): drawn as
      * one column with its free time, as the booking page offers it.
@@ -321,6 +328,12 @@ export function CalendarScreen({
                             </TextLink>
                         ) : null}
                     </p>
+                ) : null}
+                {/* One message at a time: the plan, a partial read and
+                    nobody on the diary come first, and the first day's
+                    help (U4). */}
+                {calendarLine && staff !== null && !nobodyYet && !firstDay ? (
+                    <div className="mb-3">{calendarLine}</div>
                 ) : null}
                 {layout === "day" ? (
                     <>

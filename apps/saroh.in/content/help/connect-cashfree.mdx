@@ -4,7 +4,7 @@
 # content/integrations/cashfree.mdx takes from the same code, so Help and
 # Integrations say the same. Sources, from the repo root:
 #   PAGE   apps/app.saroh.in/app/(shell)/settings/(sections)/providers/page.tsx
-#          (Settings › Providers)
+#          (Settings › Integrations)
 #   ROWS   apps/app.saroh.in/lib/providers/rows.ts (Connect under
 #          Available; "Connected"; the last-payment-update line)
 #   SETUP  apps/app.saroh.in/components/providers/connections/provider-setup-sheet.tsx
@@ -38,10 +38,10 @@ updated: "2026-10-06"
 publishOn: "2026-10-17"
 steps:
     # PAGE, ROWS.
-    - title: Open Settings › Providers
-      body: "In Saroh, open Settings › Providers. It lists the services behind your business, connected ones first, then those available. Press Connect on Cashfree's row."
+    - title: Open Settings › Integrations
+      body: "In Saroh, open Settings › Integrations. It lists the services behind your business, connected ones first, then those available. Press Connect on Cashfree's row."
       shot: help-connect-cashfree-1
-      caption: "Providers at Rye & Co. (a demo bakery), with Connect on Cashfree's row."
+      caption: "Integrations at Rye & Co. (a demo bakery), with Connect on Cashfree's row."
       marker: Connect
     # SETUP, KEYS.
     - title: Add your API keys
@@ -64,7 +64,7 @@ steps:
       marker: Connect Cashfree
     # ROWS, WORDS.
     - title: Check that payment updates arrive
-      body: "Make a test payment, such as an invoice's payment link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says No payment updates received yet. Check the webhook in Cashfree."
+      body: "Make a test payment, such as an invoice's payment link. Cashfree's row in Settings › Integrations then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says No payment updates received yet. Check the webhook in Cashfree."
       shot: help-connect-cashfree-5
       caption: "Cashfree connected at Northwind Supply (a demo shop), waiting for its first payment update."
       marker: No payment updates received yet

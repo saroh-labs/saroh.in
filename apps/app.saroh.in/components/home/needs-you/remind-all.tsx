@@ -265,7 +265,7 @@ function None({ preview }: { preview: RemindAllPreview }) {
                     href={PROVIDERS_HREF}
                     className="text-sm"
                 >
-                    Open Settings › Providers
+                    Open Settings › Integrations
                 </TextLink>
             ) : null}
         </div>

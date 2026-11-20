@@ -21,7 +21,7 @@ import type { Db } from "./helpers";
  *   none is written, and one an earlier seed left is removed. A connection
  *   someone made there with real keys has other credentials, so it is
  *   never touched. The business then reads as not connected, and real
- *   test keys can be connected through Settings › Providers.
+ *   test keys can be connected through Settings › Integrations.
  *
  * A DISABLED row with the placeholders is honest anywhere (it says the
  * provider is off, and nothing opens a disabled connection), so it is

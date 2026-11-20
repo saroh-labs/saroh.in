@@ -147,7 +147,7 @@ describe("ProviderHealthService", () => {
         expect(byKey(list, "PAYMENTS")).toMatchObject({
             status: "FAILED",
             message: expect.stringContaining("refused its keys"),
-            actionHref: "/settings/providers",
+            actionHref: "/settings/integrations",
         });
         expect(byKey(list, "COMMUNICATIONS")?.status).toBe("ACTIVE");
     });

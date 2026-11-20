@@ -95,7 +95,7 @@ export const ACTIVITY_ACTIONS = [
     "customer.removed",
     "member.alerts.update",
     // One of the business's automatic emails to its customers turned on
-    // or off (DEC-174, U4 #1135), on Settings › Providers.
+    // or off (DEC-174, U4 #1135), on Settings › Integrations.
     "customer-notices.setting",
     // A GST rate chosen for a service, a product or a course from the rates
     // sheet, as it was written before price history (12 Oct 2026). The
@@ -352,8 +352,8 @@ export function activityLine(
             });
         case "customer-notices.setting":
             return line(customerEmailWhat(meta), {
-                label: "Providers",
-                href: "/settings/providers",
+                label: "Integrations",
+                href: "/settings/integrations",
             });
         case "storefront.fulfilment.update": {
             // How orders leave, or when they count as late (B17).

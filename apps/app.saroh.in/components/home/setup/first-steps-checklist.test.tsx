@@ -72,7 +72,7 @@ const MONEY: ReadyChecklist = {
             label: "Connect payments",
             why: "So money reaches your bank.",
             cta: "Connect payments",
-            href: "/settings/providers",
+            href: "/settings/integrations",
             broken: false,
             done: false,
         },

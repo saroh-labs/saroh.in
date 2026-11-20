@@ -138,10 +138,10 @@ export function Webhooks({
                     address your payment provider sends updates to is in{" "}
                     <Link
                         data-ph-unmask=""
-                        href="/settings/providers"
+                        href="/settings/integrations"
                         className="font-semibold underline underline-offset-[3px]"
                     >
-                        Settings › Providers
+                        Settings › Integrations
                     </Link>
                     .
                 </p>

@@ -10,6 +10,7 @@ export type SettingsSection =
     | "modules"
     | "providers"
     | "share"
+    | "google-calendar"
     | "activity"
     | "billing"
     | "profile"
@@ -36,7 +37,7 @@ export const SECTION_FAILURE: Record<
         reassurance: "Nothing has been turned on or off.",
     },
     providers: {
-        heading: "Providers",
+        heading: "Integrations",
         things: "providers",
         reassurance: "Your website, email and payments keep working.",
     },
@@ -44,6 +45,11 @@ export const SECTION_FAILURE: Record<
         heading: "Share",
         things: "your QR codes",
         reassurance: "The printed ones keep working.",
+    },
+    "google-calendar": {
+        heading: "Google Calendar",
+        things: "your Google Calendar",
+        reassurance: "Your bookings and your Google events are as they were.",
     },
     activity: {
         heading: "Activity",

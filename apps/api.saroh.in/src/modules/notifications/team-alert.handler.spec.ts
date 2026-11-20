@@ -878,7 +878,7 @@ describe("a provider that refused the business's keys (UX-012)", () => {
         attentionAt: new Date(SINCE),
     });
 
-    it("says payments can't be taken, links to Providers, and emails the owner and admin", async () => {
+    it("says payments can't be taken, links to Integrations, and emails the owner and admin", async () => {
         const tx = makeTx();
         tx.merchantPaymentProvider.findFirst.mockResolvedValue(
             flagged("RAZORPAY"),
@@ -926,7 +926,7 @@ describe("a provider that refused the business's keys (UX-012)", () => {
         expect(recipients(out).sort()).toEqual(["u_admin", "u_owner"]);
         expect(out.emails[0].mail).toMatchObject({
             heading: "Resend refused your email keys",
-            url: "https://app.saroh.localhost/settings/providers",
+            url: "https://app.saroh.localhost/settings/integrations",
         });
     });
 
@@ -1042,7 +1042,7 @@ describe("a provider that refused the business's keys (UX-012)", () => {
             expect(recipients(out)).toEqual(["u_owner"]);
             expect(out.emails[0].mail).toMatchObject({
                 subject: "Rye & Co: Cashfree is working again",
-                url: "https://app.saroh.localhost/settings/providers",
+                url: "https://app.saroh.localhost/settings/integrations",
             });
         });
 

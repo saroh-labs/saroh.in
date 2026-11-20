@@ -23,7 +23,7 @@ describe("offlinePayHint (#835)", () => {
     it("keeps the provider hint for a plan that includes online payments", () => {
         expect(
             offlinePayHint({ ...base, blocker: "NO_PROVIDER" }).fix?.href,
-        ).toBe("/settings/providers");
+        ).toBe("/settings/integrations");
         // An API older than the blocker: read from what it sends.
         expect(offlinePayHint(base).text).toBe(
             "No payment provider is connected, so customers can't pay online.",

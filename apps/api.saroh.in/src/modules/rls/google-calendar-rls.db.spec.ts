@@ -185,7 +185,17 @@ describeRls("row-level security on the Google Calendar tables", () => {
         ).resolves.toMatchObject({ calendarId: "family" });
     });
 
-    it("refuses a second connection for one person in one business, not in another", async () => {
+    it("refuses one Google account twice for one person in one business, not a second account or another business", async () => {
+        await expect(
+            prisma.googleCalendarConnection.create({
+                data: {
+                    organizationId: a.orgId,
+                    membershipId: a.membershipId,
+                    googleEmail: "meera@example.com",
+                },
+            }),
+        ).rejects.toThrow(/Unique constraint/);
+        // A second Google account for the same person is fine (v2).
         await expect(
             prisma.googleCalendarConnection.create({
                 data: {
@@ -194,7 +204,7 @@ describeRls("row-level security on the Google Calendar tables", () => {
                     googleEmail: "again@example.com",
                 },
             }),
-        ).rejects.toThrow(/Unique constraint/);
+        ).resolves.toMatchObject({ googleEmail: "again@example.com" });
         // The same person in Pulse: their own membership there, their own row.
         const there = await prisma.membership.create({
             data: { organizationId: b.orgId, userId: a.userId },

@@ -79,10 +79,17 @@ describe("module map (KTD-8)", () => {
         expect(limitWithin("variants")).toBe("product");
         // Under no registry module: the row never decides whether Commerce is on.
         expect(catalogueModulesFor("COMMERCE")).not.toContain("variants");
-        // Every other limit is a count across the business.
+        // Every other limit but Google accounts (a cap on each person,
+        // DEC-233) is a count across the business.
         for (const [id, e] of Object.entries(MODULE_MAP)) {
-            if (id !== "variants") expect(e.within).toBeUndefined();
+            if (id !== "variants" && id !== "google-accounts") {
+                expect(e.within).toBeUndefined();
+            }
         }
+        expect(limitWithin("google-accounts")).toBe("person");
+        expect(MODULE_MAP["google-accounts"].limitKey).toBe(
+            "googleAccountsPerPerson",
+        );
         expect(limitWithin("products")).toBeNull();
         expect(limitWithin("toString")).toBeNull();
     });

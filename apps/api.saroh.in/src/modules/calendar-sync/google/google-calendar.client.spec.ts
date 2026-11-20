@@ -380,6 +380,40 @@ describe("busy reads and guest limits (GC-01, GC-04, GC-09, GC-10, GC-12)", () =
         expect(calls[0].url).toContain("sendUpdates=none");
         expect(calls[1].url).toContain("sendUpdates=none");
     });
+
+    it("invites on a new event but patches one already there quietly (DEC-233)", async () => {
+        const { fetch, calls } = fetchOf(
+            json(409, { error: { errors: [{ reason: "duplicate" }] } }),
+            json(200, { id: "saroh0abc" }),
+        );
+        await client(fetch).putEvent("at", "primary", event, {
+            quietUpdate: true,
+        });
+        expect(calls[0].url).toContain("sendUpdates=all");
+        expect(calls[1].url).toContain("sendUpdates=none");
+    });
+
+    it("finds Saroh's event for a booking by its private property (DEC-233)", async () => {
+        const { fetch, calls } = fetchOf(
+            json(200, {
+                items: [
+                    { id: "gone1", status: "cancelled" },
+                    { id: "live1", status: "confirmed" },
+                ],
+            }),
+            json(200, { items: [] }),
+        );
+        const c = client(fetch);
+        await expect(
+            c.findEventByBooking("at", "primary", "bk1"),
+        ).resolves.toMatchObject({ eventId: "live1" });
+        expect(
+            new URL(calls[0].url).searchParams.get("privateExtendedProperty"),
+        ).toBe("sarohBookingId=bk1");
+        await expect(
+            c.findEventByBooking("at", "primary", "bk2"),
+        ).resolves.toBeNull();
+    });
 });
 
 describe("FakeGoogleCalendar", () => {

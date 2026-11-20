@@ -7,5 +7,5 @@ import { redirect } from "next/navigation";
  * provider, which lives on the providers screen with the rest.
  */
 export default function CommunicationsPage() {
-    redirect("/settings/providers");
+    redirect("/settings/integrations");
 }

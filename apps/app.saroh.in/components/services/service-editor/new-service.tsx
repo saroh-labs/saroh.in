@@ -86,6 +86,7 @@ export function NewService(props: EditorProps) {
         gstRegistered = null,
         businessPriceMode = null,
         others = [],
+        meet = null,
     } = props;
     const router = useRouter();
     const people = (staff ?? []).filter((p) => p.status === "ACTIVE");
@@ -375,6 +376,7 @@ export function NewService(props: EditorProps) {
                     isSaved: false,
                     others,
                     selfId: null,
+                    meet,
                 }}
                 problemsOf={problemsOf}
                 saveLabel={

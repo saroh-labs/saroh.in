@@ -42,7 +42,7 @@ export interface AlertPreferencesView {
     alerts: AlertRowView[];
     /** What each channel can do for them here; an unavailable one reads as off. */
     channels: Record<AlertChannel, ChannelState>;
-    /** They may connect a provider themselves (Settings › Providers). */
+    /** They may connect a provider themselves (Settings › Integrations). */
     canConnect: boolean;
 }
 

@@ -43,8 +43,8 @@ const RULES_FIX: OnlineFix = {
     label: "Change it in Booking rules",
 };
 const PROVIDER_FIX: OnlineFix = {
-    href: "/settings/providers",
-    label: "Connect one in Settings › Providers",
+    href: "/settings/integrations",
+    label: "Connect one in Settings › Integrations",
 };
 /**
  * Where a plan without online payments is changed (#821, #835). Every

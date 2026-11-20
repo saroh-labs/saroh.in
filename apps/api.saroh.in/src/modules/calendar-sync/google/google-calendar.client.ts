@@ -292,11 +292,12 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
         accessToken: string,
         calendarId: string,
         event: EventInput,
-        opts: { quiet?: boolean } = {},
+        opts: { quiet?: boolean; quietUpdate?: boolean } = {},
     ): Promise<EventResult> {
         const base = `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events`;
-        const query = `?sendUpdates=${opts.quiet ? "none" : "all"}&conferenceDataVersion=1`;
-        const res = await this.call(base + query, {
+        const send = (quiet: boolean | undefined) =>
+            `?sendUpdates=${quiet ? "none" : "all"}&conferenceDataVersion=1`;
+        const res = await this.call(base + send(opts.quiet), {
             method: "POST",
             headers: authJson(accessToken),
             body: JSON.stringify(eventBody(event)),
@@ -307,7 +308,7 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
         if (res.status !== 409) throw await errorOf(res, "event insert");
         await res.body?.cancel();
         const patched = await this.json<GoogleEvent>(
-            `${base}/${encodeURIComponent(event.eventId)}${query}`,
+            `${base}/${encodeURIComponent(event.eventId)}${send(opts.quiet === true || opts.quietUpdate === true)}`,
             accessToken,
             {
                 method: "PATCH",
@@ -320,6 +321,30 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
             "event patch",
         );
         return resultOf(patched);
+    }
+
+    async findEventByBooking(
+        accessToken: string,
+        calendarId: string,
+        bookingId: string,
+    ): Promise<EventResult | null> {
+        const url = new URL(
+            `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events`,
+        );
+        url.searchParams.set(
+            "privateExtendedProperty",
+            `sarohBookingId=${bookingId}`,
+        );
+        url.searchParams.set("maxResults", "5");
+        url.searchParams.set(
+            "fields",
+            "items(id,status,hangoutLink,conferenceData)",
+        );
+        const body = await this.json<{
+            items?: (GoogleEvent & { status?: string })[];
+        }>(url.toString(), accessToken, { method: "GET" }, "events search");
+        const live = body.items?.find((e) => e.id && e.status !== "cancelled");
+        return live ? resultOf(live) : null;
     }
 
     async deleteEvent(

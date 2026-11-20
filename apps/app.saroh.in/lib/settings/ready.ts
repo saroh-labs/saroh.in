@@ -291,7 +291,7 @@ function payments(
             left: true,
         };
     }
-    const href = view.blockers[0]?.actionHref ?? "/settings/providers";
+    const href = view.blockers[0]?.actionHref ?? "/settings/integrations";
     // Connected, but no payment through it can be confirmed: saved without
     // its webhook signing secret (DEC-063). Not ready to take money, and
     // not "switched off" either.

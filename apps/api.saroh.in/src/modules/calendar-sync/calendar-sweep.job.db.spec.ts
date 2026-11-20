@@ -14,10 +14,7 @@ import { prisma } from "@saroh/database";
 import { env } from "../../env";
 import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { CALENDAR_BUSY_TYPE } from "./calendar-jobs";
-import {
-    CALENDAR_BEHIND_NOTICE,
-    CalendarLapseService,
-} from "./calendar-lapse.service";
+import { CALENDAR_BEHIND_NOTICE } from "./calendar-lapse.service";
 import { CalendarReleaseService } from "./calendar-release.service";
 import { CalendarSweepJob } from "./calendar-sweep.job";
 import { eventIdFor } from "./event-shape";
@@ -163,8 +160,8 @@ describe("calendar.sweep", () => {
     });
 });
 
-describe("releasing a removed member's calendar (GC-09)", () => {
-    it("takes their upcoming events off quietly, then deletes the connection", async () => {
+describe("releasing a removed member's calendar (DEC-233)", () => {
+    it("leaves their upcoming events in Google and keeps the row, disconnected", async () => {
         const c = await connected();
         const google = new FakeGoogleCalendar();
         const svc = await prisma.service.create({
@@ -207,20 +204,27 @@ describe("releasing a removed member's calendar (GC-09)", () => {
             },
         });
 
-        await new CalendarReleaseService(
-            google,
-            new CalendarLapseService(),
-        ).releaseMember(c.organizationId, c.membershipId);
+        const kept = await new CalendarReleaseService(google).releaseMember(
+            c.organizationId,
+            c.membershipId,
+        );
 
-        expect(google.events.get("primary-cal")?.get(eventId)).toMatchObject({
-            status: "cancelled",
-            quiet: true,
-        });
+        expect(kept).toBe(1);
+        expect(google.events.get("primary-cal")?.get(eventId)?.status).toBe(
+            "confirmed",
+        );
         expect(google.revoked).toHaveLength(1);
+        const row = await prisma.googleCalendarConnection.findUniqueOrThrow({
+            where: { id: c.connectionId },
+        });
+        expect(row).toMatchObject({
+            status: "DISCONNECTED",
+            tokenCiphertext: null,
+        });
         expect(
-            await prisma.googleCalendarConnection.count({
-                where: { id: c.connectionId },
+            await prisma.googleCalendarEvent.count({
+                where: { connectionId: c.connectionId },
             }),
-        ).toBe(0);
+        ).toBe(1);
     });
 });

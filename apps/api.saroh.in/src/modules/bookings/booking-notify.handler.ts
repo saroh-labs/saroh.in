@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
+import { meetLinkPending } from "../calendar-sync/calendar-target";
 import { noticeOf } from "../notifications/notice-target";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { bookingNoticeKey } from "../site-accounts/customer-notify-queue";
@@ -49,7 +50,13 @@ export interface BookingNotifyPayload {
      * the customer hears "‹Business› cancelled this class".
      */
     classCancelled?: boolean;
+    /** How many times a reassign's notice has waited for its new Meet link (DEC-233). */
+    meetWaits?: number;
 }
+
+/** A reassign's notice waits this long for the new Meet link, this many times, then goes. */
+export const MEET_WAIT_MS = 30_000;
+export const MEET_WAITS = 6;
 
 type Tx = Prisma.TransactionClient;
 
@@ -87,6 +94,30 @@ export class BookingNotifyHandler {
             return;
         }
         const organizationId = job.organizationId;
+        // Handed to someone whose Google Calendar is making the booking a
+        // new Meet (DEC-233): the customer hears once it is saved, with the
+        // new link, never the old one; past the waits it goes as it is.
+        const waits = payload.meetWaits ?? 0;
+        if (
+            payload.reason === "reassigned" &&
+            waits < MEET_WAITS &&
+            (await runInOrgContext(organizationId, () =>
+                meetLinkPending(organizationId, payload.bookingId),
+            ))
+        ) {
+            await runInOrgContext(organizationId, () =>
+                prisma.job.create({
+                    data: {
+                        organizationId,
+                        type: BOOKING_NOTIFY_TYPE,
+                        payload: { ...payload, meetWaits: waits + 1 },
+                        runAt: new Date(Date.now() + MEET_WAIT_MS),
+                    },
+                    select: { id: true },
+                }),
+            );
+            return;
+        }
         await runInOrgContext(organizationId, () =>
             prisma.$transaction((tx) =>
                 tellAboutBooking(tx, this.notices, {

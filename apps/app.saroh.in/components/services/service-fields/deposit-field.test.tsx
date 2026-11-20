@@ -92,7 +92,7 @@ describe("DepositField when online can't take the deposit (UX-056)", () => {
         blocked: false,
         text: "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book.",
         line: "",
-        fix: { href: "/settings/providers", label: "Connect one" },
+        fix: { href: "/settings/integrations", label: "Connect one" },
     };
 
     it("says only the desk outcome, never what it would take when booking", () => {

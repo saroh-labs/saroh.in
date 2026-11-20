@@ -53,6 +53,8 @@ describe("rows the product knows by id (DEC-158)", () => {
     it("offers it to a catalogue made before it, and to no other", () => {
         expect(knownRowsMissing(blankCatalog())).toEqual([
             { id: "variants", name: "Variants" },
+            // A cap on each person (DEC-233).
+            { id: "google-accounts", name: "Google accounts a person" },
         ]);
     });
 

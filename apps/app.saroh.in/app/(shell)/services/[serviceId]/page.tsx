@@ -3,6 +3,7 @@ import { cache } from "react";
 import { ServiceEditorState } from "@/components/services/service-editor/editor-states";
 import { ServiceEditor } from "@/components/services/service-editor/service-editor";
 import { rowLock } from "@/lib/billing/access";
+import { readMeetSetup } from "@/lib/google-calendar/meet-setup";
 import { recordTitle } from "@/lib/page-title";
 import { readPriceHistory } from "@/lib/price-history/service";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
@@ -117,6 +118,7 @@ export default async function ServiceEditorPage({
             // A name another service already has says so, with the way to it.
             others={services.map((s) => ({ id: s.id, name: s.name }))}
             priceHistory={priceHistory}
+            meet={await readMeetSetup()}
             share={
                 shareSetup && bookUrl ? { setup: shareSetup, bookUrl } : null
             }

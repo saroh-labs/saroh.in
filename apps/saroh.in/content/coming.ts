@@ -68,7 +68,7 @@ export interface ComingItem {
 export const COMING_ITEMS: readonly ComingItem[] = [
     {
         group: "next",
-        // A business can already connect WhatsApp in Settings › Providers
+        // A business can already connect WhatsApp in Settings › Integrations
         // and write to an enquiry by hand; nothing is sent on its own. No
         // booking reminder exists on any channel yet (ledger BK2, CN1;
         // #1057), so the line doesn't promise one (20 Oct 2026).

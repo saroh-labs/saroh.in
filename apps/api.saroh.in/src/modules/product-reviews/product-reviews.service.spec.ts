@@ -241,7 +241,7 @@ describe("invite", () => {
             status: "skipped",
             reason: "no-email-provider",
             message:
-                "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.",
+                "Review invitations go from your own email. Connect an email provider in Settings › Integrations to send them.",
         });
         expect(send).not.toHaveBeenCalled();
         expect(db.reviewInvitation!.upsert).not.toHaveBeenCalled();

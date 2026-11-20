@@ -379,7 +379,7 @@ describe("step 2: how each one goes", () => {
             "[data-no-provider] a",
         );
         expect(connect?.textContent).toBe("Connect email");
-        expect(connect?.getAttribute("href")).toBe("/settings/providers");
+        expect(connect?.getAttribute("href")).toBe("/settings/integrations");
     });
 
     it("a failed read says nothing was sent, and Back returns to who", async () => {

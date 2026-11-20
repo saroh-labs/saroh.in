@@ -14,18 +14,24 @@ import { randomUUID } from "node:crypto";
 import { appBase } from "../../common/app-url";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
+import {
+    AuditAction,
+    AuditOutcome,
+    AuditService,
+} from "../audit/audit.service";
 import { planMeter } from "../billing/metering.service";
 import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { assertWithinReach } from "../organizations/organization-members.service";
 import { authorize } from "../organizations/organization-policy";
 import { apiBase } from "../payments/webhook-setup";
 import type { SealedConnection } from "./calendar-access";
+import { accessTokenFor, SEALED_CONNECTION } from "./calendar-access";
 import {
-    accessTokenFor,
-    openRefreshToken,
-    SEALED_CONNECTION,
-} from "./calendar-access";
-import { pausedBecause } from "./calendar-allowed";
+    accountsAllowed,
+    overAllowance,
+    pausedBecause,
+} from "./calendar-allowed";
 import { scheduleBusy } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
 import { CalendarReleaseService } from "./calendar-release.service";
@@ -37,9 +43,11 @@ import {
     verifyState,
 } from "./connect-state";
 import type {
+    CalendarAccountView,
     CalendarStatusView,
     ChooseCalendarsDto,
     ConnectStartView,
+    DisconnectView,
     GoogleCalendarOptionView,
 } from "./dto";
 import type {
@@ -51,6 +59,8 @@ import {
     grantedParts,
     isGoogleError,
 } from "./google/google-calendar.port";
+import { businessMeetAccess } from "./meet-access";
+import { queueCalendarSyncs } from "./queue-sync";
 import { sealToken, tokenColumns } from "./sealing";
 
 /** Where Google sends the person back to, on the API. */
@@ -58,14 +68,8 @@ export const CALLBACK_PATH = "/integrations/google-calendar/callback";
 /** Where the API then sends them, in the app: their calendar settings (the next round's screen). */
 export const RETURN_PATH = "/settings/google-calendar";
 
-/**
- * How many of their Google calendars one person may choose (KTD5): one
- * today, used both to write bookings to and to check for busy times. The
- * one place a paid plan's larger allowance plugs in later.
- */
-export function calendarsAllowed(_organizationId: string): number {
-    return 1;
-}
+/** A connection that counts: one Saroh holds a token for, or should (reconnect). */
+const LIVE = ["CONNECTED", "LAPSED"];
 
 /** Who is connecting: their membership and their place on the diary. */
 interface Person {
@@ -84,6 +88,8 @@ export type CallbackOutcome =
     | StateRefusal
     | "someone-else"
     | "refused"
+    /** Another Google account past the plan's allowance (DEC-233). */
+    | "limit"
     | "failed";
 
 /**
@@ -110,6 +116,8 @@ export class CalendarConnectService {
         private readonly flags: FeatureFlagService,
         private readonly lapses: CalendarLapseService,
         private readonly releases: CalendarReleaseService,
+        @Optional()
+        private readonly audit: AuditService = new AuditService(),
     ) {}
 
     async start(ctx: OrganizationContext): Promise<ConnectStartView> {
@@ -205,11 +213,13 @@ export class CalendarConnectService {
 
     async status(ctx: OrganizationContext): Promise<CalendarStatusView> {
         const membershipId = await this.membershipOf(ctx);
-        const connection = await prisma.googleCalendarConnection.findFirst({
+        const rows = await prisma.googleCalendarConnection.findMany({
             where: {
                 organizationId: ctx.organizationId,
                 membershipId,
+                status: { in: LIVE },
             },
+            orderBy: { createdAt: "asc" },
             select: {
                 id: true,
                 status: true,
@@ -227,63 +237,88 @@ export class CalendarConnectService {
                 },
             },
         });
-        const allowed = calendarsAllowed(ctx.organizationId);
         // Kept, but no longer allowed (GC-02, GC-03): shown as paused, with
         // why, so the person sees it and can disconnect it.
-        const paused = connection
-            ? await pausedBecause(ctx.organizationId, membershipId, this.flags)
-            : null;
+        const paused =
+            rows.length > 0
+                ? await pausedBecause(
+                      ctx.organizationId,
+                      membershipId,
+                      this.flags,
+                  )
+                : null;
         if (!paused) await this.gate(ctx);
-        if (!connection) {
-            return {
-                state: "NOT_CONNECTED",
-                googleEmail: null,
-                calendars: [],
-                granted: null,
-                busyRefreshedAt: null,
-                behind: false,
-                pausedBecause: null,
-                calendarsAllowed: allowed,
-            };
+        // Past the plan's allowance (a downgrade): that account is paused.
+        const over = await overAllowance(ctx.organizationId);
+        const accounts: CalendarAccountView[] = [];
+        for (const row of rows) {
+            const checksBusy = row.calendars.some((c) => c.checkBusy);
+            const rowPaused = !!paused || over.has(row.id);
+            const behind =
+                !rowPaused &&
+                row.status === "CONNECTED" &&
+                checksBusy &&
+                isStale(row.busyRefreshedAt);
+            // A chain that stopped (a worker lost, a flag flipped) restarts here.
+            if (behind) {
+                await scheduleBusy(ctx.organizationId, row.id, new Date());
+            }
+            accounts.push({
+                id: row.id,
+                googleEmail: row.googleEmail,
+                state:
+                    row.status === "LAPSED"
+                        ? "LAPSED"
+                        : rowPaused
+                          ? "PAUSED"
+                          : "CONNECTED",
+                calendars: row.calendars.map((c) => ({
+                    id: c.calendarId,
+                    name: c.name,
+                    writeTo: c.writeTo,
+                    checkBusy: c.checkBusy,
+                })),
+                granted: grantedParts(row.scopes),
+                busyRefreshedAt: row.busyRefreshedAt?.toISOString() ?? null,
+                behind,
+            });
         }
-        const checksBusy = connection.calendars.some((c) => c.checkBusy);
-        const behind =
-            !paused &&
-            connection.status === "CONNECTED" &&
-            checksBusy &&
-            isStale(connection.busyRefreshedAt);
-        // A chain that stopped (a worker lost, a flag flipped) restarts here.
-        if (behind) {
-            await scheduleBusy(ctx.organizationId, connection.id, new Date());
-        }
+        const goes = accounts
+            .filter((a) => a.state !== "LAPSED")
+            .flatMap((a) =>
+                a.calendars
+                    .filter((c) => c.writeTo)
+                    .map((c) => ({
+                        accountId: a.id,
+                        googleEmail: a.googleEmail,
+                        calendarId: c.id,
+                        name: c.name,
+                    })),
+            );
         return {
             state:
-                connection.status === "LAPSED"
-                    ? "LAPSED"
+                accounts.length === 0
+                    ? "NOT_CONNECTED"
                     : paused
                       ? "PAUSED"
-                      : "CONNECTED",
-            googleEmail: connection.googleEmail,
-            calendars: connection.calendars.map((c) => ({
-                id: c.calendarId,
-                name: c.name,
-                writeTo: c.writeTo,
-                checkBusy: c.checkBusy,
-            })),
-            granted: grantedParts(connection.scopes),
-            busyRefreshedAt: connection.busyRefreshedAt?.toISOString() ?? null,
-            behind,
+                      : accounts.some((a) => a.state === "CONNECTED")
+                        ? "CONNECTED"
+                        : "LAPSED",
             pausedBecause: paused,
-            calendarsAllowed: allowed,
+            accounts,
+            bookingsGoTo: goes.length > 0 ? goes[0] : null,
+            accountsAllowed: await accountsAllowed(ctx.organizationId),
+            meetAccess: await businessMeetAccess(ctx.organizationId),
         };
     }
 
-    /** Their Google calendars, to choose from. */
+    /** One of their Google accounts' calendars, to choose from. */
     async listCalendars(
         ctx: OrganizationContext,
+        accountId: string,
     ): Promise<GoogleCalendarOptionView[]> {
         const { google, person } = await this.gate(ctx);
-        const connection = await this.connectionOf(ctx, person);
+        const connection = await this.connectionOf(ctx, person, accountId);
         const entries = await this.calendarsOf(google, connection);
         return entries.map((e) => ({
             id: e.id,
@@ -293,30 +328,34 @@ export class CalendarConnectService {
         }));
     }
 
+    /**
+     * This account's busy calendars, and, when `writeTo` is given, whether
+     * bookings go to one of its calendars (DEC-233: one across all their
+     * accounts, so choosing one here takes it off any other).
+     */
     async choose(
         ctx: OrganizationContext,
+        accountId: string,
         dto: ChooseCalendarsDto,
     ): Promise<CalendarStatusView> {
         const { google, person } = await this.gate(ctx);
-        const connection = await this.connectionOf(ctx, person);
-        const scopes = (
+        const connection = await this.connectionOf(ctx, person, accountId);
+        const { scopes } =
             await prisma.googleCalendarConnection.findUniqueOrThrow({
                 where: { id: connection.id },
                 select: { scopes: true },
-            })
-        ).scopes;
+            });
         const granted = grantedParts(scopes);
-        const writeTo = dto.writeTo ?? null;
+        const current = await prisma.googleCalendarLink.findFirst({
+            where: { connectionId: connection.id, writeTo: true },
+            select: { calendarId: true },
+        });
+        const writeTo =
+            dto.writeTo === undefined
+                ? (current?.calendarId ?? null)
+                : dto.writeTo;
         const busy = [...new Set(dto.checkBusy)];
         const chosen = new Set([...(writeTo ? [writeTo] : []), ...busy]);
-        const allowed = calendarsAllowed(ctx.organizationId);
-        if (chosen.size > allowed) {
-            throw new BadRequestException(
-                allowed === 1
-                    ? "Choose one calendar: Saroh uses it for your bookings and your busy times."
-                    : `Choose up to ${allowed} calendars.`,
-            );
-        }
         if (writeTo && !granted.events) {
             throw new BadRequestException(
                 "Google didn't let Saroh add events. Connect again and allow it to put bookings on your calendar.",
@@ -332,7 +371,7 @@ export class CalendarConnectService {
         for (const id of chosen) {
             if (!byId.has(id)) {
                 throw new BadRequestException(
-                    "That calendar isn't in your Google account.",
+                    "That calendar isn't in this Google account.",
                 );
             }
         }
@@ -342,6 +381,17 @@ export class CalendarConnectService {
             );
         }
         await prisma.$transaction(async (tx) => {
+            // One "bookings go to" across their accounts (DEC-233).
+            if (writeTo) {
+                await tx.googleCalendarLink.updateMany({
+                    where: {
+                        organizationId: ctx.organizationId,
+                        writeTo: true,
+                        connection: { membershipId: person.membershipId },
+                    },
+                    data: { writeTo: false },
+                });
+            }
             await tx.googleCalendarLink.deleteMany({
                 where: { connectionId: connection.id },
             });
@@ -371,47 +421,106 @@ export class CalendarConnectService {
     }
 
     /**
-     * Stop both directions (KTD10, as amended by GC-06 and GC-09): upcoming
-     * events Saroh made are deleted with no email, the grant is revoked at
-     * Google when nothing else of Saroh's uses it, and the connection goes
-     * with its choices, busy times and event records
-     * (`CalendarReleaseService`). Needs only a membership (GC-03): someone
-     * who lost the permission or their diary place can still stop it.
+     * Stop syncing (DEC-233): Saroh's access goes (revoked at Google at
+     * its last use, the token deleted), busy times stop blocking, and the
+     * upcoming events Saroh made stay in Google as they are, no longer
+     * updated; connecting the same account again picks them back up
+     * (`CalendarReleaseService`). Every account of theirs, or one. Needs
+     * only a membership (GC-03): someone who lost the permission or their
+     * diary place can still stop it.
      */
-    async disconnect(ctx: OrganizationContext): Promise<CalendarStatusView> {
+    async disconnect(
+        ctx: OrganizationContext,
+        accountId?: string,
+    ): Promise<DisconnectView> {
         const membershipId = await this.membershipOf(ctx);
-        await this.releases.releaseMember(ctx.organizationId, membershipId);
-        return this.notConnected(ctx);
+        let kept: number;
+        if (accountId) {
+            const row = await prisma.googleCalendarConnection.findFirst({
+                where: {
+                    id: accountId,
+                    organizationId: ctx.organizationId,
+                    membershipId,
+                },
+                select: { id: true },
+            });
+            if (!row)
+                throw new NotFoundException(
+                    "That account isn't connected here.",
+                );
+            kept = await this.releases.release(ctx.organizationId, row.id);
+        } else {
+            kept = await this.releases.releaseMember(
+                ctx.organizationId,
+                membershipId,
+            );
+        }
+        return this.after(ctx, kept, "your");
     }
 
     /**
      * An owner or admin stopping someone else's connection (GC-03): anyone
-     * who may change people's roles may also stop what a role allowed.
+     * who may change this person's role (`member:role:update`, within
+     * reach) may also stop what a role allowed.
+     * Their events stay as the person's own disconnect leaves them. Audited.
      */
     async disconnectMember(
         ctx: OrganizationContext,
         membershipId: string,
-    ): Promise<CalendarStatusView> {
+    ): Promise<DisconnectView> {
         authorize(ctx, "member:role:update");
         const member = await prisma.membership.findFirst({
             where: { id: membershipId, organizationId: ctx.organizationId },
-            select: { id: true },
+            select: { id: true, role: true, extraActions: true },
         });
         if (!member) throw new NotFoundException("That person isn't here.");
-        await this.releases.releaseMember(ctx.organizationId, member.id);
-        return this.notConnected(ctx);
+        // As changing their role: never someone who can do more than you.
+        await assertWithinReach(ctx, member.role, "disconnect", {
+            mustExist: false,
+            extras: member.extraActions,
+        });
+        const kept = await this.releases.releaseMember(
+            ctx.organizationId,
+            member.id,
+        );
+        await this.audit.record({
+            action: AuditAction.CalendarMemberDisconnect,
+            actorUserId: ctx.userId,
+            actorRoleKey: ctx.roleKey,
+            organizationId: ctx.organizationId,
+            targetType: "membership",
+            targetId: member.id,
+            outcome: AuditOutcome.Success,
+            // A count, never the Google address.
+            metadata: { keptUpcomingEvents: kept },
+        });
+        return this.after(ctx, kept, "their");
     }
 
-    private notConnected(ctx: OrganizationContext): CalendarStatusView {
+    private async after(
+        ctx: OrganizationContext,
+        kept: number,
+        whose: "your" | "their",
+    ): Promise<DisconnectView> {
+        // The caller's own status; one who can't read it (off the diary,
+        // not a member) reads as not connected.
+        const view = await this.status(ctx).catch(() => this.notConnected(ctx));
+        return {
+            ...view,
+            kept: { upcomingEvents: kept, message: keptWords(kept, whose) },
+        };
+    }
+
+    private async notConnected(
+        ctx: OrganizationContext,
+    ): Promise<CalendarStatusView> {
         return {
             state: "NOT_CONNECTED",
-            googleEmail: null,
-            calendars: [],
-            granted: null,
-            busyRefreshedAt: null,
-            behind: false,
             pausedBecause: null,
-            calendarsAllowed: calendarsAllowed(ctx.organizationId),
+            accounts: [],
+            bookingsGoTo: null,
+            accountsAllowed: await accountsAllowed(ctx.organizationId),
+            meetAccess: await businessMeetAccess(ctx.organizationId),
         };
     }
 
@@ -430,49 +539,47 @@ export class CalendarConnectService {
         if (person.membershipId !== membershipId) return "someone-else";
         const grant = await google.exchangeCode(code, this.redirectUri(ctx));
         const granted = grantedParts(grant.scopes);
+        // The same Google account again (a lapse, a disconnect): its row,
+        // its choices and its events (DEC-233).
         const before = await prisma.googleCalendarConnection.findFirst({
             where: {
                 organizationId: ctx.organizationId,
                 membershipId: person.membershipId,
+                googleEmail: grant.email,
             },
-            select: {
-                ...SEALED_CONNECTION,
-                googleEmail: true,
-                membership: { select: { userId: true } },
-            },
+            select: { id: true, status: true },
         });
-        const sameAccount = before?.googleEmail === grant.email;
-        // Another Google account (GC-09): the old one's upcoming events go
-        // quietly while its token still works, and its grant when this was
-        // its last use (GC-06).
-        if (before && !sameAccount && before.status === "CONNECTED") {
-            await this.releases.clearUpcoming(before);
-            if (
-                await this.releases.lastUse(
-                    before.id,
-                    before.googleEmail,
-                    before.membership.userId,
-                )
-            ) {
-                await this.revokeQuietly(before);
-            }
-        }
+        const counts = !before || before.status === "DISCONNECTED";
+        const allowed = counts
+            ? await accountsAllowed(ctx.organizationId)
+            : null;
         const primary = granted.calendars
             ? (await google.listCalendars(grant.accessToken)).find(
                   (c) => c.primary,
               )
             : undefined;
         const connectionId = await prisma.$transaction(async (tx) => {
+            if (allowed !== null) {
+                // One connect at a time per person, so two consents
+                // finishing together can't both pass the allowance.
+                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`google-calendar-connect:${person.membershipId}`}))`;
+                const live = await tx.googleCalendarConnection.count({
+                    where: {
+                        organizationId: ctx.organizationId,
+                        membershipId: person.membershipId,
+                        status: { in: LIVE },
+                    },
+                });
+                if (live >= allowed) return null;
+            }
             const row = before
                 ? await tx.googleCalendarConnection.update({
                       where: { id: before.id },
                       data: {
-                          googleEmail: grant.email,
                           scopes: grant.scopes,
                           status: "CONNECTED",
                           lapsedAt: null,
                           lastError: null,
-                          ...(sameAccount ? {} : { busyRefreshedAt: null }),
                       },
                       select: { id: true },
                   })
@@ -494,17 +601,22 @@ export class CalendarConnectService {
                     }),
                 ),
             });
-            // Another Google account: what was chosen, read and made in
-            // the old one doesn't carry over (its events stay there).
-            if (before && !sameAccount) {
-                await tx.googleCalendarLink.deleteMany({
-                    where: { connectionId: row.id },
-                });
-                await tx.googleCalendarBusy.deleteMany({
-                    where: { connectionId: row.id },
-                });
-                await tx.googleCalendarEvent.deleteMany({
-                    where: { connectionId: row.id },
+            // Bookings go to one calendar across their accounts (DEC-233):
+            // this one only when no other account of theirs has it.
+            const elsewhere = await tx.googleCalendarLink.count({
+                where: {
+                    writeTo: true,
+                    connection: {
+                        id: { not: row.id },
+                        membershipId: person.membershipId,
+                        status: { in: LIVE },
+                    },
+                },
+            });
+            if (elsewhere > 0) {
+                await tx.googleCalendarLink.updateMany({
+                    where: { connectionId: row.id, writeTo: true },
+                    data: { writeTo: false },
                 });
             }
             const links = await tx.googleCalendarLink.count({
@@ -518,13 +630,37 @@ export class CalendarConnectService {
                         // Google's own name for the primary calendar.
                         calendarId: primary?.id ?? "primary",
                         name: primary?.name ?? grant.email,
-                        writeTo: granted.events,
+                        writeTo: granted.events && elsewhere === 0,
                         checkBusy: granted.freeBusy,
                     },
                 });
             }
+            // Its upcoming events, picked back up with no email (DEC-233).
+            if (before) {
+                const events = await tx.googleCalendarEvent.findMany({
+                    where: {
+                        connectionId: row.id,
+                        booking: { endAt: { gt: new Date() } },
+                    },
+                    select: { bookingId: true },
+                });
+                await queueCalendarSyncs(
+                    tx,
+                    ctx.organizationId,
+                    events.map((e) => e.bookingId),
+                    { quietUpdate: true },
+                );
+            }
             return row.id;
         });
+        if (!connectionId) {
+            await this.releases.revokeGrant(
+                grant.refreshToken,
+                grant.email,
+                ctx.userId,
+            );
+            return "limit";
+        }
         await scheduleBusy(ctx.organizationId, connectionId, new Date());
         return granted.events && granted.freeBusy ? "connected" : "partial";
     }
@@ -605,16 +741,21 @@ export class CalendarConnectService {
     private async connectionOf(
         ctx: OrganizationContext,
         person: Person,
+        accountId: string,
     ): Promise<SealedConnection> {
         const connection = await prisma.googleCalendarConnection.findFirst({
             where: {
+                id: accountId,
                 organizationId: ctx.organizationId,
                 membershipId: person.membershipId,
+                status: { in: LIVE },
             },
             select: SEALED_CONNECTION,
         });
         if (!connection) {
-            throw new NotFoundException("Connect your Google Calendar first.");
+            throw new NotFoundException(
+                "That Google account isn't connected here.",
+            );
         }
         if (connection.status !== "CONNECTED") {
             throw new ForbiddenException({
@@ -650,18 +791,6 @@ export class CalendarConnectService {
         }
     }
 
-    /** Revoke the old account's grant at Google; a failure is only logged. */
-    private async revokeQuietly(connection: SealedConnection): Promise<void> {
-        if (!this.google) return;
-        try {
-            await this.google.revoke(openRefreshToken(connection));
-        } catch (error) {
-            this.logger.warn(
-                `google_calendar_revoke_failed connection=${connection.id} reason=${reasonOf(error)}`,
-            );
-        }
-    }
-
     private redirectUri(ctx: OrganizationContext): string {
         if (env.GOOGLE_CALENDAR_LOCAL_REDIRECT)
             return env.GOOGLE_CALENDAR_LOCAL_REDIRECT;
@@ -680,6 +809,15 @@ export class CalendarConnectService {
     ): string {
         return `${appBase(edition ?? undefined)}${RETURN_PATH}?calendar=${outcome}`;
     }
+}
+
+/** What a disconnect left in Google, said plainly (DEC-233). */
+export function keptWords(n: number, whose: "your" | "their"): string {
+    if (n === 0) {
+        return "Nothing upcoming was on Google Calendar. Saroh no longer reaches it.";
+    }
+    const them = n === 1 ? "booking stays" : `${n} upcoming bookings stay`;
+    return `${n === 1 ? `1 upcoming ${them}` : them} on ${whose} Google Calendar with ${n === 1 ? "its" : "their"} Meet links. Saroh stops updating ${n === 1 ? "it" : "them"}; connect the same Google account again to pick ${n === 1 ? "it" : "them"} back up.`;
 }
 
 const isStale = (at: Date | null, now: Date = new Date()) =>

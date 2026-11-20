@@ -18,10 +18,10 @@ category: Payments
 title: "Connect Cashfree: payments into your own account · Saroh"
 description: "Connect your own Cashfree account to Saroh in five steps: your keys, the webhook address and the events to tick. The money goes straight to you."
 intro: "Saroh's Cashfree integration takes payments through your own Cashfree account, for a business that already uses Cashfree. Customers pay by UPI, card or the other methods your account has switched on, and the money goes straight to you. Saroh never holds it."
-updated: "2026-10-22"
+updated: "2026-11-20"
 doesTitle: What it does in Saroh
-# PAGE: the screen is titled "Providers"; SETUP: Cashfree is a provider in it.
-panelPath: [Settings, Providers, Cashfree]
+# PAGE: the screen is titled "Integrations"; SETUP: Cashfree is a provider in it.
+panelPath: [Settings, Integrations, Cashfree]
 # PATH: webhookPath("CASHFREE", "your-business-id").
 webhookPath: /public/webhooks/cashfree/your-business-id
 # PATH: WEBHOOK_EVENTS.CASHFREE, in Settings' order (HOOK, "Tick these events").
@@ -33,9 +33,9 @@ events:
 initialStep: 2
 steps:
     # ROWS: a provider not yet connected has a "Connect" button and type "Payments".
-    - title: Open Settings › Providers
+    - title: Open Settings › Integrations
       cta: Connect
-      body: "Providers lists the services behind your business, Razorpay and Cashfree among them. Press Connect on Cashfree's row. The form shows your webhook address straight away, before you connect anything."
+      body: "Integrations lists the services behind your business, Razorpay and Cashfree among them. Press Connect on Cashfree's row. The form shows your webhook address straight away, before you connect anything."
       rows:
           - { label: Provider, value: Cashfree }
           - { label: Type, value: Payments }
@@ -86,7 +86,7 @@ steps:
             }
     # WORDS: lastUpdateLine(). ROWS: the "Connected" pill.
     - title: Check that payment updates arrive
-      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Cashfree's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says 'No payment updates received yet. Check the webhook in Cashfree.'"
+      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Cashfree's row in Settings › Integrations then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook works. Until then it says 'No payment updates received yet. Check the webhook in Cashfree.'"
       rows:
           - {
                 label: Cashfree,

@@ -87,7 +87,7 @@ const SETTINGS = [
     "/settings/profile",
     "/settings/share",
     "/settings/activity",
-    "/settings/providers",
+    "/settings/integrations",
     "/settings/developers",
 ];
 

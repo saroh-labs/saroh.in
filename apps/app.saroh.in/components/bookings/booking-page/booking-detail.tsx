@@ -1,5 +1,6 @@
 "use client";
 
+import type { BookingMeeting } from "@/lib/google-calendar/types";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
@@ -45,6 +46,7 @@ import { CustomerCard } from "./customer-card";
 import { PageHead } from "./head";
 import { JoinOnline } from "./join-online";
 import { MainButton } from "./main-action";
+import { MeetCard } from "./meet-card";
 import type { PageSheet } from "./overlays";
 import { PageOverlays } from "./overlays";
 import { TreatmentVisits } from "./treatment-visits";
@@ -75,6 +77,7 @@ export function BookingDetailView({
     waitlist,
     person = null,
     reassign,
+    meeting = null,
 }: {
     booking: PageBooking;
     /** Whether the slot has ended. Read by the page so "now" stays out of render. */
@@ -118,6 +121,12 @@ export function BookingDetailView({
      * anyone (the API still decides).
      */
     reassign?: ReassignScope;
+    /**
+     * Its Meet and Google event (DEC-233), read only while Google Calendar
+     * is on here or the booking already has a Meet; null draws Join online
+     * as before.
+     */
+    meeting?: BookingMeeting | null;
 }) {
     const launcher = useNewBookingLauncher();
     const ids = { frontDesk: useId() };
@@ -377,7 +386,23 @@ export function BookingDetailView({
                     </>
                 }
             />
-            {link ? <JoinOnline url={link} /> : null}
+            {meeting ? (
+                <MeetCard
+                    bookingId={booking.id}
+                    link={link}
+                    meeting={meeting}
+                    staffName={booking.staff?.name ?? null}
+                    customerName={who}
+                    canWrite={canWrite}
+                    canAdd={
+                        !past &&
+                        booking.status === "CONFIRMED" &&
+                        service.capacity <= 1
+                    }
+                />
+            ) : link ? (
+                <JoinOnline url={link} />
+            ) : null}
 
             <div className="mt-3.5 grid gap-3 min-[760px]:mt-0 min-[760px]:grid-cols-[minmax(0,1fr)_360px] min-[760px]:items-start min-[760px]:gap-x-[18px] min-[760px]:gap-y-3.5">
                 {before.map(inColumn)}

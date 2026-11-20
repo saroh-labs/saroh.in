@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import type { MeetSetup } from "@/components/services/service-fields/where-field";
 import type { PlanLock } from "@/lib/billing/access";
 import type { GstPriceMode } from "@/lib/gst/price-mode";
 import type { PriceHistoryPage } from "@/lib/price-history/words";
@@ -68,6 +69,8 @@ export interface EditorProps {
      * read. Null or left out when either isn't live: no Share button.
      */
     share?: { setup: ShareSetup; bookUrl: string } | null;
+    /** Google Meet per booking, when Google Calendar is on here (DEC-233). */
+    meet?: MeetSetup | null;
 }
 
 export const SERVICES_HREF = "/services";

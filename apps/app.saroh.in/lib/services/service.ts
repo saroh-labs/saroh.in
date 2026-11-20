@@ -7,6 +7,10 @@ import type { ApiResult } from "@/lib/api/failure";
 import { toFailure } from "@/lib/api/failure";
 import type { CrmResult } from "@/lib/api/http";
 import { apiFetch, orgBase } from "@/lib/api/http";
+import type {
+    MeetAccess,
+    ReassignCalendarNote,
+} from "@/lib/google-calendar/types";
 
 /**
  * Bookable Services data access for app.saroh.in (S4-003). Org-scoped Service
@@ -25,6 +29,9 @@ export type ServiceStatus = "ACTIVE" | "ARCHIVED";
  * chosen per booking (E1; the booking page asks from E7).
  */
 export type LocationType = "IN_PERSON" | "ONLINE" | "EITHER";
+
+/** Where an online service's link comes from (DEC-233). */
+export type MeetingLink = "MANUAL" | "GOOGLE_MEET";
 
 /**
  * What is paid at booking (E1), as a share of the price: the Service
@@ -74,6 +81,14 @@ export interface Service extends SharedService {
     locationType: LocationType;
     /** The link an online service's bookers join by; null in person. */
     meetingUrl: string | null;
+    /**
+     * GOOGLE_MEET: a Meet of its own per booking, made on the Google
+     * Calendar of whoever takes it (DEC-233); `meetingUrl` is then the
+     * fallback for someone who hasn't connected. Absent from an older API.
+     */
+    meetingLink?: MeetingLink;
+    /** Who may join its Meets without knocking; null: the business's. */
+    meetAccess?: MeetAccess | null;
     /** Visits one booking of it is, 1 to 12 (E1; honoured from E9/E10). */
     visits: number;
     depositMode: DepositMode;
@@ -274,6 +289,8 @@ export interface CreateServiceInput {
     timezone: string;
     locationType?: LocationType;
     meetingUrl?: string | null;
+    meetingLink?: MeetingLink;
+    meetAccess?: MeetAccess | null;
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
@@ -299,6 +316,8 @@ export interface UpdateServiceInput {
     locationType?: LocationType;
     /** `null` clears it; the API also clears it on going back to in person. */
     meetingUrl?: string | null;
+    meetingLink?: MeetingLink;
+    meetAccess?: MeetAccess | null;
     visits?: number;
     depositMode?: DepositMode;
     showOnBookingPage?: boolean;
@@ -655,6 +674,8 @@ export type BookByHandInput = {
      * Only with `paidWith: "PAID"`; needs payment permission.
      */
     paidBy?: "CASH" | "UPI" | "CARD";
+    /** Where = Google Meet (DEC-233): a Meet of its own on whoever takes it. */
+    meetingLink?: "GOOGLE_MEET";
 } & (
     | { contactId: string }
     | { bookerEmail: string; bookerName?: string; bookerPhone?: string }
@@ -743,8 +764,8 @@ export function rescheduleBooking(
 export function reassignBooking(
     bookingId: string,
     input: { staffId: string; startAt?: string },
-): Promise<CrmResult<Booking>> {
-    return send<Booking>(
+): Promise<CrmResult<Booking & { googleCalendar?: ReassignCalendarNote }>> {
+    return send<Booking & { googleCalendar?: ReassignCalendarNote }>(
         `/bookings/${encodeURIComponent(bookingId)}/reassign`,
         "POST",
         input,
@@ -760,6 +781,8 @@ export interface ReassignCandidate {
     state: "current" | "free" | "busy" | "off";
     busyFrom?: string;
     busyTo?: string;
+    /** Their bookings reach Google Calendar (DEC-233); absent while it's off. */
+    googleCalendar?: boolean;
 }
 
 /**

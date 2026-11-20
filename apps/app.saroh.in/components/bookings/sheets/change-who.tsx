@@ -10,6 +10,7 @@ import type { SendHeld } from "@/components/bookings/sheets/cancel-sheet";
 import { TimePicker } from "@/components/bookings/sheets/time-picker";
 import type { HeldResult } from "@/components/shared/undo/use-hold";
 import { formatDateTime, formatTime } from "@/lib/format/datetime";
+import { candidateGoogle, reassignWarning } from "@/lib/google-calendar/words";
 import type { NoticeReach } from "@/lib/messages/notice-reach";
 import { firstName } from "@/lib/names";
 import {
@@ -212,6 +213,7 @@ export function useChangeWho({
         const to = chosen;
         const time = at;
         const first = firstName(target.who);
+        let google: string | null = null;
         send(`reassign-booking:${target.id}`, {
             soon: `Giving it to ${firstName(to.name) || to.name} in 10 seconds`,
             description: toldLine(reach, first),
@@ -221,10 +223,15 @@ export function useChangeWho({
                     ...(time ? { startAt: time } : {}),
                 });
                 if (!res.ok) return { ok: false, error: res.error };
+                // What Google does with it (DEC-233), said in the toast.
+                google = res.data.googleCalendar?.message ?? null;
                 router.refresh();
                 return { ok: true };
             },
-            sent: changedText(target, to, time, timezone),
+            sent: () => {
+                const done = changedText(target, to, time, timezone);
+                return google ? `${done} ${google}` : done;
+            },
             failed: "Who it's with wasn't changed.",
         });
         onDone();
@@ -283,12 +290,19 @@ export function ChangeWhoFields({
     const ids = { list: useId(), when: useId() };
     const when = s.at ?? target.startAt;
     const others = s.people.filter((p) => p.state !== "current");
+    // Whose bookings reach Google, only once anyone's do (DEC-233).
+    const google = s.people.some((p) => p.googleCalendar === true);
     const options: RadioCard<string>[] = s.people.map((p) => ({
         value: p.id,
         label: p.state === "current" ? `${p.name} (now)` : p.name,
         note: p.onlyOthers
             ? "Free then. An owner or admin can give it to them."
-            : candidateNote(p, timezone),
+            : [
+                  candidateNote(p, timezone),
+                  google ? candidateGoogle(p.googleCalendar) : null,
+              ]
+                  .filter(Boolean)
+                  .join(" · "),
         disabled: p.state !== "free" || p.onlyOthers === true,
     }));
     return (
@@ -342,6 +356,18 @@ export function ChangeWhoFields({
                     />
                 )}
             </div>
+            {google ? (
+                <GoogleWarning
+                    warning={reassignWarning(
+                        s.people.find((p) => p.state === "current") ?? null,
+                        s.picked
+                            ? (s.people.find((p) => p.id === s.picked?.id) ??
+                                  null)
+                            : null,
+                        target.who,
+                    )}
+                />
+            ) : null}
             {s.timeOpen ? (
                 <div className="grid min-w-0 gap-2">
                     <TimePicker
@@ -494,5 +520,19 @@ function SheetDraft({
                 onSubmit={state.save}
             />
         </>
+    );
+}
+
+/** Before Save: what Google does when it changes hands (board GC2Reassign). */
+function GoogleWarning({
+    warning,
+}: {
+    warning: { title: string; body: string } | null;
+}) {
+    if (!warning) return null;
+    return (
+        <Notice tone="info" title={warning.title}>
+            {warning.body}
+        </Notice>
     );
 }

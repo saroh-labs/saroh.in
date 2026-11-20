@@ -83,16 +83,16 @@ function warning(): HTMLElement | null {
 }
 
 describe("the deposit's warning (#821)", () => {
-    it("Both, a deposit with no provider: paid at the desk for now, linking to Settings › Providers (DEC-089)", () => {
+    it("Both, a deposit with no provider: paid at the desk for now, linking to Settings › Integrations (DEC-089)", () => {
         render(draft(), {
             bookingPayment: "BOTH",
             onlineBlocker: "NO_PROVIDER",
         });
         expect(warning()?.textContent).toBe(
-            "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book. Connect one in Settings › Providers",
+            "Paid at the desk for now: no payment provider is connected, so nothing is taken when people book. Connect one in Settings › Integrations",
         );
         expect(warning()?.querySelector("a")?.getAttribute("href")).toBe(
-            "/settings/providers",
+            "/settings/integrations",
         );
     });
 
@@ -116,7 +116,7 @@ describe("the deposit's warning (#821)", () => {
             onlineBlocker: "NO_PROVIDER",
         });
         expect(warning()?.textContent).toBe(
-            "People can't book this online: it takes payment when they book, and no payment provider is connected. Connect one in Settings › Providers",
+            "People can't book this online: it takes payment when they book, and no payment provider is connected. Connect one in Settings › Integrations",
         );
     });
 

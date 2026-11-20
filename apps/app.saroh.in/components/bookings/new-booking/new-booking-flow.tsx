@@ -130,6 +130,8 @@ export function NewBookingFlow({
         name: string;
     } | null>(null);
     const [taken, setTaken] = useState<string | null>(null);
+    // Where = Google Meet (DEC-233): a Meet of this booking's own.
+    const [meet, setMeet] = useState(false);
     const [reload, setReload] = useState(0);
     const [visitChoice, setVisitChoice] = useState<
         "tomorrow" | "week" | "pick" | null
@@ -249,6 +251,8 @@ export function NewBookingFlow({
         only,
     });
 
+    const offerMeet = setup.meet === true && !isClass(service);
+
     async function book() {
         setTried(true);
         if (saving || missing || payGap || !service || !startAt) return;
@@ -270,6 +274,9 @@ export function NewBookingFlow({
                     ...(staffId ? { staffId } : {}),
                     ...(paying ? { packPurchaseId: pack.id } : {}),
                     ...(paying ? {} : payInput(payNow, paidBy)),
+                    ...(meet && offerMeet
+                        ? { meetingLink: "GOOGLE_MEET" as const }
+                        : {}),
                     ...booker,
                 }),
             { quiet: true, onUnreached: setRefusal },
@@ -586,6 +593,18 @@ export function NewBookingFlow({
                                     onChange: () => jump(4),
                                 },
                             ]}
+                            where={
+                                offerMeet
+                                    ? {
+                                          meet,
+                                          onChange: setMeet,
+                                          serviceLabel: service.online
+                                              ? "Its own link"
+                                              : "In person",
+                                          note: `A Google Meet link is made on ${withName.startsWith("Anyone") ? "their" : `${firstName(withName)}'s`} Google Calendar, and Google emails ${first || "the customer"} the invite.`,
+                                      }
+                                    : null
+                            }
                             attention={finder.attention}
                             pay={{
                                 value: payNow,

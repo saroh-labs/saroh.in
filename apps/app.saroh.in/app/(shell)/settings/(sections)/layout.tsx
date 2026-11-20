@@ -1,6 +1,7 @@
 import { SettingsTabs } from "@/components/settings/page/settings-tabs";
 import { settingsPagesFor } from "@/components/shared/navigation/nav-items";
 import { readEmailSetup } from "@/lib/communications/email-setup-service";
+import { readGoogleCalendar } from "@/lib/google-calendar/service";
 import { listModules } from "@/lib/modules/service";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { listCommsProviders } from "@/lib/providers/service";
@@ -26,22 +27,40 @@ import { emailAttention, providersTabNote } from "@/lib/settings/ready";
  * of someone who may manage messaging, and best-effort: a failed read drops
  * the line, never the screen. A plan that can't connect its own email is
  * never told it has none (DEC-091).
+ *
+ * Google Calendar lives under Providers (20 Nov 2026): while the business
+ * has it switched on and this person's role reaches it
+ * (`readGoogleCalendar`, shared with the page in one render), Providers is
+ * their tab too, even without `provider:read`.
  */
 export default async function SettingsLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    const org = await resolveActiveOrganization();
+    const [org, calendar] = await Promise.all([
+        resolveActiveOrganization(),
+        readGoogleCalendar(),
+    ]);
+    // Google Calendar opens Providers: not while its switch is off or the
+    // role doesn't reach it; it does (to say so) when it couldn't be asked.
+    const switches =
+        calendar.kind === "off" || calendar.kind === "denied"
+            ? []
+            : ["google-calendar"];
     const pages = settingsPagesFor({
         role: org?.role ?? null,
         actions: org?.actions ?? null,
+        switches,
     });
     const mayMessaging = org?.actions
         ? org.actions.includes("comms:manage")
         : org?.role === "OWNER" || org?.role === "ADMIN";
     let providersNote: string | null = null;
-    if (mayMessaging && pages.some((p) => p.href === "/settings/providers")) {
+    if (
+        mayMessaging &&
+        pages.some((p) => p.href === "/settings/integrations")
+    ) {
         const mayPlans = org?.actions
             ? org.actions.includes("billing:read")
             : org?.role === "OWNER" || org?.role === "ADMIN";
@@ -67,7 +86,7 @@ export default async function SettingsLayout({
                         kind={org?.kind}
                         notes={
                             providersNote
-                                ? { "/settings/providers": providersNote }
+                                ? { "/settings/integrations": providersNote }
                                 : undefined
                         }
                     />

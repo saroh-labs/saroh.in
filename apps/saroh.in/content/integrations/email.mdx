@@ -18,15 +18,15 @@ description: "Connect your Resend account to Saroh, and invoices and reminders g
 intro: "Saroh sends your business's email through your own email provider, not Saroh's. Connect your Resend account, choose the address it comes from, and invoices and reminders go out as you."
 updated: "2026-11-20"
 doesTitle: What it sends
-# PAGE: the screen is titled "Providers"; SETUP: the email form is titled "Messaging".
-panelPath: [Settings, Providers, Messaging]
+# PAGE: the screen is titled "Integrations"; SETUP: the email form is titled "Messaging".
+panelPath: [Settings, Integrations, Messaging]
 initialStep: 0
 steps:
     # ROWS: CONNECTABLE_COMMS.EMAIL = Resend, type "Email", and a "Connect"
     # button until connected.
-    - title: Open Settings › Providers
+    - title: Open Settings › Integrations
       cta: Connect
-      body: "Providers lists the services behind your business. Your email provider has its own row: Resend. Press Connect on it."
+      body: "Integrations lists the services behind your business. Your email provider has its own row: Resend. Press Connect on it."
       rows:
           - { label: Provider, value: Resend }
           - { label: Type, value: Email }
@@ -63,7 +63,7 @@ steps:
             }
     # SETUP: the toast "Email is sent through Resend". ROWS: the "Connected"
     # pill and the "Sends from" reference on the row.
-    - title: Check the row in Settings › Providers
+    - title: Check the row in Settings › Integrations
       body: "Once connected, your provider's row says Connected and shows the address it sends from. Email stops the moment you disconnect it, and ones already sent aren't affected."
       rows:
           - {

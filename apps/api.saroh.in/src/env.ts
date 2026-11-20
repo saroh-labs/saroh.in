@@ -208,6 +208,22 @@ const envSchema = z.object({
     // cookie there) is bounced to API_PUBLIC_URL's callback. Refused at boot
     // under NODE_ENV=production (below).
     GOOGLE_CALENDAR_LOCAL_REDIRECT: z.string().url().optional(),
+    // Google Calendar changes one business may ask for an hour: "Move my
+    // upcoming bookings", Meet access, a booking's own link
+    // (`calendar-sync/calendar-bookings.service.ts`). Past it 429. Unset: 120.
+    GOOGLE_CALENDAR_CHANGES_PER_HOUR: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .default(120),
+    // Days a disconnected Google account's row (its address and the ids of
+    // the events left in Google, for a reconnect) is kept before the hourly
+    // calendar sweep deletes it. The Privacy Policy says 30. Unset: 30.
+    GOOGLE_CALENDAR_DISCONNECTED_KEEP_DAYS: z.coerce
+        .number()
+        .int()
+        .min(1)
+        .default(30),
     // TEST ONLY. `1`: a business's email or WhatsApp keys are taken without
     // asking Resend or Meta (the email-setup browser spec connects one).
     // Refused at boot under NODE_ENV=production (below), and honoured only in

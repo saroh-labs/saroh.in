@@ -95,7 +95,7 @@ export interface LiveIntegration {
     cta: string;
     /**
      * Where it is connected, as the app names it: "Connect in Settings ›
-     * Providers" (`app.saroh.in/app/(shell)/settings/(sections)/providers`),
+     * Integrations" (`app.saroh.in/app/(shell)/settings/(sections)/integrations`),
      * "Connect in Claude".
      */
     connect: string;
@@ -136,7 +136,7 @@ export const integrationsIndex = {
         },
         payments: {
             title: "Payments and email",
-            line: "Your payment account and your email, connected in Settings › Providers in a few minutes.",
+            line: "Your payment account and your email, connected in Settings › Integrations in a few minutes.",
         },
     },
     plannedTitle: "Planned · not available yet",
@@ -256,7 +256,7 @@ export const liveIntegrations: readonly LiveIntegration[] = [
         category: "Payments",
         line: "Deposits on bookings and pay links on invoices, paid into your own Razorpay account.",
         cta: "See Razorpay",
-        connect: "Connect in Settings › Providers",
+        connect: "Connect in Settings › Integrations",
         href: "/integrations/razorpay",
     },
     {
@@ -265,7 +265,7 @@ export const liveIntegrations: readonly LiveIntegration[] = [
         category: "Payments",
         line: "The same, if your business already uses Cashfree. Paid into your own Cashfree account.",
         cta: "See Cashfree",
-        connect: "Connect in Settings › Providers",
+        connect: "Connect in Settings › Integrations",
         href: "/integrations/cashfree",
     },
     {
@@ -274,7 +274,7 @@ export const liveIntegrations: readonly LiveIntegration[] = [
         category: "Email",
         line: "Invoices and reminders sent through your own Resend account, from an address you choose.",
         cta: "See email",
-        connect: "Connect in Settings › Providers",
+        connect: "Connect in Settings › Integrations",
         href: "/integrations/email",
     },
 ];

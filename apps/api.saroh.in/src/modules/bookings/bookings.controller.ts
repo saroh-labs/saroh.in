@@ -22,6 +22,7 @@ import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { PriceHistoryQueryDto } from "../audit/price-history.dto";
+import type { ReassignCalendarNote } from "../calendar-sync/calendar-target";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import { payLinkUrlFor } from "../invoices/pay-link-url";
@@ -300,7 +301,9 @@ export class BookingsController {
         @OrgContext() ctx: OrganizationContext,
         @Param("bookingId") bookingId: string,
         @Body() dto: ReassignBookingDto,
-    ): Promise<WithoutIntakeNote<Booking>> {
+    ): Promise<
+        WithoutIntakeNote<Booking & { googleCalendar?: ReassignCalendarNote }>
+    > {
         return this.bookings
             .reassignBooking(ctx, bookingId, dto)
             .then(withoutIntakeNote);

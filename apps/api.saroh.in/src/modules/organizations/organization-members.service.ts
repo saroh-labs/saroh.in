@@ -345,7 +345,7 @@ export class OrganizationMembersService {
             // The role the default names exists before it is checked.
             await ensureCalendarOnlyRole(prisma, ctx.organizationId);
         }
-        await this.assertWithinReach(ctx, role, "invite someone as");
+        await assertWithinReach(ctx, role, "invite someone as");
 
         const siteIds = await this.resolveSiteIds(ctx, role, dto.siteIds);
 
@@ -765,11 +765,11 @@ export class OrganizationMembersService {
         // than you is how it promotes itself.
         // The person as they stand counts their extras (F17): someone given
         // more than their role is judged on everything they can do.
-        await this.assertWithinReach(ctx, membership.role, "change", {
+        await assertWithinReach(ctx, membership.role, "change", {
             mustExist: false,
             extras: membership.extraActions,
         });
-        await this.assertWithinReach(ctx, dto.role, "give someone");
+        await assertWithinReach(ctx, dto.role, "give someone");
         const siteIds = await this.resolveSiteIds(ctx, dto.role, dto.siteIds);
         if (membership.role === "OWNER" && dto.role !== "OWNER") {
             await this.assertNotLastOwner(ctx.organizationId, userId, "demote");
@@ -918,8 +918,8 @@ export class OrganizationMembersService {
 
         const { organizationId } = ctx;
         const [roleSet, before] = await Promise.all([
-            this.actionsOf(organizationId, membership.role, false),
-            this.actionsOf(
+            actionsOf(organizationId, membership.role, false),
+            actionsOf(
                 organizationId,
                 membership.role,
                 false,
@@ -933,7 +933,7 @@ export class OrganizationMembersService {
         }
 
         const next = wanted.filter((a) => !roleSet.has(a)).sort();
-        const after = await this.actionsOf(
+        const after = await actionsOf(
             organizationId,
             membership.role,
             false,
@@ -1028,7 +1028,7 @@ export class OrganizationMembersService {
         authorize(ctx, "member:remove");
 
         const membership = await this.requireMembership(ctx, userId);
-        await this.assertWithinReach(ctx, membership.role, "remove", {
+        await assertWithinReach(ctx, membership.role, "remove", {
             mustExist: false,
             extras: membership.extraActions,
         });
@@ -1295,48 +1295,6 @@ export class OrganizationMembersService {
     }
 
     /**
-     * Refuse to act on a role that can do more than the actor can.
-     *
-     * The rule roles need once a business can invent them. `member:role:update`
-     * can be granted to a role like "Stock clerk"; without this, whoever holds
-     * it could give themselves Owner, or demote the Owner, and the owner who
-     * granted it would have handed over the business by ticking one box. The
-     * role editor asks the same question of what a role may be given (F19);
-     * both go through `withinReach` in the policy.
-     *
-     * It also changes one thing for the built-ins, deliberately: an Admin can
-     * no longer make someone an Owner, because Owner can close the business
-     * and Admin cannot. An Owner is still made by an Owner.
-     *
-     * `mustExist` is false for a person's CURRENT role, which may name a role
-     * that has since been removed — that resolves to the read-only floor
-     * rather than blocking anyone from ever changing them again.
-     */
-    private async assertWithinReach(
-        ctx: OrganizationContext,
-        roleKey: string,
-        verb: string,
-        {
-            mustExist = true,
-            extras,
-        }: { mustExist?: boolean; extras?: readonly string[] } = {},
-    ): Promise<void> {
-        const theirs = await this.actionsOf(
-            ctx.organizationId,
-            roleKey,
-            mustExist,
-            extras,
-        );
-        if (!withinReach(ctx, theirs)) {
-            throw new ForbiddenException(
-                extras && extraActionsFor(roleKey, extras).length > 0
-                    ? `You cannot ${verb} someone who can do more than you can.`
-                    : `You cannot ${verb} a role that can do more than you can.`,
-            );
-        }
-    }
-
-    /**
      * The diary person an invite gives a login to (#868): this business's,
      * with no login yet, and no other invite out for them. Refused in
      * words otherwise.
@@ -1364,32 +1322,74 @@ export class OrganizationMembersService {
         assertDiaryInvitable(person, other?.email ?? null);
         return person as DiaryPerson;
     }
+}
 
-    /**
-     * What a role in this business may do, with a person's extras when
-     * given (F17); 400 if the role must exist and does not.
-     */
-    private async actionsOf(
-        organizationId: string,
-        roleKey: string,
-        mustExist: boolean,
-        extras?: readonly string[],
-    ): Promise<ReadonlySet<OrgAction>> {
-        if (isBuiltInRole(roleKey)) {
-            return resolveCapabilities(roleKey, null, extras);
-        }
-        const row = await prisma.organizationRole.findUnique({
-            where: { organizationId_key: { organizationId, key: roleKey } },
-            select: { actions: true },
-        });
-        if (!row && mustExist) {
-            throw new BadRequestException({
-                message: "That role does not exist in this business.",
-                field: "role",
-            });
-        }
-        return resolveCapabilities(roleKey, row?.actions, extras);
+/**
+ * Refuse to act on a role that can do more than the actor can.
+ *
+ * The rule roles need once a business can invent them. `member:role:update`
+ * can be granted to a role like "Stock clerk"; without this, whoever holds
+ * it could give themselves Owner, or demote the Owner, and the owner who
+ * granted it would have handed over the business by ticking one box. The
+ * role editor asks the same question of what a role may be given (F19);
+ * both go through `withinReach` in the policy.
+ *
+ * It also changes one thing for the built-ins, deliberately: an Admin can
+ * no longer make someone an Owner, because Owner can close the business
+ * and Admin cannot. An Owner is still made by an Owner.
+ *
+ * `mustExist` is false for a person's CURRENT role, which may name a role
+ * that has since been removed — that resolves to the read-only floor
+ * rather than blocking anyone from ever changing them again.
+ */
+export async function assertWithinReach(
+    ctx: OrganizationContext,
+    roleKey: string,
+    verb: string,
+    {
+        mustExist = true,
+        extras,
+    }: { mustExist?: boolean; extras?: readonly string[] } = {},
+): Promise<void> {
+    const theirs = await actionsOf(
+        ctx.organizationId,
+        roleKey,
+        mustExist,
+        extras,
+    );
+    if (!withinReach(ctx, theirs)) {
+        throw new ForbiddenException(
+            extras && extraActionsFor(roleKey, extras).length > 0
+                ? `You cannot ${verb} someone who can do more than you can.`
+                : `You cannot ${verb} a role that can do more than you can.`,
+        );
     }
+}
+
+/**
+ * What a role in this business may do, with a person's extras when
+ * given (F17); 400 if the role must exist and does not.
+ */
+async function actionsOf(
+    organizationId: string,
+    roleKey: string,
+    mustExist: boolean,
+    extras?: readonly string[],
+): Promise<ReadonlySet<OrgAction>> {
+    if (isBuiltInRole(roleKey)) {
+        return resolveCapabilities(roleKey, null, extras);
+    }
+    const row = await prisma.organizationRole.findUnique({
+        where: { organizationId_key: { organizationId, key: roleKey } },
+        select: { actions: true },
+    });
+    if (!row && mustExist) {
+        throw new BadRequestException({
+            message: "That role does not exist in this business.",
+            field: "role",
+        });
+    }
+    return resolveCapabilities(roleKey, row?.actions, extras);
 }
 
 /**

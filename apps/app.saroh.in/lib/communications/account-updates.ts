@@ -8,7 +8,7 @@
  * note someone chooses to send when they change or cancel an order.
  *
  * The API decides when a post is written (`accountThreadOn`); this is what
- * the workspace says about it on Settings › Providers. Pure: safe in
+ * the workspace says about it on Settings › Integrations. Pure: safe in
  * server and client components.
  */
 

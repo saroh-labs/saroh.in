@@ -116,7 +116,7 @@ test.describe("a reviewer", () => {
             "/settings/organization",
             "/settings/people",
             "/settings/modules",
-            "/settings/providers",
+            "/settings/integrations",
             "/sites/new",
         ]) {
             await expect(rail.locator(`a[href="${gone}"]`)).toHaveCount(0);

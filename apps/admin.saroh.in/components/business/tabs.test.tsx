@@ -272,7 +272,7 @@ describe("Website and payments: sites and payments", () => {
     it("the steps to send name the business and where to go, and never a key", () => {
         const steps = paymentSteps("Northwind", null);
         expect(steps).toContain("Hi Northwind,");
-        expect(steps).toContain("Settings › Providers");
+        expect(steps).toContain("Settings › Integrations");
         expect(steps).not.toMatch(/rzp_|secret/i);
     });
 });

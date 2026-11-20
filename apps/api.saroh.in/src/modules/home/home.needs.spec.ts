@@ -285,7 +285,7 @@ describe("flattenNeeds", () => {
                 {
                     code: "PAYMENTS_ATTENTION",
                     title: "Reconnect Razorpay",
-                    href: "/settings/providers",
+                    href: "/settings/integrations",
                     severity: "ATTENTION",
                 },
             ],

@@ -34,7 +34,7 @@ describe("IntegrationSteps", () => {
         render(
             <IntegrationSteps
                 steps={steps}
-                panelPath={["Settings", "Providers"]}
+                panelPath={["Settings", "Integrations"]}
                 initialStep={1}
             />,
         );
@@ -47,7 +47,7 @@ describe("IntegrationSteps", () => {
         render(
             <IntegrationSteps
                 steps={steps}
-                panelPath={["Settings", "Providers"]}
+                panelPath={["Settings", "Integrations"]}
             />,
         );
         const [first, , third] = screen.getAllByRole("button");

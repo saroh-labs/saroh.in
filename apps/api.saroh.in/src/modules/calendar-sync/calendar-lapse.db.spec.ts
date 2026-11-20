@@ -187,7 +187,7 @@ describe("a lapsed Google Calendar", () => {
             google,
             flags as unknown as FeatureFlagService,
             lapses,
-            new CalendarReleaseService(google, lapses),
+            new CalendarReleaseService(google),
         );
         await expect(
             service.connect(
@@ -212,9 +212,9 @@ describe("a lapsed Google Calendar", () => {
             google,
             flags as unknown as FeatureFlagService,
             lapses,
-            new CalendarReleaseService(google, lapses),
+            new CalendarReleaseService(google),
         );
-        expect((await service.status(c.ctx)).behind).toBe(false);
+        expect((await service.status(c.ctx)).accounts[0].behind).toBe(false);
         await prisma.googleCalendarConnection.update({
             where: { id: c.connectionId },
             data: {
@@ -223,6 +223,6 @@ describe("a lapsed Google Calendar", () => {
                 ),
             },
         });
-        expect((await service.status(c.ctx)).behind).toBe(true);
+        expect((await service.status(c.ctx)).accounts[0].behind).toBe(true);
     });
 });

@@ -79,7 +79,10 @@ export type MeteredLimitKey = (typeof METERED_LIMIT_KEYS)[number];
  * Never metered: no count across the business exists for them. Their rule
  * is `item-limits.ts`.
  */
-export const ITEM_LIMIT_KEYS = ["variantsPerProduct"] as const;
+export const ITEM_LIMIT_KEYS = [
+    "variantsPerProduct",
+    "googleAccountsPerPerson",
+] as const;
 export type ItemLimitKey = (typeof ITEM_LIMIT_KEYS)[number];
 
 const METERED: ReadonlySet<string> = new Set(METERED_LIMIT_KEYS);

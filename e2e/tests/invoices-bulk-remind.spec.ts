@@ -189,7 +189,7 @@ test.describe("Remind many by channel: Northwind, own invoices", () => {
             await expect(sheet).not.toContainText("Email, sent for you");
             await expect(
                 sheet.getByRole("link", { name: "Connect email" }),
-            ).toHaveAttribute("href", "/settings/providers");
+            ).toHaveAttribute("href", "/settings/integrations");
         }
 
         await sheet.getByRole("button", { name: "Not now" }).click();

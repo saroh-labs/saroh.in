@@ -2233,7 +2233,7 @@ export class PaymentsService {
         }
         // A Razorpay connection without its public key id can't open the
         // checkout window, so no provider order is made for it (DEC-054).
-        // Settings › Providers says it needs attention; the backfill fills
+        // Settings › Integrations says it needs attention; the backfill fills
         // every connection made before setup asked for it.
         if (
             needsPublicKey(providerRow.provider) &&

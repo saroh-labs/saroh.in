@@ -17,6 +17,9 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import type { MeetAccess } from "../calendar-sync/google/google-calendar.port";
+import { MEET_ACCESS } from "../calendar-sync/google/google-calendar.port";
+
 import type { GstPriceMode } from "../invoices/gst-price";
 import { GST_PRICE_MODES } from "../invoices/gst-price";
 import type { DatePreset } from "../orders/date-presets";
@@ -226,6 +229,14 @@ export class CreateServiceDto {
     meetingLink?: MeetingLink;
 
     /**
+     * Who may join its Meet links without knocking (DEC-233): RESTRICTED,
+     * TRUSTED or OPEN. `null`: the business's default.
+     */
+    @IsOptional()
+    @IsIn(MEET_ACCESS)
+    meetAccess?: MeetAccess | null;
+
+    /**
      * How many visits one booking of it is, 1 to 12 (E1). More than one
      * makes it a treatment, sold as one order (E9/E10).
      */
@@ -364,6 +375,14 @@ export class UpdateServiceDto {
     @IsOptional()
     @IsIn(MEETING_LINKS)
     meetingLink?: MeetingLink;
+
+    /**
+     * Who may join its Meet links without knocking (DEC-233): RESTRICTED,
+     * TRUSTED or OPEN. `null`: the business's default.
+     */
+    @IsOptional()
+    @IsIn(MEET_ACCESS)
+    meetAccess?: MeetAccess | null;
 
     /**
      * How many visits one booking of it is, 1 to 12 (E1). More than one
@@ -564,6 +583,15 @@ export class BookByHandDto {
     @IsString()
     @MaxLength(64)
     staffId?: string;
+
+    /**
+     * Where = Google Meet (DEC-233): a Meet link of its own, made on the
+     * Google Calendar of whoever takes it, whatever the service says.
+     * Refused when they have no Google Calendar connected here.
+     */
+    @IsOptional()
+    @IsIn(["GOOGLE_MEET"])
+    meetingLink?: "GOOGLE_MEET";
 
     /**
      * How it is paid (U3). PACK is the same as `useClassPack`; MEMBERSHIP

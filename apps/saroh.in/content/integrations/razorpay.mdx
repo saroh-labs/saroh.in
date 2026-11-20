@@ -16,10 +16,10 @@ category: Payments
 title: "Connect Razorpay: payments into your own account · Saroh"
 description: "Connect your own Razorpay account to Saroh in five steps: API keys, webhook address, events and signing secret. The money goes straight to you."
 intro: "Saroh's Razorpay integration takes payments through your own Razorpay account. Customers pay by UPI, card or the other methods your account has switched on, and the money goes straight to you. Saroh never holds it."
-updated: "2026-10-22"
+updated: "2026-11-20"
 doesTitle: What it does in Saroh
-# PAGE: the screen is titled "Providers"; SETUP: Razorpay is a provider in it.
-panelPath: [Settings, Providers, Razorpay]
+# PAGE: the screen is titled "Integrations"; SETUP: Razorpay is a provider in it.
+panelPath: [Settings, Integrations, Razorpay]
 # PATH: webhookPath("RAZORPAY", "your-business-id").
 webhookPath: /public/webhooks/razorpay/your-business-id
 # PATH: WEBHOOK_EVENTS.RAZORPAY, in Settings' order (HOOK, "Tick these events").
@@ -33,9 +33,9 @@ initialStep: 2
 steps:
     # ROWS: a provider not yet connected has a "Connect" button and type "Payments".
     # SETUP: the "Provider" select offers Razorpay and Cashfree.
-    - title: Open Settings › Providers
+    - title: Open Settings › Integrations
       cta: Connect
-      body: "Providers lists the services behind your business, Razorpay and Cashfree among them. Press Connect on Razorpay's row. The form shows your webhook address straight away, before you connect anything."
+      body: "Integrations lists the services behind your business, Razorpay and Cashfree among them. Press Connect on Razorpay's row. The form shows your webhook address straight away, before you connect anything."
       rows:
           - { label: Provider, value: Razorpay }
           - { label: Type, value: Payments }
@@ -95,7 +95,7 @@ steps:
     # and "No payment updates received yet. Check the webhook in Razorpay."
     # ROWS: the "Connected" pill. SETUP: a connected provider's button is "Save keys".
     - title: Check that payment updates arrive
-      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Razorpay's row in Settings › Providers then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook and the secret match. When you're ready, enter your live keys and add the same webhook in Razorpay's live mode."
+      body: "Make a test payment, such as a booking deposit or an invoice's pay link. Razorpay's row in Settings › Integrations then says when the last payment update arrived. Saroh keeps only updates whose signature checked out, so one there means the webhook and the secret match. When you're ready, enter your live keys and add the same webhook in Razorpay's live mode."
       rows:
           - {
                 label: Razorpay,
@@ -116,7 +116,7 @@ faq:
     # ROWS: "Needs its webhook signing secret. Payments can't be confirmed
     # until you add it." with the button "Add webhook secret".
     - q: What if Saroh says the webhook signing secret is missing?
-      a: "Razorpay's row in Settings › Providers shows Add webhook secret. Press it and enter your keys again with the same secret you set in Razorpay's webhook. Keys can't be read back once saved, so they're entered again too."
+      a: "Razorpay's row in Settings › Integrations shows Add webhook secret. Press it and enter your keys again with the same secret you set in Razorpay's webhook. Keys can't be read back once saved, so they're entered again too."
     - q: Where does the money go?
       a: "Straight into your Razorpay account, and from there to your bank on Razorpay's usual schedule. Saroh never holds it."
     - q: Who charges the payment fees?

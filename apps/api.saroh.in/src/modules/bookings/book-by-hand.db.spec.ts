@@ -28,6 +28,7 @@ import {
 } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { isReservedContactEmail } from "../contacts/contact-email";
+import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { lockWalkInPhone } from "../orders/walk-in-customer";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { StaffService } from "../staff/staff.service";
@@ -749,5 +750,86 @@ describe("New booking's times, the API (U8)", () => {
 
         const one = await bookings.availability(owner, facialId, from, to);
         expect(one.every((s) => s.placesLeft === undefined)).toBe(true);
+    });
+});
+
+describe("Where = Google Meet on New booking (DEC-233)", () => {
+    it("is refused for someone with no Google Calendar, and kept on the booking for someone with one", async () => {
+        const consultId = await makeService("Online consult");
+        await prisma.staffService.create({
+            data: {
+                organizationId: orgId,
+                staffId: raviStaffId,
+                serviceId: consultId,
+            },
+        });
+        await staff.replaceHours(
+            owner,
+            raviStaffId,
+            [0, 1, 2, 3, 4, 5, 6].map((dayOfWeek) => ({
+                dayOfWeek,
+                startMinute: 0,
+                endMinute: 1440,
+            })),
+        );
+        await expect(
+            bookings.bookByHand(owner, consultId, {
+                startAt: nextStart(),
+                bookerEmail: `meet-${tag}@example.com`,
+                staffId: raviStaffId,
+                meetingLink: "GOOGLE_MEET",
+            }),
+        ).rejects.toMatchObject({
+            status: 400,
+            response: { details: { field: "meetingLink" } },
+        });
+
+        const ravi = await prisma.staffMember.findUniqueOrThrow({
+            where: { id: raviStaffId },
+        });
+        const connection = await prisma.googleCalendarConnection.create({
+            data: {
+                organizationId: orgId,
+                membershipId: ravi.membershipId ?? "",
+                googleEmail: `ravi-${tag}@example.com`,
+                scopes: [
+                    "https://www.googleapis.com/auth/calendar.events.owned",
+                ],
+                calendars: {
+                    create: {
+                        organizationId: orgId,
+                        calendarId: "primary",
+                        name: "Ravi",
+                        writeTo: true,
+                    },
+                },
+            },
+        });
+        const isEnabled = FeatureFlagService.prototype.isEnabled;
+        const flag = jest
+            .spyOn(FeatureFlagService.prototype, "isEnabled")
+            .mockImplementation(function (
+                this: FeatureFlagService,
+                key,
+                ...rest
+            ) {
+                return key === "GOOGLE_CALENDAR"
+                    ? Promise.resolve(true)
+                    : isEnabled.call(this, key, ...rest);
+            });
+        try {
+            const booked = await bookings.bookByHand(owner, consultId, {
+                startAt: nextStart(),
+                bookerEmail: `meet-${tag}@example.com`,
+                staffId: raviStaffId,
+                meetingLink: "GOOGLE_MEET",
+            });
+            expect(booked.meetingLink).toBe("GOOGLE_MEET");
+        } finally {
+            flag.mockRestore();
+            await prisma.googleCalendarConnection.delete({
+                where: { id: connection.id },
+            });
+        }
     });
 });

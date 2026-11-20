@@ -139,7 +139,7 @@ export interface InvitationState {
 }
 
 export const NO_PROVIDER_MESSAGE =
-    "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.";
+    "Review invitations go from your own email. Connect an email provider in Settings › Integrations to send them.";
 export const NO_PROVIDER_PLAN_MESSAGE =
     "Review invitations go from your own email, and connecting your own email needs a paid plan.";
 

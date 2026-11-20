@@ -301,7 +301,7 @@ describe("a team reply in Messages is emailed (real database)", () => {
         const b = await business();
 
         await threads.reply(b.owner, b.contactId, "Queued first.", at(0));
-        // The switch turned off (Settings › Providers writes this row).
+        // The switch turned off (Settings › Integrations writes this row).
         await prisma.customerNoticeSetting.create({
             data: {
                 organizationId: b.owner.organizationId,

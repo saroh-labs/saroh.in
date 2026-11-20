@@ -252,7 +252,7 @@ test.describe("share one invoice: Northwind, own invoices", () => {
         );
         await expect(
             sheet.getByRole("link", { name: "Connect email" }),
-        ).toHaveAttribute("href", "/settings/providers");
+        ).toHaveAttribute("href", "/settings/integrations");
         await expect(
             sheet.getByRole("button", { name: "Email it" }),
         ).toBeDisabled();

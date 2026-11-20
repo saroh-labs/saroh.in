@@ -2,7 +2,7 @@
  * Settings › Activity tells a change to one of the business's automatic
  * customer emails (DEC-174, U4 #1135): the audit row the API writes as
  * `customer-notices.setting`, with the kind and on or off as it was and
- * became. The line opens Settings › Providers, where the switch is.
+ * became. The line opens Settings › Integrations, where the switch is.
  */
 import { describe, expect, it } from "vitest";
 
@@ -41,7 +41,7 @@ describe("a customer email turned on or off", () => {
             at: "2026-10-21T03:44:00.000Z",
             who: "Priya",
             what: "turned Membership emails off for customers",
-            where: { label: "Providers", href: "/settings/providers" },
+            where: { label: "Integrations", href: "/settings/integrations" },
         });
         expect(
             activityLine(change("OVERDUE_REMINDERS", false, true))?.what,
@@ -92,7 +92,7 @@ describe("when overdue reminders go, changed (DEC-178, #1169)", () => {
     it("says what was changed, and opens Providers", () => {
         expect(activityLine(retimed)).toMatchObject({
             what: "changed when Overdue reminders go",
-            where: { label: "Providers", href: "/settings/providers" },
+            where: { label: "Integrations", href: "/settings/integrations" },
         });
     });
 

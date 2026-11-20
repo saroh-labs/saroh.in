@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Settings › Providers' "Updates in Messages" (12 Oct 2026), read first:
+ * Settings › Integrations' "Updates in Messages" (12 Oct 2026), read first:
  * the row says what is saved and what that leaves the customers with, and
  * is drawn only while the choice can have an effect. Edit opens a side
  * sheet with the two choices and one Save. Saved, it closes with a toast

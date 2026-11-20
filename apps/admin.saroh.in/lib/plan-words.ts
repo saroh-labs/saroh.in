@@ -17,7 +17,7 @@ export interface EffectivePlan {
 }
 
 /** Why a count reads as it does (the API's `UsageNote`). */
-export type UsageNote = "online-only" | "per-product" | "seats";
+export type UsageNote = "online-only" | "per-product" | "per-person" | "seats";
 
 /** What each usage note says beside the count. */
 export const USAGE_NOTE_WORDS: Record<UsageNote, string> = {
@@ -25,6 +25,8 @@ export const USAGE_NOTE_WORDS: Record<UsageNote, string> = {
     "online-only": "Online only, no locations",
     // A cap inside each product (variants, DEC-158): nothing to total.
     "per-product": "Each product has its own count",
+    // A cap on each person (Google accounts, DEC-233): nothing to total.
+    "per-person": "Each person has their own count",
     // Seats (DEC-155): more than the business's people when invites are open.
     seats: "Counts its people, invites still open and staff with no sign-in",
 };

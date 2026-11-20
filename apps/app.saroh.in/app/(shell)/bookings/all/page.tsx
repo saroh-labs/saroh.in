@@ -23,6 +23,7 @@ import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
 import { packsOn } from "@/lib/class-packs/switched-on";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
+import { googleMeetOffered } from "@/lib/google-calendar/service";
 import { onlinePayReady } from "@/lib/invoices/payments-on";
 import { modulesOrUnknown } from "@/lib/modules/guard";
 import { bookingsListMoment } from "@/lib/moments/read";
@@ -227,6 +228,7 @@ export default async function BookingsPage({
                 showMoney:
                     may("payment:read") || canTakeDeskPayments(organization),
                 business: organization?.name ?? null,
+                meet: await googleMeetOffered(),
                 now: readNow(),
             }}
         >

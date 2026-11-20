@@ -198,8 +198,8 @@ export function paymentSteps(
             ? `${refused} refused the keys saved in Saroh, so your customers can't pay online.`
             : "Your customers can't pay online yet, because no payment provider is connected.",
         refused
-            ? `Sign in to Saroh, open Settings › Providers and enter your ${refused} keys again.`
-            : "Sign in to Saroh, open Settings › Providers and connect Razorpay or Cashfree with your own account's keys.",
+            ? `Sign in to Saroh, open Settings › Integrations and enter your ${refused} keys again.`
+            : "Sign in to Saroh, open Settings › Integrations and connect Razorpay or Cashfree with your own account's keys.",
         "Only you can do this: the keys are yours, and we never see them.",
     ].join("\n\n");
 }

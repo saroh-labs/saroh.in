@@ -6950,6 +6950,13 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Fix:** `whitespace-normal` on the composer's big button; `compactOnPhone` only on the Channels tab; `focus({ preventScroll: true })` in `QuickLook`. The spec now checks `window.innerWidth` equals the viewport on the composer and with the sheet open.
 - **Rule:** a phone spec that can fail on a click asserts `innerWidth === viewport width` first; a zoomed-out page is a layout bug, not a flaky click. Find the culprit by rendering the trace's DOM snapshot (drop its `<base>`, point the CSS at `resources/`) in a non-mobile 412px context and listing elements past 412. `compactOnPhone` is for one action.
 
+### New booking routes in another module skipped the own-diary check (20 Nov 2026)
+
+- **Symptom:** the security review of Google Calendar v2 found `GET`/`PUT …/calendar/google/bookings/:id/meeting` checked only `booking:read`/`booking:write`, so a Calendar only person could read a colleague's booking, its host's Google address, and paste their own link onto it. `disconnectMember` checked `member:role:update` without the reach rule, so an Admin could disconnect the Owner.
+- **Cause:** both routes live outside `bookings/` and `organizations/`, so they didn't go through `requireOwnedBooking` or the members service's `assertWithinReach`; the action check alone looked complete.
+- **Fix:** `assertOwnBooking(prisma, ctx, booking, "read" | "write")` on both meeting routes; `assertWithinReach` is now a module function in `organization-members.service.ts` and `disconnectMember` calls it. Specs in `calendar-bookings.service.db.spec.ts` and `calendar-connect.service.db.spec.ts`.
+- **Rule:** any route that reads or changes one booking calls `assertOwnBooking`, wherever it lives; any route that acts on another member calls `assertWithinReach` on their role and extras (`docs/patterns/backend-auth-and-access.md`).
+
 ### Off features and dead connections read as working (20 Nov 2026)
 
 - **Symptom:** the 20 Nov review (03 #1, 04 H1-H3): saroh.in's trade days and Website page told Claude, ChatGPT and Ask AI as working while they were off; the email sheet offered SendGrid and "SMTP relay" and WhatsApp offered Twilio, all "Connected" and none able to send; the shop's order page promised an email the business couldn't send; production booted without Saroh's SMTP and logged sign-in codes.

@@ -521,7 +521,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   its own login system sends its own codes (not built). With no email
   provider, owners and admins who can act are asked to connect one — "Your
   customers get no emails from you", and what they miss — on Home's Needs
-  you and Settings › Providers, with Connect (`comms:manage`), or on a plan
+  you and Settings › Integrations, with Connect (`comms:manage`), or on a plan
   that can't connect one, "comes with a paid plan" and See plans
   (`billing:read`); it goes once one is connected, and the same note says
   why an invoice or a review invitation can't be emailed (built, #850). Consent gates every send.
@@ -566,7 +566,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   customer still writes to the business in Messages, the team's Reply still
   reaches them, and so does the note someone chooses to send when they
   change or cancel an order ("Tell the customer"). The business chooses on
-  Settings › Providers ("Updates in Messages", `comms:manage`): a read row
+  Settings › Integrations ("Updates in Messages", `comms:manage`): a read row
   with Edit, a sheet with the two choices and Undo. The row is drawn only
   while the first two hold (`offered`), so nobody is offered a switch that
   does nothing, and it says what a business with no email provider is left
@@ -594,7 +594,7 @@ organizations/:org/customers`: everyone who has paid (an order through a
   **A kind is not listed until Saroh sends it** (`NOTICE_SENDS`, U4
   #1135): every kind starts false, and the unit that ships a kind's sender
   flips its own line in the same commit, so no switch ever does nothing.
-- **Current** (DEC-174, U4 #1135) — **Settings › Providers' "Emails to
+- **Current** (DEC-174, U4 #1135) — **Settings › Integrations' "Emails to
   your customers"**, under "Updates in Messages"
   (`components/providers/customer-emails/customer-emails-row.tsx`, words in
   `lib/communications/customer-emails.ts`): a read row ("9 on, 1 off",

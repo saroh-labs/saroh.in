@@ -17,7 +17,7 @@ import {
  * the key id: setup asks for it once, checks it and the secret, and stores it
  * as the connection's `publicKey` next to the sealed pair. A Razorpay
  * connection without it can't open the window ("couldn't open the payment
- * window"), and Settings › Providers says it needs attention.
+ * window"), and Settings › Integrations says it needs attention.
  *
  * Cashfree's drop-in opens on the order's payment session, so its public key
  * stays optional.

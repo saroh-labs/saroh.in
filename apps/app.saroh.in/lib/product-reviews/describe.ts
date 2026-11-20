@@ -62,7 +62,7 @@ export function stars(rating: number): string {
 
 /** The API's words for "no email provider" (`product-reviews.service.ts`). */
 export const NO_PROVIDER_NOTE =
-    "Review invitations go from your own email. Connect an email provider in Settings › Providers to send them.";
+    "Review invitations go from your own email. Connect an email provider in Settings › Integrations to send them.";
 export const NO_PROVIDER_PLAN_NOTE =
     "Review invitations go from your own email, and connecting your own email needs a paid plan.";
 

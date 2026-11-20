@@ -241,6 +241,10 @@ export const AuditAction = {
     // An address that was off turned back on because a test got through
     // (actor `system:webhooks`). Metadata: the host and the test delivery.
     WebhookEndpointOnAfterTest: "webhook.on_after_test",
+    // An owner or admin disconnected someone else's Google Calendar
+    // (DEC-233), the person's membership the target. Metadata: how many
+    // upcoming events stay in Google. Never the Google address.
+    CalendarMemberDisconnect: "calendar.member.disconnect",
 } as const;
 
 export type AuditAction = (typeof AuditAction)[keyof typeof AuditAction];

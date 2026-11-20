@@ -147,8 +147,9 @@ export function CataloguePlan({
                                     </td>
                                     <td className="py-2 text-right tabular-nums">
                                         {m.usage ??
-                                            (m.usageNote ===
-                                            "per-product" ? null : (
+                                            (m.usageNote === "per-product" ||
+                                            m.usageNote ===
+                                                "per-person" ? null : (
                                                 <span className="text-muted-foreground">
                                                     Not measured
                                                 </span>

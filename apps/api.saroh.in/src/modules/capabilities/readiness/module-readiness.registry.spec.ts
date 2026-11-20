@@ -380,7 +380,9 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
             expect(result.readiness).toBe("ATTENTION_REQUIRED");
             expect(result.blockers[0]?.code).toBe(code);
             expect(result.blockers[0]?.severity).toBe("ATTENTION");
-            expect(result.blockers[0]?.actionHref).toBe("/settings/providers");
+            expect(result.blockers[0]?.actionHref).toBe(
+                "/settings/integrations",
+            );
         },
     );
 
@@ -418,7 +420,7 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
             "PAYMENTS_WEBHOOK_SECRET_MISSING",
         );
         expect(result.blockers[0]?.severity).toBe("ATTENTION");
-        expect(result.blockers[0]?.actionHref).toBe("/settings/providers");
+        expect(result.blockers[0]?.actionHref).toBe("/settings/integrations");
         expect(result.blockers[0]?.message).toMatch(/webhook signing secret/);
     });
 
@@ -454,7 +456,9 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
             ).evaluate(moduleKey, input);
             expect(result.readiness).toBe("ATTENTION_REQUIRED");
             expect(result.blockers[0]?.code).toBe(code);
-            expect(result.blockers[0]?.actionHref).toBe("/settings/providers");
+            expect(result.blockers[0]?.actionHref).toBe(
+                "/settings/integrations",
+            );
         },
     );
 

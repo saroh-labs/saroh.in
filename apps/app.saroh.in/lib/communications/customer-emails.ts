@@ -4,7 +4,7 @@ import { readOnlyLine, WHO_CAN_CHANGE } from "@/lib/access/who-can-change";
  * "Emails to your customers" (DEC-174, U4 #1135): the business's switches
  * for the automatic emails Saroh sends its customers from the business's
  * own email (a renewal invoice, a refund, a membership change…), on
- * Settings › Providers under "Updates in Messages".
+ * Settings › Integrations under "Updates in Messages".
  *
  * The API decides what is listed (`communications/notice-settings.ts`):
  * only the kinds Saroh sends today, whose module is on for the business.

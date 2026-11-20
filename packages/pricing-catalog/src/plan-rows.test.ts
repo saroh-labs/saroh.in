@@ -93,6 +93,7 @@ describe("plan keys", () => {
                 "bookings",
                 "class-packs",
                 "courses",
+                "google-accounts",
                 "integrations",
                 "invoicing",
                 "locations",

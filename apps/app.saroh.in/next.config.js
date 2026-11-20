@@ -142,6 +142,20 @@ const nextConfig = {
                 destination: "/commerce/locations/:path*",
                 permanent: true,
             },
+            // Settings › Integrations became Integrations, and Google
+            // Calendar moved under it (20 Nov 2026). Google's callback
+            // still returns to /settings/google-calendar (the API's
+            // RETURN_PATH): `?calendar=<outcome>` is carried across.
+            {
+                source: "/settings/providers/:path*",
+                destination: "/settings/integrations/:path*",
+                permanent: true,
+            },
+            {
+                source: "/settings/google-calendar",
+                destination: "/settings/integrations/google-calendar",
+                permanent: true,
+            },
         ];
     },
     images: {

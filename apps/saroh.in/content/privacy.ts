@@ -20,7 +20,8 @@
  * addition for the owner to review; every sub-processor named, Google's
  * Limited Use statement and Meta's data deletion steps, 20 Nov (review
  * 2026-11-20 04 H5, M1), NOT YET in the owner's doc: for the owner to
- * review). Published VERBATIM at
+ * review; a disconnected Google Calendar kept 30 days, 20 Nov (DEC-233),
+ * the owner asked for it, NOT YET in the owner's doc). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -128,6 +129,7 @@ Our servers and database are in **India**. Some providers above may process data
 | Security logs | 1 year |
 | A suspended account under investigation | As long as the law requires, or while it's needed to prevent, detect or investigate an offence, even if deletion was requested |
 | Recordings of use | 30 days |
+| A Google Calendar you disconnect | Its Google address and the record of the bookings left in that calendar, so connecting it again picks them back up: 30 days after you disconnect it |
 
 ## Your rights
 

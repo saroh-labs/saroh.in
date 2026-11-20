@@ -27,7 +27,7 @@ const mod = (key: string, codes: string[]): ModuleView => ({
 });
 
 describe("Modules on a plan that won't connect a provider (UX-017)", () => {
-    it("Payments with an old provider disabled: the plan's line, never Go to Providers", () => {
+    it("Payments with an old provider disabled: the plan's line, never Go to Integrations", () => {
         const m = mod("PAYMENTS", ["PAYMENTS_PROVIDER_DISABLED"]);
         const lock = rowPlanLock(m, LOCKS);
         expect(lock?.line).toBe(

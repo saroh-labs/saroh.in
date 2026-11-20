@@ -18,7 +18,7 @@ import {
 } from "./customer-emails-sheet";
 
 /**
- * Settings › Providers' "Emails to your customers" (DEC-174, U4 #1135):
+ * Settings › Integrations' "Emails to your customers" (DEC-174, U4 #1135):
  * the automatic emails Saroh sends the business's customers from its own
  * email, under "Updates in Messages". Read first: how many are on, which
  * are not sent, and at most one quiet line (no email provider, else why

@@ -91,7 +91,7 @@ const TIMING_FIELDS: Record<keyof OverdueTiming, string> = {
  *
  * - **Reading** is open to anyone in the business, so a Member sees what
  *   is sent and that they can't change it (`canChange`).
- * - **Writing** needs `comms:manage`, as the rest of Settings › Providers.
+ * - **Writing** needs `comms:manage`, as the rest of Settings › Integrations.
  *   A kind not offered (its module off, or the enquiry reply with no email
  *   provider) is refused in words (409), so a stale screen can't change
  *   something it no longer shows.

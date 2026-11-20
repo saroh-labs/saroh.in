@@ -36,7 +36,7 @@ export const CONNECT_KEYS: ReadonlySet<string> = new Set([
 ]);
 
 /** Where "Connect now" goes. */
-export const PROVIDERS_HREF = "/settings/providers";
+export const PROVIDERS_HREF = "/settings/integrations";
 
 export interface TurnOnPlan {
     /** Every module to turn on, what is needed before what needs it. */
@@ -496,7 +496,7 @@ const FIRST_SCREEN: Readonly<Record<string, string>> = {
 };
 
 /**
- * Where to go once it is on: Settings › Providers when "Connect now" was
+ * Where to go once it is on: Settings › Integrations when "Connect now" was
  * chosen, else the first picked module's own screen. Null for a module
  * with none (Communications works in the background): stay where you are.
  *

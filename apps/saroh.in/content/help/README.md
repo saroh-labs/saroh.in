@@ -21,7 +21,7 @@ readMinutes: 3
 updated: "2026-10-08" # the day its words or shots last changed (R20)
 publishOn: "2026-10-17" # optional; Help's day by default (KTD-2)
 steps:
-    - title: Open Settings › Providers
+    - title: Open Settings › Integrations
       body: "…what to do, naming each control as the app labels it…"
       shot: help-connect-razorpay-1 # a captured key, required
       caption: "…what the picture shows, naming the demo business…"

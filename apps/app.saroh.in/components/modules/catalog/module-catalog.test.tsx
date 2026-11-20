@@ -202,7 +202,7 @@ describe("Settings › Modules on a plan that won't let it connect (UX-006, UX-0
         blockers: [
             {
                 code: "COMMUNICATIONS_NO_PROVIDER",
-                actionHref: "/settings/providers",
+                actionHref: "/settings/integrations",
             },
         ],
     });
@@ -228,7 +228,9 @@ describe("Settings › Modules on a plan that won't let it connect (UX-006, UX-0
                 'a[href="/settings/billing/plans?plan=grow"]',
             ),
         ).toHaveLength(2);
-        expect(host.querySelector('a[href="/settings/providers"]')).toBeNull();
+        expect(
+            host.querySelector('a[href="/settings/integrations"]'),
+        ).toBeNull();
     });
 
     it("Grow: Communications still asks to connect, Payments says nothing of plans", () => {

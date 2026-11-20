@@ -30,7 +30,7 @@ import { EmptyState } from "@saroh/ui/data-state";
 import { TabStrip } from "@saroh/ui/tabs";
 import { showInfo } from "@saroh/ui/toast";
 import { Users } from "lucide-react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { useState } from "react";
 import type { ReviewableSite } from "./invite-sheet";
 import { InviteSheet } from "./invite-sheet";
@@ -87,7 +87,10 @@ export function TeamScreen({
     bookableNoLogin = 0,
     diaryPeople = [],
     paused = NONE_PAUSED,
+    calendar = null,
 }: {
+    /** Team's Google Calendar column (DEC-233); null draws none. */
+    calendar?: ComponentProps<typeof PeopleTab>["calendar"];
     organizationName: string;
     members: OrganizationMember[];
     invitations: OrganizationInvitation[];
@@ -266,6 +269,7 @@ export function TeamScreen({
                     // without inviting anyone (F17).
                     onEdit={canManage || canEditRoles ? setEditing : undefined}
                     onRemove={setRemoving}
+                    calendar={calendar}
                     notice={
                         canEditRoles ? (
                             <StorefrontTeamNotice

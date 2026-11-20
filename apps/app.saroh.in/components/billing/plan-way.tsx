@@ -66,7 +66,7 @@ export function PlanWay({
     children: ReactNode;
     /**
      * For a link that is only sometimes the way to a plan (a fix that may
-     * also be "Connect one in Providers"): `isPlanHref(href)`. False, the
+     * also be "Connect one in Integrations"): `isPlanHref(href)`. False, the
      * link is drawn as given.
      */
     when?: boolean;
