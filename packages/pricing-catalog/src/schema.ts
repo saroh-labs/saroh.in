@@ -576,7 +576,7 @@ function storageSoftUnlessSaid(input: unknown): unknown {
     return {
         ...input,
         modules: modules.map((m: unknown) => {
-            const row = m as { id?: unknown; cells?: unknown };
+            const row = m as { id?: unknown; cells?: unknown } | null;
             if (
                 !row ||
                 typeof row.id !== "string" ||
@@ -589,10 +589,13 @@ function storageSoftUnlessSaid(input: unknown): unknown {
             const cells = Object.fromEntries(
                 Object.entries(row.cells).map(
                     ([plan, c]: [string, unknown]) => {
-                        const cell = c as { inc?: unknown; soft?: unknown };
+                        const cell = c as {
+                            inc?: unknown;
+                            soft?: unknown;
+                        } | null;
                         return [
                             plan,
-                            cell && cell.inc === true && cell.soft === undefined
+                            cell?.inc === true && cell.soft === undefined
                                 ? { ...cell, soft: true }
                                 : c,
                         ];

@@ -13,7 +13,7 @@ import {
 
 import { lockCouponPlacesInTx } from "../pricing/coupons.service";
 import { prorateDifferencePaise } from "./checkout-quote";
-import { samePayer } from "./same-payer";
+import { offerHeld, samePayer } from "./same-payer";
 import { holdXactLock } from "./xact-lock";
 
 type Tx = Prisma.TransactionClient;
@@ -53,20 +53,6 @@ export async function catalogueOfVersion(
     if (!r.ok) return null;
     parsed.set(row.id, r.catalog);
     return r.catalog;
-}
-
-/**
- * A checkout that holds an offer for its business: completed, waiting to
- * start, or still open (N3: two businesses of one person checking out side
- * by side can't both get it).
- */
-export function offerHeld(now: Date): Prisma.BillingCheckoutWhereInput {
-    return {
-        OR: [
-            { status: { in: ["COMPLETED", "SCHEDULED"] } },
-            { status: "OPEN", expiresAt: { gt: now } },
-        ],
-    };
 }
 
 /**

@@ -21,8 +21,7 @@ import {
 import { AdminPermission } from "../admin/admin-permissions";
 import { autopayTakes } from "../billing/autopay-currency";
 import { couponMonthPaise } from "../billing/checkout-quote";
-import { offerHeld } from "../billing/offers";
-import { samePayer } from "../billing/same-payer";
+import { offerHeld, samePayer } from "../billing/same-payer";
 import { RAZORPAY_OFFER_ID } from "./dto";
 import type { PublicOffer } from "./public-catalog";
 

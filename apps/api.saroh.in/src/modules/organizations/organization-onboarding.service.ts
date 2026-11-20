@@ -122,7 +122,9 @@ export class OrganizationOnboardingService {
         refuseCountryOutsideEdition(edition, dto.profile?.country);
         // India's tax ID is the GSTIN, in the register's shape (N9).
         const gstin =
-            edition === "INDIA" ? normaliseGstin(dto.profile?.taxId) : "";
+            editionProfile(edition).taxSystem !== "named-line"
+                ? normaliseGstin(dto.profile?.taxId)
+                : "";
         const gstinRefused = gstin ? gstinProblem(gstin) : null;
         if (gstinRefused) {
             throw new BadRequestException({

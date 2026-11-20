@@ -82,3 +82,17 @@ export async function samePayer(
     });
     return [...new Set([organizationId, ...rows.map((r) => r.id)])];
 }
+
+/**
+ * A checkout that holds an offer for its business: completed, waiting to
+ * start, or still open (N3: two businesses of one person checking out side
+ * by side can't both get it).
+ */
+export function offerHeld(now: Date): Prisma.BillingCheckoutWhereInput {
+    return {
+        OR: [
+            { status: { in: ["COMPLETED", "SCHEDULED"] } },
+            { status: "OPEN", expiresAt: { gt: now } },
+        ],
+    };
+}
