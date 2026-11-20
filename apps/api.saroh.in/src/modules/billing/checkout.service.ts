@@ -1200,9 +1200,12 @@ export class CheckoutService {
             sub.status === "CANCELLED" ||
             !catalog ||
             quote.payment !== "ONE_TIME" ||
-            target.interval === "year" ||
-            autopayTakes(target.currency) ||
-            (quote.kind !== "NEW" && quote.kind !== "RENEW")
+            // A year paid once carries them on its renewal (review 19 Nov,
+            // H-1); a new year starts with none.
+            (target.interval === "year"
+                ? quote.kind !== "RENEW"
+                : autopayTakes(target.currency) ||
+                  (quote.kind !== "NEW" && quote.kind !== "RENEW"))
         ) {
             return [];
         }
@@ -1211,12 +1214,14 @@ export class CheckoutService {
             select: { addonId: true, quantity: true },
         });
         const start = quote.startAt ?? now;
+        const cycle = target.interval === "year" ? "year" : "month";
         return monthAddonLines(
             catalog,
             planId,
             held,
             start,
-            periodEnd(start, "month"),
+            periodEnd(start, cycle),
+            cycle,
         );
     }
 
