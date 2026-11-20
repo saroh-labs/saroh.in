@@ -54,7 +54,7 @@ export class CalendarBookingsService {
         @Optional()
         private readonly changes: WindowLimiter = new SharedRateLimiter(
             "google-calendar-changes",
-            env.GOOGLE_CALENDAR_CHANGES_PER_HOUR,
+            Number(env.GOOGLE_CALENDAR_CHANGES_PER_HOUR) || 120,
             60 * 60_000,
         ),
     ) {}

@@ -5,6 +5,7 @@ import { prisma } from "@saroh/database";
 import { env } from "../../env";
 import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { noticeOf } from "../notifications/notice-target";
+import { NOT_ON_LEGAL_HOLD } from "../organizations/legal-hold";
 import {
     businessPause,
     overAllowance,
@@ -168,14 +169,21 @@ export class CalendarSweepJob {
 
     /**
      * Delete disconnected accounts kept past their time (L1): the address
-     * and the record of the events left in Google go with the row.
+     * and the record of the events left in Google go with the row. A held
+     * business's are kept until the hold lifts (DEC-122): which account a
+     * member linked, and which events Saroh put in it, can be evidence.
      */
     async purgeDisconnected(now: Date): Promise<number> {
-        const keepMs = env.GOOGLE_CALENDAR_DISCONNECTED_KEEP_DAYS * 86_400_000;
+        // Read raw under SKIP_ENV_VALIDATION, where the schema's default never applies.
+        const keepDays =
+            Number(env.GOOGLE_CALENDAR_DISCONNECTED_KEEP_DAYS) || 30;
         const { count } = await prisma.googleCalendarConnection.deleteMany({
             where: {
                 status: "DISCONNECTED",
-                updatedAt: { lt: new Date(now.getTime() - keepMs) },
+                updatedAt: {
+                    lt: new Date(now.getTime() - keepDays * 86_400_000),
+                },
+                organization: NOT_ON_LEGAL_HOLD,
             },
         });
         return count;

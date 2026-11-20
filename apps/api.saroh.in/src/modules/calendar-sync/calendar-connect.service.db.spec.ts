@@ -831,6 +831,16 @@ describe("connecting Google Calendar", () => {
             where: { id: row.id },
             data: { updatedAt: new Date(Date.now() - 31 * 86_400_000) },
         });
+        // A held business keeps it until the hold lifts (DEC-122).
+        await prisma.organization.update({
+            where: { id: row.organizationId },
+            data: { legalHoldAt: new Date() },
+        });
+        await expect(sweep.purgeDisconnected(new Date())).resolves.toBe(0);
+        await prisma.organization.update({
+            where: { id: row.organizationId },
+            data: { legalHoldAt: null },
+        });
         await sweep.purgeDisconnected(new Date());
         expect(
             await prisma.googleCalendarConnection.count({
