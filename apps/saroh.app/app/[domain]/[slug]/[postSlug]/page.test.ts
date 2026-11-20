@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resolvePostEmbeds } from "@/lib/post-embeds";
 import { postMovedTo } from "@/lib/post-moved";
 import type * as Publication from "@/lib/publication";
 import { getPublishedPost } from "@/lib/publication";
@@ -23,6 +24,11 @@ vi.mock("@/lib/publication", async (importOriginal) => ({
     getPublishedPost: vi.fn(() => Promise.resolve(null)),
 }));
 vi.mock("@/lib/post-moved", () => ({ postMovedTo: vi.fn() }));
+vi.mock("@/lib/post-embeds", () => ({
+    resolvePostEmbeds: vi.fn((html: string) =>
+        Promise.resolve(html.replace("<div data-embed", "<div data-post-card")),
+    ),
+}));
 vi.mock("@/lib/test-metadata", () => ({
     shareable: vi.fn((_resolved: unknown, metadata: unknown) => metadata),
 }));
@@ -99,6 +105,25 @@ describe("old post links (U17a)", () => {
         vi.mocked(getPublishedPost).mockResolvedValue(post);
         await at("bridal-trial");
         expect(postMovedTo).not.toHaveBeenCalled();
+    });
+});
+
+describe("a post's cards from the business (U15b)", () => {
+    it("hands the article the body with its cards read now", async () => {
+        vi.mocked(getPublishedPost).mockResolvedValue({
+            ...post,
+            content: '<p>Hi</p><div data-embed="service" data-id="s1"></div>',
+        });
+        const page = (await at("bridal-trial")) as {
+            props: { children: { props: { post: { content: string } } }[] };
+        };
+        expect(page.props.children[0].props.post.content).toBe(
+            '<p>Hi</p><div data-post-card="service" data-id="s1"></div>',
+        );
+        expect(resolvePostEmbeds).toHaveBeenCalledWith(
+            '<p>Hi</p><div data-embed="service" data-id="s1"></div>',
+            "site-1",
+        );
     });
 });
 

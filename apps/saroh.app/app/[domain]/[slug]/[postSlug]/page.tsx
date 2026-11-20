@@ -6,6 +6,7 @@ import {
     PostNeighbours,
     postNeighbours,
 } from "@/components/post-view";
+import { resolvePostEmbeds } from "@/lib/post-embeds";
 import { postMovedTo } from "@/lib/post-moved";
 import {
     findRedirect,
@@ -117,9 +118,13 @@ export default async function PostPage({
         notFound();
     }
 
+    // Its cards from the business, filled from Services and Products now
+    // (U15b): never the price the post was written with.
+    const content = await resolvePostEmbeds(post.content, resolved.siteId);
+
     return (
         <>
-            <PostArticle post={post} />
+            <PostArticle post={{ ...post, content }} />
             <PostNeighbours
                 {...postNeighbours(posts ?? [], post.slug)}
                 basePath={`/${slug}`}

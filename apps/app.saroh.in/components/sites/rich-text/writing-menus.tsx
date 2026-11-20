@@ -17,33 +17,61 @@ import {
     ListOrdered,
     Minus,
     Quote,
+    ShoppingBag,
     SlidersHorizontal,
+    Tag,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+
+import type { EmbedKind } from "./embeds/insert-embed";
+import { insertEmbed } from "./embeds/insert-embed";
+
+/* On demand: the picker reads Services and Products when it opens. */
+const EmbedPicker = dynamic(
+    () => import("./embeds/embed-picker").then((m) => m.EmbedPicker),
+    { ssr: false },
+);
 
 /**
  * The writing surface's two menus (U15, `blogdesk/WXWInsert`): the format
  * bar over a selection, and the add menu that "/" opens on an empty line.
  * Both run the editor's existing nodes; every rarer control stays in the
- * full toolbar, which More formatting shows (C10). "From your business"
- * (service card, product, offer, Book now) comes with U15b.
+ * full toolbar, which More formatting shows (C10). From your business
+ * (U15b): a service card and a product, which store only which one.
+ * Offer, Book now button, Gallery, Video and Button are not built yet.
  */
 
 /** One thing the add menu puts in the post. */
 export interface AddItem {
     key: string;
     label: string;
-    group: "Write" | "Media";
+    group: "From your business" | "Write" | "Media";
     icon: LucideIcon;
     /** What typing it as markdown does, shown beside it. */
     keys?: string;
-    /** Runs it at the cursor; absent for Image, which asks for the photo. */
+    /** Runs it at the cursor; absent for one that asks which first. */
     run?: (editor: Editor) => void;
 }
 
+/** What an item without `run` asks for before it adds. */
+type Picking = "image" | EmbedKind;
+
 export const ADD_ITEMS: AddItem[] = [
+    {
+        key: "service",
+        label: "Service card",
+        group: "From your business",
+        icon: Tag,
+    },
+    {
+        key: "product",
+        label: "Product",
+        group: "From your business",
+        icon: ShoppingBag,
+    },
     {
         key: "heading",
         label: "Heading",
@@ -121,15 +149,31 @@ export function AddList({
     editor,
     items = ADD_ITEMS,
     active,
+    startPicking = null,
     onDone,
 }: {
     editor: Editor | null;
     items?: AddItem[];
     /** The row the keyboard is on, by key. */
     active?: string;
+    /** Open on what an item asks for (Enter on it in the "/" menu). */
+    startPicking?: Picking | null;
     onDone?: () => void;
 }) {
-    const [picking, setPicking] = useState(false);
+    const [picking, setPicking] = useState<Picking | null>(startPicking);
+    if ((picking === "service" || picking === "product") && editor) {
+        return (
+            <EmbedPicker
+                kind={picking}
+                onBack={() => setPicking(null)}
+                onPick={(id) => {
+                    insertEmbed(editor, picking, id);
+                    setPicking(null);
+                    onDone?.();
+                }}
+            />
+        );
+    }
     if (picking && editor) {
         return (
             <div className="grid gap-2 p-2">
@@ -137,14 +181,14 @@ export function AddList({
                     label="Choose a photo"
                     onPick={(img) => {
                         insertImage(editor, img);
-                        setPicking(false);
+                        setPicking(null);
                         onDone?.();
                     }}
                 />
             </div>
         );
     }
-    const groups = ["Write", "Media"] as const;
+    const groups = ["From your business", "Write", "Media"] as const;
     return (
         <div role="listbox" aria-label="Add to the post" className="grid p-1.5">
             {items.length === 0 ? (
@@ -169,7 +213,7 @@ export function AddList({
                                 onClick={() => {
                                     if (!editor) return;
                                     if (!item.run) {
-                                        setPicking(true);
+                                        setPicking(item.key as Picking);
                                         return;
                                     }
                                     item.run(editor);
@@ -218,6 +262,7 @@ export function SlashMenu({ editor }: { editor: Editor }) {
     const [at, setAt] = useState<{ top: number; left: number } | null>(null);
     const [query, setQuery] = useState("");
     const [index, setIndex] = useState(0);
+    const [picking, setPicking] = useState<Picking | null>(null);
     const box = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -229,6 +274,7 @@ export function SlashMenu({ editor }: { editor: Editor }) {
             const c = editor.view.coordsAtPos(editor.state.selection.from);
             setQuery("");
             setIndex(0);
+            setPicking(null);
             setAt({ top: c.bottom, left: c.left });
         };
         dom.addEventListener("keydown", onKey);
@@ -245,7 +291,7 @@ export function SlashMenu({ editor }: { editor: Editor }) {
         if (item.run) {
             item.run(editor);
             setAt(null);
-        }
+        } else setPicking(item.key as Picking);
     };
     return (
         <Popover
@@ -300,7 +346,9 @@ export function SlashMenu({ editor }: { editor: Editor }) {
                     />
                 </div>
                 <AddList
+                    key={picking ?? "list"}
                     editor={editor}
+                    startPicking={picking}
                     items={items}
                     active={items[index]?.key}
                     onDone={() => setAt(null)}

@@ -129,6 +129,7 @@ export {
 // Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
+export { formatDuration, servicePriceWords } from "./blocks/service-words";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService, ServicesFeed } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";

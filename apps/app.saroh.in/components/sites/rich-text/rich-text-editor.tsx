@@ -61,6 +61,7 @@ import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { editorKey } from "@/lib/tiptap/editor-key";
 import { Tip } from "@saroh/ui/tooltip";
 
+import { BusinessEmbed } from "./embeds/business-embed";
 import { FormatBar, insertImage, SlashMenu } from "./writing-menus";
 
 /**
@@ -78,7 +79,9 @@ import { FormatBar, insertImage, SlashMenu } from "./writing-menus";
  * worst failure, because it is silent. So every
  * extension loaded here maps onto something the allowlist keeps, and the ones
  * that do not — task lists render an <input>, embeds an <iframe> — are not
- * loaded, however good they look in the reference.
+ * loaded, however good they look in the reference. A post's cards from the
+ * business (U15b) are the one embed: a `<div>` with two attributes the
+ * allowlist keeps, filled in live by the page.
  *
  * Colour, highlight, font family, size and alignment are included on a product
  * call, and they are the one place a merchant can step outside the site's
@@ -201,6 +204,8 @@ export function RichTextEditor({
             TableCell,
             Placeholder.configure({ placeholder }),
             CharacterCount,
+            // A post's cards from the business (U15b); a section has none.
+            ...(asDocument ? [BusinessEmbed] : []),
         ],
         content: value,
         editorProps: {

@@ -1,5 +1,6 @@
 "use client";
 
+import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { cn } from "@saroh/ui/lib/utils";
@@ -14,12 +15,14 @@ import {
     MessageSquare,
     Trash2,
 } from "lucide-react";
+import dynamic from "next/dynamic";
 import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
+import { insertEmbed } from "@/components/sites/rich-text/embeds/insert-embed";
 import {
     ADD_ITEMS,
     insertImage,
@@ -28,19 +31,34 @@ import { formatDateTime } from "@/lib/format/datetime";
 
 import type { PostEditorModel } from "../editor/post-model";
 
+/* On demand: the picker reads Services and Products when it opens. */
+const EmbedPicker = dynamic(
+    () =>
+        import("@/components/sites/rich-text/embeds/embed-picker").then(
+            (m) => m.EmbedPicker,
+        ),
+    { ssr: false },
+);
+
 /** The Add sheet's four big tiles' words (`blogphone/WXYAdd`), by item. */
 const TILE_WORDS: Record<string, string> = {
+    service: "With price and Book now",
     image: "From Photos and files or your phone",
     heading: "Start a new part",
     quote: "A client's words",
 };
-const TILES = ["image", "heading", "quote"];
+const TILES = ["service", "image", "heading", "quote"];
+const TILE_NAMES: Record<string, string> = {
+    service: "Your services",
+    image: "Photo",
+};
 
 /**
  * Add to the post (`blogphone/WXYAdd`): "Goes where your cursor is".
  * Photo, Heading and Quote as tiles, then More: everything else the "/"
- * menu adds (List, Numbered list, Divider). Services, products, offers,
- * Book now, gallery and video come with U15b.
+ * menu adds (Product, List, Numbered list, Divider). Your services and
+ * Product add a card that reads its price live (U15b); offers, Book now,
+ * gallery and video are not built yet.
  */
 export function AddMenu({
     editor,
@@ -50,18 +68,36 @@ export function AddMenu({
     onDone: () => void;
 }) {
     const [more, setMore] = useState(true);
-    const [picking, setPicking] = useState(false);
-    const tiles = ADD_ITEMS.filter((i) => TILES.includes(i.key));
+    const [picking, setPicking] = useState<string | null>(null);
+    const tiles = ADD_ITEMS.filter((i) => TILES.includes(i.key)).sort(
+        (a, b) => TILES.indexOf(a.key) - TILES.indexOf(b.key),
+    );
     const rest = ADD_ITEMS.filter((i) => !TILES.includes(i.key));
     function add(key: string) {
         const item = ADD_ITEMS.find((i) => i.key === key);
         if (!editor || !item) return;
         if (!item.run) {
-            setPicking(true);
+            setPicking(key);
             return;
         }
         item.run(editor);
         onDone();
+    }
+    if ((picking === "service" || picking === "product") && editor) {
+        const kind = picking;
+        return (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+                <EmbedPicker
+                    kind={kind}
+                    onBack={() => setPicking(null)}
+                    onPick={(id) => {
+                        insertEmbed(editor, kind, id);
+                        setPicking(null);
+                        onDone();
+                    }}
+                />
+            </div>
+        );
     }
     if (picking && editor) {
         return (
@@ -70,7 +106,7 @@ export function AddMenu({
                     label="Choose a photo"
                     onPick={(img) => {
                         insertImage(editor, img);
-                        setPicking(false);
+                        setPicking(null);
                         onDone();
                     }}
                 />
@@ -95,8 +131,13 @@ export function AddMenu({
                             aria-hidden
                             className="size-[22px] text-foreground/80"
                         />
-                        <b className="text-[0.9375rem] font-semibold">
-                            {t.key === "image" ? "Photo" : t.label}
+                        <b className="flex items-center gap-1.5 text-[0.9375rem] font-semibold">
+                            {TILE_NAMES[t.key] ?? t.label}
+                            {t.key === "service" ? (
+                                <Badge variant="info" size="sm">
+                                    New
+                                </Badge>
+                            ) : null}
                         </b>
                         <span className="max-w-full truncate text-xs text-muted-foreground">
                             {TILE_WORDS[t.key]}
