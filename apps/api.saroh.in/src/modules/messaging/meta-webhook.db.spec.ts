@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 
 import {
     ForbiddenException,
+    Logger,
     type RawBodyRequest,
     UnauthorizedException,
 } from "@nestjs/common";
@@ -12,6 +13,10 @@ import { env } from "../../env";
 import { inReplyWindow, numberHash } from "./messaging-records";
 import { MetaWebhookController } from "./meta-webhook.controller";
 import { WalletService } from "./wallet.service";
+import {
+    MemoryHealthStore,
+    WhatsappSignInHealth,
+} from "./whatsapp-signin-health";
 
 /** Meta's WhatsApp webhook (#1374 U2) against a real database. Paise values are arbitrary. */
 
@@ -278,7 +283,113 @@ describe("Meta delivery reports", () => {
             );
             expect(await inReplyWindow(numberHash(`+${from}`))).toBe(false);
         } finally {
-            env.META_WA_PHONE_NUMBER_ID = was;
+            // Under SKIP_ENV_VALIDATION (CI) `env` is process.env, where
+            // assigning undefined stores the string "undefined".
+            if (was === undefined) delete env.META_WA_PHONE_NUMBER_ID;
+            else env.META_WA_PHONE_NUMBER_ID = was;
         }
+    });
+});
+
+// Owner, 19 Nov: a sign-in code Meta couldn't deliver, or the sign-in
+// template going bad, reaches Saroh even though nobody sees it fail.
+describe("Meta webhooks Saroh watches sign-in codes by", () => {
+    let error: jest.SpyInstance;
+    let alert: jest.Mock;
+    let health: WhatsappSignInHealth;
+    let watched: MetaWebhookController;
+    beforeEach(() => {
+        error = jest
+            .spyOn(Logger.prototype, "error")
+            .mockImplementation(() => {});
+        alert = jest.fn().mockResolvedValue(1);
+        health = new WhatsappSignInHealth(
+            new MemoryHealthStore(),
+            { send: alert },
+            5,
+            30,
+            "saroh_login_code",
+        );
+        watched = new MetaWebhookController(wallet, health);
+    });
+    afterEach(() => error.mockRestore());
+
+    function signed(body: unknown) {
+        const rawBody = Buffer.from(JSON.stringify(body));
+        return watched.handle(sign(rawBody), {
+            rawBody,
+        } as RawBodyRequest<Request>);
+    }
+    const failedStatus = (wamid: string, code: number) =>
+        signed(
+            envelope({
+                statuses: [
+                    {
+                        id: wamid,
+                        status: "failed",
+                        recipient_id: "919800000000",
+                        errors: [{ code, title: "x" }],
+                    },
+                ],
+            }),
+        );
+    const templateChange = (field: string, value: Record<string, unknown>) =>
+        signed({
+            object: "whatsapp_business_account",
+            entry: [{ id: "waba", changes: [{ field, value }] }],
+        });
+
+    it("counts Meta's failed status for a sign-in code once, and alerts on an account-level code", async () => {
+        const wamid = `wamid.${uniq("signin")}`;
+        await health.sent(wamid);
+        await expect(failedStatus(wamid, 131042)).resolves.toEqual({
+            ok: true,
+        });
+        await failedStatus(wamid, 131042);
+        await failedStatus(`wamid.${uniq("other")}`, 131042);
+        await expect(health.lastHour()).resolves.toMatchObject({
+            sends: 1,
+            failures: 1,
+            lastError: "whatsapp_131042",
+        });
+        expect(alert).toHaveBeenCalledTimes(1);
+        expect(String(error.mock.calls[0]?.[0])).toContain(
+            "account_phone_whatsapp_account_error reason=whatsapp_131042",
+        );
+    });
+
+    it("alerts once when the sign-in template is paused, and ignores other templates and fields", async () => {
+        const paused = {
+            event: "PAUSED",
+            message_template_id: 1,
+            message_template_name: "saroh_login_code",
+            message_template_language: "en_US",
+            reason: "NONE",
+        };
+        await expect(
+            templateChange("message_template_status_update", paused),
+        ).resolves.toEqual({ ok: true });
+        await templateChange("message_template_status_update", paused);
+        await templateChange("message_template_status_update", {
+            ...paused,
+            message_template_name: "order_update",
+            event: "DISABLED",
+        });
+        await expect(
+            templateChange("account_update", { event: "DISABLED" }),
+        ).resolves.toEqual({ ok: true });
+        expect(alert).toHaveBeenCalledTimes(1);
+        expect(alert.mock.calls[0][0].subject).toContain("paused");
+    });
+
+    it("alerts when the sign-in template's quality drops to RED", async () => {
+        await templateChange("message_template_quality_update", {
+            previous_quality_score: "YELLOW",
+            new_quality_score: "RED",
+            message_template_id: 1,
+            message_template_name: "saroh_login_code",
+            message_template_language: "en_US",
+        });
+        expect(alert).toHaveBeenCalledTimes(1);
     });
 });

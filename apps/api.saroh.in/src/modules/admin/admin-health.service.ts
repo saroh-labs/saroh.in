@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import {
     catalogueStartedAt,
     liveCatalogueVersion,
@@ -7,6 +7,7 @@ import {
 
 import { env } from "../../env";
 import { HealthService } from "../health/health.service";
+import { WhatsappSignInHealth } from "../messaging/whatsapp-signin-health";
 import { AdminMachineryService } from "./admin-machinery.service";
 
 /** One check's state. `unmeasured` is honest: this instance cannot tell. */
@@ -51,6 +52,9 @@ export class AdminHealthService {
     constructor(
         private readonly health: HealthService,
         private readonly machinery: AdminMachineryService,
+        // Not a DI provider: its counts live in Redis, shared with the senders.
+        @Optional()
+        private readonly whatsapp: WhatsappSignInHealth = new WhatsappSignInHealth(),
     ) {}
 
     async board(): Promise<{ checkedAt: Date; checks: HealthCheck[] }> {
@@ -69,6 +73,9 @@ export class AdminHealthService {
             this.safe("version", "Version", () => this.version()),
             this.safe("signins", "Failed sign-ins", () =>
                 Promise.resolve(this.signIns()),
+            ),
+            this.safe("whatsapp-signin", "WhatsApp sign-in codes", () =>
+                this.whatsappSignIn(),
             ),
         ]);
         return { checkedAt: new Date(), checks };
@@ -334,6 +341,29 @@ export class AdminHealthService {
             summary: latest
                 ? `Schema at ${latest}. This build does not report its own release number.`
                 : "No migration has been applied.",
+        };
+    }
+
+    /**
+     * Account phone codes on WhatsApp in the last hour: counts and Meta's
+     * last error code, never a number (owner, 19 Nov).
+     */
+    private async whatsappSignIn() {
+        const hour = await this.whatsapp.lastHour();
+        const last = hour.lastError ? ` Last error: ${hour.lastError}.` : "";
+        if (hour.sends === 0 && hour.failures === 0) {
+            return {
+                state: "unmeasured" as const,
+                summary: `None sent in the last hour.${last}`,
+            };
+        }
+        return {
+            state: (hour.failing
+                ? "failed"
+                : hour.failures > 0
+                  ? "warn"
+                  : "ok") as CheckState,
+            summary: `${NUMBER.format(hour.sends)} sent and ${NUMBER.format(hour.failures)} failed in the last hour.${last}`,
         };
     }
 

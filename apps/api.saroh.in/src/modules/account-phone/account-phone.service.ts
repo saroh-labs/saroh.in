@@ -25,6 +25,7 @@ import { FlagKey } from "../feature-flags/flags";
 import { numberHash } from "../messaging/messaging-records";
 import { MessagingService } from "../messaging/messaging.service";
 import { indianPhoneE164 } from "../messaging/verification.service";
+import { WhatsappSignInHealth } from "../messaging/whatsapp-signin-health";
 import {
     challengeUnavailable,
     ChallengeVerifier,
@@ -118,6 +119,8 @@ export class AccountPhoneService {
         // Not a DI provider: a per-instance default tests can replace.
         @Optional()
         private readonly ceiling: WhatsappCeiling = new WhatsappCeiling(),
+        @Optional()
+        private readonly health: WhatsappSignInHealth = new WhatsappSignInHealth(),
     ) {}
 
     async options(): Promise<PhoneOptions> {
@@ -542,11 +545,15 @@ export class AccountPhoneService {
             return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
         let reason: string;
+        let messageId: string | undefined;
         try {
             const result = await this.messaging.sendOtp({
                 toE164: input.phoneE164,
                 code,
             });
+            if (result.outcome === "accepted") {
+                messageId = result.providerMessageId;
+            }
             reason =
                 result.outcome === "accepted"
                     ? ""
@@ -556,6 +563,9 @@ export class AccountPhoneService {
         } catch {
             reason = "transport_error";
         }
+        // Signing in, nobody sees a failed send: Saroh counts it instead.
+        await this.health.sent(messageId);
+        if (reason) await this.health.failed(reason);
         if (reason) {
             this.blocked("start", `whatsapp_${reason}`, keys);
             // Signing in, the failure must look like an unknown number: the

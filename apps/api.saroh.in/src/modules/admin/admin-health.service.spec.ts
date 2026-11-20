@@ -74,6 +74,7 @@ describe("AdminHealthService.board", () => {
             "storage",
             "version",
             "signins",
+            "whatsapp-signin",
         ]);
     });
 
@@ -97,7 +98,7 @@ describe("AdminHealthService.board", () => {
             }),
         );
         expect(byKey.database?.state).toBe("ok");
-        expect(board.checks).toHaveLength(9);
+        expect(board.checks).toHaveLength(10);
     });
 
     describe("plan rows (#839)", () => {
