@@ -104,7 +104,7 @@ async function connectEmail(organizationId: string) {
         data: {
             organizationId,
             channel: "EMAIL",
-            provider: "SMTP",
+            provider: "RESEND",
             fromAddress: "hello@rye.in",
             encryptedCredentials: "sealed",
             credentialsIv: "iv",
@@ -160,7 +160,7 @@ describe("Review invitations through the business's provider (D11, DB)", () => {
         expect(message.body).toContain(SECRET_LINK_SLOT);
         expect(message.body).not.toContain("/review/");
         expect(message.deliveries).toHaveLength(1);
-        expect(message.deliveries[0]!.provider).toBe("SMTP");
+        expect(message.deliveries[0]!.provider).toBe("RESEND");
 
         const job = await prisma.job.findFirstOrThrow({
             where: {

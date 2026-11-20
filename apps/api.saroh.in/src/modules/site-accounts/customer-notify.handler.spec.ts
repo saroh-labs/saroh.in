@@ -100,9 +100,11 @@ function makeTx() {
             findFirst: jest.fn().mockResolvedValue(null),
         },
         communicationProvider: {
-            findUnique: jest
-                .fn()
-                .mockResolvedValue({ status: "CONNECTED", provider: "RESEND" }),
+            findUnique: jest.fn().mockResolvedValue({
+                status: "CONNECTED",
+                channel: "EMAIL",
+                provider: "RESEND",
+            }),
         },
     };
 }

@@ -141,6 +141,30 @@ model SignInEmailChange {
   @@index([newEmail])
 }
 
+// OwnerChangeRequest: Saroh staff asked to make someone an Owner of a
+// business, or to move or remove an Owner (review F3). It waits until a
+// second, different staff member confirms; only then does it apply.
+model OwnerChangeRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The member it changes. Staff user ids below are not foreign keys: the
+  // record outlives a staff account.
+  userId            String
+  kind              String // "ROLE" | "REMOVE"
+  role              String? // the new role, for ROLE
+  fromRole          String
+  reason            String
+  requestedByUserId String
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, confirmedAt])
+}
+
 // Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and
 // carries Membership. Renamed from the former optional Workspace grouping.
 
@@ -400,6 +424,7 @@ model Organization {
   // outbound messages, delivery records, per-contact channel consent, and the
   // new-lead automation rules (S6-003).
   communicationProviders CommunicationProvider[]
+  ownerChangeRequests    OwnerChangeRequest[]
   messages               Message[]
   deliveries             Delivery[]
   consents               Consent[]

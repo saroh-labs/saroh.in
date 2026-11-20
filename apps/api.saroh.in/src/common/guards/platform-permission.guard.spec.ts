@@ -16,6 +16,7 @@ import {
 } from "../../modules/admin/admin-permissions";
 import { IDENTITY_ONLY } from "../decorators/identity-only.decorator";
 import type { PlatformAdminInfo } from "../decorators/platform-admin-context.decorator";
+import { STEP_UP_PERMISSIONS } from "./admin-session";
 import { PlatformPermissionGuard } from "./platform-permission.guard";
 
 function contextFor(platformAdmin?: PlatformAdminInfo): ExecutionContext {
@@ -176,5 +177,17 @@ describe("PlatformPermissionGuard", () => {
         );
         expect(guard.canActivate(at("POST", 5))).toBe(true);
         expect(guard.canActivate(at("GET", 90))).toBe(true);
+    });
+
+    it.each([
+        AdminPermission.CouponsManage,
+        AdminPermission.PricingEdit,
+        AdminPermission.OrganizationModulesWrite,
+        AdminPermission.WaitlistInvite,
+        AdminPermission.WebhooksReplay,
+        AdminPermission.JobsRetry,
+        AdminPermission.OrganizationViewAs,
+    ])("%s is a write that needs a recent sign-in (F10)", (permission) => {
+        expect(STEP_UP_PERMISSIONS.has(permission)).toBe(true);
     });
 });

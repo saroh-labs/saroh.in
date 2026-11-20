@@ -50,6 +50,7 @@ import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
     isSupportedComms,
+    sendable,
 } from "./providers/provider.port";
 import { relayBase } from "./providers/relay-base";
 import type {
@@ -647,7 +648,7 @@ export class CommunicationsService {
                 `No connected provider for channel "${channel}"`,
             );
         }
-        if (providerRow.status !== "CONNECTED") {
+        if (!sendable(providerRow)) {
             throw new ConflictException(
                 `Provider for channel "${channel}" is not connected`,
             );
@@ -714,9 +715,9 @@ export class CommunicationsService {
             where: {
                 organizationId_channel: { organizationId, channel: "EMAIL" },
             },
-            select: { status: true },
+            select: { status: true, channel: true, provider: true },
         });
-        return row?.status === "CONNECTED";
+        return sendable(row);
     }
 
     /**

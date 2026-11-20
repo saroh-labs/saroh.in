@@ -23,11 +23,15 @@ ledger (`staff.break-glass.used`).
 
 The API refuses `/admin` for a session signed in more than
 `ADMIN_SESSION_MAX_AGE_MINUTES` ago, and a dangerous write (grants, people,
-sign-in help, flags, overrides, deploys) one older than
+sign-in help, flags, overrides, pricing, coupons, modules, waitlist
+invites, replays and retries, opening a support session, deploys) one older than
 `ADMIN_STEP_UP_MAX_AGE_MINUTES` (401 `reauth_required`, `NotAuthorized`
 `signInAgain`). Writes need an Origin (`adminFetch` sends it). Role changes
 and removals need an open support session for the business: the API checks
-it, and `people-actions.ts` sends the business's access cookie.
+it, and `people-actions.ts` sends the business's access cookie. Making an
+Owner, or moving or removing one, only records a request (review F3): a
+second, different staff member confirms it from the Team tab, and the
+business's Owners are emailed (`OwnerChangeRequest`).
 
 ## Rules that bite here
 

@@ -54,6 +54,7 @@ const AUDITED = new Set([
     "admin-people.controller.ts#changeEmail",
     "admin-people.controller.ts#changeRole",
     "admin-people.controller.ts#confirmEmail",
+    "admin-people.controller.ts#confirmOwnerChange",
     "admin-people.controller.ts#endSessions",
     "admin-people.controller.ts#markVerified",
     "admin-people.controller.ts#removeMember",

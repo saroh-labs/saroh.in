@@ -458,6 +458,42 @@ describe("provider readiness reflects provider STATUS, not row count", () => {
         },
     );
 
+    it.each([
+        ["EMAIL", "SENDGRID", false],
+        ["EMAIL", "SMTP", false],
+        ["WHATSAPP", "TWILIO", false],
+        ["EMAIL", "RESEND", true],
+    ] as const)(
+        "COMMUNICATIONS: a CONNECTED %s %s row is active: %s (F2)",
+        async (channel, provider, active) => {
+            const rows = [
+                {
+                    status: "CONNECTED",
+                    channel,
+                    provider,
+                    attentionReason: null,
+                },
+            ];
+            const db = {
+                communicationProvider: {
+                    count: jest.fn(() => Promise.resolve(1)),
+                    findMany: jest.fn(() => Promise.resolve(rows)),
+                },
+            } as never;
+            const result = await new ModuleReadinessRegistry(db).evaluate(
+                "COMMUNICATIONS",
+                input,
+            );
+            expect(result.readiness).toBe(
+                active ? "ACTIVE" : "ATTENTION_REQUIRED",
+            );
+            if (!active)
+                expect(result.blockers[0]?.code).toBe(
+                    "COMMUNICATIONS_KEYS_REFUSED",
+                );
+        },
+    );
+
     it("one connection whose keys still work is enough", async () => {
         const result = await new ModuleReadinessRegistry(
             dbWithProviders({

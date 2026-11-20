@@ -44,6 +44,25 @@ export function isSupportedComms(
 }
 
 /**
+ * Whether a business's messaging row can send: CONNECTED and through a
+ * provider Saroh has an adapter for. A SendGrid, SMTP relay or Twilio row
+ * saved before they were refused stays CONNECTED in the table but can't
+ * send, so every reader that decides "set up" or "can send" asks this.
+ */
+export function sendable(
+    row:
+        | { status: string; channel: string; provider: string }
+        | null
+        | undefined,
+): boolean {
+    return (
+        row?.status === "CONNECTED" &&
+        isCommsChannel(row.channel) &&
+        isSupportedComms(row.channel, row.provider)
+    );
+}
+
+/**
  * Decrypted provider credentials — the plaintext that only ever exists
  * in-memory at the instant of a provider call. A generic string map so each
  * adapter can read the keys it needs (e.g. `apiKey` for email, `accessToken` +

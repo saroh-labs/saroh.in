@@ -309,6 +309,40 @@ export class AdminPeopleController {
         );
     }
 
+    /**
+     * A second, different staff member confirms an Owner change another
+     * asked for (review F3): making an Owner, or moving or removing one.
+     */
+    @Post("organizations/:organizationId/owner-changes/:requestId/confirm")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.OrganizationPeopleWrite,
+    )
+    @RequireOrganizationAccessSession("READ")
+    confirmOwnerChange(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("requestId") requestId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.owner-change.confirm",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+                organizationId,
+            },
+            { organizationId, requestId, reason: dto.reason },
+            () =>
+                this.people.confirmOwnerChange({
+                    staff,
+                    organizationId,
+                    requestId,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
     @Post("organizations/:organizationId/invitations/:invitationId/resend")
     @RequireAdminPermission(
         AdminPermission.OrganizationPiiRead,

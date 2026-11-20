@@ -77,6 +77,9 @@ const HISTORY_WORDS: Record<string, string> = {
     "person.sessions.ended": "Signed them out everywhere",
     "person.role.changed": "Changed their role in a business",
     "person.removed": "Removed them from a business",
+    "person.owner-change.requested":
+        "Asked to change their Owner role; waits for a second staff member",
+    "person.owner-change.confirmed": "Confirmed a change to their Owner role",
 };
 
 /**

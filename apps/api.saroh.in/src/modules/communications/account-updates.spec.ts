@@ -81,7 +81,11 @@ beforeEach(() => {
     flagOn.mockResolvedValue(true);
     profile.mockResolvedValue({ accountUpdates: true });
     upsert.mockResolvedValue({});
-    provider.mockResolvedValue({ status: "CONNECTED" });
+    provider.mockResolvedValue({
+        status: "CONNECTED",
+        channel: "EMAIL",
+        provider: "RESEND",
+    });
     route.mockResolvedValue("RESEND");
     resolve.mockImplementation((_db: unknown, id: string) =>
         Promise.resolve({
