@@ -150,6 +150,34 @@ describe("Overview (WXHOverview)", () => {
         expect(out).toContain("Mohit published the site");
     });
 
+    it("puts the phone's groups right after the status, before Activity", () => {
+        const out = html(
+            <Overview
+                {...props}
+                overview={overview()}
+                phoneHome={<nav>Pages and posts</nav>}
+            />,
+        );
+        const groups = out.indexOf("data-phone-home");
+        expect(groups).toBeGreaterThan(out.indexOf("Last published"));
+        expect(groups).toBeLessThan(out.indexOf("Mohit published the site"));
+        expect(out).toMatch(/data-phone-home=""[^>]*min-\[760px\]:hidden/);
+    });
+
+    it("leaves Review and publish to the phone's changes bar while changes wait", () => {
+        const waiting = html(<Overview {...props} overview={overview()} />);
+        expect(waiting).toMatch(/max-\[759px\]:hidden[^>]*>Review and publish/);
+        const never = html(
+            <Overview
+                {...props}
+                status={{ label: "Not published", tone: "draft", waiting: 0 }}
+                overview={overview({ lastPublished: null })}
+            />,
+        );
+        expect(never).toContain("Review and publish");
+        expect(never).not.toContain("max-[759px]:hidden");
+    });
+
     it("gives a reviewer no fix buttons and no Review and publish", () => {
         const out = html(
             <Overview

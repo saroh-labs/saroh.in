@@ -85,6 +85,31 @@ describe("pageHealth", () => {
         ]);
     });
 
+    it("names a page hidden behind a built-in route, and which one", () => {
+        const health = pageHealth(
+            [
+                page(),
+                page({
+                    id: "p_walk",
+                    path: "/book",
+                    title: "Book a walkthrough",
+                }),
+                page({ id: "p_book", path: "/book", kind: "BOOK" }),
+            ],
+            { socialImageUrl: null },
+        );
+        expect(health).toEqual([
+            expect.objectContaining({
+                pageId: "p_walk",
+                issues: ["hiddenByRoute"],
+                hiddenBehind: expect.objectContaining({
+                    root: "/book",
+                    name: "your booking page",
+                }),
+            }),
+        ]);
+    });
+
     it("leaves a hidden page out", () => {
         expect(
             pageHealth([page({ hidden: true, seoDescription: null })], {

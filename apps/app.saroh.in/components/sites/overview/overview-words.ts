@@ -79,11 +79,18 @@ const ISSUE_WORDS: Record<
         why: "Visitors who press it get nothing.",
         action: "Fix",
     },
+    hiddenByRoute: {
+        title: (n) =>
+            `${count(n, "page")} ${plural(n, "is", "are")} hidden behind a built-in page`,
+        why: "Visitors can't open it until it has its own link.",
+        action: "Fix",
+    },
 };
 
 /** At most three, one per issue, with the pages it is on (WXHOverview). */
 export function needsDoingItems(pages: readonly Health[]): NeedsDoingItem[] {
     const order: Health["issues"][number][] = [
+        "hiddenByRoute",
         "brokenLink",
         "googleText",
         "shareImage",

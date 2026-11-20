@@ -27,8 +27,7 @@ import type {
 
 import { PageRowMenu } from "./page-row-menu";
 import { PageSheet } from "./page-sheet";
-import type { PageIssue } from "./page-words";
-import { ISSUE_WORDS, madeFrom, pageLink } from "./page-words";
+import { hiddenWords, issueWords, madeFrom, pageLink } from "./page-words";
 
 type Filter = "all" | "menu" | "fix";
 
@@ -58,6 +57,7 @@ export function PagesArea({
     addableKinds,
     health,
     edits,
+    lastPublishedAt = null,
     redirects,
     footer,
 }: {
@@ -72,6 +72,8 @@ export function PagesArea({
     /** Null when the overview couldn't be read: no column then claims "All good". */
     health: SiteOverview["needsDoing"] | null;
     edits: SiteOverview["pageEdits"] | null;
+    /** When the site last went live; null when never or unknown. */
+    lastPublishedAt?: string | null;
     redirects: readonly SiteRedirect[] | null;
     /** A line under the list (the AI way in). */
     footer?: ReactNode;
@@ -83,9 +85,7 @@ export function PagesArea({
     const [term, setTerm] = useState("");
     const [adding, setAdding] = useState(false);
 
-    const issues = new Map<string, PageIssue[]>(
-        (health ?? []).map((h) => [h.pageId, h.issues]),
-    );
+    const healthOf = new Map((health ?? []).map((h) => [h.pageId, h]));
     const edited = new Map((edits ?? []).map((e) => [e.pageId, e]));
     // A link changed since the last publish: an automatic old link to it waits.
     const moved = new Set(
@@ -97,7 +97,7 @@ export function PagesArea({
         (a, b) => Number(b.isHome) - Number(a.isHome),
     );
     const inMenu = (p: SitePage) => p.isHome || p.inMenu !== false;
-    const needs = (p: SitePage) => (issues.get(p.id)?.length ?? 0) > 0;
+    const needs = (p: SitePage) => (healthOf.get(p.id)?.issues.length ?? 0) > 0;
     const needle = term.trim().toLowerCase();
     const shown = sorted.filter(
         (p) =>
@@ -106,6 +106,15 @@ export function PagesArea({
                 p.title.toLowerCase().includes(needle) ||
                 p.path.toLowerCase().includes(needle)),
     );
+
+    // Edited since the site last went live, or its link changed since.
+    const waits = (p: SitePage) => {
+        const at = edited.get(p.id)?.at;
+        return (
+            moved.has(p.path) ||
+            (at !== undefined && (!lastPublishedAt || at > lastPublishedAt))
+        );
+    };
 
     const openId = params.get("page");
     const open = pages.find((p) => p.id === openId) ?? null;
@@ -225,14 +234,13 @@ export function PagesArea({
                     </ListTableHead>
                     <ul aria-label="Pages">
                         {shown.map((page) => {
-                            const fix = issues.get(page.id) ?? [];
+                            const fix = healthOf.get(page.id);
+                            const hasFix = (fix?.issues.length ?? 0) > 0;
                             const fixWords =
                                 health === null
                                     ? null
-                                    : fix.length > 0
-                                      ? fix
-                                            .map((i) => ISSUE_WORDS[i])
-                                            .join(", ")
+                                    : fix && hasFix
+                                      ? issueWords(fix)
                                       : "All good";
                             const edit = edited.get(page.id);
                             const from = madeFrom(page);
@@ -284,9 +292,7 @@ export function PagesArea({
                                         {/* A phone reads the columns here. */}
                                         <p className="text-xs text-muted-foreground md:hidden">
                                             {[
-                                                fix.length > 0
-                                                    ? fixWords
-                                                    : null,
+                                                hasFix ? fixWords : null,
                                                 inMenu(page)
                                                     ? "In menu"
                                                     : "Not in menu",
@@ -305,7 +311,7 @@ export function PagesArea({
                                     <span
                                         className={cn(
                                             "hidden text-sm md:block",
-                                            fix.length > 0
+                                            hasFix
                                                 ? "font-medium text-foreground"
                                                 : "text-muted-foreground",
                                         )}
@@ -363,6 +369,8 @@ export function PagesArea({
                 siteImageUrl={siteImageUrl}
                 live={live}
                 canUpdate={canUpdate}
+                unseen={open ? hiddenWords(healthOf.get(open.id)) : null}
+                waiting={open ? waits(open) : false}
                 editorHref={open ? `/sites/${siteId}?page=${open.id}` : null}
                 onClose={() => goTo(null)}
                 onSaved={() => router.refresh()}

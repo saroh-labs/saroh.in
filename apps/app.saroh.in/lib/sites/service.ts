@@ -1112,7 +1112,11 @@ export interface SiteOverview {
         pageId: string;
         title: string;
         path: string;
-        issues: ("googleText" | "shareImage" | "brokenLink")[];
+        issues: (
+            "googleText" | "shareImage" | "brokenLink" | "hiddenByRoute"
+        )[];
+        /** With `hiddenByRoute`: the built-in route the page is hidden behind. */
+        hiddenBehind?: { root: string; name: string; purpose: string };
     }[];
     activity: {
         kind:

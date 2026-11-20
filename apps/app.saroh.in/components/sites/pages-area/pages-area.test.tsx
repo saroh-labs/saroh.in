@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -5,10 +6,32 @@ import type { SitePage } from "@/lib/sites/service";
 
 import { PagesArea } from "./pages-area";
 
+// The sheet primitive needs a real browser; what is pinned is the content.
+vi.mock("@saroh/ui/form-sheet", () => ({
+    FormSheet: ({
+        open,
+        title,
+        children,
+        footNote,
+    }: {
+        open: boolean;
+        title: string;
+        children: ReactNode;
+        footNote: ReactNode;
+    }) =>
+        open ? (
+            <div role="dialog" aria-label={title}>
+                <h2>{title}</h2>
+                {children}
+                <footer>{footNote}</footer>
+            </div>
+        ) : null,
+}));
+const query = vi.hoisted(() => ({ value: "" }));
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), push: vi.fn() }),
     usePathname: () => "/sites/s1/pages",
-    useSearchParams: () => new URLSearchParams(),
+    useSearchParams: () => new URLSearchParams(query.value),
 }));
 vi.mock("@/lib/sites/actions", () => ({
     createPage: vi.fn(),
@@ -109,5 +132,80 @@ describe("Pages (WXPPages)", () => {
 
     it("gives a reader the list and nothing to add", () => {
         expect(render({ canUpdate: false })).not.toContain("New page");
+    });
+});
+
+describe("a page hidden behind a built-in route", () => {
+    const walk = page({ id: "p5", path: "/book", title: "Book a walkthrough" });
+    const health = [
+        {
+            pageId: "p5",
+            title: "Book a walkthrough",
+            path: "/book",
+            issues: ["hiddenByRoute" as const],
+            hiddenBehind: {
+                root: "/book",
+                name: "your booking page",
+                purpose: "your booking page",
+            },
+        },
+    ];
+
+    it("says so in To fix", () => {
+        expect(render({ pages: [...pages, walk], health })).toContain(
+            "Hidden behind your booking page",
+        );
+    });
+
+    it("says why at its link in the sheet, and the link stays editable", () => {
+        query.value = "page=p5";
+        const html = render({ pages: [...pages, walk], health });
+        query.value = "";
+        expect(html).toContain(
+            "This page can&#x27;t be reached at /book: that link is your booking page. Give it its own link so visitors can open it.",
+        );
+        expect(html).toMatch(
+            /<input[^>]*value="\/book"(?![^>]*disabled)[^>]*>/,
+        );
+    });
+});
+
+describe("the page sheet's foot", () => {
+    const open = (over: Partial<Parameters<typeof PagesArea>[0]> = {}) => {
+        query.value = "page=p2";
+        const html = render({
+            health: null,
+            edits: null,
+            redirects: null,
+            ...over,
+        });
+        query.value = "";
+        return html.slice(html.indexOf('role="dialog"'));
+    };
+
+    it("says nothing on a fresh sheet with nothing waiting", () => {
+        const text = open();
+        expect(text).toContain("Page settings");
+        expect(text).not.toContain("data-save-footer");
+        expect(text).not.toContain("goes live when you publish");
+    });
+
+    it("says Changed when the page was edited since it last went live", () => {
+        expect(
+            open({
+                edits: [
+                    { pageId: "p2", at: "2026-11-18T05:00:00.000Z", by: null },
+                ],
+                lastPublishedAt: "2026-11-17T05:00:00.000Z",
+            }),
+        ).toContain("Changed · goes live when you publish");
+        expect(
+            open({
+                edits: [
+                    { pageId: "p2", at: "2026-11-16T05:00:00.000Z", by: null },
+                ],
+                lastPublishedAt: "2026-11-17T05:00:00.000Z",
+            }),
+        ).not.toContain("goes live when you publish");
     });
 });

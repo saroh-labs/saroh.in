@@ -8,6 +8,8 @@ import type { ReactNode } from "react";
  */
 export const SAVE_LINES = {
     "waits-for-publish": "Saved · goes live when you publish",
+    // An open sheet whose thing already has changes waiting (Page settings).
+    "changed-waits": "Changed · goes live when you publish",
     "post-goes-live-alone": "Goes live now, on its own",
     "from-your-code": "Goes live from your code",
     "goes-live-now":

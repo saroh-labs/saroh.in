@@ -23,7 +23,8 @@ export const metadata = { title: "Overview · Website" };
 /**
  * A site's Overview (plan 2026-11-18-001 U4): address and status, what the
  * site brought in, what needs doing and activity. On a phone the four
- * groups follow, each with one line of how it stands (the site home). A
+ * groups come right after the status, each with one line of how it stands
+ * (the site home). A
  * failed overview read costs only its own parts; the header and the groups
  * stay. With the Website area off it forwards to the Pages tab.
  */
@@ -67,20 +68,18 @@ export default async function SiteOverviewPage({
     const home = site.pages.find((p) => p.isHome && !p.hidden);
 
     return (
-        <div className="flex min-w-0 flex-col gap-6">
-            <Overview
-                siteId={site.id}
-                overview={overview}
-                status={siteStatus(site, { reader: !site.can.edit })}
-                live={site.currentPublicationId !== null}
-                host={host ?? null}
-                url={address?.url ?? null}
-                canEdit={site.can.edit}
-                canPublish={site.can.publish}
-                timeZone={businessZone(organization)}
-                share={home ? { page: home, business: site.name } : null}
-            />
-            <div className="min-[760px]:hidden">
+        <Overview
+            siteId={site.id}
+            overview={overview}
+            status={siteStatus(site, { reader: !site.can.edit })}
+            live={site.currentPublicationId !== null}
+            host={host ?? null}
+            url={address?.url ?? null}
+            canEdit={site.can.edit}
+            canPublish={site.can.publish}
+            timeZone={businessZone(organization)}
+            share={home ? { page: home, business: site.name } : null}
+            phoneHome={
                 <SiteHome
                     groups={groups}
                     lines={{
@@ -90,7 +89,7 @@ export default async function SiteOverviewPage({
                         reach: host,
                     }}
                 />
-            </div>
-        </div>
+            }
+        />
     );
 }

@@ -70,9 +70,10 @@ test.describe("Pages", () => {
             );
             const sheet = page.getByRole("dialog", { name: "Page settings" });
             await expect(sheet).toBeVisible();
+            // A fresh sheet has saved nothing, so it says nothing about it.
             await expect(
                 sheet.getByText("Saved · goes live when you publish"),
-            ).toBeVisible();
+            ).toHaveCount(0);
             expect(await noSideScroll(page)).toBe(true);
 
             const link = sheet.getByLabel("Page link");

@@ -11,6 +11,7 @@ import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 import type { CreateSiteRedirectDto } from "./dto";
+import { reservedPathFor } from "./page-kinds";
 import { assertSiteInOrg } from "./site-access";
 import {
     ownRedirectProblem,
@@ -157,11 +158,14 @@ export class SiteRedirectsService {
                 (r) => `${r.from} ${r.to}`,
             ),
         );
-        return rows.map((r) => ({
-            ...r,
-            toTitle: titles.get(r.toPath) ?? null,
-            live: live.has(`${r.fromPath} ${r.toPath}`),
-        }));
+        // A forward from a built-in route never goes live (`snapshotRedirects`).
+        return rows
+            .filter((r) => reservedPathFor(r.fromPath) === null)
+            .map((r) => ({
+                ...r,
+                toTitle: titles.get(r.toPath) ?? null,
+                live: live.has(`${r.fromPath} ${r.toPath}`),
+            }));
     }
 
     /** Forward one of the merchant's old links to a page. `site:update`. */

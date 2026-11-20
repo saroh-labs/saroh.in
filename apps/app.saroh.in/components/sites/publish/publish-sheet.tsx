@@ -136,9 +136,13 @@ export function PublishSheet({
         (f) => !(fixedHost && f.type === "addressMissing"),
     );
     const blockers = shown.filter((f) => f.blocking);
-    // The checks have their own box on top (U10); the rest stay listed.
+    // The checks have their own box on top (U10); the rest stay listed,
+    // but never "Changes visitors cannot see yet": that is this sheet's
+    // own subject.
     const listed = flags.filter(
-        (f) => f.blocking === true || !CHECK_TYPES.has(f.type),
+        (f) =>
+            f.type !== "unpublishedChanges" &&
+            (f.blocking === true || !CHECK_TYPES.has(f.type)),
     );
     const list = changes?.read === "ready" ? changes.changes : null;
     // Per-change approval (U9) replaces the whole-site refusal when sent.
@@ -263,6 +267,7 @@ export function PublishSheet({
                                 <ApprovalLine review={review} zone={zone} />
                             ) : null}
                             <PublishFlags
+                                part="blockers"
                                 flags={listed}
                                 pages={pages}
                                 addressFix={addressFix}
@@ -320,6 +325,15 @@ export function PublishSheet({
                                     />
                                 </>
                             )}
+                            <PublishFlags
+                                part="advice"
+                                flags={listed}
+                                pages={pages}
+                                addressFix={addressFix}
+                                fixedHost={fixedHost}
+                                onAddressSaved={onAddressSaved}
+                                onJump={onJump}
+                            />
                             {/*
                              * Said plainly: a check that silently skips two
                              * of its tests would let "nothing outstanding"

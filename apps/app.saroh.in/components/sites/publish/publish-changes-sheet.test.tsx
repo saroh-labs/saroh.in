@@ -207,6 +207,38 @@ describe("the Publish sheet's changes (U11)", () => {
         expect(owner?.disabled).toBe(false);
     });
 
+    it("puts the changes right after the checks, the advice folded below them, and never its own subject as a flag", () => {
+        draw({
+            flags: [
+                {
+                    type: "missingSeoDescription",
+                    message: "Search results show the first lines.",
+                    pageId: null,
+                    sectionIndex: null,
+                    field: "seoDescription",
+                },
+                {
+                    type: "unpublishedChanges",
+                    message: "Visitors still see the last version.",
+                    pageId: null,
+                    sectionIndex: null,
+                    field: null,
+                },
+            ],
+        });
+        const text = host.textContent;
+        const checks = text.indexOf("Checked before you publish");
+        const people = text.indexOf("Ritika Sharma");
+        const advice = text.indexOf("1 more thing worth a look");
+        expect(checks).toBeGreaterThan(-1);
+        expect(checks).toBeLessThan(people);
+        expect(people).toBeLessThan(advice);
+        expect(
+            host.querySelector("[data-flag-advice]")?.hasAttribute("open"),
+        ).toBe(false);
+        expect(text).not.toContain("Changes visitors cannot see yet");
+    });
+
     it("lists posts apart: they publish on their own", () => {
         draw();
         expect(host.textContent).toContain("Posts publish on their own");

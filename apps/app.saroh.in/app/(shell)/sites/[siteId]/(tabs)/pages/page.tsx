@@ -267,6 +267,7 @@ async function WebsitePages({
             addableKinds={site.addablePageKinds}
             health={overview?.needsDoing ?? null}
             edits={overview?.pageEdits ?? null}
+            lastPublishedAt={overview?.lastPublished?.at ?? null}
             redirects={redirects}
             footer={wayIn ? <AiWayIn /> : null}
         />

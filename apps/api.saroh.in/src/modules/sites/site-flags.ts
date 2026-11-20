@@ -895,7 +895,7 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         }
         flags.push({
             type: "reservedAddress",
-            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its path so visitors can reach it.`,
+            message: `This page can't be reached at ${reserved.root}: that link is ${reserved.purpose}. Give it its own link so visitors can open it.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",

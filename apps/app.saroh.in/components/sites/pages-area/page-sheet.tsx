@@ -54,6 +54,8 @@ export interface PageSheetProps {
     canUpdate: boolean;
     /** Why visitors can't see the page at its link, if they can't. */
     unseen?: string | null;
+    /** The page has changes waiting for Publish: the foot says so. */
+    waiting?: boolean;
     /** "Open this page in the editor"; left out inside the editor. */
     editorHref?: string | null;
     onClose: () => void;
@@ -93,6 +95,7 @@ function OpenPageSheet({
     live,
     canUpdate,
     unseen = null,
+    waiting = false,
     editorHref = null,
     onClose,
     onSaved,
@@ -184,12 +187,17 @@ function OpenPageSheet({
                                     {`Didn't save. ${failed} Your words are still here.`}
                                 </Notice>
                             ) : null}
-                            <p
-                                data-save-footer="waits-for-publish"
-                                className="text-sm text-muted-foreground"
-                            >
-                                {SAVE_LINES["waits-for-publish"]}
-                            </p>
+                            {/* Nothing until there is something waiting:
+                                a fresh sheet has saved nothing. A save
+                                closes the sheet and says so in a toast. */}
+                            {waiting ? (
+                                <p
+                                    data-save-footer="changed-waits"
+                                    className="text-sm text-muted-foreground"
+                                >
+                                    {SAVE_LINES["changed-waits"]}
+                                </p>
+                            ) : null}
                         </div>
                     )
                 }

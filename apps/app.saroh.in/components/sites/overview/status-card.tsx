@@ -1,5 +1,6 @@
 import { Button } from "@saroh/ui/button";
 import { CopyButton } from "@saroh/ui/copy-button";
+import { cn } from "@saroh/ui/lib/utils";
 import { TextLink } from "@saroh/ui/text-link";
 import Link from "next/link";
 
@@ -134,7 +135,15 @@ export function StatusCard({
             </div>
             <p className="text-sm text-muted-foreground">{published}</p>
             {offerPublish ? (
-                <Button asChild className="self-start">
+                // On a phone the changes bar (`ChangesBar`) already offers
+                // it while changes wait: one button, not two.
+                <Button
+                    asChild
+                    className={cn(
+                        "self-start",
+                        status.waiting > 0 && "max-[759px]:hidden",
+                    )}
+                >
                     <Link href={`/sites/${siteId}`}>Review and publish</Link>
                 </Button>
             ) : null}

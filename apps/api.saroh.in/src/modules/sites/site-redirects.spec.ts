@@ -66,6 +66,21 @@ describe("planPageMove", () => {
         ).toBeNull();
     });
 
+    it.each(["/book", "/checkout/thanks", "/account"])(
+        "never forwards from a built-in route: a page moved off %s leaves no forward",
+        (oldPath) => {
+            // The route answers there, so the forward could never take effect.
+            expect(
+                planPageMove({
+                    redirects: [],
+                    oldPath,
+                    newPath: "/book-a-walkthrough",
+                    oldPathIsLive: true,
+                }).create,
+            ).toBeNull();
+        },
+    );
+
     it("collapses a chain: A to B, then B to C, forwards A to C", () => {
         // After A→B: one row A→B. B never went live, so moving B to C makes
         // no row for B; the A row now lands on C.
@@ -148,6 +163,18 @@ describe("snapshotRedirects", () => {
             { from: "/b", to: "/a" },
             { from: "/z", to: "/a" },
         ]);
+    });
+
+    it("never carries a forward from a built-in route, even one already stored", () => {
+        expect(
+            snapshotRedirects(
+                [
+                    { fromPath: "/book", toPath: "/book-a-walkthrough" },
+                    { fromPath: "/old", toPath: "/book-a-walkthrough" },
+                ],
+                new Set(["/", "/book-a-walkthrough"]),
+            ),
+        ).toEqual([{ from: "/old", to: "/book-a-walkthrough" }]);
     });
 
     it("reads no forwards from a snapshot made before them", () => {

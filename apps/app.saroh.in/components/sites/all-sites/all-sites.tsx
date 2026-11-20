@@ -5,8 +5,8 @@ import { SiteCard } from "./site-card";
 
 /**
  * All sites (WXHSites, WXHSitesPhone): a card per site, three across on a
- * desk and one on a phone, and the line that says what a site owns and what
- * the business shares. The page's header holds New site.
+ * desk and one on a phone, and the line that says what the business shares
+ * (one web address for now, DEC-230). The page's header holds New site.
  */
 export function AllSites({ sites }: { sites: readonly SiteCardData[] }) {
     return (
@@ -21,9 +21,9 @@ export function AllSites({ sites }: { sites: readonly SiteCardData[] }) {
             </ul>
             <p className="flex max-w-[68ch] items-start gap-2.5 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground">
                 <Database aria-hidden className="mt-0.5 size-4 shrink-0" />
-                Each site has its own pages, look and web address. Services,
-                products, bookings and customers belong to the business, so
-                every site can show them.
+                Services, products, bookings and customers belong to the
+                business, so your site shows them. More sites, each with its own
+                address, come later.
             </p>
         </div>
     );

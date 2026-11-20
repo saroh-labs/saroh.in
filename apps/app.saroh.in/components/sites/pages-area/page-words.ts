@@ -12,14 +12,38 @@ import type {
  * from the screens that draw them.
  */
 
-export type PageIssue = SiteOverview["needsDoing"][number]["issues"][number];
+type PageHealth = SiteOverview["needsDoing"][number];
+export type PageIssue = PageHealth["issues"][number];
 
 /** The To fix column (WXPPages), one issue per page in this order. */
 export const ISSUE_WORDS: Record<PageIssue, string> = {
     googleText: "No text for Google",
     shareImage: "No share image",
     brokenLink: "Broken link",
+    hiddenByRoute: "Hidden behind a built-in page",
 };
+
+/** A page's To fix words: "Hidden behind your booking page, No share image". */
+export function issueWords(health: PageHealth): string {
+    return health.issues
+        .map((i) =>
+            i === "hiddenByRoute" && health.hiddenBehind
+                ? `Hidden behind ${health.hiddenBehind.name}`
+                : ISSUE_WORDS[i],
+        )
+        .join(", ");
+}
+
+/**
+ * Said at the page link of a page a built-in route hides (its sheet), or
+ * null: "This page can't be reached at /book: that link is your booking
+ * page. Give it its own link so visitors can open it."
+ */
+export function hiddenWords(health: PageHealth | undefined): string | null {
+    const behind = health?.hiddenBehind;
+    if (!behind) return null;
+    return `This page can't be reached at ${behind.root}: that link is ${behind.purpose}. Give it its own link so visitors can open it.`;
+}
 
 /** Where Google cuts a title and a text (guidance, never a block). */
 export const GOOGLE_TITLE_GUIDE = 60;

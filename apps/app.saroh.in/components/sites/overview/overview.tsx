@@ -1,4 +1,5 @@
 import { FailedRead } from "@saroh/ui/failed-read";
+import type { ReactNode } from "react";
 
 import type { SharePage } from "@/components/sites/share/share-page-sheet";
 import type { SiteOverview } from "@/lib/sites/service";
@@ -15,6 +16,10 @@ import { AddressCard, StatusCard } from "./status-card";
  * and what happened lately. `overview` is null when its read failed: the
  * address and status still show (they come from the site), and the rest
  * says it couldn't load, with Try again; the site header above is kept.
+ *
+ * `phoneHome` is the four groups a phone opens from (the desk has them in
+ * the left list): drawn right after the status, phone only, so they never
+ * sink below Activity.
  */
 export function Overview({
     siteId,
@@ -27,6 +32,7 @@ export function Overview({
     canPublish,
     timeZone,
     share = null,
+    phoneHome = null,
     now = new Date(),
 }: {
     siteId: string;
@@ -40,6 +46,7 @@ export function Overview({
     timeZone: string;
     /** The home page, for Share this page; null: nothing to share. */
     share?: { page: SharePage; business: string } | null;
+    phoneHome?: ReactNode;
     now?: Date;
 }) {
     return (
@@ -61,6 +68,11 @@ export function Overview({
                     now={now}
                 />
             </div>
+            {phoneHome ? (
+                <div data-phone-home="" className="min-[760px]:hidden">
+                    {phoneHome}
+                </div>
+            ) : null}
             {overview === null ? (
                 <FailedRead
                     size="panel"

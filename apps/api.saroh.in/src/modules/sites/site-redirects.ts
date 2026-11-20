@@ -38,7 +38,9 @@ export interface PageMovePlan {
  * live site serves a page at `oldPath`; only then does anyone hold that link.
  *
  * Chains collapse here (A→B, then B→C, leaves A→C), and renaming a page back
- * to its live link leaves no forward at all.
+ * to its live link leaves no forward at all. A page moved off a built-in
+ * route (/book, /checkout, …) leaves none either: the route answers there,
+ * so the forward could never take effect.
  */
 export function planPageMove(input: {
     redirects: readonly RedirectRow[];
@@ -58,7 +60,10 @@ export function planPageMove(input: {
     );
     return {
         create:
-            input.oldPathIsLive && !taken && oldPath !== newPath
+            input.oldPathIsLive &&
+            !taken &&
+            oldPath !== newPath &&
+            reservedPathFor(oldPath) === null
                 ? { from: oldPath, to: newPath }
                 : null,
         retarget,
@@ -94,7 +99,8 @@ export function ownRedirectProblem(
 
 /**
  * The forwards a publish writes: only those that land on a page this publish
- * serves, and never one shadowing a page. Sorted, so the same forwards are
+ * serves, never one shadowing a page, and never one from a built-in route
+ * (made before `planPageMove` refused them: the route would win). Sorted, so the same forwards are
  * the same bytes in every snapshot.
  */
 export function snapshotRedirects(
@@ -103,7 +109,12 @@ export function snapshotRedirects(
     pagePaths: ReadonlySet<string>,
 ): SnapshotRedirect[] {
     return rows
-        .filter((r) => pagePaths.has(r.toPath) && !pagePaths.has(r.fromPath))
+        .filter(
+            (r) =>
+                pagePaths.has(r.toPath) &&
+                !pagePaths.has(r.fromPath) &&
+                reservedPathFor(r.fromPath) === null,
+        )
         .map((r) => ({ from: r.fromPath, to: r.toPath }))
         .sort((a, b) => (a.from < b.from ? -1 : a.from > b.from ? 1 : 0));
 }

@@ -80,12 +80,15 @@ export function GoingLive({
 }
 
 /**
- * The flags (DEC-185): blockers first, in red, each with its fix ("Fix
- * first"); then the advice, marked as not stopping you. A web address is
- * fixed in place when this person may choose one; any other fix goes to
- * its spot on the page, and the sheet opens again on the same list.
+ * The flags (DEC-185), in two parts of the sheet: `blockers`, in red, each
+ * with its fix ("Fix first"), above the changes; `advice`, below them,
+ * folded ("7 more things worth a look") so it never pushes the changes
+ * below the fold. A web address is fixed in place when this person may
+ * choose one; any other fix goes to its spot on the page, and the sheet
+ * opens again on the same list.
  */
 export function PublishFlags({
+    part,
     flags,
     pages,
     addressFix,
@@ -93,6 +96,7 @@ export function PublishFlags({
     onAddressSaved,
     onJump,
 }: {
+    part: "blockers" | "advice";
     flags: Flag[];
     pages: SitePage[];
     addressFix: WebAddressFix | null;
@@ -115,6 +119,47 @@ export function PublishFlags({
         }
         return page ?? "This site";
     };
+
+    if (part === "advice") {
+        if (shown.length === 0 && !fixedHost) {
+            return (
+                <p className="text-sm text-muted-foreground">
+                    Everything checks out. Publish when you are ready.
+                </p>
+            );
+        }
+        if (advice.length === 0) return null;
+        return (
+            <details data-flag-advice="" className="text-sm">
+                <summary className="cursor-pointer font-semibold">
+                    {`${count(advice.length, "more thing")} worth a look`}
+                </summary>
+                <ul className="mt-2 divide-y rounded-lg border">
+                    {advice.map((flag, i) => (
+                        <FlagRow
+                            key={i}
+                            tone="advice"
+                            title={TYPE_LABEL[flag.type]}
+                            line={`${where(flag)} · ${flag.message}`}
+                            fix={
+                                <FixButton
+                                    label={FIX_WORD[flag.type]}
+                                    onClick={() =>
+                                        onJump(flag.pageId, flag.sectionIndex)
+                                    }
+                                />
+                            }
+                        />
+                    ))}
+                </ul>
+                <p className="mt-1.5 text-muted-foreground">
+                    {advice.length === 1
+                        ? "It won’t stop you publishing."
+                        : "None of these stop you publishing."}
+                </p>
+            </details>
+        );
+    }
 
     return (
         <>
@@ -185,44 +230,6 @@ export function PublishFlags({
                         line={fixedHost}
                     />
                 </FlagGroup>
-            ) : null}
-            {advice.length > 0 ? (
-                <FlagGroup
-                    title={
-                        blockers.length > 0
-                            ? `Worth a look · ${advice.length} · won’t stop you`
-                            : `${count(advice.length, "thing")} worth a look`
-                    }
-                >
-                    {advice.map((flag, i) => (
-                        <FlagRow
-                            key={i}
-                            tone="advice"
-                            title={TYPE_LABEL[flag.type]}
-                            line={`${where(flag)} · ${flag.message}`}
-                            fix={
-                                <FixButton
-                                    label={FIX_WORD[flag.type]}
-                                    onClick={() =>
-                                        onJump(flag.pageId, flag.sectionIndex)
-                                    }
-                                />
-                            }
-                        />
-                    ))}
-                </FlagGroup>
-            ) : null}
-            {advice.length > 0 && blockers.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                    {advice.length === 1
-                        ? "It won’t stop you publishing."
-                        : "None of these stop you publishing."}
-                </p>
-            ) : null}
-            {shown.length === 0 && !fixedHost ? (
-                <p className="text-sm text-muted-foreground">
-                    Everything checks out. Publish when you are ready.
-                </p>
             ) : null}
         </>
     );
