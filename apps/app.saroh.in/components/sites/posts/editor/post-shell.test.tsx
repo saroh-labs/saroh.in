@@ -62,6 +62,10 @@ vi.mock("@/lib/sites/actions", () => ({
     setCommentResolved: vi.fn(),
     updateCommentBody: vi.fn(),
 }));
+vi.mock("@/lib/sites/post-revisions-read", () => ({
+    readPostRevisions: vi.fn(() => Promise.resolve({ ok: true, rows: [] })),
+    readPostRevision: vi.fn(),
+}));
 vi.mock("@/components/billing/plan-refusal", () => ({
     showPlanRefusal: vi.fn(),
 }));

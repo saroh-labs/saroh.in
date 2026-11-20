@@ -3,7 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { PostLiveCopy } from "@/lib/content/service";
 
 import type { PostDraftView } from "./post-diff";
-import { postChanges, postStatusLabel } from "./post-diff";
+import {
+    diffCounts,
+    paragraphDiff,
+    postChanges,
+    postStatusLabel,
+    wordDiff,
+} from "./post-diff";
 
 const live: PostLiveCopy = {
     title: "Bridal makeup trial",
@@ -81,5 +87,59 @@ describe("postStatusLabel", () => {
                 scheduledFor: "Fri 21 Nov, 9 am",
             }),
         ).toBe("Scheduled for Fri 21 Nov, 9 am");
+    });
+});
+
+describe("wordDiff", () => {
+    it("marks the words put in and taken out, and joins back into the line", () => {
+        const runs = wordDiff(
+            "photos to show your family and friends.",
+            "photos to show your family.",
+        );
+        expect(runs).toEqual([
+            { kind: "same", text: "photos to show your " },
+            { kind: "removed", text: "family and friends." },
+            { kind: "added", text: "family." },
+        ]);
+        expect(
+            runs
+                .filter((r) => r.kind !== "removed")
+                .map((r) => r.text)
+                .join(""),
+        ).toBe("photos to show your family.");
+    });
+
+    it("is one same run for the same line", () => {
+        expect(wordDiff("A trial.", "A trial.")).toEqual([
+            { kind: "same", text: "A trial." },
+        ]);
+    });
+});
+
+describe("paragraphDiff", () => {
+    it("pairs a paragraph taken out with the one put in its place", () => {
+        const out = paragraphDiff(
+            ["One.", "The trial costs a little.", "Three."],
+            [
+                "One.",
+                "The trial costs a little, within 60 days.",
+                "Three.",
+                "Four.",
+            ],
+        );
+        expect(out.map((p) => p.kind)).toEqual([
+            "same",
+            "changed",
+            "same",
+            "added",
+        ]);
+        expect(diffCounts(out)).toEqual({ added: 2, removed: 1 });
+    });
+
+    it("says a paragraph taken out", () => {
+        expect(paragraphDiff(["One.", "Two."], ["One."])).toEqual([
+            { kind: "same", text: "One." },
+            { kind: "removed", text: "Two." },
+        ]);
     });
 });

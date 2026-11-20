@@ -256,7 +256,8 @@ export function usePostDraft({
         };
     }
 
-    async function publish() {
+    /** Publish now; true once it is live (Publish post's Tell people). */
+    async function publish(): Promise<boolean> {
         setPublishing(true);
         // Publish what is on screen, not what was last saved.
         const id =
@@ -265,22 +266,23 @@ export function usePostDraft({
                 : postId;
         if (!id) {
             setPublishing(false);
-            return;
+            return false;
         }
         const res = await runAction(() => publishPost(siteId, id), {
             setBusy: setPublishing,
         });
-        if (!res) return;
+        if (!res) return false;
         if (!res.ok) {
             // At the plan's blog-posts limit (U13): its notice, not a toast.
             if (res.plan) showPlanRefusal(res.plan);
             else showError(res.error);
-            return;
+            return false;
         }
         setLive(true);
         setLiveAt(new Date().toISOString());
         showSuccess(`Published. It is live at ${res.data.path}.`);
         refreshServer();
+        return true;
     }
 
     async function unpublish() {

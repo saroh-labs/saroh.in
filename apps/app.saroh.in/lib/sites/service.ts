@@ -1951,6 +1951,8 @@ export interface SiteCommentView {
     editable: boolean;
     /** You wrote it (DEC-200, U4). Absent from an older API: not yours. */
     mine?: boolean;
+    /** The words a note is pinned to (U17a); null or absent: the whole post. */
+    quote?: string | null;
 }
 
 /**
@@ -2147,7 +2149,12 @@ export async function createComment(
               testReleaseId?: string;
           }
         /** A note on a draft post (DEC-200 U8). */
-        | { postId: string; body: string },
+        | {
+              postId: string;
+              body: string;
+              /** The words of the post it is pinned to (U17a), ≤500. */
+              quote?: string;
+          },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base)

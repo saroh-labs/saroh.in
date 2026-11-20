@@ -16,7 +16,7 @@ import { postParagraphs } from "@/lib/content/plain-text";
 import { formatNumber } from "@/lib/format/money";
 import { resolveStyleVariables } from "@/lib/sites/style";
 
-import { ReadOnlyBody } from "../post-editor";
+import { PostReviewBody } from "../review/review-body";
 import type { PostEditorModel } from "./post-model";
 
 /* On demand and browser-only: the editor is heavy and made in the browser. */
@@ -225,7 +225,7 @@ export function WritingSurface({
                         ) : null}
 
                         {!writer ? (
-                            <ReadOnlyBody content={fields.content} />
+                            <PostReviewBody model={model} />
                         ) : (
                             <div className="mt-6">
                                 <RichTextEditor
