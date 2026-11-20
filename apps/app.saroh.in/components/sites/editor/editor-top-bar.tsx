@@ -1,10 +1,9 @@
 "use client";
 
 import { Badge } from "@saroh/ui/badge";
-import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
-import { ChevronDown, ChevronLeft, Eye, MoreHorizontal } from "lucide-react";
+import { ChevronDown, ChevronLeft, Eye } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -16,10 +15,7 @@ import type {
     TestReleaseActions,
     TopBarActionProps,
 } from "@/components/sites/editor/top-bar-actions";
-import {
-    PublishButton,
-    TopBarActions,
-} from "@/components/sites/editor/top-bar-actions";
+import { TopBarActions } from "@/components/sites/editor/top-bar-actions";
 import type {
     EditorLayout,
     EditorSheet as SheetName,
@@ -45,8 +41,7 @@ import { readerSiteState } from "@/lib/sites/site-state";
 import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { Tip } from "@saroh/ui/tooltip";
 import type { Device, Zoom } from "./editor-constants";
-import { EditorSheet } from "./editor-sheet";
-import { MoreSheet } from "./more-actions";
+import { PhoneTopBar } from "./phone/phone-top-bar";
 import { useEditorReadOnly } from "./read-only";
 
 /**
@@ -63,53 +58,7 @@ import { useEditorReadOnly } from "./read-only";
  * the bar, as the design's bar does. A phone (DEC-185) keeps ← Website, the
  * page (its sheet), the status, ⋯ More (a sheet of the rest) and Publish.
  */
-export function EditorTopBar({
-    siteId,
-    siteName,
-    address,
-    pages,
-    pageId,
-    dirty,
-    saving,
-    saveError,
-    lastSavedAt,
-    onlyHeldBack,
-    heldBack,
-    styleSaving,
-    styleDirty,
-    review,
-    openNotes,
-    asking,
-    askForReview,
-    withdrawReview,
-    neverPublished,
-    publishedAt = null,
-    pendingSummary,
-    pendingShort,
-    pendingKnown,
-    publishing,
-    siteFlags,
-    openCheck,
-    device,
-    setDevice,
-    zoom,
-    setZoom,
-    previewing,
-    setPreviewing,
-    layout,
-    openFeedback,
-    openSitePreview,
-    canUpdateSite,
-    addablePageKinds,
-    needsApproval = false,
-    canOverride = false,
-    scheduled = null,
-    testRelease,
-    sheet = null,
-    setSheet,
-    sheetHost = null,
-    reviewerVerdict,
-}: {
+export interface EditorTopBarProps {
     siteId: string;
     siteName: string;
     address?: string | null;
@@ -167,17 +116,72 @@ export function EditorTopBar({
     setSheet?: (next: SheetName) => void;
     /** The editor's body, where a phone's sheets are laid. */
     sheetHost?: HTMLElement | null;
+    /**
+     * The page settings sheet's open page, held by the editor so More and
+     * the shell can open it (U46); absent, the bar holds its own.
+     */
+    pageSettings?: { id: string | null; set: (id: string | null) => void };
     /** A Reviewer's verdict (DEC-200): the bar's buttons on a desk, the Review sheet's body on a phone. */
     reviewerVerdict?: ReactNode;
-}) {
-    /** The page switcher under the page name in the breadcrumb. */
+}
+
+/**
+ * What the desk bar, the phone bar and the new shell's bar (U46) all work
+ * out from the same props: the status, the actions, the page settings sheet.
+ */
+export function useEditorBar({
+    siteId,
+    siteName,
+    address,
+    pages,
+    pageId,
+    dirty,
+    saving,
+    saveError,
+    lastSavedAt,
+    onlyHeldBack,
+    heldBack,
+    styleSaving,
+    styleDirty,
+    review,
+    openNotes,
+    asking,
+    askForReview,
+    withdrawReview,
+    neverPublished,
+    publishedAt = null,
+    pendingSummary,
+    pendingShort,
+    pendingKnown,
+    publishing,
+    siteFlags,
+    openCheck,
+    device,
+    setDevice,
+    zoom,
+    setZoom,
+    previewing,
+    setPreviewing,
+    layout,
+    openFeedback,
+    openSitePreview,
+    canUpdateSite,
+    needsApproval = false,
+    canOverride = false,
+    scheduled = null,
+    testRelease,
+    pageSettings,
+}: EditorTopBarProps) {
     const zone = useBusinessZone();
     const readOnly = useEditorReadOnly();
+    /** The page switcher under the page name in the breadcrumb. */
     const [pagesOpen, setPagesOpen] = useState(false);
     const router = useRouter();
     // With the Website area on, the page menu opens the one page settings
     // sheet, the same as Website › Pages (U5); off, it draws its own.
-    const [settingsFor, setSettingsFor] = useState<string | null>(null);
+    const [ownSettingsFor, setOwnSettingsFor] = useState<string | null>(null);
+    const settingsFor = pageSettings ? pageSettings.id : ownSettingsFor;
+    const setSettingsFor = pageSettings ? pageSettings.set : setOwnSettingsFor;
     const onPageSettings = websiteAreaOn()
         ? (page: SitePage) => setSettingsFor(page.id)
         : undefined;
@@ -280,141 +284,58 @@ export function EditorTopBar({
         />
     );
 
-    if (phone) {
-        const close = () => setSheet?.(null);
-        return (
-            <>
-                <header
-                    data-editor-bar=""
-                    className="flex h-14 shrink-0 items-center gap-1 border-b px-1.5"
-                >
-                    <Link
-                        href={`/sites/${siteId}/pages`}
-                        aria-label="Back to Website"
-                        className="grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <ChevronLeft aria-hidden className="size-5" />
-                    </Link>
-                    <button
-                        type="button"
-                        aria-haspopup="dialog"
-                        aria-label={`Page: ${activePage?.title ?? "Page"}. Choose another page to edit`}
-                        onClick={() => setSheet?.("pages")}
-                        className="flex h-11 min-w-0 max-w-[40%] shrink-0 items-center gap-1.5 rounded-lg border bg-card px-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <span className="min-w-0 truncate">
-                            {activePage?.title ?? "Page"}
-                        </span>
-                        <ChevronDown
-                            aria-hidden
-                            className="size-[13px] shrink-0 text-muted-foreground"
-                        />
-                    </button>
-                    <Badge
-                        role="status"
-                        variant={STATUS_BADGE[status.tone]}
-                        size="sm"
-                        className="ml-0.5 min-w-0 shrink truncate"
-                    >
-                        <span className="truncate">{status.label}</span>
-                    </Badge>
-                    <span className="flex-1" />
-                    <button
-                        type="button"
-                        aria-label={
-                            openNotes > 0
-                                ? `More: preview, feedback (${openNotes} open), share and test releases`
-                                : "More: preview, feedback, share and test releases"
-                        }
-                        onClick={() => setSheet?.("more")}
-                        className="relative grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                        <MoreHorizontal aria-hidden className="size-5" />
-                        {openNotes > 0 ? (
-                            <span
-                                aria-hidden
-                                data-notes-dot=""
-                                className="absolute right-2 top-2.5 size-2 rounded-full bg-destructive ring-2 ring-background"
-                            />
-                        ) : null}
-                    </button>
-                    {readOnly ? (
-                        // Where Publish sits: a Reviewer's verdict (RVD3Phone).
-                        // A reader who may not approve has none to open.
-                        reviewerVerdict ? (
-                            <Button
-                                type="button"
-                                aria-haspopup="dialog"
-                                onClick={() => setSheet?.("review")}
-                                className="h-11 shrink-0"
-                            >
-                                Review
-                            </Button>
-                        ) : null
-                    ) : (
-                        <PublishButton {...actions} className="h-11 shrink-0" />
-                    )}
-                </header>
-                {readOnly && reviewerVerdict ? (
-                    <EditorSheet
-                        open={sheet === "review"}
-                        onClose={close}
-                        container={sheetHost}
-                        side="bottom"
-                        title="Your review"
-                        closeLabel="Close your review"
-                        className="h-[80%]"
-                    >
-                        {reviewerVerdict}
-                    </EditorSheet>
-                ) : null}
-                <EditorSheet
-                    open={sheet === "pages"}
-                    onClose={close}
-                    container={sheetHost}
-                    side="bottom"
-                    title="Pages"
-                    closeLabel="Close pages"
-                >
-                    <div className="min-h-0 flex-1 overflow-y-auto">
-                        <PagesPanel
-                            siteId={siteId}
-                            pages={pages}
-                            activePageId={pageId}
-                            dirty={dirty || saving || styleDirty}
-                            unfinished={
-                                onlyHeldBack
-                                    ? unfinishedPhrase(heldBack)
-                                    : undefined
-                            }
-                            canUpdate={canUpdateSite}
-                            addableKinds={addablePageKinds}
-                            flags={siteFlags.flags}
-                            onClose={close}
-                            phone
-                            onPageSettings={onPageSettings}
-                        />
-                    </div>
-                </EditorSheet>
-                <EditorSheet
-                    open={sheet === "more"}
-                    onClose={close}
-                    container={sheetHost}
-                    side="bottom"
-                    title="More"
-                    closeLabel="Close More"
-                >
-                    <MoreSheet
-                        {...actions}
-                        status={readout}
-                        done={close}
-                        onFeedback={openFeedback}
-                    />
-                </EditorSheet>
-                {pageSheet}
-            </>
-        );
-    }
+    return {
+        readOnly,
+        activePage,
+        status,
+        readout,
+        actions,
+        phone,
+        pagesOpen,
+        setPagesOpen,
+        pageSheet,
+        onPageSettings,
+        openPageSettings: (pageId: string) => setSettingsFor(pageId),
+    };
+}
+
+/**
+ * The editor's top bar: where you are (Website, site, page, status), how the
+ * page is shown (theme, width, zoom, Preview), and the two ways
+ * work leaves the editor (Share, Publish). With the Website area on, the
+ * desk draws the shell's trimmed bar instead (`shell/desk-top-bar.tsx`, U46);
+ * a phone's bar is `phone/phone-top-bar.tsx`.
+ */
+export function EditorTopBar(props: EditorTopBarProps) {
+    const bar = useEditorBar(props);
+    const {
+        siteId,
+        siteName,
+        address,
+        pages,
+        pageId,
+        dirty,
+        saving,
+        onlyHeldBack,
+        heldBack,
+        styleDirty,
+        siteFlags,
+        layout,
+        canUpdateSite,
+        addablePageKinds,
+        reviewerVerdict,
+    } = props;
+    const {
+        readOnly,
+        activePage,
+        readout,
+        actions,
+        pagesOpen,
+        setPagesOpen,
+        pageSheet,
+        onPageSettings,
+    } = bar;
+    if (bar.phone) return <PhoneTopBar {...props} bar={bar} />;
 
     return (
         <>

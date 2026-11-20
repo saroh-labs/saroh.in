@@ -31,6 +31,13 @@ import type { TestRelease } from "@/lib/sites/test-releases";
 import { SiteEditor } from "./site-editor";
 import { useEditorDraft } from "./use-editor-draft";
 
+// The Website area's switch (KTD-E1): off unless a test turns it on.
+const area = vi.hoisted(() => ({ on: false }));
+vi.mock("@/lib/sites/website-area-switch", () => ({
+    websiteAreaOn: () => area.on,
+    websiteAreaOnFor: () => area.on,
+}));
+
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }),
     usePathname: () => "/sites",
@@ -302,6 +309,16 @@ const ALLOWED: RegExp[] = [
     // Test releases: the list, and each one's own review page (a link).
     /^Test releases( · )?\d*$/,
     /^Show (all \d+|fewer)$/,
+    // The new desk shell (U46): the rail, the Pages tree, More and its
+    // looking-only items.
+    /^Pages$/,
+    /^More: desk, tablet or phone width/,
+    /^(Home\/|About\/about)$/,
+    /^Our storyHidden$/,
+    /^(Desk|Tablet|Phone|Fit|\d+%)$/,
+    /^Page settings$/,
+    /^Test links\d*$/,
+    /^Theme: switch to (light|dark)$/,
 ];
 
 /** The page's options in the page picker: switching page writes nothing. */
@@ -321,6 +338,7 @@ const CONTROLS = [
     "[role=switch]",
     "[role=slider]",
     "[role=menuitem]",
+    "[role=menuitemradio]",
     "[role=separator]",
     "[draggable=true]",
     "[contenteditable]",
@@ -351,12 +369,16 @@ function writeControls(): string[] {
     for (const frame of Array.from(document.querySelectorAll("iframe"))) {
         if (frame.contentDocument) docs.push(frame.contentDocument);
     }
-    return docs
-        .flatMap((d) => Array.from(d.querySelectorAll(CONTROLS)))
-        .filter(isEnabled)
-        .filter((el) => !isPageOption(el))
-        .map(nameOf)
-        .filter((name) => !ALLOWED.some((ok) => ok.test(name)));
+    return (
+        docs
+            .flatMap((d) => Array.from(d.querySelectorAll(CONTROLS)))
+            .filter(isEnabled)
+            .filter((el) => !isPageOption(el))
+            // A menu's divider is drawn, not pressed.
+            .filter((el) => !el.matches("[role=menu] [role=separator]"))
+            .map(nameOf)
+            .filter((name) => !ALLOWED.some((ok) => ok.test(name)))
+    );
 }
 
 let root: Root;
@@ -482,6 +504,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+    area.on = false;
     // Long enough for any autosave (1.5s) to have fired, had it been armed.
     await act(async () => {
         vi.advanceTimersByTime(5000);
@@ -1067,5 +1090,233 @@ describe("the draft hook in no-save mode", () => {
             await Promise.resolve();
         });
         // afterEach: saveDraftSections was never called.
+    });
+});
+
+/** The open menu's item with this name. */
+function menuItem(name: string): HTMLElement {
+    const hit = Array.from(
+        document.querySelectorAll<HTMLElement>(
+            "[role=menuitem],[role=menuitemradio]",
+        ),
+    ).find((el) => nameOf(el) === name);
+    if (!hit) throw new Error(`No menu item ${name}`);
+    return hit;
+}
+
+/** Open a Radix menu from its trigger, as a keyboard does. */
+function openMenu(trigger: HTMLElement) {
+    act(() => {
+        trigger.focus();
+        trigger.dispatchEvent(
+            new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
+        );
+    });
+}
+const menuItems = () =>
+    Array.from(
+        document.querySelectorAll<HTMLElement>(
+            "[role=menuitem],[role=menuitemradio]",
+        ),
+    ).map((el) => nameOf(el));
+
+describe("the desk shell with the Website area on (U46)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(1920);
+    });
+
+    it("a reader: Read only, Preview, More and the verdict; nothing that writes", () => {
+        render();
+        expectReadOnly("shell, reader, Pages tab");
+        expect($("[data-reviewing]")?.textContent).toBe("Read only");
+        for (const gone of [
+            "Undo",
+            "Ask AI",
+            "Publish",
+            "Add section",
+            "Add a page",
+            "Add",
+            "History",
+        ]) {
+            expect(has(gone), gone).toBe(false);
+        }
+        expect($("[data-status-chip]")).toBeNull();
+        expect($("[draggable=true]")).toBeNull();
+        // The rail is Pages · Brand · Feedback (fix/WXMReviewer).
+        const trail = $("[data-editor-trail]");
+        expect(
+            Array.from(trail?.querySelectorAll("button") ?? []).map(
+                (b) => b.firstChild?.nextSibling?.textContent,
+            ),
+        ).toEqual(["Pages", "Brand", "Feedback"]);
+        expect(has("Approve")).toBe(true);
+        expect(has("Ask for changes")).toBe(true);
+        expect(
+            $("[data-pages-tree]")?.textContent.includes(
+                "Nothing else changes.",
+            ),
+        ).toBe(true);
+    });
+
+    it("a reader's More: how the page is shown and test links, nothing that writes", () => {
+        render();
+        openMenu(button(/^More: desk/));
+        const items = menuItems();
+        expect(items).toEqual(
+            expect.arrayContaining(["Desk", "Tablet", "Phone", "Fit"]),
+        );
+        for (const gone of [
+            "Redo",
+            "Share a test link",
+            "Ask a teammate to review",
+            "Withdraw the review request",
+            "Share a preview link",
+            "History",
+        ]) {
+            expect(items, gone).not.toContain(gone);
+        }
+        expectReadOnly("shell, reader, More open");
+    });
+
+    it("a reader who may not approve has no verdict", () => {
+        render({ reviewCan: { comment: true, approve: false } });
+        expect(has("Approve")).toBe(false);
+        expect(has("Ask for changes")).toBe(false);
+    });
+
+    it("the rail's Brand and Feedback stay readable", () => {
+        render();
+        click(button("Brand"));
+        expectReadOnly("shell, reader, Brand");
+        click(button(/^Feedback\d*$/));
+        expect($("[data-left-panel=feedback]")).not.toBeNull();
+        expectReadOnly("shell, reader, Feedback");
+    });
+});
+
+describe("the desk shell for an owner (U46)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(1920);
+    });
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        askAi: true,
+        initialPendingChanges: 2,
+        initialPendingSiteChanges: [],
+    };
+
+    it("the bar is Website, page, Undo, Ask AI, the chip, Preview, More, Publish", () => {
+        render(owner);
+        const bar = $("[data-editor-bar]");
+        const names = Array.from(
+            bar?.querySelectorAll<HTMLElement>("a,button") ?? [],
+        ).map((el) => (el.matches("[data-status-chip]") ? "chip" : nameOf(el)));
+        expect(names).toEqual([
+            "Back to Website",
+            "Page: Home. Choose another page to edit",
+            "Undo",
+            "Ask AI",
+            "chip",
+            "Preview",
+            expect.stringMatching(/^More: desk/),
+            "Publish",
+        ]);
+        expect($("[data-status-chip]")?.textContent).toBe(
+            "Live · 2 changes waiting",
+        );
+        // None of the old bar's controls sit on it any more.
+        for (const gone of ["Share", "In review", "Test release", "Zoom"]) {
+            expect(has(gone), gone).toBe(false);
+        }
+    });
+
+    it("everything that left the bar is in More (00-universal §15)", () => {
+        render(owner);
+        openMenu(button(/^More: desk/));
+        expect(menuItems()).toEqual(
+            expect.arrayContaining([
+                "Desk",
+                "Tablet",
+                "Phone",
+                "50%",
+                "75%",
+                "100%",
+                "Fit",
+                "Redo",
+                "Page settings",
+                "Share a test link",
+                "Test links1",
+                // REVIEW is pending in this file's fixture.
+                "Withdraw the review request",
+                "Share a preview link",
+                "History",
+                "Feedback1",
+                expect.stringMatching(/^Theme: switch to/),
+            ]),
+        );
+    });
+
+    it("More › Width changes the canvas bar's word", () => {
+        render(owner);
+        expect($("[data-canvas-bar]")?.textContent).toContain("Desk view");
+        openMenu(button(/^More: desk/));
+        click(menuItem("Tablet"));
+        expect($("[data-canvas-bar]")?.textContent).toContain("Tablet view");
+    });
+
+    it("More › Share a preview link opens the rail's Feedback", () => {
+        render(owner);
+        openMenu(button(/^More: desk/));
+        click(menuItem("Share a preview link"));
+        expect($("[data-left-panel=feedback]")).not.toBeNull();
+    });
+
+    it("the rail is Pages · Add · Brand · History · Feedback, and the tree lists the page's sections", () => {
+        render(owner);
+        expect(
+            Array.from(
+                $("[data-editor-trail]")?.querySelectorAll("button") ?? [],
+            ).map((b) => b.firstChild?.nextSibling?.textContent),
+        ).toEqual(["Pages", "Add", "Brand", "History", "Feedback"]);
+        const tree = $("[data-pages-tree]");
+        expect(tree?.textContent).toContain("On every page");
+        expect(tree?.textContent).toContain("Welcome in");
+        expect(tree?.textContent).toContain("Our storyHidden");
+        expect(has("Add section")).toBe(true);
+        expect($("[draggable=true]")).not.toBeNull();
+        click(button("Add section"));
+        expect($("[data-left-panel=add]")).not.toBeNull();
+    });
+
+    it("Undo waits for something to undo; Redo puts it back", () => {
+        render(owner);
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
+        // Remove the selected section from the inspector, as today.
+        click(button("Welcome in"));
+        click(button("Remove"));
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(false);
+        click(button("Undo"));
+        expect($("[data-pages-tree]")?.textContent).toContain("Welcome in");
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    it("a phone keeps today's bar until U49", () => {
+        atWidth(390);
+        render(owner);
+        expect($("[data-editor-trail]")).toBeNull();
+        expect($("[data-edit-pill]")).not.toBeNull();
+    });
+
+    it("off: today's chrome, unchanged", () => {
+        area.on = false;
+        render(owner);
+        expect($("[data-editor-trail]")).toBeNull();
+        expect(has("Test release")).toBe(true);
+        expect(has("In review")).toBe(true);
+        expect($("[data-status-chip]")).toBeNull();
     });
 });

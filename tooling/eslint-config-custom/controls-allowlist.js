@@ -227,6 +227,14 @@ export const RAW_ALLOWED = {
     "components/sites/looks/component-styles.tsx": ["button"],
     // button: a row or card that is one button, a row that opens
     "components/sites/editor/editor-top-bar.tsx": ["button"],
+    // button: the page picker and the phone's page and ⋯ More, moved from editor-top-bar.tsx (U46)
+    "components/sites/editor/phone/phone-top-bar.tsx": ["button"],
+    // button: the desk bar's page picker (page over site) and status chip (U46)
+    "components/sites/editor/shell/desk-top-bar.tsx": ["button"],
+    // button: a rail tab, its icon over its word (U46)
+    "components/sites/editor/shell/editor-trail.tsx": ["button"],
+    // button: a row of the Pages tree, one button (U46)
+    "components/sites/editor/shell/pages-tree.tsx": ["button"],
     // button: a phone's floating pill, Blocks · + · Brand (DEC-185)
     "components/sites/editor/edit-pill.tsx": ["button"],
     // button: a bottom sheet's grip, pulled or pressed to make it taller

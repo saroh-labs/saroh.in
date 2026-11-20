@@ -10,6 +10,7 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { parseSectionContent } from "@saroh/block-contract";
 
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { tradeOf } from "@/lib/organizations/trade";
 import type { Section } from "@/lib/sites/service";
 import {
@@ -142,6 +143,8 @@ export default async function SiteEditorPage({
             pageId={activePage.id}
             pages={site.pages}
             readOnly={readOnly}
+            // Ask AI in the shell's bar (U46): never for a reader.
+            askAi={!readOnly && askAiOn()}
             // What a reader may do besides read: never offer a note box or
             // a verdict the API would refuse (a `site:read`-only role).
             reviewCan={{

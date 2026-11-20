@@ -147,4 +147,6 @@ export interface SiteEditorProps {
      * site has none (DEC-185). Null when it can't be read.
      */
     webAddressFix?: WebAddressFix | null;
+    /** Ask AI's panel is on here (`askAiOn`); the shell's bar offers it (U46). */
+    askAi?: boolean;
 }

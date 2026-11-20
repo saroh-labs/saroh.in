@@ -1,6 +1,6 @@
 import type { ToastId } from "@saroh/ui/toast";
 import { dismissToast, showUndo } from "@saroh/ui/toast";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { Hold, HoldSlot } from "@/lib/hold-undo";
 import { createHoldSlot, HOLD_UNDO_MS } from "@/lib/hold-undo";
@@ -22,6 +22,17 @@ interface Watch {
     before: unknown;
     after: unknown;
     armed: boolean;
+}
+
+/**
+ * The one action Undo took back, so More › Redo can put it back (U46). It
+ * lasts until the document moves on: `restored` is what the Undo left, and
+ * any other value means a new edit, which drops it.
+ */
+interface Redo {
+    doc: Doc;
+    value: unknown;
+    restored: unknown;
 }
 
 /**
@@ -81,20 +92,42 @@ export function useUndo({
     const slotRef = useRef<HoldSlot | null>(null);
     const watch = useRef<Watch | null>(null);
     const slot = () => (slotRef.current ??= createHoldSlot());
+    // The top bar's Undo icon is pressable while the window is open (U46).
+    const [undoOpen, setUndoOpen] = useState(false);
+    const [redo, setRedo] = useState<Redo | null>(null);
 
     function hold(message: string, doc: Doc, before: unknown, put: () => void) {
         let toastId: ToastId | null = null;
+        const w: Watch = {
+            hold: null as unknown as Hold,
+            doc,
+            before,
+            after: null,
+            armed: false,
+        };
         const held = slot().start({
-            undo: put,
+            undo: () => {
+                put();
+                // What the action left, for Redo; read from this hold's own
+                // watch, since the window has closed by now.
+                if (w.armed) setRedo({ doc, value: w.after, restored: before });
+            },
             onChange: (state) => {
                 if (state.status === "held") return;
                 // The window has closed, however it closed: an Undo left on
                 // screen would do nothing.
                 if (toastId !== null) dismissToast(toastId);
-                if (watch.current?.hold === held) watch.current = null;
+                if (watch.current?.hold === held) {
+                    watch.current = null;
+                    setUndoOpen(false);
+                }
             },
         });
-        watch.current = { hold: held, doc, before, after: null, armed: false };
+        w.hold = held;
+        watch.current = w;
+        setUndoOpen(true);
+        // A new action: what was undone before it can't come back.
+        setRedo(null);
         toastId = showUndo(message, () => void held.undo(), {
             duration: HOLD_UNDO_MS,
         });
@@ -111,6 +144,13 @@ export function useUndo({
     useEffect(() => () => void slotRef.current?.leave(), []);
 
     const label = (section: Section) => SECTION_LABELS[section.type];
+    // Redo lasts while the document is still what the Undo left (U46).
+    const redoNow =
+        redo !== null &&
+        !readOnly &&
+        (redo.doc === "sections" ? sections : style) === redo.restored
+            ? redo
+            : null;
 
     function moveWithUndo(from: number, to: number) {
         if (readOnly) return;
@@ -132,6 +172,25 @@ export function useUndo({
     }
 
     return {
+        /** The Undo window is open: the top bar's Undo icon is pressable. */
+        canUndo: undoOpen && !readOnly,
+        /** Undo the held action: the same as the toast's Undo. */
+        undo() {
+            if (readOnly) return;
+            void watch.current?.hold.undo();
+        },
+        /** Something Undo took back can be put back (More › Redo). */
+        canRedo: redoNow !== null,
+        /** Put back what Undo took back, until the next edit. */
+        redo() {
+            if (!redoNow) return;
+            setRedo(null);
+            if (redoNow.doc === "sections") {
+                restoreSections(redoNow.value as Section[]);
+            } else {
+                setStyle(redoNow.value as SiteStyle);
+            }
+        },
         /**
          * Close the Undo window now and take its toast away. Opening the
          * pre-publish check does this: an Undo pressed behind the check

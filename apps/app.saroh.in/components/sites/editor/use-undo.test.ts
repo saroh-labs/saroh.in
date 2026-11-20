@@ -216,3 +216,50 @@ describe("useUndo", () => {
         root = createRoot(host);
     });
 });
+
+describe("the top bar's Undo and More › Redo (U46)", () => {
+    it("Undo is pressable only while the window is open, and does what the toast does", () => {
+        expect(h.undo.canUndo).toBe(false);
+        act(() => h.undo.removeAt(0));
+        expect(h.undo.canUndo).toBe(true);
+        act(() => h.undo.undo());
+        expect(h.sections).toEqual([A, B]);
+        expect(h.undo.canUndo).toBe(false);
+        expect(toast.dismissToast).toHaveBeenCalledWith(lastId());
+    });
+
+    it("closes with the window after ten seconds", () => {
+        act(() => h.undo.removeAt(0));
+        act(() => {
+            vi.advanceTimersByTime(10_000);
+        });
+        expect(h.undo.canUndo).toBe(false);
+    });
+
+    it("Redo puts the removal back, once", () => {
+        expect(h.undo.canRedo).toBe(false);
+        act(() => h.undo.removeAt(0));
+        pressUndo();
+        expect(h.undo.canRedo).toBe(true);
+        act(() => h.undo.redo());
+        expect(h.sections).toEqual([B]);
+        expect(h.undo.canRedo).toBe(false);
+    });
+
+    it("a new edit clears Redo", () => {
+        act(() => h.undo.removeAt(0));
+        pressUndo();
+        act(() => h.setSections([B, A]));
+        expect(h.undo.canRedo).toBe(false);
+        act(() => h.undo.redo());
+        expect(h.sections).toEqual([B, A]);
+    });
+
+    it("Redo works for the look too", () => {
+        act(() => h.undo.resetStyle());
+        pressUndo();
+        expect(h.style).toBe(LOOK);
+        act(() => h.undo.redo());
+        expect(h.style).toBe(PLAIN);
+    });
+});

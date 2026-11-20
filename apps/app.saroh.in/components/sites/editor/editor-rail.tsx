@@ -75,7 +75,13 @@ export function EditorRail({
     onPicked,
     templateRow = null,
     templateName,
+    hideTabs = false,
 }: {
+    /**
+     * The new shell's rail of tabs (U46) chooses the panel, so this draws
+     * none of its own.
+     */
+    hideTabs?: boolean;
     /** The Brand tab's Template row (DEC-216); null draws none. */
     templateRow?: ReactNode;
     /** The site's template as a Reviewer reads it; null: not recorded; absent: no row. */
@@ -145,7 +151,7 @@ export function EditorRail({
     return (
         <aside className="flex min-h-0 flex-1 flex-col">
             {/* A Reviewer's Blocks sheet keeps Page | Brand (RVD2Phone). */}
-            {phone && !readOnly ? null : (
+            {(phone && !readOnly) || hideTabs ? null : (
                 <EditorTabs
                     label="Editor panels"
                     tabs={

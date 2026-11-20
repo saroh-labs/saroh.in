@@ -13,6 +13,7 @@ import { BrandSheetActions } from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
 import type { PublishMore } from "@/components/sites/publish/publish-more";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
+import type { DraftReadiness } from "@/components/sites/publish/use-publish";
 import { usePublish } from "@/components/sites/publish/use-publish";
 import { usePublishChanges } from "@/components/sites/publish/use-publish-changes";
 import { ReviewSheet } from "@/components/sites/review/review-sheet";
@@ -29,19 +30,27 @@ import {
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { useTestReleases } from "@/components/sites/test-releases/use-test-releases";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
+import { siteStatus } from "@/lib/sites/site-status";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import type { LookId } from "@saroh/block-contract";
+import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import { BlockToolbar } from "./block-toolbar";
 import { SECTION_LABELS } from "./editor-constants";
+import type { EditorPanelsProps } from "./editor-panels";
 import { EditorPanels } from "./editor-panels";
-import { EditorRail } from "./editor-rail";
+import { EditorRail, railTabFor, selectRailTab } from "./editor-rail";
+import type { EditorTopBarProps } from "./editor-top-bar";
 import { EditorTopBar } from "./editor-top-bar";
 import { InspectorHost } from "./inspector-host";
+import { PhoneShell } from "./phone/phone-shell";
 import { EditorReadOnly, EditorReviewCan } from "./read-only";
+import type { EditorModel, TrailKey } from "./shell/editor-model";
+import { EditorShell } from "./shell/editor-shell";
 import type { SiteEditorProps } from "./site-editor-props";
 import { useEditorDraft } from "./use-editor-draft";
 import { takePendingNote, useEditorJumps } from "./use-editor-jumps";
@@ -101,6 +110,7 @@ export function SiteEditor({
     reloadDraft,
     initialSheet = null,
     webAddressFix = null,
+    askAi = false,
 }: SiteEditorProps) {
     // Read-only (DEC-200) takes the owner's powers away whatever was sent.
     const canUpdateSite = canUpdateSiteProp && !readOnly;
@@ -380,219 +390,296 @@ export function SiteEditor({
               }
             : null;
 
+    /*
+     * The Website area's shell (U46, KTD-E1): on a desk the new frame, on a
+     * phone today's until U49; off, today's chrome. All three run on the
+     * hooks above.
+     */
+    const areaOn = websiteAreaOn();
+    // The page settings sheet (batch 1), opened from the picker or More.
+    const [settingsPage, setSettingsPage] = useState<string | null>(null);
+    const openCheck = (ready: DraftReadiness) => {
+        // An Undo pressed behind the check would change the draft being
+        // published (G-1).
+        if (!ready.dirty) {
+            edits.settleUndo();
+            void publishChanges.load();
+        }
+        return publish.openCheck(ready);
+    };
+    const desk = areaOn && layout !== "phone";
+    // History and Feedback are the shell's own rail tabs; Pages, Add and
+    // Brand are today's rail state, so a reload comes back to Brand.
+    const [trailExtra, setTrailExtra] = useState<"history" | "feedback" | null>(
+        null,
+    );
+    const railTab = railTabFor(selection.rail, add.adding && !readOnly);
+    const trail: TrailKey =
+        trailExtra ?? (railTab === "page" ? "pages" : railTab);
+    const openRail = (tab: TrailKey) => {
+        if (tab === "history" || tab === "feedback") {
+            setTrailExtra(tab);
+            add.setAdding(false);
+            return;
+        }
+        setTrailExtra(null);
+        selectRailTab(tab === "pages" ? "page" : tab, setRail, add.setAdding);
+    };
+    const model: EditorModel = {
+        ...{ siteId, pageId, pages, address: address ?? null, layout },
+        page: pages.find((p) => p.id === pageId),
+        siteName: chrome.displayName,
+        ...{ readOnly, canUpdateSite, canPublish, askAi: askAi && !readOnly },
+        unsaved,
+        // The chip's words (RULES §2), from the counts the bar has always read.
+        status: siteStatus(
+            {
+                currentPublicationId: publish.neverPublished ? null : "live",
+                pendingSectionChanges: publish.pendingChanges,
+                pendingSiteChanges: publish.pendingSiteChanges,
+                hasUnpublishedChanges: false,
+            },
+            { reader: readOnly },
+        ),
+        styleOptions,
+        addablePageKinds: addablePageKinds ?? [],
+        ...{ shopOpen, packsOpen, active, draft, selection, sheets, viewport },
+        ...{ edits, review, publish, publishChanges, siteStyle, chrome, add },
+        releases,
+        openPublish: () =>
+            void openCheck({
+                dirty,
+                onlyHeldBack: draft.onlyHeldBack,
+                heldBack: draft.heldBack,
+            }),
+        openPageSettings: (id) => setSettingsPage(id),
+        openRail,
+        jumpToNote,
+        trail,
+        scrollToSection: scrollToBlock,
+        reloadDraft: reloadDraft ? (page) => reloadDraft(page) : undefined,
+    };
+
+    const railEl = (
+        <EditorRail
+            hideTabs={desk}
+            phone={layout === "phone"}
+            onPicked={scrollToBlock}
+            {...selection}
+            {...siteStyle}
+            {...draft}
+            {...edits}
+            styleOptions={styleOptions}
+            {...add}
+            flagsBySection={flagsBySection}
+            notedKeys={review.notedKeys}
+            shopOpen={shopOpen}
+            packsOpen={packsOpen}
+            looks={{
+                available: looksAvailable,
+                liveLook,
+                published: !publish.neverPublished,
+                templateId,
+                error: siteStyle.lookError,
+                onChoose: siteStyle.chooseLook,
+                // Each look's Preview draws its showcase
+                // template, and offers its starter content to
+                // whoever may change the site (DEC-182).
+                preview: {
+                    pages,
+                    ...(canUpdateSite && starter ? { starter } : {}),
+                },
+            }}
+            styleRules={styleRules}
+            // The site's template (DEC-216): changed by
+            // whoever may change the site, read by others.
+            templateRow={
+                templateRow ? (
+                    <TemplateRow
+                        source={templateRow}
+                        pages={pages}
+                        starter={canUpdateSite ? starter : null}
+                        look={style.look ?? null}
+                    />
+                ) : null
+            }
+            templateName={
+                templateRow
+                    ? (templateRow.templates?.find(
+                          (t) => t.id === templateRow.current,
+                      )?.name ?? null)
+                    : undefined
+            }
+        />
+    );
+    const canvasEl = (
+        <EditorCanvas
+            {...viewport}
+            {...selection}
+            {...draft}
+            {...{
+                siteId,
+                pageId,
+                address,
+                pages,
+                styleOptions,
+            }}
+            blockTools={blockTools}
+            // A typeface being tried draws on the page unsaved.
+            style={siteStyle.trying ?? style}
+            trying={triedFace(siteStyle.trying, styleOptions)}
+            // Holds a page switch back (G-3).
+            dirty={unsaved}
+            neverPublished={publish.neverPublished}
+            canvasChrome={canvasChrome}
+            notesByKey={review.notesByKey}
+        />
+    );
+    const inspectorEl = (
+        <InspectorHost
+            {...{ siteId, pageId, pages, styleOptions }}
+            {...selection}
+            {...draft}
+            {...edits}
+            {...review}
+            style={style}
+            active={active}
+            fixedText={chrome}
+            jumpToNote={jumpToNote}
+            activeFlags={activeFlags}
+            unreadableSections={unreadableSections}
+        />
+    );
+    // Today's bar and body; with the Website area on, the desk shell
+    // (U46) runs on the same props, and a phone keeps them until U49.
+    const topBar: ReactElement<EditorTopBarProps> = (
+        <EditorTopBar
+            {...{ siteId, address, pages, pageId, layout }}
+            publishedAt={publishedAt}
+            siteName={chrome.displayName}
+            {...draft}
+            // Site settings saved on their own clock: the look, the name
+            // and the footer. Publish waits for all three.
+            styleSaving={siteStyle.styleSaving || chrome.chromeSaving}
+            styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
+            saveError={draft.saveError || chrome.chromeFailed}
+            {...review}
+            {...publish}
+            openCheck={openCheck}
+            {...viewport}
+            openFeedback={() => setInspector("feedback")}
+            openSitePreview={() => {
+                // The whole site's Feedback, where a preview link is
+                // made, not a block's (UX-068): the shell's rail tab.
+                if (desk) return openRail("feedback");
+                setSelectedIndex(null);
+                setInspector("feedback");
+            }}
+            pageSettings={{ id: settingsPage, set: setSettingsPage }}
+            canUpdateSite={canUpdateSite}
+            addablePageKinds={addablePageKinds}
+            scheduled={releases.scheduled}
+            testRelease={testReleaseActions(releases)}
+            sheet={sheets.sheet}
+            setSheet={sheets.setSheet}
+            sheetHost={body}
+            reviewerVerdict={
+                !verdict ? undefined : layout === "phone" ? (
+                    <ReviewSheet
+                        {...verdict}
+                        review={review.review}
+                        loadFailed={review.loadFailed}
+                        onRetry={() => void review.refreshReview()}
+                        onSeeSettled={() => {
+                            // The whole site's Feedback, where the
+                            // settled notes are (RVD4).
+                            setSelectedIndex(null);
+                            setInspector("feedback");
+                        }}
+                        onDone={() => sheets.setSheet(null)}
+                    />
+                ) : (
+                    <TopBarVerdict {...verdict} />
+                )
+            }
+        />
+    );
+    const panels: ReactElement<EditorPanelsProps> = (
+        <EditorPanels
+            {...{ layout, viewport, sheets, selection }}
+            {...add}
+            dialogOpen={lookFor !== null || browsing}
+            hasSubject={active !== null || selection.selectedChrome !== null}
+            inspectorTitle={
+                selection.selectedChrome === "header"
+                    ? "Header"
+                    : selection.selectedChrome === "footer"
+                      ? "Footer"
+                      : // A Reviewer's Feedback sheet names its block (RVD1Phone).
+                        (selection.inspector === "feedback" && !readOnly) ||
+                          !active
+                        ? "Feedback"
+                        : SECTION_LABELS[active.section.type]
+            }
+            pageTitle={pages.find((p) => p.id === pageId)?.title ?? "this page"}
+            overlayOpen={publish.checking}
+            openNotes={review.openNotes}
+            brandActions={
+                readOnly ? undefined : (
+                    <BrandSheetActions
+                        saving={siteStyle.styleSaving}
+                        dirty={siteStyle.styleDirty}
+                        onReset={() => edits.resetStyle()}
+                    />
+                )
+            }
+            body={body}
+            setBody={setBody}
+            rail={railEl}
+            canvas={canvasEl}
+            inspector={inspectorEl}
+            releases={
+                releases.available
+                    ? {
+                          open: releases.panelOpen,
+                          onClose: () => releases.setPanelOpen(false),
+                          content: (
+                              <TestReleasesPanel
+                                  siteId={siteId}
+                                  releases={releases}
+                              />
+                          ),
+                      }
+                    : undefined
+            }
+        />
+    );
+
     return (
         // The workspace's theme (#335); the page on the canvas is bright.
         <EditorReadOnly.Provider value={readOnly}>
             <EditorReviewCan.Provider value={reviewCan}>
                 <div className="flex h-dvh flex-col bg-background text-foreground">
-                    <EditorTopBar
-                        {...{ siteId, address, pages, pageId, layout }}
-                        publishedAt={publishedAt}
-                        siteName={chrome.displayName}
-                        {...draft}
-                        // Site settings saved on their own clock: the look, the name
-                        // and the footer. Publish waits for all three.
-                        styleSaving={
-                            siteStyle.styleSaving || chrome.chromeSaving
-                        }
-                        styleDirty={siteStyle.styleDirty || chrome.chromeDirty}
-                        saveError={draft.saveError || chrome.chromeFailed}
-                        {...review}
-                        {...publish}
-                        openCheck={(ready) => {
-                            // An Undo pressed behind the check would change the
-                            // draft being published (G-1).
-                            if (!ready.dirty) {
-                                edits.settleUndo();
-                                void publishChanges.load();
-                            }
-                            return publish.openCheck(ready);
-                        }}
-                        {...viewport}
-                        openFeedback={() => setInspector("feedback")}
-                        openSitePreview={() => {
-                            // The whole site's Feedback, where a preview link is
-                            // made, not a block's (UX-068).
-                            setSelectedIndex(null);
-                            setInspector("feedback");
-                        }}
-                        canUpdateSite={canUpdateSite}
-                        addablePageKinds={addablePageKinds}
-                        scheduled={releases.scheduled}
-                        testRelease={testReleaseActions(releases)}
-                        sheet={sheets.sheet}
-                        setSheet={sheets.setSheet}
-                        sheetHost={body}
-                        reviewerVerdict={
-                            !verdict ? undefined : layout === "phone" ? (
-                                <ReviewSheet
-                                    {...verdict}
-                                    review={review.review}
-                                    loadFailed={review.loadFailed}
-                                    onRetry={() => void review.refreshReview()}
-                                    onSeeSettled={() => {
-                                        // The whole site's Feedback, where the
-                                        // settled notes are (RVD4).
-                                        setSelectedIndex(null);
-                                        setInspector("feedback");
-                                    }}
-                                    onDone={() => sheets.setSheet(null)}
-                                />
-                            ) : (
-                                <TopBarVerdict {...verdict} />
-                            )
-                        }
-                    />
-
-                    <EditorPanels
-                        {...{ layout, viewport, sheets, selection }}
-                        {...add}
-                        dialogOpen={lookFor !== null || browsing}
-                        hasSubject={
-                            active !== null || selection.selectedChrome !== null
-                        }
-                        inspectorTitle={
-                            selection.selectedChrome === "header"
-                                ? "Header"
-                                : selection.selectedChrome === "footer"
-                                  ? "Footer"
-                                  : // A Reviewer's Feedback sheet names its block (RVD1Phone).
-                                    (selection.inspector === "feedback" &&
-                                          !readOnly) ||
-                                      !active
-                                    ? "Feedback"
-                                    : SECTION_LABELS[active.section.type]
-                        }
-                        pageTitle={
-                            pages.find((p) => p.id === pageId)?.title ??
-                            "this page"
-                        }
-                        overlayOpen={publish.checking}
-                        openNotes={review.openNotes}
-                        brandActions={
-                            readOnly ? undefined : (
-                                <BrandSheetActions
-                                    saving={siteStyle.styleSaving}
-                                    dirty={siteStyle.styleDirty}
-                                    onReset={() => edits.resetStyle()}
-                                />
-                            )
-                        }
-                        body={body}
-                        setBody={setBody}
-                        rail={
-                            <EditorRail
-                                phone={layout === "phone"}
-                                onPicked={scrollToBlock}
-                                {...selection}
-                                {...siteStyle}
-                                {...draft}
-                                {...edits}
-                                styleOptions={styleOptions}
-                                {...add}
-                                flagsBySection={flagsBySection}
-                                notedKeys={review.notedKeys}
-                                shopOpen={shopOpen}
-                                packsOpen={packsOpen}
-                                looks={{
-                                    available: looksAvailable,
-                                    liveLook,
-                                    published: !publish.neverPublished,
-                                    templateId,
-                                    error: siteStyle.lookError,
-                                    onChoose: siteStyle.chooseLook,
-                                    // Each look's Preview draws its showcase
-                                    // template, and offers its starter content to
-                                    // whoever may change the site (DEC-182).
-                                    preview: {
-                                        pages,
-                                        ...(canUpdateSite && starter
-                                            ? { starter }
-                                            : {}),
-                                    },
-                                }}
-                                styleRules={styleRules}
-                                // The site's template (DEC-216): changed by
-                                // whoever may change the site, read by others.
-                                templateRow={
-                                    templateRow ? (
-                                        <TemplateRow
-                                            source={templateRow}
-                                            pages={pages}
-                                            starter={
-                                                canUpdateSite ? starter : null
-                                            }
-                                            look={style.look ?? null}
-                                        />
-                                    ) : null
-                                }
-                                templateName={
-                                    templateRow
-                                        ? (templateRow.templates?.find(
-                                              (t) =>
-                                                  t.id === templateRow.current,
-                                          )?.name ?? null)
-                                        : undefined
-                                }
-                            />
-                        }
-                        canvas={
-                            <EditorCanvas
-                                {...viewport}
-                                {...selection}
-                                {...draft}
-                                {...{
-                                    siteId,
-                                    pageId,
-                                    address,
-                                    pages,
-                                    styleOptions,
-                                }}
-                                blockTools={blockTools}
-                                // A typeface being tried draws on the page unsaved.
-                                style={siteStyle.trying ?? style}
-                                trying={triedFace(
-                                    siteStyle.trying,
-                                    styleOptions,
-                                )}
-                                // Holds a page switch back (G-3).
-                                dirty={unsaved}
-                                neverPublished={publish.neverPublished}
-                                canvasChrome={canvasChrome}
-                                notesByKey={review.notesByKey}
-                            />
-                        }
-                        inspector={
-                            <InspectorHost
-                                {...{ siteId, pageId, pages, styleOptions }}
-                                {...selection}
-                                {...draft}
-                                {...edits}
-                                {...review}
-                                style={style}
-                                active={active}
-                                fixedText={chrome}
-                                jumpToNote={jumpToNote}
-                                activeFlags={activeFlags}
-                                unreadableSections={unreadableSections}
-                            />
-                        }
-                        releases={
-                            releases.available
-                                ? {
-                                      open: releases.panelOpen,
-                                      onClose: () =>
-                                          releases.setPanelOpen(false),
-                                      content: (
-                                          <TestReleasesPanel
-                                              siteId={siteId}
-                                              releases={releases}
-                                          />
-                                      ),
-                                  }
-                                : undefined
-                        }
-                    />
+                    {desk ? (
+                        <EditorShell
+                            model={model}
+                            bar={topBar.props}
+                            panels={panels.props}
+                            canvas={canvasEl}
+                            inspector={inspectorEl}
+                            brand={railEl}
+                            flagsBySection={flagsBySection}
+                        />
+                    ) : areaOn ? (
+                        <PhoneShell model={model} topBar={topBar}>
+                            {panels}
+                        </PhoneShell>
+                    ) : (
+                        <>
+                            {topBar}
+                            {panels}
+                        </>
+                    )}
 
                     <TestReleaseSheets
                         siteId={siteId}
