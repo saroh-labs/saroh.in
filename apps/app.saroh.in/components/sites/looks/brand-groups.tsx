@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { useId, useState, useTransition } from "react";
 
 import { SiteIconImage } from "@/components/sites/site-icon/site-icon-summary";
+import { runAction } from "@/lib/api/run-action";
 import { colourName } from "@/lib/share-item/share";
 import type { SiteIconSaved } from "@/lib/sites/service";
 import { shownSiteIcon, SITE_ICON_LINE } from "@/lib/sites/site-icon";
@@ -225,9 +226,12 @@ export function LogoGroup({
 
     function save(mediaId: string | null) {
         start(async () => {
-            // Imported on save, as the sheet is on open.
-            const { saveSiteIcon } = await import("@/lib/sites/actions");
-            const res = await saveSiteIcon(icon.siteId, mediaId);
+            const res = await runAction(async () => {
+                // Imported on save, as the sheet is on open.
+                const { saveSiteIcon } = await import("@/lib/sites/actions");
+                return saveSiteIcon(icon.siteId, mediaId);
+            });
+            if (!res) return;
             if (!res.ok) {
                 showError(res.error);
                 return;

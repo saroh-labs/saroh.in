@@ -40,7 +40,7 @@ export function brandColourLines(hex: string, palette: SitePalette) {
                 part: "Text",
                 colour: palette.fg,
                 made: `A deep shade of your ${name}`,
-                reads: "Text is easy to read on this",
+                reads: "Text reads clearly on this",
             },
             {
                 part: "Buttons",
@@ -49,7 +49,7 @@ export function brandColourLines(hex: string, palette: SitePalette) {
                     palette.accent === hex
                         ? `Your ${name}, as it is, with ${words}`
                         : `Your ${name}, a shade deeper, with ${words}`,
-                reads: "Button words are easy to read on it",
+                reads: "Button words read clearly on it",
             },
             {
                 part: "Links and small text",
@@ -58,7 +58,7 @@ export function brandColourLines(hex: string, palette: SitePalette) {
                     palette.accentText === hex
                         ? `Your ${name}, as it is`
                         : `Your ${name}, a shade deeper`,
-                reads: "Easy to read, even small",
+                reads: "Reads clearly, even small",
             },
         ],
         warning: tooLight
@@ -95,7 +95,7 @@ export function BrandColourSheet({
         <FormSheet
             open={open}
             title="Colours from my brand colour"
-            description="One colour in, and the page’s colours are made from it, each one easy to read."
+            description="One colour in, and the page’s colours are made from it, each one clear to read."
             onClose={onClose}
             saveLabel="Use these colours"
             footNote="Every page changes. Saved · goes live when you publish."

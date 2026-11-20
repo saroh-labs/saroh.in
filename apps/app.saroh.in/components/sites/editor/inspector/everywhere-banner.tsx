@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { Notice } from "@saroh/ui/notice";
 
 import { count } from "@/lib/format/plural";
 import type { SitePage } from "@/lib/sites/service";
@@ -31,35 +32,41 @@ export function EverywhereBanner({
     onBack: () => void;
 }) {
     return (
-        <div
-            role="status"
+        <Notice
+            tone="info"
+            layout="banner"
+            icon={false}
+            align="center"
             data-everywhere-banner=""
-            className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b bg-info-subtle px-4 py-2 text-sm text-info-subtle-foreground"
+            action={
+                <>
+                    <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 font-semibold text-inherit"
+                        onClick={onSeePages}
+                    >
+                        See the {count(pages.length, "page")}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0 font-semibold text-inherit"
+                        onClick={onBack}
+                    >
+                        Back to this page&apos;s sections
+                    </Button>
+                </>
+            }
         >
-            <p className="min-w-0 flex-1">
+            <p>
                 <span className="font-semibold">
                     Changes here show on all {count(pages.length, "page")}
                 </span>
                 <span data-ph-mask=""> · {pagesLine(pages)}</span>
             </p>
-            <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0 font-semibold text-inherit"
-                onClick={onSeePages}
-            >
-                See the {count(pages.length, "page")}
-            </Button>
-            <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0 font-semibold text-inherit"
-                onClick={onBack}
-            >
-                Back to this page&apos;s sections
-            </Button>
-        </div>
+        </Notice>
     );
 }

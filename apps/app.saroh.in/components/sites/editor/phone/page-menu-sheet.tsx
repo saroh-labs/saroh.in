@@ -1,5 +1,6 @@
 "use client";
 
+import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import {
@@ -18,8 +19,8 @@ import { openAskAi } from "@/components/ask-ai/open";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 
+import type { EditorTopBarProps, useEditorBar } from "../editor-bar";
 import { EditorSheet } from "../editor-sheet";
-import type { EditorTopBarProps, useEditorBar } from "../editor-top-bar";
 import { MoreSheet } from "../more-actions";
 import type { EditorModel } from "../shell/editor-model";
 
@@ -145,7 +146,7 @@ export function PageMenuSheet({
             title="Pages"
             closeLabel="Close pages"
         >
-            <div className="min-h-0 flex-1 overflow-y-auto">
+            <FormSheetBody className="mx-0 block gap-0 p-0">
                 <PagesPanel
                     siteId={siteId}
                     pages={pages}
@@ -183,7 +184,7 @@ export function PageMenuSheet({
                     done={onClose}
                     onFeedback={onFeedback}
                 />
-            </div>
+            </FormSheetBody>
         </EditorSheet>
     );
 }

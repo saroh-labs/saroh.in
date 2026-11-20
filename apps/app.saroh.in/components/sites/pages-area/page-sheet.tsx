@@ -332,6 +332,7 @@ function OpenPageSheet({
                         On Google
                     </h3>
                     <Field
+                        holdsData={false}
                         label="Title on Google"
                         hint={lengthHint(
                             draft.seoTitle.length,

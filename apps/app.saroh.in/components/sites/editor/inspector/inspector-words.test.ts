@@ -14,13 +14,12 @@ import {
     withTone,
 } from "./section-frame";
 
-const hero = (content: Record<string, unknown>): Section =>
-    ({
-        key: "k1",
-        type: "hero",
-        contractVersion: 1,
-        content: { heading: "Hi", ...content },
-    }) as Section;
+const hero = (content: Record<string, unknown>): Section => ({
+    key: "k1",
+    type: "hero",
+    contractVersion: 1,
+    content: { heading: "Hi", ...content },
+});
 
 describe("a section's frame (KTD-E5)", () => {
     it("absent is the site look; an emptied frame is left out", () => {

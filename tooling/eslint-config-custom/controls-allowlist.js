@@ -277,8 +277,6 @@ export const RAW_ALLOWED = {
     "components/sites/section-fields/padding.tsx": ["input"],
     // button: a block's name tag on the canvas
     "components/sites/canvas/section-preview.tsx": ["button"],
-    // input: a slider
-    "components/sites/looks/style-panel.tsx": ["input"],
     // input: a file picker
     "components/stores/import/csv-import.tsx": ["input"],
     // button: a post picture that is one button, picked from a row or swiped to (#1375)

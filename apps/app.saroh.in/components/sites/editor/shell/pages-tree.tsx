@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { EmptyState } from "@saroh/ui/data-state";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { showError } from "@saroh/ui/toast";
@@ -311,8 +312,12 @@ export function PagesTree({
                                             );
                                         })}
                                         {sections.length === 0 ? (
-                                            <li className="py-2 pl-[30px] text-xs text-muted-foreground">
-                                                No sections yet
+                                            <li className="py-2 pl-[30px]">
+                                                <EmptyState
+                                                    size="inline"
+                                                    className="text-xs"
+                                                    title="No sections yet"
+                                                />
                                             </li>
                                         ) : null}
                                     </ul>

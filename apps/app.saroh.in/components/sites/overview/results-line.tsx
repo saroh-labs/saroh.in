@@ -43,6 +43,7 @@ export function ResultsLine({
             </div>
             {results.visits === 0 ? (
                 <EmptyState
+                    data-ph-mask=""
                     size="inline"
                     title={
                         live ? "No visits in the last 7 days" : "No visits yet"

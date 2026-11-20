@@ -110,6 +110,7 @@ export function PostHistoryPanel({ model }: { model: PostEditorModel }) {
                                 {g.rows.map((r) => (
                                     <li key={r.id}>
                                         <Button
+                                            data-ph-mask=""
                                             type="button"
                                             variant="ghost"
                                             data-version={r.id}

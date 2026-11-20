@@ -23,8 +23,10 @@ import type {
 } from "@/lib/sites/service";
 
 import type { EditorModel } from "../shell/editor-model";
-import type { HistoryScope } from "./history-panel";
 import { FRAME_WIDTH, ScaledPage } from "./preview-frames";
+
+/** Page or whole site: what History compares. */
+export type HistoryScope = "page" | "site";
 
 type Loaded =
     | { state: "loading" }

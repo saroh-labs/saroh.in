@@ -27,6 +27,7 @@ import {
     ADD_ITEMS,
     insertImage,
 } from "@/components/sites/rich-text/writing-menus";
+import { runAction } from "@/lib/api/run-action";
 import { formatDateTime } from "@/lib/format/datetime";
 
 import type { PostEditorModel } from "../editor/post-model";
@@ -437,10 +438,11 @@ function DeleteCard({
                     busy={busy}
                     busyLabel="Deleting…"
                     onClick={async () => {
-                        setBusy(true);
                         setError(null);
-                        const res = await model.draft.remove();
-                        setBusy(false);
+                        const res = await runAction(
+                            () => model.draft.remove(),
+                            { setBusy },
+                        );
                         if (res) setError(res.error);
                     }}
                 >

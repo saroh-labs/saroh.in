@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { Label } from "@saroh/ui/label";
 import { Textarea } from "@saroh/ui/textarea";
 import { useState } from "react";
@@ -110,7 +111,7 @@ function TextBody({
                     Save
                 </Button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pt-4">
+            <FormSheetBody className="mx-0 block gap-0 px-4 pb-0 pt-4">
                 <Label
                     htmlFor="phone-text-sheet"
                     className="mb-2 block text-[0.8125rem] font-medium text-muted-foreground"
@@ -133,7 +134,7 @@ function TextBody({
                 >
                     {count(words, "word")}
                 </p>
-            </div>
+            </FormSheetBody>
         </>
     );
 }

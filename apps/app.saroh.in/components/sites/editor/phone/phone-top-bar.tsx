@@ -8,8 +8,8 @@ import Link from "next/link";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 import { STATUS_BADGE } from "@/components/sites/publish/status-readout";
+import type { EditorTopBarProps, useEditorBar } from "../editor-bar";
 import { EditorSheet } from "../editor-sheet";
-import type { EditorTopBarProps, useEditorBar } from "../editor-top-bar";
 import { MoreSheet } from "../more-actions";
 import { PublishButton } from "../top-bar-actions";
 

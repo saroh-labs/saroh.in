@@ -184,7 +184,7 @@ export function PublishPostSheet({
         setBusy(true);
         const postId =
             draft.dirty || !draft.postId
-                ? await draft.save({ silent: true })
+                ? await runAction(() => draft.save({ silent: true }))
                 : draft.postId;
         if (!postId) {
             setBusy(false);

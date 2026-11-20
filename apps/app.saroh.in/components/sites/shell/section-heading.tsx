@@ -45,6 +45,7 @@ export function SiteSectionHeading({
 
     return (
         <PageHeader
+            holdsData={false}
             title={title}
             // The phone's site home is its own heading.
             className={cn(

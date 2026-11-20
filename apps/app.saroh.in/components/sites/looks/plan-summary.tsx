@@ -49,7 +49,7 @@ export function planLines(
             part: "Colours, buttons and shapes",
             note:
                 paidWays.length > 0
-                    ? `Every colour and your brand colour; ${andList(paidWays.map((c) => c.name))} on paid plans`
+                    ? `Every colour and your brand colour. ${andList(paidWays.map((c) => c.name))} on paid plans`
                     : "Every colour, your brand colour, buttons, cards and corners",
             mark: paidWays.length > 0 ? "Some" : "Yours",
         },
@@ -60,7 +60,7 @@ export function planLines(
             part: "Fonts",
             note:
                 more > 0
-                    ? `${freePairs.length} ${freePairs.length === 1 ? "pair" : "pairs"}; ${more} more on paid plans`
+                    ? `${freePairs.length} ${freePairs.length === 1 ? "pair" : "pairs"}. ${more} more on paid plans`
                     : "Every pair",
             mark: more > 0 ? `${freePairs.length} of ${pairs.length}` : "Yours",
         });
@@ -74,7 +74,7 @@ export function planLines(
             part: "Looks",
             note:
                 paidLooks.length > 0
-                    ? `${andList(free.map(lookName))}; ${andList(paidLooks.map(lookName))} on paid plans`
+                    ? `${andList(free.map(lookName))}. ${andList(paidLooks.map(lookName))} on paid plans`
                     : "Every look",
             mark: paidLooks.length > 0 ? "Some" : "Yours",
         });

@@ -190,6 +190,7 @@ function Options({
             {options.map((o) => (
                 <li key={o.id}>
                     <Button
+                        data-ph-mask=""
                         type="button"
                         variant="ghost"
                         onMouseDown={(e) => e.preventDefault()}

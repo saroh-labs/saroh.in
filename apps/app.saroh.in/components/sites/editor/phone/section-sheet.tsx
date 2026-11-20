@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { TabStrip } from "@saroh/ui/tabs";
@@ -356,16 +357,16 @@ export function SectionSheet({
                 >
                     {actions}
                     {tabs}
-                    <div
+                    <FormSheetBody
                         className={cn(
-                            "min-h-0 flex-1 overflow-y-auto",
+                            "mx-0 block gap-0 p-0",
                             active || selection.selectedChrome
                                 ? "px-4 py-3.5"
                                 : "",
                         )}
                     >
                         {body}
-                    </div>
+                    </FormSheetBody>
                     {footer ? (
                         <SaveFooter className="shrink-0 border-t px-4 pb-3 pt-2 [&>p]:basis-full [&>p]:text-xs">
                             {active && !selection.selectedChrome ? (

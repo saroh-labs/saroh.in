@@ -260,6 +260,10 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
         "components/organizations/team/team-screen.tsx":
             "People and Roles: who is here, and what each role can do",
         "components/sites/editor/editor-chrome.tsx": "the site editor's panels",
+        "components/sites/editor/inspector/site-inspector.tsx":
+            "a section's inspector: Content, Style, Visibility and Feedback, each its own panel",
+        "components/sites/editor/phone/section-sheet.tsx":
+            "a section's sheet on a phone: Content, Style, Visibility and Feedback, each its own panel",
         "components/sites/posts/editor/post-inspector.tsx":
             "a post's inspector: Details, Search and sharing, Feedback (U15)",
         "components/sites/header/website-header.tsx":

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@saroh/ui/button";
+import { FormSheetBody } from "@saroh/ui/form-sheet";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import {
@@ -138,7 +139,7 @@ export function SectionsSheet({
                 </div>
             }
         >
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+            <FormSheetBody className="mx-0 block gap-0 px-4 py-3">
                 <ul
                     ref={list}
                     aria-label="Sections, top to bottom"
@@ -267,7 +268,7 @@ export function SectionsSheet({
                         onOpen={chooseChrome}
                     />
                 </ul>
-            </div>
+            </FormSheetBody>
             <div className="flex shrink-0 gap-2 border-t px-4 pb-3 pt-2.5">
                 {readOnly ? null : (
                     <Button

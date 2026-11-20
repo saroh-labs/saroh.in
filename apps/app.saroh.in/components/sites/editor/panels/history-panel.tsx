@@ -24,14 +24,13 @@ import type {
 } from "@/lib/sites/service";
 
 import type { EditorModel } from "../shell/editor-model";
+import type { HistoryScope } from "./history-compare";
 import { HistoryCompare } from "./history-compare";
 import { ROW, VersionRows, Who } from "./history-rows";
 
 export interface HistoryPanelProps {
     model: EditorModel;
 }
-
-export type HistoryScope = "page" | "site";
 
 /**
  * Set before an Undo or a restore remounts the editor on the new draft

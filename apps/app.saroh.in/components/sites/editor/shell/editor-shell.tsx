@@ -7,9 +7,9 @@ import { PANEL_DEFAULT, RAIL_DEFAULT } from "@/lib/sites/editor-prefs";
 import type { Flag } from "@/lib/sites/service";
 
 import { AddPanel } from "../add/add-panel";
+import type { EditorTopBarProps } from "../editor-bar";
 import type { EditorPanelsProps } from "../editor-panels";
 import { EditorPanels } from "../editor-panels";
-import type { EditorTopBarProps } from "../editor-top-bar";
 import { COMMAND_MENU_READY, CommandMenu } from "../panels/command-menu";
 import { FeedbackPanel } from "../panels/feedback-panel";
 import { HistoryPanel } from "../panels/history-panel";

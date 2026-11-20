@@ -298,7 +298,7 @@ describe("one Brand panel (U24b)", () => {
             ),
         );
         const fonts = host.querySelector('[data-plan-line="Fonts"]');
-        expect(fonts?.textContent).toContain("2 pairs; 1 more on paid plans");
+        expect(fonts?.textContent).toContain("2 pairs. 1 more on paid plans");
         expect(fonts?.textContent).toContain("2 of 3");
         // Change the catalogue, and the card follows.
         paidPairs.add("serif");

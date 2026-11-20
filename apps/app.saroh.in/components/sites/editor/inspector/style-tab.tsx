@@ -181,6 +181,7 @@ export function StyleTab({
                     </span>
                     {readOnly ? null : (
                         <Button
+                            data-ph-unmask=""
                             type="button"
                             variant="link"
                             size="sm"

@@ -142,6 +142,7 @@ export function TypefacePicker({
             }
             trigger={
                 <Button
+                    data-ph-unmask=""
                     type="button"
                     variant="outline"
                     aria-haspopup="listbox"

@@ -5,11 +5,11 @@ import { cloneElement, useState } from "react";
 
 import { AddPanel } from "../add/add-panel";
 import { useKeyboardUp } from "../edit-pill";
+import type { EditorTopBarProps } from "../editor-bar";
+import { useEditorBar } from "../editor-bar";
 import type { EditorPanelsProps } from "../editor-panels";
 import { selectRailTab } from "../editor-rail";
 import { EditorSheet } from "../editor-sheet";
-import type { EditorTopBarProps } from "../editor-top-bar";
-import { useEditorBar } from "../editor-top-bar";
 import type { InspectorHost } from "../inspector-host";
 import type { EditorModel } from "../shell/editor-model";
 import { ReviewerStrip } from "../shell/reviewer-strip";

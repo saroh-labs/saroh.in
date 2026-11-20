@@ -18,8 +18,8 @@ import { openAskAi } from "@/components/ask-ai/open";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 
-import type { EditorTopBarProps } from "../editor-top-bar";
-import { useEditorBar } from "../editor-top-bar";
+import type { EditorTopBarProps } from "../editor-bar";
+import { useEditorBar } from "../editor-bar";
 import { PublishButton } from "../top-bar-actions";
 import type { EditorModel } from "./editor-model";
 import { MoreMenu } from "./more-menu";

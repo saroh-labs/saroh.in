@@ -75,6 +75,7 @@ export function BoundServices({
                             </span>
                             {onPrice ? (
                                 <Button
+                                    data-ph-mask=""
                                     type="button"
                                     variant="outline"
                                     size="sm"
