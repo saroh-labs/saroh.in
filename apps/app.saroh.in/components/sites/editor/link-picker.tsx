@@ -9,6 +9,7 @@ import {
 import { Button } from "@saroh/ui/button";
 import { CheckRow } from "@saroh/ui/check-row";
 import { RadioCards } from "@saroh/ui/choice-group";
+import { EmptyState } from "@saroh/ui/data-state";
 import { Input } from "@saroh/ui/input";
 import { Label } from "@saroh/ui/label";
 import { useId, useState } from "react";
@@ -223,9 +224,10 @@ export function LinkPicker({
                         onChange={set}
                     />
                 ) : (
-                    <p className="text-sm text-muted-foreground">
-                        No services to link to yet.
-                    </p>
+                    <EmptyState
+                        size="inline"
+                        title="No services to link to yet."
+                    />
                 )
             ) : (
                 <div className="grid gap-1.5">
