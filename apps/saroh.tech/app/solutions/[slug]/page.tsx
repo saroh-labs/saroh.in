@@ -282,6 +282,7 @@ export default async function SolutionPage({ params }: Props) {
                         : undefined
                 }
                 claimOn={(c) => !off.includes(c)}
+                releaseOn={(r) => !featuresOff().includes(r)}
                 templatesOn={templatesOn}
                 // As saroh.in: the fallback only repeats "No card needed".
                 freeLine={free !== FREE_PLAN_LINE.fallback ? free : undefined}

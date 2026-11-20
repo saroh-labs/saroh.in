@@ -680,7 +680,11 @@ Saroh refunds nothing, so nothing paid for is cut short:
   `paidUntil` for the date; never compare `currentPeriodEnd` yourself, and
   never special-case `TRIALING` to move at once.
 - The first-month offer belongs to the plan it is set on and is used once
-  per business (`hadTrial`). No path may quote a `TRIAL` while one runs.
+  per person and GSTIN (DEC-227, `trialTakenBy`, `same-payer.ts`): a
+  business that shares an owner, a billing profile's person or a GSTIN with
+  one that had it doesn't get it, and checkout says why (`offerNotes`). The
+  launch discount and a typed coupon are once per person the same way
+  (`hadPaidPlanOrLaunchOffer`). No path may quote a `TRIAL` while one runs.
 - Ending the provider subscription a business is leaving goes through
   `leavesWithCycle`: with the cycle in a paid period, at once in a first
   month (it has no cycle, and left alone would take the full charge).

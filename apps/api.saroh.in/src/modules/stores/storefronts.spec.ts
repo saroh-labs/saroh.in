@@ -15,10 +15,11 @@ jest.mock("@saroh/database", () => {
         site: { updateMany: jest.fn() },
         storeSettings: { upsert: jest.fn() },
         stockLevel: { findMany: jest.fn(), count: jest.fn() },
-        $queryRaw: jest.fn(),
+        $queryRaw: jest.fn(() => Promise.resolve([])),
         $executeRaw: jest.fn(),
     };
     return {
+        onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
         prisma: {
             store: {
                 findMany: jest.fn(),

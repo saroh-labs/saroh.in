@@ -24,6 +24,8 @@ import {
 } from "@/lib/providers/actions";
 import type { StripeKeys } from "@/lib/providers/rows";
 import {
+    cantSend,
+    CONNECTABLE_COMMS,
     connectablePayments,
     needsPublicKey,
     needsWebhookSecret,
@@ -84,6 +86,8 @@ const CHANNELS: Record<
             hint?: string;
         }[];
         fromLabel: string;
+        /** What the provider asks of the business before it can send. */
+        setup?: string;
     }
 > = {
     EMAIL: {
@@ -93,15 +97,9 @@ const CHANNELS: Record<
             { value: "SENDGRID", label: "SendGrid" },
             { value: "SMTP", label: "SMTP relay" },
         ],
-        fields: [
-            { key: "apiKey", label: "API key", secret: true },
-            {
-                key: "baseUrl",
-                label: "Relay address",
-                optional: true,
-                hint: "Only for a self-hosted or regional relay. Leave empty for the provider's own.",
-            },
-        ],
+        // No relay address: a key sent to a relay can't be checked, so it
+        // could read "connected" and never send (review 04 H1).
+        fields: [{ key: "apiKey", label: "API key", secret: true }],
         fromLabel: "Send from",
     },
     WHATSAPP: {
@@ -115,8 +113,19 @@ const CHANNELS: Record<
             { key: "phoneNumberId", label: "Phone number ID" },
         ],
         fromLabel: "Sending number",
+        setup: "Your own WhatsApp Business number, through Meta. Meta asks you to verify your business first. Messages to someone who hasn't written to you in the last 24 hours need a template Meta has approved. Meta bills your business for these messages directly, not through Saroh.",
     },
 };
+
+/** The providers Saroh can send through on a channel (`CONNECTABLE_COMMS`). */
+const sendable = (channel: CommsChannel) =>
+    CHANNELS[channel].providers.filter((p) =>
+        CONNECTABLE_COMMS[channel].includes(p.value),
+    );
+/** `wanted` when Saroh can send through it, else the channel's first. */
+const firstSendable = (channel: CommsChannel, wanted?: string) =>
+    sendable(channel).find((p) => p.value === wanted)?.value ??
+    sendable(channel)[0].value;
 
 const labelOfPayment = (p: string) =>
     PAYMENT_PROVIDERS.find((x) => x.value === p)?.label ?? p;
@@ -608,11 +617,12 @@ function MessagingForm({
     const router = useRouter();
     const [channel, setChannel] = useState<CommsChannel>(initialChannel);
     const spec = CHANNELS[channel];
+    const offered = sendable(channel);
     const current = connected.find(
         (c) => c.channel === channel && c.status === "CONNECTED",
     );
     const [provider, setProvider] = useState(
-        initialProvider ?? current?.provider ?? spec.providers[0].value,
+        firstSendable(channel, initialProvider ?? current?.provider),
     );
     const [values, setValues] = useState<Record<string, string>>({});
     const [fromAddress, setFromAddress] = useState(current?.fromAddress ?? "");
@@ -627,7 +637,7 @@ function MessagingForm({
             (c) => c.channel === next && c.status === "CONNECTED",
         );
         setChannel(next);
-        setProvider(now?.provider ?? CHANNELS[next].providers[0].value);
+        setProvider(firstSendable(next, now?.provider));
         setFromAddress(now?.fromAddress ?? "");
         setValues({});
         setTried(false);
@@ -695,7 +705,7 @@ function MessagingForm({
                             key: c.channel,
                             name: labelOfComms(c.channel, c.provider),
                             detail: c.fromAddress,
-                            status: c.status,
+                            status: cantSend(c) ? "NOT_WORKING" : c.status,
                         }))}
                     onDisconnect={(key) => setConfirming(key as CommsChannel)}
                 />
@@ -708,9 +718,14 @@ function MessagingForm({
                         id={providerId}
                         value={provider}
                         onValueChange={setProvider}
-                        options={spec.providers}
+                        options={offered}
                     />
                 </div>
+                {spec.setup ? (
+                    <p className="text-[12.5px] text-muted-foreground">
+                        {spec.setup}
+                    </p>
+                ) : null}
                 {spec.fields.map((f, i) => (
                     <SecretField
                         key={`${channel}-${f.key}`}
@@ -813,12 +828,20 @@ function Connected({
                     </span>
                     <Badge
                         variant={
-                            r.status === "CONNECTED" ? "success" : "neutral"
+                            r.status === "CONNECTED"
+                                ? "success"
+                                : r.status === "NOT_WORKING"
+                                  ? "warning"
+                                  : "neutral"
                         }
                     >
-                        {r.status === "CONNECTED" ? "Connected" : "Off"}
+                        {r.status === "CONNECTED"
+                            ? "Connected"
+                            : r.status === "NOT_WORKING"
+                              ? "Not working"
+                              : "Off"}
                     </Badge>
-                    {r.status === "CONNECTED" ? (
+                    {r.status === "CONNECTED" || r.status === "NOT_WORKING" ? (
                         <Button
                             type="button"
                             variant="ghost"

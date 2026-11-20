@@ -110,9 +110,10 @@ describe("an unpublished page is in neither the nav nor the sitemap", () => {
         // with the account manager's link cookie (DEC-169), and to 21 Oct with
         // Saroh's own cookieless visit counting (DEC-181), and to 26 Oct with
         // the free tools' emails (DEC-194). The Terms' moved to 6 Nov with
-        // "Saroh is in early access." (owner).
+        // "Saroh is in early access." (owner). Privacy's moved to 20 Nov with
+        // the sub-processor list and Google's Limited Use (review 20 Nov).
         const termsBefore = at("2026-10-08T18:31:00Z");
-        const privacyAfter = at("2026-11-05T18:31:00Z");
+        const privacyAfter = at("2026-11-19T18:31:00Z");
         expect(shownLegal(legalBefore).map((p) => p.href)).toEqual([]);
         for (const href of ["/privacy", "/terms", "/refunds"]) {
             expect(indexedPaths("waitlist", legalBefore)).not.toContain(href);

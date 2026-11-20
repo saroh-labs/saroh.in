@@ -1,6 +1,7 @@
 import { prisma } from "@saroh/database";
 
 import { accountThreadOffered, accountUpdatesChosen } from "./account-thread";
+import { sendable } from "./providers/provider.port";
 
 /**
  * "Updates in your customers' Messages" (12 Oct 2026), for Settings ›
@@ -37,10 +38,10 @@ export async function readAccountUpdates(
             where: {
                 organizationId_channel: { organizationId, channel: "EMAIL" },
             },
-            select: { status: true },
+            select: { status: true, channel: true, provider: true },
         }),
     ]);
-    return { on, offered, emailConnected: provider?.status === "CONNECTED" };
+    return { on, offered, emailConnected: sendable(provider) };
 }
 
 /** Set the choice, making the profile if the business has none yet. */

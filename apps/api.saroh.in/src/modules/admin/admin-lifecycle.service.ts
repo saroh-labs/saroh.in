@@ -15,6 +15,7 @@ import { EntitlementService } from "../billing/entitlement.service";
 import { backfillOneOrganization } from "../capabilities/module-backfill";
 import { ModuleLifecycleService } from "../capabilities/module-lifecycle.service";
 import { isModuleKey } from "../capabilities/module-registry";
+import { settleFreeLimitInTx } from "../organizations/free-business";
 import { LEGAL_HOLD_CODE } from "../organizations/legal-hold";
 import {
     legalHoldAllowsMoveTo,
@@ -254,6 +255,13 @@ export class AdminLifecycleService {
                 deletionReason: null,
             }),
             action: "organization.reinstated",
+            // A deletion called off brings it back: past the one-Free rule
+            // it pauses (DEC-227). A lifted suspension never counted out.
+            inTx: async (tx, organizationId, from) =>
+                from !== OrganizationLifecycleStatus.Suspended &&
+                (await settleFreeLimitInTx(tx, organizationId))
+                    ? { freeLimitPaused: true }
+                    : {},
         });
     }
 
@@ -469,7 +477,20 @@ export class AdminLifecycleService {
                         ? "organization.trial.extended"
                         : "organization.trial.started",
                 targetType: "subscription",
-                metadata: { days: command.days, endsAt: endsAt.toISOString() },
+                metadata: {
+                    days: command.days,
+                    endsAt: endsAt.toISOString(),
+                    // The before-value (review B1).
+                    from: existing
+                        ? {
+                              status: existing.status,
+                              planId: existing.planId,
+                              endsAt:
+                                  existing.currentPeriodEnd?.toISOString() ??
+                                  null,
+                          }
+                        : null,
+                },
             });
             return { ok: true, endsAt };
         });
@@ -679,6 +700,7 @@ export class AdminLifecycleService {
             inTx?: (
                 tx: Tx,
                 organizationId: string,
+                from: string,
             ) => Promise<Record<string, unknown>>;
         },
     ) {
@@ -747,7 +769,7 @@ export class AdminLifecycleService {
             if (updated.count === 0) throw changedMeanwhile();
 
             const effects = options.inTx
-                ? await options.inTx(tx, organization.id)
+                ? await options.inTx(tx, organization.id, from)
                 : {};
             const metadata = { from, to, ...options.metadata, ...effects };
             await this.ledger(tx, {

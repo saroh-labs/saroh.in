@@ -65,6 +65,8 @@ export default async function TeamTab({ params }: BusinessTabProps) {
                             role: m.role,
                         }))}
                         invitations={people.invitations}
+                        ownerChanges={people.ownerChanges}
+                        staffUserId={staff.userId}
                         canChange={canChange}
                     />
                 )}

@@ -52,6 +52,8 @@ export const CANCEL_REFUSED: Readonly<Record<string, string>> = {
         "The retention eraser runs itself again; cancelling a run would only hide it",
     "security-logs.retention":
         "The security log retention sweep runs itself again; cancelling a run would only hide it",
+    "media.pending-sweep":
+        "The unconfirmed-upload sweep runs itself again; cancelling a run would only hide it",
     "ai.retention":
         "The Ask AI history sweep runs itself again; cancelling a run would only hide it",
     "ai.spend-alarm":

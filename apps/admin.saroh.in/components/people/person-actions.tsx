@@ -4,6 +4,7 @@ import { Label } from "@saroh/ui/label";
 
 import {
     changeMemberRoleAction,
+    confirmOwnerChangeAction,
     endSessionsAction,
     removeMemberAction,
     resendInvitationAction,
@@ -11,6 +12,18 @@ import {
 } from "@/lib/people-actions";
 
 import { OperatorDialog } from "../operator-dialog";
+
+/** The API recorded an Owner change for a second staff member (F3). */
+function waitsForSecond(result: { ok: boolean; data?: unknown }): boolean {
+    return (
+        result.ok &&
+        (result.data as { pending?: unknown } | null)?.pending === true
+    );
+}
+
+/** Making, moving or removing an Owner waits for a second staff member. */
+const OWNER_NOTE =
+    " A change to an Owner waits until a second staff member confirms it, and the business's Owners are emailed.";
 
 const BUILT_IN_ROLES = [
     { value: "OWNER", label: "Owner" },
@@ -55,6 +68,7 @@ export function ChangeRole({
     trigger = "Change role",
     roles = BUILT_IN_ROLES,
     onChanged,
+    onPending,
 }: {
     organizationId: string;
     userId: string;
@@ -65,13 +79,15 @@ export function ChangeRole({
     roles?: readonly { value: string; label: string; can?: string }[];
     /** After the API took it: the new role and the reason, for feedback. */
     onChanged?: (change: { from: string; to: string; reason: string }) => void;
+    /** After the API recorded an Owner change for a second staff member. */
+    onPending?: () => void;
 }) {
     return (
         <OperatorDialog
             trigger={trigger}
             triggerVariant="ghost"
             title={`Change ${name}'s role`}
-            effect="The business's history records the change under your name, and the trail records your reason."
+            effect={`The business's history records the change under your name, and the trail records your reason.${OWNER_NOTE}`}
             fields={
                 <div className="grid gap-1.5">
                     <Label htmlFor={`role-${userId}`}>New role</Label>
@@ -102,7 +118,8 @@ export function ChangeRole({
                     userId,
                     { reason, idempotencyKey, role: to },
                 );
-                if (result.ok) onChanged?.({ from: role, to, reason });
+                if (waitsForSecond(result)) onPending?.();
+                else if (result.ok) onChanged?.({ from: role, to, reason });
                 return result;
             }}
         />
@@ -116,6 +133,7 @@ export function RemoveMember({
     business,
     trigger = "Remove",
     onRemoved,
+    onPending,
 }: {
     organizationId: string;
     userId: string;
@@ -124,13 +142,15 @@ export function RemoveMember({
     trigger?: string;
     /** After the API took it, for feedback. */
     onRemoved?: () => void;
+    /** After the API recorded an Owner's removal for a second staff member. */
+    onPending?: () => void;
 }) {
     return (
         <OperatorDialog
             trigger={trigger}
             triggerVariant="ghost"
             title={`Remove ${name} from ${business}`}
-            effect="They lose access to this business at once, and their share links stop working. Their account and other businesses are untouched."
+            effect={`They lose access to this business at once, and their share links stop working. Their account and other businesses are untouched.${OWNER_NOTE}`}
             destructive
             submitLabel="Remove from business"
             onSubmit={async ({ reason, idempotencyKey }) => {
@@ -139,7 +159,8 @@ export function RemoveMember({
                     userId,
                     { reason, idempotencyKey },
                 );
-                if (result.ok) onRemoved?.();
+                if (waitsForSecond(result)) onPending?.();
+                else if (result.ok) onRemoved?.();
                 return result;
             }}
         />
@@ -185,5 +206,33 @@ export function InvitationActions({
                 }
             />
         </div>
+    );
+}
+
+/** A second, different staff member confirms an Owner change (F3). */
+export function ConfirmOwnerChange({
+    organizationId,
+    requestId,
+    what,
+}: {
+    organizationId: string;
+    requestId: string;
+    /** The change in words: "Make Asha an Owner". */
+    what: string;
+}) {
+    return (
+        <OperatorDialog
+            trigger="Confirm…"
+            triggerVariant="outline"
+            title={`Confirm: ${what}`}
+            effect="Another staff member asked for this. Confirming applies it now, records your reason beside theirs, and emails the business's Owners."
+            submitLabel="Confirm change"
+            onSubmit={({ reason, idempotencyKey }) =>
+                confirmOwnerChangeAction(organizationId, requestId, {
+                    reason,
+                    idempotencyKey,
+                })
+            }
+        />
     );
 }

@@ -40,7 +40,7 @@ describe("the days the footer's pages publish", () => {
 
 describe("sarohFooterLinks", () => {
     it("is Privacy, Terms and Help once all three are published", () => {
-        expect(sarohFooterLinks(new Date("2026-11-06T00:00:00+05:30"))).toEqual(
+        expect(sarohFooterLinks(new Date("2026-11-20T00:00:00+05:30"))).toEqual(
             [
                 { label: "Privacy", href: `${SAROH_SITE_URL}/privacy` },
                 { label: "Terms", href: `${SAROH_SITE_URL}/terms` },
@@ -87,7 +87,7 @@ describe("each edition's links open a real page", () => {
 
     it("sends Global to saroh.tech's /legal/privacy, /legal/terms and /help", () => {
         expect(
-            sarohFooterLinks(new Date("2026-11-06T00:00:00+05:30"), "GLOBAL"),
+            sarohFooterLinks(new Date("2026-11-20T00:00:00+05:30"), "GLOBAL"),
         ).toEqual([
             { label: "Privacy", href: "https://saroh.tech/legal/privacy" },
             { label: "Terms", href: "https://saroh.tech/legal/terms" },
@@ -108,7 +108,7 @@ describe("each edition's links open a real page", () => {
     it("keeps India's at saroh.in's root", () => {
         expect(
             sarohFooterLinks(
-                new Date("2026-11-06T00:00:00+05:30"),
+                new Date("2026-11-20T00:00:00+05:30"),
                 "INDIA",
             ).map((l) => l.href),
         ).toEqual([

@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 
 import { appBase } from "../../common/app-url";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { planMeter } from "../billing/metering.service";
 import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
@@ -662,6 +663,8 @@ export class CalendarConnectService {
     }
 
     private redirectUri(ctx: OrganizationContext): string {
+        if (env.GOOGLE_CALENDAR_LOCAL_REDIRECT)
+            return env.GOOGLE_CALENDAR_LOCAL_REDIRECT;
         const base = apiBase(ctx.edition ?? null);
         if (!base) {
             throw new ServiceUnavailableException(

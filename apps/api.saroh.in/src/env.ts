@@ -202,6 +202,17 @@ const envSchema = z.object({
     // (below), and honoured only in a test run, as STRIPE_FAKE is
     // (`calendar-sync/google/google-calendar.provider.ts`).
     GOOGLE_CALENDAR_FAKE: z.enum(["1"]).optional(),
+    // LOCAL ONLY. Google won't take `https://api.saroh.localhost` as a
+    // redirect address, so a laptop registers `http://localhost:<PORT>` +
+    // the callback path and sets it here; that bare-port hit (no session
+    // cookie there) is bounced to API_PUBLIC_URL's callback. Refused at boot
+    // under NODE_ENV=production (below).
+    GOOGLE_CALENDAR_LOCAL_REDIRECT: z.string().url().optional(),
+    // TEST ONLY. `1`: a business's email or WhatsApp keys are taken without
+    // asking Resend or Meta (the email-setup browser spec connects one).
+    // Refused at boot under NODE_ENV=production (below), and honoured only in
+    // a test run, as STRIPE_FAKE is (`communications/provider-keys.ts`).
+    COMMS_KEYS_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -298,6 +309,20 @@ const envSchema = z.object({
     // until the window turns (SMS still is), and Platform owners are
     // emailed. Unset: 100 an hour, 500 a day
     // (`account-phone/whatsapp-ceiling.ts`).
+    // Invitation emails a day (A-02, `organizations/invite-send-limit.ts`):
+    // sends, not live invites, so withdrawing and inviting again counts
+    // each time. One budget per business (business and location invites
+    // together) and one per recipient address across every business.
+    INVITE_SENDS_PER_BUSINESS_PER_DAY: z.string().regex(/^\d+$/).optional(),
+    INVITE_SENDS_PER_EMAIL_PER_DAY: z.string().regex(/^\d+$/).optional(),
+    // Wrong passwords one account may take in a window, from any address,
+    // before password sign-in for it waits for the window to turn (A-03,
+    // `common/auth/password-tries.ts`).
+    PASSWORD_FAILS_PER_ACCOUNT: z.string().regex(/^\d+$/).optional(),
+    PASSWORD_FAIL_WINDOW_MINUTES: z.string().regex(/^\d+$/).optional(),
+    // How long a write waits for its plan meter lock before a 429 (A-01,
+    // `billing/metering.service.ts`), in ms.
+    PLAN_METER_LOCK_WAIT_MS: z.string().regex(/^\d+$/).optional(),
     WHATSAPP_CODES_PER_HOUR: z.string().regex(/^\d+$/).optional(),
     WHATSAPP_CODES_PER_DAY: z.string().regex(/^\d+$/).optional(),
     // Requests a minute one signed-in person may make to the API, every
@@ -305,6 +330,9 @@ const envSchema = z.object({
     // Unset: 1200. 0 turns it off (the browser-test stacks, where many
     // workers share one seeded login).
     MEMBER_REQUESTS_PER_MINUTE: z.string().regex(/^\d+$/).optional(),
+    // Businesses one person may set up a day (M-4, DEC-227,
+    // `organizations/free-business.ts`). Unset: 5. 0 turns it off.
+    BUSINESS_CREATES_PER_DAY: z.string().regex(/^\d+$/).optional(),
     // The opening-day launch offer (marketing plan U31, OQ-1): how many days
     // of the offer plan a business made through a waitlist invite gets, from
     // the moment it is made. The owner's number, set per instance, never
@@ -393,6 +421,12 @@ const envSchema = z.object({
     API_REPLICAS: z.coerce.number().int().positive().default(1),
     // The pg pool's `max` (`@saroh/database` reads it); unset keeps pg's 10.
     DB_POOL_MAX: z.coerce.number().int().positive().optional(),
+    // Bounds on every database wait (A-01, `@saroh/database` pool-options),
+    // in ms; 0 turns one off. Taking a connection from a full pool, one
+    // statement, and a transaction left idle.
+    DB_POOL_CONNECT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
+    DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
+    DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
     // Which Cashfree the API talks to, for merchants' payments and Saroh's own
     // billing alike: `sandbox` for test credentials, `production` (default)
     // for live ones. The API sends the mode with every checkout's client
@@ -447,6 +481,21 @@ const envSchema = z.object({
     // should normally hold one break-glass address or be empty. Unset = nobody,
     // and the guard still fails closed.
     ADMIN_ALLOWLIST: z.string().optional(),
+    // The admin console's session (review A2): `/admin` refuses a session
+    // signed in longer ago than this many minutes (default 720, 12 hours),
+    // and a dangerous admin write (grants, people, sign-in help, flags,
+    // overrides, deploys) one older than ADMIN_STEP_UP_MAX_AGE_MINUTES
+    // (default 60). The console sends the person to sign in again.
+    ADMIN_SESSION_MAX_AGE_MINUTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(720),
+    ADMIN_STEP_UP_MAX_AGE_MINUTES: z.coerce
+        .number()
+        .int()
+        .positive()
+        .default(60),
 
     // Set automatically by npm/pnpm run scripts; used for the health probe.
     // Background job worker (S3-003 — durable JobQueue outbox + worker).
@@ -497,15 +546,25 @@ const envSchema = z.object({
  * at boot, so a missing one stops the deploy instead (plan
  * 2026-10-05-001, KTD-2).
  */
-const REQUIRED_IN_PRODUCTION = [
+type EnvKey = keyof z.infer<typeof envSchema>;
+
+const REQUIRED_IN_PRODUCTION: readonly (EnvKey | readonly EnvKey[])[] = [
     "RENDERER_URL",
     "APP_URL",
-    "EMAIL_FROM",
+    // A list is one setting under any name the code reads; the first is the
+    // one named when all are missing.
+    ["EMAIL_FROM", "SENDER_EMAIL_ID"],
     // Keys every phone and address hash the durable limits count by: unset,
     // they were random per process, so phone-code limits started over on
     // every deploy and a code sent before one could never be checked (03-M3).
     "ANALYTICS_IP_SALT",
-] as const;
+    // Saroh's own email (review 04 H3): unset, every sign-in code and
+    // reset link was written to the log and the screen said "sent". Under
+    // either name `common/email.ts` reads (07 F11); with no host it sends
+    // through Gmail, so the host is not required.
+    ["SMTP_USER", "USER_ACCOUNT"],
+    ["SMTP_PASS", "USER_PASSWORD"],
+];
 
 /**
  * Test-only switches: a deployed API refuses to boot with any of them set,
@@ -518,6 +577,8 @@ const TEST_ONLY = [
     "AI_PROVIDER_FAKE",
     "SOCIAL_FAKE",
     "GOOGLE_CALENDAR_FAKE",
+    "GOOGLE_CALENDAR_LOCAL_REDIRECT",
+    "COMMS_KEYS_FAKE",
     // Where Saroh's Meta token and MSG91 key are sent: a value left in
     // production would hand them to that host (03-L8).
     "META_GRAPH_BASE_URL",
@@ -548,11 +609,12 @@ const checkedSchema = envSchema.superRefine((value, ctx) => {
             });
         }
     }
-    for (const key of REQUIRED_IN_PRODUCTION) {
-        if (!value[key]) {
+    for (const required of REQUIRED_IN_PRODUCTION) {
+        const names = typeof required === "string" ? [required] : required;
+        if (!names.some((name) => value[name])) {
             ctx.addIssue({
                 code: "custom",
-                path: [key],
+                path: [names[0] ?? ""],
                 message: "required when NODE_ENV=production",
             });
         }

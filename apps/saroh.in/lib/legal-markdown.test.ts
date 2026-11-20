@@ -39,7 +39,7 @@ describe("parseLegal", () => {
 describe("the Privacy Policy", () => {
     const blocks = parseLegal(PRIVACY.body);
 
-    it("has the owner's thirteen sections, in order", () => {
+    it("has the owner's sixteen sections, in order", () => {
         expect(
             blocks.flatMap((b) => (b.kind === "heading" ? [b.text] : [])),
         ).toEqual([
@@ -48,6 +48,9 @@ describe("the Privacy Policy", () => {
             "What we collect",
             "Why we're allowed to",
             "Who we share it with",
+            "Sub-processors",
+            "Google user data",
+            "Deleting data a Meta app connected",
             "Where it's stored",
             "How long we keep it",
             "Your rights",

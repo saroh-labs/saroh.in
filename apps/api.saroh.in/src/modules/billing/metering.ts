@@ -18,7 +18,7 @@
  * | `integrations`     | connected payment and messaging providers                              |
  * | `shopLocations`    | locations not deleted whose settings say `SHOP` (customers visit); an online-only one, or one with no settings, never counts |
  * | `sites`            | websites not deleted                                                   |
- * | `storageGb`        | photos and videos uploaded and checked (`Media.status` READY), in GB  |
+ * | `storageGb`        | photos and videos uploaded and checked (READY) or still uploading (PENDING, at the size it said, until swept), in GB |
  * | `visitsPerMonth`   | this month's site views (`site.view`), from the daily rollup          |
  * | `aiQuestionsPerMonth` | Ask AI turns that counted (`AiUsage.counted`, DEC-220): answered, drafted or stopped after the answer began |
  * | `socialPostsPerMonth` | Saroh Social posts going out in the window (by `publishAt`, so one scheduled into next month counts there), once each however many channels; drafts and posts cancelled before they started never count |
@@ -38,7 +38,10 @@
  *
  * Storage is in decimal gigabytes ({@link BYTES_PER_GB}, as a disk is sold),
  * rounded UP to the hundredth so a business with anything stored never reads
- * as using 0 GB. Failed or unconfirmed uploads hold nothing.
+ * as using 0 GB. An upload holds its space from the moment it starts, so
+ * uploads started side by side can't pass a hard storage cap (M-5); one
+ * never confirmed is swept (`media/pending-upload-sweep.job.ts`). A failed
+ * upload holds nothing: its object was deleted.
  */
 import type { Prisma } from "@saroh/database";
 import type { LimitPeriod, LimitWords } from "@saroh/pricing-catalog";
@@ -51,6 +54,7 @@ import {
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
+import { sendable } from "../communications/providers/provider.port";
 import { BOOKABLE_STAFF, countedOnDiary } from "./seats";
 
 /** The limit keys metering counts, in `MODULE_MAP`'s words. */
@@ -314,8 +318,14 @@ export function openInvitations(now: Date) {
     return { status: "PENDING", expiresAt: { gt: now } } as const;
 }
 
-/** Media that holds space: uploaded and checked. */
-export const STORED = "READY";
+/**
+ * The one media status that holds no space: a failed upload, whose object
+ * was deleted. READY and PENDING (an upload in progress) both hold it.
+ */
+export const NOT_STORED = "FAILED";
+
+/** Media that holds space: anything but a failed upload. */
+export const STORED_MEDIA = { status: { not: NOT_STORED } } as const;
 
 /** A location customers visit (`StoreSettings.kind`). */
 export const SHOP_KIND = "SHOP";
@@ -437,11 +447,14 @@ export async function countUsage(
                 db.merchantPaymentProvider.count({
                     where: { organizationId, status: "CONNECTED" },
                 }),
-                db.communicationProvider.count({
+                // Only rows that can send: a retired provider's row still
+                // reads CONNECTED but never sends (N11).
+                db.communicationProvider.findMany({
                     where: { organizationId, status: "CONNECTED" },
+                    select: { status: true, channel: true, provider: true },
                 }),
             ]);
-            return payments + messaging;
+            return payments + messaging.filter(sendable).length;
         }
         case "shopLocations":
             return db.store.count({
@@ -457,7 +470,7 @@ export async function countUsage(
             });
         case "storageGb": {
             const sum = await db.media.aggregate({
-                where: { organizationId, status: STORED },
+                where: { organizationId, ...STORED_MEDIA },
                 _sum: { sizeBytes: true },
             });
             return bytesToGb(Number(sum._sum.sizeBytes ?? 0));

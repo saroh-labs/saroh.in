@@ -135,10 +135,14 @@ export function OperatorDialog({
             if (typeof value === "string") values[name] = value;
         });
         setError(null);
+        // A dialog its parent opened (controlled, mounted closed) never got
+        // a key from onOpenChange: make this attempt's now, kept for a retry.
+        const attemptKey = key || crypto.randomUUID();
+        if (!key) setKey(attemptKey);
         startTransition(async () => {
             const result = await onSubmit({
                 reason: reason.trim(),
-                idempotencyKey: key,
+                idempotencyKey: attemptKey,
                 values,
                 form: data,
             });

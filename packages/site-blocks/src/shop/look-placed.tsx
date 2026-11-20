@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { formatAmount } from "../lib/money";
-import { toldText } from "../lib/told";
+import { emailed, toldText } from "../lib/told";
 import { cn } from "../lib/utils";
 import { SoldByLine } from "../sold-by";
 import { SHOP_LABEL, SHOP_TITLE, shopOutline, shopPrimary } from "./look-shop";
@@ -32,15 +32,23 @@ import { OrderConfirmation, toPayLead } from "./order-confirmation";
  * the look's slow step (200 ms, `data-site-rise`).
  */
 
-/** What happens next, in words: pick-up and delivery said apart. */
-export function placedNext(order: OrderConfirmationData): string {
+/**
+ * What happens next, in words: pick-up and delivery said apart. "We'll
+ * email you" only when the business's own email sends it (`reach`); else
+ * the business will be in touch, as Classic says.
+ */
+export function placedNext(
+    order: OrderConfirmationData,
+    businessName: string,
+): string {
     const pickup =
         order.fulfilment.type === "PICKUP" || order.fulfilment.pickup !== null;
     if (order.refunded) return "Your money has been sent back.";
     const pay = order.toPay ? `${toPayLead(order.toPay)} ` : "";
+    const who = emailed(order.reach) ? "We'll email you" : `${businessName} will be in touch`;
     return pickup
-        ? `${pay}We'll email you when it's ready for pick-up.`
-        : `${pay}We'll email you when it's on its way.`;
+        ? `${pay}${who} when it's ready for pick-up.`
+        : `${pay}${who} when it's on its way.`;
 }
 
 export function LookOrderPlaced({
@@ -95,7 +103,7 @@ export function LookOrderPlaced({
                         {order.refunded
                             ? null
                             : `${toldText(order.reach, order.email)} `}
-                        {placedNext(order)}
+                        {placedNext(order, businessName)}
                     </p>
                     <div className="mt-7 flex flex-wrap gap-3">
                         {ordersHref ? (

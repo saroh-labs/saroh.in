@@ -200,13 +200,22 @@ export class AccountPhoneService {
         const { eventId } = verdict;
         if (input.channel === "whatsapp") {
             await this.underCeiling(keys, eventId);
+            const code = newCode();
             if (input.purpose === "add") {
-                return this.sendWhatsapp(input, keys, eventId);
+                return this.sendWhatsapp(input, keys, eventId, code);
             }
             const account = await accountOf(input.phoneE164);
+            // The row is saved before anything is sent, known number or not,
+            // so a wrong code straight after start answers the same (02 A-1,
+            // 07 F1). For an unknown number no one is ever sent it.
+            await saveCode({
+                phoneHash: keys.phoneHash,
+                code,
+                purpose: "SIGN_IN",
+            });
             if (account) {
                 this.inBackground(
-                    this.sendWhatsapp(input, keys, eventId, account),
+                    this.sendWhatsapp(input, keys, eventId, code, account),
                 );
             } else {
                 this.blocked("start", "no_account", keys);
@@ -514,7 +523,8 @@ export class AccountPhoneService {
     }
 
     /**
-     * Make a code, send it from Saroh's number, keep its hash. A send that
+     * Send a code from Saroh's number (signing in, its hash is saved before
+     * the call; adding a phone, after it succeeds). A send that
      * fails is still a start for the daily and address caps, but not for
      * the 30-second cooldown: it was our failure, not the person's.
      * Signing in (`account` given), Saroh staff get nothing (DEC-198).
@@ -523,13 +533,14 @@ export class AccountPhoneService {
         input: { phoneE164: string; purpose: PhonePurpose; userId?: string },
         keys: Keys,
         eventId: string,
+        code: string,
         account?: { id: string; email: string },
     ): Promise<PhoneStart> {
         if (account && (await isSarohStaff(account))) {
+            // The saved row stands as the decoy no one is sent.
             this.blocked("start", "staff", keys);
             return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
-        const code = newCode();
         let reason: string;
         try {
             const result = await this.messaging.sendOtp({
@@ -547,19 +558,27 @@ export class AccountPhoneService {
         }
         if (reason) {
             this.blocked("start", `whatsapp_${reason}`, keys);
-            // Our own failure doesn't hold the cooldown; it still counts.
-            await releaseStart(eventId, `whatsapp_${reason}`);
+            // Signing in, the failure must look like an unknown number: the
+            // cooldown holds and the saved row stands as a decoy (02 A-1, A-2).
+            if (!account) {
+                // Our own failure doesn't hold the cooldown; it still counts.
+                await releaseStart(eventId, `whatsapp_${reason}`);
+            }
             throw new UnprocessableEntityException({
                 message: "Couldn't send on WhatsApp. Try SMS instead.",
                 details: { code: "WHATSAPP_FAILED" },
             });
         }
-        await saveCode({
-            phoneHash: keys.phoneHash,
-            code,
-            purpose: input.purpose === "add" ? "ADD" : "SIGN_IN",
-            userId: input.purpose === "add" ? input.userId : undefined,
-        });
+        if (!account) {
+            // Adding a phone: kept only once sent, so a failed resend
+            // doesn't hide the code already sent.
+            await saveCode({
+                phoneHash: keys.phoneHash,
+                code,
+                purpose: "ADD",
+                userId: input.userId,
+            });
+        }
         return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
     }
 

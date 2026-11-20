@@ -3,6 +3,7 @@ import { nextOrderNumberInTx, Prisma, prisma } from "@saroh/database";
 
 import { isSerializationFailure } from "../../common/prisma-errors";
 import { planMeter } from "../billing/metering.service";
+import { ordersPaused } from "../billing/plan-limit-errors";
 import { splitName } from "../bookings/reservation";
 import { fillContactPhoneInTx } from "../customer-workspace/contact-phone-fill";
 import { resolveContact } from "../customer-workspace/resolve-contact";
@@ -139,17 +140,18 @@ export async function createCheckoutOrder(
         try {
             return await prisma.$transaction(
                 async (tx) => {
-                    // The plan's monthly orders cap is soft here (U13, OQ-8):
-                    // the site never turns a customer away; at the cap the
-                    // business is told instead. It counts once paid (OQ-7), or
-                    // from the start when it is paid on handover.
+                    // The plan's monthly orders cap, as its cell says
+                    // (DEC-227, replacing OQ-8's always-soft site): hard, a
+                    // full month turns the customer away with no plan words
+                    // and the business hears from its limit notice; soft, it
+                    // counts and tells. It counts once paid (OQ-7), or from
+                    // the start when it is paid on handover (R30). The same
+                    // lock as an order added by hand.
                     await planMeter.roomInTx(
                         tx,
                         scope.organizationId,
                         "orders",
-                        {
-                            soft: true,
-                        },
+                        { refuse: ordersPaused },
                     );
                     // A guest's order fills nothing: their contact was made
                     // with what they gave, or is someone's already.

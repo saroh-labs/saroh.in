@@ -29,11 +29,15 @@ function makeDb(
 ) {
     return {
         communicationProvider: {
-            findUnique: jest
-                .fn()
-                .mockResolvedValue(
-                    provider ? { status: provider, provider: "RESEND" } : null,
-                ),
+            findUnique: jest.fn().mockResolvedValue(
+                provider
+                    ? {
+                          status: provider,
+                          channel: "EMAIL",
+                          provider: "RESEND",
+                      }
+                    : null,
+            ),
         },
         customerAccount: {
             count: jest.fn().mockResolvedValue(accounts),

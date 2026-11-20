@@ -48,7 +48,9 @@ describe("money and limits as typed", () => {
         expect(parseLimit("")).toBeNull();
         expect(parseLimit("  ")).toBeNull();
         expect(parseLimit("12")).toBe(12);
-        for (const t of ["0", "-1", "2.5", "ten"])
+        // A fraction, for storage's GB; the catalogue refuses it elsewhere.
+        expect(parseLimit("2.5")).toBe(2.5);
+        for (const t of ["0", "-1", "2.555", "ten"])
             expect(parseLimit(t)).toBeUndefined();
     });
 });

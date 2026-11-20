@@ -346,7 +346,7 @@ describe("alerts (real database)", () => {
             data: {
                 organizationId: b.organizationId,
                 channel: "EMAIL",
-                provider: "SMTP",
+                provider: "RESEND",
                 fromAddress: "hello@rye.in",
                 encryptedCredentials: "sealed",
                 credentialsIv: "iv",

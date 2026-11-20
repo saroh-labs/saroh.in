@@ -5,6 +5,7 @@ import type { ModuleAccess } from "@saroh/pricing-catalog";
 
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
+import { freeLimitPaused } from "../organizations/free-business";
 import { CatalogueAccessService } from "./catalogue-access.service";
 import { openInvitations, SHOP_KIND } from "./metering";
 import type {
@@ -24,6 +25,7 @@ import {
     pausedFromMeasure,
     pauseLimitsOf,
     pausesFrom,
+    UNCAPPED,
 } from "./over-limit";
 import { BOOKABLE_STAFF, countedOnDiary } from "./seats";
 
@@ -183,6 +185,19 @@ export class OverLimitService {
                 s?.paused && s.pausesFrom
                     ? pausedFromMeasure(organizationId, s.pausesFrom, s.measure)
                     : null;
+            // Past the one-Free rule (DEC-227): every website stops taking
+            // orders and bookings, as an extra website past a plan does.
+            const freePaused = await freeLimitPaused(organizationId).catch(
+                (err: unknown) => {
+                    this.logger.warn(
+                        `free_limit_unresolved org=${organizationId} error=${err instanceof Error ? err.name : "unknown"}`,
+                    );
+                    return false;
+                },
+            );
+            if (freePaused) {
+                value = await withEverySitePaused(organizationId, now, value);
+            }
         } catch (err) {
             this.logger.warn(
                 `over_limit_unresolved org=${organizationId} error=${err instanceof Error ? err.name : "unknown"}`,
@@ -253,6 +268,32 @@ export class OverLimitService {
     ): Promise<PauseMeasure> {
         return measurePauses(prisma, organizationId, pauseLimitsOf(modules));
     }
+}
+
+/** `paused` with every website of the business added to what pauses. */
+async function withEverySitePaused(
+    organizationId: string,
+    now: Date,
+    paused: PausedNow | null,
+): Promise<PausedNow> {
+    const sites = await prisma.site.findMany({
+        where: { organizationId, deletedAt: null },
+        select: { id: true },
+    });
+    const base =
+        paused ??
+        pausedFromMeasure(organizationId, now, {
+            limits: UNCAPPED,
+            people: [],
+            products: { cut: null, count: 0 },
+            posts: { cut: null, count: 0 },
+            locations: [],
+            sites: [],
+        });
+    return {
+        ...base,
+        siteIds: new Set([...base.siteIds, ...sites.map((x) => x.id)]),
+    };
 }
 
 /** The service built bare, for free functions (as `planMeter` is). */

@@ -18,7 +18,12 @@ function make(data: {
         attentionAt?: Date | null;
         attentionReason?: string | null;
     }[];
-    comms?: { status: string; attentionAt?: Date | null }[];
+    comms?: {
+        status: string;
+        attentionAt?: Date | null;
+        channel?: string;
+        provider?: string;
+    }[];
     domains?: { status: string }[];
 }) {
     const db = {
@@ -129,7 +134,14 @@ describe("ProviderHealthService", () => {
     it("reports FAILED, with where to fix it, when the only connection refused its keys (UX-012)", async () => {
         const { svc } = make({
             payments: [{ status: "CONNECTED", attentionAt: new Date() }],
-            comms: [{ status: "CONNECTED", attentionAt: null }],
+            comms: [
+                {
+                    status: "CONNECTED",
+                    attentionAt: null,
+                    channel: "EMAIL",
+                    provider: "RESEND",
+                },
+            ],
         });
         const list = await svc.list(OWNER);
         expect(byKey(list, "PAYMENTS")).toMatchObject({
@@ -139,6 +151,17 @@ describe("ProviderHealthService", () => {
         });
         expect(byKey(list, "COMMUNICATIONS")?.status).toBe("ACTIVE");
     });
+    it.each(["SENDGRID", "SMTP"])(
+        "reports FAILED for a %s row saved as CONNECTED: Saroh can't send through it (F2)",
+        async (provider) => {
+            const { svc } = make({
+                comms: [{ status: "CONNECTED", channel: "EMAIL", provider }],
+            });
+            expect(byKey(await svc.list(OWNER), "COMMUNICATIONS")?.status).toBe(
+                "FAILED",
+            );
+        },
+    );
     it("stays ACTIVE when a Stripe key only lacks a side permission: payments still go through (KTD-14)", async () => {
         const { svc } = make({
             payments: [

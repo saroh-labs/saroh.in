@@ -568,7 +568,7 @@ describe("FeatureFlagService — control-plane audit", () => {
                 reason: "CRM GA rollout",
                 outcome: "SUCCESS",
                 idempotencyKey: "flag-change-123",
-                metadata: { enabled: true },
+                metadata: { enabled: true, from: false },
             }),
         });
     });

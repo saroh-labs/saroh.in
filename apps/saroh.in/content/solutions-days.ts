@@ -497,8 +497,10 @@ const RYE_DAY: TradeDay = {
             note: {
                 text: "Have a developer or an agency? They can read orders with an API key and hear about each paid one by webhook.",
                 link: { label: "API keys and webhooks", href: "/developers" },
+                release: "developers",
             },
             used: [{ feature: "ai-apps" }, { feature: "website" }],
+            release: "ai-apps",
         },
         {
             anchor: "9pm",
@@ -532,6 +534,7 @@ const RYE_DAY: TradeDay = {
             },
             after: RYE_ASK_FOOT,
             used: [{ feature: "ask-ai" }],
+            release: "ask-ai",
         },
     ],
     next: {
@@ -918,6 +921,7 @@ const PETAL_DAY: TradeDay = {
                 },
             ],
             used: [{ feature: "ai-apps" }, { feature: "ask-ai" }],
+            release: "ai-apps",
         },
     ],
     doorLine:

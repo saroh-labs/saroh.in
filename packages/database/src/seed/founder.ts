@@ -12,14 +12,18 @@ import { hashPassword, id } from "./helpers";
  * left as it is. Returns her id.
  */
 export async function seedFounder(prisma: Db): Promise<string> {
+    // Her seeded businesses are on Free, and every setup spec makes another
+    // as her: staff's exception to one Free business a person (DEC-227).
+    const extraFreeBusinesses = 100_000;
     const founder = await prisma.user.upsert({
         where: { email: FOUNDER_EMAIL },
-        update: { name: "Asha Rao", emailVerified: true },
+        update: { name: "Asha Rao", emailVerified: true, extraFreeBusinesses },
         create: {
             id: id("user", "founder"),
             email: FOUNDER_EMAIL,
             name: "Asha Rao",
             emailVerified: true,
+            extraFreeBusinesses,
         },
     });
     // better-auth's own hasher, as for the owner and the reviewer.

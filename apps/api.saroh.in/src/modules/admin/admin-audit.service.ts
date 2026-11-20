@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
-import { getCorrelationId } from "../../common/logging/request-context";
+import { getRequestContext } from "../../common/logging/request-context";
 import type { AdminPermission } from "./admin-permissions";
 
 const MAX_PAGE_SIZE = 100;
@@ -40,6 +40,10 @@ export interface AdminAuditListInput {
     actorUserId?: string;
     organizationId?: string;
     action?: string;
+    /** Part of the actor's name or email. */
+    actor?: string;
+    /** Part of the business's name. */
+    business?: string;
 }
 
 export interface AdminAuditListItem {
@@ -53,8 +57,14 @@ export interface AdminAuditListItem {
     reason: string | null;
     outcome: string;
     correlationId: string | null;
+    ipAddress: string | null;
+    userAgent: string | null;
+    sessionId: string | null;
     metadata: unknown;
     createdAt: Date;
+    /** The actor's name, else email; null when the account is gone. */
+    actorName: string | null;
+    organizationName: string | null;
 }
 
 export interface AdminAuditPage {
@@ -97,15 +107,56 @@ export class AdminAuditService {
 
     async list(input: AdminAuditListInput = {}): Promise<AdminAuditPage> {
         const limit = clampLimit(input.limit);
+        // The ledger has no relations by design; names resolve to ids here.
+        const actorIds = input.actor?.trim()
+            ? (
+                  await prisma.user.findMany({
+                      where: {
+                          OR: [
+                              {
+                                  name: {
+                                      contains: input.actor.trim(),
+                                      mode: "insensitive",
+                                  },
+                              },
+                              {
+                                  email: {
+                                      contains: input.actor.trim(),
+                                      mode: "insensitive",
+                                  },
+                              },
+                          ],
+                      },
+                      select: { id: true },
+                      take: 100,
+                  })
+              ).map((u) => u.id)
+            : null;
+        const businessIds = input.business?.trim()
+            ? (
+                  await prisma.organization.findMany({
+                      where: {
+                          name: {
+                              contains: input.business.trim(),
+                              mode: "insensitive",
+                          },
+                      },
+                      select: { id: true },
+                      take: 100,
+                  })
+              ).map((o) => o.id)
+            : null;
         const rows = await prisma.adminAuditEvent.findMany({
             where: {
-                ...(input.actorUserId
-                    ? { actorUserId: input.actorUserId }
-                    : {}),
-                ...(input.organizationId
-                    ? { organizationId: input.organizationId }
-                    : {}),
-                ...(input.action ? { action: input.action } : {}),
+                AND: [
+                    input.actorUserId ? { actorUserId: input.actorUserId } : {},
+                    input.organizationId
+                        ? { organizationId: input.organizationId }
+                        : {},
+                    input.action ? { action: input.action } : {},
+                    actorIds ? { actorUserId: { in: actorIds } } : {},
+                    businessIds ? { organizationId: { in: businessIds } } : {},
+                ],
             },
             ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
             take: limit + 1,
@@ -121,13 +172,49 @@ export class AdminAuditService {
                 reason: true,
                 outcome: true,
                 correlationId: true,
+                ipAddress: true,
+                userAgent: true,
+                sessionId: true,
                 metadata: true,
                 createdAt: true,
             },
         });
 
         const hasMore = rows.length > limit;
-        const items = hasMore ? rows.slice(0, limit) : rows;
+        const page = hasMore ? rows.slice(0, limit) : rows;
+        const [users, orgs] = await Promise.all([
+            prisma.user.findMany({
+                where: {
+                    id: { in: [...new Set(page.map((r) => r.actorUserId))] },
+                },
+                select: { id: true, name: true, email: true },
+            }),
+            prisma.organization.findMany({
+                where: {
+                    id: {
+                        in: [
+                            ...new Set(
+                                page.flatMap((r) =>
+                                    r.organizationId ? [r.organizationId] : [],
+                                ),
+                            ),
+                        ],
+                    },
+                },
+                select: { id: true, name: true },
+            }),
+        ]);
+        const userName = new Map(
+            users.map((u) => [u.id, u.name?.trim() ? u.name : u.email]),
+        );
+        const orgName = new Map(orgs.map((o) => [o.id, o.name]));
+        const items = page.map((row) => ({
+            ...row,
+            actorName: userName.get(row.actorUserId) ?? null,
+            organizationName: row.organizationId
+                ? (orgName.get(row.organizationId) ?? null)
+                : null,
+        }));
 
         return {
             items,
@@ -143,7 +230,11 @@ export function createAdminAuditData(
         ? validateMetadata(input.metadata)
         : undefined;
 
+    const request = getRequestContext();
     return {
+        ipAddress: request?.ip,
+        userAgent: request?.userAgent,
+        sessionId: request?.sessionId,
         actorUserId: input.actorUserId,
         permission: input.permission,
         action: input.action,
@@ -152,7 +243,7 @@ export function createAdminAuditData(
         organizationId: input.organizationId,
         reason: input.reason,
         outcome: input.outcome,
-        correlationId: getCorrelationId(),
+        correlationId: request?.correlationId,
         idempotencyKey: input.idempotencyKey,
         metadata,
     };

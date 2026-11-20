@@ -9,6 +9,7 @@
  */
 const tx = {
     $executeRaw: jest.fn(),
+    $queryRaw: jest.fn(() => Promise.resolve([{ prev: "0" }])),
     job: { create: jest.fn() },
     product: { count: jest.fn() },
     order: { count: jest.fn() },
@@ -18,7 +19,7 @@ const tx = {
     staffMember: { count: jest.fn() },
     organizationInvitation: { findMany: jest.fn() },
     merchantPaymentProvider: { count: jest.fn() },
-    communicationProvider: { count: jest.fn() },
+    communicationProvider: { findMany: jest.fn() },
     businessProfile: { findUnique: jest.fn() },
     service: { findFirst: jest.fn() },
     store: { count: jest.fn() },
@@ -31,6 +32,7 @@ const tx = {
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
 jest.mock("@saroh/database", () => ({
+    onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
     prisma: {
         $transaction: (fn: never) => $transaction(fn),
         // `hasRoom` counts outside a write's transaction.
@@ -76,6 +78,7 @@ import {
     crossesNotice,
     MeteringService,
     PLAN_LIMIT_NOTICE_TYPE,
+    rowGate,
 } from "./metering.service";
 import { bookingsPaused, moduleLocked } from "./plan-limit-errors";
 import { limitLevel, limitNoticeWords } from "./plan-limit-notice.handler";
@@ -407,7 +410,7 @@ describe("what each count asks", () => {
             1.24,
         );
         expect(tx.media.aggregate).toHaveBeenCalledWith({
-            where: { organizationId: "org", status: "READY" },
+            where: { organizationId: "org", status: { not: "FAILED" } },
             _sum: { sizeBytes: true },
         });
         tx.media.aggregate.mockResolvedValue({ _sum: { sizeBytes: null } });
@@ -465,9 +468,23 @@ describe("what each count asks", () => {
 
     it("adds connected messaging to connected payment providers", async () => {
         tx.merchantPaymentProvider.count.mockResolvedValue(1);
-        tx.communicationProvider.count.mockResolvedValue(1);
+        tx.communicationProvider.findMany.mockResolvedValue([
+            { status: "CONNECTED", channel: "EMAIL", provider: "RESEND" },
+        ]);
         expect(await countUsage(tx as never, "org", "integrations", now)).toBe(
             2,
+        );
+    });
+
+    it("leaves out a retired messaging row that can't send (N11)", async () => {
+        tx.merchantPaymentProvider.count.mockResolvedValue(0);
+        tx.communicationProvider.findMany.mockResolvedValue([
+            { status: "CONNECTED", channel: "EMAIL", provider: "SENDGRID" },
+            { status: "CONNECTED", channel: "WHATSAPP", provider: "TWILIO" },
+            { status: "CONNECTED", channel: "WHATSAPP", provider: "META" },
+        ]);
+        expect(await countUsage(tx as never, "org", "integrations", now)).toBe(
+            1,
         );
     });
 
@@ -535,7 +552,21 @@ describe("crossing a notice's line", () => {
         expect(limitNoticeWords(row, "teamMembers", 2, 2, "full").title).toBe(
             "You've reached your 2 team members on Plan A",
         );
+        // Past a hard orders cap only a payment confirmed late takes it
+        // there (DEC-227); a soft one kept taking orders.
         expect(limitNoticeWords(row, "ordersPerMonth", 2, 3, "over")).toEqual({
+            title: "You're past your 2 orders a month on Plan A",
+            body: "Your site isn't taking more orders until the count starts again. Plan B raises the limit.",
+        });
+        expect(
+            limitNoticeWords(
+                { ...row, soft: true },
+                "ordersPerMonth",
+                2,
+                3,
+                "over",
+            ),
+        ).toEqual({
             title: "You're past your 2 orders a month on Plan A",
             body: "Your site kept taking orders, so no customer was turned away. Plan B raises the limit.",
         });
@@ -607,7 +638,8 @@ describe("MeteringService", () => {
         const err = await meter
             .roomInTx(tx as never, "org", "products")
             .catch((e: unknown) => e);
-        expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+        // Bounded wait, the lock, the wait put back (A-01).
+        expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
         expect(responseOf(err)).toMatchObject({
             message: "You've reached your 3 products on Plan A",
             details: {
@@ -773,7 +805,7 @@ describe("hasRoom: the connect's check, asked before offering it (DEC-086)", () 
     // `integrations`: 1 on Plan A, 2 on Plan B, no cap on Plan C.
     function connections(n: number) {
         tx.merchantPaymentProvider.count.mockResolvedValue(n);
-        tx.communicationProvider.count.mockResolvedValue(0);
+        tx.communicationProvider.findMany.mockResolvedValue([]);
     }
 
     it("is room when the plan includes it with room for one more", async () => {
@@ -837,6 +869,33 @@ describe("hasRoom: the connect's check, asked before offering it (DEC-086)", () 
         await expect(meter.hasRoom("org", "integrations")).rejects.toThrow(
             "down",
         );
+    });
+});
+
+describe("rowGate: storage a plan leaves out (N4)", () => {
+    const cell = (moduleId: string, state: "on" | "locked") => ({
+        moduleId,
+        state,
+        limit: state === "on" ? 1 : null,
+        soft: false,
+    });
+
+    it("reads storage that isn't included as open, never every upload locked", () => {
+        expect(rowGate(cell("storage", "locked") as never, false)).toBe("open");
+    });
+
+    it("still locks another row the plan leaves out", () => {
+        expect(rowGate(cell("products", "locked") as never, false)).toBe(
+            "locked",
+        );
+    });
+
+    it("keeps an included hard storage cell hard", () => {
+        expect(rowGate(cell("storage", "on") as never, false)).toEqual({
+            key: "storageGb",
+            limit: 1,
+            soft: false,
+        });
     });
 });
 

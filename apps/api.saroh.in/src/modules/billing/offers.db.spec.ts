@@ -1101,6 +1101,113 @@ describe("add-ons", () => {
     });
 });
 
+describe("add-ons are always paid for (review 19 Nov 2026, H-1 and M-1)", () => {
+    /** An order paid at the provider, as Razorpay's `order.paid` reads. */
+    async function orderPaid(order: string, amount: number) {
+        evt += 1;
+        const raw = Buffer.from(
+            JSON.stringify({
+                providerEventId: `evt_${evt}_${tag}`,
+                type: "order.paid",
+                providerSubscriptionId: order,
+                status: "ACTIVE",
+                phase: "charged",
+                eventAt: new Date(Date.now() + evt).toISOString(),
+                providerPaymentId: `pay_${evt}_${tag}`,
+                paymentAmountPaise: amount,
+            }),
+        );
+        const signature = createHmac("sha256", SECRET)
+            .update(raw)
+            .digest("hex");
+        return webhooks.handle("razorpay", raw, {
+            "x-fake-signature": signature,
+        });
+    }
+
+    it("H-1: on a yearly plan, more is the rest of the year on an order of its own, held once paid; the renewal's order carries it", async () => {
+        await install(
+            OFFERS((c) => {
+                c.plans[1]!.trial = undefined;
+            }),
+        );
+        const ctx = await business();
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "year" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const yearOrder = fake.orders.created.at(-1)!;
+        await orderPaid(`fake_order_${r.checkout.id}`, yearOrder.amountPaise);
+        expect(await sub(ctx.organizationId)).toMatchObject({
+            status: "ACTIVE",
+            billingCycle: "year",
+        });
+
+        const buying = new AddonsService(undefined, checkout);
+        const view = await buying.set(ctx, "things-pack", 2);
+        // Nothing held, and nothing left waiting on a charge that never comes.
+        expect(view.addons.find((a) => a.id === "things-pack")?.quantity).toBe(
+            0,
+        );
+        expect(
+            await prisma.subscriptionAddonCharge.count({
+                where: { status: "QUEUED" },
+            }),
+        ).toBe(0);
+        const order = fake.orders.created.at(-1)!;
+        expect(order.amountPaise).toBeGreaterThan(withGstPaise(2 * 111));
+        expect(view.payment?.providerOrderId).toBe(
+            `fake_order_${order.reference}`,
+        );
+
+        await orderPaid(view.payment!.providerOrderId, order.amountPaise);
+        const held = await prisma.subscriptionAddon.findMany({
+            where: { organizationId: ctx.organizationId },
+        });
+        expect(held).toEqual([
+            expect.objectContaining({ addonId: "things-pack", quantity: 2 }),
+        ]);
+        expect(
+            await prisma.sarohInvoice.findFirstOrThrow({
+                where: {
+                    providerSubscriptionId: view.payment!.providerOrderId,
+                },
+            }),
+        ).toMatchObject({ source: "ADDON", totalPaise: order.amountPaise });
+
+        // The next year is paid with the add-ons held then, a whole year.
+        const live = await sub(ctx.organizationId);
+        const renewing = new Date(live.currentPeriodEnd!.getTime() - 5 * DAY);
+        const quote = await checkout.quote(
+            ctx,
+            { plan: "b", cycle: "year" },
+            renewing,
+        );
+        expect(quote.kind).toBe("RENEW");
+        expect(quote.addonsNowPaise).toBeGreaterThan(2 * 111);
+    });
+
+    it("M-1: once a move to Free is scheduled, no more can be bought; less still can", async () => {
+        await install(
+            OFFERS((c) => {
+                c.plans[1]!.trial = undefined;
+            }),
+        );
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        await addons.set(ctx, "things-pack", 1);
+        await checkout.changePlan(ctx, { plan: "free", cycle: "month" });
+        expect((await sub(ctx.organizationId)).cancelAtPeriodEnd).toBe(true);
+
+        const before = await prisma.subscriptionAddonCharge.count();
+        await expect(addons.set(ctx, "things-pack", 2)).rejects.toMatchObject({
+            status: 409,
+        });
+        expect((await addons.list(ctx)).canBuy).toBe(false);
+        expect(await prisma.subscriptionAddonCharge.count()).toBe(before);
+        await addons.set(ctx, "things-pack", 0);
+        expect(await prisma.subscriptionAddon.count()).toBe(0);
+    });
+});
+
 describe("automatic coupons (owner, 18 Nov 2026)", () => {
     const automatic = (code: string, over: Parameters<typeof coupon>[1] = {}) =>
         coupon(code, over).then((c) =>

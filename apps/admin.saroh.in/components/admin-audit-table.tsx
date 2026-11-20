@@ -10,7 +10,11 @@ import {
 } from "@saroh/ui/table";
 import Link from "next/link";
 
-import type { AdminAuditPage, AdminAuditQuery } from "@/lib/control-plane";
+import type {
+    AdminAuditEvent,
+    AdminAuditPage,
+    AdminAuditQuery,
+} from "@/lib/control-plane";
 
 /**
  * Semantic status tokens, not raw palette classes. These previously hardcoded
@@ -54,7 +58,7 @@ export function AdminAuditTable({
              * scrolls, unmarked, inside this one.
              */}
             <ScrollX label="Audit events" className="rounded-lg border">
-                <table className="w-full min-w-[980px] caption-bottom text-sm">
+                <table className="w-full min-w-[1180px] caption-bottom text-sm">
                     <TableHeader>
                         <TableRow>
                             <TableHead>Time</TableHead>
@@ -64,6 +68,7 @@ export function AdminAuditTable({
                             <TableHead>Outcome</TableHead>
                             <TableHead>Reason</TableHead>
                             <TableHead>Correlation</TableHead>
+                            <TableHead>Details</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -72,8 +77,13 @@ export function AdminAuditTable({
                                 <TableCell className="whitespace-nowrap text-muted-foreground">
                                     {formatTime(event.createdAt)}
                                 </TableCell>
-                                <TableCell className="max-w-48 font-mono text-xs">
-                                    <span className="block truncate">
+                                <TableCell className="max-w-48">
+                                    {event.actorName && (
+                                        <span className="block truncate">
+                                            {event.actorName}
+                                        </span>
+                                    )}
+                                    <span className="block truncate font-mono text-xs text-muted-foreground">
                                         {event.actorUserId}
                                     </span>
                                 </TableCell>
@@ -92,7 +102,8 @@ export function AdminAuditTable({
                                     </p>
                                     {event.organizationId && (
                                         <p className="mt-1 truncate text-xs text-muted-foreground">
-                                            Org: {event.organizationId}
+                                            {event.organizationName ??
+                                                `Org: ${event.organizationId}`}
                                         </p>
                                     )}
                                 </TableCell>
@@ -110,6 +121,9 @@ export function AdminAuditTable({
                                     <span className="block truncate">
                                         {event.correlationId ?? "—"}
                                     </span>
+                                </TableCell>
+                                <TableCell className="max-w-80 text-xs">
+                                    <EventDetails event={event} />
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -156,6 +170,55 @@ export function AdminAuditTable({
     );
 }
 
+/** What the row holds beyond its columns: where from, and the metadata. */
+function EventDetails({ event }: { event: AdminAuditEvent }) {
+    const where = [event.ipAddress, event.userAgent, event.sessionId].filter(
+        Boolean,
+    );
+    if (where.length === 0 && event.metadata == null) return "—";
+    return (
+        <details>
+            <summary className="cursor-pointer text-muted-foreground">
+                Show
+            </summary>
+            <dl className="mt-2 grid gap-1">
+                {event.ipAddress && (
+                    <div>
+                        <dt className="text-muted-foreground">Address</dt>
+                        <dd className="break-all font-mono">
+                            {event.ipAddress}
+                        </dd>
+                    </div>
+                )}
+                {event.userAgent && (
+                    <div>
+                        <dt className="text-muted-foreground">Browser</dt>
+                        <dd className="break-all">{event.userAgent}</dd>
+                    </div>
+                )}
+                {event.sessionId && (
+                    <div>
+                        <dt className="text-muted-foreground">Session</dt>
+                        <dd className="break-all font-mono">
+                            {event.sessionId}
+                        </dd>
+                    </div>
+                )}
+                {event.metadata != null && (
+                    <div>
+                        <dt className="text-muted-foreground">Detail</dt>
+                        <dd>
+                            <pre className="whitespace-pre-wrap break-all font-mono">
+                                {JSON.stringify(event.metadata, null, 2)}
+                            </pre>
+                        </dd>
+                    </div>
+                )}
+            </dl>
+        </details>
+    );
+}
+
 function formatTime(value: string): string {
     return new Intl.DateTimeFormat("en-GB", {
         dateStyle: "medium",
@@ -172,6 +235,8 @@ function withoutCursor(
             actorUserId: query.actorUserId,
             organizationId: query.organizationId,
             action: query.action,
+            actor: query.actor,
+            business: query.business,
         }).filter((entry): entry is [string, string] => Boolean(entry[1])),
     );
 }

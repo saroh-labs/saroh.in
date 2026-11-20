@@ -71,7 +71,7 @@ async function connectEmail(b: Business) {
         data: {
             organizationId: b.organizationId,
             channel: "EMAIL",
-            provider: "SMTP",
+            provider: "RESEND",
             fromAddress: "hello@example.com",
             encryptedCredentials: "sealed",
             credentialsIv: "iv",

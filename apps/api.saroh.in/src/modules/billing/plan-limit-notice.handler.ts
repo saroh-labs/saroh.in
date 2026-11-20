@@ -6,6 +6,7 @@ import {
     countedWhat,
     LIMIT_WARN_AT,
     limitNotice,
+    pausedWords,
 } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
@@ -57,15 +58,17 @@ export function resetDay(end: Date, zone: string): string {
 /** What past a cap says, by key: what kept working. */
 function overBody(key: MeteredLimitKey, soft: boolean): string {
     if (key === "ordersPerMonth")
-        return "Your site kept taking orders, so no customer was turned away.";
-    // A soft cap's own words say nothing was stopped (`LIMIT_WORDS.paused`).
-    if (soft) return METER_WORDS[key].paused;
+        return soft
+            ? "Your site kept taking orders, so no customer was turned away."
+            : "Your site isn't taking more orders until the count starts again.";
+    // A soft cap's own words say nothing was stopped (`pausedWords`).
+    if (soft) return pausedWords(METER_WORDS[key], true);
     return "What you already have stays as it is.";
 }
 
 /**
  * The notice's words: the design's 80% / 100% (`limitNotice`), or past it.
- * A soft cap (`ModuleAccess.soft`: storage, visits) never stops anything,
+ * A soft cap (`ModuleAccess.soft`: visits, storage where its cell says) never stops anything,
  * so its 80% notice doesn't say "you'll be stopped".
  */
 export function limitNoticeWords(
@@ -124,7 +127,7 @@ export function limitNoticeWords(
         },
         used,
         words.what,
-        words.paused,
+        pausedWords(words, soft),
         { action: words.action, actionOpen, resetsOn },
     );
     if (!n.on) return { title: "", body: "" };

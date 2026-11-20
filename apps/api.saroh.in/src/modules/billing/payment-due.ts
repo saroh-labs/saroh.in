@@ -2,6 +2,7 @@ import type { Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { settleFreeLimitInTx } from "../organizations/free-business";
 import { enqueueBillingEmail } from "./billing-email.job";
 import { enqueueProviderCancel } from "./provider-cancel.job";
 
@@ -117,6 +118,8 @@ async function closeOneInTx(id: string, now: Date): Promise<boolean> {
             where: { id: sub.id },
             data: { status: "CANCELLED", paymentDueUntil: null },
         });
+        // On Free now: past the one-Free rule it pauses (DEC-227).
+        await settleFreeLimitInTx(tx, sub.organizationId);
         // Ended at the provider too, so it can never charge for a plan the
         // business no longer has.
         if (sub.provider && sub.providerSubscriptionId) {

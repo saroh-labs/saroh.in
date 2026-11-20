@@ -70,6 +70,11 @@ export function stateName(code: string | null | undefined): string | null {
 }
 
 const GSTIN_SHAPE = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+
+/** A GSTIN as stored and compared: letters and digits only, upper-cased. */
+export function normaliseGstin(v: string | null | undefined): string {
+    return (v ?? "").replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+}
 const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /** The GSTIN's own check character, from its first fourteen. */

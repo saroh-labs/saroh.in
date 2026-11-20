@@ -198,11 +198,13 @@ export function monthAddonLines(
     held: readonly HeldAddon[],
     start: Date,
     end: Date,
+    /** A year paid once carries them a whole year (review 19 Nov, H-1). */
+    cycle: "month" | "year" = "month",
 ): AddonChargeLine[] {
     return held.flatMap((h) => {
         const addon = catalog.addons.find((a) => a.id === h.addonId);
         return addon && h.quantity > 0 && addonOfferedOn(addon, planId)
-            ? [addonPeriodLine(addon, h.quantity, "month", start, end)]
+            ? [addonPeriodLine(addon, h.quantity, cycle, start, end)]
             : [];
     });
 }

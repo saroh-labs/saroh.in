@@ -409,6 +409,7 @@ export function TradePage(props: TradePageProps) {
             }
             feature={feature}
             claimOn={props.claimOn}
+            releaseOn={(r) => !off.includes(r)}
             templatesOn={!off.includes("templates")}
             freeLine={props.freeLine}
             problems={{

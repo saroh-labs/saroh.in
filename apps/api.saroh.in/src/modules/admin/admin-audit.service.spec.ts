@@ -4,11 +4,18 @@ jest.mock("@saroh/database", () => ({
             create: jest.fn(),
             findMany: jest.fn(),
         },
+        user: { findMany: jest.fn() },
+        organization: { findMany: jest.fn() },
     },
 }));
 
 jest.mock("../../common/logging/request-context", () => ({
-    getCorrelationId: jest.fn(() => "request_123"),
+    getRequestContext: jest.fn(() => ({
+        correlationId: "request_123",
+        ip: "203.0.113.9",
+        userAgent: "Browser/1",
+        sessionId: "sess_1",
+    })),
 }));
 
 import { BadRequestException } from "@nestjs/common";
@@ -19,6 +26,8 @@ import { AdminPermission } from "./admin-permissions";
 
 const create = prisma.adminAuditEvent.create as jest.Mock;
 const findMany = prisma.adminAuditEvent.findMany as jest.Mock;
+const findUsers = prisma.user.findMany as jest.Mock;
+const findOrgs = prisma.organization.findMany as jest.Mock;
 
 const input = {
     actorUserId: "user_1",
@@ -33,6 +42,8 @@ describe("AdminAuditService", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        findUsers.mockResolvedValue([]);
+        findOrgs.mockResolvedValue([]);
     });
 
     it("writes safe metadata with the current correlation id", async () => {
@@ -49,6 +60,9 @@ describe("AdminAuditService", () => {
             data: expect.objectContaining({
                 ...input,
                 correlationId: "request_123",
+                ipAddress: "203.0.113.9",
+                userAgent: "Browser/1",
+                sessionId: "sess_1",
                 metadata: { view: "summary", filters: ["active"] },
             }),
         });
@@ -117,9 +131,13 @@ describe("AdminAuditService", () => {
         expect(findMany).toHaveBeenCalledWith(
             expect.objectContaining({
                 where: {
-                    actorUserId: "user_1",
-                    organizationId: "org_1",
-                    action: "flags.global.set",
+                    AND: [
+                        { actorUserId: "user_1" },
+                        { organizationId: "org_1" },
+                        { action: "flags.global.set" },
+                        {},
+                        {},
+                    ],
                 },
                 cursor: { id: "event_before" },
                 skip: 1,
@@ -129,5 +147,43 @@ describe("AdminAuditService", () => {
         );
         expect(page.items).toHaveLength(100);
         expect(page.nextCursor).toBe("event_99");
+    });
+
+    it("filters by an actor's or a business's name, and names them (B6)", async () => {
+        findUsers
+            .mockResolvedValueOnce([{ id: "user_1" }])
+            .mockResolvedValueOnce([
+                { id: "user_1", name: "Asha", email: "asha@example.com" },
+            ]);
+        findOrgs
+            .mockResolvedValueOnce([{ id: "org_1" }])
+            .mockResolvedValueOnce([{ id: "org_1", name: "Rye Bakery" }]);
+        findMany.mockResolvedValue([
+            {
+                id: "e1",
+                actorUserId: "user_1",
+                organizationId: "org_1",
+                createdAt: new Date(),
+            },
+        ]);
+
+        const page = await service.list({ actor: "ash", business: "rye" });
+
+        expect(findMany).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: {
+                    AND: expect.arrayContaining([
+                        { actorUserId: { in: ["user_1"] } },
+                        { organizationId: { in: ["org_1"] } },
+                    ]),
+                },
+            }),
+        );
+        expect(page.items[0]).toEqual(
+            expect.objectContaining({
+                actorName: "Asha",
+                organizationName: "Rye Bakery",
+            }),
+        );
     });
 });

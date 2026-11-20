@@ -19,7 +19,12 @@ import { codeNext, doneLine } from "@/components/auth/panel-copy";
 import { PhoneSignIn } from "@/components/auth/phone-sign-in";
 import { SocialButtons } from "@/components/auth/social-buttons";
 import { getAccountsUrl, getAppUrl } from "@/lib/app-urls";
-import { authFailureCopy, settle } from "@/lib/auth-error-copy";
+import {
+    TOO_MANY_REQUESTS,
+    authErrorCode,
+    authFailureCopy,
+    settle,
+} from "@/lib/auth-error-copy";
 import { codeClient } from "@/lib/code-client";
 import { isJoining, withCarry } from "@/lib/joining";
 import type { PhoneOptions } from "@/lib/phone-sign-in";
@@ -33,6 +38,14 @@ import type { SocialProvider } from "@/lib/sign-in-options";
  * way in for an account that added one (DEC-196).
  */
 export type SignInWay = "code" | "password" | "phone";
+
+/**
+ * Password sign-in refused for too many wrong tries on this address (A-03):
+ * anyone can cause that, so the emailed code stays a way in (07 F5).
+ */
+export const PASSWORD_LOCKED_WORDS =
+    "Too many password tries for this address. You can still sign in with a code by email.";
+export const CODE_INSTEAD_LABEL = "Get a code by email instead";
 
 /**
  * Signing in. "Email me a code" is the main way (owner, 10 Oct 2026): it
@@ -86,6 +99,8 @@ export function LoginForm({
     const [password, setPassword] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    // Password sign-in refused for now (429): the code is offered instead.
+    const [locked, setLocked] = useState(false);
     // The API asked for the bot check before it sends the code.
     const [challenge, setChallenge] = useState(false);
     // The code step, once a code has gone: the wait before Resend, and
@@ -134,7 +149,9 @@ export function LoginForm({
             return;
         }
         if (err) {
-            setError(authFailureCopy(err));
+            const tooMany = authErrorCode(err) === TOO_MANY_REQUESTS;
+            setLocked(tooMany);
+            setError(tooMany ? PASSWORD_LOCKED_WORDS : authFailureCopy(err));
             return;
         }
         leave();
@@ -260,11 +277,17 @@ export function LoginForm({
                 onClick={() => {
                     setError(null);
                     setWay(way === "code" ? "password" : "code");
+                    if (way === "password" && locked) {
+                        setLocked(false);
+                        void askForCode();
+                    }
                 }}
             >
                 {way === "code"
                     ? "Use a password instead"
-                    : "Email me a code instead"}
+                    : locked
+                      ? CODE_INSTEAD_LABEL
+                      : "Email me a code instead"}
             </AuthAlt>
             {phone?.available && !joining ? (
                 <AuthAlt

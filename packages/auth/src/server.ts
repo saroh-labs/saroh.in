@@ -220,6 +220,13 @@ export interface CreateAuthOptions {
      * address has an account, so a refusal says nothing about that. Not
      * asked on a server-side `auth.api` call (staff's own sends).
      */
+    /**
+     * A sign-in with an email and a password or code was refused. The host
+     * records it where it matters (a Saroh staff account, admin review B4).
+     * Run in the background, never awaited by the response; a failure here
+     * is swallowed.
+     */
+    onSignInFailed?: (email: string) => Promise<void>;
     mayMailCode?: (
         email: string,
         challenge: {
@@ -237,6 +244,19 @@ export interface CreateAuthOptions {
      * provider.
      */
     github?: { clientId: string; clientSecret: string } | null;
+    /**
+     * Wrong passwords per account (A-03): `blocked` before a password
+     * sign-in turns it away with a neutral 429 once the account's window is
+     * used up; `failed` counts each wrong password (any 401). Keyed by the
+     * address asked for, known or not, so it says nothing about whether an
+     * account exists. A window, never a permanent lock.
+     */
+    passwordTries?: {
+        blocked: (
+            email: string,
+        ) => Promise<{ retryAfterSeconds: number } | null>;
+        failed: (email: string) => Promise<void>;
+    };
     /**
      * Where the sign-in rate limit counts, shared by every API replica and
      * kept across deploys (the host's Redis, 03-M7). Unset: Better Auth's
@@ -291,6 +311,24 @@ export function existingUserSignUpHook(
  * Runs inside Better Auth's `beforeDelete` hook, so throwing here aborts the
  * deletion before any row is touched.
  */
+/**
+ * A Saroh staff account (any `PlatformAdmin` row, revoked or not) is not
+ * deleted from the account page: its grant history must stay (admin review
+ * A5). The database refuses too (`onDelete: Restrict`); this says why.
+ */
+async function assertNotStaff(userId: string): Promise<void> {
+    const grant = await prisma.platformAdmin.findUnique({
+        where: { userId },
+        select: { id: true },
+    });
+    if (!grant) return;
+    // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+    throw new APIError("BAD_REQUEST", {
+        message:
+            "This account is on Saroh's team, so it can't be deleted here. Ask a Platform owner.",
+    });
+}
+
 async function assertNotSoleOwner(userId: string): Promise<void> {
     const ownerships = await prisma.membership.findMany({
         where: { userId, role: "OWNER" },
@@ -523,12 +561,93 @@ export const CODE_MAIL_PATHS: readonly string[] = [
     "/sign-in/email",
 ];
 
+/** One check run by the host's `hooks.before`; it throws to refuse. */
+type BeforeCheck = (ctx: {
+    request?: Request;
+    path?: string;
+    body?: unknown;
+    headers?: Headers;
+}) => Promise<void>;
+
+/** The address a password sign-in names, lower-cased; null if none. */
+function signInEmail(ctx: { path?: string; body?: unknown }): string | null {
+    if (ctx.path !== "/sign-in/email") return null;
+    const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
+    return typeof email === "string" && email.trim()
+        ? email.trim().toLowerCase()
+        : null;
+}
+
+/** `hooks.before` for {@link CreateAuthOptions.passwordTries}. */
+function passwordTriesBefore(
+    tries: NonNullable<CreateAuthOptions["passwordTries"]>,
+): BeforeCheck {
+    return async (ctx) => {
+        const email = ctx.request ? signInEmail(ctx) : null;
+        if (!email) return;
+        const wait = await tries.blocked(email);
+        if (!wait) return;
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+        throw new APIError(
+            "TOO_MANY_REQUESTS",
+            {
+                code: "TOO_MANY_REQUESTS",
+                message:
+                    "Too many sign-in tries. Wait a while, then try again.",
+            },
+            { "X-Retry-After": String(wait.retryAfterSeconds) },
+        );
+    };
+}
+
+/** `hooks.after` for {@link CreateAuthOptions.passwordTries}. */
+function passwordTriesAfter(
+    tries: NonNullable<CreateAuthOptions["passwordTries"]>,
+) {
+    return createAuthMiddleware(async (ctx) => {
+        const email = ctx.request ? signInEmail(ctx) : null;
+        if (!email) return;
+        const returned: unknown = ctx.context.returned;
+        if (returned instanceof APIError && returned.statusCode === 401)
+            await tries.failed(email);
+    });
+}
+
+/** The sign-ins that name an address and can be refused. */
+const SIGN_IN_PATHS: readonly string[] = [
+    "/sign-in/email",
+    "/sign-in/email-otp",
+];
+
+/** Better Auth's `hooks.after` for {@link CreateAuthOptions.onSignInFailed}. */
+function signInFailedHook(
+    told: NonNullable<CreateAuthOptions["onSignInFailed"]>,
+) {
+    // eslint-disable-next-line @typescript-eslint/require-await -- the hook must return a promise; the work is left running on purpose (07 F6)
+    return createAuthMiddleware(async (ctx) => {
+        if (!SIGN_IN_PATHS.includes(ctx.path)) return;
+        // A refusal comes back as an APIError (by name across copies).
+        const returned = ctx.context.returned as { name?: unknown } | undefined;
+        if (returned?.name !== "APIError") return;
+        const email: unknown = (ctx.body as { email?: unknown } | undefined)
+            ?.email;
+        if (typeof email !== "string" || !email.trim()) return;
+        // In the background: awaited, the extra lookups for a known or staff
+        // account would show in the response time (07 F6). Never a
+        // sign-in's problem if it fails.
+        void Promise.resolve()
+            .then(() => told(email.trim().toLowerCase()))
+            .catch(() => undefined);
+    });
+}
+
 /** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
 function codeMailHook(
     mayMailCode: NonNullable<CreateAuthOptions["mayMailCode"]>,
-) {
-    return createAuthMiddleware(async (ctx) => {
-        if (!ctx.request || !CODE_MAIL_PATHS.includes(ctx.path)) return;
+): BeforeCheck {
+    return async (ctx) => {
+        if (!ctx.request || !ctx.path || !CODE_MAIL_PATHS.includes(ctx.path))
+            return;
         const email: unknown = (ctx.body as { email?: unknown } | undefined)
             ?.email;
         if (typeof email !== "string" || !email.trim()) return;
@@ -556,7 +675,7 @@ function codeMailHook(
             },
             { "X-Retry-After": String(wait.retryAfterSeconds) },
         );
-    });
+    };
 }
 
 export const MAILBOX_PROOF_PATHS: readonly string[] = [
@@ -612,6 +731,37 @@ function sessionHooks(
     };
 }
 
+/** The host's `before` and `after` hooks, only those it asked for. */
+function authHooks(opts: CreateAuthOptions): Pick<BetterAuthOptions, "hooks"> {
+    const before = [
+        opts.passwordTries && passwordTriesBefore(opts.passwordTries),
+        opts.mayMailCode && codeMailHook(opts.mayMailCode),
+    ].filter((h) => !!h);
+    const after = [
+        opts.passwordTries && passwordTriesAfter(opts.passwordTries),
+        opts.onSignInFailed && signInFailedHook(opts.onSignInFailed),
+    ].filter((h) => !!h);
+    if (before.length === 0 && after.length === 0) return {};
+    return {
+        hooks: {
+            ...(before.length
+                ? {
+                      before: createAuthMiddleware(async (ctx) => {
+                          for (const check of before) await check(ctx);
+                      }),
+                  }
+                : {}),
+            ...(after.length
+                ? {
+                      after: createAuthMiddleware(async (ctx) => {
+                          for (const hook of after) await hook(ctx);
+                      }),
+                  }
+                : {}),
+        },
+    };
+}
+
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
     const baseURL = opts.baseURL ?? process.env.BETTER_AUTH_URL;
@@ -637,9 +787,7 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         ...(opts.onServerError
             ? { onAPIError: serverErrorHook(opts.onServerError) }
             : {}),
-        ...(opts.mayMailCode
-            ? { hooks: { before: codeMailHook(opts.mayMailCode) } }
-            : {}),
+        ...authHooks(opts),
         account: {
             accountLinking: {
                 enabled: true,
@@ -754,6 +902,7 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
                 // assertNotSoleOwner). Runs before any row is deleted.
                 beforeDelete: async (user) => {
                     await assertNotSoleOwner(user.id);
+                    await assertNotStaff(user.id);
                     try {
                         await opts.onUserDeleting?.({ id: user.id });
                     } catch (error) {

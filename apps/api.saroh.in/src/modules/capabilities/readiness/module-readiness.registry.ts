@@ -14,6 +14,7 @@ import { prisma } from "@saroh/database";
 
 import { KEYS_REFUSED } from "../../../common/providers/provider-attention";
 import { planTakesOnlinePayment } from "../../billing/online-payments-plan";
+import { sendable } from "../../communications/providers/provider.port";
 import { lacksWebhookSecret } from "../../payments/webhook-setup";
 import {
     SHOP_AWAITS_SELLS_FROM,
@@ -445,11 +446,21 @@ export class ModuleReadinessRegistry {
                 if (connected > 0) {
                     // Refused keys on a live call (UX-012, FB-7): connected,
                     // but nothing sends until they are entered again.
+                    // A SendGrid, SMTP or Twilio row can't send either:
+                    // it is reconnected the same way (F2).
                     const rows = await this.db.communicationProvider.findMany({
                         where: { organizationId, status: CONNECTED },
-                        select: { attentionReason: true },
+                        select: {
+                            attentionReason: true,
+                            status: true,
+                            channel: true,
+                            provider: true,
+                        },
                     });
-                    if (rows.length > 0 && rows.every(keysRefused))
+                    if (
+                        rows.length > 0 &&
+                        rows.every((r) => keysRefused(r) || !sendable(r))
+                    )
                         return attention(
                             COMMUNICATIONS_KEYS_REFUSED,
                             "Your messaging provider refused its keys. Enter them again to send messages.",

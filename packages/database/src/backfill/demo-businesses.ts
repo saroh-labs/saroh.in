@@ -30,6 +30,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { setStatementTimeout } from "../org-context";
 import type { SeedSection, SeedSite } from "../seed/data";
 import type { Db } from "../seed/helpers";
 import { writeSite } from "../seed/helpers";
@@ -349,6 +350,7 @@ export async function makeDemoBusinesses(
     try {
         await db.$transaction(
             async (tx) => {
+                await setStatementTimeout(tx, 120_000);
                 const before = await countRows(tx, ids);
                 for (const spec of DEMO_BUSINESSES) {
                     await writeDemo(tx, spec, now);

@@ -12,7 +12,7 @@
  * globally, so other specs running beside this one are untouched. Runs in
  * the integration project (TEST_DATABASE_URL), plain and RLS.
  */
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, HttpException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma, writeCatalogueVersion } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
@@ -26,6 +26,7 @@ import {
     waitUntilAdvisoryBlockedBy,
 } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { ImpactService } from "../pricing/impact.service";
@@ -33,7 +34,11 @@ import { CatalogueAccessService } from "./catalogue-access.service";
 import type { MeteredLimitKey } from "./metering";
 import { countUsage, firstDayOf, meterWindow, monthWindow } from "./metering";
 import { countUsageAcross } from "./metering-across";
-import { MeteringService, PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
+import {
+    MeteringService,
+    PLAN_LIMIT_NOTICE_TYPE,
+    holdXactLock,
+} from "./metering.service";
 import {
     PLAN_LIMIT_NOTIFICATION_TYPE,
     PlanLimitNoticeHandler,
@@ -660,14 +665,15 @@ describe("what each limit counts (DB, U13)", () => {
         expect(await countUsage(prisma, orgId, "sites")).toBe(1);
     });
 
-    it("sums checked uploads in GB, rounded up to the hundredth", async () => {
+    it("sums checked and in-progress uploads in GB, rounded up to the hundredth", async () => {
         const { orgId } = await business("free");
         await media(orgId, 1_000_000_000, "READY");
         await media(orgId, 200_000_001, "READY");
-        // Not stored: still uploading, or not what its type said.
+        // Still uploading holds its space (DEC-227, M-5).
         await media(orgId, 900_000_000, "PENDING");
+        // Not stored: not what its type said, its object deleted.
         await media(orgId, 900_000_000, "FAILED");
-        expect(await countUsage(prisma, orgId, "storageGb")).toBe(1.21);
+        expect(await countUsage(prisma, orgId, "storageGb")).toBe(2.11);
     });
 
     it("counts this month's site views from the rollup's org-wide total", async () => {
@@ -990,6 +996,55 @@ describe("enforcement behind PLAN_ENFORCEMENT (DB, U13)", () => {
     });
 });
 
+describe("a burst at the cap (DB, A-01)", () => {
+    afterEach(() => {
+        delete env.PLAN_METER_LOCK_WAIT_MS;
+    });
+
+    it("answers 30 parallel creates at the cap quickly with 4xx, and other reads go on", async () => {
+        const { orgId } = await business("free");
+        await product(orgId);
+        await product(orgId);
+        await product(orgId);
+        const started = Date.now();
+        const burst = Array.from({ length: 30 }, () =>
+            add(orgId, "products").then(
+                () => 0,
+                (err: unknown) =>
+                    err instanceof HttpException ? err.getStatus() : 500,
+            ),
+        );
+        // Another business's read while the burst runs.
+        const other = Date.now();
+        await prisma.organization.count();
+        expect(Date.now() - other).toBeLessThan(3_000);
+        const statuses = await Promise.all(burst);
+        expect(statuses.every((s) => s === 403 || s === 429)).toBe(true);
+        expect(Date.now() - started).toBeLessThan(5_000);
+    });
+
+    it("turns a write away with 429 once the meter lock is held past the wait", async () => {
+        env.PLAN_METER_LOCK_WAIT_MS = "200";
+        const { orgId } = await business("free");
+        const held = gate();
+        const locked = gate();
+        const first = prisma.$transaction(async (tx) => {
+            await meter.roomInTx(tx, orgId, "products");
+            locked.release();
+            await held.wait;
+        });
+        await locked.wait;
+        const second = await add(orgId, "products").then(
+            () => null,
+            (err: unknown) => err,
+        );
+        held.release();
+        await first;
+        expect(second).toBeInstanceOf(HttpException);
+        expect((second as HttpException).getStatus()).toBe(429);
+    });
+});
+
 describe("limit notices (DB, U13)", () => {
     const run = async (orgId: string) => {
         const jobs = await prisma.job.findMany({
@@ -1080,5 +1135,20 @@ describe("usage on GET …/billing/access (DB, U13)", () => {
         // A switch isn't counted; a row the plan leaves off shows no usage.
         expect(row("review")?.usage).toBeNull();
         expect(row("roles")?.usage).toBeNull();
+    });
+});
+
+// 07 F8: RESET dropped a lock_timeout the caller set earlier in the
+// transaction (billing-customer.ts), so its later locks waited unbounded.
+describe("the meter lock's wait (DB, A-01)", () => {
+    it("puts the caller's own lock_timeout back after the lock", async () => {
+        const after = await prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT set_config('lock_timeout', '30s', true)`;
+            await holdXactLock(tx, `f8-${Date.now()}`);
+            const [row] = await tx.$queryRaw<{ t: string }[]>`
+                SELECT current_setting('lock_timeout') AS t`;
+            return row?.t;
+        });
+        expect(after).toBe("30s");
     });
 });

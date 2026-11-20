@@ -12,6 +12,8 @@
  * - `BOOKINGS_PAUSED` (409): the booking page at the monthly cap. Said to a
  *   customer, so it names no plan, limit or price; the merchant hears why
  *   from their limit notice. Refused before any payment is taken.
+ * - `ORDERS_PAUSED` (409): the site's checkout at a hard monthly orders
+ *   cap (DEC-227), said to a customer as `BOOKINGS_PAUSED` is.
  */
 import { ConflictException, ForbiddenException } from "@nestjs/common";
 import type { LimitPeriod, ModuleAccess } from "@saroh/pricing-catalog";
@@ -22,6 +24,7 @@ import type { ItemLimitKey, MeteredLimitKey } from "./metering";
 export const PLAN_LIMIT_REACHED = "PLAN_LIMIT_REACHED";
 export const MODULE_LOCKED = "MODULE_LOCKED";
 export const BOOKINGS_PAUSED = "BOOKINGS_PAUSED";
+export const ORDERS_PAUSED = "ORDERS_PAUSED";
 
 /** Where a refused business could go: the first plan above it with the row. */
 export interface UpgradeTo {
@@ -161,5 +164,21 @@ export function bookingsPaused(): ConflictException {
     return new ConflictException({
         message: BOOKINGS_PAUSED_MESSAGE,
         details: { code: BOOKINGS_PAUSED, reason: "bookingsPaused" },
+    });
+}
+
+export const ORDERS_PAUSED_MESSAGE =
+    "This shop isn't taking more orders this month.";
+
+/**
+ * 409 at the site's checkout (and the storefront API's) when the plan's
+ * monthly orders cell is hard and full (DEC-227). Said to a customer, so
+ * it names no plan, limit or price; the business hears why from its limit
+ * notice. Refused before any payment is asked for.
+ */
+export function ordersPaused(): ConflictException {
+    return new ConflictException({
+        message: ORDERS_PAUSED_MESSAGE,
+        details: { code: ORDERS_PAUSED, reason: "ordersPaused" },
     });
 }

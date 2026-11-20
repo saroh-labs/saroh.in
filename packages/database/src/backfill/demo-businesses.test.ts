@@ -48,7 +48,13 @@ function recordingClient(
         );
     const tx: Record<string, unknown> = new Proxy(
         {},
-        { get: (_, model: string) => delegate(model) },
+        {
+            // The transaction's own statement limit (setStatementTimeout).
+            get: (_, model: string) =>
+                model === "$executeRaw"
+                    ? () => Promise.resolve(1)
+                    : delegate(model),
+        },
     );
     const db = new Proxy(
         {},

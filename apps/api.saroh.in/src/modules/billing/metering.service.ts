@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { onTransaction, prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 import { LIMIT_WARN_AT } from "@saroh/pricing-catalog";
 
@@ -12,6 +12,10 @@ import { itemCapOf } from "./item-limits";
 import type { MeteredLimitKey } from "./metering";
 import { countUsage, meteredKeyOf, quietAtOne } from "./metering";
 import { moduleLocked, planLimitReached } from "./plan-limit-errors";
+import { holdXactLock } from "./xact-lock";
+
+// Kept here too: the many callers that import them from metering.
+export { holdXactLock, meterBusy } from "./xact-lock";
 
 /** The job that tells a business it is near or at a limit. */
 export const PLAN_LIMIT_NOTICE_TYPE = "plan.limit.notice";
@@ -59,15 +63,15 @@ type MeterTx = Prisma.TransactionClient;
 /**
  * Serialise a business's writes against one limit for the rest of the
  * transaction (`backend-jobs.md`, advisory lock registry: `plan-meter`), so
- * two creates at once can't both pass a count that only one fits.
+ * two creates at once can't both pass a count that only one fits. The wait
+ * is bounded ({@link holdXactLock}).
  */
 export async function lockMeter(
-    tx: Pick<MeterTx, "$executeRaw">,
+    tx: Pick<MeterTx, "$executeRaw" | "$queryRaw">,
     organizationId: string,
     key: MeteredLimitKey,
 ): Promise<void> {
-    const lock = `plan-meter:${organizationId}:${key}`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
+    await holdXactLock(tx, `plan-meter:${organizationId}:${key}`);
 }
 
 /**
@@ -204,9 +208,13 @@ export class MeteringService {
     ): Promise<PlanRoom | null> {
         if ((options.adding ?? 1) <= 0) return null;
         const now = options.now ?? new Date();
+        // On the write's own connection: reading the plan on another while
+        // this one is held drained the pool under a burst (A-01).
         const row =
             options.row ??
-            (await this.enforcedRow(organizationId, moduleId, now));
+            (await onTransaction(tx, () =>
+                this.enforcedRow(organizationId, moduleId, now),
+            ));
         if (!row) return null;
         return this.room(tx, row, organizationId, { ...options, now });
     }
@@ -351,7 +359,7 @@ export class MeteringService {
  * plan leaves it off ("locked"), nothing caps it ("open": off but soft, not
  * metered, or no limit), or the cap to count against. The catalogue's word
  * wins over the call site's: a soft cell counts and tells, never refuses.
- * One rule for {@link MeteringService.withRoom} and
+ * Storage a plan leaves out is open. One rule for {@link MeteringService.withRoom} and
  * {@link MeteringService.hasRoom}, so a screen never offers what the write
  * would refuse.
  */
@@ -360,8 +368,12 @@ export function rowGate(
     callerSoft: boolean,
 ): "locked" | "open" | { key: MeteredLimitKey; limit: number; soft: boolean } {
     const soft = callerSoft || row.soft === true;
-    if (row.state !== "on") return soft ? "open" : "locked";
     const key = meteredKeyOf(row.moduleId);
+    // Storage a plan leaves out reads as a catalogue without the row: no
+    // cap, never every upload refused (N4).
+    if (row.state !== "on") {
+        return soft || key === "storageGb" ? "open" : "locked";
+    }
     if (!key || row.limit === null) return "open";
     return { key, limit: row.limit, soft };
 }

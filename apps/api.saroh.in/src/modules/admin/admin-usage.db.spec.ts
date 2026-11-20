@@ -51,8 +51,9 @@ describe("AdminUsageService.storage (DB)", () => {
         await media(heavy, BIG, "READY", 1);
         await media(heavy, BIG, "READY", 2);
         await media(heavy, BIG, "READY", 3);
-        // Not stored: a pending upload holds nothing.
-        await media(heavy, BIG, "PENDING", 4);
+        // Not stored: a failed upload holds nothing (a pending one does,
+        // DEC-227).
+        await media(heavy, BIG, "FAILED", 4);
     });
 
     afterAll(async () => {
@@ -61,7 +62,7 @@ describe("AdminUsageService.storage (DB)", () => {
         });
     });
 
-    it("puts the business using the most first, counting READY media only", async () => {
+    it("puts the business using the most first, not counting failed uploads", async () => {
         const page = await usage.storage({ order: "most", limit: 5 });
 
         expect(page.items[0]).toMatchObject({

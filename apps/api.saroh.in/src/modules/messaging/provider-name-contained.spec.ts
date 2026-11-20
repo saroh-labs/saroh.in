@@ -36,6 +36,9 @@ const ALLOWED: Record<string, string> = {
         "checks the widget's host is not allowed there",
     "apps/saroh.tech/lib/content.test.ts":
         "checks Global's legal pages don't name it",
+    // The law needs every service that receives personal data named (review 20 Nov).
+    "apps/saroh.in/content/privacy.ts":
+        "India's privacy page lists it as a sub-processor",
 };
 
 function files(): string[] {

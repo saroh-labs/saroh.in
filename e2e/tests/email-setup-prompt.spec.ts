@@ -87,14 +87,10 @@ async function connectEmail(page: Page, org: string) {
         headers: headers(org),
         data: {
             channel: "EMAIL",
-            provider: "SMTP",
+            // Resend, its keys taken without asking it (COMMS_KEYS_FAKE).
+            provider: "RESEND",
             fromAddress: "hello@example.in",
-            credentials: {
-                host: "smtp.example.in",
-                port: "587",
-                user: "e2e",
-                pass: "e2e-not-a-secret",
-            },
+            credentials: { apiKey: "re_e2e_not_a_secret" },
         },
     });
     expect(res.ok(), await res.text()).toBe(true);

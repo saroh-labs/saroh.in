@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { RETIRED_MODULE_IDS } from "./module-map";
+import { MODULE_MAP, RETIRED_MODULE_IDS } from "./module-map";
 
 /**
  * The pricing catalogue: one snapshot of plans, the module-by-plan matrix and
@@ -95,13 +95,17 @@ export const includedCellSchema = z.object({
     text: z.string(),
     /** The plan card's line; empty means the card leaves it out. */
     card: z.string().default(""),
-    /** A cap, or null for no cap. */
-    limit: z.number().int().positive().nullable().default(null),
+    /**
+     * A cap, or null for no cap. A whole number, except storage's GB, which
+     * may have a fraction (half a GB): checked across the catalogue below.
+     */
+    limit: z.number().positive().nullable().default(null),
     per: z.enum(LIMIT_PERIODS).default(""),
     /**
      * A soft cap counts and tells the business when it's reached, and never
-     * refuses: storage and site visits, where turning a customer away is worse
-     * than a conversation about the bill.
+     * refuses: site visits, where turning a customer away is worse than a
+     * conversation about the bill. Storage is hard or soft as its cell says
+     * (a storage cell without it reads as soft: `storageSoftUnlessSaid`).
      */
     soft: z.boolean().default(false),
 });
@@ -374,6 +378,26 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
                 ]);
             }
         }
+        // Only storage counts in a unit with fractions (GB).
+        const fractional =
+            Object.prototype.hasOwnProperty.call(MODULE_MAP, m.id) &&
+            MODULE_MAP[m.id].limitKey === "storageGb";
+        for (const [planId, cell] of Object.entries(m.cells)) {
+            if (
+                cell.inc &&
+                cell.limit !== null &&
+                !fractional &&
+                !Number.isInteger(cell.limit)
+            ) {
+                issue(`${m.name}'s limit must be a whole number`, [
+                    "modules",
+                    i,
+                    "cells",
+                    planId,
+                    "limit",
+                ]);
+            }
+        }
         if (m.child && !m.menu) {
             issue(`${m.name} names a menu row without its menu`, [
                 "modules",
@@ -539,15 +563,59 @@ export function cellOf(module: CatalogModule, planId: string): Cell {
 }
 
 /** Parse a snapshot, throwing a readable error. */
+/**
+ * Storage was soft on every plan until DEC-227 made it follow its cell, and
+ * a cell saved before then has no `soft`: it stays soft. Only an explicit
+ * `soft: false` makes storage hard (N4). Every other row's missing `soft`
+ * is hard, as the schema defaults it.
+ */
+function storageSoftUnlessSaid(input: unknown): unknown {
+    if (!input || typeof input !== "object") return input;
+    const modules = (input as { modules?: unknown }).modules;
+    if (!Array.isArray(modules)) return input;
+    return {
+        ...input,
+        modules: modules.map((m: unknown) => {
+            const row = m as { id?: unknown; cells?: unknown } | null;
+            if (
+                !row ||
+                typeof row.id !== "string" ||
+                !Object.prototype.hasOwnProperty.call(MODULE_MAP, row.id) ||
+                MODULE_MAP[row.id].limitKey !== "storageGb" ||
+                !row.cells ||
+                typeof row.cells !== "object"
+            )
+                return m;
+            const cells = Object.fromEntries(
+                Object.entries(row.cells).map(
+                    ([plan, c]: [string, unknown]) => {
+                        const cell = c as {
+                            inc?: unknown;
+                            soft?: unknown;
+                        } | null;
+                        return [
+                            plan,
+                            cell?.inc === true && cell.soft === undefined
+                                ? { ...cell, soft: true }
+                                : c,
+                        ];
+                    },
+                ),
+            );
+            return { ...row, cells };
+        }),
+    };
+}
+
 export function parseCatalog(input: unknown): Catalog {
-    return catalogSchema.parse(input);
+    return catalogSchema.parse(storageSoftUnlessSaid(input));
 }
 
 /** Validate without throwing: the messages the admin shows next to Publish. */
 export function validateCatalog(
     input: unknown,
 ): { ok: true; catalog: Catalog } | { ok: false; errors: string[] } {
-    const r = catalogSchema.safeParse(input);
+    const r = catalogSchema.safeParse(storageSoftUnlessSaid(input));
     if (r.success) return { ok: true, catalog: r.data };
     return {
         ok: false,

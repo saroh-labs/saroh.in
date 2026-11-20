@@ -22,10 +22,11 @@ const ABOUT_DOCS = /^\/(tools|templates|guides)(\/|$)/;
  * A receipt says how it was paid; the one list of what's coming says "Not
  * available yet"; Features and the home page's money section say card
  * payments go through your own Stripe (Global launch plan KTD9; home, owner
- * 16 Nov 2026, #11).
+ * 16 Nov 2026, #11). The privacy page must name every service that receives
+ * personal data, Stripe among them (review 20 Nov).
  */
 const NAMES_A_PROVIDER =
-    /^\/(tools\/receipt-maker|changelog|integrations|features)(\/|$)|^\/$/;
+    /^\/(tools\/receipt-maker|changelog|integrations|features|legal\/privacy)(\/|$)|^\/$/;
 
 /** Advice and paper for anyone's trade, or the law's words: not what the product does for you. */
 const NOT_THE_PRODUCT =

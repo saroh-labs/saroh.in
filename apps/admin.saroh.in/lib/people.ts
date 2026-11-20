@@ -64,7 +64,8 @@ export interface PersonDetail extends PersonRow {
     }[];
     signIn: SignInState;
     /** Their businesses this console doesn't show. Older API builds leave it out. */
-    otherEditionBusinesses?: number;
+    otherEditionBusinesses?: number; /** Businesses on Free they may own beyond their one (DEC-227). */
+    extraFreeBusinesses?: number;
 }
 
 /** One line of the History tab: something staff did to this person. */

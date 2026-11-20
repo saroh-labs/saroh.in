@@ -10,6 +10,7 @@ import {
     endSessionsAction,
     markVerifiedAction,
     sendSignInCodeAction,
+    setExtraFreeBusinessesAction,
 } from "@/lib/people-actions";
 import { useChangeFeedback } from "@/lib/use-change-feedback";
 
@@ -30,6 +31,7 @@ export function UserActions({
     held,
     sessions,
     canEndSessions,
+    extraFreeBusinesses = 0,
 }: {
     userId: string;
     name: string;
@@ -40,6 +42,8 @@ export function UserActions({
     sessions: number;
     /** Sign out everywhere needs `organization:people:write` too. */
     canEndSessions: boolean;
+    /** Free businesses they may own beyond their one (DEC-227). */
+    extraFreeBusinesses?: number;
 }) {
     const feedback = useChangeFeedback();
     return (
@@ -122,6 +126,44 @@ export function UserActions({
                         if (result.ok) {
                             feedback.report({
                                 message: `${name} signed out everywhere`,
+                            });
+                        }
+                        return result;
+                    }}
+                />
+            )}
+            {canEndSessions && (
+                <OperatorDialog
+                    trigger="Free businesses…"
+                    title={`Free businesses ${name} may own`}
+                    effect={`A person owns one business on Free. Set how many more ${name} may own on Free; 0 takes the exception away. Now: ${extraFreeBusinesses} more. Businesses they already own are not changed.`}
+                    submitLabel="Save"
+                    fields={
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="free-businesses-extra">
+                                More free businesses
+                            </Label>
+                            <Input
+                                id="free-businesses-extra"
+                                name="extra"
+                                type="number"
+                                inputMode="numeric"
+                                min={0}
+                                max={100}
+                                defaultValue={extraFreeBusinesses}
+                                required
+                            />
+                        </div>
+                    }
+                    onSubmit={async ({ reason, idempotencyKey, values }) => {
+                        const extra = Number(values.extra ?? "0");
+                        const result = await setExtraFreeBusinessesAction(
+                            userId,
+                            { reason, idempotencyKey, extra },
+                        );
+                        if (result.ok) {
+                            feedback.report({
+                                message: `${name} may own ${extra} more free ${extra === 1 ? "business" : "businesses"}`,
                             });
                         }
                         return result;

@@ -122,7 +122,7 @@ describe("AdminUsageService.storage", () => {
         expect(sql.sql).toContain('ORDER BY "bytes" DESC');
         expect(sql.sql).toContain('LEFT JOIN "Media"');
         // Only stored media counts, as the plan meter reads it.
-        expect(sql.values).toEqual(["READY", 25, 0]);
+        expect(sql.values).toEqual(["FAILED", 25, 0]);
     });
 
     it("sorts least first and pages by offset", async () => {
@@ -136,7 +136,7 @@ describe("AdminUsageService.storage", () => {
 
         expect(page).toMatchObject({ order: "least", page: 3, total: 60 });
         expect(sqlOf(0).sql).toContain('ORDER BY "bytes" ASC');
-        expect(sqlOf(0).values).toEqual(["READY", 20, 40]);
+        expect(sqlOf(0).values).toEqual(["FAILED", 20, 40]);
     });
 
     it("clamps a page size past the cap and a page below 1", async () => {
@@ -148,7 +148,7 @@ describe("AdminUsageService.storage", () => {
         });
 
         expect(page).toMatchObject({ page: 1, limit: 100 });
-        expect(sqlOf(0).values).toEqual(["READY", 100, 0]);
+        expect(sqlOf(0).values).toEqual(["FAILED", 100, 0]);
     });
 
     it("narrows the list and both totals to one edition, as a parameter", async () => {
@@ -157,10 +157,10 @@ describe("AdminUsageService.storage", () => {
         await new AdminUsageService(accessWith({})).storage({}, "GLOBAL");
 
         expect(sqlOf(0).sql).toContain('o."edition" = ?::"Edition"');
-        expect(sqlOf(0).values).toEqual(["READY", "GLOBAL", 25, 0]);
+        expect(sqlOf(0).values).toEqual(["FAILED", "GLOBAL", 25, 0]);
         // The total's count, and its bytes through the Organization join.
         expect(sqlOf(1).sql).toContain('JOIN "Organization" o');
-        expect(sqlOf(1).values).toEqual(["GLOBAL", "READY", "GLOBAL"]);
+        expect(sqlOf(1).values).toEqual(["GLOBAL", "FAILED", "GLOBAL"]);
     });
 
     it("gives each row its plan's storage limit and the share used", async () => {
@@ -202,7 +202,7 @@ describe("AdminUsageService.storage", () => {
         expect(page.items.map((r) => r.id)).toEqual(["org_near", "org_mid"]);
         // Read unpaged: the order needs every business's limit.
         expect(sqlOf(0).sql).not.toContain("LIMIT");
-        expect(sqlOf(0).values).toEqual(["READY"]);
+        expect(sqlOf(0).values).toEqual(["FAILED"]);
 
         answer(
             [

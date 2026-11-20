@@ -1,4 +1,4 @@
-import type { ClaimSwitch } from "../content/feature-switches";
+import type { ClaimSwitch, ReleaseSwitch } from "../content/feature-switches";
 import type { WorldBusiness } from "../content/world";
 import type { HomeMoment, MomentData, WaitingMoment } from "./moments/types";
 import type { Words } from "./words";
@@ -28,6 +28,11 @@ export interface DayHour<F extends string = string> {
     moments: readonly MomentData[];
     used: readonly UsedLink<F>[];
     /**
+     * The feature the hour shows (DEC-222): while its release switch is
+     * off, the hour carries a "Coming soon" pill, never a working claim.
+     */
+    release?: ReleaseSwitch;
+    /**
      * Moments that follow a claim: `on` while it is, else `off` (9 pm's
      * answer in Hinglish, or in English).
      */
@@ -39,7 +44,12 @@ export interface DayHour<F extends string = string> {
     /** A line under the moments, which may hold claims. */
     after?: Words;
     /** A dark note under the moments ("Have a developer…"). */
-    note?: { text: string; link: { label: string; href: string } };
+    note?: {
+        text: string;
+        link: { label: string; href: string };
+        /** Drawn only while this release switch is on (its page answers). */
+        release?: ReleaseSwitch;
+    };
 }
 
 export interface TradeDay<F extends string = string> {
