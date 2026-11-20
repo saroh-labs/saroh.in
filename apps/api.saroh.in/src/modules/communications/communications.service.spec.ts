@@ -310,16 +310,24 @@ describe("CommunicationsService.connectProvider — the key checked first (UX-01
         providerFindUnique.mockReset();
     });
 
-    it("lets through a provider the adapter can't check (an SMTP relay)", async () => {
+    it("refuses SendGrid, an SMTP relay or Twilio: none can send (review 04 H1)", async () => {
         const { service } = serviceAnswering(null);
 
-        await service.connectProvider(ctx(), {
-            ...RESEND,
-            provider: "smtp",
-            credentials: { host: "smtp.example.in", pass: "x" },
-        });
-
-        expect(providerUpsert).toHaveBeenCalledTimes(1);
+        for (const [channel, provider] of [
+            ["EMAIL", "smtp"],
+            ["EMAIL", "sendgrid"],
+            ["WHATSAPP", "twilio"],
+        ]) {
+            await expect(
+                service.connectProvider(ctx(), {
+                    ...RESEND,
+                    channel,
+                    provider,
+                    credentials: { host: "smtp.example.in", pass: "x" },
+                }),
+            ).rejects.toThrow(/Unsupported provider/);
+        }
+        expect(providerUpsert).not.toHaveBeenCalled();
     });
 });
 

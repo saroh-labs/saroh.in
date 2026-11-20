@@ -178,9 +178,27 @@ export function connectablePayments(): readonly PaymentProviderName[] {
     return PROFILE.paymentProviders;
 }
 export const CONNECTABLE_COMMS: Record<CommsChannel, readonly string[]> = {
-    EMAIL: ["RESEND", "SENDGRID", "SMTP"],
-    WHATSAPP: ["META", "TWILIO"],
+    // SendGrid, SMTP relay and Twilio have no adapter of their own yet: the
+    // API refuses them, and one connected before says it can't send.
+    EMAIL: ["RESEND"],
+    WHATSAPP: ["META"],
 };
+
+/**
+ * A connection kept from before its provider was taken off the list
+ * (SendGrid, SMTP relay, Twilio): Saroh can't send through it.
+ */
+export function cantSend(c: { channel: CommsChannel; provider: string; status: string }): boolean {
+    return (
+        c.status === "CONNECTED" &&
+        !CONNECTABLE_COMMS[c.channel].includes(c.provider.toUpperCase())
+    );
+}
+
+/** "Not working. Saroh can't send through SendGrid. Reconnect with Resend." */
+export function cantSendNote(c: { channel: CommsChannel; provider: string }): string {
+    return `Not working. Saroh can't send through ${commsProviderName(c.provider)}. Reconnect with ${words(CONNECTABLE_COMMS[c.channel].map(commsProviderName))}.`;
+}
 
 /** "A, B and C" */
 function words(list: readonly string[]): string {
@@ -414,8 +432,14 @@ export function buildProvidersView(input: ProviderRowsInput): ProvidersView {
     }
 
     // Only one the business can connect: never a jump to a lock.
+    // With only Resend to offer, a Resend row someone disconnected is the
+    // one to connect again.
     view.connectEmailKey =
-        view.available.find((e) => e.type === "Email" && !e.lock)?.key ?? null;
+        view.available.find((e) => e.type === "Email" && !e.lock)?.key ??
+        view.connected.find(
+            (e) => e.type === "Email" && e.state === "DISCONNECTED" && !e.lock,
+        )?.key ??
+        null;
 
     const domains = has("DOMAINS");
     if (domains) view.domains = domainsRow(domains, input);
@@ -537,17 +561,25 @@ function commsEntry(
     const spec = CHANNEL[c.channel];
     const live = c.status === "CONNECTED";
     const refused = keysRefused(c);
+    const unsendable = cantSend(c);
     return {
         key: `${c.channel}:${c.provider}`,
         name: commsProviderName(c.provider),
         type: spec.type,
-        state: refused ? "ATTENTION" : live ? "CONNECTED" : "DISCONNECTED",
-        note: refused
-            ? `Needs attention. ${commsProviderName(c.provider)} refused its keys, so nothing is sent through it. Enter the keys again to clear it.`
-            : live
-              ? spec.purpose
-              : spec.stopped,
-        fix: refused ? "Enter keys again" : null,
+        state:
+            refused || unsendable
+                ? "ATTENTION"
+                : live
+                  ? "CONNECTED"
+                  : "DISCONNECTED",
+        note: unsendable
+            ? cantSendNote(c)
+            : refused
+              ? `Needs attention. ${commsProviderName(c.provider)} refused its keys, so nothing is sent through it. Enter the keys again to clear it.`
+              : live
+                ? spec.purpose
+                : spec.stopped,
+        fix: unsendable ? "Reconnect" : refused ? "Enter keys again" : null,
         update: null,
         refs:
             live && c.fromAddress
@@ -555,7 +587,13 @@ function commsEntry(
                 : [],
         manageHref: live ? dashboardFor(c.provider) : null,
         target: live ? { kind: "messaging", channel: c.channel } : null,
-        setup: { kind: "messaging", channel: c.channel, provider: c.provider },
+        setup: {
+            kind: "messaging",
+            channel: c.channel,
+            provider: unsendable
+                ? CONNECTABLE_COMMS[c.channel][0]
+                : c.provider,
+        },
         consequence: spec.consequence,
         // Connecting it again is a new connection: the plan's to allow.
         lock: live ? null : (locks?.messaging ?? null),

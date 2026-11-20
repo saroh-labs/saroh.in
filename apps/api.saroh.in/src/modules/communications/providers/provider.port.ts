@@ -28,8 +28,11 @@ export const SUPPORTED_COMMS_PROVIDERS: Record<
     CommsChannel,
     readonly string[]
 > = {
-    EMAIL: ["RESEND", "SENDGRID", "SMTP"],
-    WHATSAPP: ["TWILIO", "META"],
+    // SENDGRID, SMTP and TWILIO only reached Resend's or Meta's API in
+    // their shape, so they could never send: refused until each has an
+    // adapter of its own (the adapters still read rows saved before).
+    EMAIL: ["RESEND"],
+    WHATSAPP: ["META"],
 };
 
 /** True if `provider` is a supported adapter for `channel`. */

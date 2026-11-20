@@ -9,7 +9,7 @@ import { planWords } from "./plan-words";
  * lib/tools/draft-store.ts. Who handles data is the code's: the billing provider
  * isn't here, because a Global business has no billing profile (DEC-203).
  */
-export const LEGAL_UPDATED = "2026-11-04";
+export const LEGAL_UPDATED = "2026-11-20";
 
 const COMPANY = `Virashi Softwares LLP, ${REGISTERED_OFFICE.join(", ")}`;
 
@@ -344,7 +344,7 @@ export const PRIVACY: readonly LegalSection[] = [
         ],
     },
     {
-        title: "Who else handles it",
+        title: "Who else handles it: our sub-processors",
         paragraphs: [
             "We don't sell personal data. We share it with authorities only when the law requires it. What you connect yourself, such as your own email account, is handled by that provider under its own terms.",
             "Otherwise, only the companies that help us run Saroh, each for its own job, and only what that job needs:",
@@ -355,7 +355,35 @@ export const PRIVACY: readonly LegalSection[] = [
             "Amazon Web Services (SES): sending the emails Saroh sends, from India.",
             "Google (Workspace): our mailboxes, when you write to us.",
             "PostHog: counting visits to this site, finding and fixing errors in Saroh, seeing which setup steps businesses complete, and keeping the recordings of use. Stored in the EU.",
-            "Google or GitHub: only if you choose to sign in with them.",
+            "Google or GitHub: your name, email and account ID, only if you choose to sign in with them.",
+            "Cloudflare Turnstile: your IP address and browser details, to check a form is filled in by a person and not a bot.",
+            "Anthropic: the question you type in Ask AI and the business records needed to answer it, when your business turns Ask AI on. Processed outside India.",
+            "Google (Calendar and Meet): the bookings Saroh adds to your calendar, your calendars' busy times and Meet link settings, when you connect Google Calendar.",
+            "Meta (Facebook, Instagram) and Threads: the posts you schedule, and your Page's or profile's name and access, when you turn on Saroh Social and connect those accounts.",
+        ],
+    },
+    {
+        title: "Services you connect with your own account",
+        paragraphs: [
+            "Some services you connect yourself, with your own account: Stripe for your customers' payments, your own email provider (Resend) and your own WhatsApp Business number on Meta. What they receive is your customers' data, sent for your business, under that company's terms with you.",
+        ],
+    },
+    {
+        title: "Google user data",
+        paragraphs: [
+            "When you connect Google Calendar, Saroh reads and writes only the calendar events it makes for your bookings, your calendars' list and busy times, and Meet settings for the links it adds.",
+            "Saroh's use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy (developers.google.com/terms/api-services-user-data-policy), including the Limited Use requirements. We don't use it for advertising, don't sell it, don't let people read it unless you ask us to for support or the law requires it, and don't use it to train AI models. Disconnect Google Calendar at any time, or remove Saroh in your Google account's settings, and we stop using it.",
+        ],
+    },
+    {
+        title: "Deleting data a Meta app connected",
+        paragraphs: [
+            "If you connected Facebook, Instagram or Threads to Saroh, you can have us delete what we hold from them in any of these ways.",
+        ],
+        items: [
+            "In Saroh, open Social and disconnect the account.",
+            "In Facebook, Instagram or Threads, open Settings › Apps and websites, remove Saroh and ask for your data to be deleted. Meta tells us, we delete it, and you get a confirmation code. The page Meta links you to shows what was deleted and when.",
+            `Write to ${SUPPORT_EMAIL}.`,
         ],
     },
     {

@@ -1026,21 +1026,30 @@ describe.each(LOOKS)("Order placed under %s", (look) => {
 
 describe("Order placed's next step", () => {
     it("is on its way only for a delivery", () => {
-        expect(placedNext({ ...ORDER, toPay: null })).toBe(
+        const sent = { ...ORDER, toPay: null, reach: "EMAIL" as const };
+        expect(placedNext(sent, "Rye & Co.")).toBe(
             "We'll email you when it's ready for pick-up.",
         );
         expect(
-            placedNext({
-                ...ORDER,
-                toPay: null,
-                fulfilment: {
-                    type: "LOCAL_DELIVERY",
-                    label: "Local delivery",
-                    pickup: null,
-                    deliverTo: { name: "Asha", lines: ["1 MG Road"] },
+            placedNext(
+                {
+                    ...sent,
+                    fulfilment: {
+                        type: "LOCAL_DELIVERY",
+                        label: "Local delivery",
+                        pickup: null,
+                        deliverTo: { name: "Asha", lines: ["1 MG Road"] },
+                    },
                 },
-            }),
+                "Rye & Co.",
+            ),
         ).toBe("We'll email you when it's on its way.");
+    });
+
+    it("never promises an email the business can't send (review 04 H2)", () => {
+        expect(
+            placedNext({ ...ORDER, toPay: null, reach: "ACCOUNT" }, "Rye & Co."),
+        ).toBe("Rye & Co. will be in touch when it's ready for pick-up.");
     });
 });
 

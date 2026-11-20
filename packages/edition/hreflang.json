@@ -88,19 +88,19 @@
         },
         {
             "tech": "/solutions/shops",
-            "in": "/solutions/shops"
+            "in": "/for/shops"
         },
         {
             "tech": "/solutions/salons",
-            "in": "/solutions/salons"
+            "in": "/for/salons"
         },
         {
             "tech": "/solutions/gyms",
-            "in": "/solutions/gyms"
+            "in": "/for/gyms"
         },
         {
             "tech": "/solutions/clinics",
-            "in": "/solutions/clinics"
+            "in": "/for/clinics"
         }
     ]
 }
