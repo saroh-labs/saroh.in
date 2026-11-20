@@ -127,10 +127,15 @@ function adminWriteRoutes(): string[] {
     for (const file of controllerFiles(SRC)) {
         const source = readFileSync(file, "utf8");
         if (!source.includes("@AdminRoutes()")) continue;
-        const write =
-            /@(Post|Put|Patch|Delete)\(([^)]*)\)((?:\s*@[\s\S]*?\)\s*)*?)\s*(?:async\s+)?(\w+)\s*\(/g;
+        // Linear, no nested quantifiers (CodeQL: polynomial backtracking):
+        // each write decorator, then the first method line after it.
+        const write = /@(?:Post|Put|Patch|Delete)\(/g;
+        const method =
+            /\n[ \t]*(?:public[ \t]+)?(?:async[ \t]+)?([A-Za-z_]\w*)[ \t]*\(/g;
         for (const match of source.matchAll(write)) {
-            routes.push(`${path.basename(file)}#${match[4]}`);
+            method.lastIndex = match.index + match[0].length;
+            const name = method.exec(source)?.[1];
+            if (name) routes.push(`${path.basename(file)}#${name}`);
         }
     }
     return routes.sort();
