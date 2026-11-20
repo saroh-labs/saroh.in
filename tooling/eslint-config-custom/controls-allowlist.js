@@ -225,6 +225,9 @@ export const RAW_ALLOWED = {
     "components/sites/looks/colour-picker.tsx": ["button"],
     // button: Brand's "Customise components" row, two lines that open the list (DEC-227)
     "components/sites/looks/component-styles.tsx": ["button"],
+    // button, input: today's Brand panel, parked behind the Website area switch (owner, 20 Nov)
+    "components/sites/looks/legacy/component-styles.tsx": ["button"],
+    "components/sites/looks/legacy/style-panel.tsx": ["input"],
     // button: a row or card that is one button, a row that opens
     "components/sites/editor/editor-top-bar.tsx": ["button"],
     // button: the page picker and the phone's page and ⋯ More, moved from editor-top-bar.tsx (U46)

@@ -53,6 +53,8 @@ const NOT_FORMS: Record<string, string> = {
         "a template's preview: the site drawn read-only, with Choose or its confirm",
     "components/sites/looks/draft-tools.tsx":
         "the draft's previous versions, read-only, each with Roll back and Bring in",
+    "components/sites/looks/legacy/draft-tools.tsx":
+        "today's previous versions while the Website area is off, read-only, each with Roll back and Bring in",
     "components/stores/catalogue/quick-look.tsx": "a read-only quick look",
     "components/bookings/quick-look/booking-quick-look.tsx":
         "a read-only quick look with its own actions",

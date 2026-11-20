@@ -19,7 +19,14 @@ export function useEditorStyle({
     initialStyle,
     styleOptions,
     onSaved,
+    legacyBrand = false,
 }: {
+    /**
+     * Today's Brand panel (`looks/legacy`), while the Website area is off:
+     * its Reset style keeps the component choices, which have their own
+     * "Reset to <look>" there (DEC-227).
+     */
+    legacyBrand?: boolean;
     siteId: string;
     initialStyle: SiteStyle;
     styleOptions: SiteStyleOptions;
@@ -157,6 +164,11 @@ export function useEditorStyle({
         const look = style.look ?? null;
         lookChanges.nameNext("Look", `Reset to ${lookName(look)}`);
         const keep = (next: SiteStyle): SiteStyle => {
+            if (legacyBrand) {
+                return style.components
+                    ? { ...next, components: style.components }
+                    : next;
+            }
             const { components: _c, brandColour: _b, ...rest } = next;
             return rest;
         };

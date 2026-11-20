@@ -9,6 +9,7 @@ import {
     EditorCanvas,
 } from "@/components/sites/canvas/editor-canvas";
 import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport";
+import { BrandSheetActions as LegacyBrandSheetActions } from "@/components/sites/looks/legacy/brand-sheet-parts";
 import { lookChoices } from "@/components/sites/looks/look-picker";
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
 import {
@@ -229,6 +230,8 @@ export function SiteEditor({
         initialStyle,
         styleOptions,
         onSaved: publish.markStylePending,
+        // Off, today's Brand panel and its Reset style (owner, 20 Nov).
+        legacyBrand: !websiteAreaOn(),
     });
     const { style } = siteStyle;
     useEffect(() => {
@@ -740,7 +743,13 @@ export function SiteEditor({
             overlayOpen={publish.checking}
             openNotes={review.openNotes}
             brandActions={
-                !canUpdateSite ? undefined : (
+                !canUpdateSite ? undefined : !areaOn ? (
+                    <LegacyBrandSheetActions
+                        saving={siteStyle.styleSaving}
+                        dirty={siteStyle.styleDirty}
+                        onReset={() => edits.resetStyle()}
+                    />
+                ) : (
                     <BrandSheetActions
                         saving={siteStyle.styleSaving}
                         dirty={siteStyle.styleDirty}

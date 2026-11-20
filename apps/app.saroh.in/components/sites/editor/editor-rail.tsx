@@ -16,12 +16,15 @@ import type {
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
 import type { SiteIconSource } from "@/components/sites/looks/brand-groups";
+import { BrandReadOnly as LegacyBrandReadOnly } from "@/components/sites/looks/legacy/brand-read-only";
+import { StylePanel as LegacyStylePanel } from "@/components/sites/looks/legacy/style-panel";
 import type { LookChanges } from "@/components/sites/looks/look-changes";
 import type { LookChoices } from "@/components/sites/looks/look-picker";
 import { StylePanel } from "@/components/sites/looks/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { Tip } from "@saroh/ui/tooltip";
 import { BrandReadOnly } from "./brand-read-only";
 import { EditorTabs, railRowState } from "./editor-chrome";
@@ -180,7 +183,32 @@ export function EditorRail({
                     onSelect={selectTab}
                 />
             )}
-            {tab === "brand" && (readOnly || styleDenied) ? (
+            {/* Off, today's Brand panel exactly as it was (owner, 20 Nov). */}
+            {tab === "brand" && !websiteAreaOn() ? (
+                readOnly ? (
+                    <LegacyBrandReadOnly
+                        style={style}
+                        options={styleOptions}
+                        looks={looks?.available === true}
+                        template={templateName}
+                    />
+                ) : (
+                    <LegacyStylePanel
+                        style={style}
+                        options={styleOptions}
+                        onChange={setStyle}
+                        onReset={resetStyle}
+                        saving={styleSaving}
+                        dirty={styleDirty}
+                        looks={looks}
+                        rules={styleRules}
+                        onTry={tryStyle}
+                        heroInText={heroDrawsInText(sections, style.look)}
+                        phoneTabs={phone}
+                        templateRow={templateRow}
+                    />
+                )
+            ) : tab === "brand" && (readOnly || styleDenied) ? (
                 <BrandReadOnly
                     style={style}
                     options={styleOptions}

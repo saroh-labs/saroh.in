@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { PostShell } from "@/components/sites/posts/editor/post-shell";
@@ -7,6 +7,7 @@ import { recordTitle } from "@/lib/page-title";
 import { requireSession } from "@/lib/session";
 import { readPostEditorData } from "@/lib/sites/post-editor-read";
 import { getSite } from "@/lib/sites/service";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 // One read for the tab's title and the page.
 const readPost = cache((siteId: string, postId: string) =>
@@ -40,6 +41,8 @@ export default async function WritePostPage({
     params: Promise<{ siteId: string; postId: string }>;
 }) {
     const { siteId, postId } = await params;
+    // Off, today's post editor, as every link into it is (owner, 20 Nov).
+    if (!websiteAreaOn()) redirect(`/sites/${siteId}/posts/${postId}`);
     await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();

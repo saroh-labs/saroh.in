@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { PostShell } from "@/components/sites/posts/editor/post-shell";
 import { deniedFor } from "@/lib/access/require-can";
@@ -7,6 +7,8 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { readPostEditorData } from "@/lib/sites/post-editor-read";
 import { getSite } from "@/lib/sites/service";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
+import { withQuery } from "@/lib/sites/with-query";
 
 /** The tab's title (UX-081). */
 export const metadata = { title: "New post · Website" };
@@ -26,6 +28,12 @@ export default async function WriteNewPostPage({
     searchParams?: Promise<{ from?: string | string[] }>;
 }) {
     const { siteId } = await params;
+    // Off, today's post editor, as every link into it is (owner, 20 Nov).
+    if (!websiteAreaOn()) {
+        redirect(
+            withQuery(`/sites/${siteId}/posts/new`, (await searchParams) ?? {}),
+        );
+    }
     const { from } = (await searchParams) ?? {};
     await requireSession();
     const site = await getSite(siteId);

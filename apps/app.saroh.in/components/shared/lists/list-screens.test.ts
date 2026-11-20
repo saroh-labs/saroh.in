@@ -243,6 +243,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "Product settings' sub-pages: Categories, Options, Fields and the rest",
         "components/sites/looks/style-panel.tsx":
             "a phone's Brand sheet: Look, Colours, Fonts, Logo and Buttons and shapes, one group at a time (WXBBrandPhone)",
+        "components/sites/looks/legacy/style-panel.tsx":
+            "today's phone Brand sheet while the Website area is off: Look, Type, Colour and Spacing, each its own options (DEC-185)",
         "components/commerce/stock/stock-screen.tsx":
             "Levels, Log and Checks: three views of stock with different columns",
         "components/customers/data-requests/customers-tabs.tsx":

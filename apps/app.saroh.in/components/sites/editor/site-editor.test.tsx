@@ -28,6 +28,12 @@ import { SiteEditor } from "./site-editor";
 import { leaveLost } from "./use-editor-leave";
 
 // `vi.mock` is hoisted above the imports, so the editor gets these.
+// The Website area's switch (KTD-E1): off, today's editor and Brand panel.
+const area = vi.hoisted(() => ({ on: false }));
+vi.mock("@/lib/sites/website-area-switch", () => ({
+    websiteAreaOn: () => area.on,
+    websiteAreaOnFor: () => area.on,
+}));
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ push, refresh: vi.fn(), replace: vi.fn() }),
@@ -666,8 +672,8 @@ describe("SiteEditor shell", () => {
         const { siteId } = render();
         click(button("Brand"));
         expect(button("Brand").getAttribute("aria-selected")).toBe("true");
-        // The fonts in force (KTD-2), the default, named in the rail.
-        expect(host.textContent).toContain("Fonts");
+        // The typeface in force (KTD-2), the default, named in the rail.
+        expect(host.textContent).toContain("Typeface");
         expect(
             host.querySelector<HTMLElement>("[data-typeface-current]")?.dataset
                 .typefaceCurrent,
@@ -1116,12 +1122,24 @@ describe("SiteEditor shell", () => {
     });
 
     it("Brand reads, with who can change it, for a role without site:update (C11)", () => {
+        area.on = true;
+        try {
+            render({ canUpdateSite: false });
+            click(button("Brand"));
+            expect($("[data-brand-read-only=denied]")?.textContent).toContain(
+                "Your role can read the look but not change it.",
+            );
+            expect($("[data-brand-panel]")).toBeNull();
+        } finally {
+            area.on = false;
+        }
+    });
+
+    it("keeps today's Brand panel while the Website area is off", () => {
         render({ canUpdateSite: false });
         click(button("Brand"));
-        expect($("[data-brand-read-only=denied]")?.textContent).toContain(
-            "Your role can read the look but not change it.",
-        );
-        expect($("[data-brand-panel]")).toBeNull();
+        expect($("[data-brand-read-only]")).toBeNull();
+        expect(host.textContent).toContain("Spacing");
     });
 
     it("names what goes live in the Publish sheet, and reads Published after", async () => {
@@ -1904,21 +1922,12 @@ describe("SiteEditor narrow and phone (G4)", () => {
                 "[role=tablist][aria-label=Brand] [role=tab]",
             ) ?? [],
         ).map((t) => t.textContent);
-        // No look to offer here, so no Look tab (U24b, WXBBrandPhone).
-        expect(tabs).toEqual(["Colours", "Fonts", "Buttons and shapes"]);
-        // Fonts: each face itself, a tap is the choice; no search on a phone.
-        const fonts = Array.from(
-            sheet()?.querySelectorAll<HTMLElement>("[role=tab]") ?? [],
-        ).find((t) => t.textContent === "Fonts");
-        act(() => {
-            fonts?.dispatchEvent(
-                new MouseEvent("mousedown", { bubbles: true, button: 0 }),
-            );
-            fonts?.click();
-        });
+        // No look to offer here, so no Look tab.
+        expect(tabs).toEqual(["Type", "Colour", "Components", "Spacing"]);
+        // Type: each face itself, a tap is the choice; no search on a phone.
         expect(sheet()?.textContent).toContain("Newsreader");
         expect(
-            sheet()?.querySelector("input[aria-label='Search fonts']"),
+            sheet()?.querySelector("input[aria-label='Search typefaces']"),
         ).toBeNull();
         expect(button("More: Reset style")).toBeTruthy();
         expect(button("Close Brand")).toBeTruthy();
