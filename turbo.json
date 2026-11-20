@@ -162,6 +162,8 @@
         // The redesigned Website area (plan 2026-11-18-001): the app's
         // switch, read at build.
         "NEXT_PUBLIC_WEBSITE_AREA",
+        // The api's half (owner, 20 Nov 2026): post approval only while on.
+        "WEBSITE_AREA",
         // Share as a post and Create post (DEC-217): the app's switch, read at
         // build, and the api's, which answers 404 while it is off.
         "NEXT_PUBLIC_SHARE_POSTS",

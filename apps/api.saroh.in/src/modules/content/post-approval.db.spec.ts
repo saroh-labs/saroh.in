@@ -12,6 +12,7 @@ import { ConflictException, ForbiddenException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { planMeter } from "../billing/metering.service";
 import { TEAM_ALERT_TYPE } from "../notifications/team-alerts";
 import type { OrgAction } from "../organizations/organization-actions";
@@ -106,10 +107,33 @@ async function isLive(postId: string): Promise<boolean> {
 }
 
 describe("post approval (O7)", () => {
+    // Approval is the Website area's (owner, 20 Nov 2026).
+    const area = env.WEBSITE_AREA;
     beforeEach(() => {
+        env.WEBSITE_AREA = "on";
         jest.spyOn(planMeter, "isIncluded").mockResolvedValue(true);
     });
-    afterEach(() => jest.restoreAllMocks());
+    afterEach(() => {
+        env.WEBSITE_AREA = area;
+        jest.restoreAllMocks();
+    });
+
+    it("with the Website area off, a teammate publishes and schedules as before", async () => {
+        env.WEBSITE_AREA = "off";
+        const b = await business();
+        const view = await b.inOrg(() =>
+            posts.get(b.writer, b.site.id, b.postId),
+        );
+        expect(view.approval.on).toBe(false);
+        expect(view.approval.mustAsk).toBe(false);
+        await b.inOrg(() =>
+            posts.schedule(b.writer, b.site.id, b.postId, {
+                at: new Date(Date.now() + 86_400_000).toISOString(),
+            }),
+        );
+        await b.inOrg(() => posts.publish(b.writer, b.site.id, b.postId));
+        expect(await isLive(b.postId)).toBe(true);
+    });
 
     it("refuses a teammate's publish until a reviewer approves, then goes live", async () => {
         const b = await business();

@@ -3115,6 +3115,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: posts went live past "Publishing needs approval": a post publishes on its own, outside the site's Publish, so a teammate's post never waited for anyone.
 - Decision: with "Publishing needs approval" on, a teammate who is not the owner or an admin presses **Send for approval** instead of Publish post, with an optional note and "As soon as it is approved" or "After approval, on a day I pick". **Any reviewer, admin or owner other than the post's last editor** can approve, and approving publishes the post now, or on the day the writer picked. Ask for changes needs a reason (UX-043). Owner and admin posts need no approval (DEC-103).
 - Consequences: the post is one change unit, `post:<postId>`, in the same approval records as a site's changes (DEC-226): the approval binds to the post's fingerprint, so a later edit voids it, and nobody approves their own writing. The API refuses a teammate's unapproved publish or schedule with the site's approval words (409), and the scheduled go-live checks approval again. Sending is a `sent` revision in the post's History, approving an `approved` one. No new table.
+- Behind the Website area switch (owner, 20 Nov 2026): the api's `WEBSITE_AREA` (on with the app's `NEXT_PUBLIC_WEBSITE_AREA`); off, posts publish and schedule as before and the three approval routes are a 404.
 
 ## DEC-235 A started booking or checkout and an enquiry keep the site page they came from
 

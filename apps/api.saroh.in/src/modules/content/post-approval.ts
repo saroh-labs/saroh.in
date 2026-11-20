@@ -17,6 +17,7 @@ import {
     approvalApplies,
     changesAwaitApproval,
 } from "../sites/publish-approval";
+import { websiteAreaOn } from "../sites/website-area-switch";
 import type { RevisionState } from "./post-revisions";
 import { REVISION_FIELDS, revisionStateOf } from "./post-revisions";
 
@@ -27,7 +28,8 @@ import { REVISION_FIELDS, revisionStateOf } from "./post-revisions";
  * `post:<postId>`, and the verdict is a `SiteChangeApproval` row like a site
  * change's: bound to the post's fingerprint, so a later edit voids it, and
  * never given by the post's last editor. Owner and admin posts need none
- * (DEC-103).
+ * (DEC-103). Only with the Website area on (owner, 20 Nov 2026): off, the
+ * old post editor has no Send for approval, so posts publish as before.
  */
 
 type Tx = Prisma.TransactionClient;
@@ -106,12 +108,16 @@ export async function isLead(
     return m !== null && LEAD_ROLES.includes(m.role);
 }
 
-/** Whether "Publishing needs approval" applies to the site now (DEC-103). */
+/**
+ * Whether "Publishing needs approval" applies to the site's posts now
+ * (DEC-103): never while the Website area is off.
+ */
 export async function postApprovalOn(
     tx: Pick<Tx, "site">,
     organizationId: string,
     siteId: string,
 ): Promise<boolean> {
+    if (!websiteAreaOn()) return false;
     const site = await tx.site.findFirst({
         where: { id: siteId, organizationId },
         select: { publishNeedsApproval: true },

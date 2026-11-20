@@ -16,6 +16,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { WebsiteAreaSwitchGuard } from "../sites/website-area-switch";
 import {
     ApprovePostDto,
     AskPostChangesDto,
@@ -132,6 +133,7 @@ export class PostsController {
      * whoever may approve it.
      */
     @Post(":postId/approval-request")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     requestApproval(
         @OrgContext() ctx: OrganizationContext,
@@ -147,6 +149,7 @@ export class PostsController {
      * Publishes it now, or on the day its writer picked.
      */
     @Post(":postId/approve")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     approve(
         @OrgContext() ctx: OrganizationContext,
@@ -159,6 +162,7 @@ export class PostsController {
 
     /** Ask for changes on the post, with a reason (UX-043). Same rules. */
     @Post(":postId/ask")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     askForChanges(
         @OrgContext() ctx: OrganizationContext,

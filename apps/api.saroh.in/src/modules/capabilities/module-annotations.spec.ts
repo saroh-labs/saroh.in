@@ -65,6 +65,8 @@ const CLASS_LEVEL: Record<string, string> = {
     "sites/page-results.controller.ts": "WEBSITE",
     "sites/service-uses.controller.ts": "WEBSITE",
     "sites/change-revert.controller.ts": "WEBSITE",
+    // Restore a version as the draft (owner, 20 Nov 2026).
+    "sites/version-restore.controller.ts": "WEBSITE",
     "share-posts/share-posts.controller.ts": "WEBSITE",
     // The booking page's card with the sheet's headline (#1375).
     "share-posts/share-cards.controller.ts": "WEBSITE",
