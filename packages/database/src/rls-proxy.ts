@@ -67,6 +67,19 @@ export function outsideOrgContext<T>(fn: () => T): T {
     return activeTxStore.exit(() => orgContextStore.exit(fn));
 }
 
+/**
+ * Run `fn` with `tx` as the ambient transaction, so every `prisma.*` call
+ * inside it runs on `tx`'s connection instead of taking a second one from the
+ * pool while `tx` holds its own (A-01: parallel transactions each waiting on
+ * a second connection drained the pool). Under an organization context `tx`
+ * is already ambient; this is for the base path, with enforcement off or no
+ * context. Keep `fn` to awaited reads: work it starts and leaves running
+ * would find `tx` closed.
+ */
+export function onTransaction<T>(tx: TransactionClient, fn: () => T): T {
+    return activeTxStore.getStore() ? fn() : activeTxStore.run(tx, fn);
+}
+
 /** Thrown inside {@link rolledBack}'s transaction to undo it; never escapes. */
 class RollBack extends Error {}
 

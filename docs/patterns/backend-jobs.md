@@ -97,6 +97,12 @@
   state and handles "it was deleted" (`enquiry-notify.handler.ts`).
 - **Current** — **Advisory locks have a registry** (below). A new
   `pg_advisory_xact_lock` adds its row in the same change.
+- **Current** (20 Nov 2026) — **A lock a request can queue on has a bounded
+  wait, and nothing inside a transaction takes a second connection.** A
+  request-path lock goes through `holdXactLock` (`billing/metering.service.ts`:
+  `lock_timeout`, then 429); inside the transaction use `tx`, or wrap a helper
+  that reads through `prisma` in `onTransaction(tx, …)` (`@saroh/database`). Waiters that each hold one connection and want
+  another drain the pool for every business (DEV_LEARNINGS, A-01).
 - **Current** (18 Oct 2026) — **A job written inside a business's transaction
   carries that business's `organizationId`,** even when its work spans
   businesses: the `Job` RLS policy refuses one with none there.

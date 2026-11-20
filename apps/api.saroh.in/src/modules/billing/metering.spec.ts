@@ -9,6 +9,7 @@
  */
 const tx = {
     $executeRaw: jest.fn(),
+    $queryRaw: jest.fn(() => Promise.resolve([{ prev: "0" }])),
     job: { create: jest.fn() },
     product: { count: jest.fn() },
     order: { count: jest.fn() },
@@ -31,6 +32,7 @@ const tx = {
 const $transaction = jest.fn((fn: (t: typeof tx) => unknown) => fn(tx));
 
 jest.mock("@saroh/database", () => ({
+    onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
     prisma: {
         $transaction: (fn: never) => $transaction(fn),
         // `hasRoom` counts outside a write's transaction.
@@ -607,7 +609,8 @@ describe("MeteringService", () => {
         const err = await meter
             .roomInTx(tx as never, "org", "products")
             .catch((e: unknown) => e);
-        expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+        // Bounded wait, the lock, the wait put back (A-01).
+        expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
         expect(responseOf(err)).toMatchObject({
             message: "You've reached your 3 products on Plan A",
             details: {

@@ -12,7 +12,7 @@
  * globally, so other specs running beside this one are untouched. Runs in
  * the integration project (TEST_DATABASE_URL), plain and RLS.
  */
-import { ForbiddenException } from "@nestjs/common";
+import { ForbiddenException, HttpException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma, writeCatalogueVersion } from "@saroh/database";
 import type { Catalog } from "@saroh/pricing-catalog";
@@ -26,6 +26,7 @@ import {
     waitUntilAdvisoryBlockedBy,
 } from "../../../test/lock-wait";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { ImpactService } from "../pricing/impact.service";
@@ -987,6 +988,55 @@ describe("enforcement behind PLAN_ENFORCEMENT (DB, U13)", () => {
             used: 3,
         });
         expect(await countUsage(prisma, orgId, "products")).toBe(3);
+    });
+});
+
+describe("a burst at the cap (DB, A-01)", () => {
+    afterEach(() => {
+        delete env.PLAN_METER_LOCK_WAIT_MS;
+    });
+
+    it("answers 30 parallel creates at the cap quickly with 4xx, and other reads go on", async () => {
+        const { orgId } = await business("free");
+        await product(orgId);
+        await product(orgId);
+        await product(orgId);
+        const started = Date.now();
+        const burst = Array.from({ length: 30 }, () =>
+            add(orgId, "products").then(
+                () => 0,
+                (err: unknown) =>
+                    err instanceof HttpException ? err.getStatus() : 500,
+            ),
+        );
+        // Another business's read while the burst runs.
+        const other = Date.now();
+        await prisma.organization.count();
+        expect(Date.now() - other).toBeLessThan(3_000);
+        const statuses = await Promise.all(burst);
+        expect(statuses.every((s) => s === 403 || s === 429)).toBe(true);
+        expect(Date.now() - started).toBeLessThan(5_000);
+    });
+
+    it("turns a write away with 429 once the meter lock is held past the wait", async () => {
+        env.PLAN_METER_LOCK_WAIT_MS = "200";
+        const { orgId } = await business("free");
+        const held = gate();
+        const locked = gate();
+        const first = prisma.$transaction(async (tx) => {
+            await meter.roomInTx(tx, orgId, "products");
+            locked.release();
+            await held.wait;
+        });
+        await locked.wait;
+        const second = await add(orgId, "products").then(
+            () => null,
+            (err: unknown) => err,
+        );
+        held.release();
+        await first;
+        expect(second).toBeInstanceOf(HttpException);
+        expect((second as HttpException).getStatus()).toBe(429);
     });
 });
 

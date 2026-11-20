@@ -298,6 +298,20 @@ const envSchema = z.object({
     // until the window turns (SMS still is), and Platform owners are
     // emailed. Unset: 100 an hour, 500 a day
     // (`account-phone/whatsapp-ceiling.ts`).
+    // Invitation emails a day (A-02, `organizations/invite-send-limit.ts`):
+    // sends, not live invites, so withdrawing and inviting again counts
+    // each time. One budget per business (business and location invites
+    // together) and one per recipient address across every business.
+    INVITE_SENDS_PER_BUSINESS_PER_DAY: z.string().regex(/^\d+$/).optional(),
+    INVITE_SENDS_PER_EMAIL_PER_DAY: z.string().regex(/^\d+$/).optional(),
+    // Wrong passwords one account may take in a window, from any address,
+    // before password sign-in for it waits for the window to turn (A-03,
+    // `common/auth/password-tries.ts`).
+    PASSWORD_FAILS_PER_ACCOUNT: z.string().regex(/^\d+$/).optional(),
+    PASSWORD_FAIL_WINDOW_MINUTES: z.string().regex(/^\d+$/).optional(),
+    // How long a write waits for its plan meter lock before a 429 (A-01,
+    // `billing/metering.service.ts`), in ms.
+    PLAN_METER_LOCK_WAIT_MS: z.string().regex(/^\d+$/).optional(),
     WHATSAPP_CODES_PER_HOUR: z.string().regex(/^\d+$/).optional(),
     WHATSAPP_CODES_PER_DAY: z.string().regex(/^\d+$/).optional(),
     // Requests a minute one signed-in person may make to the API, every
@@ -393,6 +407,12 @@ const envSchema = z.object({
     API_REPLICAS: z.coerce.number().int().positive().default(1),
     // The pg pool's `max` (`@saroh/database` reads it); unset keeps pg's 10.
     DB_POOL_MAX: z.coerce.number().int().positive().optional(),
+    // Bounds on every database wait (A-01, `@saroh/database` pool-options),
+    // in ms; 0 turns one off. Taking a connection from a full pool, one
+    // statement, and a transaction left idle.
+    DB_POOL_CONNECT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
+    DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
+    DB_IDLE_IN_TRANSACTION_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
     // Which Cashfree the API talks to, for merchants' payments and Saroh's own
     // billing alike: `sandbox` for test credentials, `production` (default)
     // for live ones. The API sends the mode with every checkout's client

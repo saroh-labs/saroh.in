@@ -60,6 +60,12 @@ export class FixedWindowRateLimiter {
         return true;
     }
 
+    /** Whether `key` has used its window up, without taking a hit. */
+    blocked(key: string, now: number = Date.now()): boolean {
+        const window = this.windows.get(key);
+        return !!window && now < window.resetAt && window.count >= this.limit;
+    }
+
     /**
      * Seconds until `key`'s window resets, for a 429 that says when to try
      * again (site sign-in codes, A2). At least 1; 1 for an unknown key.

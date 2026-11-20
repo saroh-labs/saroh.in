@@ -1,11 +1,17 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
+import {
+    isRlsEnforcementEnabled,
+    outsideOrgContext,
+    prisma,
+    runInOrgContext,
+} from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 import { DateTime } from "luxon";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
 import { CatalogueAccessService } from "../../billing/catalogue-access.service";
+import { holdXactLock } from "../../billing/metering.service";
 import { FeatureFlagService } from "../../feature-flags/feature-flags.service";
 import { allows } from "../../organizations/organization-policy";
 import { AiSettingsService } from "../settings/ai-settings.service";
@@ -159,9 +165,10 @@ export class AskAiAccess {
         const me = { organizationId: org, userId: ctx.userId };
         return async (tx, window) => {
             // shortcut: one lock for every business, so Saroh's day can't be
-            // over-reserved; starts are short. Per-business locks plus a
-            // looser Saroh check if starts ever queue on it.
-            await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${START_LOCK}))`;
+            // over-reserved; starts are short. A try-lock that answers 429
+            // when starts queue (A-01); per-business locks plus a looser
+            // Saroh check if that is ever seen.
+            await holdXactLock(tx, START_LOCK);
 
             if (row.limit !== null) {
                 const used = await questionsUsed(tx, org, window.start);
@@ -194,9 +201,14 @@ export class AskAiAccess {
             const sarohDay = DateTime.fromJSDate(now, { zone: "utc" })
                 .startOf("day")
                 .toJSDate();
-            const saroh = await outsideOrgContext(() =>
-                dayHeld(prisma, { startedAt: { gte: sarohDay } }, cap),
-            );
+            // Without row security the start's own connection sees them all,
+            // so no second pool connection is taken under the lock (H-10).
+            const sarohWhere = { startedAt: { gte: sarohDay } };
+            const saroh = isRlsEnforcementEnabled()
+                ? await outsideOrgContext(() =>
+                      dayHeld(prisma, sarohWhere, cap),
+                  )
+                : await dayHeld(tx, sarohWhere, cap);
             if (saroh + cap > limits.sarohDayCostCapMicroUsd) {
                 return { reason: "daily-limit", scope: "saroh" };
             }
