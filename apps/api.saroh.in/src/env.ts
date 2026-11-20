@@ -202,6 +202,11 @@ const envSchema = z.object({
     // (below), and honoured only in a test run, as STRIPE_FAKE is
     // (`calendar-sync/google/google-calendar.provider.ts`).
     GOOGLE_CALENDAR_FAKE: z.enum(["1"]).optional(),
+    // TEST ONLY. `1`: a business's email or WhatsApp keys are taken without
+    // asking Resend or Meta (the email-setup browser spec connects one).
+    // Refused at boot under NODE_ENV=production (below), and honoured only in
+    // a test run, as STRIPE_FAKE is (`communications/provider-keys.ts`).
+    COMMS_KEYS_FAKE: z.enum(["1"]).optional(),
     // Cloudflare Turnstile, the bot challenge a code needs past a shared
     // ceiling. Unset: no challenge is ever asked (and an ERROR says when one
     // would have been), so a customer is never stuck on a widget that can't load.
@@ -563,6 +568,7 @@ const TEST_ONLY = [
     "AI_PROVIDER_FAKE",
     "SOCIAL_FAKE",
     "GOOGLE_CALENDAR_FAKE",
+    "COMMS_KEYS_FAKE",
     // Where Saroh's Meta token and MSG91 key are sent: a value left in
     // production would hand them to that host (03-L8).
     "META_GRAPH_BASE_URL",

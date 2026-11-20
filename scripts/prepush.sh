@@ -445,6 +445,8 @@ e2e_stack() {
     # calling Stripe; only the signed webhook settles. Test only, as above;
     # the stripe-checkout spec runs when the runner sees it too.
     export STRIPE_FAKE=1
+    # Email keys connect without asking Resend, as CI (test only).
+    export COMMS_KEYS_FAKE=1
     export PAYMENTS_ENC_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef # gitleaks:allow (test key, as in the API specs)
     # Ask AI on a script, as CI: nothing calls Anthropic. Test only, as above;
     # the text key is a throwaway for this stack's test conversations.

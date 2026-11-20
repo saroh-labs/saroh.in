@@ -6,6 +6,9 @@ import {
 import type { CommunicationProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { isTestRun } from "../../common/test-run";
+import { declaredNodeEnv, env } from "../../env";
+
 import {
     KEYS_REFUSED,
     NO_ATTENTION,
@@ -44,6 +47,11 @@ export async function assertCommsKeysAccepted(
     adapter: CommsProvider,
     input: CommsVerifyInput,
 ): Promise<void> {
+    if (
+        env.COMMS_KEYS_FAKE === "1" &&
+        isTestRun({ nodeEnvs: [declaredNodeEnv, env.NODE_ENV], ci: env.CI })
+    )
+        return;
     const check = (await adapter.verifyCredentials?.(input)) ?? null;
     if (check === null || check === "ACCEPTED") return;
     const label = LABELS[input.provider] ?? input.provider;

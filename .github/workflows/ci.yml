@@ -792,6 +792,8 @@ jobs:
       # without calling Stripe; only the signed webhook settles. Test only,
       # as above; the stripe-checkout spec runs when it sees it too.
       STRIPE_FAKE: "1"
+      # A business's email keys connect without asking Resend (test only).
+      COMMS_KEYS_FAKE: "1"
       # Every real environment has a payments key, and sending an invoice
       # seals its pay link with it (D17): without one, Send answered 500 on
       # this stack. The same throwaway key the API specs use; it opens
