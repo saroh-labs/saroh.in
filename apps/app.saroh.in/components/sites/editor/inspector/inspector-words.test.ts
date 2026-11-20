@@ -101,6 +101,20 @@ describe("this page's results (KTD-E8)", () => {
         });
         expect(started).toMatch(/^1 order started since /);
     });
+
+    it("draws starts and questions once they count by page, 0 included, each with its own since (DEC-235)", () => {
+        expect(
+            resultParts({
+                ...RESULTS,
+                started: { count: 0, since: "2026-11-20" },
+                questions: { count: 1, since: "2026-11-20" },
+            }),
+        ).toEqual([
+            "312 visits",
+            expect.stringMatching(/^0 bookings started since 20 Nov/),
+            expect.stringMatching(/^1 question since 20 Nov/),
+        ]);
+    });
 });
 
 describe("the pages a header shows on", () => {

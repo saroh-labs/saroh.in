@@ -2343,7 +2343,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 ## DEC-181 Where a visit came from is counted only as totals, from links the business made in Saroh, like a cookieless analytics tool
 
-**Status: Accepted — 2026-10-21** · owner · follows the U15 privacy review (#1099); amends DEC-171 and plan A13
+**Status: Accepted — 2026-10-21** · owner · follows the U15 privacy review (#1099); amends DEC-171 and plan A13 · **superseded in part by DEC-235 (20 Nov 2026):** a started booking or checkout (`site.started`) and an enquiry now keep the site page's path; everything else here stands
 
 - Context:
     - The privacy review of site link tracking found that any `?ref=` value could be recorded (a booking id, a person's name) and that the visit's source was kept on the order, which makes it personal data once the order names a customer. The owner asked how Plausible does it: no cookies, no visitor id, a daily-rotating salt, totals only, and one line in the site owner's privacy policy instead of a banner.
@@ -3114,3 +3114,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: posts went live past "Publishing needs approval": a post publishes on its own, outside the site's Publish, so a teammate's post never waited for anyone.
 - Decision: with "Publishing needs approval" on, a teammate who is not the owner or an admin presses **Send for approval** instead of Publish post, with an optional note and "As soon as it is approved" or "After approval, on a day I pick". **Any reviewer, admin or owner other than the post's last editor** can approve, and approving publishes the post now, or on the day the writer picked. Ask for changes needs a reason (UX-043). Owner and admin posts need no approval (DEC-103).
 - Consequences: the post is one change unit, `post:<postId>`, in the same approval records as a site's changes (DEC-226): the approval binds to the post's fingerprint, so a later edit voids it, and nobody approves their own writing. The API refuses a teammate's unapproved publish or schedule with the site's approval words (409), and the scheduled go-live checks approval again. Sending is a `sent` revision in the post's History, approving an `approved` one. No new table.
+
+## DEC-235 A started booking or checkout and an enquiry keep the site page they came from
+
+**Status: Accepted — 2026-11-20** · owner · website editor plan 2026-11-20-002 (KTD-E8, "This page · last 7 days") · supersedes in part DEC-181 and the U15 privacy review's "no path on a visit's steps"
+
+- Context: the editor's inspector says what one page brought in the last 7 days. Visits had a path; enquiries kept only their form and lead ids, and a visit's steps no path at all (U15 privacy review, DEC-181), so a page could never honestly say "6 bookings started · 2 questions".
+- Decision:
+    - **Recorded:** the path of a site page, and nothing else about it, on two events. `enquiry.submitted` keeps the path of the page the form was on. `site.started` keeps the path of the last site page the visit saw before the booking page or the checkout (the page that sent the visitor); a visit that landed on the booking page itself keeps none. A booking counts as started when a time is chosen, as a checkout counts when it opens, once per visit.
+    - **Never recorded:** the query string or the fragment, a trailing slash, anything that isn't a site path (an address with a host, a path with spaces or control characters, over 2,048 characters), and any private page or the account area: the one list in `@saroh/block-contract` (`PRIVATE_PATH_PREFIXES`) that keeps the trackers off and the page-view beacon silent. The other steps (`site.visit`, `site.looked`, `site.paid`) still carry no path; no visitor, order, booking, customer or anything typed is added to any event.
+    - **Older events keep counting** in the site's totals and Insights; they just don't count for a page. A page's part says "since <date>" from the first day it counted by page, never a 0 it didn't measure. No back-fill.
+- Consequences: `sitePagePathOf` in `packages/block-contract/src/private-paths.ts` is the one rule, used by the site (`visit-source.ts`, `blocks/enquiry.tsx`, `lib/site-view.ts`) and again by the API contract (`analytics/event-contract.ts`), which drops a path it may not keep and still counts the event. The public enquiry endpoint takes an optional `pagePath`. The daily rollups already break `site.started` and `enquiry.submitted` down by path (U47a). Saroh's privacy policy says in one line that a site counts which page a booking was started or a question sent from: a minimal factual addition for the owner to review, as earlier ones were.
+- Rules: `docs/patterns/saroh-product.md` → "what visit tracking collects".

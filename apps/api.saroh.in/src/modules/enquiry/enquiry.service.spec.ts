@@ -176,6 +176,37 @@ describe("EnquiryService.submit — one submission produces one correct lead", (
         expect(JSON.stringify(data)).not.toContain("Jane");
     });
 
+    it("keeps the page the form was on as its path alone, never a private page (DEC-235)", async () => {
+        const service = new EnquiryService();
+        wireHappyPath();
+        await service.submit(
+            "form_1",
+            validData,
+            undefined,
+            "iphash",
+            "/contact?name=Jane#form",
+        );
+        expect(analyticsEventCreate.mock.calls[0][0].data.properties).toEqual({
+            formId: "form_1",
+            leadId: "lead_1",
+            path: "/contact",
+        });
+
+        analyticsEventCreate.mockClear();
+        wireHappyPath();
+        await service.submit(
+            "form_1",
+            validData,
+            undefined,
+            "iphash",
+            "/account/bookings/b1",
+        );
+        expect(analyticsEventCreate.mock.calls[0][0].data.properties).toEqual({
+            formId: "form_1",
+            leadId: "lead_1",
+        });
+    });
+
     it("ISOLATION: every created row is stamped with form.organizationId, never a client value", async () => {
         const service = new EnquiryService();
         wireHappyPath();

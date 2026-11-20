@@ -47,3 +47,29 @@ export function isPrivateSitePath(path: string): boolean {
         (prefix) => path === prefix || path.startsWith(`${prefix}/`),
     );
 }
+
+/** The longest page path kept (the analytics contract's own bound). */
+const MAX_SITE_PAGE_PATH = 2048;
+
+/**
+ * A site page's path as an event may keep it (DEC-235), or null when it
+ * may not be kept: cut at the query and the fragment, a trailing slash
+ * dropped, and refused when it isn't a site path at all (not a string, not
+ * starting with one `/`, spaces or control characters, too long) or is a
+ * private page ({@link isPrivateSitePath}, the trackers' own rule). One
+ * function for the site, which sends it, and the API, which checks it again.
+ */
+export function sitePagePathOf(value: unknown): string | null {
+    if (typeof value !== "string") return null;
+    const cut = value.split(/[?#]/)[0] ?? "";
+    if (!cut.startsWith("/") || cut.startsWith("//")) return null;
+    if (
+        cut.length > MAX_SITE_PAGE_PATH ||
+        // eslint-disable-next-line no-control-regex -- refusing control characters is the point
+        /[\s\u0000-\u001f\u007f\\]/.test(cut)
+    ) {
+        return null;
+    }
+    const path = cut.length > 1 ? cut.replace(/\/+$/, "") || "/" : cut;
+    return isPrivateSitePath(path) ? null : path;
+}

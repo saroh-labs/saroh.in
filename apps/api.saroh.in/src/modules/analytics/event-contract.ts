@@ -1,5 +1,5 @@
 import { BadRequestException } from "@nestjs/common";
-import { isPrivateSitePath } from "@saroh/block-contract";
+import { isPrivateSitePath, sitePagePathOf } from "@saroh/block-contract";
 
 import { isVisitSource, visitRefOf } from "./visit-source";
 
@@ -152,11 +152,32 @@ const siteViewV1: EventValidator = (props) => {
     return out;
 };
 
-/** The `enquiry.submitted` contract (v1): an org-internal funnel event. */
-const enquirySubmittedV1: EventValidator = (props) => ({
-    formId: requireString(props, "formId", 128),
-    leadId: requireString(props, "leadId", 128),
-});
+/**
+ * The page an event came from (DEC-235), kept only as a site page's path
+ * (`sitePagePathOf`: no query, no fragment, never a private page or the
+ * account area). A path that may not be kept is dropped, never the event:
+ * the event still counts in the site's totals, just not by page.
+ */
+function withPagePath(
+    out: Record<string, unknown>,
+    props: Record<string, unknown>,
+): Record<string, unknown> {
+    const path = sitePagePathOf(props.path);
+    return path === null ? out : { ...out, path };
+}
+
+/**
+ * The `enquiry.submitted` contract (v1): an org-internal funnel event, and
+ * since DEC-235 the path of the page the form was on, when it may be kept.
+ */
+const enquirySubmittedV1: EventValidator = (props) =>
+    withPagePath(
+        {
+            formId: requireString(props, "formId", 128),
+            leadId: requireString(props, "leadId", 128),
+        },
+        props,
+    );
 
 /**
  * Where a visit came from (U15, #1099): one of the five groups, required,
@@ -185,8 +206,9 @@ function visitOriginProps(
 /**
  * The four steps of a visit (U15; `site.paid` since DEC-181), each sent at
  * most once per visit by the site's own beacon and carrying only where the
- * visit came from: no path, no product, no order, no amount, no visitor
- * (`AnalyticsService.ingestPublic` stores no visitor hash for them).
+ * visit came from: no product, no order, no amount, no visitor
+ * (`AnalyticsService.ingestPublic` stores no visitor hash for them), and no
+ * path, except `site.started`'s (DEC-235, below).
  *
  * - `site.visit`: a visit began (its first page on the site);
  * - `site.looked`: it opened a product or the booking page;
@@ -196,6 +218,14 @@ function visitOriginProps(
  *   order, so nothing about a visit is kept on an order).
  */
 const visitStepV1: EventValidator = (props) => visitOriginProps(props);
+
+/**
+ * `site.started` (DEC-235, supersedes DEC-181's "no path" for this step):
+ * also the path of the site page the visitor started from (the page before
+ * the booking page or the checkout), when it may be kept.
+ */
+const visitStartedV1: EventValidator = (props) =>
+    withPagePath(visitOriginProps(props), props);
 
 /** The `order.paid` contract (v1): an org-internal commerce event. */
 const orderPaidV1: EventValidator = (props) => ({
@@ -405,7 +435,7 @@ const REGISTRY = new Map<string, EventValidator>([
     [key(ORDER_REFUNDED_TYPE, 1), orderRefundedV1],
     [key(SITE_VISIT_TYPE, 1), visitStepV1],
     [key(SITE_LOOKED_TYPE, 1), visitStepV1],
-    [key(SITE_STARTED_TYPE, 1), visitStepV1],
+    [key(SITE_STARTED_TYPE, 1), visitStartedV1],
     [key(SITE_PAID_TYPE, 1), visitStepV1],
     // Activation (#176) — server-produced only; absent from
     // PUBLIC_INGESTABLE_TYPES on purpose.

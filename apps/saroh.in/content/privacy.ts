@@ -17,7 +17,9 @@
  * WhatsApp number, 31 Oct (plan 2026-10-31-002 U9), NOT YET in the owner's
  * doc: a minimal factual addition for the owner to review; how fast pages
  * load, 6 Nov (DEC-160), NOT YET in the owner's doc: a minimal factual
- * addition for the owner to review). Published VERBATIM at
+ * addition for the owner to review; the page a booking was started or a
+ * question sent from, 20 Nov (DEC-235), NOT YET in the owner's doc: a
+ * minimal factual addition for the owner to review). Published VERBATIM at
  * /privacy: do not reword it here. A change comes from the owner's text,
  * and moves `publishOn`, which is the "Last updated" date the page shows.
  *
@@ -46,7 +48,7 @@ This policy covers saroh.in, app.saroh.in, accounts.saroh.in and the emails we s
 
 If your website uses analytics or advertising tools that you connect (such as Google Analytics, Meta Pixel or Microsoft Clarity), they run on your site on your behalf. Your business chose them and decides how what they collect is used. Saroh asks your visitors before any of them sets cookies, never loads them on checkout, payment or account pages, and stores only the tools' public IDs.
 
-Sites on Saroh also count visits for your business without cookies or personal data: which pages were opened and where visits came from (Instagram, Google, WhatsApp, a link you made in Saroh, or typed in), kept only as totals. Nothing that identifies a visitor is stored, and nothing is counted when a browser asks not to be tracked.
+Sites on Saroh also count visits for your business without cookies or personal data: which pages were opened, which page a booking was started or a question sent from, and where visits came from (Instagram, Google, WhatsApp, a link you made in Saroh, or typed in), kept only as totals. Nothing that identifies a visitor is stored, and nothing is counted when a browser asks not to be tracked.
 
 ## What we collect
 

@@ -17,7 +17,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * `AnalyticsService.record`: the lead and its count commit together, and a
  * replayed submission (same idempotency key) never reaches here. The
  * `dedupeKey` is the submission's, so a second write could never count it
- * twice either. No visitor detail is stored: the form and lead ids only.
+ * twice either. No visitor detail is stored: the form and lead ids and,
+ * since DEC-235, the path of the site page the form was on (the contract
+ * drops one that isn't a public site page's).
  */
 export function enquirySubmittedEvent(input: {
     organizationId: string;
@@ -25,12 +27,15 @@ export function enquirySubmittedEvent(input: {
     formId: string;
     leadId: string;
     submissionId: string;
+    /** The page the form was on, as the site sent it; checked by the contract. */
+    pagePath?: string | null;
     now?: Date;
 }): Prisma.AnalyticsEventUncheckedCreateInput {
     const now = input.now ?? new Date();
     const properties = validateEventProperties(ENQUIRY_SUBMITTED_TYPE, 1, {
         formId: input.formId,
         leadId: input.leadId,
+        path: input.pagePath,
     });
     return {
         organizationId: input.organizationId,
