@@ -13,7 +13,8 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * from then on the API refuses a direct publish (409 `APPROVAL_REQUIRED`)
  * — the refusal the editor's Publish tells the merchant about. Then the
  * owner turns it off again, and it's turned off whatever happens, so the
- * site is left as it was found.
+ * site is left as it was found. While on, each waiting change carries its
+ * approval (DEC-226, U9), and approve/ask refuse what they must.
  *
  * `@serial`: it changes how Northwind's one site (ADR-006) publishes, which
  * every spec that publishes it would read. On Northwind, where the seed has
@@ -108,13 +109,56 @@ test(
                 `${urls.APP_URL}/sites/${siteId}/settings?section=advanced`,
             );
 
-            // A direct publish is now refused, and nothing is written.
-            const refused = await page.request.post(
-                `${urls.API_URL}/organizations/${NORTHWIND_ORG}/sites/${siteId}/publish`,
-                { headers: northwind(page.request).headers, data: {} },
-            );
-            expect(refused.status()).toBe(409);
-            expect(await refused.text()).toContain("APPROVAL_REQUIRED");
+            // Per change (DEC-226, U9): each waiting change says whether it
+            // needs approval and who may give it. Read only: nothing here
+            // approves Northwind's draft.
+            const changes = await northwind(page.request).get<{
+                approvalRequired: boolean;
+                units: {
+                    key: string;
+                    approval: { state: string; approvers: unknown[] };
+                }[];
+            }>(`/sites/${siteId}/changes`);
+            expect(changes.approvalRequired).toBe(true);
+            for (const unit of changes.units) {
+                expect([
+                    "not-needed",
+                    "waiting",
+                    "approved",
+                    "asked",
+                ]).toContain(unit.approval.state);
+                expect(Array.isArray(unit.approval.approvers)).toBe(true);
+            }
+            // A direct publish is now refused, and nothing is written: an
+            // owner's own changes need no approval (DEC-103), so asked only
+            // while none would go out.
+            if (
+                changes.units.every(
+                    (u) =>
+                        u.approval.state === "waiting" ||
+                        u.approval.state === "asked",
+                )
+            ) {
+                const refused = await page.request.post(
+                    `${urls.API_URL}/organizations/${NORTHWIND_ORG}/sites/${siteId}/publish`,
+                    { headers: northwind(page.request).headers, data: {} },
+                );
+                expect(refused.status()).toBe(409);
+                expect(await refused.text()).toContain("APPROVAL_REQUIRED");
+            }
+            const changesUrl = `${urls.API_URL}/organizations/${NORTHWIND_ORG}/sites/${siteId}/changes`;
+            // Asking for changes needs a reason (UX-043)...
+            const noReason = await page.request.post(`${changesUrl}/ask`, {
+                headers: northwind(page.request).headers,
+                data: { units: ["site:footer"] },
+            });
+            expect(noReason.status()).toBe(400);
+            // ...and a change that isn't waiting can't be approved.
+            const gone = await page.request.post(`${changesUrl}/approve`, {
+                headers: northwind(page.request).headers,
+                data: { units: ["section:nowhere:k0"] },
+            });
+            expect(gone.status()).toBe(400);
 
             await approvalSwitch(page).click();
             await expect(

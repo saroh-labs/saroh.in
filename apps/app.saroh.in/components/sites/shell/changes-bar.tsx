@@ -1,20 +1,26 @@
+"use client";
+
 import { Button } from "@saroh/ui/button";
 import Link from "next/link";
 
+import type { SitePublishData } from "@/components/sites/publish/site-publish";
+import { SitePublish } from "@/components/sites/publish/site-publish";
 import { count } from "@/lib/format/plural";
 
 /**
  * A phone's bar above the tab bar while changes wait (WXHOverviewPhone):
- * how many, and Review and publish. Drawn only when something waits and
- * this person may publish; the count is `siteStatus`'s, the header's own.
- * Publish lives in the editor until the Publish sheet comes out (U11).
+ * how many, and Review and publish, which opens the Publish sheet (U11)
+ * the header's chip opens. Drawn only when something waits and this
+ * person may publish; the count is `siteStatus`'s, the header's own.
  */
 export function ChangesBar({
     siteId,
     waiting,
+    publish = null,
 }: {
     siteId: string;
     waiting: number;
+    publish?: SitePublishData | null;
 }) {
     if (waiting <= 0) return null;
     return (
@@ -25,9 +31,25 @@ export function ChangesBar({
             <p className="min-w-0 flex-1 font-semibold">
                 {count(waiting, "change")} waiting
             </p>
-            <Button asChild className="coarse:h-11">
-                <Link href={`/sites/${siteId}`}>Review and publish</Link>
-            </Button>
+            {publish ? (
+                <SitePublish
+                    data={publish}
+                    trigger={(open) => (
+                        <Button
+                            type="button"
+                            className="coarse:h-11"
+                            aria-haspopup="dialog"
+                            onClick={open}
+                        >
+                            Review and publish
+                        </Button>
+                    )}
+                />
+            ) : (
+                <Button asChild className="coarse:h-11">
+                    <Link href={`/sites/${siteId}`}>Review and publish</Link>
+                </Button>
+            )}
         </div>
     );
 }

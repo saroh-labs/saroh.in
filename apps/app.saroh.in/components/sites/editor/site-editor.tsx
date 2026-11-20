@@ -11,8 +11,10 @@ import { useEditorViewport } from "@/components/sites/canvas/use-editor-viewport
 import { starterContentActions } from "@/components/sites/looks/starter-content-actions";
 import { BrandSheetActions } from "@/components/sites/looks/style-panel";
 import { useEditorStyle } from "@/components/sites/looks/use-editor-style";
+import type { PublishMore } from "@/components/sites/publish/publish-more";
 import { PublishSheet } from "@/components/sites/publish/publish-sheet";
 import { usePublish } from "@/components/sites/publish/use-publish";
+import { usePublishChanges } from "@/components/sites/publish/use-publish-changes";
 import { ReviewSheet } from "@/components/sites/review/review-sheet";
 import {
     reviewOwner,
@@ -142,6 +144,8 @@ export function SiteEditor({
             void releaseState.readLive();
         },
     });
+    // The changes by person, read as the Publish sheet opens (U11).
+    const publishChanges = usePublishChanges(siteId);
     const releases = {
         ...releaseState,
         abilities: {
@@ -398,7 +402,10 @@ export function SiteEditor({
                         openCheck={(ready) => {
                             // An Undo pressed behind the check would change the
                             // draft being published (G-1).
-                            if (!ready.dirty) edits.settleUndo();
+                            if (!ready.dirty) {
+                                edits.settleUndo();
+                                void publishChanges.load();
+                            }
                             return publish.openCheck(ready);
                         }}
                         {...viewport}
@@ -625,6 +632,29 @@ export function SiteEditor({
 
                     <PublishSheet
                         open={publish.checking}
+                        siteId={siteId}
+                        changes={publishChanges}
+                        onFlagsChanged={() => void publish.refreshFlags()}
+                        onAsk={() => void review.askForReview()}
+                        more={publishMore(siteId, releases, publish.closeCheck)}
+                        // Tell people about the page open here, once live;
+                        // the home page when this one was left out.
+                        share={
+                            publish.siteAddress
+                                ? {
+                                      page:
+                                          (publishChanges.leftOut.has(
+                                              `page:${pageId}`,
+                                          )
+                                              ? homePage
+                                              : pages.find(
+                                                    (p) => p.id === pageId,
+                                                )) ?? pages[0],
+                                      business: chrome.displayName,
+                                      host: publish.siteAddress,
+                                  }
+                                : null
+                        }
                         phone={layout === "phone"}
                         pages={pages}
                         flags={publish.siteFlags.flags}
@@ -657,8 +687,8 @@ export function SiteEditor({
                             publish.setSiteAddress(host);
                             void publish.refreshFlags();
                         }}
-                        onPublish={() =>
-                            void publish.onPublish(chrome.displayName)
+                        onPublish={(choice) =>
+                            void publish.onPublish(chrome.displayName, choice)
                         }
                         onClose={publish.closeCheck}
                         onJump={jumpToFlag}
@@ -668,6 +698,38 @@ export function SiteEditor({
             </EditorReviewCan.Provider>
         </EditorReadOnly.Provider>
     );
+}
+
+/**
+ * The Publish sheet's other ways on (DEC-071): See versions, and the test
+ * links where they are on. Each closes the sheet for what it opens.
+ */
+function publishMore(
+    siteId: string,
+    releases: Parameters<typeof testReleaseActions>[0],
+    closeSheet: () => void,
+): PublishMore {
+    const actions = testReleaseActions(releases);
+    const then = (run: () => void) => () => {
+        closeSheet();
+        run();
+    };
+    return {
+        versionsHref: `/sites/${siteId}/versions`,
+        ...(actions
+            ? {
+                  testLinks: {
+                      count: actions.count,
+                      onOpen: then(actions.onOpenList),
+                  },
+                  // Scheduling is a test link's Go live › Schedule.
+                  onSchedule: then(actions.onOpenList),
+                  ...(actions.onMake
+                      ? { onShareTestLink: then(actions.onMake) }
+                      : {}),
+              }
+            : {}),
+    };
 }
 
 /** An editor's default: a reader's abilities are passed in by the page. */

@@ -49,6 +49,8 @@ export async function wordReview(
             return wordNote(tx, organizationId, p.commentId);
         case "release":
             return wordRelease(tx, organizationId, p.testReleaseId);
+        case "change":
+            return wordChangeAsk(tx, organizationId, p);
     }
 }
 
@@ -311,6 +313,56 @@ async function wordNote(
             ? `/sites/${c.siteId}/releases/${c.testReleaseId}`
             : `/sites/${c.siteId}/pages`,
         skipUserId: c.authorUserId,
+    };
+}
+
+/**
+ * Changes asked for on one person's change (DEC-226, U9): told to them
+ * alone. The bell quotes the reason; the email doesn't (team free text).
+ */
+async function wordChangeAsk(
+    tx: Tx,
+    organizationId: string,
+    p: Extract<ReviewPayload, { about: "change" }>,
+): Promise<WordedAlert | null> {
+    const a = await tx.siteChangeApproval.findFirst({
+        where: { id: p.changeApprovalId, organizationId },
+        select: {
+            id: true,
+            siteId: true,
+            byUserId: true,
+            reason: true,
+            site: { select: { name: true } },
+        },
+    });
+    if (!a) return null;
+    const by = await tx.user.findUnique({
+        where: { id: a.byUserId },
+        select: { name: true, email: true },
+    });
+    const who = by ? nameOf(by) : "Someone on the team";
+    const line = (a.reason ?? "").replace(/\s+/g, " ").trim();
+    const quote =
+        line.length > NOTE_QUOTE_MAX
+            ? `${line.slice(0, NOTE_QUOTE_MAX - 1).trimEnd()}…`
+            : line;
+    return {
+        event: "site",
+        eventKey: `team:review-change:${a.id}`,
+        notificationId: null,
+        ...noticeOf(SITE_REVIEW_CHANGES_NOTIFICATION_TYPE, {
+            siteId: a.siteId,
+        }),
+        title: `${who} asked for changes to your work on ${a.site.name}`,
+        body: quote ? `“${quote}”` : "Open the site to see what they asked.",
+        mail: {
+            heading: `${mailName(by?.name, "Someone on the team")} asked for changes to your work on ${mailName(a.site.name, "your website")}`,
+            body: "Open the site in Saroh to read what they asked.",
+        },
+        path: `/sites/${a.siteId}/pages`,
+        skipUserId: a.byUserId,
+        forUserId: p.editorUserId,
+        alwaysUserId: p.editorUserId,
     };
 }
 

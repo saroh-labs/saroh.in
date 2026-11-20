@@ -142,6 +142,28 @@ export default async function WebsiteTabsLayout({
             mayTeam: navCan(actor, "member:read"),
         });
         const waiting = site.can.publish ? status.waiting : 0;
+        // The Publish sheet (U11), for whoever may publish; a Reviewer
+        // approves in the editor instead (DEC-226).
+        const publish = site.can.publish
+            ? {
+                  siteId: site.id,
+                  siteName: here.name,
+                  host: address?.host ?? null,
+                  pages: site.pages,
+                  neverPublished: site.currentPublicationId === null,
+                  pendingSectionChanges: site.pendingSectionChanges,
+                  pendingSiteChanges: site.pendingSiteChanges,
+                  needsApproval: site.publishNeedsApproval === true,
+                  canOverride: site.canOverride === true,
+                  addressFix: webAddress
+                      ? {
+                            address: webAddress.address,
+                            platformOrigin: webAddress.platformOrigin,
+                            canChange: webAddress.canChange === true,
+                        }
+                      : null,
+              }
+            : null;
         return (
             <PageContainer width="full">
                 <div
@@ -164,6 +186,7 @@ export default async function WebsiteTabsLayout({
                         canEdit={site.can.edit}
                         mayCreate={mayCreate}
                         askAi={askAiOn() && organization?.role !== "REVIEWER"}
+                        publish={publish}
                     />
                     {thisPaused ? (
                         <PausedNote>{pausedWords("site")}</PausedNote>
@@ -182,7 +205,11 @@ export default async function WebsiteTabsLayout({
                         </div>
                     </div>
                 </div>
-                <ChangesBar siteId={site.id} waiting={waiting} />
+                <ChangesBar
+                    siteId={site.id}
+                    waiting={waiting}
+                    publish={publish}
+                />
             </PageContainer>
         );
     }

@@ -8,10 +8,11 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 
 import { pendingAreas } from "@/lib/sites/pending";
-import type { Flag, SitePage } from "@/lib/sites/service";
+import type { Flag, ReviewState, SitePage } from "@/lib/sites/service";
 import type { WebAddressFix } from "./address-fix";
 import { AddressFix } from "./address-fix";
 import {
+    APPROVAL_LINE,
     FIX_WORD,
     goesLive,
     oneAreaWords,
@@ -301,5 +302,40 @@ function FixButton({ label, onClick }: { label: string; onClick: () => void }) {
         >
             {label}
         </Button>
+    );
+}
+
+/** The review's latest verdict, a line in the Publish sheet (spec §2). */
+export function ApprovalLine({
+    review,
+    zone,
+}: {
+    review: ReviewState;
+    zone: string;
+}) {
+    if (!review.latestApproval) return null;
+    return (
+        <p
+            className={
+                APPROVAL_LINE[review.latestApproval.outcome].approved
+                    ? "rounded-md bg-muted px-3 py-2 text-sm text-foreground"
+                    : "rounded-md border px-3 py-2 text-sm text-muted-foreground"
+            }
+        >
+            {APPROVAL_LINE[review.latestApproval.outcome].text(
+                review.latestApproval,
+                zone,
+            )}
+            {review.openNotes > 0
+                ? `, with ${count(review.openNotes, "note")} still open.`
+                : "."}
+            {review.outstanding ? (
+                <span className="mt-1 block">
+                    A reviewer&apos;s request for changes is still open.
+                    Publishing now goes ahead without approval, and records that
+                    it did, here and in version history.
+                </span>
+            ) : null}
+        </p>
     );
 }

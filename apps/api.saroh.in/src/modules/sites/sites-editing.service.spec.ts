@@ -47,6 +47,8 @@ jest.mock("@saroh/database", () => {
             findMany: jest.fn(),
             create: jest.fn(),
         },
+        // putLive's record of changes a publish left out (U8).
+        auditEvent: { create: jest.fn() },
         // putLive's lock on the site row (KTD-14).
         $queryRaw: jest.fn().mockResolvedValue([]),
         // Who changed what (change units, U7).
@@ -808,9 +810,12 @@ describe("SitesService.publishSite", () => {
 
     it("refuses to publish a site with no web address, and writes nothing (L5)", async () => {
         siteFindFirst.mockResolvedValue(siteWithRichText("<p>hello</p>"));
-        (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
-            subdomain: null,
-        });
+        (prisma.site.findUniqueOrThrow as jest.Mock)
+            .mockResolvedValueOnce({
+                publishNeedsApproval: false,
+                currentPublication: null,
+            })
+            .mockResolvedValueOnce({ subdomain: null });
 
         await expect(
             service.publishSite(ctx(), "site_1"),
@@ -1199,6 +1204,77 @@ describe("SitesService.publishSite", () => {
             response: roleDenial("site:publish"),
         });
         expect(siteFindFirst).not.toHaveBeenCalled();
+    });
+
+    describe("a broken section left out (U8)", () => {
+        const hero = (key: string, content: unknown) => ({
+            key,
+            type: "hero",
+            contractVersion: 1,
+            content,
+        });
+        const draft = () => ({
+            ...siteWithRichText("<p>hello</p>"),
+            pages: [
+                {
+                    id: "p1",
+                    path: "/",
+                    title: "Home",
+                    isHome: true,
+                    versions: [
+                        {
+                            sections: [
+                                hero("a", { heading: "Hi" }),
+                                // hero v1 needs a heading: unfinished.
+                                hero("b", {}),
+                            ],
+                        },
+                    ],
+                },
+            ],
+        });
+        const live = {
+            site: {},
+            pages: [
+                {
+                    path: "/",
+                    title: "Home",
+                    isHome: true,
+                    sections: [hero("a", { heading: "Hi" })].map(
+                        ({ key: _k, ...s }) => s,
+                    ),
+                },
+            ],
+            keys: { "/": { id: "p1", sections: ["a"] } },
+        };
+
+        it("doesn't block a publish that leaves it out", async () => {
+            siteFindFirst.mockResolvedValue(draft());
+            (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+                publishNeedsApproval: false,
+                currentPublication: { snapshot: live },
+            });
+
+            await service.publishSite(ctx(), "site_1", {
+                leaveOut: ["section:p1:b"],
+            });
+
+            const written = publicationCreate.mock.calls[0][0].data.snapshot;
+            expect(written.pages[0].sections).toHaveLength(1);
+        });
+
+        it("still refuses it when it would go live", async () => {
+            siteFindFirst.mockResolvedValue(draft());
+            (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+                publishNeedsApproval: false,
+                currentPublication: { snapshot: live },
+            });
+
+            await expect(
+                service.publishSite(ctx(), "site_1"),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(publicationCreate).not.toHaveBeenCalled();
+        });
     });
 });
 

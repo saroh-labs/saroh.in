@@ -93,4 +93,34 @@ describe("the site header keeps today's controls (00-universal §15)", () => {
     it("says Read only to someone who reads the site (DEC-200)", () => {
         expect(header(false)).toContain("Read only");
     });
+
+    it("opens Publish from the status chip for whoever may publish; a Reviewer's is a badge (U11)", () => {
+        expect(header(false)).not.toContain("data-status-chip");
+        const html = renderToStaticMarkup(
+            <SiteHeader
+                site={site}
+                sites={[site]}
+                address="gulmohar.saroh.app"
+                liveUrl="https://gulmohar.saroh.app"
+                qrUrl="https://gulmohar.saroh.app"
+                canEdit
+                mayCreate
+                askAi
+                publish={{
+                    siteId: "s1",
+                    siteName: "Gulmohar",
+                    host: "gulmohar.saroh.app",
+                    pages: [],
+                    neverPublished: false,
+                    pendingSectionChanges: 2,
+                    pendingSiteChanges: [],
+                    needsApproval: false,
+                    canOverride: false,
+                    addressFix: null,
+                }}
+            />,
+        );
+        expect(html).toContain("data-status-chip");
+        expect(html).toContain("Live · 2 changes waiting: open Publish");
+    });
 });

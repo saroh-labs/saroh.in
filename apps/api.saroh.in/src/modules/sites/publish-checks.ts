@@ -75,7 +75,7 @@ const HEAD_WORDS = new Set([
 ]);
 
 /** "₹2,500", "Rs. 2500", "INR 2,500.50", "$40". */
-const AMOUNT = String.raw`(?:₹|\brs\.?|\binr|\$|£|€)\s?(\d[\d,]*)(?:\.(\d{1,2}))?`;
+const AMOUNT = String.raw`(?:\u20B9|\brs\.?|\binr|\$|£|€)\s?(\d[\d,]*)(?:\.(\d{1,2}))?`;
 const WORD = String.raw`[\p{L}\p{N}][\p{L}\p{N}'’-]*`;
 const TOKEN = new RegExp(`${AMOUNT}|(${WORD})`, "giu");
 

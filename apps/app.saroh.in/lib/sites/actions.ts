@@ -43,6 +43,7 @@ import {
     listDraftVersions as listDraftVersionsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
+    recordChangeVerdict as recordChangeVerdictApi,
     recordPageView as recordPageViewApi,
     removeSiteRedirect as removeSiteRedirectApi,
     requestReview as requestReviewApi,
@@ -131,6 +132,16 @@ export async function createApproval(
     reason?: string,
 ) {
     return createApprovalApi(siteId, outcome, testReleaseId, reason);
+}
+
+/** Approve, or ask for changes on, waiting changes (DEC-226, U9). */
+export async function recordChangeVerdict(
+    siteId: string,
+    units: string[],
+    outcome: ReviewerVerdict,
+    reason?: string,
+) {
+    return recordChangeVerdictApi(siteId, units, outcome, reason);
 }
 
 /** Take back the draft's open review request (UX-068). */

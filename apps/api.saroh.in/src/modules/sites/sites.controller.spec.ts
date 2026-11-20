@@ -195,6 +195,32 @@ const ROUTES: Route[] = [
         expect: [ctx, SITE, DTO],
     },
     {
+        handler: "approveChanges",
+        method: RequestMethod.POST,
+        path: ":siteId/changes/approve",
+        target: "sites",
+        call: "recordChangeVerdict",
+        args: [ctx, SITE, { units: ["site:footer"] }],
+        expect: [ctx, SITE, { units: ["site:footer"], outcome: "APPROVED" }],
+    },
+    {
+        handler: "askForChanges",
+        method: RequestMethod.POST,
+        path: ":siteId/changes/ask",
+        target: "sites",
+        call: "recordChangeVerdict",
+        args: [ctx, SITE, { units: ["site:footer"], reason: "Old hours" }],
+        expect: [
+            ctx,
+            SITE,
+            {
+                units: ["site:footer"],
+                outcome: "CHANGES_REQUESTED",
+                reason: "Old hours",
+            },
+        ],
+    },
+    {
         handler: "createPreviewLink",
         method: RequestMethod.POST,
         path: ":siteId/preview-links",

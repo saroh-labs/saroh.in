@@ -1152,6 +1152,29 @@ export interface ChangeUnit {
     editedAt: string | null;
     /** Units that go out, or are left out, with this one. */
     requires: string[];
+    /** Its approval (DEC-226, U9). */
+    approval: ChangeApproval;
+}
+
+/** Someone who may approve a change (DEC-226). */
+export interface ChangeApprover {
+    id: string;
+    name: string;
+    role: "REVIEWER" | "OWNER" | "ADMIN";
+}
+
+/** A change's approval (API `change-approvals.ts`, U9). */
+export interface ChangeApproval {
+    /** `not-needed`: made last by an owner or admin. */
+    state: "not-needed" | "waiting" | "approved" | "asked";
+    by?: { id: string; name: string | null };
+    at?: string;
+    /** What needs changing, when asked. */
+    reason?: string;
+    /** An approval a later edit no longer matches. */
+    voided: boolean;
+    /** Who may approve it; never its last editor. */
+    approvers: ChangeApprover[];
 }
 
 /** What publishing would change, by who changed it (U7). */
@@ -1170,6 +1193,46 @@ export interface SiteChanges {
     }[];
     /** Posts not live yet: each goes live with its own Publish post. */
     posts: { id: string; title: string; updatedAt: string }[];
+    /**
+     * "Publishing needs approval" applies: a teammate's change goes out
+     * only once approved; the rest are left out by default.
+     */
+    approvalRequired: boolean;
+}
+
+/**
+ * Approve waiting changes, or ask for changes with a reason (DEC-226, U9).
+ * Requires `site:approve`; never on a change you made.
+ */
+export async function recordChangeVerdict(
+    siteId: string,
+    units: string[],
+    outcome: ReviewerVerdict,
+    reason?: string,
+): Promise<SitesResult<{ recorded: number }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/${siteId}/changes/${outcome === "APPROVED" ? "approve" : "ask"}`,
+        {
+            method: "POST",
+            body: JSON.stringify({
+                units,
+                ...(outcome === "CHANGES_REQUESTED" ? { reason } : {}),
+            }),
+        },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        recorded?: number;
+    } | null;
+    if (res.ok && typeof data?.recorded === "number") {
+        return { ok: true, data: { recorded: data.recorded } };
+    }
+    return { ok: false, ...readError(data, "Couldn't record that.") };
 }
 
 /** Null on a 404 / no active org; throws on a real failure. */

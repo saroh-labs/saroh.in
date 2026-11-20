@@ -123,6 +123,10 @@ export const AuditAction = {
     // site and `leftOut`, the change unit keys (ids, never content). The
     // target is the new publication.
     SitePublishLeftOut: "site.publish.left_out",
+    // An approval of one change that a later edit no longer matches
+    // (DEC-226, website area U9), written by the publish that found it.
+    // Metadata: the change unit keys. The target is the site.
+    SiteChangeApprovalVoided: "site.change_approval.voided",
     // A site's draft brought up to its template's newest version by Saroh
     // (DEC-141, `sites/template-upgrade.ts`), written in the upgrade's own
     // transaction with the site as the target and `system:template-upgrade`

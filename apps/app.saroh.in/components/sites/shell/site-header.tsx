@@ -13,6 +13,9 @@ import {
     StateBadge,
 } from "@/components/sites/header/website-header";
 
+import type { SitePublishData } from "@/components/sites/publish/site-publish";
+import { SitePublish } from "@/components/sites/publish/site-publish";
+
 import type { SwitcherSite } from "./site-switcher";
 import { SiteSwitcher } from "./site-switcher";
 
@@ -23,8 +26,9 @@ import { SiteSwitcher } from "./site-switcher";
  * (in the switcher), the address link or Preview, QR, the state and Paused
  * badges and Open editor. New post and Categories sit over Writing.
  *
- * The status chip is a badge until the Publish sheet comes out of the
- * editor (U11); Review and publish opens the editor, where Publish is.
+ * The status chip opens the Publish sheet (U11) for someone who may
+ * publish; for anyone else (a Reviewer approves in the editor) it is a
+ * badge.
  */
 export function SiteHeader({
     site,
@@ -35,6 +39,7 @@ export function SiteHeader({
     canEdit,
     mayCreate,
     askAi,
+    publish = null,
 }: {
     site: SwitcherSite;
     sites: readonly SwitcherSite[];
@@ -48,6 +53,8 @@ export function SiteHeader({
     mayCreate: boolean;
     /** Ask AI's panel is here for this person (`askAiOn`, not a Reviewer). */
     askAi: boolean;
+    /** The Publish sheet's read; null: the chip is only a badge. */
+    publish?: SitePublishData | null;
 }) {
     const base = `/sites/${site.id}`;
     return (
@@ -101,7 +108,27 @@ export function SiteHeader({
                         />
                     </>
                 ) : null}
-                <StateBadge state={site.status} />
+                {publish ? (
+                    <SitePublish
+                        data={publish}
+                        trigger={(open) => (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="inline"
+                                aria-haspopup="dialog"
+                                aria-label={`${site.status.label}: open Publish`}
+                                data-status-chip=""
+                                onClick={open}
+                                className="-my-1 rounded-full p-0 hover:bg-transparent coarse:min-h-11"
+                            >
+                                <StateBadge state={site.status} />
+                            </Button>
+                        )}
+                    />
+                ) : (
+                    <StateBadge state={site.status} />
+                )}
                 {site.paused ? (
                     <StatusBadge size="default" tone="warning">
                         Paused

@@ -36,6 +36,14 @@ import {
     authorize,
     ROLE_DENIED,
 } from "../organizations/organization-policy";
+import type { ChangeVerdict, UnitApproval } from "./change-approvals";
+import {
+    editorsOf,
+    heldForApproval,
+    readUnitVerdicts,
+    recordUnitVerdicts,
+    unitApprovals,
+} from "./change-approvals";
 import type {
     ChangeGroup,
     ChangeStamp,
@@ -89,7 +97,9 @@ import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import {
     approvalApplies,
+    approvalRequired,
     assertOverrideAllowed,
+    changesAwaitApproval,
     isOwner,
     setPublishNeedsApproval,
 } from "./publish-approval";
@@ -375,13 +385,37 @@ export interface PageDraftView {
 }
 
 /** What `GET …/sites/:siteId/changes` answers (change units, U7). */
+/** Someone who may approve a change (DEC-226). */
+export interface ChangeApprover {
+    id: string;
+    name: string;
+    role: "REVIEWER" | "OWNER" | "ADMIN";
+}
+
 export interface SiteChangesView {
     siteId: string;
     /** When the version visitors see went live; null before the first. */
     livePublishedAt: Date | null;
     /** `units.length`; null before the first publish (nothing to diff). */
     count: number | null;
-    units: ChangeUnit[];
+    units: (ChangeUnit & {
+        /** Approved, asked about or waiting (DEC-226, U9), and by whom. */
+        approval: {
+            state: UnitApproval["state"];
+            by?: { id: string; name: string | null };
+            at?: string;
+            reason?: string;
+            /** An approval a later edit no longer matches. */
+            voided: boolean;
+            /** Who may approve it, for "Waiting for Kavya's approval". */
+            approvers: ChangeApprover[];
+        };
+    })[];
+    /**
+     * "Publishing needs approval" applies (on, and the plan has it,
+     * DEC-103): a teammate's change waiting goes out only once approved.
+     */
+    approvalRequired: boolean;
     /** By person, newest first; `userId` null is "Earlier changes". */
     groups: (ChangeGroup & { name: string | null; you: boolean })[];
     /** Posts not live yet: each has its own Publish post. */
@@ -1249,6 +1283,106 @@ export class SitesService {
     }
 
     /**
+     * The change units of `draft` against `live`, with who changed each read
+     * of `tx`: what a publish names when it decides what needs approval
+     * (U9). Fingerprints are of the snapshot being published.
+     */
+    private async unitsInTx(
+        tx: Prisma.TransactionClient,
+        siteId: string,
+        draft: SiteSnapshot,
+        live: unknown,
+    ): Promise<ChangeUnit[]> {
+        const site = await tx.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: changesSiteSelect,
+        });
+        return changeUnits(draft, live, changeStamps(site));
+    }
+
+    /**
+     * Who may approve a change on the site (DEC-226): its reviewers, the
+     * business's admins and owners.
+     */
+    private async approversOf(
+        organizationId: string,
+        siteId: string,
+    ): Promise<ChangeApprover[]> {
+        const [reviewers, leads] = await Promise.all([
+            prisma.siteReviewer.findMany({
+                where: { organizationId, siteId },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    user: { select: { id: true, name: true, email: true } },
+                },
+            }),
+            prisma.membership.findMany({
+                where: { organizationId, role: { in: ["OWNER", "ADMIN"] } },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    role: true,
+                    user: { select: { id: true, name: true, email: true } },
+                },
+            }),
+        ]);
+        const out = new Map<string, ChangeApprover>();
+        for (const r of reviewers) {
+            out.set(r.user.id, {
+                id: r.user.id,
+                name: r.user.name ?? r.user.email,
+                role: "REVIEWER",
+            });
+        }
+        for (const m of leads) {
+            out.set(m.user.id, {
+                id: m.user.id,
+                name: m.user.name ?? m.user.email,
+                role: m.role as "OWNER" | "ADMIN",
+            });
+        }
+        return [...out.values()];
+    }
+
+    /**
+     * The units waiting on a site the caller may see (reviewer-scoped, 404
+     * otherwise), for a verdict on them (U9).
+     */
+    private async waitingUnits(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<ChangeUnit[]> {
+        await assertSiteInOrg(ctx, siteId);
+        return (
+            (await this.pendingSectionChanges([siteId])).get(siteId)?.units ??
+            []
+        );
+    }
+
+    /**
+     * Approve, or ask for changes on, waiting changes (DEC-226, U9).
+     * `site:approve`: a reviewer of this site, an admin or the owner; never
+     * on a change the caller made last (403). A reason is required to ask
+     * (the DTO). Asking tells whoever made each change.
+     */
+    async recordChangeVerdict(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: { units: string[]; outcome: ChangeVerdict; reason?: string },
+    ): Promise<{ recorded: number }> {
+        authorize(ctx, "site:approve");
+        const units = await this.waitingUnits(ctx, siteId);
+        return prisma.$transaction((tx) =>
+            recordUnitVerdicts(tx, ctx, {
+                siteId,
+                units,
+                keys: input.units,
+                outcome: input.outcome,
+                reason: input.reason,
+            }),
+        );
+    }
+
+    /**
      * What publishing would change, one unit at a time, who changed each and
      * the posts that go live on their own (change units, U7). Every count of
      * "changes waiting" is this list's length. `site:read`; a reviewer sees
@@ -1268,32 +1402,45 @@ export class SitesService {
             },
             select: {
                 id: true,
+                publishNeedsApproval: true,
                 currentPublication: { select: { publishedAt: true } },
             },
         });
         if (!site) throw new NotFoundException(`Site "${siteId}" not found`);
 
-        const [pending, posts] = await Promise.all([
-            this.pendingSectionChanges([siteId]),
-            // Posts publish on their own (not units): those not live yet.
-            // shortcut: a live post edited since is not listed; add it when
-            // posts get draft-vs-live state (batch 3).
-            prisma.post.findMany({
-                where: {
-                    siteId,
-                    currentPublicationId: null,
-                    status: { not: "ARCHIVED" },
-                },
-                orderBy: { updatedAt: "desc" },
-                take: 20,
-                select: { id: true, title: true, updatedAt: true },
-            }),
-        ]);
+        const [pending, posts, approvalRequired, approvers] = await Promise.all(
+            [
+                this.pendingSectionChanges([siteId]),
+                // Posts publish on their own (not units): those not live yet.
+                // shortcut: a live post edited since is not listed; add it when
+                // posts get draft-vs-live state (batch 3).
+                prisma.post.findMany({
+                    where: {
+                        siteId,
+                        currentPublicationId: null,
+                        status: { not: "ARCHIVED" },
+                    },
+                    orderBy: { updatedAt: "desc" },
+                    take: 20,
+                    select: { id: true, title: true, updatedAt: true },
+                }),
+                approvalApplies(ctx.organizationId, site.publishNeedsApproval),
+                this.approversOf(ctx.organizationId, siteId),
+            ],
+        );
         const units = pending.get(siteId)?.units ?? null;
         const groups = groupByPerson(units ?? []);
-        const people = groups
-            .map((g) => g.userId)
-            .filter((id): id is string => id !== null);
+        // Each unit's approval (DEC-226, U9), whether or not it applies.
+        const { rows, leads } = await readUnitVerdicts(prisma, {
+            organizationId: ctx.organizationId,
+            siteId,
+            editors: editorsOf(units ?? []),
+        });
+        const approvals = unitApprovals(units ?? [], rows, leads);
+        const people = [
+            ...groups.map((g) => g.userId),
+            ...[...approvals.values()].map((a) => a.byUserId),
+        ].filter((id): id is string => id !== null);
         const users =
             people.length > 0
                 ? await prisma.user.findMany({
@@ -1306,7 +1453,35 @@ export class SitesService {
             siteId,
             livePublishedAt: site.currentPublication?.publishedAt ?? null,
             count: units?.length ?? null,
-            units: units ?? [],
+            units: (units ?? []).map((u) => {
+                const a = approvals.get(u.key) ?? {
+                    state: "waiting" as const,
+                    byUserId: null,
+                    reason: null,
+                    at: null,
+                    voided: false,
+                };
+                return {
+                    ...u,
+                    approval: {
+                        state: a.state,
+                        ...(a.byUserId
+                            ? {
+                                  by: {
+                                      id: a.byUserId,
+                                      name: names.get(a.byUserId) ?? null,
+                                  },
+                              }
+                            : {}),
+                        ...(a.at ? { at: a.at } : {}),
+                        ...(a.reason ? { reason: a.reason } : {}),
+                        voided: a.voided,
+                        // Who may approve it: never its last editor.
+                        approvers: approvers.filter((p) => p.id !== u.editedBy),
+                    },
+                };
+            }),
+            approvalRequired,
             groups: groups.map((g) => ({
                 ...g,
                 name: g.userId ? (names.get(g.userId) ?? null) : null,
@@ -2327,8 +2502,12 @@ export class SitesService {
          * `lenient` keeps a section that fails its contract instead of
          * throwing (#282). The pending-change count is a read and must not
          * fail; publish is not lenient.
+         *
+         * `invalid` is lenient too, and gathers each kept section with the
+         * reason it can't publish: publish then refuses only one that is
+         * still in what goes live (a left-out one stays in the draft, U8).
          */
-        options: { lenient?: boolean } = {},
+        options: { lenient?: boolean; invalid?: Map<unknown, string> } = {},
     ): SiteSnapshot {
         // v2 buttons name a page by id; the snapshot needs its path (#207).
         // Built from the pages this publish will write, so a hidden page
@@ -2353,19 +2532,18 @@ export class SitesService {
                      * this writes, not over the raw draft.
                      */
                     const result = toPublishableSection(section, resolvePage);
-                    if (!result.ok && options.lenient) {
-                        return {
+                    if (result.ok) return result.section;
+                    const message = `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`;
+                    if (options.lenient || options.invalid) {
+                        const kept = {
                             type: section.type,
                             contractVersion: section.contractVersion,
                             content: section.content,
                         };
+                        options.invalid?.set(kept, message);
+                        return kept;
                     }
-                    if (!result.ok) {
-                        throw new BadRequestException(
-                            `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`,
-                        );
-                    }
-                    return result.section;
+                    throw new BadRequestException(message);
                 }),
             );
             return {
@@ -2560,53 +2738,98 @@ export class SitesService {
         }
 
         const publishedAt = new Date();
-        const draftSnapshot = this.buildSnapshot(site, publishedAt);
-        const leaveOut = options.leaveOut ?? [];
         /*
-         * A template's note to the owner never goes live (DEC-141): the
-         * first starters put "Say what you do and where, in one line." under
-         * every headline, and customers read it. Refused in the words the
-         * pre-publish check uses, which names the block.
+         * Lenient here, with what can't publish gathered: a broken section
+         * that is left out stays in the draft and blocks nothing (U8). One
+         * still in what goes live is refused below, in the same words.
          */
-        const refuseOwnerNote = (pages: SiteSnapshot["pages"]) => {
-            if (hasOwnerNote(pages)) {
-                throw new ConflictException({
-                    message: OWNER_NOTE_MESSAGE,
-                    details: { reason: "ownerNote" },
-                });
-            }
-        };
-        if (leaveOut.length === 0) refuseOwnerNote(draftSnapshot.pages);
+        const invalid = new Map<unknown, string>();
+        const draftSnapshot = this.buildSnapshot(site, publishedAt, {
+            invalid,
+        });
+        const asked = options.leaveOut ?? [];
 
         const published = await prisma.$transaction(async (tx) => {
-            if (options.confirm || leaveOut.length > 0) {
-                await lockSite(tx, site.id);
-            }
+            await lockSite(tx, site.id);
             if (options.confirm) await options.confirm(tx, site);
             /*
-             * Leave out (U8): composed against the live version under the
-             * lock, so a publish that lands meanwhile is what left-out
-             * changes keep.
+             * Leave out (U8) and per-change approval (U9): composed against
+             * the live version under the lock, so a publish that lands
+             * meanwhile is what left-out changes keep.
              */
+            const current = await tx.site.findUniqueOrThrow({
+                where: { id: site.id },
+                select: {
+                    publishNeedsApproval: true,
+                    currentPublication: { select: { snapshot: true } },
+                },
+            });
+            const liveSnapshot = current.currentPublication?.snapshot ?? null;
+            const leaveOut = [...asked];
+            /*
+             * "Publishing needs approval" (DEC-226, KTD-6): a teammate's
+             * change nobody approved is left out and stays waiting; an
+             * owner's override takes everything, recorded by `putLive`. A
+             * first publish has no changes to name, and goes as before.
+             */
+            const gated =
+                liveSnapshot !== null &&
+                options.override !== true &&
+                (await approvalApplies(
+                    ctx.organizationId,
+                    current.publishNeedsApproval,
+                ));
+            if (gated) {
+                const units = await this.unitsInTx(
+                    tx,
+                    site.id,
+                    draftSnapshot,
+                    liveSnapshot,
+                );
+                const held = await heldForApproval(tx, {
+                    organizationId: ctx.organizationId,
+                    siteId: site.id,
+                    userId: ctx.userId,
+                    units,
+                });
+                const out = new Set([...leaveOut, ...held]);
+                // Nothing approved would go out: refused, as before U9.
+                if (units.every((u) => out.has(u.key))) {
+                    throw held.length > 0
+                        ? changesAwaitApproval(held)
+                        : approvalRequired();
+                }
+                leaveOut.push(...held.filter((k) => !asked.includes(k)));
+            }
             let snapshot = draftSnapshot;
             let leftOut: string[] = [];
-            let alsoLeftOut: string[] = [];
             if (leaveOut.length > 0) {
-                const current = await tx.site.findUniqueOrThrow({
-                    where: { id: site.id },
-                    select: {
-                        currentPublication: { select: { snapshot: true } },
-                    },
-                });
                 const composed = leaveOutOf(
                     draftSnapshot,
-                    current.currentPublication?.snapshot ?? null,
+                    liveSnapshot,
                     leaveOut,
                 );
                 snapshot = composed.snapshot as unknown as SiteSnapshot;
                 leftOut = composed.leftOut;
-                alsoLeftOut = composed.alsoLeftOut;
-                refuseOwnerNote(snapshot.pages);
+            }
+            const alsoLeftOut = leftOut.filter((k) => !asked.includes(k));
+            for (const page of snapshot.pages as { sections: unknown[] }[]) {
+                for (const section of page.sections) {
+                    const message = invalid.get(section);
+                    if (message) throw new BadRequestException(message);
+                }
+            }
+            /*
+             * A template's note to the owner never goes live (DEC-141): the
+             * first starters put "Say what you do and where, in one line."
+             * under every headline, and customers read it. Refused in the
+             * words the pre-publish check uses, which names the block.
+             */
+            if (hasOwnerNote(snapshot.pages)) {
+                throw new ConflictException({
+                    message: OWNER_NOTE_MESSAGE,
+                    details: { reason: "ownerNote" },
+                });
             }
             /*
              * Approval gates nothing, and says so (#199, #278). The epic's
@@ -2652,6 +2875,7 @@ export class SitesService {
                 template: publicationTemplate(site),
                 publishedAt,
                 leftOut,
+                unitsApproved: gated,
             });
             return {
                 publicationId: live.publicationId,
@@ -3432,20 +3656,29 @@ export class SitesService {
             });
         }
 
-        return this.approvalWithAlert(ctx, {
-            siteId,
-            organizationId: ctx.organizationId,
-            byUserId: ctx.userId,
-            outcome: dto.outcome,
-            reason: reasonOf(dto),
-            // An approval names the draft it approved (#278), so later
-            // edits do not inherit it. A change request does not: it is
-            // about the work as a whole and stands until it is answered.
-            draftFingerprint:
-                dto.outcome === "APPROVED"
-                    ? await this.currentDraftFingerprint(ctx, siteId)
-                    : null,
-        });
+        // The verdict covers each change waiting now that the caller didn't
+        // make (DEC-226, U9): what Approve in the review approves.
+        const units = (await this.waitingUnits(ctx, siteId)).filter(
+            (u) => u.editedBy !== ctx.userId,
+        );
+        return this.approvalWithAlert(
+            ctx,
+            {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: dto.outcome,
+                reason: reasonOf(dto),
+                // An approval names the draft it approved (#278), so later
+                // edits do not inherit it. A change request does not: it is
+                // about the work as a whole and stands until it is answered.
+                draftFingerprint:
+                    dto.outcome === "APPROVED"
+                        ? await this.currentDraftFingerprint(ctx, siteId)
+                        : null,
+            },
+            units,
+        );
     }
 
     /**
@@ -3456,12 +3689,32 @@ export class SitesService {
     private approvalWithAlert(
         ctx: OrganizationContext,
         data: Prisma.SiteApprovalUncheckedCreateInput,
+        /** Changes the draft's verdict also answers (U9). */
+        units: ChangeUnit[] = [],
     ): Promise<{ id: string }> {
         return prisma.$transaction(async (tx) => {
             const approval = await tx.siteApproval.create({
                 data,
                 select: { id: true },
             });
+            if (
+                units.length > 0 &&
+                (data.outcome === "APPROVED" ||
+                    data.outcome === "CHANGES_REQUESTED")
+            ) {
+                // The draft's own alert already tells the team.
+                await tx.siteChangeApproval.createMany({
+                    data: units.map((u) => ({
+                        organizationId: ctx.organizationId,
+                        siteId: data.siteId,
+                        unitKey: u.key,
+                        unitFingerprint: u.fingerprint,
+                        byUserId: ctx.userId,
+                        outcome: data.outcome,
+                        reason: data.reason ?? null,
+                    })),
+                });
+            }
             await queueReviewAlert(
                 tx,
                 ctx.organizationId,

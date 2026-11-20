@@ -152,6 +152,14 @@ export function oneAreaWords(summary: string): string {
         : summary;
 }
 
+/** The flags "Checked before you publish" shows (U10), not the list. */
+export const CHECK_TYPES: ReadonlySet<FlagType> = new Set<FlagType>([
+    "priceMismatch",
+    "freeClaim",
+    "brokenLink",
+    "photoNoDescription",
+]);
+
 /** One row of "Checked before you publish" (plan U10, WXMPublish). */
 export interface CheckRow {
     key: "prices" | "free" | "links" | "photos";

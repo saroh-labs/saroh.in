@@ -1,6 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
     ArrayMaxSize,
+    ArrayMinSize,
     IsArray,
     IsBoolean,
     IsDefined,
@@ -607,6 +608,25 @@ export class PublishOptionsDto extends GoLiveOptionsDto {
     @IsString({ each: true, message: "leaveOut must be a list of changes" })
     @MaxLength(300, { each: true, message: "leaveOut has a key too long" })
     leaveOut?: string[];
+}
+
+/** Approve waiting changes (DEC-226, U9): their unit keys. */
+export class ApproveChangesDto {
+    @IsArray({ message: "units must be a list of changes" })
+    @ArrayMinSize(1, { message: "Choose at least one change" })
+    @ArrayMaxSize(500, { message: "units is too long" })
+    @IsString({ each: true, message: "units must be a list of changes" })
+    @MaxLength(300, { each: true, message: "units has a key too long" })
+    units!: string[];
+}
+
+/** Ask for changes on waiting changes, saying what (UX-043, U9). */
+export class AskForChangesDto extends ApproveChangesDto {
+    @Transform(trim)
+    @IsString({ message: "Say what needs changing." })
+    @MinLength(3, { message: "Say what needs changing." })
+    @MaxLength(500, { message: "Keep it under 500 characters." })
+    reason!: string;
 }
 
 /** Mint a preview link (#198). The choices are the ones the design offers. */

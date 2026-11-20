@@ -329,6 +329,7 @@ model Organization {
   aiReports            AiReport[]
   siteLinks            SiteLink[]
   siteRedirects        SiteRedirect[]
+  siteChangeApprovals  SiteChangeApproval[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
   qrScanDays           QrScanDay[]
@@ -4089,6 +4090,8 @@ model Site {
   siteLinks        SiteLink[]
   // Old page links that forward to a page (page links forward, KTD-3).
   redirects        SiteRedirect[]
+  // A reviewer's, admin's or owner's verdict on one change (DEC-226, U9).
+  changeApprovals  SiteChangeApproval[]
   // What Undo puts back after starter content was copied in (DEC-182).
   draftSnapshots   SiteDraftSnapshot[]
   // "Tell me when it's back" asked on this site (DEC-174 U23).
@@ -4836,6 +4839,35 @@ model SiteRedirect {
   // One forward per old link on a site among rows not removed.
   @@unique([siteId, fromPath], map: "SiteRedirect_siteId_fromPath_live_key", where: raw("\"removedAt\" IS NULL"))
   @@index([organizationId, siteId])
+}
+
+/**
+ * A verdict on one change waiting to go live (DEC-226, website area U9):
+ * a reviewer, an admin or the owner approves it, or asks for changes with a
+ * reason. Bound to the change unit's key and fingerprint (`change-units.ts`),
+ * so a later edit to that change voids it. Appended, never updated: the
+ * newest row for a key is its state.
+ */
+model SiteChangeApproval {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // `section:<pageId>:<key>`, `page:<pageId>` or `site:<kind>`.
+  unitKey         String
+  // What the unit would publish when the verdict was given.
+  unitFingerprint String
+  byUserId        String
+  // APPROVED | CHANGES_REQUESTED
+  outcome         String
+  // What needs changing: required with CHANGES_REQUESTED.
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, siteId, createdAt])
 }
 
 model SiteLink {

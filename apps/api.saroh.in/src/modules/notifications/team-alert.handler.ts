@@ -820,7 +820,10 @@ function payloadOf(value: unknown): TeamAlertPayload | null {
         case "review":
             return (p.about === "approval" && str("approvalId")) ||
                 (p.about === "note" && str("commentId")) ||
-                (p.about === "release" && str("testReleaseId"))
+                (p.about === "release" && str("testReleaseId")) ||
+                (p.about === "change" &&
+                    str("changeApprovalId") &&
+                    str("editorUserId"))
                 ? (p as TeamAlertPayload)
                 : null;
         case "domain":

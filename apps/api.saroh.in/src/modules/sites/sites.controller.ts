@@ -19,6 +19,8 @@ import type { OrganizationContext } from "../../common/types/organization-contex
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
 import {
+    ApproveChangesDto,
+    AskForChangesDto,
     CreateApprovalDto,
     CreateCommentDto,
     CreatePageDto,
@@ -112,6 +114,41 @@ export class SitesController {
         @Param("siteId") siteId: string,
     ) {
         return this.sites.getChanges(ctx, siteId);
+    }
+
+    /**
+     * Approve waiting changes (DEC-226, U9). `site:approve`: a reviewer of
+     * this site, an admin or the owner; 403 on a change the caller made.
+     */
+    @Post(":siteId/changes/approve")
+    @HttpCode(200)
+    approveChanges(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: ApproveChangesDto,
+    ) {
+        return this.sites.recordChangeVerdict(ctx, siteId, {
+            units: dto.units,
+            outcome: "APPROVED",
+        });
+    }
+
+    /**
+     * Ask for changes on waiting changes, with a reason (UX-043, U9); tells
+     * whoever made them. Same rules as approving.
+     */
+    @Post(":siteId/changes/ask")
+    @HttpCode(200)
+    askForChanges(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Body() dto: AskForChangesDto,
+    ) {
+        return this.sites.recordChangeVerdict(ctx, siteId, {
+            units: dto.units,
+            outcome: "CHANGES_REQUESTED",
+            reason: dto.reason,
+        });
     }
 
     /**

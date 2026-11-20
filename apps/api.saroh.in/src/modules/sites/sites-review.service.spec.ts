@@ -4,7 +4,10 @@
 jest.mock("@saroh/database", () => {
     const actual = jest.requireActual("@saroh/database");
     const db: Record<string, unknown> = {
-        site: { findFirst: jest.fn() },
+        site: {
+            findFirst: jest.fn(),
+            findMany: jest.fn().mockResolvedValue([]),
+        },
         page: {
             findFirst: jest.fn(),
             findMany: jest.fn(),
