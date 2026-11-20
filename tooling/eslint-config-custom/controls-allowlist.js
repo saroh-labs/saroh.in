@@ -241,6 +241,14 @@ export const RAW_ALLOWED = {
     "components/sites/editor/shell/editor-trail.tsx": ["button"],
     // button: a row of the Pages tree, one button (U46)
     "components/sites/editor/shell/pages-tree.tsx": ["button"],
+    // button: the one phone editor's bar cells, icon over word (U49)
+    "components/sites/editor/phone/phone-bar.tsx": ["button"],
+    // button: a section sheet's action tiles, icon over word, and its More row (U49)
+    "components/sites/editor/phone/section-sheet.tsx": ["button"],
+    // button: a row of the phone's Sections sheet, one button (U49)
+    "components/sites/editor/phone/sections-sheet.tsx": ["button"],
+    // button: the phone's page picker (page over site) and a reader's rows (U49)
+    "components/sites/editor/phone/page-menu-sheet.tsx": ["button"],
     // button: a phone's floating pill, Blocks · + · Brand (DEC-185)
     "components/sites/editor/edit-pill.tsx": ["button"],
     // button: a bottom sheet's grip, pulled or pressed to make it taller

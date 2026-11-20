@@ -102,6 +102,16 @@ export function keyboardUpNow(): boolean {
     return vv ? window.innerHeight - vv.height > KEYBOARD_PX : false;
 }
 
+/**
+ * How far the keyboard reaches up from the window's foot, in px; 0 with
+ * none up. A sheet lifts itself by this so its Save stays above it.
+ */
+export function keyboardInsetNow(): number {
+    const vv = typeof window === "undefined" ? null : window.visualViewport;
+    if (!vv) return 0;
+    return Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+}
+
 function subscribeViewport(onChange: () => void): () => void {
     const vv = window.visualViewport;
     if (!vv) return () => undefined;

@@ -28,6 +28,9 @@ import type {
 } from "@/lib/sites/service";
 import type { SiteStyleOptions } from "@/lib/sites/style";
 import type { TestRelease } from "@/lib/sites/test-releases";
+import { showUndo } from "@saroh/ui/toast";
+
+import { typeInto } from "./phone/text-sheet";
 import { SiteEditor } from "./site-editor";
 import { useEditorDraft } from "./use-editor-draft";
 
@@ -322,6 +325,12 @@ const ALLOWED: RegExp[] = [
     // The new inspector (U47): its tabs, and the whole site's notes.
     /^(Content|Style|Visibility)$/,
     /^All notes on this site$/,
+    // The one phone editor (U49): the page picker, the Sections sheet's
+    // rows and pinned header and footer, and a reader's way to Brand.
+    /^Page: .+\. Choose another page or change its settings$/,
+    /^(Welcome in|Our story)(Hero|Hidden when published)$/,
+    /^Open the (header|footer)$/,
+    /^(Sections on this page|Done)$/,
 ];
 
 /** The page's options in the page picker: switching page writes nothing. */
@@ -1307,11 +1316,12 @@ describe("the desk shell for an owner (U46)", () => {
         expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
     });
 
-    it("a phone keeps today's bar until U49", () => {
+    it("a phone draws the one phone editor (U49), not the desk shell", () => {
         atWidth(390);
         render(owner);
         expect($("[data-editor-trail]")).toBeNull();
-        expect($("[data-edit-pill]")).not.toBeNull();
+        expect($("[data-phone-bar]")).not.toBeNull();
+        expect($("[data-edit-pill]")).toBeNull();
     });
 
     it("off: today's chrome, unchanged", () => {
@@ -1420,5 +1430,262 @@ describe("the inspector with the Website area on (U47)", () => {
         );
         click(button("Back to this page's sections"));
         expect($("[data-everywhere-banner]")).toBeNull();
+    });
+});
+
+describe("the one phone editor (U49)", () => {
+    beforeEach(() => {
+        area.on = true;
+        atWidth(390);
+    });
+    const owner: Partial<Props> = {
+        readOnly: false,
+        canUpdateSite: true,
+        canPublish: true,
+        askAi: true,
+        initialPendingChanges: 2,
+        initialPendingSiteChanges: [],
+    };
+    const FAQ: Section = {
+        key: "s3",
+        type: "faq",
+        contractVersion: 1,
+        content: {
+            heading: "Questions",
+            intro: "Ask us anything",
+            items: [{ question: "Open Sundays?", answer: "Yes, till noon." }],
+        },
+    };
+    const names = (sel: string) =>
+        Array.from(
+            document.querySelectorAll<HTMLElement>(`${sel} a,${sel} button`),
+        ).map(nameOf);
+    const sectionSheet = () => $("[data-section-sheet]");
+    const tapSection = (index: number) => {
+        const block = $(`[data-block-index='${index}'] > button[aria-pressed]`);
+        if (!block) throw new Error(`No section ${index} on the canvas`);
+        click(block);
+    };
+    /** The toast's Undo (the phone has no Undo icon). */
+    const undoFromToast = () => {
+        const call = vi.mocked(showUndo).mock.calls.at(-1);
+        act(() => (call?.[1] as () => void)());
+    };
+
+    it("one top bar, one bar: Sections · Add · Brand · Publish with the chip's count", () => {
+        render(owner);
+        expect(names("[data-editor-bar]")).toEqual([
+            "Back to Website",
+            "Page: Home. Choose another page or change its settings",
+            "Ask AI",
+            "Preview",
+        ]);
+        expect(names("[data-phone-bar]")).toEqual([
+            "Sections",
+            "Add",
+            "Brand",
+            "Publish: 2 changes waiting",
+        ]);
+        expect($("[data-publish-count]")?.textContent).toBe("2");
+        // Only one phone editor (00-universal §15): no pill, no second bar.
+        expect($("[data-edit-pill]")).toBeNull();
+        expect(
+            document.querySelectorAll("nav[aria-label=Editor]"),
+        ).toHaveLength(1);
+        expect(has("Blocks")).toBe(false);
+    });
+
+    it("the first visit's hint goes for good with Got it", () => {
+        window.localStorage.removeItem("saroh.editor.phone-hint-seen");
+        render(owner);
+        expect($("[data-first-hint]")?.textContent).toContain(
+            "Tap any part of the page to change it. Shown once.",
+        );
+        click(button("Got it"));
+        expect($("[data-first-hint]")).toBeNull();
+        expect(
+            window.localStorage.getItem("saroh.editor.phone-hint-seen"),
+        ).toBe("1");
+    });
+
+    it("a tapped section opens its sheet: actions, the four tabs, Cancel and Save", () => {
+        render(owner);
+        tapSection(0);
+        const sheet = sectionSheet();
+        expect(sheet).not.toBeNull();
+        expect(document.body.textContent).toContain("Hero section · 1 of 2");
+        expect(
+            Array.from(
+                document.querySelectorAll(
+                    "[aria-label='Section actions'] button",
+                ),
+            ).map(nameOf),
+        ).toEqual(["Move", "Duplicate", "Hide here", "Delete", "Ask AI"]);
+        for (const tab of ["Content", "Style", "Visibility", /^Feedback/]) {
+            expect(has(tab), String(tab)).toBe(true);
+        }
+        expect($("[data-save-footer]")?.textContent).toContain(
+            "Saved · goes live when you publish",
+        );
+        expect(has("Cancel")).toBe(true);
+        click(button("Visibility"));
+        expect(sheet?.textContent).toContain("Hidden when published");
+        click(button("Save"));
+        expect(sectionSheet()).toBeNull();
+        // The old phone's toolbar on a tapped block is gone.
+        expect(has(/^Move .* (up|down)$/)).toBe(false);
+    });
+
+    it("Duplicate and Hide here act at once with the toast's Undo", () => {
+        render(owner);
+        tapSection(0);
+        click(button("Duplicate"));
+        expect(document.body.textContent).toContain("Hero section · 2 of 3");
+        undoFromToast();
+        expect(document.body.textContent).toContain("Hero section · 1 of 2");
+        click(button("Hide here"));
+        expect(button("Show here").getAttribute("aria-pressed")).toBe("true");
+        undoFromToast();
+        expect(has("Hide here")).toBe(true);
+    });
+
+    it("Move opens Sections: pinned header and footer, Up and Down with Undo", () => {
+        render(owner);
+        tapSection(0);
+        click(button("Move"));
+        const list = () => $("[data-sections-sheet]");
+        expect(list()?.textContent).toContain(
+            "HeaderOn every page · stays at the top",
+        );
+        expect(list()?.textContent).toContain(
+            "FooterOn every page · stays at the bottom",
+        );
+        expect(
+            (button("Move Welcome in up") as HTMLButtonElement).disabled,
+        ).toBe(true);
+        click(button("Move Welcome in down"));
+        expect(list()?.textContent.indexOf("Our story")).toBeLessThan(
+            list()?.textContent.indexOf("Welcome in") ?? -1,
+        );
+        expect(vi.mocked(showUndo).mock.calls.at(-1)?.[0]).toBe(
+            "Hero moved down",
+        );
+        undoFromToast();
+        // Undo selects the section again, so its sheet is what shows.
+        expect(document.body.textContent).toContain("Hero section · 1 of 2");
+        click(button("Sections"));
+        expect(list()?.textContent.indexOf("Welcome in")).toBeLessThan(
+            list()?.textContent.indexOf("Our story") ?? -1,
+        );
+        expect(has("Add a section")).toBe(true);
+        click(button("Done"));
+        expect(list()).toBeNull();
+    });
+
+    it("a long text field opens full screen with its word count; Cancel on the section puts it back", () => {
+        render({ ...owner, initialSections: [...SECTIONS, FAQ] });
+        tapSection(2);
+        const intro = Array.from(
+            document.querySelectorAll<HTMLTextAreaElement>(
+                "[data-section-sheet] textarea",
+            ),
+        ).find((t) => t.value === "Ask us anything");
+        if (!intro) throw new Error("No Intro field");
+        act(() => intro.focus());
+        const big = document.getElementById(
+            "phone-text-sheet",
+        ) as HTMLTextAreaElement | null;
+        expect(big?.value).toBe("Ask us anything");
+        expect(document.body.textContent).toContain("Questions · Intro");
+        expect(document.body.textContent).toContain("3 words");
+        if (!big) return;
+        act(() => typeInto(big, "Ask us anything at all"));
+        expect(document.body.textContent).toContain("5 words");
+        const save = Array.from(
+            document.querySelectorAll<HTMLElement>(
+                "[data-editor-sheet=Intro] button",
+            ),
+        ).find((b) => b.textContent === "Save");
+        if (!save) throw new Error("No Save on the text sheet");
+        click(save);
+        expect(document.getElementById("phone-text-sheet")).toBeNull();
+        expect(intro.value).toBe("Ask us anything at all");
+        // Cancel: the section as it was when its sheet opened.
+        click(button("Cancel"));
+        tapSection(2);
+        expect(
+            Array.from(
+                document.querySelectorAll<HTMLTextAreaElement>(
+                    "[data-section-sheet] textarea",
+                ),
+            ).some((t) => t.value === "Ask us anything"),
+        ).toBe(true);
+    });
+
+    it("the page picker holds the pages and what the old bar's More held", () => {
+        render(owner);
+        click(button(/^Page: Home/));
+        for (const kept of [
+            /^Settings for Home/,
+            // REVIEW is pending: Withdraw stands where Ask would.
+            /^Withdraw the review request/,
+            /^Share a preview link/,
+            /^Make a test release/,
+            /^Preview/,
+            /^Feedback/,
+            /^(Light|Dark)/,
+        ]) {
+            expect(has(kept), String(kept)).toBe(true);
+        }
+    });
+
+    it("Add and Brand open their sheets; Publish opens the Publish sheet", () => {
+        render(owner);
+        click(button("Add"));
+        expect($("[data-editor-sheet=Add]")).not.toBeNull();
+        click(button("Close Add"));
+        click(button("Brand"));
+        expect($("[data-editor-sheet=Brand]")).not.toBeNull();
+        click(button("Close Brand"));
+        click(button("Publish: 2 changes waiting"));
+        expect(
+            button("Publish: 2 changes waiting").getAttribute("aria-current"),
+        ).toBe("true");
+    });
+
+    it("a reader: the verdict takes the bar's place, nothing writes", () => {
+        render();
+        expect($("[data-phone-bar]")).toBeNull();
+        expect($("[data-read-only-line]")?.textContent).toBe(
+            "Read only. You can leave notes.",
+        );
+        expect(has("Approve")).toBe(true);
+        expect(has("Ask for changes")).toBe(true);
+        expectReadOnly("phone editor, reader");
+        tapSection(0);
+        expectReadOnly("phone editor, reader, a section's sheet");
+        expect($("[aria-label='Section actions']")).toBeNull();
+        click(button("Close the section"));
+        click(button(/^Page: Home/));
+        expectReadOnly("phone editor, reader, page picker");
+        click(button("Sections on this page"));
+        expectReadOnly("phone editor, reader, Sections");
+        expect(has(/^Drag to move/)).toBe(false);
+        click(button("Done"));
+        click(button("Approve"));
+        expectReadOnly("phone editor, reader, review sheet");
+    });
+
+    it("a reader who may not approve has no verdict bar", () => {
+        render({ reviewCan: { comment: true, approve: false } });
+        expect($("[data-reader-bar]")).toBeNull();
+        expect(has("Approve")).toBe(false);
+    });
+
+    it("off: today's phone, pill and all", () => {
+        area.on = false;
+        render(owner);
+        expect($("[data-edit-pill]")).not.toBeNull();
+        expect($("[data-phone-bar]")).toBeNull();
     });
 });
