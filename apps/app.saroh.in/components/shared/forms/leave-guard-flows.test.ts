@@ -18,7 +18,7 @@ const FLOWS: [flow: string, file: string][] = [
     ["class pack", "components/editor-shell/editor-shell.tsx"],
     ["product", "components/commerce/product-editor-v2/editor-shell.tsx"],
     ["service (new)", "components/services/service-editor/new-service.tsx"],
-    ["post", "components/sites/posts/post-editor.tsx"],
+    ["post", "components/sites/posts/editor/use-post-draft.ts"],
     ["site editor", "components/sites/editor/use-editor-leave.ts"],
     [
         "product settings",
@@ -37,6 +37,17 @@ const FLOWS: [flow: string, file: string][] = [
     ["stock count", "components/commerce/stock/stock-screen.tsx"],
 ];
 
+/** A guard made in a hook is drawn by the screens that call it. */
+const DRAWN_BY: Record<string, string[]> = {
+    "components/sites/editor/use-editor-leave.ts": [
+        "components/sites/editor/site-editor.tsx",
+    ],
+    "components/sites/posts/editor/use-post-draft.ts": [
+        "components/sites/posts/post-editor.tsx",
+        "components/sites/posts/editor/post-shell.tsx",
+    ],
+};
+
 describe("the leave guard is mounted in every create and edit flow", () => {
     it.each(FLOWS)("%s", (_flow, file) => {
         const src = read(file);
@@ -49,12 +60,12 @@ describe("the leave guard is mounted in every create and edit flow", () => {
 
     it("draws the question wherever the guard is called", () => {
         for (const [flow, file] of FLOWS) {
-            // The site editor's hook hands the guard to `site-editor.tsx`.
-            const drawn =
-                file === "components/sites/editor/use-editor-leave.ts"
-                    ? "components/sites/editor/site-editor.tsx"
-                    : file;
-            expect(read(drawn), flow).toMatch(/[gG]uard\.dialog\}/);
+            // A hook hands the guard to the screens that draw it: the site
+            // editor's to `site-editor.tsx`, a post's to both post editors.
+            const drawn = DRAWN_BY[file] ?? [file];
+            for (const at of drawn) {
+                expect(read(at), flow).toMatch(/[gG]uard\.dialog\}/);
+            }
         }
     });
 

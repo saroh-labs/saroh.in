@@ -28,6 +28,7 @@ import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
 import TextAlign from "@tiptap/extension-text-align";
 import { TextStyleKit } from "@tiptap/extension-text-style";
+import type { Editor } from "@tiptap/react";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import {
@@ -59,6 +60,8 @@ import { useEffect, useState } from "react";
 import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { editorKey } from "@/lib/tiptap/editor-key";
 import { Tip } from "@saroh/ui/tooltip";
+
+import { FormatBar, insertImage, SlashMenu } from "./writing-menus";
 
 /**
  * Write copy without typing markup (#208).
@@ -140,12 +143,29 @@ export function RichTextEditor({
     onChange,
     placeholder = "Start writing…",
     className,
+    variant = "boxed",
+    toolbar = false,
+    onToolbarChange,
+    onEditor,
 }: {
     value: string;
     onChange: (html: string) => void;
     placeholder?: string;
     className?: string;
+    /**
+     * `boxed`: a field with its toolbar on top (sections, the footer).
+     * `document`: a post's writing surface (U15, `blogdesk/WXWInsert`):
+     * no box, a format bar over a selection, "/" to add on an empty line,
+     * and the full toolbar only when `toolbar` is on (More formatting).
+     */
+    variant?: "boxed" | "document";
+    /** `document` only: the full toolbar is showing. */
+    toolbar?: boolean;
+    onToolbarChange?: (open: boolean) => void;
+    /** The editor once made, for a host that adds to it (rail › Add). */
+    onEditor?: (editor: Editor | null) => void;
 }) {
+    const asDocument = variant === "document";
     const editor = useEditor({
         // No SSR guard here on purpose. This component is only ever reached
         // through `next/dynamic` with `ssr: false`, so there is no server pass
@@ -187,11 +207,20 @@ export function RichTextEditor({
             attributes: {
                 // The merchant's own prose styles, so what they write here
                 // reads like it will on the page.
-                class: "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
+                class: asDocument
+                    ? // The site's own type (`--site-*`), set by the host's scope.
+                      "prose max-w-none min-h-[50vh] outline-none font-site-body text-site-body prose-headings:font-site-heading prose-headings:text-site-fg prose-strong:text-site-fg prose-blockquote:text-site-body prose-a:text-site-fg"
+                    : "prose prose-sm max-w-none min-h-40 px-3 py-2 outline-none dark:prose-invert",
             },
         },
         onUpdate: ({ editor }) => onChange(editor.getHTML()),
     });
+
+    useEffect(() => {
+        if (!onEditor) return;
+        onEditor(editor);
+        return () => onEditor(null);
+    }, [editor, onEditor]);
 
     /*
      * Two components on purpose. `useEditorState` builds its state manager
@@ -228,6 +257,9 @@ export function RichTextEditor({
             value={value}
             onChange={onChange}
             className={className}
+            asDocument={asDocument}
+            toolbar={toolbar}
+            onToolbarChange={onToolbarChange}
         />
     );
 }
@@ -237,11 +269,17 @@ function EditorSurface({
     value,
     onChange,
     className,
+    asDocument = false,
+    toolbar = false,
+    onToolbarChange,
 }: {
     editor: NonNullable<ReturnType<typeof useEditor>>;
     value: string;
     onChange: (html: string) => void;
     className?: string;
+    asDocument?: boolean;
+    toolbar?: boolean;
+    onToolbarChange?: (open: boolean) => void;
 }) {
     const [source, setSource] = useState(false);
 
@@ -324,313 +362,339 @@ function EditorSurface({
 
     const chain = () => editor.chain().focus();
 
+    const bar = (
+        <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
+            <Tool
+                label="Undo"
+                onClick={() => chain().undo().run()}
+                disabled={!state.canUndo}
+            >
+                <Undo2 />
+            </Tool>
+            <Tool
+                label="Redo"
+                onClick={() => chain().redo().run()}
+                disabled={!state.canRedo}
+            >
+                <Redo2 />
+            </Tool>
+            <Tool
+                label="Clear formatting"
+                onClick={() => chain().unsetAllMarks().clearNodes().run()}
+            >
+                <Eraser />
+            </Tool>
+            <Gap />
+
+            <Select
+                value={String(state.heading)}
+                onValueChange={(v) => {
+                    const level = Number(v);
+                    if (level === 0) chain().setParagraph().run();
+                    else
+                        chain()
+                            .toggleHeading({
+                                level: level as 1 | 2 | 3 | 4,
+                            })
+                            .run();
+                }}
+            >
+                <SelectTrigger
+                    className="h-7 w-[7.5rem]"
+                    aria-label="Text style"
+                >
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="0">Paragraph</SelectItem>
+                    <SelectItem value="1">Heading 1</SelectItem>
+                    <SelectItem value="2">Heading 2</SelectItem>
+                    <SelectItem value="3">Heading 3</SelectItem>
+                    <SelectItem value="4">Heading 4</SelectItem>
+                </SelectContent>
+            </Select>
+            <Select
+                value={state.font ?? "__site"}
+                onValueChange={(v) =>
+                    v === "__site"
+                        ? chain().unsetFontFamily().run()
+                        : chain().setFontFamily(v).run()
+                }
+            >
+                <SelectTrigger className="h-7 w-24" aria-label="Font">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {FONTS.map((f) => (
+                        <SelectItem key={f.label} value={f.value ?? "__site"}>
+                            {f.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Select
+                value={state.size ?? "__normal"}
+                onValueChange={(v) =>
+                    v === "__normal"
+                        ? chain().unsetFontSize().run()
+                        : chain().setFontSize(v).run()
+                }
+            >
+                <SelectTrigger className="h-7 w-24" aria-label="Size">
+                    <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                    {SIZES.map((s) => (
+                        <SelectItem key={s.label} value={s.value ?? "__normal"}>
+                            {s.label}
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            <Gap />
+
+            <Mark
+                label="Bold"
+                pressed={state.bold}
+                onPressedChange={() => chain().toggleBold().run()}
+            >
+                <Bold />
+            </Mark>
+            <Mark
+                label="Italic"
+                pressed={state.italic}
+                onPressedChange={() => chain().toggleItalic().run()}
+            >
+                <Italic />
+            </Mark>
+            <Mark
+                label="Underline"
+                pressed={state.underline}
+                onPressedChange={() => chain().toggleUnderline().run()}
+            >
+                <UnderlineIcon />
+            </Mark>
+            <Mark
+                label="Strikethrough"
+                pressed={state.strike}
+                onPressedChange={() => chain().toggleStrike().run()}
+            >
+                <Strikethrough />
+            </Mark>
+            <Mark
+                label="Subscript"
+                pressed={state.sub}
+                onPressedChange={() => chain().toggleSubscript().run()}
+            >
+                <SubscriptIcon />
+            </Mark>
+            <Mark
+                label="Superscript"
+                pressed={state.sup}
+                onPressedChange={() => chain().toggleSuperscript().run()}
+            >
+                <SuperscriptIcon />
+            </Mark>
+            <Gap />
+
+            <Swatches
+                label="Text colour"
+                icon={<Baseline />}
+                colours={COLOURS}
+                current={state.colour}
+                onPick={(c) =>
+                    c ? chain().setColor(c).run() : chain().unsetColor().run()
+                }
+            />
+            <Swatches
+                label="Highlight"
+                icon={<Highlighter />}
+                colours={HIGHLIGHTS}
+                current={null}
+                onPick={(c) =>
+                    c
+                        ? chain().setHighlight({ color: c }).run()
+                        : chain().unsetHighlight().run()
+                }
+            />
+            <Gap />
+
+            <Mark
+                label="Align left"
+                pressed={state.align === "left"}
+                onPressedChange={() => chain().setTextAlign("left").run()}
+            >
+                <AlignLeft />
+            </Mark>
+            <Mark
+                label="Align centre"
+                pressed={state.align === "center"}
+                onPressedChange={() => chain().setTextAlign("center").run()}
+            >
+                <AlignCenter />
+            </Mark>
+            <Mark
+                label="Align right"
+                pressed={state.align === "right"}
+                onPressedChange={() => chain().setTextAlign("right").run()}
+            >
+                <AlignRight />
+            </Mark>
+            <Gap />
+
+            <Mark
+                label="Bulleted list"
+                pressed={state.bullet}
+                onPressedChange={() => chain().toggleBulletList().run()}
+            >
+                <List />
+            </Mark>
+            <Mark
+                label="Numbered list"
+                pressed={state.ordered}
+                onPressedChange={() => chain().toggleOrderedList().run()}
+            >
+                <ListOrdered />
+            </Mark>
+            <Mark
+                label="Quote"
+                pressed={state.quote}
+                onPressedChange={() => chain().toggleBlockquote().run()}
+            >
+                <Quote />
+            </Mark>
+            <Mark
+                label="Code block"
+                pressed={state.code}
+                onPressedChange={() => chain().toggleCodeBlock().run()}
+            >
+                <Code2 />
+            </Mark>
+            <Tool
+                label="Horizontal rule"
+                onClick={() => chain().setHorizontalRule().run()}
+            >
+                <Minus />
+            </Tool>
+            <Gap />
+
+            <LinkTool
+                active={state.link}
+                current={
+                    (editor.getAttributes("link").href as string | undefined) ??
+                    ""
+                }
+                onSet={(href) =>
+                    href
+                        ? chain()
+                              .extendMarkRange("link")
+                              .setLink({ href })
+                              .run()
+                        : chain().extendMarkRange("link").unsetLink().run()
+                }
+            />
+            <Popover>
+                <PopoverTrigger asChild>
+                    <IconButton
+                        label="Insert image"
+                        icon={<ImagePlus className="size-4" />}
+                        size="xs"
+                    />
+                </PopoverTrigger>
+                <PopoverContent align="start" className="w-80">
+                    <MediaPicker
+                        label="Choose a photo"
+                        onPick={(img) => insertImage(editor, img)}
+                    />
+                </PopoverContent>
+            </Popover>
+            <Tool
+                label="Insert table"
+                onClick={() =>
+                    chain()
+                        .insertTable({
+                            rows: 3,
+                            cols: 3,
+                            withHeaderRow: true,
+                        })
+                        .run()
+                }
+            >
+                <Table2 />
+            </Tool>
+            <Gap />
+
+            <Toggle
+                size="sm"
+                className="h-7 px-2 text-xs"
+                pressed={source}
+                onPressedChange={(on) => {
+                    // Leaving source view pushes whatever was typed back
+                    // through the schema, so a stray tag is normalised the
+                    // way a paste would be.
+                    if (!on && !editor.isDestroyed)
+                        editor.commands.setContent(value, {
+                            emitUpdate: false,
+                        });
+                    setSource(on);
+                }}
+                aria-label="Edit as HTML"
+            >
+                HTML
+            </Toggle>
+        </div>
+    );
+
+    const body = source ? (
+        <Textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={10}
+            className="rounded-none border-0 font-mono focus-visible:ring-0"
+            aria-label="HTML source"
+        />
+    ) : (
+        <EditorContent editor={editor} />
+    );
+
+    if (asDocument) {
+        return (
+            <div className={className}>
+                {toolbar ? (
+                    <div
+                        role="toolbar"
+                        aria-label="More formatting"
+                        className="sticky top-0 z-10 mb-6 flex items-start rounded-[10px] border bg-background font-sans shadow-sm [&>div]:flex-1 [&>div]:border-b-0"
+                    >
+                        {bar}
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="xs"
+                            className="m-1"
+                            onClick={() => onToolbarChange?.(false)}
+                        >
+                            Hide
+                        </Button>
+                    </div>
+                ) : null}
+                <FormatBar
+                    editor={editor}
+                    onMoreFormatting={() => onToolbarChange?.(true)}
+                />
+                <SlashMenu editor={editor} />
+                {body}
+            </div>
+        );
+    }
+
     return (
         // The same border and fill as every other field, so the editor reads as
         // one more place to type rather than a panel of its own.
         <div
             className={cn("rounded-md border border-input bg-field", className)}
         >
-            <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
-                <Tool
-                    label="Undo"
-                    onClick={() => chain().undo().run()}
-                    disabled={!state.canUndo}
-                >
-                    <Undo2 />
-                </Tool>
-                <Tool
-                    label="Redo"
-                    onClick={() => chain().redo().run()}
-                    disabled={!state.canRedo}
-                >
-                    <Redo2 />
-                </Tool>
-                <Tool
-                    label="Clear formatting"
-                    onClick={() => chain().unsetAllMarks().clearNodes().run()}
-                >
-                    <Eraser />
-                </Tool>
-                <Gap />
-
-                <Select
-                    value={String(state.heading)}
-                    onValueChange={(v) => {
-                        const level = Number(v);
-                        if (level === 0) chain().setParagraph().run();
-                        else
-                            chain()
-                                .toggleHeading({
-                                    level: level as 1 | 2 | 3 | 4,
-                                })
-                                .run();
-                    }}
-                >
-                    <SelectTrigger
-                        className="h-7 w-[7.5rem]"
-                        aria-label="Text style"
-                    >
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="0">Paragraph</SelectItem>
-                        <SelectItem value="1">Heading 1</SelectItem>
-                        <SelectItem value="2">Heading 2</SelectItem>
-                        <SelectItem value="3">Heading 3</SelectItem>
-                        <SelectItem value="4">Heading 4</SelectItem>
-                    </SelectContent>
-                </Select>
-                <Select
-                    value={state.font ?? "__site"}
-                    onValueChange={(v) =>
-                        v === "__site"
-                            ? chain().unsetFontFamily().run()
-                            : chain().setFontFamily(v).run()
-                    }
-                >
-                    <SelectTrigger className="h-7 w-24" aria-label="Font">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {FONTS.map((f) => (
-                            <SelectItem
-                                key={f.label}
-                                value={f.value ?? "__site"}
-                            >
-                                {f.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Select
-                    value={state.size ?? "__normal"}
-                    onValueChange={(v) =>
-                        v === "__normal"
-                            ? chain().unsetFontSize().run()
-                            : chain().setFontSize(v).run()
-                    }
-                >
-                    <SelectTrigger className="h-7 w-24" aria-label="Size">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {SIZES.map((s) => (
-                            <SelectItem
-                                key={s.label}
-                                value={s.value ?? "__normal"}
-                            >
-                                {s.label}
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                <Gap />
-
-                <Mark
-                    label="Bold"
-                    pressed={state.bold}
-                    onPressedChange={() => chain().toggleBold().run()}
-                >
-                    <Bold />
-                </Mark>
-                <Mark
-                    label="Italic"
-                    pressed={state.italic}
-                    onPressedChange={() => chain().toggleItalic().run()}
-                >
-                    <Italic />
-                </Mark>
-                <Mark
-                    label="Underline"
-                    pressed={state.underline}
-                    onPressedChange={() => chain().toggleUnderline().run()}
-                >
-                    <UnderlineIcon />
-                </Mark>
-                <Mark
-                    label="Strikethrough"
-                    pressed={state.strike}
-                    onPressedChange={() => chain().toggleStrike().run()}
-                >
-                    <Strikethrough />
-                </Mark>
-                <Mark
-                    label="Subscript"
-                    pressed={state.sub}
-                    onPressedChange={() => chain().toggleSubscript().run()}
-                >
-                    <SubscriptIcon />
-                </Mark>
-                <Mark
-                    label="Superscript"
-                    pressed={state.sup}
-                    onPressedChange={() => chain().toggleSuperscript().run()}
-                >
-                    <SuperscriptIcon />
-                </Mark>
-                <Gap />
-
-                <Swatches
-                    label="Text colour"
-                    icon={<Baseline />}
-                    colours={COLOURS}
-                    current={state.colour}
-                    onPick={(c) =>
-                        c
-                            ? chain().setColor(c).run()
-                            : chain().unsetColor().run()
-                    }
-                />
-                <Swatches
-                    label="Highlight"
-                    icon={<Highlighter />}
-                    colours={HIGHLIGHTS}
-                    current={null}
-                    onPick={(c) =>
-                        c
-                            ? chain().setHighlight({ color: c }).run()
-                            : chain().unsetHighlight().run()
-                    }
-                />
-                <Gap />
-
-                <Mark
-                    label="Align left"
-                    pressed={state.align === "left"}
-                    onPressedChange={() => chain().setTextAlign("left").run()}
-                >
-                    <AlignLeft />
-                </Mark>
-                <Mark
-                    label="Align centre"
-                    pressed={state.align === "center"}
-                    onPressedChange={() => chain().setTextAlign("center").run()}
-                >
-                    <AlignCenter />
-                </Mark>
-                <Mark
-                    label="Align right"
-                    pressed={state.align === "right"}
-                    onPressedChange={() => chain().setTextAlign("right").run()}
-                >
-                    <AlignRight />
-                </Mark>
-                <Gap />
-
-                <Mark
-                    label="Bulleted list"
-                    pressed={state.bullet}
-                    onPressedChange={() => chain().toggleBulletList().run()}
-                >
-                    <List />
-                </Mark>
-                <Mark
-                    label="Numbered list"
-                    pressed={state.ordered}
-                    onPressedChange={() => chain().toggleOrderedList().run()}
-                >
-                    <ListOrdered />
-                </Mark>
-                <Mark
-                    label="Quote"
-                    pressed={state.quote}
-                    onPressedChange={() => chain().toggleBlockquote().run()}
-                >
-                    <Quote />
-                </Mark>
-                <Mark
-                    label="Code block"
-                    pressed={state.code}
-                    onPressedChange={() => chain().toggleCodeBlock().run()}
-                >
-                    <Code2 />
-                </Mark>
-                <Tool
-                    label="Horizontal rule"
-                    onClick={() => chain().setHorizontalRule().run()}
-                >
-                    <Minus />
-                </Tool>
-                <Gap />
-
-                <LinkTool
-                    active={state.link}
-                    current={
-                        (editor.getAttributes("link").href as
-                            string | undefined) ?? ""
-                    }
-                    onSet={(href) =>
-                        href
-                            ? chain()
-                                  .extendMarkRange("link")
-                                  .setLink({ href })
-                                  .run()
-                            : chain().extendMarkRange("link").unsetLink().run()
-                    }
-                />
-                <Popover>
-                    <PopoverTrigger asChild>
-                        <IconButton
-                            label="Insert image"
-                            icon={<ImagePlus className="size-4" />}
-                            size="xs"
-                        />
-                    </PopoverTrigger>
-                    <PopoverContent align="start" className="w-80">
-                        <MediaPicker
-                            label="Choose a photo"
-                            onPick={(img) =>
-                                chain()
-                                    .setImage({
-                                        src: img.src,
-                                        alt: "",
-                                        ...(img.width && img.height
-                                            ? {
-                                                  width: img.width,
-                                                  height: img.height,
-                                              }
-                                            : {}),
-                                    })
-                                    .run()
-                            }
-                        />
-                    </PopoverContent>
-                </Popover>
-                <Tool
-                    label="Insert table"
-                    onClick={() =>
-                        chain()
-                            .insertTable({
-                                rows: 3,
-                                cols: 3,
-                                withHeaderRow: true,
-                            })
-                            .run()
-                    }
-                >
-                    <Table2 />
-                </Tool>
-                <Gap />
-
-                <Toggle
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    pressed={source}
-                    onPressedChange={(on) => {
-                        // Leaving source view pushes whatever was typed back
-                        // through the schema, so a stray tag is normalised the
-                        // way a paste would be.
-                        if (!on && !editor.isDestroyed)
-                            editor.commands.setContent(value, {
-                                emitUpdate: false,
-                            });
-                        setSource(on);
-                    }}
-                    aria-label="Edit as HTML"
-                >
-                    HTML
-                </Toggle>
-            </div>
+            {bar}
 
             {source ? (
                 <Textarea

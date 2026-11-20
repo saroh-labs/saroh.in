@@ -1,4 +1,4 @@
-// @covers app:/sites/[siteId]/posts app:/sites/[siteId]/posts/new api:content
+// @covers app:/sites/[siteId]/posts app:/sites/[siteId]/posts/new app:/sites/[siteId]/write/new app:/sites/[siteId]/write/[postId] api:content
 import { expect, test } from "@playwright/test";
 
 import { northwind, stamp } from "../fixtures/own-data";
@@ -45,8 +45,9 @@ test("a new post keeps its editor through the first save", async ({
         await body.click();
         await page.keyboard.type("The first words.");
 
-        // The first save moves the post to its own address.
-        await expect(page).toHaveURL(/\/posts\/(?!new\b)[^/?#]+$/, {
+        // The first save moves the post to its own address (the desk
+        // editor's `/write/<id>` with the Website area on).
+        await expect(page).toHaveURL(/\/(posts|write)\/(?!new\b)[^/?#]+$/, {
             timeout: 15_000,
         });
         postId = new URL(page.url()).pathname.split("/").pop();
@@ -67,3 +68,97 @@ test("a new post keeps its editor through the first save", async ({
         if (postId) await api.delete(`/sites/${site.id}/posts/${postId}`);
     }
 });
+
+/**
+ * The desk post editor (plan 2026-11-20-002 U15, `blogdesk/WXWWrite`,
+ * `WXWSearch`, `WXWStates`), behind `NEXT_PUBLIC_WEBSITE_AREA`: today's
+ * New post forwards to `/write/new`; a post needs a title before it saves
+ * or publishes; it autosaves and says so; its page link lives in Search
+ * and sharing. Owns its post: a stamped title, deleted at the end.
+ */
+for (const size of [
+    { name: "1920", viewport: { width: 1920, height: 1080 } },
+    { name: "1440", viewport: { width: 1440, height: 900 } },
+]) {
+    test.describe(`the desk post editor at ${size.name}`, () => {
+        test.use({ viewport: size.viewport });
+
+        test("title first, autosave, and the page link in Search and sharing", async ({
+            page,
+        }, testInfo) => {
+            test.skip(
+                testInfo.project.name.startsWith("phone"),
+                "A desk board; the phone post editor is U16's.",
+            );
+            await useSession(page);
+            await page.goto(`/open/${NORTHWIND_ORG}`);
+            const api = northwind(page.request);
+            const site = (await api.get<SiteRow[]>("/sites")).at(0);
+            test.skip(!site, "Northwind has no website.");
+            if (!site) return;
+
+            await page.goto(`/sites/${site.id}/posts/new`);
+            test.skip(
+                !page.url().includes("/write/new"),
+                "NEXT_PUBLIC_WEBSITE_AREA is off: today's post editor",
+            );
+            const bar = page.locator("[data-post-bar]");
+            await expect(
+                bar.getByRole("link", { name: "Back to Website" }),
+            ).toBeVisible();
+
+            // Publish post with no title asks for one and sends nothing.
+            await bar.getByRole("button", { name: "Publish post" }).click();
+            await expect(page.getByRole("alert")).toContainText(
+                "A post needs a title.",
+            );
+
+            const title = `Desk post ${stamp(testInfo)}`;
+            let postId: string | undefined;
+            try {
+                await page
+                    .getByRole("textbox", { name: "Post title" })
+                    .fill(title);
+                await page.locator('[contenteditable="true"]').first().click();
+                await page.keyboard.type("Written at the desk.");
+                await expect(page).toHaveURL(/\/write\/(?!new\b)[^/?#]+$/, {
+                    timeout: 15_000,
+                });
+                postId = new URL(page.url()).pathname.split("/").pop();
+                await expect(page.locator("[data-saved-line]")).toContainText(
+                    "Saved",
+                    { timeout: 15_000 },
+                );
+                await expect(page.locator("[data-status-chip]")).toHaveText(
+                    "Not live yet",
+                );
+
+                // The page link is in Search and sharing (RULES §1).
+                await page
+                    .getByRole("tab", { name: "Search and sharing" })
+                    .click();
+                await page
+                    .getByRole("button", { name: "Change search and sharing" })
+                    .click();
+                const sheet = page.getByRole("dialog", {
+                    name: "Search and sharing",
+                });
+                await expect(sheet.getByLabel("Page link")).toBeVisible();
+                await expect(sheet).toContainText(
+                    "Saved · goes live when you publish",
+                );
+                await sheet.getByRole("button", { name: "Cancel" }).click();
+                await expect(
+                    page.evaluate(
+                        () =>
+                            document.documentElement.scrollWidth <=
+                            window.innerWidth,
+                    ),
+                ).resolves.toBe(true);
+            } finally {
+                if (postId)
+                    await api.delete(`/sites/${site.id}/posts/${postId}`);
+            }
+        });
+    });
+}

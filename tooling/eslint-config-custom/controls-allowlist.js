@@ -231,6 +231,12 @@ export const RAW_ALLOWED = {
     "components/sites/editor/phone/phone-top-bar.tsx": ["button"],
     // button: the desk bar's page picker (page over site) and status chip (U46)
     "components/sites/editor/shell/desk-top-bar.tsx": ["button"],
+    // button: the post bar's post picker and status chip (U15)
+    "components/sites/posts/editor/post-top-bar.tsx": ["button"],
+    // button: a heading row of a post's outline, pressed to scroll there (U15)
+    "components/sites/posts/editor/posts-left-panel.tsx": ["button"],
+    // button, input: the format bar's toggles and link box over a selection, and the add menu's rows (U15)
+    "components/sites/rich-text/writing-menus.tsx": ["button", "input"],
     // button: a rail tab, its icon over its word (U46)
     "components/sites/editor/shell/editor-trail.tsx": ["button"],
     // button: a row of the Pages tree, one button (U46)

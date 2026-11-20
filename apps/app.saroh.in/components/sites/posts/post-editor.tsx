@@ -6,40 +6,32 @@ import { POST_TITLE_MAX } from "@saroh/api-contract";
 import { Badge } from "@saroh/ui/badge";
 import { Button } from "@saroh/ui/button";
 import { Input } from "@saroh/ui/input";
-import { useSaveShortcut } from "@saroh/ui/lib/keyboard-save";
 import { cn } from "@saroh/ui/lib/utils";
 import { Textarea } from "@saroh/ui/textarea";
-import { showError, showSuccess } from "@saroh/ui/toast";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { PausedNote } from "@/components/billing/paused-banner";
-import { showPlanRefusal } from "@/components/billing/plan-refusal";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { MediaPicker } from "@/components/shared/fields/media-picker";
 import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
 import { accountSettingsUrl } from "@/lib/accounts";
-import { runAction } from "@/lib/api/run-action";
 import { pausedWords } from "@/lib/billing/paused";
-import {
-    createPost,
-    deletePost,
-    publishPost,
-    unpublishPost,
-    updatePost,
-} from "@/lib/content/actions";
 import { postParagraphs } from "@/lib/content/plain-text";
 import type { PostCategory, PostDetail } from "@/lib/content/service";
 import type { ShareSetup } from "@/lib/share-item/share";
 import type { SiteCommentView } from "@/lib/sites/service";
-import type { ConfirmResult } from "@saroh/ui/confirm-dialog";
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
 import { EmptyState } from "@saroh/ui/data-state";
 import { OptionSelect } from "@saroh/ui/option-select";
-import { useLeaveGuard } from "@saroh/ui/use-leave-guard";
 
+import {
+    adoptPostAddress,
+    slugFrom,
+    usePostDraft,
+} from "./editor/use-post-draft";
 import { PostFeedback } from "./post-feedback";
 
 /* On demand and browser-only, for the same reasons as everywhere else it is
@@ -71,23 +63,12 @@ const RichTextEditor = dynamic(
  * otherwise tell.
  */
 
-/**
- * Point the address bar at a post that now exists, without a navigation.
- * Next's router follows `history.replaceState`, so `usePathname` and a later
- * reload both see the new address, while the editor and what is typed in it
- * stay mounted.
- */
-export function adoptPostAddress(path: string): void {
-    window.history.replaceState(null, "", path);
-}
+export { adoptPostAddress };
 
 /** Open in editor from an Ask AI blog draft (owner, 14 Nov): one quiet line. */
 export const FROM_ASK_AI =
     "Started from Ask AI. Nothing is saved until you save.";
 export const ASK_AI_GONE = "That Ask AI draft isn't available any more.";
-
-/** Long enough to be worth saying, short enough not to nag. */
-const AUTOSAVE_MS = 2500;
 
 export function PostEditor({
     siteId,
@@ -135,22 +116,30 @@ export function PostEditor({
 }) {
     const zone = useBusinessZone();
     const router = useRouter();
-    const [postId, setPostId] = useState(post?.id ?? null);
     const [confirmDelete, setConfirmDelete] = useState(false);
-
-    const [title, setTitle] = useState(post?.title ?? fromAskAi?.title ?? "");
-    const [content, setContent] = useState(
-        post?.content ?? fromAskAi?.body ?? "",
+    // Today's editor keeps its own address for a new post's first save.
+    const addressOf = useCallback(
+        (id: string) => `/sites/${siteId}/posts/${id}`,
+        [siteId],
     );
-    const [slug, setSlug] = useState(post?.slug ?? "");
-    const [excerpt, setExcerpt] = useState(
-        post?.excerpt ?? fromAskAi?.excerpt ?? "",
-    );
-    const [categoryId, setCategoryId] = useState(post?.categoryId ?? "");
-    const [image, setImage] = useState(post?.image ?? "");
+    const draft = usePostDraft({
+        siteId,
+        post,
+        fromAskAi,
+        paused,
+        readOnly,
+        addressOf,
+        listHref: `/sites/${siteId}/posts`,
+    });
+    const { postId, live, liveAt, dirty, saving, publishing, savedAt, guard } =
+        draft;
+    const { title, content, slug, excerpt, categoryId, image } = draft.fields;
+    const save = draft.save;
+    const onPublish = draft.publish;
+    const onUnpublish = draft.unpublish;
+    const onDelete = draft.remove;
+    const touched = draft.set;
 
-    const [live, setLive] = useState(post?.live ?? false);
-    const [liveAt, setLiveAt] = useState<string | null>(post?.liveAt ?? null);
     /** The one side panel open: Details, Feedback, or neither. */
     const [panel, setPanel] = useState<"details" | "feedback" | null>(
         readOnly && feedback ? "feedback" : null,
@@ -158,18 +147,7 @@ export function PostEditor({
     const detailsOpen = panel === "details";
     const openNotes =
         feedback?.comments.filter((c) => c.resolvedAt === null).length ?? 0;
-    const [dirty, setDirty] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [publishing, setPublishing] = useState(false);
-    const [savedAt, setSavedAt] = useState<Date | null>(null);
 
-    /**
-     * The newest values, for a save fired from a timer — which closes over
-     * whatever was current when it was scheduled, and would otherwise write
-     * two-and-a-half seconds of stale text. Updated in an effect rather than
-     * during render, because a render may be thrown away.
-     */
-    const latest = useRef({ title, content, slug, excerpt, categoryId, image });
     // The title grows with its text where `field-sizing` isn't supported.
     const titleRef = useRef<HTMLTextAreaElement>(null);
     useEffect(() => {
@@ -178,194 +156,6 @@ export function PostEditor({
         box.style.height = "auto";
         box.style.height = `${box.scrollHeight}px`;
     }, [title]);
-    useEffect(() => {
-        latest.current = { title, content, slug, excerpt, categoryId, image };
-    }, [title, content, slug, excerpt, categoryId, image]);
-
-    /*
-     * The save in flight, if any (#285).
-     *
-     * Autosave, the Save button and Publish each call `save()` on their own.
-     * Before a NEW post's first save returns, `postId` is still null — so two
-     * overlapping saves each took the create branch and the merchant ended up
-     * with a duplicate draft they never asked for.
-     *
-     * A second caller now waits for the first rather than starting its own.
-     * Publish in particular: it wants an id, and the one being minted is the
-     * one it should use.
-     */
-    const inFlight = useRef<Promise<string | null> | null>(null);
-
-    const save = useCallback(
-        async (opts: { silent?: boolean } = {}) => {
-            if (inFlight.current) return inFlight.current;
-
-            const run = (async () => {
-                const v = latest.current;
-                if (!v.title.trim()) {
-                    if (!opts.silent) showError("A post needs a title.");
-                    return null;
-                }
-                setSaving(true);
-                const body = {
-                    title: v.title,
-                    slug: v.slug.trim() || undefined,
-                    excerpt: v.excerpt.trim() || undefined,
-                    content: v.content,
-                    categoryId: v.categoryId || undefined,
-                    image: v.image.trim() || undefined,
-                };
-                // What is being sent, so edits made WHILE it is in flight are
-                // not marked saved when it returns.
-                const sent = JSON.stringify(body);
-                const res = await runAction(
-                    () =>
-                        postId
-                            ? updatePost(siteId, postId, {
-                                  ...body,
-                                  slug: v.slug.trim() || slugFrom(v.title),
-                              })
-                            : createPost(siteId, body),
-                    // An autosave that didn't get there says nothing: the
-                    // next one, or Save, tries again.
-                    { setBusy: setSaving, quiet: opts.silent },
-                );
-                if (!res) return null;
-                if (!res.ok) {
-                    showError(res.error);
-                    return null;
-                }
-                const now = latest.current;
-                const unchanged =
-                    sent ===
-                    JSON.stringify({
-                        title: now.title,
-                        slug: now.slug.trim() || undefined,
-                        excerpt: now.excerpt.trim() || undefined,
-                        content: now.content,
-                        categoryId: now.categoryId || undefined,
-                        image: now.image.trim() || undefined,
-                    });
-                // Still dirty when the merchant kept typing: autosave fires
-                // again for what they wrote, instead of the editor claiming
-                // their newest words are saved.
-                if (unchanged) setDirty(false);
-                setSavedAt(new Date());
-                if (!postId && res.data.id) {
-                    // A new post becomes a real one on its first save, and the
-                    // address should say so — otherwise a reload loses the work.
-                    // The address changes in place (UX-034): a navigation to
-                    // `/posts/<id>` remounted the editor from the server's copy,
-                    // and whatever was typed while the save was out was lost.
-                    setPostId(res.data.id);
-                    adoptPostAddress(`/sites/${siteId}/posts/${res.data.id}`);
-                }
-                if (!opts.silent) showSuccess("Draft saved.");
-                return res.data.id;
-            })();
-
-            inFlight.current = run;
-            try {
-                return await run;
-            } finally {
-                inFlight.current = null;
-            }
-        },
-        [postId, siteId],
-    );
-
-    // Autosave, and only when there is something to save. An editor that loses
-    // an hour of writing to a closed tab is not worth the simplicity.
-    useEffect(() => {
-        // Never while one is already running (#285): the timer would otherwise
-        // queue a second save against a post whose id does not exist yet.
-        if (!dirty || saving || !title.trim()) return;
-        const t = setTimeout(() => void save({ silent: true }), AUTOSAVE_MS);
-        return () => clearTimeout(t);
-    }, [dirty, saving, title, content, slug, excerpt, categoryId, image, save]);
-
-    /*
-     * Re-read the server's copy after publishing or taking a post down — only
-     * when the editor opened on a saved post. A post begun at `/posts/new`
-     * changed its address in place, so a refresh would draw the `[postId]`
-     * page and remount the editor over anything typed meanwhile (UX-034);
-     * its header already says what changed.
-     */
-    const refreshServer = useCallback(() => {
-        if (post) router.refresh();
-    }, [post, router]);
-
-    // For the case the timer has not yet fired. A way out saves what is
-    // waiting first and asks only when that save can't go; closing the
-    // tab gets the browser's own warning.
-    // Cmd/Ctrl+S: Save draft, said aloud if it can't (no title yet).
-    useSaveShortcut(() => void save(), !paused && !readOnly);
-    const guard = useLeaveGuard({
-        dirty,
-        lost: title.trim()
-            ? "Your latest changes to this post couldn't be saved, and will be lost if you leave now."
-            : "A post saves once it has a title, so what you've written will be lost.",
-        flush: async () => (await save({ silent: true })) !== null,
-    });
-
-    function touched<T>(setter: (v: T) => void) {
-        return (v: T) => {
-            setter(v);
-            setDirty(true);
-        };
-    }
-
-    async function onPublish() {
-        setPublishing(true);
-        // Publish what is on screen, not what was last saved — the merchant
-        // pressed publish looking at this.
-        const id =
-            dirty || !postId
-                ? await runAction(() => save({ silent: true }))
-                : postId;
-        if (!id) {
-            setPublishing(false);
-            return;
-        }
-        const res = await runAction(() => publishPost(siteId, id), {
-            setBusy: setPublishing,
-        });
-        if (!res) return;
-        if (!res.ok) {
-            // At the plan's blog-posts limit (U13): its notice, not a toast.
-            if (res.plan) showPlanRefusal(res.plan);
-            else showError(res.error);
-            return;
-        }
-        setLive(true);
-        setLiveAt(new Date().toISOString());
-        showSuccess(`Published. It is live at ${res.data.path}.`);
-        refreshServer();
-    }
-
-    async function onUnpublish() {
-        if (!postId) return;
-        const res = await runAction(() => unpublishPost(siteId, postId), {
-            setBusy: setPublishing,
-        });
-        if (!res) return;
-        if (!res.ok) {
-            showError(res.error);
-            return;
-        }
-        setLive(false);
-        setLiveAt(null);
-        showSuccess("Taken off the site. The writing is still here.");
-        refreshServer();
-    }
-
-    async function onDelete(): Promise<ConfirmResult> {
-        if (!postId) return;
-        const res = await deletePost(siteId, postId);
-        if (!res.ok) return { ok: false, error: res.error };
-        showSuccess("Post deleted.");
-        router.push(`/sites/${siteId}/posts`);
-    }
 
     return (
         <div className="flex min-h-[calc(100dvh-var(--app-header-h,3.5rem))] flex-col">
@@ -520,7 +310,7 @@ export function PostEditor({
                             value={title}
                             readOnly={readOnly}
                             onChange={(e) =>
-                                touched(setTitle)(
+                                touched("title")(
                                     e.target.value.replace(/\s*\n+\s*/g, " "),
                                 )
                             }
@@ -541,7 +331,7 @@ export function PostEditor({
                             <div className="mt-6">
                                 <RichTextEditor
                                     value={content}
-                                    onChange={touched(setContent)}
+                                    onChange={touched("content")}
                                     placeholder="Write…"
                                     className="rounded-none border-0 bg-transparent [&>div:first-child]:border-0 [&>div:first-child]:px-0 [&_.ProseMirror]:min-h-[50vh] [&_.ProseMirror]:px-0"
                                 />
@@ -621,7 +411,7 @@ export function PostEditor({
                                 value={slug}
                                 disabled={readOnly}
                                 onChange={(e) =>
-                                    touched(setSlug)(e.target.value)
+                                    touched("slug")(e.target.value)
                                 }
                                 placeholder={slugFrom(title) || "post-path"}
                                 aria-label="Post path"
@@ -637,7 +427,7 @@ export function PostEditor({
                                 disabled={readOnly}
                                 rows={3}
                                 onChange={(e) =>
-                                    touched(setExcerpt)(e.target.value)
+                                    touched("excerpt")(e.target.value)
                                 }
                                 aria-label="Post summary"
                             />
@@ -649,7 +439,7 @@ export function PostEditor({
                                 value={categoryId}
                                 disabled={readOnly}
                                 onValueChange={(v) => {
-                                    touched(setCategoryId)(v);
+                                    touched("categoryId")(v);
                                 }}
                                 options={[
                                     { value: "", label: "None" },
@@ -678,7 +468,7 @@ export function PostEditor({
                                 {readOnly ? null : (
                                     <MediaPicker
                                         onPick={(img) =>
-                                            touched(setImage)(img.src)
+                                            touched("image")(img.src)
                                         }
                                     />
                                 )}
@@ -687,7 +477,7 @@ export function PostEditor({
                                     disabled={readOnly}
                                     placeholder="or paste an image address"
                                     onChange={(e) =>
-                                        touched(setImage)(e.target.value)
+                                        touched("image")(e.target.value)
                                     }
                                     aria-label="Cover image address"
                                 />
@@ -746,7 +536,7 @@ export function PostEditor({
  * a draft's markup is sanitized only at publish, so it is never drawn as
  * markup for someone who didn't write it.
  */
-function ReadOnlyBody({ content }: { content: string }) {
+export function ReadOnlyBody({ content }: { content: string }) {
     const body = postParagraphs(content);
     return (
         <div className="mt-6 space-y-4 text-[15px] leading-relaxed">
@@ -784,13 +574,4 @@ function Field({
             ) : null}
         </div>
     );
-}
-
-/** The same shape the api derives, so the placeholder does not lie. */
-function slugFrom(title: string): string {
-    return title
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
 }
