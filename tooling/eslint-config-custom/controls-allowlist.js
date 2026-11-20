@@ -233,6 +233,12 @@ export const RAW_ALLOWED = {
     "components/sites/editor/shell/desk-top-bar.tsx": ["button"],
     // button: the post bar's post picker and status chip (U15)
     "components/sites/posts/editor/post-top-bar.tsx": ["button"],
+    // button: the phone post editor's writing tools and format panel toggles (U16)
+    "components/sites/posts/phone/writing-tools.tsx": ["button"],
+    // button: the phone Add sheet's tiles and rows, and More's rows, each one button (U16)
+    "components/sites/posts/phone/phone-menus.tsx": ["button"],
+    // button: Details' Search and sharing row, two lines that open its sheet (U16)
+    "components/sites/posts/phone/details-sheet.tsx": ["button"],
     // button: a heading row of a post's outline, pressed to scroll there (U15)
     "components/sites/posts/editor/posts-left-panel.tsx": ["button"],
     // button, input: the format bar's toggles and link box over a selection, and the add menu's rows (U15)

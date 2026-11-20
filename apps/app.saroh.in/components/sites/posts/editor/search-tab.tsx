@@ -97,7 +97,7 @@ export function SearchTab({
     );
 }
 
-function SearchSheet({
+export function SearchSheet({
     model,
     open,
     onOpenChange,

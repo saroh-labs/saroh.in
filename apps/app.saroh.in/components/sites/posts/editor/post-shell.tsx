@@ -9,6 +9,7 @@ import { openAskAi } from "@/components/ask-ai/open";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import type { TrailTab } from "@/components/sites/editor/shell/editor-trail";
 import { EditorTrail } from "@/components/sites/editor/shell/editor-trail";
+import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { AddList } from "@/components/sites/rich-text/writing-menus";
 import type { PostDetail } from "@/lib/content/service";
 import { formatDateTime } from "@/lib/format/datetime";
@@ -18,6 +19,7 @@ import {
     POST_HISTORY_READY,
     PostHistoryPanel,
 } from "../history/post-history-panel";
+import { PhonePostEditor } from "../phone/phone-post-editor";
 import { usePublishPost } from "../publish/publish-post";
 import type { DetailsRow } from "./details-tab";
 import type { InspectorTab } from "./post-inspector";
@@ -91,6 +93,8 @@ export function PostShell({
 }) {
     const router = useRouter();
     const zone = useBusinessZone();
+    // Below 760px the phone post editor (U16), on this same model and draft.
+    const phone = useEditorLayout() === "phone";
     const { siteId } = data;
     const addressOf = useCallback(
         (id: string) => `/sites/${siteId}/write/${id}`,
@@ -184,6 +188,29 @@ export function PostShell({
         setEditing("cover");
     };
 
+    const onDiscard =
+        data.fromAskAi !== undefined && !draft.postId
+            ? () => {
+                  draft.guard.release();
+                  router.push(`/sites/${siteId}/writing`);
+              }
+            : undefined;
+
+    if (phone) {
+        return (
+            <>
+                <PhonePostEditor
+                    model={model}
+                    onPublish={publish.open}
+                    titleError={showTitleError}
+                    onDiscard={onDiscard}
+                />
+                {publish.node}
+                {draft.guard.dialog}
+            </>
+        );
+    }
+
     const left =
         trail === "add" ? (
             <section aria-label="Add" className="flex min-h-0 flex-1 flex-col">
@@ -215,14 +242,7 @@ export function PostShell({
                         onMoreFormatting={() => setToolbar(true)}
                     />
                 }
-                onDiscard={
-                    data.fromAskAi !== undefined && !draft.postId
-                        ? () => {
-                              draft.guard.release();
-                              router.push(`/sites/${siteId}/writing`);
-                          }
-                        : undefined
-                }
+                onDiscard={onDiscard}
             />
             <PostBanner model={model} />
             <div className="flex min-h-0 flex-1">
