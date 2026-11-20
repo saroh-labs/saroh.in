@@ -72,6 +72,8 @@ export interface PersonDetail extends PersonRow {
     signIn: SignInState;
     /** Their businesses on the other edition: a count, never which. */
     otherEditionBusinesses: number;
+    /** Businesses on Free they may own beyond their one (DEC-227). */
+    extraFreeBusinesses: number;
 }
 
 /**
@@ -199,6 +201,7 @@ export class AdminPeopleService {
                     },
                     orderBy: { organization: { name: "asc" } },
                 },
+                extraFreeBusinesses: true,
                 sessions: {
                     where: { expiresAt: { gt: new Date() } },
                     select: {
@@ -215,9 +218,10 @@ export class AdminPeopleService {
         });
         if (!user) throw new NotFoundException("Person not found");
 
-        const { memberships, sessions, ...base } = user;
+        const { memberships, sessions, extraFreeBusinesses, ...base } = user;
         return {
             ...(await personRow({ ...base, memberships })),
+            extraFreeBusinesses,
             signIn: await signInState(base),
             otherEditionBusinesses: edition
                 ? await prisma.membership.count({
@@ -274,6 +278,42 @@ export class AdminPeopleService {
                 metadata: { sessions: ended.count },
             });
             return { ended: ended.count };
+        });
+    }
+
+    /**
+     * Let this person own more businesses on Free than their one (DEC-227):
+     * `extra` beyond it, zero to take the exception away. On the ledger
+     * with the reason, the old and the new number.
+     */
+    async setExtraFreeBusinesses(
+        staff: PlatformAdminInfo,
+        userId: string,
+        extra: number,
+        reason: string,
+    ) {
+        const why = requireReason(reason);
+        return prisma.$transaction(async (tx) => {
+            const user = await tx.user.findUnique({
+                where: { id: userId },
+                select: { extraFreeBusinesses: true },
+            });
+            if (!user) throw new NotFoundException("Person not found");
+            await tx.user.update({
+                where: { id: userId },
+                data: { extraFreeBusinesses: extra },
+            });
+            await this.audit.write(tx, {
+                actorUserId: staff.userId,
+                permission: AdminPermission.OrganizationPeopleWrite,
+                action: "person.free-businesses.set",
+                targetType: "user",
+                targetId: userId,
+                reason: why,
+                outcome: AdminAuditOutcome.Success,
+                metadata: { from: user.extraFreeBusinesses, to: extra },
+            });
+            return { extraFreeBusinesses: extra };
         });
     }
 

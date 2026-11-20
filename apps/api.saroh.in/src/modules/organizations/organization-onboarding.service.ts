@@ -28,6 +28,7 @@ import {
     firstBillingProfileInTx,
 } from "../billing/billing-profiles.service";
 import { FREE_PLAN_ID } from "../billing/catalogue-access.service";
+import type { WindowLimiter } from "../rate-limits/shared-window";
 import {
     addressProblem,
     addressTaken,
@@ -38,6 +39,11 @@ import { refuseCountryOutsideEdition } from "./business-country";
 import { businessTypeWrite } from "./business-type";
 import { startingZone } from "./business-zone";
 import type { OnboardOrganizationDto } from "./dto";
+import {
+    assertMayOwnAnotherFreeInTx,
+    businessCreationLimiter,
+    takeBusinessCreation,
+} from "./free-business";
 import { DEFAULT_ORGANIZATION_KIND } from "./organization-kind";
 import { referringBusiness } from "./referral";
 import { slugify } from "./slug";
@@ -81,6 +87,9 @@ export interface OnboardedOrganization {
 @Injectable()
 export class OrganizationOnboardingService {
     private readonly logger = new Logger(OrganizationOnboardingService.name);
+
+    /** Set-ups a day per person (M-4, DEC-227); a spec hands in its own. */
+    creations: WindowLimiter | null = businessCreationLimiter();
 
     constructor(
         private readonly audit: AuditService,
@@ -158,8 +167,12 @@ export class OrganizationOnboardingService {
         const kind = dto.kind ?? DEFAULT_ORGANIZATION_KIND;
 
         const referredBy = await this.referredBy(userId, dto.referralCode);
+        await takeBusinessCreation(this.creations, userId);
 
         const making = prisma.$transaction(async (tx) => {
+            // Every business starts on Free (below), and a person owns one
+            // business on Free (DEC-227): refused before anything is made.
+            await assertMayOwnAnotherFreeInTx(tx, [userId]);
             /*
              * Fail fast on a taken address with a clear 409 rather than a raw
              * unique-constraint error. "Taken" means another business

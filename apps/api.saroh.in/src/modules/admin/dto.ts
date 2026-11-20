@@ -518,6 +518,15 @@ export class ChangeSignInEmailDto extends OperatorReasonDto {
     email!: string;
 }
 
+/** Businesses on Free a person may own beyond their one (DEC-227). */
+export class SetExtraFreeBusinessesDto extends OperatorReasonDto {
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    @Max(100)
+    extra!: number;
+}
+
 export class ChangeMemberRoleDto extends OperatorReasonDto {
     @IsString()
     @MaxLength(80)

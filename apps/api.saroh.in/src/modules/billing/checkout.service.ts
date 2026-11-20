@@ -36,11 +36,13 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
+import { assertMayOwnAnotherFreeInTx } from "../organizations/free-business";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
-    findAutomaticCoupon,
+    automaticCouponFor,
     findUsableCoupon,
+    LAUNCH_OFFER_USED_ELSEWHERE,
 } from "../pricing/coupons.service";
 import { SharedRateLimiter } from "../rate-limits/shared-window";
 import {
@@ -106,9 +108,10 @@ import {
 import type { AddonChargeLine } from "./offers";
 import {
     catalogueOfVersion,
-    hadTrial,
     planFirstPaise,
     planTrialDays,
+    TRIAL_USED_ELSEWHERE,
+    trialTakenBy,
 } from "./offers";
 import { PlansService } from "./plans.service";
 import { profileSwitchStateInTx, renewalProfileOf } from "./profile-switch";
@@ -249,6 +252,12 @@ export interface ChangePlanQuoteView {
      * Saroh's invoice prints it (CGST Rule 46(e)).
      */
     registeredAddress: boolean;
+    /**
+     * Why an offer the plan has isn't given (DEC-227): its free trial or
+     * launch discount was had with another business by the same person or
+     * GSTIN. Empty when nothing is withheld that way.
+     */
+    offerNotes: string[];
     /**
      * Who Saroh bills, before it charges or sets up autopay (17 Oct 2026,
      * `billing-details.ts`): the business's billing profile (DEC-167; null
@@ -434,7 +443,7 @@ export class CheckoutService {
             client,
             now,
         );
-        const { target, quote, coupon, addonsEnding, monthAddons } =
+        const { target, quote, coupon, addonsEnding, monthAddons, offerNotes } =
             await this.resolve(
                 ctx.organizationId,
                 input,
@@ -452,6 +461,7 @@ export class CheckoutService {
                 monthAddons,
                 !input.coupon?.trim(),
             ),
+            offerNotes,
             ...details,
             // A profile is its owner's (R2): only those who change what the
             // business pays are told which one bills it.
@@ -712,6 +722,7 @@ export class CheckoutService {
             );
         const view = {
             ...viewOf(resolved),
+            offerNotes: resolved.offerNotes,
             ...billingDetailsView(party),
         };
         if (quote.kind === "NONE") {
@@ -905,6 +916,7 @@ export class CheckoutService {
         };
         const view = {
             ...this.quoteView(plan, quote),
+            offerNotes: [],
             ...billingDetailsView(party),
         };
         const result = await this.checkout(ctx, plan, quote, view, now, {
@@ -1074,10 +1086,22 @@ export class CheckoutService {
         // A first-month offer rides on autopay: none for a plan paid one
         // month at a time (stage 9, KTD5b).
         const autopay = autopayTakes(target.currency);
+        // Once per person (DEC-227): a trial had by a business sharing
+        // this one's payer is said at checkout, not just left out.
+        const trialBy =
+            autopay && catalog
+                ? await trialTakenBy(prisma, organizationId)
+                : null;
         const trialDays =
-            autopay && catalog && !(await hadTrial(prisma, organizationId))
+            autopay && catalog && !trialBy
                 ? planTrialDays(catalog, planId)
                 : null;
+        const offerNotes: string[] =
+            trialBy === "other" &&
+            catalog &&
+            planTrialDays(catalog, planId) !== null
+                ? [TRIAL_USED_ELSEWHERE]
+                : [];
         // DEC-093's nominal first month, from the same version's offer.
         const trialFirstPaise =
             autopay && catalog ? planFirstPaise(catalog, planId) : 0;
@@ -1138,7 +1162,9 @@ export class CheckoutService {
             // No code typed: the plan's automatic coupon, when this business
             // may still use it; else the full price, silently (owner, 18 Nov
             // 2026). A typed code always wins over it.
-            coupon = await findAutomaticCoupon(couponAsk);
+            const auto = await automaticCouponFor(couponAsk);
+            coupon = auto.coupon;
+            if (auto.elsewhere) offerNotes.push(LAUNCH_OFFER_USED_ELSEWHERE);
         }
         let quote = quoteChange({ ...asked, coupon });
         const monthAddons = await this.monthAddons(
@@ -1177,6 +1203,7 @@ export class CheckoutService {
             coupon,
             addonsEnding,
             monthAddons,
+            offerNotes,
         };
     }
 
@@ -1268,7 +1295,10 @@ export class CheckoutService {
         monthAddons: AddonChargeLine[] = [],
         /** No code was typed: the coupon is the automatic one. */
         automatic = false,
-    ): Omit<ChangePlanQuoteView, "registeredAddress" | "billingDetails"> {
+    ): Omit<
+        ChangePlanQuoteView,
+        "registeredAddress" | "billingDetails" | "offerNotes"
+    > {
         return {
             plan: {
                 id: catalogPlanIdForKey(target.key) ?? target.key,
@@ -1324,6 +1354,17 @@ export class CheckoutService {
     ): Promise<Date> {
         return prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${ctx.organizationId} FOR UPDATE`;
+            // A person owns one business on Free (DEC-227): its owners
+            // may not already own another.
+            const owners = await tx.membership.findMany({
+                where: { organizationId: ctx.organizationId, role: "OWNER" },
+                select: { userId: true },
+            });
+            await assertMayOwnAnotherFreeInTx(
+                tx,
+                owners.map((o) => o.userId),
+                ctx.organizationId,
+            );
             const sub = await tx.subscription.findUnique({
                 where: { organizationId: ctx.organizationId },
                 select: SUB_SELECT,
