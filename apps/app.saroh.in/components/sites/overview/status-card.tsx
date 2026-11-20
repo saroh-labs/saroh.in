@@ -5,6 +5,8 @@ import Link from "next/link";
 
 import { QrButton } from "@/components/qr/link-qr/qr-button";
 import { StateBadge } from "@/components/sites/header/website-header";
+import type { SharePage } from "@/components/sites/share/share-page-sheet";
+import { SharePageButton } from "@/components/sites/share/share-page-sheet";
 import { formatDate } from "@/lib/format/datetime";
 import type { SiteOverview } from "@/lib/sites/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
@@ -16,19 +18,22 @@ const CARD =
 
 /**
  * Where people reach the site (WXHOverview's left card): the business's
- * web address (DEC-230) with Copy, Open the live site, and its QR for the
- * counter.
+ * web address (DEC-230) with Copy, Open the live site, its QR for the
+ * counter, and Share this page for the home page while the site is live.
  */
 export function AddressCard({
     siteId,
     host,
     url,
     live,
+    share,
 }: {
     siteId: string;
     host: string | null;
     url: string | null;
     live: boolean;
+    /** The home page and the business's name; null: nothing to share. */
+    share?: { page: SharePage; business: string } | null;
 }) {
     return (
         <section aria-labelledby="ov-address" className={CARD}>
@@ -67,9 +72,19 @@ export function AddressCard({
                             from: "Website overview",
                         }}
                     />
-                    <p className="min-w-0 text-sm text-muted-foreground">
-                        Print it on the bill counter or a mirror card.
-                    </p>
+                    <div className="grid min-w-0 gap-1">
+                        <p className="text-sm text-muted-foreground">
+                            Print it on the bill counter or a mirror card.
+                        </p>
+                        {live && host && share ? (
+                            <SharePageButton
+                                siteId={siteId}
+                                host={host}
+                                page={share.page}
+                                business={share.business}
+                            />
+                        ) : null}
+                    </div>
                 </div>
             ) : null}
             {live && url ? (

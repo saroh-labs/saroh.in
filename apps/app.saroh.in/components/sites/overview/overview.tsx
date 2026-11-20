@@ -1,5 +1,6 @@
 import { FailedRead } from "@saroh/ui/failed-read";
 
+import type { SharePage } from "@/components/sites/share/share-page-sheet";
 import type { SiteOverview } from "@/lib/sites/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 
@@ -25,6 +26,7 @@ export function Overview({
     canEdit,
     canPublish,
     timeZone,
+    share = null,
     now = new Date(),
 }: {
     siteId: string;
@@ -36,6 +38,8 @@ export function Overview({
     canEdit: boolean;
     canPublish: boolean;
     timeZone: string;
+    /** The home page, for Share this page; null: nothing to share. */
+    share?: { page: SharePage; business: string } | null;
     now?: Date;
 }) {
     return (
@@ -46,6 +50,7 @@ export function Overview({
                     host={host}
                     url={url}
                     live={live}
+                    share={share}
                 />
                 <StatusCard
                     siteId={siteId}

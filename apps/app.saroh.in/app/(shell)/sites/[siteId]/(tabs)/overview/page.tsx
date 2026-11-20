@@ -64,6 +64,7 @@ export default async function SiteOverviewPage({
     const written = posts ? count(posts.length, "post") : null;
     const address = businessAddress(site, webAddress, RENDERER_APEX);
     const host = address?.host;
+    const home = site.pages.find((p) => p.isHome && !p.hidden);
 
     return (
         <div className="flex min-w-0 flex-col gap-6">
@@ -77,6 +78,7 @@ export default async function SiteOverviewPage({
                 canEdit={site.can.edit}
                 canPublish={site.can.publish}
                 timeZone={businessZone(organization)}
+                share={home ? { page: home, business: site.name } : null}
             />
             <div className="min-[760px]:hidden">
                 <SiteHome

@@ -332,6 +332,8 @@ export function PagesArea({
                                         siteId={siteId}
                                         page={page}
                                         url={url(page)}
+                                        host={host}
+                                        business={siteName}
                                         shareable={live && !page.hidden}
                                         canUpdate={canUpdate}
                                         onSettings={() => goTo(page.id)}

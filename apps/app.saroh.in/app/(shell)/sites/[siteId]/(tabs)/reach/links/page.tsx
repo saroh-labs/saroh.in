@@ -47,6 +47,7 @@ export default async function SiteLinksPage({
             <LinksList
                 siteId={site.id}
                 host={host}
+                business={site.name}
                 pages={site.pages}
                 currentPublicationId={site.currentPublicationId ?? null}
                 redirects={redirects}

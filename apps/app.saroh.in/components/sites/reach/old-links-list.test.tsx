@@ -96,6 +96,7 @@ describe("Page links you share", () => {
             <LinksList
                 siteId="s1"
                 host="gulmohar.saroh.app"
+                business="Gulmohar"
                 pages={pages}
                 currentPublicationId="pub1"
                 redirects={[auto]}
@@ -106,6 +107,8 @@ describe("Page links you share", () => {
         // Home is the bare address; it didn't change.
         expect(html).toContain(">gulmohar.saroh.app<");
         expect(html).toContain("Live");
+        // A live, visible page can be shared from its row.
+        expect(html).toContain("data-share-page-open");
     });
 });
 

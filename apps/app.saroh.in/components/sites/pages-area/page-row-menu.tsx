@@ -1,7 +1,7 @@
 "use client";
 
 import { ConfirmDialog } from "@saroh/ui/confirm-dialog";
-import { canShare, copyFailedMessage, copyText } from "@saroh/ui/copy-button";
+import { copyFailedMessage, copyText } from "@saroh/ui/copy-button";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -25,6 +25,7 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
+import { SharePageSheet } from "@/components/sites/share/share-page-sheet";
 import { runAction } from "@/lib/api/run-action";
 import { deletePage, duplicatePage, updatePage } from "@/lib/sites/actions";
 import type { SitePage } from "@/lib/sites/service";
@@ -43,6 +44,8 @@ export function PageRowMenu({
     siteId,
     page,
     url,
+    host,
+    business,
     shareable,
     canUpdate,
     onSettings,
@@ -53,6 +56,10 @@ export function PageRowMenu({
     page: SitePage;
     /** The page's full link; null before the site has an address. */
     url: string | null;
+    /** The business's web address (DEC-230); null before it has one. */
+    host: string | null;
+    /** The business's name, for Share this page's messages. */
+    business: string;
     /** Live and public: a share would open it. */
     shareable: boolean;
     canUpdate: boolean;
@@ -61,23 +68,12 @@ export function PageRowMenu({
     onDuplicated: (copy: SitePage) => void;
 }) {
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [shareOpen, setShareOpen] = useState(false);
 
     async function copy() {
         if (!url) return;
         if (await copyText(url)) showSuccess("Link copied.");
         else showError(copyFailedMessage());
-    }
-
-    async function share() {
-        if (!url) return;
-        if (!canShare()) return copy();
-        try {
-            await navigator.share({ url, title: page.title });
-        } catch (error) {
-            // Closing the share sheet is a choice, not a failure.
-            if (!(error instanceof DOMException && error.name === "AbortError"))
-                await copy();
-        }
     }
 
     async function duplicate() {
@@ -135,10 +131,10 @@ export function PageRowMenu({
                             Copy link
                         </DropdownMenuItem>
                     ) : null}
-                    {url && shareable ? (
+                    {host && shareable ? (
                         <DropdownMenuItem
                             className={ITEM}
-                            onSelect={() => void share()}
+                            onSelect={() => setShareOpen(true)}
                         >
                             <Share2 aria-hidden />
                             Share this page
@@ -199,6 +195,16 @@ export function PageRowMenu({
                 keepLabel="Keep page"
                 onConfirm={remove}
             />
+            {host && shareable ? (
+                <SharePageSheet
+                    open={shareOpen}
+                    onClose={() => setShareOpen(false)}
+                    siteId={siteId}
+                    page={page}
+                    business={business}
+                    host={host}
+                />
+            ) : null}
         </>
     );
 }
