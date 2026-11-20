@@ -1,6 +1,7 @@
 // #276: the roster rules — who may change it, what an invitation is worth,
 // and the one invariant that keeps an organization ownable.
 jest.mock("@saroh/database", () => ({
+    onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
     prisma: {
         membership: {
             findMany: jest.fn(),
@@ -93,7 +94,10 @@ const db = prisma as unknown as {
 };
 
 const audit = { record: jest.fn() } as unknown as AuditService;
-const service = new OrganizationMembersService(audit);
+// Sends are limited in their own spec (invite-send-limit.spec.ts).
+const service = new OrganizationMembersService(audit, {
+    take: () => Promise.resolve(),
+} as never);
 
 const ctx = (role: OrgRole = "OWNER"): OrganizationContext => ({
     organizationId: "org_1",

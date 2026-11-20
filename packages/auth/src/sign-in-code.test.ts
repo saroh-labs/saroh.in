@@ -36,7 +36,10 @@ function stack(
         rateLimit?: boolean;
         hooks?: Pick<
             CreateAuthOptions,
-            "mayStartSession" | "onMailboxProven" | "mayMailCode"
+            | "mayStartSession"
+            | "onMailboxProven"
+            | "mayMailCode"
+            | "passwordTries"
         >;
     } = {},
 ) {
@@ -182,6 +185,72 @@ describe("sign up and sign in with an emailed code", () => {
         expect(again.status).toBe(200);
         expect(s.users()).toHaveLength(1);
         expect(s.users()[0]).toMatchObject({ name: "Asha" });
+    });
+
+    // A-03: wrong passwords per account, from any address.
+    it("turns password sign-in away once an account's wrong passwords run out, known or not, then lets it back", async () => {
+        const fails = new Map<string, number>();
+        let open = false;
+        const s = stack({
+            hooks: {
+                passwordTries: {
+                    blocked: (email) =>
+                        Promise.resolve(
+                            !open && (fails.get(email) ?? 0) >= 3
+                                ? { retryAfterSeconds: 60 }
+                                : null,
+                        ),
+                    failed: (email) => {
+                        fails.set(email, (fails.get(email) ?? 0) + 1);
+                        return Promise.resolve();
+                    },
+                },
+            },
+        });
+        await s.post("/sign-up/email", {
+            name: "Priya",
+            email: "priya@example.com",
+            password: "a-long-password",
+        });
+        await s.post("/email-otp/verify-email", {
+            email: "priya@example.com",
+            otp: s.lastCode(),
+        });
+        const tryAs = (email: string, password: string, from: string) =>
+            s.post("/sign-in/email", { email, password }, from);
+        const answers = async (email: string) => {
+            const out: number[] = [];
+            for (let i = 0; i < 4; i++)
+                out.push(
+                    (await tryAs(email, "wrong-guess", `198.51.100.${i}`))
+                        .status,
+                );
+            return out;
+        };
+        expect(await answers("Priya@example.com")).toEqual([
+            401, 401, 401, 429,
+        ]);
+        // An address with no account answers the same way.
+        expect(await answers("nobody@example.com")).toEqual([
+            401, 401, 401, 429,
+        ]);
+        const held = await tryAs(
+            "priya@example.com",
+            "a-long-password",
+            "203.0.113.9",
+        );
+        expect(held.status).toBe(429);
+        expect(held.body?.message).toBe(
+            "Too many sign-in tries. Wait a while, then try again.",
+        );
+        // The window turns: the right password works again.
+        open = true;
+        const back = await tryAs(
+            "priya@example.com",
+            "a-long-password",
+            "203.0.113.9",
+        );
+        expect(back.status).toBe(200);
     });
 
     it("a password account keeps its password, and the code is a second way in", async () => {

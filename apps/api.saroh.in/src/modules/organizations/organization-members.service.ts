@@ -5,6 +5,7 @@ import {
     Injectable,
     Logger,
     NotFoundException,
+    Optional,
 } from "@nestjs/common";
 import { ensureCalendarOnlyRole, prisma } from "@saroh/database";
 import { randomBytes } from "node:crypto";
@@ -38,6 +39,8 @@ import {
     joinsBookable,
     linkDiaryPerson,
 } from "./diary-invite";
+import type { InviteSendLimit } from "./invite-send-limit";
+import { inviteSendLimit } from "./invite-send-limit";
 import { hashInviteToken } from "./invite-token";
 import { memberLeaving } from "./member-leaving";
 import type {
@@ -167,7 +170,11 @@ export const LAST_OWNER_CANT_LEAVE =
 export class OrganizationMembersService {
     private readonly logger = new Logger(OrganizationMembersService.name);
 
-    constructor(private readonly audit: AuditService) {}
+    constructor(
+        private readonly audit: AuditService,
+        @Optional()
+        private readonly sends: InviteSendLimit = inviteSendLimit,
+    ) {}
 
     /** Everyone in the org, with a reviewer's granted sites. */
     async list(ctx: OrganizationContext): Promise<MemberView[]> {
@@ -349,6 +356,9 @@ export class OrganizationMembersService {
                 field: "email",
             });
         }
+
+        // Every send counts, a live invite sent again too (A-02).
+        await this.sends.take(ctx.organizationId, dto.email);
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);

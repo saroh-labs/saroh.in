@@ -12,6 +12,34 @@ mistaken for bureaucracy and removed.
 
 ---
 
+## Database — one business's burst of creates stalled the API for everyone
+
+**Symptom**: 20 Nov 2026, abuse test A-01: about 16 parallel `POST
+/stores/<id>/products` from one Free business at its product cap made other
+businesses' reads take seconds instead of milliseconds, `/health/ready`
+answered 503, and the burst itself got 500s (Prisma `P2028`, transaction
+timeout). Site creation at the site cap did the same.
+**Cause**: a pool deadlock, not a slow query. With `RLS_ENFORCEMENT` off, a
+service's `prisma.$transaction(...)` ran on the base client without publishing
+its transaction, so every ambient `prisma.*` call inside the callback (the plan
+meter reads the plan through services that use `prisma`) took a second pool
+connection while the first was held. Ten such transactions filled the pool and
+each waited for an eleventh connection until Prisma's 5 s timeout. The meter's
+`pg_advisory_xact_lock` waited without bound too, and the pool had no connect,
+statement or idle-in-transaction timeout (19 Nov M-2).
+**Fix**: the meter reads the plan on the write's own connection
+(`onTransaction` in `rls-proxy.ts`, which makes `tx` ambient for one call).
+Publishing every base transaction instead broke race specs that start a second
+request inside a transaction's callback, so it stays scoped. The plan
+meter lock (and Ask AI's start lock, H-10) waits at most
+`PLAN_METER_LOCK_WAIT_MS` (Postgres `lock_timeout`) and answers 429. The pool
+bounds the connect wait, each statement and an idle transaction
+(`pool-options.ts`, `DB_*_MS`).
+**Rule**: inside a transaction, never take another connection: use `tx`, or
+wrap a helper that reads through `prisma` in `onTransaction(tx, …)`; `outsideOrgContext` inside a transaction
+costs a second connection. Every lock wait has a bound. Enforced by
+`metering.db.spec.ts` "a burst at the cap", which fails at 5 s without the fix.
+
 ## Sites — signing in during a booking lost the date and time
 
 **Symptom**: 4 Nov 2026, the owner: "we do all the steps, then we click the

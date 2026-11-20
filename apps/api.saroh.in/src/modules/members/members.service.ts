@@ -12,6 +12,8 @@ import { prisma } from "@saroh/database";
 
 import { appBase } from "../../common/app-url";
 import { sendStoreInvitationEmail } from "../../common/email";
+import type { InviteSendLimit } from "../organizations/invite-send-limit";
+import { inviteSendLimit } from "../organizations/invite-send-limit";
 import type { OrgAction } from "../organizations/organization-actions";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import {
@@ -54,6 +56,8 @@ export class MembersService {
         // working; it holds no state.
         @Optional()
         private readonly contexts: OrganizationContextService = new OrganizationContextService(),
+        @Optional()
+        private readonly sends: InviteSendLimit = inviteSendLimit,
     ) {}
 
     /** True if the caller owns the store (StoreOwner row exists). */
@@ -172,7 +176,7 @@ export class MembersService {
         email: string,
         role: MemberRole,
     ) {
-        await this.teamContext(storeId, callerId);
+        const ctx = await this.teamContext(storeId, callerId);
         await this.assertMayBringOntoTeam(storeId, callerId);
 
         // Already a member? (matched by their account email, if they have one)
@@ -194,6 +198,9 @@ export class MembersService {
                 });
             }
         }
+
+        // Every send counts, from the business's one budget (A-02).
+        await this.sends.take(ctx.organizationId, email);
 
         const token = randomBytes(32).toString("hex");
         const expiresAt = new Date(Date.now() + INVITE_TTL_MS);

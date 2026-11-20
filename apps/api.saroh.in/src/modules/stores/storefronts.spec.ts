@@ -19,6 +19,7 @@ jest.mock("@saroh/database", () => {
         $executeRaw: jest.fn(),
     };
     return {
+        onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
         prisma: {
             store: {
                 findMany: jest.fn(),

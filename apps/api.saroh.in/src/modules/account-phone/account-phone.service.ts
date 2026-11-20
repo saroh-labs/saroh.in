@@ -210,6 +210,9 @@ export class AccountPhoneService {
                 );
             } else {
                 this.blocked("start", "no_account", keys);
+                // A code row no one is sent, so the code step answers an
+                // unknown number as it answers a known one (02 A-1).
+                this.inBackground(decoyCode(keys));
             }
             return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
@@ -527,6 +530,7 @@ export class AccountPhoneService {
     ): Promise<PhoneStart> {
         if (account && (await isSarohStaff(account))) {
             this.blocked("start", "staff", keys);
+            await decoyCode(keys);
             return { whatsapp: { resendAfterSeconds: START_COOLDOWN_SECONDS } };
         }
         const code = newCode();
@@ -547,8 +551,14 @@ export class AccountPhoneService {
         }
         if (reason) {
             this.blocked("start", `whatsapp_${reason}`, keys);
-            // Our own failure doesn't hold the cooldown; it still counts.
-            await releaseStart(eventId, `whatsapp_${reason}`);
+            if (account) {
+                // Signing in, the failure must look like an unknown number:
+                // the cooldown holds and a decoy code stands (02 A-1, A-2).
+                await decoyCode(keys);
+            } else {
+                // Our own failure doesn't hold the cooldown; it still counts.
+                await releaseStart(eventId, `whatsapp_${reason}`);
+            }
             throw new UnprocessableEntityException({
                 message: "Couldn't send on WhatsApp. Try SMS instead.",
                 details: { code: "WHATSAPP_FAILED" },
@@ -592,6 +602,15 @@ function accountOf(phoneE164: string) {
 interface Keys {
     phoneHash: string;
     ipHash?: string;
+}
+
+/** A sign-in code row that is never sent: the code step can't tell numbers apart. */
+function decoyCode(keys: Keys) {
+    return saveCode({
+        phoneHash: keys.phoneHash,
+        code: newCode(),
+        purpose: "SIGN_IN",
+    });
 }
 
 /** A claimed start that sent nothing: noted, so it doesn't hold the cooldown. */

@@ -1,9 +1,16 @@
-import { Injectable, Logger, Optional } from "@nestjs/common";
+import {
+    HttpException,
+    HttpStatus,
+    Injectable,
+    Logger,
+    Optional,
+} from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { onTransaction, prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 import { LIMIT_WARN_AT } from "@saroh/pricing-catalog";
 
+import { env } from "../../env";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { CatalogueAccessService } from "./catalogue-access.service";
@@ -56,18 +63,55 @@ export interface RoomOptions {
 /** The tables a metered write's transaction needs. */
 type MeterTx = Prisma.TransactionClient;
 
+/** How long a write waits for the meter lock before it is turned away. */
+function meterLockWaitMs(): number {
+    const ms = Number(env.PLAN_METER_LOCK_WAIT_MS);
+    return Number.isInteger(ms) && ms > 0 ? ms : 3_000;
+}
+
+/** 429: too many writes against one limit at once; nothing was written. */
+export function meterBusy(): HttpException {
+    return new HttpException(
+        { message: "Too many changes at once. Wait a moment and try again." },
+        HttpStatus.TOO_MANY_REQUESTS,
+    );
+}
+
 /**
  * Serialise a business's writes against one limit for the rest of the
  * transaction (`backend-jobs.md`, advisory lock registry: `plan-meter`), so
- * two creates at once can't both pass a count that only one fits.
+ * two creates at once can't both pass a count that only one fits. The wait
+ * is bounded ({@link holdXactLock}).
  */
 export async function lockMeter(
     tx: Pick<MeterTx, "$executeRaw">,
     organizationId: string,
     key: MeteredLimitKey,
 ): Promise<void> {
-    const lock = `plan-meter:${organizationId}:${key}`;
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
+    await holdXactLock(tx, `plan-meter:${organizationId}:${key}`);
+}
+
+/**
+ * Take a transaction advisory lock, waiting at most `PLAN_METER_LOCK_WAIT_MS`
+ * and then refusing with {@link meterBusy}, rather than waiting on it
+ * unbounded while holding a pool connection (A-01). The wait is Postgres's
+ * own `lock_timeout`, set for the lock only and reset after.
+ */
+export async function holdXactLock(
+    tx: Pick<MeterTx, "$executeRaw">,
+    lock: string,
+): Promise<void> {
+    await tx.$executeRaw`SELECT set_config('lock_timeout', ${String(meterLockWaitMs())}, true)`;
+    try {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
+    } catch (err) {
+        const text = `${JSON.stringify((err as { meta?: unknown }).meta ?? null)} ${err instanceof Error ? err.message : ""}`;
+        if (text.includes("55P03") || text.includes("lock timeout"))
+            throw meterBusy();
+        throw err;
+    }
+    // Back to the connection's own setting for the rest of the transaction.
+    await tx.$executeRaw`RESET lock_timeout`;
 }
 
 /**
@@ -204,9 +248,13 @@ export class MeteringService {
     ): Promise<PlanRoom | null> {
         if ((options.adding ?? 1) <= 0) return null;
         const now = options.now ?? new Date();
+        // On the write's own connection: reading the plan on another while
+        // this one is held drained the pool under a burst (A-01).
         const row =
             options.row ??
-            (await this.enforcedRow(organizationId, moduleId, now));
+            (await onTransaction(tx, () =>
+                this.enforcedRow(organizationId, moduleId, now),
+            ));
         if (!row) return null;
         return this.room(tx, row, organizationId, { ...options, now });
     }

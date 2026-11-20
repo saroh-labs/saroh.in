@@ -61,6 +61,7 @@ jest.mock("@saroh/database", () => {
         businessProfile: { findUnique: jest.fn() },
     };
     return {
+        onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
         ...actual,
         prisma: {
             classPack: {

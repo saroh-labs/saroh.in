@@ -238,6 +238,19 @@ export interface CreateAuthOptions {
      */
     github?: { clientId: string; clientSecret: string } | null;
     /**
+     * Wrong passwords per account (A-03): `blocked` before a password
+     * sign-in turns it away with a neutral 429 once the account's window is
+     * used up; `failed` counts each wrong password (any 401). Keyed by the
+     * address asked for, known or not, so it says nothing about whether an
+     * account exists. A window, never a permanent lock.
+     */
+    passwordTries?: {
+        blocked: (
+            email: string,
+        ) => Promise<{ retryAfterSeconds: number } | null>;
+        failed: (email: string) => Promise<void>;
+    };
+    /**
      * Where the sign-in rate limit counts, shared by every API replica and
      * kept across deploys (the host's Redis, 03-M7). Unset: Better Auth's
      * own memory store, per process.
@@ -523,12 +536,65 @@ export const CODE_MAIL_PATHS: readonly string[] = [
     "/sign-in/email",
 ];
 
+/** One check run by the host's `hooks.before`; it throws to refuse. */
+type BeforeCheck = (ctx: {
+    request?: Request;
+    path?: string;
+    body?: unknown;
+    headers?: Headers;
+}) => Promise<void>;
+
+/** The address a password sign-in names, lower-cased; null if none. */
+function signInEmail(ctx: { path?: string; body?: unknown }): string | null {
+    if (ctx.path !== "/sign-in/email") return null;
+    const email: unknown = (ctx.body as { email?: unknown } | undefined)?.email;
+    return typeof email === "string" && email.trim()
+        ? email.trim().toLowerCase()
+        : null;
+}
+
+/** `hooks.before` for {@link CreateAuthOptions.passwordTries}. */
+function passwordTriesBefore(
+    tries: NonNullable<CreateAuthOptions["passwordTries"]>,
+): BeforeCheck {
+    return async (ctx) => {
+        const email = ctx.request ? signInEmail(ctx) : null;
+        if (!email) return;
+        const wait = await tries.blocked(email);
+        if (!wait) return;
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- APIError extends Error at runtime; see assertNotSoleOwner
+        throw new APIError(
+            "TOO_MANY_REQUESTS",
+            {
+                code: "TOO_MANY_REQUESTS",
+                message:
+                    "Too many sign-in tries. Wait a while, then try again.",
+            },
+            { "X-Retry-After": String(wait.retryAfterSeconds) },
+        );
+    };
+}
+
+/** `hooks.after` for {@link CreateAuthOptions.passwordTries}. */
+function passwordTriesAfter(
+    tries: NonNullable<CreateAuthOptions["passwordTries"]>,
+) {
+    return createAuthMiddleware(async (ctx) => {
+        const email = ctx.request ? signInEmail(ctx) : null;
+        if (!email) return;
+        const returned: unknown = ctx.context.returned;
+        if (returned instanceof APIError && returned.statusCode === 401)
+            await tries.failed(email);
+    });
+}
+
 /** Better Auth's `hooks.before` for {@link CreateAuthOptions.mayMailCode}. */
 function codeMailHook(
     mayMailCode: NonNullable<CreateAuthOptions["mayMailCode"]>,
-) {
-    return createAuthMiddleware(async (ctx) => {
-        if (!ctx.request || !CODE_MAIL_PATHS.includes(ctx.path)) return;
+): BeforeCheck {
+    return async (ctx) => {
+        if (!ctx.request || !ctx.path || !CODE_MAIL_PATHS.includes(ctx.path))
+            return;
         const email: unknown = (ctx.body as { email?: unknown } | undefined)
             ?.email;
         if (typeof email !== "string" || !email.trim()) return;
@@ -556,7 +622,7 @@ function codeMailHook(
             },
             { "X-Retry-After": String(wait.retryAfterSeconds) },
         );
-    });
+    };
 }
 
 export const MAILBOX_PROOF_PATHS: readonly string[] = [
@@ -612,6 +678,25 @@ function sessionHooks(
     };
 }
 
+/** The host's `before` and `after` hooks, only those it asked for. */
+function authHooks(opts: CreateAuthOptions): Pick<BetterAuthOptions, "hooks"> {
+    const before = [
+        opts.passwordTries && passwordTriesBefore(opts.passwordTries),
+        opts.mayMailCode && codeMailHook(opts.mayMailCode),
+    ].filter((h) => !!h);
+    if (before.length === 0) return {};
+    return {
+        hooks: {
+            before: createAuthMiddleware(async (ctx) => {
+                for (const check of before) await check(ctx);
+            }),
+            ...(opts.passwordTries
+                ? { after: passwordTriesAfter(opts.passwordTries) }
+                : {}),
+        },
+    };
+}
+
 export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
     const secret = resolveAuthSecret();
     const baseURL = opts.baseURL ?? process.env.BETTER_AUTH_URL;
@@ -637,9 +722,7 @@ export function authOptions(opts: CreateAuthOptions = {}): BetterAuthOptions {
         ...(opts.onServerError
             ? { onAPIError: serverErrorHook(opts.onServerError) }
             : {}),
-        ...(opts.mayMailCode
-            ? { hooks: { before: codeMailHook(opts.mayMailCode) } }
-            : {}),
+        ...authHooks(opts),
         account: {
             accountLinking: {
                 enabled: true,
