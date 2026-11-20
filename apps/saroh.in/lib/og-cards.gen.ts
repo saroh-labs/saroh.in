@@ -103,7 +103,7 @@ export const INTEGRATION_CARDS: Record<
     },
     email: {
         name: "Your own email",
-        intro: "Saroh sends your business's email through your own email provider, not Saroh's. Connect Resend, SendGrid or an SMTP relay, choose the address it comes from, and invoices and reminders go out as you.",
+        intro: "Saroh sends your business's email through your own email provider, not Saroh's. Connect your Resend account, choose the address it comes from, and invoices and reminders go out as you.",
     },
     razorpay: {
         name: "Razorpay",
