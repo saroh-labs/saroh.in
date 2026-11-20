@@ -36,7 +36,7 @@ import {
     AuditService,
 } from "../audit/audit.service";
 import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
-import { assertMayOwnAnotherFreeInTx } from "../organizations/free-business";
+import { settleFreeLimitInTx } from "../organizations/free-business";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
 import { allows, authorize } from "../organizations/organization-policy";
 import {
@@ -108,6 +108,7 @@ import {
 import type { AddonChargeLine } from "./offers";
 import {
     catalogueOfVersion,
+    holdPayerOffersInTx,
     planFirstPaise,
     planTrialDays,
     TRIAL_USED_ELSEWHERE,
@@ -1090,7 +1091,7 @@ export class CheckoutService {
         // this one's payer is said at checkout, not just left out.
         const trialBy =
             autopay && catalog
-                ? await trialTakenBy(prisma, organizationId)
+                ? await trialTakenBy(prisma, organizationId, now)
                 : null;
         const trialDays =
             autopay && catalog && !trialBy
@@ -1354,17 +1355,6 @@ export class CheckoutService {
     ): Promise<Date> {
         return prisma.$transaction(async (tx) => {
             await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "organizationId" = ${ctx.organizationId} FOR UPDATE`;
-            // A person owns one business on Free (DEC-227): its owners
-            // may not already own another.
-            const owners = await tx.membership.findMany({
-                where: { organizationId: ctx.organizationId, role: "OWNER" },
-                select: { userId: true },
-            });
-            await assertMayOwnAnotherFreeInTx(
-                tx,
-                owners.map((o) => o.userId),
-                ctx.organizationId,
-            );
             const sub = await tx.subscription.findUnique({
                 where: { organizationId: ctx.organizationId },
                 select: SUB_SELECT,
@@ -1414,6 +1404,8 @@ export class CheckoutService {
                         billingCycle: "month",
                     },
                 });
+                // Never refused (DEC-227): over the one-Free rule, it pauses.
+                await settleFreeLimitInTx(tx, ctx.organizationId);
                 return now;
             }
             // A payment still due (DEC-210) has nothing paid ahead: Free now.
@@ -1482,6 +1474,7 @@ export class CheckoutService {
                     providerEventAt: null,
                 },
             });
+            await settleFreeLimitInTx(tx, ctx.organizationId);
             return now;
         });
     }
@@ -1684,6 +1677,15 @@ export class CheckoutService {
         try {
             row = await prisma.$transaction(async (tx) => {
                 await assertBillingMayStart(tx, ctx.organizationId);
+                // Offers once per person, under the payer's locks (N3).
+                if (stored === "TRIAL" || (discounted && coupon)) {
+                    await holdPayerOffersInTx(
+                        tx,
+                        ctx.organizationId,
+                        stored === "TRIAL",
+                        now,
+                    );
+                }
                 if (discounted && coupon) {
                     await takeCouponPlaceInTx(
                         tx,

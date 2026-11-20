@@ -118,6 +118,28 @@ describe("the catalogue schema", () => {
         );
     });
 
+    it("reads a storage cell without soft as soft; only soft: false is hard (N4)", () => {
+        const input = fixtureInput();
+        input.modules.push({
+            id: "storage",
+            name: "Photos and videos",
+            group: "g1",
+            cells: {
+                a: { inc: true, text: "1 GB", limit: 1 },
+                b: { inc: true, text: "5 GB", limit: 5, soft: false },
+            },
+        });
+        const storage = parseCatalog(input).modules.find(
+            (m) => m.id === "storage",
+        );
+        expect(storage?.cells.a).toMatchObject({ soft: true });
+        expect(storage?.cells.b).toMatchObject({ soft: false });
+        // Another row without soft stays hard.
+        expect(parseCatalog(input).modules[1].cells.a).toMatchObject({
+            soft: false,
+        });
+    });
+
     it("reads a missing cell as excluded and locked", () => {
         const c = edit(fixture(), (x) => {
             delete x.modules[0].cells.c;

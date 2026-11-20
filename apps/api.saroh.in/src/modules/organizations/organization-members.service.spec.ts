@@ -31,7 +31,11 @@ jest.mock("@saroh/database", () => ({
         storeMembers: { findMany: jest.fn(), deleteMany: jest.fn() },
         storeInvitation: { updateMany: jest.fn() },
         user: { findUnique: jest.fn() },
-        organization: { findUnique: jest.fn() },
+        organization: {
+            findUnique: jest.fn(),
+            // The one-Free rule for a new Owner (DEC-227): not on Free.
+            findFirst: jest.fn(async () => null),
+        },
         organizationRole: { findUnique: jest.fn(), findMany: jest.fn() },
         // Someone on the diary given a login (#868).
         staffMember: {

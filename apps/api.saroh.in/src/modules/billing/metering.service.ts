@@ -1,16 +1,9 @@
-import {
-    HttpException,
-    HttpStatus,
-    Injectable,
-    Logger,
-    Optional,
-} from "@nestjs/common";
+import { Injectable, Logger, Optional } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { onTransaction, prisma } from "@saroh/database";
 import type { ModuleAccess } from "@saroh/pricing-catalog";
 import { LIMIT_WARN_AT } from "@saroh/pricing-catalog";
 
-import { env } from "../../env";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
 import { CatalogueAccessService } from "./catalogue-access.service";
@@ -19,6 +12,10 @@ import { itemCapOf } from "./item-limits";
 import type { MeteredLimitKey } from "./metering";
 import { countUsage, meteredKeyOf, quietAtOne } from "./metering";
 import { moduleLocked, planLimitReached } from "./plan-limit-errors";
+import { holdXactLock } from "./xact-lock";
+
+// Kept here too: the many callers that import them from metering.
+export { holdXactLock, meterBusy } from "./xact-lock";
 
 /** The job that tells a business it is near or at a limit. */
 export const PLAN_LIMIT_NOTICE_TYPE = "plan.limit.notice";
@@ -63,20 +60,6 @@ export interface RoomOptions {
 /** The tables a metered write's transaction needs. */
 type MeterTx = Prisma.TransactionClient;
 
-/** How long a write waits for the meter lock before it is turned away. */
-function meterLockWaitMs(): number {
-    const ms = Number(env.PLAN_METER_LOCK_WAIT_MS);
-    return Number.isInteger(ms) && ms > 0 ? ms : 3_000;
-}
-
-/** 429: too many writes against one limit at once; nothing was written. */
-export function meterBusy(): HttpException {
-    return new HttpException(
-        { message: "Too many changes at once. Wait a moment and try again." },
-        HttpStatus.TOO_MANY_REQUESTS,
-    );
-}
-
 /**
  * Serialise a business's writes against one limit for the rest of the
  * transaction (`backend-jobs.md`, advisory lock registry: `plan-meter`), so
@@ -89,33 +72,6 @@ export async function lockMeter(
     key: MeteredLimitKey,
 ): Promise<void> {
     await holdXactLock(tx, `plan-meter:${organizationId}:${key}`);
-}
-
-/**
- * Take a transaction advisory lock, waiting at most `PLAN_METER_LOCK_WAIT_MS`
- * and then refusing with {@link meterBusy}, rather than waiting on it
- * unbounded while holding a pool connection (A-01). The wait is Postgres's
- * own `lock_timeout`, set for the lock only, then the caller's own put back.
- */
-export async function holdXactLock(
-    tx: Pick<MeterTx, "$executeRaw" | "$queryRaw">,
-    lock: string,
-): Promise<void> {
-    // The caller may have set its own earlier in the transaction
-    // (billing-customer.ts), which RESET would drop (07 F8).
-    const [{ prev } = { prev: "0" }] = await tx.$queryRaw<
-        { prev: string }[]
-    >`SELECT current_setting('lock_timeout') AS prev`;
-    await tx.$executeRaw`SELECT set_config('lock_timeout', ${String(meterLockWaitMs())}, true)`;
-    try {
-        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${lock}))`;
-    } catch (err) {
-        const text = `${JSON.stringify((err as { meta?: unknown }).meta ?? null)} ${err instanceof Error ? err.message : ""}`;
-        if (text.includes("55P03") || text.includes("lock timeout"))
-            throw meterBusy();
-        throw err;
-    }
-    await tx.$executeRaw`SELECT set_config('lock_timeout', ${prev}, true)`;
 }
 
 /**
@@ -403,7 +359,7 @@ export class MeteringService {
  * plan leaves it off ("locked"), nothing caps it ("open": off but soft, not
  * metered, or no limit), or the cap to count against. The catalogue's word
  * wins over the call site's: a soft cell counts and tells, never refuses.
- * One rule for {@link MeteringService.withRoom} and
+ * Storage a plan leaves out is open. One rule for {@link MeteringService.withRoom} and
  * {@link MeteringService.hasRoom}, so a screen never offers what the write
  * would refuse.
  */
@@ -412,8 +368,12 @@ export function rowGate(
     callerSoft: boolean,
 ): "locked" | "open" | { key: MeteredLimitKey; limit: number; soft: boolean } {
     const soft = callerSoft || row.soft === true;
-    if (row.state !== "on") return soft ? "open" : "locked";
     const key = meteredKeyOf(row.moduleId);
+    // Storage a plan leaves out reads as a catalogue without the row: no
+    // cap, never every upload refused (N4).
+    if (row.state !== "on") {
+        return soft || key === "storageGb" ? "open" : "locked";
+    }
     if (!key || row.limit === null) return "open";
     return { key, limit: row.limit, soft };
 }

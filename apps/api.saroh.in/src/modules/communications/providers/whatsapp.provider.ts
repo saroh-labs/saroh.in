@@ -119,9 +119,17 @@ export class WhatsappCommsProvider implements CommsProvider {
         if (!res.ok) {
             this.logger.warn(`WhatsApp send failed with HTTP ${res.status}`);
             const message = `WhatsApp send failed (HTTP ${res.status})`;
-            // A revoked or expired token (401/403, or Meta's 400 code 190):
-            // the connection needs reconnecting, not only a retry.
-            if (refusesKeys(res.status) || (await errorCode(res)) === 190) {
+            // A revoked or expired token (401/403, or Meta's 400 code 190),
+            // or one without permission on this number (10, 200: accepted
+            // on save, so the first refused send says so, N10): the
+            // connection needs reconnecting, not only a retry.
+            const code = await errorCode(res);
+            if (
+                refusesKeys(res.status) ||
+                code === 190 ||
+                code === 10 ||
+                code === 200
+            ) {
                 throw new ProviderKeysRefusedError(message, res.status);
             }
             throw new Error(message);

@@ -60,6 +60,7 @@ const AUDITED = new Set([
     "admin-people.controller.ts#removeMember",
     "admin-people.controller.ts#resendInvitation",
     "admin-people.controller.ts#sendSignInCode",
+    "admin-people.controller.ts#setExtraFreeBusinesses",
     "admin-people.controller.ts#withdrawInvitation",
     "admin-pricing.controller.ts#cancelVersion",
     "admin-pricing.controller.ts#createCoupon",

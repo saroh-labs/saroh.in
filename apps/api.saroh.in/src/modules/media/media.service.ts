@@ -15,6 +15,7 @@ import {
     isVideoContentType,
 } from "@saroh/object-storage";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BYTES_PER_GB } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
@@ -54,6 +55,18 @@ export interface CreateUploadResult {
  * {@link ObjectStorage} port; this service owns only the metadata index and the
  * PENDING → READY lifecycle.
  */
+/**
+ * The sweep removed the upload first (never confirmed in time, N12): its
+ * row is gone, so a confirm answers "nothing uploaded", as for a failed
+ * one, not a 500. Anything else is rethrown unless `onlyGone`.
+ */
+function goneAsNothing(error: unknown, onlyGone = false): void {
+    if (prismaErrorCode(error) === "P2025") {
+        throw new BadRequestException(NOTHING_UPLOADED_MESSAGE);
+    }
+    if (!onlyGone) throw error;
+}
+
 @Injectable()
 export class MediaService {
     constructor(
@@ -164,10 +177,12 @@ export class MediaService {
             this.storage.seesUploads,
         );
         if (problem) {
-            await prisma.media.update({
-                where: { id: media.id },
-                data: { status: "FAILED" },
-            });
+            await prisma.media
+                .update({
+                    where: { id: media.id },
+                    data: { status: "FAILED" },
+                })
+                .catch(goneAsNothing);
             await this.storage.deleteObject(media.key);
             throw new BadRequestException(problem);
         }
@@ -199,6 +214,7 @@ export class MediaService {
                 { adding: extra },
             )
             .catch(async (error: unknown) => {
+                goneAsNothing(error, true);
                 if (error instanceof ForbiddenException) {
                     await prisma.media.update({
                         where: { id: media.id },

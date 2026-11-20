@@ -54,6 +54,7 @@ import {
 import { DateTime } from "luxon";
 
 import { businessTimezone } from "../bookings/staff-availability";
+import { sendable } from "../communications/providers/provider.port";
 import { BOOKABLE_STAFF, countedOnDiary } from "./seats";
 
 /** The limit keys metering counts, in `MODULE_MAP`'s words. */
@@ -446,11 +447,14 @@ export async function countUsage(
                 db.merchantPaymentProvider.count({
                     where: { organizationId, status: "CONNECTED" },
                 }),
-                db.communicationProvider.count({
+                // Only rows that can send: a retired provider's row still
+                // reads CONNECTED but never sends (N11).
+                db.communicationProvider.findMany({
                     where: { organizationId, status: "CONNECTED" },
+                    select: { status: true, channel: true, provider: true },
                 }),
             ]);
-            return payments + messaging;
+            return payments + messaging.filter(sendable).length;
         }
         case "shopLocations":
             return db.store.count({

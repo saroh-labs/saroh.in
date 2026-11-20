@@ -301,15 +301,35 @@ describe("OrganizationSettingsService", () => {
             });
 
             const settings = await service.update(ctx(), {
-                profile: { taxId: "TAX9" },
+                profile: { taxId: "29AAAAA0000A1ZY" },
             });
 
             expect(profileUpsert).toHaveBeenCalledWith({
                 where: { organizationId: "org_1" },
-                create: { organizationId: "org_1", taxId: "TAX9" },
-                update: { taxId: "TAX9" },
+                create: { organizationId: "org_1", taxId: "29AAAAA0000A1ZY" },
+                update: { taxId: "29AAAAA0000A1ZY" },
             });
             expect(settings.profile).toBeNull();
+        });
+
+        it("stores a GSTIN as letters and digits, and refuses one not in its shape (N9)", async () => {
+            orgFindUnique.mockResolvedValue({
+                id: "org_1",
+                name: "Acme",
+                slug: "acme",
+                businessProfile: null,
+            });
+            await service.update(ctx(), {
+                profile: { taxId: "29aaaaa 0000-a1zy" },
+            });
+            expect(profileUpsert).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    update: { taxId: "29AAAAA0000A1ZY" },
+                }),
+            );
+            await expect(
+                service.update(ctx(), { profile: { taxId: "TAX9" } }),
+            ).rejects.toBeInstanceOf(BadRequestException);
         });
 
         it("patches only the fields sent — never blanks the untouched ones", async () => {
@@ -633,7 +653,10 @@ describe("OrganizationSettingsService", () => {
         it("audits the changed field NAMES only — never the PII values", async () => {
             await service.update(ctx(), {
                 name: "Acme Global",
-                profile: { taxId: "SECRET-TAX", contactEmail: "cfo@acme.test" },
+                profile: {
+                    taxId: "29AAAAA0000A1ZY",
+                    contactEmail: "cfo@acme.test",
+                },
             });
 
             expect(record).toHaveBeenCalledWith(
@@ -648,7 +671,7 @@ describe("OrganizationSettingsService", () => {
                 }),
             );
             const audited = JSON.stringify(record.mock.calls[0][0]);
-            expect(audited).not.toContain("SECRET-TAX");
+            expect(audited).not.toContain("29AAAAA0000A1ZY");
             expect(audited).not.toContain("cfo@acme.test");
         });
 

@@ -1,5 +1,6 @@
-import { Logger } from "@nestjs/common";
+import { ConflictException, Logger } from "@nestjs/common";
 import type { BillingCheckout, Prisma } from "@saroh/database";
+import { outsideOrgContext, prisma } from "@saroh/database";
 import type { Addon, BillingCycle, Catalog } from "@saroh/pricing-catalog";
 import {
     addonMaxQuantity,
@@ -12,7 +13,8 @@ import {
 
 import { lockCouponPlacesInTx } from "../pricing/coupons.service";
 import { prorateDifferencePaise } from "./checkout-quote";
-import { samePayer } from "./same-payer";
+import { offerHeld, samePayer } from "./same-payer";
+import { holdXactLock } from "./xact-lock";
 
 type Tx = Prisma.TransactionClient;
 
@@ -55,30 +57,72 @@ export async function catalogueOfVersion(
 
 /**
  * A person may have one free trial (DEC-227, M-2): never again once a trial
- * checkout was completed by this business or by any that shares its payer
- * (`same-payer.ts`: an owner, a billing profile's person, a GSTIN),
- * whatever happened after (KTD-18's "the client names a plan, the server
- * decides"). It is the offer of the plan first started with one (DEC-159):
- * a plan with no offer starts at its full price and uses nothing up.
+ * checkout was completed by this business, or completed, scheduled or still
+ * open for any that shares its payer (`same-payer.ts`: an owner, a billing
+ * profile's person, a GSTIN), whatever happened after (KTD-18's "the client
+ * names a plan, the server decides"). It is the offer of the plan first
+ * started with one (DEC-159): a plan with no offer starts at its full price
+ * and uses nothing up.
  *
  * "this": this business had it; "other": a business sharing its payer did
- * (said at checkout); null: none has.
+ * or is checking out with it (said at checkout); null: none has.
  */
 export async function trialTakenBy(
     db: Pick<Tx, "billingCheckout" | "organization">,
     organizationId: string,
+    now: Date = new Date(),
 ): Promise<"this" | "other" | null> {
-    const trial = (ids: string[]) =>
-        db.billingCheckout.findFirst({
-            where: {
-                organizationId: { in: ids },
-                kind: "TRIAL",
-                status: "COMPLETED",
-            },
-            select: { id: true },
+    const own = await db.billingCheckout.findFirst({
+        where: { organizationId, kind: "TRIAL", status: "COMPLETED" },
+        select: { id: true },
+    });
+    if (own) return "this";
+    const others = (await samePayer(db, organizationId)).filter(
+        (id) => id !== organizationId,
+    );
+    if (others.length === 0) return null;
+    const other = await db.billingCheckout.findFirst({
+        where: {
+            organizationId: { in: others },
+            kind: "TRIAL",
+            ...offerHeld(now),
+        },
+        select: { id: true },
+    });
+    return other ? "other" : null;
+}
+
+/**
+ * Hold the business's payer group (`same-payer.ts`) for the rest of the
+ * transaction that records a checkout, one lock per business in one order,
+ * then ask again whether the trial is still this business's to have (N3).
+ * Read on its own connection, outside the business's row-level security,
+ * while the locks are held, as `takeCouponPlaceInTx` reads a coupon's
+ * places. Refuses (409) a trial another business of the payer took first.
+ */
+export async function holdPayerOffersInTx(
+    tx: Pick<Tx, "$executeRaw" | "$queryRaw">,
+    organizationId: string,
+    trial: boolean,
+    now: Date,
+): Promise<void> {
+    const ids = await outsideOrgContext(() =>
+        samePayer(prisma, organizationId),
+    );
+    for (const id of [...ids].sort()) {
+        await holdXactLock(tx, `offer-payer:${id}`);
+    }
+    if (
+        trial &&
+        (await outsideOrgContext(() =>
+            trialTakenBy(prisma, organizationId, now),
+        ))
+    ) {
+        throw new ConflictException({
+            message: `${TRIAL_USED_ELSEWHERE} Reload to see the price without it.`,
+            details: { field: "plan", reason: "trial-taken" },
         });
-    if (await trial([organizationId])) return "this";
-    return (await trial(await samePayer(db, organizationId))) ? "other" : null;
+    }
 }
 
 /** Said at checkout when the trial went to a business sharing this one's payer. */

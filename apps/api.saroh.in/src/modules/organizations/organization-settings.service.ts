@@ -597,22 +597,25 @@ export class OrganizationSettingsService {
         // The invoices' default look (DEC-173): "" clears either, back to
         // Classic in ink. Issued paper keeps the look it froze.
         const paperData = invoicePaperData(dto.invoicePaper);
+        // A set: the tax check writes the tax ID again, normalised (N9).
         const changed: string[] = [
-            ...(dto.name !== undefined ? ["name"] : []),
-            ...(dto.kind !== undefined ? ["kind"] : []),
-            ...(dto.trade !== undefined ? ["trade"] : []),
-            // The typed trade goes with it (DEC-216): set beside Other,
-            // cleared when the trade changes away.
-            ...(dto.trade !== undefined || dto.tradeOther !== undefined
-                ? ["tradeOther"]
-                : []),
-            ...Object.keys(profileData),
-            ...Object.keys(phone),
-            ...Object.keys(taxData),
-            ...Object.keys(payData),
-            ...Object.keys(socialData),
-            ...Object.keys(siteData),
-            ...Object.keys(paperData),
+            ...new Set([
+                ...(dto.name !== undefined ? ["name"] : []),
+                ...(dto.kind !== undefined ? ["kind"] : []),
+                ...(dto.trade !== undefined ? ["trade"] : []),
+                // The typed trade goes with it (DEC-216): set beside Other,
+                // cleared when the trade changes away.
+                ...(dto.trade !== undefined || dto.tradeOther !== undefined
+                    ? ["tradeOther"]
+                    : []),
+                ...Object.keys(profileData),
+                ...Object.keys(phone),
+                ...Object.keys(taxData),
+                ...Object.keys(payData),
+                ...Object.keys(socialData),
+                ...Object.keys(siteData),
+                ...Object.keys(paperData),
+            ]),
         ];
 
         // Nothing to do — return current state rather than writing an empty

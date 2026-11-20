@@ -71,10 +71,11 @@ export class PendingUploadSweepJob {
 
     async sweep(now: Date): Promise<{ removed: number; failed: number }> {
         const before = new Date(now.getTime() - PENDING_UPLOAD_STALE_MS);
-        const held = await heldOrganizationIds(prisma);
         const failedIds: string[] = [];
         let removed = 0;
         for (;;) {
+            // Read again for every batch: a hold placed mid-run counts (N12).
+            const held = await heldOrganizationIds(prisma);
             const rows = await prisma.media.findMany({
                 where: {
                     status: "PENDING",

@@ -9,7 +9,11 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { prismaErrorCode } from "../../common/prisma-errors";
-import { gstinProblem, stateCode } from "../invoices/gst-states";
+import {
+    gstinProblem,
+    normaliseGstin,
+    stateCode,
+} from "../invoices/gst-states";
 import {
     normaliseIndianPhone,
     normalisePublicPhone,
@@ -240,7 +244,7 @@ function profileWrite(
         out.gstState = code;
     }
     if (input.gstin !== undefined) {
-        const gstin = nonEmpty(input.gstin)?.toUpperCase() ?? null;
+        const gstin = normaliseGstin(input.gstin) || null;
         if (gstin) {
             const state =
                 out.gstState !== undefined

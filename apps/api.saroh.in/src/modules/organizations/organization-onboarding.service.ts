@@ -28,6 +28,7 @@ import {
     firstBillingProfileInTx,
 } from "../billing/billing-profiles.service";
 import { FREE_PLAN_ID } from "../billing/catalogue-access.service";
+import { gstinProblem, normaliseGstin } from "../invoices/gst-states";
 import type { WindowLimiter } from "../rate-limits/shared-window";
 import {
     addressProblem,
@@ -119,6 +120,18 @@ export class OrganizationOnboardingService {
         // country must belong there (DEC-204). An address of neither is India.
         const edition = editionOfHost(owner?.host ?? "") ?? "INDIA";
         refuseCountryOutsideEdition(edition, dto.profile?.country);
+        // India's tax ID is the GSTIN, in the register's shape (N9).
+        const gstin =
+            editionProfile(edition).taxSystem !== "named-line"
+                ? normaliseGstin(dto.profile?.taxId)
+                : "";
+        const gstinRefused = gstin ? gstinProblem(gstin) : null;
+        if (gstinRefused) {
+            throw new BadRequestException({
+                message: gstinRefused,
+                details: { field: "taxId" },
+            });
+        }
         const profile = editionProfile(edition);
         // PHONE_REQUIRED_FOR_ACCOUNTS, held here too (03-M5): skipping the
         // accounts step by opening the workspace directly no longer sets a
@@ -172,7 +185,7 @@ export class OrganizationOnboardingService {
         const making = prisma.$transaction(async (tx) => {
             // Every business starts on Free (below), and a person owns one
             // business on Free (DEC-227): refused before anything is made.
-            await assertMayOwnAnotherFreeInTx(tx, [userId]);
+            await assertMayOwnAnotherFreeInTx(tx, [userId], edition);
             /*
              * Fail fast on a taken address with a clear 409 rather than a raw
              * unique-constraint error. "Taken" means another business
@@ -240,7 +253,7 @@ export class OrganizationOnboardingService {
             await tx.businessProfile.create({
                 data: {
                     organizationId: organization.id,
-                    ...this.buildProfileData(dto),
+                    ...this.buildProfileData(dto, gstin),
                     ...(profile.taxSystem === "named-line"
                         ? { yearStartMonth: 1 }
                         : {}),
@@ -416,7 +429,7 @@ export class OrganizationOnboardingService {
      * Reduce the DTO's optional profile to the columns actually supplied
      * (the zone is decided by the caller). Empty when no profile was sent.
      */
-    private buildProfileData(dto: OnboardOrganizationDto) {
+    private buildProfileData(dto: OnboardOrganizationDto, gstin: string) {
         const profile = dto.profile;
         if (!profile) return {};
 
@@ -432,7 +445,7 @@ export class OrganizationOnboardingService {
                 profile.registered ??
                 (type === "individual" ? false : undefined),
             country: profile.country,
-            taxId: profile.taxId,
+            taxId: gstin || profile.taxId,
             contactEmail: profile.contactEmail,
             website: profile.website,
         };

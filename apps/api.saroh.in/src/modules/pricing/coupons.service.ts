@@ -21,7 +21,7 @@ import {
 import { AdminPermission } from "../admin/admin-permissions";
 import { autopayTakes } from "../billing/autopay-currency";
 import { couponMonthPaise } from "../billing/checkout-quote";
-import { samePayer } from "../billing/same-payer";
+import { offerHeld, samePayer } from "../billing/same-payer";
 import { RAZORPAY_OFFER_ID } from "./dto";
 import type { PublicOffer } from "./public-catalog";
 
@@ -718,6 +718,37 @@ export async function hadPaidPlanOrLaunchOffer(
         : null;
 }
 
+/**
+ * Once per person (DEC-227): a coupon redeemed by this business or one
+ * sharing its payer, or held by another of the payer's checkouts
+ * (completed, scheduled or still open: N3), counts as used here.
+ */
+export async function couponUsedByPayer(
+    couponId: string,
+    organizationId: string,
+    now: Date,
+): Promise<boolean> {
+    const ids = await samePayer(prisma, organizationId);
+    const others = ids.filter((id) => id !== organizationId);
+    const [redeemed, held] = await Promise.all([
+        prisma.pricingCouponRedemption.findFirst({
+            where: { couponId, organizationId: { in: ids } },
+            select: { id: true },
+        }),
+        others.length > 0
+            ? prisma.billingCheckout.findFirst({
+                  where: {
+                      couponId,
+                      organizationId: { in: others },
+                      ...offerHeld(now),
+                  },
+                  select: { id: true },
+              })
+            : null,
+    ]);
+    return redeemed !== null || held !== null;
+}
+
 /** Said when a launch offer was had by a business sharing this one's payer. */
 export const LAUNCH_OFFER_USED_ELSEWHERE =
     "The launch discount is once per person, and you've already had it, or paid for a plan, with another business.";
@@ -754,18 +785,9 @@ async function couponProblem(
             return `Coupon ${code} is for businesses starting their first paid plan.`;
         }
     }
-    // Once per person (DEC-227): a business sharing this one's payer
-    // having used it counts as this one having used it.
-    const mine = await prisma.pricingCouponRedemption.findFirst({
-        where: {
-            couponId: coupon.id,
-            organizationId: {
-                in: await samePayer(prisma, input.organizationId),
-            },
-        },
-        select: { id: true },
-    });
-    if (mine) return `You've used coupon ${code} already.`;
+    if (await couponUsedByPayer(coupon.id, input.organizationId, input.now)) {
+        return `You've used coupon ${code} already.`;
+    }
     const taken = await couponPlacesTaken(
         coupon.id,
         input.organizationId,

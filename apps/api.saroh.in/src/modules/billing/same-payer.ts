@@ -1,5 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
+import { normaliseGstin } from "../invoices/gst-states";
+
 /**
  * The businesses that share a payer with this one (M-2, M-3, DEC-227): the
  * free trial and the launch discount are once per person, not per business.
@@ -10,8 +12,10 @@ import type { Prisma } from "@saroh/database";
  */
 type Db = Pick<Prisma.TransactionClient, "organization">;
 
+// Stored normalised since N9 (and by the backfill before it), so a
+// normalised compare matches "29AAAAA 0000A1ZY" with "29AAAAA0000A1ZY".
 function cleanGstin(v: string | null | undefined): string | null {
-    const t = v?.trim().toUpperCase() ?? "";
+    const t = normaliseGstin(v);
     return t === "" ? null : t;
 }
 
@@ -77,4 +81,18 @@ export async function samePayer(
         select: { id: true },
     });
     return [...new Set([organizationId, ...rows.map((r) => r.id)])];
+}
+
+/**
+ * A checkout that holds an offer for its business: completed, waiting to
+ * start, or still open (N3: two businesses of one person checking out side
+ * by side can't both get it).
+ */
+export function offerHeld(now: Date): Prisma.BillingCheckoutWhereInput {
+    return {
+        OR: [
+            { status: { in: ["COMPLETED", "SCHEDULED"] } },
+            { status: "OPEN", expiresAt: { gt: now } },
+        ],
+    };
 }
