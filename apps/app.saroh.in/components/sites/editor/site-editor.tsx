@@ -53,6 +53,7 @@ import { sectionActions } from "./inspector/section-actions";
 import { frameOf } from "./inspector/section-frame";
 import { SectionToolbar } from "./inspector/section-toolbar";
 import { SiteInspector } from "./inspector/site-inspector";
+import { historyAfterReload } from "./panels/history-panel";
 import { PhoneShell } from "./phone/phone-shell";
 import { EditorReadOnly, EditorReviewCan } from "./read-only";
 import type { EditorModel, TrailKey } from "./shell/editor-model";
@@ -417,7 +418,7 @@ export function SiteEditor({
     // History and Feedback are the shell's own rail tabs; Pages, Add and
     // Brand are today's rail state, so a reload comes back to Brand.
     const [trailExtra, setTrailExtra] = useState<"history" | "feedback" | null>(
-        null,
+        historyAfterReload,
     );
     const railTab = railTabFor(selection.rail, add.adding && !readOnly);
     const trail: TrailKey =
@@ -448,6 +449,7 @@ export function SiteEditor({
             { reader: readOnly },
         ),
         styleOptions,
+        canvasChrome,
         addablePageKinds: addablePageKinds ?? [],
         ...{ shopOpen, packsOpen, active, draft, selection, sheets, viewport },
         ...{ edits, review, publish, publishChanges, siteStyle, chrome, add },

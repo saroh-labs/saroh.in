@@ -140,6 +140,67 @@ vi.mock("@/lib/api/http", () => ({
     mutate: vi.fn(),
 }));
 vi.mock("@/lib/forms/actions", () => ({ ensureFormForSection: vi.fn() }));
+// Rail › History's reads (U46b); its Undo is a write, a spy that must
+// stay unpressed in every test here.
+const revertChange = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/sites/change-revert-actions", () => ({ revertChange }));
+vi.mock("@/lib/sites/changes-read", () => ({
+    readSiteChanges: vi.fn(() =>
+        Promise.resolve({
+            siteId: "site",
+            livePublishedAt: "2026-11-14T12:00:00.000Z",
+            count: 1,
+            units: [
+                {
+                    key: "section:p-home:s1",
+                    kind: "section",
+                    change: "changed",
+                    label: "Changed · Top of the page",
+                    where: "Home",
+                    pageId: "p-home",
+                    fingerprint: "f",
+                    editedBy: null,
+                    editedAt: null,
+                    requires: [],
+                    approval: {
+                        state: "not-needed",
+                        voided: false,
+                        approvers: [],
+                    },
+                },
+            ],
+            groups: [
+                {
+                    userId: null,
+                    name: null,
+                    you: false,
+                    units: ["section:p-home:s1"],
+                },
+            ],
+            posts: [],
+            approvalRequired: false,
+        }),
+    ),
+}));
+vi.mock("@/lib/sites/history-read", () => ({
+    readVersions: vi.fn(() =>
+        Promise.resolve([
+            {
+                id: "pub-1",
+                publishedAt: "2026-11-14T12:00:00.000Z",
+                publishedByUserId: null,
+                publishedBy: "Sample Owner",
+                templateId: "t",
+                templateVersion: 1,
+                isCurrent: true,
+                bypass: null,
+                reviewRoute: null,
+            },
+        ]),
+    ),
+    readVersion: vi.fn(() => Promise.resolve(null)),
+    readChangesAgainst: vi.fn(() => Promise.resolve(null)),
+}));
 vi.mock("@/lib/services/actions", () => ({
     listServicesForPicker: vi.fn(() =>
         Promise.resolve({ ok: true, services: [] }),
@@ -331,6 +392,8 @@ const ALLOWED: RegExp[] = [
     /^(Welcome in|Our story)(Hero|Hidden when published)$/,
     /^Open the (header|footer)$/,
     /^(Sections on this page|Done)$/,
+    // Preview at three sizes (U46f): which sizes, and scrolling together.
+    /^(All three|Desktop|Tablet|Phone|Scroll together)$/,
 ];
 
 /** The page's options in the page picker: switching page writes nothing. */
@@ -525,6 +588,7 @@ afterEach(async () => {
     for (const spy of [
         ...Object.values(writes),
         ...Object.values(releaseWrites),
+        revertChange,
     ]) {
         expect(spy).not.toHaveBeenCalled();
     }
@@ -1197,6 +1261,14 @@ describe("the desk shell with the Website area on (U46)", () => {
         expect(has("Ask for changes")).toBe(false);
     });
 
+    it("Preview at three sizes: nothing that writes (U46f)", () => {
+        render();
+        click(button("Preview"));
+        expect($("[data-preview-frames]")).not.toBeNull();
+        expect(has("Share a test link")).toBe(false);
+        expectReadOnly("shell, reader, Preview at three sizes");
+    });
+
     it("the rail's Brand and Feedback stay readable", () => {
         render();
         click(button("Brand"));
@@ -1322,6 +1394,40 @@ describe("the desk shell for an owner (U46)", () => {
         expect($("[data-editor-trail]")).toBeNull();
         expect($("[data-phone-bar]")).not.toBeNull();
         expect($("[data-edit-pill]")).toBeNull();
+    });
+
+    it("Rail › History: the waiting change with Undo, the versions, and Versions kept (U46b)", async () => {
+        render(owner);
+        click(button("History"));
+        await act(async () => {
+            await Promise.resolve();
+        });
+        const panel = $("[data-history-panel]");
+        expect(panel?.textContent).toContain(
+            "Earlier changes changed Top of the page",
+        );
+        expect(has("Undo")).toBe(true);
+        expect(panel?.textContent).toContain("Live now");
+        expect(panel?.querySelector("a[href$='/versions']")?.textContent).toBe(
+            "See all versions",
+        );
+    });
+
+    it("Preview draws the page at three sizes; Back to editing keeps the selection (U46f)", () => {
+        render(owner);
+        click(button("Welcome in"));
+        click(button("Preview"));
+        expect(
+            Array.from(document.querySelectorAll("[data-preview-frame]")).map(
+                (f) => f.getAttribute("data-preview-frame"),
+            ),
+        ).toEqual(["desktop", "tablet", "phone"]);
+        expect(has("Share a test link")).toBe(true);
+        click(button("Back to editing"));
+        expect($("[data-preview-frames]")).toBeNull();
+        expect($("aside[aria-label=Inspector] h2")?.textContent).toBe(
+            "Welcome in",
+        );
     });
 
     it("off: today's chrome, unchanged", () => {

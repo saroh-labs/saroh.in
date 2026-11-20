@@ -29,6 +29,7 @@ export function RestoreVersion({
     renderable,
     needsApproval = false,
     canOverride = false,
+    onRestored,
 }: {
     siteId: string;
     publicationId: string;
@@ -36,6 +37,8 @@ export function RestoreVersion({
     renderable: boolean;
     needsApproval?: boolean;
     canOverride?: boolean;
+    /** After it went live, in place of opening version history (the editor's History). */
+    onRestored?: () => void;
 }) {
     const router = useRouter();
     const [confirming, setConfirming] = useState(false);
@@ -64,6 +67,10 @@ export function RestoreVersion({
                     ? "That version is live again. Going live without approval is recorded in version history."
                     : "That version is live again.",
             );
+            if (onRestored) {
+                onRestored();
+                return;
+            }
             router.push(`/sites/${siteId}/versions`);
             router.refresh();
         });

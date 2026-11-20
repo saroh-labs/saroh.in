@@ -1,4 +1,5 @@
 import type { useAddBlock } from "@/components/sites/blocks/use-add-block";
+import type { CanvasChrome } from "@/components/sites/canvas/editor-canvas";
 import type { EditorViewport } from "@/components/sites/canvas/use-editor-viewport";
 import type { useEditorStyle } from "@/components/sites/looks/use-editor-style";
 import type { usePublish } from "@/components/sites/publish/use-publish";
@@ -49,6 +50,8 @@ export interface EditorModel {
     /** The chip's status in the Website area's words (`siteStatus`, RULES §2). */
     status: { label: string; tone: SiteStateTone; waiting: number };
     styleOptions: SiteStyleOptions;
+    /** The header and footer the canvas draws around the page (Preview's frames). */
+    canvasChrome: CanvasChrome;
     addablePageKinds: ModulePageKind[];
     shopOpen: boolean;
     packsOpen: boolean;
