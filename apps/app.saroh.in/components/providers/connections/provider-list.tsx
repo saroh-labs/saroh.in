@@ -62,6 +62,11 @@ export function ProviderList({
                             <ProviderRowView
                                 key={entry.key}
                                 entry={entry}
+                                anchorId={
+                                    entry.key === view.connectEmailKey
+                                        ? CONNECT_EMAIL_ANCHOR
+                                        : undefined
+                                }
                                 {...dialogs}
                             />
                         ))

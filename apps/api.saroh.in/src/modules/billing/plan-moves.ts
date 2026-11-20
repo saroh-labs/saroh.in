@@ -3,6 +3,7 @@ import type { BillingCheckout, Prisma } from "@saroh/database";
 import { unsyncedCatalogueVersions } from "@saroh/database";
 
 import { AuditAction, AuditOutcome } from "../audit/audit.service";
+import { settleFreeLimitInTx } from "../organizations/free-business";
 import { clearAddonsInTx, endAddonsNotOfferedInTx } from "./addon-charges";
 import type { HeldAddon } from "./addons-ending";
 import { raiseBillingOpsNoticeInTx } from "./billing-ops-notice";
@@ -225,6 +226,10 @@ export async function applyDueMoveInTx(
     }
 
     await tx.subscription.update({ where: { id: sub.id }, data });
+    // Free by a move: never refused, paused past the one-Free rule (DEC-227).
+    if (target.priceCents === 0) {
+        await settleFreeLimitInTx(tx, sub.organizationId);
+    }
     // Add-ons the plan it is on now isn't offered end with the old one.
     const endedAddons = await endAddonsNotOfferedInTx(tx, sub.id);
     return { applied: true, planId: target.id, endedAddons };

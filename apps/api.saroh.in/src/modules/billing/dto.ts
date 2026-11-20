@@ -13,6 +13,7 @@ import {
     ValidateNested,
 } from "class-validator";
 
+import { normaliseGstin } from "../invoices/gst-states";
 import { RegisteredAddressDto } from "../organizations/dto";
 import { MAX_ADDON_QUANTITY } from "./offers";
 
@@ -51,7 +52,9 @@ export class ChangePlanDto {
 
     /** The business's GSTIN for Saroh's invoice, when it has one (U17). */
     @IsOptional()
-    @Transform(upper)
+    @Transform(({ value }: { value: unknown }) =>
+        typeof value === "string" ? normaliseGstin(value) : value,
+    )
     @IsString()
     @Matches(/^[0-9A-Z]{15}$/, { message: "A GSTIN is 15 characters." })
     gstin?: string;

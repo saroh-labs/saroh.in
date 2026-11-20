@@ -16,7 +16,9 @@ import {
     ChangeSignInEmailDto,
     OperatorReasonDto,
     SearchPeopleDto,
+    SetExtraFreeBusinessesDto,
 } from "./dto";
+import { RequireOrganizationAccessSession } from "./organization-access-session.guard";
 
 /**
  * People across the instance (admin console U6; Users, U9). Every route
@@ -243,11 +245,42 @@ export class AdminPeopleController {
         );
     }
 
+    /** Let them own more businesses on Free than their one (DEC-227). */
+    @Put("people/:userId/free-businesses")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.OrganizationPeopleWrite,
+    )
+    setExtraFreeBusinesses(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("userId") userId: string,
+        @Body() dto: SetExtraFreeBusinessesDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.free-businesses",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+            },
+            { userId, extra: dto.extra, reason: dto.reason },
+            () =>
+                this.people.setExtraFreeBusinesses(
+                    staff,
+                    userId,
+                    dto.extra,
+                    dto.reason,
+                ),
+        );
+    }
+
     @Put("organizations/:organizationId/members/:userId/role")
     @RequireAdminPermission(
         AdminPermission.OrganizationPiiRead,
         AdminPermission.OrganizationPeopleWrite,
     )
+    // Who runs a business changes only inside an open support session
+    // for it, enforced here, not only on the screen (review A4).
+    @RequireOrganizationAccessSession("READ")
     changeRole(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("organizationId") organizationId: string,
@@ -278,6 +311,9 @@ export class AdminPeopleController {
         AdminPermission.OrganizationPiiRead,
         AdminPermission.OrganizationPeopleWrite,
     )
+    // Who runs a business changes only inside an open support session
+    // for it, enforced here, not only on the screen (review A4).
+    @RequireOrganizationAccessSession("READ")
     removeMember(
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("organizationId") organizationId: string,
@@ -297,6 +333,40 @@ export class AdminPeopleController {
                     staff,
                     organizationId,
                     userId,
+                    reason: dto.reason,
+                }),
+        );
+    }
+
+    /**
+     * A second, different staff member confirms an Owner change another
+     * asked for (review F3): making an Owner, or moving or removing one.
+     */
+    @Post("organizations/:organizationId/owner-changes/:requestId/confirm")
+    @RequireAdminPermission(
+        AdminPermission.OrganizationPiiRead,
+        AdminPermission.OrganizationPeopleWrite,
+    )
+    @RequireOrganizationAccessSession("READ")
+    confirmOwnerChange(
+        @PlatformAdminContext() staff: PlatformAdminInfo,
+        @Param("organizationId") organizationId: string,
+        @Param("requestId") requestId: string,
+        @Body() dto: OperatorReasonDto,
+    ) {
+        return this.idempotency.run(
+            {
+                scope: "admin.person.owner-change.confirm",
+                key: dto.idempotencyKey,
+                actorUserId: staff.userId,
+                organizationId,
+            },
+            { organizationId, requestId, reason: dto.reason },
+            () =>
+                this.people.confirmOwnerChange({
+                    staff,
+                    organizationId,
+                    requestId,
                     reason: dto.reason,
                 }),
         );

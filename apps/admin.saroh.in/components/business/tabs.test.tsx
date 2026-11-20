@@ -40,6 +40,7 @@ vi.mock("@/lib/business-actions", () => business);
 
 const people = vi.hoisted(() => ({
     changeMemberRoleAction: vi.fn(),
+    confirmOwnerChangeAction: vi.fn(),
     removeMemberAction: vi.fn(),
     resendInvitationAction: vi.fn(),
     withdrawInvitationAction: vi.fn(),
@@ -352,6 +353,45 @@ describe("Team", () => {
             role: "ADMIN",
             reason: "Undo: Moved to the front desk",
         });
+    });
+
+    it("an Owner change waits: Confirm… for another staff member, never for the one who asked (F3)", () => {
+        const change = {
+            userId: "user_2",
+            kind: "ROLE" as const,
+            role: "OWNER",
+            fromRole: "ADMIN",
+            reason: "Owner asked by email",
+            createdAt: "2026-11-20T09:00:00.000Z",
+        };
+        render(
+            <TeamRows
+                organizationId="org_1"
+                businessName="Northwind"
+                members={[
+                    {
+                        key: "m2",
+                        userId: "user_2",
+                        name: "Ravi Menon",
+                        role: "ADMIN",
+                    },
+                ]}
+                ownerChanges={[
+                    { ...change, id: "ocr_1", requestedByUserId: "staff_2" },
+                    { ...change, id: "ocr_2", requestedByUserId: "staff_1" },
+                ]}
+                staffUserId="staff_1"
+                canChange
+            />,
+        );
+        expect(
+            screen.getByText("Waiting for a second staff member"),
+        ).toBeTruthy();
+        expect(screen.getAllByText(/Make Ravi Menon an Owner/)).toHaveLength(2);
+        expect(
+            screen.getAllByRole("button", { name: "Confirm…" }),
+        ).toHaveLength(1);
+        expect(screen.getByText(/You asked: another staff/)).toBeTruthy();
     });
 
     it("an empty team is the empty card", () => {

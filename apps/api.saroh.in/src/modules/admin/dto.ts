@@ -111,6 +111,18 @@ export class ListAdminAuditDto {
     @MaxLength(200)
     organizationId?: string;
 
+    /** Part of a staff member's name or email (review B6). */
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    actor?: string;
+
+    /** Part of a business's name. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(200)
+    business?: string;
+
     @IsOptional()
     @IsString()
     @MaxLength(120)
@@ -504,6 +516,15 @@ export class ChangeSignInEmailDto extends OperatorReasonDto {
     @IsEmail({}, { message: "Enter a whole email address" })
     @MaxLength(254)
     email!: string;
+}
+
+/** Businesses on Free a person may own beyond their one (DEC-227). */
+export class SetExtraFreeBusinessesDto extends OperatorReasonDto {
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    @Max(100)
+    extra!: number;
 }
 
 export class ChangeMemberRoleDto extends OperatorReasonDto {

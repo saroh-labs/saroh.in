@@ -18,6 +18,8 @@ interface AuditSearchParams {
     actorUserId?: string;
     organizationId?: string;
     action?: string;
+    actor?: string;
+    business?: string;
 }
 
 export default async function AuditPage({
@@ -35,6 +37,8 @@ export default async function AuditPage({
         actorUserId: clean(rawQuery.actorUserId),
         organizationId: clean(rawQuery.organizationId),
         action: clean(rawQuery.action),
+        actor: clean(rawQuery.actor),
+        business: clean(rawQuery.business),
     };
     const page = await listAudit({ ...query, limit: 50 });
     if (!page) return <NotAuthorized email={staff.email} staff={staff} />;
@@ -49,7 +53,9 @@ export default async function AuditPage({
                     actions={
                         (query.actorUserId !== undefined ||
                             query.organizationId !== undefined ||
-                            query.action !== undefined) && (
+                            query.action !== undefined ||
+                            query.actor !== undefined ||
+                            query.business !== undefined) && (
                             <Link
                                 href="/audit"
                                 className={buttonVariants({
@@ -65,8 +71,18 @@ export default async function AuditPage({
 
                 <form
                     action="/audit"
-                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto]"
+                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]"
                 >
+                    <FilterField
+                        label="Actor name or email"
+                        name="actor"
+                        defaultValue={query.actor}
+                    />
+                    <FilterField
+                        label="Business name"
+                        name="business"
+                        defaultValue={query.business}
+                    />
                     <FilterField
                         label="Actor ID"
                         name="actorUserId"

@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+
+import { accessCookieName } from "./businesses";
 
 import type { ControlPlaneResult } from "./control-plane";
 import { adminWrite } from "./control-plane";
@@ -39,6 +42,17 @@ const person = (id: string) => `/people/${encodeURIComponent(id)}`;
 
 const org = (id: string) => `/organizations/${encodeURIComponent(id)}`;
 
+/**
+ * The business's open support session, which the API requires for a role
+ * change or a removal (review A4). None open: the API says to open one.
+ */
+async function accessSession(
+    organizationId: string,
+): Promise<Record<string, string> | undefined> {
+    const id = (await cookies()).get(accessCookieName(organizationId))?.value;
+    return id ? { "x-admin-access-session": id } : undefined;
+}
+
 export async function endSessionsAction(userId: string, input: Reasoned) {
     return refreshUser(
         userId,
@@ -47,6 +61,22 @@ export async function endSessionsAction(userId: string, input: Reasoned) {
             "POST",
             input,
             "Could not end their sessions.",
+        ),
+    );
+}
+
+/** How many businesses on Free they may own beyond their one (DEC-227). */
+export async function setExtraFreeBusinessesAction(
+    userId: string,
+    input: Reasoned & { extra: number },
+) {
+    return refreshUser(
+        userId,
+        await adminWrite<{ extraFreeBusinesses: number }>(
+            `${person(userId)}/free-businesses`,
+            "PUT",
+            input,
+            "Could not change their free businesses.",
         ),
     );
 }
@@ -121,6 +151,7 @@ export async function changeMemberRoleAction(
             "PUT",
             input,
             "Could not change their role.",
+            await accessSession(organizationId),
         ),
     );
 }
@@ -137,6 +168,25 @@ export async function removeMemberAction(
             "DELETE",
             input,
             "Could not remove them.",
+            await accessSession(organizationId),
+        ),
+    );
+}
+
+/** A second, different staff member confirms an Owner change (F3). */
+export async function confirmOwnerChangeAction(
+    organizationId: string,
+    requestId: string,
+    input: Reasoned,
+) {
+    return refresh(
+        [`/businesses/${organizationId}`],
+        await adminWrite(
+            `${org(organizationId)}/owner-changes/${encodeURIComponent(requestId)}/confirm`,
+            "POST",
+            input,
+            "Couldn't confirm the change.",
+            await accessSession(organizationId),
         ),
     );
 }

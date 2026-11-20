@@ -131,6 +131,27 @@ describe("MessageSendHandler", () => {
         });
     });
 
+    it("never sends through a SendGrid row saved as CONNECTED (F2)", async () => {
+        deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
+        messageFindUnique.mockResolvedValue(message);
+        providerFindUnique.mockResolvedValue(
+            sealedProviderRow({ provider: "SENDGRID" }),
+        );
+        const fake = new FakeCommsProvider("EMAIL");
+        await new MessageSendHandler(new FakeCommsProviderFactory(fake)).handle(
+            job(),
+        );
+        expect(fake.calls).toHaveLength(0);
+        expect(deliveryUpdate).toHaveBeenCalledWith(
+            expect.objectContaining({
+                data: expect.objectContaining({
+                    status: "FAILED",
+                    error: "no connected provider for channel",
+                }),
+            }),
+        );
+    });
+
     it("records a provider failure as Delivery FAILED (+ sanitized error) and Message FAILED, then re-throws for retry", async () => {
         deliveryFindUnique.mockResolvedValue({ id: "del_1", status: "QUEUED" });
         messageFindUnique.mockResolvedValue(message);

@@ -135,8 +135,9 @@ export const LEGAL_PAGES: readonly ResourcePage[] = [
         // (QR codes plan U9). 13 Oct: the referral code cookie (DEC-156).
         // 14 Oct: page visits (DEC-160). 17 Oct: Razorpay registers each
         // business at sign-up (DEC-165). 19 Oct: the account manager's link
-        // cookie (DEC-169).
-        publishOn: "2026-10-26",
+        // cookie (DEC-169). 20 Nov: every sub-processor, Google's Limited
+        // Use and Meta's data deletion (review 04 H5, M1).
+        publishOn: "2026-11-20",
     },
     {
         id: "terms",

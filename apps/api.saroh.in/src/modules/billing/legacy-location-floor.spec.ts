@@ -15,6 +15,7 @@ function txWith(shops: number) {
     return {
         store: { count: jest.fn().mockResolvedValue(shops) },
         $executeRaw: jest.fn().mockResolvedValue(0),
+        $queryRaw: jest.fn().mockResolvedValue([{ prev: "0" }]),
     };
 }
 
@@ -52,10 +53,11 @@ describe("assertLegacyLocationRoom", () => {
             "org_1",
             plan({ storefronts: 5 }),
         );
-        expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
-        const [, lock] = tx.$executeRaw.mock.calls[0] as [unknown, string];
+        // Bounded wait, the lock, the wait put back (A-01).
+        expect(tx.$executeRaw).toHaveBeenCalledTimes(3);
+        const [, lock] = tx.$executeRaw.mock.calls[1] as [unknown, string];
         expect(lock).toBe("plan-meter:org_1:shopLocations");
-        expect(tx.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        expect(tx.$executeRaw.mock.invocationCallOrder[1]).toBeLessThan(
             tx.store.count.mock.invocationCallOrder[0]!,
         );
     });

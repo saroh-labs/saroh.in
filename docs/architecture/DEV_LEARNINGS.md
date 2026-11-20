@@ -36,6 +36,34 @@ on that doesn't depend on it.
 
 ---
 
+## Database — one business's burst of creates stalled the API for everyone
+
+**Symptom**: 20 Nov 2026, abuse test A-01: about 16 parallel `POST
+/stores/<id>/products` from one Free business at its product cap made other
+businesses' reads take seconds instead of milliseconds, `/health/ready`
+answered 503, and the burst itself got 500s (Prisma `P2028`, transaction
+timeout). Site creation at the site cap did the same.
+**Cause**: a pool deadlock, not a slow query. With `RLS_ENFORCEMENT` off, a
+service's `prisma.$transaction(...)` ran on the base client without publishing
+its transaction, so every ambient `prisma.*` call inside the callback (the plan
+meter reads the plan through services that use `prisma`) took a second pool
+connection while the first was held. Ten such transactions filled the pool and
+each waited for an eleventh connection until Prisma's 5 s timeout. The meter's
+`pg_advisory_xact_lock` waited without bound too, and the pool had no connect,
+statement or idle-in-transaction timeout (19 Nov M-2).
+**Fix**: the meter reads the plan on the write's own connection
+(`onTransaction` in `rls-proxy.ts`, which makes `tx` ambient for one call).
+Publishing every base transaction instead broke race specs that start a second
+request inside a transaction's callback, so it stays scoped. The plan
+meter lock (and Ask AI's start lock, H-10) waits at most
+`PLAN_METER_LOCK_WAIT_MS` (Postgres `lock_timeout`) and answers 429. The pool
+bounds the connect wait, each statement and an idle transaction
+(`pool-options.ts`, `DB_*_MS`).
+**Rule**: inside a transaction, never take another connection: use `tx`, or
+wrap a helper that reads through `prisma` in `onTransaction(tx, …)`; `outsideOrgContext` inside a transaction
+costs a second connection. Every lock wait has a bound. Enforced by
+`metering.db.spec.ts` "a burst at the cap", which fails at 5 s without the fix.
+
 ## Sites — signing in during a booking lost the date and time
 
 **Symptom**: 4 Nov 2026, the owner: "we do all the steps, then we click the
@@ -6904,3 +6932,31 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** two rows ran wider than the phone: the composer's "Schedule for tomorrow" button (a `Button` is `whitespace-nowrap`, so its two-line suggestion never wrapped), and Social's page header with `compactOnPhone` (meant for one button) holding the meter and two buttons to their own width, about 600px. A mobile browser zooms out to fit the widest content; Playwright's hit point then lands on whatever is drawn there. The page's own `scrollWidth` read 412 in the end state, so a scroll check didn't show it. Separately, `QuickLook` focused the sheet while it was still below the screen, which scrolled the page behind to its foot.
 - **Fix:** `whitespace-normal` on the composer's big button; `compactOnPhone` only on the Channels tab; `focus({ preventScroll: true })` in `QuickLook`. The spec now checks `window.innerWidth` equals the viewport on the composer and with the sheet open.
 - **Rule:** a phone spec that can fail on a click asserts `innerWidth === viewport width` first; a zoomed-out page is a layout bug, not a flaky click. Find the culprit by rendering the trace's DOM snapshot (drop its `<base>`, point the CSS at `resources/`) in a non-mobile 412px context and listing elements past 412. `compactOnPhone` is for one action.
+
+### Off features and dead connections read as working (20 Nov 2026)
+
+- **Symptom:** the 20 Nov review (03 #1, 04 H1-H3): saroh.in's trade days and Website page told Claude, ChatGPT and Ask AI as working while they were off; the email sheet offered SendGrid and "SMTP relay" and WhatsApp offered Twilio, all "Connected" and none able to send; the shop's order page promised an email the business couldn't send; production booted without Saroh's SMTP and logged sign-in codes.
+- **Cause:** a trade day's hour and the Website page's AI paragraph had no release switch, only claim switches on some words. The comms adapters posted every provider to Resend's or Meta's API. `placedNext` didn't read `reach`. `SMTP_*` wasn't in `REQUIRED_IN_PRODUCTION`.
+- **Fix:** `DayHour.release` and `note.release` draw "Coming soon" or drop the link while the switch is off; the API's `SUPPORTED_COMMS_PROVIDERS` is Resend and Meta, and a row of another kind reads "Not working" (`cantSend`); Meta's token is checked on connect; `placedNext` follows `reach`; `SMTP_HOST`/`USER`/`PASS` are required in production.
+- **Rule:** an hour, paragraph or option that shows a feature carries its release switch, and a provider is offered only when its adapter sends through it and its key is checked on connect.
+
+### A hardening fix that opened a new oracle, or blocked what it guarded (20 Nov 2026)
+
+- **Symptom:** the batch fix review (07 F1, F4-F12) found the phone fix answering "expired" only for a known number while its send was in flight; invite budgets dodged with `+tag` and used up by strangers or by refused invites; the password lockout with no way in on the screen; a 30 s statement limit under a 120 s erase; a `RESET lock_timeout` that dropped the caller's; `db:seed:reset` blocked by a new `Restrict`; a boot check stricter than the mailer; and a WhatsApp check refusing send-only tokens.
+- **Cause:** each fix was checked only for the case it closed, not for timing, the other callers of what it changed, or the names and setups that already worked.
+- **Fix:** the sign-in code row is saved before the send; invite windows on a normalised address, per business-and-address, account and overall, taken after the seat check; "Get a code by email instead" on the 429; long transactions raise their own `statement_timeout`; the lock wait puts back the setting it found; the reset deletes the grant first; the boot check takes every name the mailer reads; Meta codes 10 and 200 accept.
+- **Rule:** a security fix is reviewed for the oracle it may open (answer and timing alike for both sides), every caller and job of the shared setting it changes, and every environment or account that works today; a limit counts only what passes the checks before it.
+
+### The admin session check refused every session in the integration suite; fixtures and a stale CHECK broke coupons (20 Nov 2026)
+
+- **Symptom:** batch-2026-11-20-2's integration run: every `/admin` spec answered 401 `reauth_required` with a session made a moment before; offers' H-1 test saw `billingCycle: "month"` after paying a year; in RLS mode plan-limits-hardening's trial fixture was refused by `BillingCheckout_completed_at` and `_start_shape`; coupons and offers' percent-coupon tests were refused by `PricingCoupon_amounts_positive` whenever `pricing-catalogue.db.spec.ts` ran before them on the same database (on development too).
+- **Cause:** `adminSessionMaxAge()` read `env.ADMIN_SESSION_MAX_AGE_MINUTES` bare; under `SKIP_ENV_VALIDATION` (CI's and prepush's integration runs) the schema default is gone, so the age limit was `undefined` and every session was too old (the `PORT` entry above, again). H-1 paid `r.checkout.providerSubscriptionId`, which the checkout view doesn't carry, so the webhook matched nothing. The trial fixture wrote a COMPLETED TRIAL with no `completedAt` or `startAt`; `db push` has no CHECKs, so only the RLS run (migrations) saw it. `pricing-catalogue.db.spec.ts` adds its migrations' CHECKs to a `db push` database, but not `20270217120000_coupon_automatic`, which replaced the coupon CHECK; it added the old one, and the old one stayed for every later spec in the shard.
+- **Fix:** the two admin accessors take `Number(...) || default`, as `limits.module.ts` does; H-1 pays `fake_order_<checkout id>`; the fixture sets `startAt` and `completedAt`; the catalogue spec takes the coupon migration too and replays ADD and DROP in order, the last one winning.
+- **Rule:** a numeric env read with a schema default is `Number(env.X) || default` at the read. A spec that writes rows by hand runs once with `TEST_RLS=on` too, because only that build holds the CHECKs. A spec that adds migration CHECKs by hand lists every later migration that changes them.
+
+### One Free business per person was blind under RLS, and every setup spec ran into it (20 Nov 2026)
+
+- **Symptom:** PR #1437's CI: in RLS mode plan-limits-hardening's N2 found nothing paused, and both N3 tests were refused by `BillingCheckout_start_shape`; in the browser shards about 40 specs that set a business up as Asha (`founder`) answered 409 `FREE_BUSINESS_TAKEN` or 429 `BUSINESS_CREATES_LIMITED` (setup-kind, onboarding-trade, stripe-checkout, global-screens, providers-customer-emails, …).
+- **Cause:** `free-business.ts`'s `atLimit`, `trialTakenBy`'s other businesses, `couponUsedByPayer` and `hadPaidPlanOrLaunchOffer` read the person's or payer's OTHER businesses through the caller's client; inside one business's request (`OrgRlsInterceptor`, or the RLS suite's wrapper of `overLimit.pausedNow`) row-level security shows only that business, so the rule never saw the other one. A real production bug once RLS is on. The N3 fixtures wrote TRIAL checkouts without `startAt` and a coupon without its discount. Asha owns seeded Free businesses and sets up one per spec, past both new limits.
+- **Fix:** those reads go through `outsideOrgContext(... prisma ...)`, as `couponPlacesTaken` and `holdPayerOffersInTx` already did; the fixtures set `startAt` and the discount; the seed gives Asha staff's exception (`extraFreeBusinesses`), and the browser stack (CI, prepush) sets `BUSINESS_CREATES_PER_DAY=0`.
+- **Rule:** a read across businesses (same owner, payer, GSTIN) is made outside the org context, never through the caller's client or `tx`. A new per-person limit is checked against the seeded people the browser specs act as, before the push.

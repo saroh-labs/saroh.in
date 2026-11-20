@@ -40,6 +40,7 @@
  */
 import type { Prisma, PrismaClient } from "@prisma/client";
 
+import { setStatementTimeout } from "../org-context";
 import type { TransactionClient } from "../transaction";
 import type { Discarded } from "./merge-same-products.move";
 import { mergeProductInto } from "./merge-same-products.move";
@@ -203,7 +204,10 @@ export async function mergeSameProducts(
     for (const org of orgs) {
         report.organizations += 1;
         const one = await db.$transaction(
-            (tx) => mergeOrganization(tx, org.id, now),
+            async (tx) => {
+                await setStatementTimeout(tx, 120_000);
+                return mergeOrganization(tx, org.id, now);
+            },
             { timeout: 120_000 },
         );
         report.productsMerged += one.merged.reduce(

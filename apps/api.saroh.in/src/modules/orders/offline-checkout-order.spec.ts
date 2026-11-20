@@ -72,6 +72,7 @@ import { ConflictException, HttpException } from "@nestjs/common";
 import { Prisma, prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
+import { ordersPaused } from "../billing/plan-limit-errors";
 import { enqueueTeamAlert } from "../notifications/team-alerts";
 import { queueUncollectedAlert } from "../notifications/uncollected-alert";
 import type { SiteAccount } from "./checkout-order";
@@ -245,16 +246,14 @@ describe("an order paid at the handover", () => {
         );
     });
 
-    it("counts on the monthly orders, softly", async () => {
+    it("counts on the monthly orders, as the catalogue's cell says (DEC-227)", async () => {
         await place(true);
 
         expect(room).toHaveBeenCalledWith(
             expect.anything(),
             "org_1",
             "orders",
-            {
-                soft: true,
-            },
+            { refuse: ordersPaused },
         );
     });
 

@@ -118,10 +118,7 @@ describe("provider rows", () => {
             "Razorpay",
             "Cashfree",
             "Resend",
-            "SendGrid",
-            "SMTP relay",
             "Meta (WhatsApp Cloud)",
-            "Twilio",
         ]);
         expect(view.available.every((e) => e.state === "NOT_CONNECTED")).toBe(
             true,
@@ -133,6 +130,10 @@ describe("provider rows", () => {
         const all = names(buildProvidersView(input()).available);
         expect(all).not.toContain("Dodo Payments");
         expect(all).not.toContain("Stripe");
+        // No adapter of their own: the API refuses them (review 04 H1).
+        expect(all).not.toContain("SendGrid");
+        expect(all).not.toContain("SMTP relay");
+        expect(all).not.toContain("Twilio");
     });
 
     it("groups each provider by itself, connected first, the rest available", () => {
@@ -158,7 +159,6 @@ describe("provider rows", () => {
         expect(names(view.available)).toEqual([
             "Razorpay",
             "Meta (WhatsApp Cloud)",
-            "Twilio",
         ]);
 
         const [cashfree, resend] = view.connected;
@@ -192,11 +192,13 @@ describe("provider rows", () => {
 
     it("opens Connect on the provider the row names", () => {
         const view = buildProvidersView(input());
-        const twilio = view.available.find((e) => e.name === "Twilio");
-        expect(twilio?.setup).toEqual({
+        const meta = view.available.find(
+            (e) => e.name === "Meta (WhatsApp Cloud)",
+        );
+        expect(meta?.setup).toEqual({
             kind: "messaging",
             channel: "WHATSAPP",
-            provider: "TWILIO",
+            provider: "META",
         });
     });
 
@@ -220,8 +222,8 @@ describe("provider rows", () => {
         const all = names(view.available);
         expect(all).not.toContain("Cashfree");
         expect(all).not.toContain("Meta (WhatsApp Cloud)");
-        // With nothing live on WhatsApp, the other provider can be connected.
-        expect(all).toContain("Twilio");
+        // Twilio can't send (review 20 Nov), so it is never offered.
+        expect(all).not.toContain("Twilio");
     });
 
     it("names the storefronts that charge through each payment provider", () => {
@@ -402,6 +404,28 @@ describe("provider rows", () => {
         expect(smtp.target).toEqual({ kind: "messaging", channel: "EMAIL" });
     });
 
+    it("says a SendGrid, SMTP or Twilio connection can't send, never Connected", () => {
+        const view = buildProvidersView(
+            input({
+                messaging: [comms("EMAIL", "SENDGRID"), comms("WHATSAPP", "TWILIO")],
+            }),
+        );
+        const [sendgrid, twilio] = view.connected;
+        expect(sendgrid.state).toBe("ATTENTION");
+        expect(sendgrid.note).toBe(
+            "Not working. Saroh can't send through SendGrid. Reconnect with Resend.",
+        );
+        expect(sendgrid.fix).toBe("Reconnect");
+        expect(sendgrid.setup).toEqual({
+            kind: "messaging",
+            channel: "EMAIL",
+            provider: "RESEND",
+        });
+        expect(twilio.note).toBe(
+            "Not working. Saroh can't send through Twilio. Reconnect with Meta (WhatsApp Cloud).",
+        );
+    });
+
     it("says what it could not read rather than offering or denying it", () => {
         const view = buildProvidersView(
             input({ payments: null, messaging: null }),
@@ -459,7 +483,7 @@ describe("no Saroh-sent booking emails (DEC-086 removed, #1134)", () => {
             "Disconnected. Email isn't sent until a provider is connected again.",
         );
         // Connect still jumps to another provider.
-        expect(view.connectEmailKey).toBe("EMAIL:SENDGRID");
+        expect(view.connectEmailKey).toBe("EMAIL:RESEND");
     });
 
     it("warns before disconnecting that email stops, never that Saroh takes over", () => {

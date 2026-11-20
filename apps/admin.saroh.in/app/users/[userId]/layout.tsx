@@ -56,6 +56,9 @@ export default async function UserLayout({
                                     staff,
                                     "organization:people:write",
                                 )}
+                                extraFreeBusinesses={
+                                    person.extraFreeBusinesses ?? 0
+                                }
                             />
                         ) : undefined
                     }

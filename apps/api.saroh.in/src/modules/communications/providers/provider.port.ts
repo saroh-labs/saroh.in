@@ -28,8 +28,11 @@ export const SUPPORTED_COMMS_PROVIDERS: Record<
     CommsChannel,
     readonly string[]
 > = {
-    EMAIL: ["RESEND", "SENDGRID", "SMTP"],
-    WHATSAPP: ["TWILIO", "META"],
+    // SENDGRID, SMTP and TWILIO only reached Resend's or Meta's API in
+    // their shape, so they could never send: refused until each has an
+    // adapter of its own (the adapters still read rows saved before).
+    EMAIL: ["RESEND"],
+    WHATSAPP: ["META"],
 };
 
 /** True if `provider` is a supported adapter for `channel`. */
@@ -38,6 +41,25 @@ export function isSupportedComms(
     provider: string,
 ): boolean {
     return SUPPORTED_COMMS_PROVIDERS[channel].includes(provider);
+}
+
+/**
+ * Whether a business's messaging row can send: CONNECTED and through a
+ * provider Saroh has an adapter for. A SendGrid, SMTP relay or Twilio row
+ * saved before they were refused stays CONNECTED in the table but can't
+ * send, so every reader that decides "set up" or "can send" asks this.
+ */
+export function sendable(
+    row:
+        | { status: string; channel: string; provider: string }
+        | null
+        | undefined,
+): boolean {
+    return (
+        row?.status === "CONNECTED" &&
+        isCommsChannel(row.channel) &&
+        isSupportedComms(row.channel, row.provider)
+    );
 }
 
 /**

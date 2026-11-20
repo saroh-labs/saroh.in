@@ -56,6 +56,7 @@ const admin = new AdminPricingController(
     new CatalogueWritesService(audit),
     new CouponsService(audit),
     new IdempotencyService(),
+    audit,
 );
 
 const salon = getTemplate("salon", 1)!;

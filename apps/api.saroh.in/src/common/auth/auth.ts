@@ -28,8 +28,10 @@ import {
 import { claimCodeMail, mailsOnPasswordSignIn } from "./code-mail-limits";
 import { refusedCodeMail } from "./code-mail-origin";
 import { clearStaffVerification } from "./email-verification";
+import { passwordTries } from "./password-tries";
 import { reportAuthServerError } from "./report-auth-error";
 import { mayStartSession } from "./sign-in-holds";
+import { noteFailedStaffSignIn } from "./staff-sign-in-failed";
 import { deliverVerificationOtp } from "./verification-otp";
 
 /**
@@ -61,6 +63,9 @@ const authServices: Parameters<typeof createAuth>[0] = {
             noticeProfilesOfDeletedOwnerInTx(tx, deletionLogger, id),
         );
     },
+    // A refused sign-in to a Saroh staff account is on the admin ledger
+    // (review B4), at most once in ten minutes per account.
+    onSignInFailed: noteFailedStaffSignIn,
     // A 5xx inside Better Auth, which answers /api/auth/* itself and so
     // never reaches AllExceptionsFilter. Never a 4xx.
     onServerError: reportAuthServerError,
@@ -72,6 +77,8 @@ const authServices: Parameters<typeof createAuth>[0] = {
     // mailbox; past the cap a code needs the bot challenge (`code-mail-limits.ts`).
     // A password sign-in mails only an unproven account (03-M9): any other
     // sign-in is not a code mail and is never counted or refused here.
+    // Wrong passwords per account, from any address (A-03).
+    passwordTries: passwordTries(),
     mayMailCode: async (email, { turnstileToken, path, host }) =>
         path === "/sign-in/email" && !(await mailsOnPasswordSignIn(email))
             ? null

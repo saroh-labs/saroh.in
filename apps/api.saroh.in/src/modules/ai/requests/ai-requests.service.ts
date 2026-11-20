@@ -5,6 +5,7 @@ import {
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
+import type { Prisma } from "@saroh/database";
 import { outsideOrgContext, prisma, runInOrgContext } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
@@ -93,6 +94,7 @@ export class AiRequestsService {
         packs: number,
         reason: string,
         now: Date = new Date(),
+        audit?: LedgerIn,
     ): Promise<void> {
         if (!Number.isInteger(packs) || packs < 1) {
             throw new BadRequestException("Grant at least one pack.");
@@ -118,14 +120,16 @@ export class AiRequestsService {
                 meterWindow(prisma, request.organizationId, now),
             );
             await outsideOrgContext(() =>
-                prisma.$transaction((tx) =>
-                    scheduleGrantEnd(tx, {
+                prisma.$transaction(async (tx) => {
+                    await scheduleGrantEnd(tx, {
                         requestId,
                         addonId,
                         organizationId: request.organizationId,
                         periodEnd: window.end,
-                    }),
-                ),
+                    });
+                    // The grant's last step: its ledger row commits with it.
+                    await audit?.(tx, request.organizationId);
+                }),
             );
         } catch (error) {
             if (added) {
@@ -160,13 +164,18 @@ export class AiRequestsService {
         staffUserId: string,
         reason: string,
         now: Date = new Date(),
+        audit?: LedgerIn,
     ): Promise<void> {
-        await this.claim(requestId, {
-            status: "DECLINED",
-            decidedByUserId: staffUserId,
-            decidedAt: now,
-            reason,
-        });
+        await this.claim(
+            requestId,
+            {
+                status: "DECLINED",
+                decidedByUserId: staffUserId,
+                decidedAt: now,
+                reason,
+            },
+            audit,
+        );
     }
 
     /** Moves an open request on, once; a decided or unknown one is refused. */
@@ -179,23 +188,35 @@ export class AiRequestsService {
             reason: string;
             packs?: number;
         },
+        audit?: LedgerIn,
     ): Promise<{ organizationId: string }> {
         if (!data.reason.trim()) throw new BadRequestException("Say why.");
         // CROSS-TENANT: the console's, behind its own guard.
-        return outsideOrgContext(async () => {
-            const { count } = await prisma.aiRequest.updateMany({
-                where: { id: requestId, status: "OPEN" },
-                data: { ...data, reason: data.reason.trim() },
-            });
-            const row = await prisma.aiRequest.findUnique({
-                where: { id: requestId },
-                select: { organizationId: true },
-            });
-            if (!row) throw new NotFoundException("No such request.");
-            if (count === 0) {
-                throw new ConflictException("That request is already decided.");
-            }
-            return row;
-        });
+        return outsideOrgContext(() =>
+            prisma.$transaction(async (tx) => {
+                const { count } = await tx.aiRequest.updateMany({
+                    where: { id: requestId, status: "OPEN" },
+                    data: { ...data, reason: data.reason.trim() },
+                });
+                const row = await tx.aiRequest.findUnique({
+                    where: { id: requestId },
+                    select: { organizationId: true },
+                });
+                if (!row) throw new NotFoundException("No such request.");
+                if (count === 0) {
+                    throw new ConflictException(
+                        "That request is already decided.",
+                    );
+                }
+                await audit?.(tx, row.organizationId);
+                return row;
+            }),
+        );
     }
 }
+
+/** An admin ledger write, inside the change's own transaction (review B2). */
+export type LedgerIn = (
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+) => Promise<void>;

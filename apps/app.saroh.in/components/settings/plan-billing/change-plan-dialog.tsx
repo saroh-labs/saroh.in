@@ -227,6 +227,9 @@ export function ChangePlanDialog({
         quoting.state === "ready" && summary?.confirm
             ? endingAddonsNote(quoting.quote, { currentPlan })
             : null;
+    // An offer withheld because it was had with another business (DEC-227).
+    const offerNotes =
+        quoting.state === "ready" ? (quoting.quote.offerNotes ?? []) : [];
 
     // Who Saroh bills (17 Oct 2026): what the business is missing must be
     // given before the payment opens; the rest is optional.
@@ -477,6 +480,16 @@ export function ChangePlanDialog({
                         ))}
                     </dl>
                 ) : null}
+
+                {offerNotes.map((note) => (
+                    <p
+                        key={note}
+                        role="note"
+                        className="text-pretty text-[12.5px] text-foreground/80"
+                    >
+                        {note}
+                    </p>
+                ))}
 
                 {endingAddons ? (
                     <p

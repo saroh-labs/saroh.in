@@ -75,8 +75,13 @@ const HISTORY_WORDS: Record<string, string> = {
     "person.sign-in-email.changed": "Changed their sign-in email",
     "person.sign-in-email.confirmed": "Confirmed the sign-in email change",
     "person.sessions.ended": "Signed them out everywhere",
+    "person.free-businesses.set":
+        "Changed how many free businesses they may own",
     "person.role.changed": "Changed their role in a business",
     "person.removed": "Removed them from a business",
+    "person.owner-change.requested":
+        "Asked to change their Owner role; waits for a second staff member",
+    "person.owner-change.confirmed": "Confirmed a change to their Owner role",
 };
 
 /**

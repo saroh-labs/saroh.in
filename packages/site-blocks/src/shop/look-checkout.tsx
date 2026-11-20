@@ -787,10 +787,10 @@ export function LookCheckout({
                                     </span>
                                 ) : null}
                                 At {quote.pickup.address}.{" "}
+                                {/* No "we'll email you": the quote doesn't say whether the business can send email. */}
                                 {!ready && quote.pickup.hours
-                                    ? `Open ${quote.pickup.hours}. `
+                                    ? `Open ${quote.pickup.hours}.`
                                     : null}
-                                We'll email you when it's ready.
                             </p>
                         ) : null}
                         {quote && needsAddress(way) ? (
@@ -834,9 +834,6 @@ export function LookCheckout({
                                             }
                                     />
                                 )}
-                                <p className="text-site-body mt-2 text-[13.5px]">
-                                    We'll email you when it's on its way.
-                                </p>
                             </fieldset>
                         ) : null}
                     </section>

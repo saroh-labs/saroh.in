@@ -15,12 +15,16 @@ import {
     readEmailSetup,
 } from "./email-setup";
 
-function db(status: string | null) {
+function db(status: string | null, provider = "RESEND") {
     return {
         communicationProvider: {
             findUnique: jest
                 .fn()
-                .mockResolvedValue(status === null ? null : { status }),
+                .mockResolvedValue(
+                    status === null
+                        ? null
+                        : { status, channel: "EMAIL", provider },
+                ),
         },
     } as unknown as Pick<Prisma.TransactionClient, "communicationProvider">;
 }
@@ -46,6 +50,19 @@ describe("readEmailSetup", () => {
         expect(r).not.toHaveBeenCalled();
         expect(t).not.toHaveBeenCalled();
     });
+
+    it.each(["SENDGRID", "SMTP"])(
+        "a CONNECTED %s row is not set up: Saroh can't send through it (F2)",
+        async (provider) => {
+            const setup = await readEmailSetup(
+                db("CONNECTED", provider),
+                "org_1",
+                room(true),
+                thread(true),
+            );
+            expect(setup.connected).toBe(false);
+        },
+    );
 
     it.each([null, "DISABLED"])(
         "none (%s): whether the plan has room to connect one",

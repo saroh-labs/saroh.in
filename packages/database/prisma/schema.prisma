@@ -56,6 +56,11 @@ model User {
   phoneE164       String?   @unique
   phoneVerifiedAt DateTime?
 
+  // Businesses on Free this person may own beyond their one (DEC-227): an
+  // exception staff grant from the console, audited there. Zero for
+  // everyone else.
+  extraFreeBusinesses Int @default(0)
+
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
@@ -141,6 +146,30 @@ model SignInEmailChange {
   @@index([newEmail])
 }
 
+// OwnerChangeRequest: Saroh staff asked to make someone an Owner of a
+// business, or to move or remove an Owner (review F3). It waits until a
+// second, different staff member confirms; only then does it apply.
+model OwnerChangeRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // The member it changes. Staff user ids below are not foreign keys: the
+  // record outlives a staff account.
+  userId            String
+  kind              String // "ROLE" | "REMOVE"
+  role              String? // the new role, for ROLE
+  fromRole          String
+  reason            String
+  requestedByUserId String
+  confirmedByUserId String?
+  confirmedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId, confirmedAt])
+}
+
 // Organization: the sole tenant root (DEC-005 / ADR-001). Owns Stores and
 // carries Membership. Renamed from the former optional Workspace grouping.
 
@@ -171,6 +200,11 @@ model Organization {
   // it after that. Code reads it from here, never from the address a request
   // came through.
   edition Edition @default(INDIA)
+  // Set when it moved to Free (or gained an owner, or was restored) while an
+  // owner already owned as many Free businesses on its edition as they may
+  // (DEC-227): it keeps everything but its websites take no orders or
+  // bookings while that owner is still over. Null for every other business.
+  freeLimitPausedAt DateTime?
   // ISO 4217, chosen at setup by a Global business: its one currency. Null for
   // a business from before, whose currency comes from what it sells (DEC-030).
   currency String?
@@ -400,6 +434,7 @@ model Organization {
   // outbound messages, delivery records, per-contact channel consent, and the
   // new-lead automation rules (S6-003).
   communicationProviders CommunicationProvider[]
+  ownerChangeRequests    OwnerChangeRequest[]
   messages               Message[]
   deliveries             Delivery[]
   consents               Consent[]
@@ -954,6 +989,8 @@ model Media {
   sharePosts     SharePost[]       @relation("SharePostMedia")
 
   @@index([organizationId])
+  // The sweep of uploads never confirmed (M-5, DEC-227).
+  @@index([status, createdAt])
 }
 
 // "Download your data" (owner, 9 Oct, DEC-120): one zip of a business's
@@ -3001,7 +3038,8 @@ model PlatformAdmin {
   id String @id @default(cuid())
 
   userId String @unique
-  user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Cascade)
+  // Restrict: deleting a staff account must not erase its grant history (review B, A5).
+  user   User   @relation("PlatformAdminUser", fields: [userId], references: [id], onDelete: Restrict)
 
   roleAssignments PlatformAdminRoleAssignment[]
   accessSessions  AdminAccessSession[]
@@ -3533,6 +3571,10 @@ model AdminAuditEvent {
   reason         String?
   outcome        String
   correlationId  String?
+  // Where the request came from (review B1): address, browser, session.
+  ipAddress      String?
+  userAgent      String?
+  sessionId      String?
   // Optional because read events are not commands. Mutation events always set
   // this key so retries become transactionally idempotent.
   idempotencyKey String? @unique
@@ -3546,6 +3588,7 @@ model AdminAuditEvent {
   @@index([actorUserId, createdAt])
   @@index([organizationId, createdAt])
   @@index([targetType, targetId, createdAt])
+  @@index([sessionId])
 }
 
 // An operator's note on one Organization, written in the admin console and

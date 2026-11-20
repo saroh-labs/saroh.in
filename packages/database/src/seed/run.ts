@@ -1661,6 +1661,10 @@ export async function deleteSeeded(
                 where: { organizationId: { startsWith: prefix } },
             }),
         () => prisma.organization.deleteMany({ where }),
+        // Sam's console grant: `Restrict` from its user (review A5), so it
+        // goes first; its role rows would cascade, but are counted here.
+        () => prisma.platformAdminRoleAssignment.deleteMany({ where }),
+        () => prisma.platformAdmin.deleteMany({ where }),
         () => prisma.account.deleteMany({ where }),
         () => prisma.user.deleteMany({ where }),
     ];

@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 
 import { planMeter } from "../billing/metering.service";
 import { accountThreadOn } from "./account-thread";
+import { sendable } from "./providers/provider.port";
 
 type Db = Pick<Prisma.TransactionClient, "communicationProvider">;
 
@@ -45,9 +46,9 @@ export async function readEmailSetup(
 ): Promise<EmailSetup> {
     const row = await db.communicationProvider.findUnique({
         where: { organizationId_channel: { organizationId, channel: "EMAIL" } },
-        select: { status: true },
+        select: { status: true, channel: true, provider: true },
     });
-    if (row?.status === "CONNECTED") {
+    if (sendable(row)) {
         return { connected: true, canConnect: null, accountUpdates: null };
     }
     const [canConnect, accountUpdates] = await Promise.all([

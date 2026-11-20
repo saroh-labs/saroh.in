@@ -41,7 +41,7 @@ export function legacyLocationRefusal(limit: number): ForbiddenException {
  * A plan with no number there is uncapped.
  */
 export async function assertLegacyLocationRoom(
-    tx: MeterDb & Pick<Prisma.TransactionClient, "$executeRaw">,
+    tx: MeterDb & Pick<Prisma.TransactionClient, "$executeRaw" | "$queryRaw">,
     organizationId: string,
     entitlements: Pick<EntitlementService, "getEntitlements">,
 ): Promise<void> {

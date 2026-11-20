@@ -136,6 +136,12 @@ export interface ChangeQuote {
      */
     addonsEnding?: EndingAddon[];
     /**
+     * Why an offer the plan has isn't given (DEC-227): its trial or launch
+     * discount was had with another business by the same person or GSTIN.
+     * An API from before it sends none.
+     */
+    offerNotes?: string[];
+    /**
      * Whether the business has its registered address on its profile,
      * whole. False: the dialog asks for it (Saroh's invoice prints it, CGST
      * Rule 46(e)). An API from before it sends none, which asks nothing.

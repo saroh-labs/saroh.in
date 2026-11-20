@@ -1,4 +1,5 @@
 import type { Prisma } from "@saroh/database";
+import { sendable } from "./providers/provider.port";
 
 /**
  * Who emails a business's customers: its own CONNECTED email provider, or
@@ -24,7 +25,7 @@ export async function emailRoute(
         where: {
             organizationId_channel: { organizationId, channel: "EMAIL" },
         },
-        select: { status: true, provider: true },
+        select: { status: true, channel: true, provider: true },
     });
-    return row?.status === "CONNECTED" ? row.provider : null;
+    return row && sendable(row) ? row.provider : null;
 }

@@ -71,7 +71,7 @@ async function wipe() {
     await prisma.pricingCatalogDraft.deleteMany({});
     await prisma.pricingCatalogVersion.deleteMany({});
     await prisma.plan.deleteMany({});
-    await prisma.adminAuditEvent.deleteMany({});
+    await prisma.$executeRaw`TRUNCATE "AdminAuditEvent"`; // append-only: rows can only be truncated
 }
 
 let n = 0;

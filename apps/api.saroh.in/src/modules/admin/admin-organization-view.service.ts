@@ -16,6 +16,7 @@ import { EntitlementService } from "../billing/entitlement.service";
 import { MODULES } from "../capabilities/module-registry";
 import { OrganizationLifecycleStatus } from "../organizations/organization-lifecycle.policy";
 import { retentionEndsAt } from "../organizations/retention";
+import { pendingOwnerChanges } from "./admin-people.service";
 import type { OrganizationPresence } from "./admin-presence";
 import { organizationPresence } from "./admin-presence";
 import type { SiteTrackersRow } from "./admin-site-trackers.service";
@@ -118,7 +119,7 @@ export interface CatalogueModuleRow {
     /** The cap now, null for none or when off. */
     limit: number | null;
     per: LimitPeriod;
-    /** A soft cap: counted and told, never refused (storage, visits). */
+    /** A soft cap: counted and told, never refused (visits; storage where its cell says). */
     soft: boolean;
     /** Its plan's own cell, before any override or add-on. */
     planState: AccessState;
@@ -253,6 +254,8 @@ export interface OrganizationSupportView {
     people: Panel<{
         members: OrganizationPerson[];
         invitations: OrganizationInvite[];
+        /** Owner changes waiting for a second staff member (F3). */
+        ownerChanges: Awaited<ReturnType<typeof pendingOwnerChanges>>;
     }>;
     modules: Panel<OrganizationModuleRow[]>;
     plan: Panel<OrganizationPlan>;
@@ -538,7 +541,7 @@ export class AdminOrganizationViewService {
     }
 
     private async people(organizationId: string, canReadPii: boolean) {
-        const [memberships, invitations] = await Promise.all([
+        const [memberships, invitations, ownerChanges] = await Promise.all([
             prisma.membership.findMany({
                 where: { organizationId },
                 select: {
@@ -567,9 +570,11 @@ export class AdminOrganizationViewService {
                 },
                 orderBy: { createdAt: "desc" },
             }),
+            pendingOwnerChanges(organizationId),
         ]);
 
         return {
+            ownerChanges,
             members: memberships.map((row) => ({
                 membershipId: row.id,
                 userId: row.user.id,

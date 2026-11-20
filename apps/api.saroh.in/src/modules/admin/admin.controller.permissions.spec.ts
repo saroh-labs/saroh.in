@@ -242,6 +242,16 @@ describe("Admin console permission assignments", () => {
             AdminPermission.OrganizationPeopleWrite,
         ]);
     });
+
+    it.each(["changeRole", "removeMember"] as const)(
+        "needs an open support session for %s, not only the screen (A4)",
+        (method) => {
+            const route = routeHandlers().find((r) => r.name === method);
+            expect(
+                Reflect.getMetadata(ORGANIZATION_ACCESS_INTENT, route!.handler),
+            ).toBe("READ");
+        },
+    );
 });
 
 describe("Job cancel permissions (#907)", () => {

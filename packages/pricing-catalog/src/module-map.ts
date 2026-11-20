@@ -139,7 +139,7 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
     },
     /** Invoicing needs no module (DEC-070); a row so the cards can say so. */
     invoicing: { registry: null, limitKey: null, legacyEntitlementKey: null },
-    /** Media storage in GB: soft. */
+    /** Media storage in GB: hard or soft as each plan's cell says (DEC-227). */
     storage: {
         registry: null,
         limitKey: "storageGb",

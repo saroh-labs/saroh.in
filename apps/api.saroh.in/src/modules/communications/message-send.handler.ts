@@ -18,6 +18,7 @@ import type {
 import {
     COMMS_PROVIDER_FACTORY,
     isCommsChannel,
+    sendable,
 } from "./providers/provider.port";
 import {
     fillHowToPay,
@@ -194,7 +195,7 @@ export class MessageSendHandler {
                 },
             },
         });
-        if (providerRow?.status !== "CONNECTED") {
+        if (!providerRow || !sendable(providerRow)) {
             await this.recordFailure(
                 delivery.id,
                 message.id,

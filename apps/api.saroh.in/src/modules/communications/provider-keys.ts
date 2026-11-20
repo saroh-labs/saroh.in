@@ -6,6 +6,9 @@ import {
 import type { CommunicationProvider } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
+import { isTestRun } from "../../common/test-run";
+import { declaredNodeEnv, env } from "../../env";
+
 import {
     KEYS_REFUSED,
     NO_ATTENTION,
@@ -44,13 +47,20 @@ export async function assertCommsKeysAccepted(
     adapter: CommsProvider,
     input: CommsVerifyInput,
 ): Promise<void> {
+    if (
+        env.COMMS_KEYS_FAKE === "1" &&
+        isTestRun({ nodeEnvs: [declaredNodeEnv, env.NODE_ENV], ci: env.CI })
+    )
+        return;
     const check = (await adapter.verifyCredentials?.(input)) ?? null;
     if (check === null || check === "ACCEPTED") return;
     const label = LABELS[input.provider] ?? input.provider;
     if (check === "REJECTED") {
+        // WhatsApp's form names its key the access token (07 F12).
+        const meta = input.provider === "META";
         throw new BadRequestException({
-            message: `${label} didn't accept this API key. Copy it from your ${label} dashboard again.`,
-            field: "apiKey",
+            message: `${label} didn't accept this ${meta ? "access token" : "API key"}. Copy it from your ${meta ? "Meta" : label} dashboard again.`,
+            field: meta ? "accessToken" : "apiKey",
         });
     }
     if (check === "DOMAIN_UNVERIFIED") {

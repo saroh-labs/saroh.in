@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     Inject,
     Injectable,
     Logger,
@@ -14,6 +15,7 @@ import {
     isVideoContentType,
 } from "@saroh/object-storage";
 
+import { prismaErrorCode } from "../../common/prisma-errors";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { BYTES_PER_GB } from "../billing/metering";
 import { planMeter } from "../billing/metering.service";
@@ -53,6 +55,18 @@ export interface CreateUploadResult {
  * {@link ObjectStorage} port; this service owns only the metadata index and the
  * PENDING → READY lifecycle.
  */
+/**
+ * The sweep removed the upload first (never confirmed in time, N12): its
+ * row is gone, so a confirm answers "nothing uploaded", as for a failed
+ * one, not a 500. Anything else is rethrown unless `onlyGone`.
+ */
+function goneAsNothing(error: unknown, onlyGone = false): void {
+    if (prismaErrorCode(error) === "P2025") {
+        throw new BadRequestException(NOTHING_UPLOADED_MESSAGE);
+    }
+    if (!onlyGone) throw error;
+}
+
 @Injectable()
 export class MediaService {
     constructor(
@@ -83,18 +97,31 @@ export class MediaService {
             purpose: input.purpose,
         });
 
-        const media = await prisma.media.create({
-            data: {
-                organizationId: ctx.organizationId,
-                key: signed.key,
-                contentType: input.contentType,
-                sizeBytes: input.contentLength,
-                filename: input.filename,
-                purpose: input.purpose ?? null,
-                status: "PENDING",
-                uploadedByUserId: ctx.userId,
-            },
-        });
+        // The plan's storage, checked before a byte is sent (owner, 20 Nov
+        // 2026): a hard cell refuses an upload that would pass it, at the
+        // size it says; a soft one counts and tells. The PENDING row holds
+        // that space from now, so uploads started side by side are counted
+        // against each other (M-5); one never confirmed is swept
+        // (`pending-upload-sweep.job.ts`). The URL is only signed above,
+        // never handed out when this refuses.
+        const media = await planMeter.withRoom(
+            ctx.organizationId,
+            "storage",
+            (db) =>
+                db.media.create({
+                    data: {
+                        organizationId: ctx.organizationId,
+                        key: signed.key,
+                        contentType: input.contentType,
+                        sizeBytes: input.contentLength,
+                        filename: input.filename,
+                        purpose: input.purpose ?? null,
+                        status: "PENDING",
+                        uploadedByUserId: ctx.userId,
+                    },
+                }),
+            { adding: input.contentLength / BYTES_PER_GB },
+        );
 
         return {
             mediaId: media.id,
@@ -150,10 +177,12 @@ export class MediaService {
             this.storage.seesUploads,
         );
         if (problem) {
-            await prisma.media.update({
-                where: { id: media.id },
-                data: { status: "FAILED" },
-            });
+            await prisma.media
+                .update({
+                    where: { id: media.id },
+                    data: { status: "FAILED" },
+                })
+                .catch(goneAsNothing);
             await this.storage.deleteObject(media.key);
             throw new BadRequestException(problem);
         }
@@ -164,24 +193,37 @@ export class MediaService {
         // Falls back to the recorded size when the head misses (dev/memory).
         const sizeBytes = head?.contentLength ?? media.sizeBytes;
 
-        // The plan's storage (`storageGb`) is soft: counted, and the
-        // business told when it passes its space, never refused. Checked on
-        // the write's transaction while this file is still PENDING, so the
-        // count is what was there before it.
-        const updated = await planMeter.withRoom(
-            ctx.organizationId,
-            "storage",
-            (db) =>
-                db.media.update({
-                    where: { id: media.id },
-                    data: { status: "READY", sizeBytes },
-                }),
-            {
-                soft: true,
-                // Confirming again adds nothing it hadn't already counted.
-                adding: media.status === "READY" ? 0 : sizeBytes / BYTES_PER_GB,
-            },
-        );
+        // The plan's storage again, with the real size: the PENDING row
+        // already holds the size the upload said, so only bytes past it are
+        // added (none on a second confirm). Hard or soft as the catalogue's
+        // cell says. A refusal fails the upload and deletes its object, so
+        // it holds no space it was refused.
+        const extra =
+            media.status === "READY"
+                ? 0
+                : Math.max(0, sizeBytes - media.sizeBytes) / BYTES_PER_GB;
+        const updated = await planMeter
+            .withRoom(
+                ctx.organizationId,
+                "storage",
+                (db) =>
+                    db.media.update({
+                        where: { id: media.id },
+                        data: { status: "READY", sizeBytes },
+                    }),
+                { adding: extra },
+            )
+            .catch(async (error: unknown) => {
+                goneAsNothing(error, true);
+                if (error instanceof ForbiddenException) {
+                    await prisma.media.update({
+                        where: { id: media.id },
+                        data: { status: "FAILED" },
+                    });
+                    await this.storage.deleteObject(media.key);
+                }
+                throw error;
+            });
 
         return {
             id: updated.id,

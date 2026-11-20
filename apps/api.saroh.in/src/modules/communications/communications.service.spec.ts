@@ -254,6 +254,28 @@ describe("CommunicationsService.connectProvider — the key checked first (UX-01
         });
     });
 
+    // 07 F12: WhatsApp's form has no API key field; the refusal goes under
+    // the access token it does have.
+    it("refuses a WhatsApp token under the access token field", async () => {
+        const { service } = serviceAnswering("REJECTED");
+
+        const err = await service
+            .connectProvider(ctx(), {
+                channel: "whatsapp",
+                provider: "meta",
+                credentials: { accessToken: SECRET, phoneNumberId: "123" },
+            })
+            .catch((e: unknown) => e);
+
+        expect((err as BadRequestException).getResponse()).toEqual({
+            message: expect.stringContaining(
+                "WhatsApp didn't accept this access token",
+            ),
+            field: "accessToken",
+        });
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
     it("refuses a sending address whose domain Resend hasn't verified, under that field", async () => {
         const { service } = serviceAnswering("DOMAIN_UNVERIFIED");
 
@@ -310,16 +332,24 @@ describe("CommunicationsService.connectProvider — the key checked first (UX-01
         providerFindUnique.mockReset();
     });
 
-    it("lets through a provider the adapter can't check (an SMTP relay)", async () => {
+    it("refuses SendGrid, an SMTP relay or Twilio: none can send (review 04 H1)", async () => {
         const { service } = serviceAnswering(null);
 
-        await service.connectProvider(ctx(), {
-            ...RESEND,
-            provider: "smtp",
-            credentials: { host: "smtp.example.in", pass: "x" },
-        });
-
-        expect(providerUpsert).toHaveBeenCalledTimes(1);
+        for (const [channel, provider] of [
+            ["EMAIL", "smtp"],
+            ["EMAIL", "sendgrid"],
+            ["WHATSAPP", "twilio"],
+        ]) {
+            await expect(
+                service.connectProvider(ctx(), {
+                    ...RESEND,
+                    channel,
+                    provider,
+                    credentials: { host: "smtp.example.in", pass: "x" },
+                }),
+            ).rejects.toThrow(/Unsupported provider/);
+        }
+        expect(providerUpsert).not.toHaveBeenCalled();
     });
 });
 
@@ -746,6 +776,7 @@ describe("CommunicationsService.queueTransactional (D17)", () => {
         });
         accountFindFirst.mockResolvedValue(null);
         providerFindUnique.mockResolvedValue({
+            channel: "EMAIL",
             provider: "RESEND",
             status: "CONNECTED",
         });
@@ -934,6 +965,7 @@ describe("CommunicationsService.queueTransactional — review invitation", () =>
         });
         linkFindFirst.mockResolvedValue({ contactId: "contact_1" });
         providerFindUnique.mockResolvedValue({
+            channel: "EMAIL",
             provider: "RESEND",
             status: "CONNECTED",
         });

@@ -76,7 +76,7 @@ export const HUB_WORDS = {
     doors: [
         {
             title: NAV_WORDS.howItWorks,
-            body: "Every moment on these pages uses a part of Saroh. See how each one works: your site, orders, bookings, payments, Ask AI and sharing.",
+            body: "Every moment on these pages uses a part of Saroh. See how each one works: your site, orders, bookings, payments and sharing.",
             link: "All features",
             href: "/features",
         },

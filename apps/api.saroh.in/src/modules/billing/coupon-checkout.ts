@@ -6,6 +6,7 @@ import { outsideOrgContext, prisma } from "@saroh/database";
 import {
     AUTOMATIC_COUPON_HOLD_MS,
     couponPlacesTaken,
+    couponUsedByPayer,
     lockCouponPlacesInTx,
 } from "../pricing/coupons.service";
 import { raiseBillingActionInTx } from "./billing-actions";
@@ -57,6 +58,19 @@ export async function takeCouponPlaceInTx(
     now: Date,
 ): Promise<void> {
     await lockCouponPlacesInTx(tx, coupon.id);
+    // Once per person, asked again under the payer's locks
+    // (`holdPayerOffersInTx`, taken first): another of their businesses
+    // may have taken it since the quote (N3).
+    if (
+        await outsideOrgContext(() =>
+            couponUsedByPayer(coupon.id, organizationId, now),
+        )
+    ) {
+        throw new CouponNotTaken(
+            "used-up",
+            `You've used coupon ${coupon.code} already.`,
+        );
+    }
     const taken = await couponPlacesTaken(coupon.id, organizationId, now);
     if (taken >= coupon.maxRedemptions) {
         throw new CouponNotTaken(

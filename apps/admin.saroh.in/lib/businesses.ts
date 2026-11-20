@@ -219,6 +219,8 @@ export interface BusinessView {
             expiresAt: string;
             createdAt: string;
         }[];
+        /** Owner changes waiting for a second staff member (review F3). */
+        ownerChanges?: OwnerChangeRow[];
     }>;
     modules: Panel<
         {
@@ -512,4 +514,17 @@ export async function getBusinessView(
         view: (await res.json()) as BusinessView,
         sessionId,
     };
+}
+
+/** An Owner change one staff member asked for, waiting for a second. */
+export interface OwnerChangeRow {
+    id: string;
+    userId: string;
+    kind: "ROLE" | "REMOVE";
+    /** The new role, for ROLE. */
+    role: string | null;
+    fromRole: string;
+    reason: string;
+    requestedByUserId: string;
+    createdAt: string;
 }

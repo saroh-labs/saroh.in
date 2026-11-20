@@ -267,7 +267,9 @@ describe("the feature sheet", () => {
             document.getElementById(
                 limit.getAttribute("aria-describedby") ?? "",
             )?.textContent,
-        ).toBe("A whole number above 0, or blank for no limit");
+        ).toBe(
+            "A whole number above 0 (storage GB can have a fraction, like 2.5), or blank for no limit",
+        );
         await act(() => vi.advanceTimersByTimeAsync(AUTOSAVE_MS * 2));
         expect(actions.savePricingDraftAction).not.toHaveBeenCalled();
     });

@@ -49,7 +49,10 @@ const db = prisma as unknown as Record<string, Record<string, jest.Mock>> & {
 const ensureRole = ensureCalendarOnlyRole as unknown as jest.Mock;
 
 const audit = { record: jest.fn() } as unknown as AuditService;
-const service = new OrganizationMembersService(audit);
+// The send budget is its own spec's (invite-send-limit.spec.ts).
+const service = new OrganizationMembersService(audit, {
+    take: () => Promise.resolve(),
+} as never);
 
 const owner: OrganizationContext = {
     organizationId: "org_1",

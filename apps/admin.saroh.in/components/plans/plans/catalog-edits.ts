@@ -214,19 +214,21 @@ export function rupeesText(paise: number): string {
 }
 
 /**
- * A limit as typed: blank is no cap (null); a whole number above 0 is the
- * cap; anything else is refused (undefined).
+ * A limit as typed: blank is no cap (null); a number above 0 is the cap
+ * (up to two decimal places, for storage's GB; the catalogue's check refuses
+ * a fraction on any other row); anything else is refused (undefined).
  */
 export function parseLimit(text: string): number | null | undefined {
     const t = text.trim();
     if (t === "") return null;
-    if (!/^\d{1,9}$/.test(t)) return undefined;
+    if (!/^\d{1,9}(\.\d{1,2})?$/.test(t)) return undefined;
     const n = Number(t);
     return n > 0 ? n : undefined;
 }
 
 export const PRICE_HINT = "Enter rupees, like 499 or 499.50";
-export const LIMIT_HINT = "A whole number above 0, or blank for no limit";
+export const LIMIT_HINT =
+    "A whole number above 0 (storage GB can have a fraction, like 2.5), or blank for no limit";
 
 // ── Validation messages beside their fields ───────────────────────────────
 

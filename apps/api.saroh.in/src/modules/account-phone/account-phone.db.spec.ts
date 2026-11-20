@@ -545,12 +545,48 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         expect(unknownAnswer).toEqual({ whatsapp: { resendAfterSeconds: 30 } });
         expect(sendsTo(known)).toHaveLength(1);
         expect(sendsTo(unknown)).toHaveLength(0);
-        await expect(codes(unknown)).resolves.toEqual([]);
+        // A decoy code no one is sent (02 A-1).
+        await expect(codes(unknown)).resolves.toHaveLength(1);
         expect(lastWarning(unknown)).toContain("reason=no_account");
         // Counted as any start, so the limits don't tell the two apart.
         await expect(events("START", unknown)).resolves.toBe(1);
         await expect(startWa(unknown)).rejects.toMatchObject({ status: 429 });
         await expect(startWa(known)).rejects.toMatchObject({ status: 429 });
+    });
+
+    // 02 A-1: the code step used to say "expired" only for a number with
+    // no account, and "too many" only for one with.
+    it("answers wrong codes for a known and an unknown number alike", async () => {
+        const known = phone();
+        await person(known);
+        const unknown = phone();
+        await startWa(known);
+        await startWa(unknown);
+        const answers = async (p: string) => {
+            const out: unknown[] = [];
+            for (let i = 0; i < 6; i++) {
+                out.push(
+                    await withCode(p, wrong(sentCode(p))).then(
+                        () => "signed in",
+                        (err: { status?: number; response?: unknown }) => [
+                            err.status,
+                            err.response,
+                        ],
+                    ),
+                );
+            }
+            return out;
+        };
+        const [k, u] = [await answers(known), await answers(unknown)];
+        expect(u).toEqual(k);
+        expect(k[0]).toEqual([
+            400,
+            expect.objectContaining({ details: { code: "NOT_VERIFIED" } }),
+        ]);
+        expect(k[5]).toEqual([
+            400,
+            expect.objectContaining({ details: { code: "TOO_MANY_ATTEMPTS" } }),
+        ]);
     });
 
     it("sends nothing to a phone saved without a verify time, nor to Saroh staff", async () => {
@@ -594,6 +630,12 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
         });
         expect(answer).toEqual({ whatsapp: { resendAfterSeconds: 30 } });
         expect(sendsTo(p)).toHaveLength(0);
+        // 07 F1: with the send still in flight, a wrong code answers as it
+        // does for an unknown number, not "expired".
+        await expect(withCode(p, "000000")).rejects.toMatchObject({
+            status: 400,
+            response: { details: { code: "NOT_VERIFIED" } },
+        });
         finish();
         await service.settled();
         expect(sendsTo(p)).toHaveLength(1);
@@ -730,20 +772,23 @@ describe("WhatsApp codes made by the server (owner, 28 Oct)", () => {
     });
 
     // Signing in, the answer can't wait for the send (owner, 18 Nov).
-    it("a failed sign-in send answers as a sent one, keeps no code, and doesn't hold the cooldown", async () => {
+    // 02 A-1, A-2: a known number whose send failed used to keep no code
+    // and get its cooldown back, which an unknown number never did.
+    it("a failed sign-in send answers and holds as an unknown number does", async () => {
         const p = phone();
         await person(p);
+        const unknown = phone();
         fake.failNext("template_paused");
         await expect(startWa(p)).resolves.toEqual({
             whatsapp: { resendAfterSeconds: 30 },
         });
         expect(lastWarning(p)).toContain("reason=whatsapp_template_paused");
-        await expect(codes(p)).resolves.toEqual([]);
-        await expect(startWa(p)).resolves.toHaveProperty("whatsapp");
-        // The failed one and the one that went.
-        expect(sendsTo(p)).toHaveLength(2);
+        await startWa(unknown);
         await expect(codes(p)).resolves.toHaveLength(1);
-        await expect(events("START", p)).resolves.toBe(2);
+        await expect(codes(unknown)).resolves.toHaveLength(1);
+        await expect(startWa(p)).rejects.toMatchObject({ status: 429 });
+        await expect(startWa(unknown)).rejects.toMatchObject({ status: 429 });
+        await expect(events("START", p)).resolves.toBe(1);
     });
 
     // Owner, 19 Nov: the person can't see a failed send, so Saroh counts it.

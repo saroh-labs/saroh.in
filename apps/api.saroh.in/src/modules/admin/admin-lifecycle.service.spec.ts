@@ -1,6 +1,11 @@
 jest.mock("@saroh/database", () => {
     const prisma = {
-        organization: { findUnique: jest.fn(), updateMany: jest.fn() },
+        organization: {
+            findUnique: jest.fn(),
+            updateMany: jest.fn(),
+            // The one-Free rule on a deletion called off (DEC-227): not on Free.
+            findFirst: jest.fn(async () => null),
+        },
         subscription: {
             findUnique: jest.fn(),
             upsert: jest.fn(),

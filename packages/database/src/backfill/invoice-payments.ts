@@ -34,6 +34,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { setStatementTimeout } from "../org-context";
 import type { TransactionClient } from "../transaction";
 
 /** Every method a ledger row holds (`InvoicePayment_method_check`). */
@@ -108,6 +109,7 @@ export async function backfillInvoicePayments(
         try {
             await db.$transaction(
                 async (tx) => {
+                    await setStatementTimeout(tx, 120_000);
                     part = await fillOrganization(tx, organizationId);
                     if (dryRun) throw new DryRunRollback();
                 },

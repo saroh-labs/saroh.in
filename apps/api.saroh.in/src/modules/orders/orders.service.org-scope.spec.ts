@@ -48,6 +48,7 @@ jest.mock("@saroh/database", () => {
             .mockResolvedValue({ organizationId: "org_of_store" }),
     };
     return {
+        onTransaction: (_tx: unknown, fn: () => unknown) => fn(),
         // The business's next number (P3): its own specs run it on Postgres.
         nextOrderNumberInTx: jest.fn().mockResolvedValue("ORD-001"),
         prisma: {

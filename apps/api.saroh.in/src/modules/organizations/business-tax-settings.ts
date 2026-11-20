@@ -11,7 +11,12 @@ import {
 } from "../invoices/gst";
 import type { GstPriceMode, PriceTerms } from "../invoices/gst-price";
 import { businessPriceMode } from "../invoices/gst-price";
-import { gstinProblem, stateCode, stateName } from "../invoices/gst-states";
+import {
+    gstinProblem,
+    normaliseGstin,
+    stateCode,
+    stateName,
+} from "../invoices/gst-states";
 import type {
     NumberFormat,
     NumberPart,
@@ -100,6 +105,7 @@ export type TaxData = Partial<{
     taxName: string | null;
     taxRate: string | null;
     yearStartMonth: number;
+    taxId: string;
 }>;
 
 /** The stored profile, as far as the tax and address read it. */
@@ -401,7 +407,17 @@ export function taxChanges(
     const registered = tax?.registered ?? current?.gstRegistered ?? false;
     if (tax?.registered !== undefined) data.gstRegistered = registered;
 
-    const gstin = (sent.taxId ?? current?.taxId ?? "").trim().toUpperCase();
+    // India's tax ID is the GSTIN: stored as letters and digits, and in
+    // the register's shape whenever one is given (N9).
+    const gst = editionProfile(edition).taxSystem !== "named-line";
+    if (gst && sent.taxId !== undefined) {
+        data.taxId = normaliseGstin(sent.taxId);
+        const problem = data.taxId ? gstinProblem(data.taxId) : null;
+        if (problem) taxError(problem, "taxId");
+    }
+    const gstin = gst
+        ? normaliseGstin(sent.taxId ?? current?.taxId)
+        : (sent.taxId ?? current?.taxId ?? "").trim().toUpperCase();
     if (registered) {
         if (!gstin) {
             taxError(

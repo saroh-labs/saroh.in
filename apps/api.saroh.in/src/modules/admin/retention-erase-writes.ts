@@ -1,5 +1,5 @@
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { prisma, setStatementTimeout } from "@saroh/database";
 
 import { deliveryPlaceErased } from "../customer-workspace/personal-data";
 import {
@@ -47,6 +47,8 @@ export async function inEraseTx<T>(
 ): Promise<T> {
     return prisma.$transaction(
         async (tx) => {
+            // Past the pool's 30 s statement limit, as long as the transaction.
+            await setStatementTimeout(tx, ERASE_TX_TIMEOUT_MS);
             const rows = await tx.$queryRaw<
                 LockedOrganization[]
             >`SELECT "lifecycleStatus", "legalHoldAt" FROM "Organization"

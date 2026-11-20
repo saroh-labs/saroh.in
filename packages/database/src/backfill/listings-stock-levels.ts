@@ -51,6 +51,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
+import { setStatementTimeout } from "../org-context";
 import type { HeldStockReport } from "./held-stock";
 import { reconcileHeldStock } from "./held-stock";
 
@@ -221,6 +222,7 @@ async function listProducts(
     // Each chunk lists what it read, so the next read starts past it.
     for (;;) {
         const listed = await db.$transaction(async (tx) => {
+            await setStatementTimeout(tx, 120_000);
             const products = await tx.product.findMany({
                 where: {
                     organizationId,
@@ -283,6 +285,7 @@ async function copyStock(
     let after: string | undefined;
     for (;;) {
         const read = await db.$transaction(async (tx) => {
+            await setStatementTimeout(tx, 120_000);
             const products = await tx.product.findMany({
                 where: {
                     organizationId,
@@ -375,6 +378,7 @@ async function linkOrderLines(
     let after: string | undefined;
     for (;;) {
         const read = await db.$transaction(async (tx) => {
+            await setStatementTimeout(tx, 120_000);
             const lines = await tx.orderItem.findMany({
                 where: {
                     stockLevelId: null,

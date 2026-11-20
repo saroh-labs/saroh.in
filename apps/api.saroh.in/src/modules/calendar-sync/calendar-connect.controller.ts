@@ -23,9 +23,14 @@ import { assertEditionMatchesAddress } from "../../common/edition-address";
 import { BetterAuthGuard } from "../../common/guards/better-auth.guard";
 import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import { OrganizationContextService } from "../organizations/organization-context.service";
 import { assertWorkspaceWrite } from "../organizations/organization-lifecycle.gate";
-import { CalendarConnectService } from "./calendar-connect.service";
+import { apiBase } from "../payments/webhook-setup";
+import {
+    CALLBACK_PATH,
+    CalendarConnectService,
+} from "./calendar-connect.service";
 import type {
     CalendarStatusView,
     ConnectStartView,
@@ -122,6 +127,15 @@ export class CalendarCallbackController {
         @Req() req: Request,
         @Res() res: Response,
     ): Promise<void> {
+        // Local only: Google sent the browser to the bare port, which has no
+        // session cookie; send it on to the portless address with the same query.
+        const local = env.GOOGLE_CALENDAR_LOCAL_REDIRECT;
+        const portless = apiBase(null);
+        if (local && portless && req.headers.host === new URL(local).host) {
+            const query = req.originalUrl.split("?")[1] ?? "";
+            res.redirect(302, `${portless}${CALLBACK_PATH}?${query}`);
+            return;
+        }
         const session = await auth.api
             .getSession({ headers: fromNodeHeaders(req.headers) })
             .catch(() => null);

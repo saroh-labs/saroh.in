@@ -90,6 +90,23 @@ export class SharedRateLimiter implements WindowLimiter {
         return this.memory.take(key, now);
     }
 
+    /** Whether `key` has used its window up, without taking a hit. */
+    async blocked(key: string, now: number = Date.now()): Promise<boolean> {
+        if (this.redis) {
+            try {
+                const count = (await this.redis.eval(
+                    "return tonumber(redis.call('GET', KEYS[1]) or '0')",
+                    1,
+                    this.key(key),
+                )) as number;
+                return count >= this.limit;
+            } catch (error) {
+                fellBack(error, now);
+            }
+        }
+        return this.memory.blocked(key, now);
+    }
+
     /** Seconds until `key`'s window resets: at least 1. */
     async retryAfterSeconds(
         key: string,

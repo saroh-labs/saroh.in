@@ -2,7 +2,10 @@ import { ChevronDown } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "../cn";
-import type { ClaimSwitch } from "../content/feature-switches";
+import type {
+    ClaimSwitch,
+    ReleaseSwitch,
+} from "../content/feature-switches";
 import { Chip } from "../kit/chip";
 import { ClosingCTA } from "../kit/closing-cta";
 import { DayScene } from "../kit/day-scene";
@@ -14,6 +17,7 @@ import { SwipeRow } from "../kit/swipe-row";
 import { hourAnchor, hourLabel, hourTint } from "../kit/time";
 import { TradeSwitcher } from "../kit/trade-switcher";
 import { Container } from "../layout/container";
+import { Pill } from "../links/pill";
 import { LinkRow, TextLink } from "../links/text-link";
 import { ring } from "../ring";
 import { FaqItems } from "../sections/faq";
@@ -97,6 +101,8 @@ export interface TradePageLayoutProps {
     /** A feature's chip, or undefined while its page is off. */
     feature: (slug: string) => FeatureLink | undefined;
     claimOn: (claim: ClaimSwitch) => boolean;
+    /** Whether a release switch is on; an hour of an off feature says "Coming soon". */
+    releaseOn: (release: ReleaseSwitch) => boolean;
     templatesOn: boolean;
     freeLine?: ReactNode;
     problems: { items: readonly TradeProblem[]; line?: string };
@@ -379,17 +385,20 @@ const CLIP: Partial<Record<MomentData["kind"], number>> = {
 function Hour({
     hour,
     claimOn,
+    releaseOn,
     feature,
     templatesOn,
     words,
 }: {
     hour: DayHour;
     claimOn: TradePageLayoutProps["claimOn"];
+    releaseOn: TradePageLayoutProps["releaseOn"];
     feature: TradePageLayoutProps["feature"];
     templatesOn: boolean;
     words: TradePageWords;
 }) {
     const at = anchorAt(hour.anchor);
+    const soon = hour.release !== undefined && !releaseOn(hour.release);
     const moments = hour.claimed
         ? claimOn(hour.claimed.claim)
             ? hour.claimed.on
@@ -399,7 +408,9 @@ function Hour({
     const lead = say(hour.lead, claimOn);
     const short = hour.phoneLead ? say(hour.phoneLead, claimOn) : "";
     const onInk = hourTint(at) === "lamp";
-    const note = hour.note ? (
+    const note =
+        hour.note &&
+        (!hour.note.release || releaseOn(hour.note.release)) ? (
         <p className="m-0 max-w-[560px] rounded-mk-card bg-foreground px-5 py-4 text-[15px] leading-normal text-background">
             {hour.note.text}{" "}
             <a
@@ -418,7 +429,7 @@ function Hour({
     const opened = OPENED;
     const folds =
         short !== "" ||
-        hour.note !== undefined ||
+        note !== null ||
         (after !== "" && !hour.claimed);
     // A cropped order or Home opens with its own "See the whole …": one link.
     const selfFolds = moments.some(
@@ -433,7 +444,18 @@ function Hour({
             at={at}
             id={hour.anchor}
             mood={say(hour.mood, claimOn)}
-            title={say(hour.title, claimOn)}
+            title={
+                soon ? (
+                    <>
+                        {say(hour.title, claimOn)}{" "}
+                        <Pill tone="soon" className="align-middle">
+                            Coming soon
+                        </Pill>
+                    </>
+                ) : (
+                    say(hour.title, claimOn)
+                )
+            }
             lead={
                 short ? (
                     <>
@@ -715,6 +737,7 @@ export function TradePageLayout(props: TradePageLayoutProps) {
                             key={h.anchor}
                             hour={h}
                             claimOn={claimOn}
+                            releaseOn={props.releaseOn}
                             feature={feature}
                             templatesOn={templatesOn}
                             words={W}

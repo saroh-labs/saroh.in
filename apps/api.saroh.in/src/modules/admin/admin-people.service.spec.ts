@@ -6,7 +6,22 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(async () => null),
         },
         organizationInvitation: { findFirst: jest.fn() },
-        membership: { count: jest.fn() },
+        membership: {
+            count: jest.fn(),
+            findUnique: jest.fn(async () => ({ role: "MEMBER" })),
+            findMany: jest.fn(async () => []),
+        },
+        ownerChangeRequest: {
+            create: jest.fn(async () => ({ id: "ocr_1" })),
+            findFirst: jest.fn(),
+            updateMany: jest.fn(async () => ({ count: 1 })),
+        },
+        organization: {
+            findUnique: jest.fn(async () => ({
+                name: "Rye",
+                edition: "INDIA",
+            })),
+        },
         signInEmailChange: { findFirst: jest.fn(async () => null) },
         adminAuditEvent: { findMany: jest.fn(async () => []) },
         $transaction: jest.fn((callback: (tx: unknown) => unknown) =>
@@ -16,13 +31,29 @@ jest.mock("@saroh/database", () => {
     return { prisma };
 });
 
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+jest.mock("../../common/email", () => ({
+    sendOwnerChangedNotice: jest.fn(async () => undefined),
+}));
+
+import {
+    BadRequestException,
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+} from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
-import type { OrganizationMembersService } from "../organizations/organization-members.service";
+import { sendOwnerChangedNotice } from "../../common/email";
+import type {
+    InTxLedger,
+    OrganizationMembersService,
+} from "../organizations/organization-members.service";
 import type { AdminAuditService } from "./admin-audit.service";
 import { AdminPeopleService } from "./admin-people.service";
+
+// The members service hands the ledger its transaction; here, the mock.
+const TX = prisma as never;
 
 const staff: PlatformAdminInfo = {
     userId: "staff_1",
@@ -35,11 +66,18 @@ const staff: PlatformAdminInfo = {
 
 function build() {
     const members = {
-        updateRole: jest.fn(async () => ({
-            userId: "u1",
-            role: "ADMIN",
-            siteIds: [],
-        })),
+        // Each runs the admin ledger write inside its own transaction.
+        updateRole: jest.fn(
+            async (
+                _ctx: unknown,
+                _userId: string,
+                _dto: unknown,
+                ledger?: InTxLedger,
+            ) => {
+                await ledger?.(TX, { from: "MEMBER", to: "ADMIN" });
+                return { userId: "u1", role: "ADMIN", siteIds: [] };
+            },
+        ),
         remove: jest.fn(async () => ({ removed: true })),
         invite: jest.fn(),
         revokeInvitation: jest.fn(async () => ({ revoked: true })),
@@ -107,11 +145,12 @@ describe("AdminPeopleService", () => {
         expect(ctx.organizationId).toBe("org_1");
         expect(ctx.actions.has("member:role:update")).toBe(true);
         expect(audit.write).toHaveBeenCalledWith(
-            prisma,
+            TX,
             expect.objectContaining({
                 action: "person.role.changed",
                 organizationId: "org_1",
                 reason: "Owner asked by email",
+                metadata: { role: "ADMIN", from: "MEMBER", to: "ADMIN" },
             }),
         );
     });
@@ -128,6 +167,181 @@ describe("AdminPeopleService", () => {
             }),
         ).rejects.toThrow("last owner");
         expect(audit.write).not.toHaveBeenCalled();
+    });
+
+    describe("an Owner change needs a second staff member (F3)", () => {
+        const other: PlatformAdminInfo = { ...staff, userId: "staff_2" };
+        const membership = prisma.membership.findUnique as jest.Mock;
+        const requests = prisma.ownerChangeRequest as unknown as Record<
+            string,
+            jest.Mock
+        >;
+
+        it("making an Owner is only asked for, on the ledger in the same transaction", async () => {
+            const { service, members, audit } = build();
+            await expect(
+                service.changeRole({
+                    staff,
+                    organizationId: "org_1",
+                    userId: "u1",
+                    role: "OWNER",
+                    reason: "Owner asked by email",
+                }),
+            ).resolves.toEqual({ pending: true, requestId: "ocr_1" });
+            expect(members.updateRole).not.toHaveBeenCalled();
+            expect(requests.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    data: expect.objectContaining({
+                        kind: "ROLE",
+                        role: "OWNER",
+                        fromRole: "MEMBER",
+                        requestedByUserId: "staff_1",
+                    }),
+                }),
+            );
+            expect(audit.write).toHaveBeenCalledWith(
+                prisma,
+                expect.objectContaining({
+                    action: "person.owner-change.requested",
+                    outcome: "SUCCESS",
+                }),
+            );
+        });
+
+        it.each([
+            ["demoting", "ADMIN"],
+            ["removing", null],
+        ])("%s an Owner is only asked for", async (_what, role) => {
+            membership.mockResolvedValueOnce({ role: "OWNER" });
+            const { service, members } = build();
+            const input = {
+                staff,
+                organizationId: "org_1",
+                userId: "u1",
+                reason: "Owner asked by email",
+            };
+            const result = role
+                ? await service.changeRole({ ...input, role })
+                : await service.removeMember(input);
+            expect(result).toMatchObject({ pending: true });
+            expect(members.updateRole).not.toHaveBeenCalled();
+            expect(members.remove).not.toHaveBeenCalled();
+        });
+
+        it("refuses a direct change to someone who became an Owner meanwhile", async () => {
+            const { service, members, audit } = build();
+            members.updateRole.mockImplementationOnce(
+                async (_c, _u, _d, ledger?: InTxLedger) => {
+                    await ledger?.(TX, { from: "OWNER", to: "ADMIN" });
+                    return { userId: "u1", role: "ADMIN", siteIds: [] };
+                },
+            );
+            await expect(
+                service.changeRole({
+                    staff,
+                    organizationId: "org_1",
+                    userId: "u1",
+                    role: "ADMIN",
+                    reason: "Owner asked by email",
+                }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(audit.write).not.toHaveBeenCalled();
+        });
+
+        it("the one who asked can't confirm it", async () => {
+            requests.findFirst.mockResolvedValue({
+                id: "ocr_1",
+                userId: "u1",
+                kind: "ROLE",
+                role: "OWNER",
+                reason: "Owner asked by email",
+                requestedByUserId: "staff_1",
+            });
+            const { service, members, audit } = build();
+            await expect(
+                service.confirmOwnerChange({
+                    staff,
+                    organizationId: "org_1",
+                    requestId: "ocr_1",
+                    reason: "Checked with the owner",
+                }),
+            ).rejects.toBeInstanceOf(ForbiddenException);
+            expect(members.updateRole).not.toHaveBeenCalled();
+            expect(audit.write).toHaveBeenCalledWith(
+                prisma,
+                expect.objectContaining({ outcome: "DENIED" }),
+            );
+        });
+
+        it("a second staff member applies it, marks it and tells the Owners", async () => {
+            requests.findFirst.mockResolvedValue({
+                id: "ocr_1",
+                userId: "u1",
+                kind: "ROLE",
+                role: "OWNER",
+                reason: "Owner asked by email",
+                requestedByUserId: "staff_1",
+            });
+            (prisma.membership.findMany as jest.Mock).mockResolvedValue([
+                { user: { email: "owner@example.test" } },
+            ]);
+            const { service, members, audit } = build();
+            await service.confirmOwnerChange({
+                staff: other,
+                organizationId: "org_1",
+                requestId: "ocr_1",
+                reason: "Checked with the owner",
+            });
+            expect(members.updateRole).toHaveBeenCalledWith(
+                expect.objectContaining({ userId: "staff_2" }),
+                "u1",
+                { role: "OWNER" },
+                expect.any(Function),
+            );
+            expect(requests.updateMany).toHaveBeenCalledWith({
+                where: { id: "ocr_1", confirmedAt: null },
+                data: expect.objectContaining({ confirmedByUserId: "staff_2" }),
+            });
+            expect(audit.write).toHaveBeenCalledWith(
+                TX,
+                expect.objectContaining({
+                    action: "person.role.changed",
+                    actorUserId: "staff_2",
+                    metadata: expect.objectContaining({
+                        requestId: "ocr_1",
+                        requestedBy: "staff_1",
+                    }),
+                }),
+            );
+            expect(sendOwnerChangedNotice).toHaveBeenCalledWith(
+                "owner@example.test",
+                expect.objectContaining({ business: "Rye", added: true }),
+                "INDIA",
+            );
+        });
+
+        it("a confirm that lost the race changes nothing on the ledger", async () => {
+            requests.findFirst.mockResolvedValue({
+                id: "ocr_1",
+                userId: "u1",
+                kind: "ROLE",
+                role: "OWNER",
+                reason: "r",
+                requestedByUserId: "staff_1",
+            });
+            requests.updateMany.mockResolvedValueOnce({ count: 0 });
+            const { service, audit } = build();
+            await expect(
+                service.confirmOwnerChange({
+                    staff: other,
+                    organizationId: "org_1",
+                    requestId: "ocr_1",
+                    reason: "Checked with the owner",
+                }),
+            ).rejects.toBeInstanceOf(ConflictException);
+            expect(audit.write).not.toHaveBeenCalled();
+            expect(sendOwnerChangedNotice).not.toHaveBeenCalled();
+        });
     });
 
     it("resends an invitation with the role it was sent with", async () => {
@@ -148,6 +362,7 @@ describe("AdminPeopleService", () => {
         expect(members.invite).toHaveBeenCalledWith(
             expect.objectContaining({ userId: "staff_1" }),
             { email: "new@example.test", role: "MEMBER", siteIds: [] },
+            expect.any(Function),
         );
     });
 

@@ -268,7 +268,7 @@ describe("saroh.tech's words", () => {
                 billingFor(false),
                 billingFor(true),
             ]),
-        ).not.toMatch(/\b(Stripe|PayPal|merchant of record)\b|\bquotes,/i);
+        ).not.toMatch(/\b(PayPal|merchant of record)\b|\bquotes,/i);
     });
 
     it("say your place and your online shop: a Free business has one place customers visit", () => {
