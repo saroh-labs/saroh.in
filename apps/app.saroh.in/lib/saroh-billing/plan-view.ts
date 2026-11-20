@@ -131,6 +131,12 @@ export interface ChangeQuote {
     /** What setting up autopay takes now: a real charge, a refunded check, or none. */
     mandateCheck: "PAID" | "REFUNDED" | "NONE";
     /**
+     * The regular yearly price before tax, struck beside `pricePaise`, when
+     * the year is charged at its plan's yearly offer (DEC-231). Absent from
+     * an API before it, or null: no offer.
+     */
+    regularPricePaise?: number | null;
+    /**
      * The add-ons held today that end with this change (DEC-157). An API
      * from before it sends none, which reads as none ending.
      */

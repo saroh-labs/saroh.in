@@ -103,12 +103,20 @@ export function PlanSheet({
                             errors={{
                                 name: at(`plans.${index}.name`),
                                 pricePaise: at(`plans.${index}.pricePaise`),
+                                yearlyOfferPaise: at(
+                                    `plans.${index}.yearlyOfferPaise`,
+                                ),
                                 cta: at(`plans.${index}.cta`),
                                 tagline: at(`plans.${index}.tagline`),
                                 plans: at("plans") ?? at(`plans.${index}.id`),
                             }}
                             onChange={(patch) =>
-                                change((p) => Object.assign(p, patch))
+                                change((p) => {
+                                    Object.assign(p, patch);
+                                    // Blank is no offer: no key, as before it.
+                                    if (p.yearlyOfferPaise === undefined)
+                                        delete p.yearlyOfferPaise;
+                                })
                             }
                             onFeature={() =>
                                 edit((c) => toggleFeatured(c, plan.id))

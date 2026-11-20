@@ -53,7 +53,7 @@ describe("pricingPageModel", () => {
         const y = model.views["year-excl"];
         expect(y.plans[1]).toMatchObject({
             price: formatInr(111_000),
-            per: "a year",
+            per: "a year, paid once",
             sub: `About ${formatInr(monthlyEquivalentPaise(111_000))} a month + GST`,
         });
         // A free plan has no year to pay for.

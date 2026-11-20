@@ -1,5 +1,5 @@
 import type { Catalog, Cell, Plan } from "@saroh/pricing-catalog";
-import { cellOf, yearlyPaise } from "@saroh/pricing-catalog";
+import { cellOf, regularYearlyPaise } from "@saroh/pricing-catalog";
 
 import { planMoney } from "@/lib/plan-money";
 import { sameCell } from "../plans/catalog-edits";
@@ -31,9 +31,11 @@ export function cellWords(c: Cell): string {
 }
 
 function yearlyWords(catalog: Catalog, plan: Plan): string {
-    return catalog.yearly.on && plan.pricePaise
-        ? planMoney(yearlyPaise(plan.pricePaise, catalog.yearly.paid))
-        : "—";
+    if (!catalog.yearly.on || !plan.pricePaise) return "—";
+    const regular = planMoney(regularYearlyPaise(catalog, plan));
+    return plan.yearlyOfferPaise
+        ? `${planMoney(plan.yearlyOfferPaise)} (offer; regular ${regular})`
+        : regular;
 }
 
 function trialWords(plan: Plan): string {

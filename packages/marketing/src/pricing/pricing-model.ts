@@ -18,7 +18,12 @@ export interface PlanCardView {
     featured: boolean;
     /** The big figure, or the placeholder. */
     price: string;
-    /** "a month", "a year"; empty beside the placeholder. */
+    /**
+     * The regular yearly price, struck through before `price`, when the
+     * plan's yearly offer is shown (DEC-231); else absent.
+     */
+    was?: string;
+    /** "a month", "a year, paid once"; empty beside the placeholder. */
     per: string;
     /** "Free for good", or what the site says about tax and the yearly sum. */
     sub: string;

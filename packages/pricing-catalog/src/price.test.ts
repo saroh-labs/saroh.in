@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    chargedYearlyPaise,
     formatInr,
     formatMinor,
     gstPaise,
     monthlyEquivalentPaise,
     planPricePaise,
+    regularYearlyPaise,
     taxPaise,
     withGstPaise,
     withTaxPaise,
@@ -51,6 +53,18 @@ describe("catalogue money", () => {
                 "month",
             ),
         ).toBe(11_100);
+    });
+
+    it("charges a year at the plan's yearly offer when it has one (DEC-231)", () => {
+        const yearly = { yearly: { on: true, paid: 9 } };
+        const plain = { pricePaise: 11_100 };
+        const offered = { pricePaise: 11_100, yearlyOfferPaise: 77_700 };
+        expect(regularYearlyPaise(yearly, plain)).toBe(99_900);
+        expect(chargedYearlyPaise(yearly, plain)).toBe(99_900);
+        expect(regularYearlyPaise(yearly, offered)).toBe(99_900);
+        expect(chargedYearlyPaise(yearly, offered)).toBe(77_700);
+        expect(planPricePaise(yearly, offered, "year")).toBe(77_700);
+        expect(planPricePaise(yearly, offered, "month")).toBe(11_100);
     });
 
     it("formats rupees the Indian way, with paise only when there are some", () => {

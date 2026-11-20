@@ -1,6 +1,7 @@
 "use client";
 
 import { formatDate, viewerTimeZone } from "@/lib/format/datetime";
+import { NO_REFUNDS_LINE } from "@saroh/pricing-catalog";
 import { Button } from "@saroh/ui/button";
 import {
     Dialog,
@@ -467,6 +468,14 @@ export function ChangePlanDialog({
                                     {l.label}
                                 </dt>
                                 <dd className="m-0 text-right font-medium tabular-nums">
+                                    {l.was ? (
+                                        <s className="mr-1.5 font-normal text-muted-foreground">
+                                            <span className="sr-only">
+                                                Regular price{" "}
+                                            </span>
+                                            {l.was}
+                                        </s>
+                                    ) : null}
                                     {l.iso ? (
                                         <ViewerDate iso={l.iso} />
                                     ) : (
@@ -476,6 +485,17 @@ export function ChangePlanDialog({
                             </div>
                         ))}
                     </dl>
+                ) : null}
+
+                {quoting.state === "ready" &&
+                summary?.toPayment &&
+                quoting.quote.cycle === "year" ? (
+                    <p
+                        role="note"
+                        className="text-pretty text-[12.5px] text-foreground/80"
+                    >
+                        {NO_REFUNDS_LINE}
+                    </p>
                 ) : null}
 
                 {endingAddons ? (

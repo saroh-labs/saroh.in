@@ -2,10 +2,12 @@ import type { Catalog } from "@saroh/pricing-catalog";
 import {
     cardLines,
     cellOf,
+    chargedYearlyPaise,
     monthlyEquivalentPaise,
+    NO_REFUNDS_LINE,
     offeredPlans,
+    regularYearlyPaise,
     trialFirstPaise,
-    yearlyPaise,
 } from "@saroh/pricing-catalog";
 
 import type {
@@ -45,10 +47,10 @@ function planViews(
         const paid = p.pricePaise > 0;
         const year = yearly && paid;
         const charge = taxed(
-            year
-                ? yearlyPaise(p.pricePaise, catalog.yearly.paid)
-                : p.pricePaise,
+            year ? chargedYearlyPaise(catalog, p) : p.pricePaise,
         );
+        // A yearly offer leads, the regular year struck beside it (DEC-231).
+        const yearOffer = year && p.yearlyOfferPaise !== undefined;
         let sub: string;
         if (!paid) sub = "Free for good";
         else if (year) {
@@ -59,16 +61,21 @@ function planViews(
         const trialOn = paid && !year && p.trial?.on === true;
         const first = trialOn ? trialFirstPaise(p) : 0;
         const cl = cardLines(catalog, p.id);
-        const offer = paid
-            ? offers.find((o) => o.planId === p.id && o.discountPaise > 0)
-            : undefined;
+        // The launch coupon doesn't stack on a yearly offer (DEC-231).
+        const offer =
+            paid && !yearOffer
+                ? offers.find((o) => o.planId === p.id && o.discountPaise > 0)
+                : undefined;
         return {
             id: p.id,
             name: p.name,
             tagline: p.tagline,
             featured: p.featured,
             price: money(charge),
-            per: year ? "a year" : "a month",
+            was: yearOffer
+                ? money(taxed(regularYearlyPaise(catalog, p)))
+                : undefined,
+            per: year ? "a year, paid once" : "a month",
             sub,
             cta: {
                 plan: p.id,
@@ -153,11 +160,19 @@ function footnote(
     withTax: boolean,
     site: PricingSite,
 ) {
-    const billed = yearly
-        ? `Billed yearly, pay for ${catalog.yearly.paid} months and get 12.`
-        : "Billed monthly.";
+    // With a yearly offer the struck price says the saving, so the rule
+    // behind the regular price isn't spelled out (DEC-231).
+    const offerOn = offeredPlans(catalog).some(
+        (p) => p.pricePaise > 0 && p.yearlyOfferPaise !== undefined,
+    );
+    const billed = !yearly
+        ? "Billed monthly."
+        : offerOn
+          ? "Billed yearly, one payment for the year."
+          : `Billed yearly, pay for ${catalog.yearly.paid} months and get 12.`;
     const tax = withTax ? site.tax?.footnoteIncl : site.tax?.footnoteExcl;
-    return tax ? `${billed} ${tax}` : billed;
+    const parts = [billed, tax, yearly ? NO_REFUNDS_LINE : undefined];
+    return parts.filter(Boolean).join(" ");
 }
 
 /**

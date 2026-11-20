@@ -12,7 +12,7 @@ import {
 } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 import { editionProfile } from "@saroh/edition";
-import { validateCatalog } from "@saroh/pricing-catalog";
+import { chargedYearlyPaise, validateCatalog } from "@saroh/pricing-catalog";
 
 import {
     AdminAuditOutcome,
@@ -175,10 +175,11 @@ export function offerTermsChanged(
 export function yearlyOffTooMuch(
     f: Pick<CouponFields, "discountPaise" | "percentOff" | "months">,
     monthlyPaise: number,
-    paidMonths: number,
+    /** What the year is charged: its yearly offer when set (DEC-231). */
+    yearPaise: number,
 ): boolean {
     const month = couponMonthPaise(f, monthlyPaise);
-    return month * f.months > monthlyPaise * paidMonths - monthlyPaise;
+    return month * f.months > yearPaise - monthlyPaise;
 }
 
 /**
@@ -543,7 +544,11 @@ export class CouponsService {
             }
             if (
                 check.catalog.yearly.on &&
-                yearlyOffTooMuch(f, plan.pricePaise, check.catalog.yearly.paid)
+                yearlyOffTooMuch(
+                    f,
+                    plan.pricePaise,
+                    chargedYearlyPaise(check.catalog, plan),
+                )
             ) {
                 throw new BadRequestException({
                     message: `On ${plan.name} yearly, this would take off more than the year costs less one month. Use fewer months or a smaller discount.`,

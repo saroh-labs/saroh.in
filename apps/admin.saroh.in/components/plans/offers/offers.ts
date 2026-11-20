@@ -10,12 +10,12 @@ import {
     addonOfferedOn,
     addonPlanNames,
     cellOf,
+    chargedYearlyPaise,
     GST_PERCENT,
     monthlyEquivalentPaise,
     TRIAL_DAYS_MAX,
     TRIAL_DAYS_MIN,
     withGstPaise,
-    yearlyPaise,
 } from "@saroh/pricing-catalog";
 
 import { planMoney } from "@/lib/plan-money";
@@ -41,7 +41,7 @@ export function paidPlans(catalog: Catalog): Plan[] {
 /** "Plan B: ₹X a year, about ₹Y a month", one per paid plan. */
 export function yearlyLines(catalog: Catalog): string[] {
     return paidPlans(catalog).map((p) => {
-        const year = yearlyPaise(p.pricePaise, catalog.yearly.paid);
+        const year = chargedYearlyPaise(catalog, p);
         return `${p.name}: ${planMoney(year)} a year, about ${planMoney(monthlyEquivalentPaise(year))} a month`;
     });
 }

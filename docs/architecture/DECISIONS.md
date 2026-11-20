@@ -3041,3 +3041,16 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context (Website redesign boards, 17 Nov 2026): DEC-103 says a teammate's site edits wait for "an owner's or admin's approval", so the boards drew the reviewer leaving Feedback only and sending approval to the owner. The owner: "the reviewer can approve, we should give them the button, the admin, and owner can also approve."
 - Decision: when "Publishing needs approval" is on, **any one of a reviewer, an admin or the owner can approve** a waiting change (a site's changes or one post). The reviewer gets an Approve button in the read-only editor (DEC-200), beside Ask for changes and the Feedback tab. Approving doesn't let a reviewer edit or publish anything else.
 - Consequences: the approval check accepts the reviewer role as well as admin and owner, and the approval record names who approved. Still Pro only (DEC-103). Whether approving changes how a reviewer counts against seats (DEC-105, DEC-155) is checked against the pricing catalogue before building.
+
+## DEC-231 A yearly offer price per plan; the launch coupon doesn't stack on it
+
+**Status: Accepted — 2026-11-20** · owner
+
+- Context (owner, 20 Nov 2026): Grow and Pro are sold yearly as well as monthly. The catalogue's yearly rule ("pay for N months, get 12") gave one yearly price per plan, and the monthly launch offer (an automatic coupon) also came off a year.
+- Decision:
+    - **The regular yearly price** stays the catalogue's rule, "pay for N months, get 12" (`yearly.paid`).
+    - **Each paid plan may have a yearly offer price** (`yearlyOfferPaise`, before tax, above nothing and below the regular yearly price), set in Admin › Plans in the plan's sheet. When set, it is what a yearly buyer is charged: the plan's yearly row and its provider plan are priced at it. Absent: the regular yearly price is charged, as before.
+    - **The page leads with the offer price**, the regular yearly price struck through beside it, "a year, paid once" and the about-a-month line worked out from the offer. The "pay for N months, get 12" line is not shown while a plan has a yearly offer ("Billed yearly, one payment for the year." instead). Checkout shows the regular price struck beside the charged one.
+    - **The automatic launch coupon doesn't apply to a year at its yearly offer**: the offer is yearly's launch price. Typing that coupon's code on such a year is refused; other typed codes follow the existing coupon rules.
+    - **Pricing and checkout say, near the yearly price:** "We don't refund payments, including a yearly plan cancelled early. If you're ever charged twice, the extra charge is refunded on its own." The Terms already say the same and are unchanged.
+- Consequences: the real offer prices go into the catalogue, never the repo. One helper pair (`regularYearlyPaise`, `chargedYearlyPaise`) is the only place a yearly price is worked out; the version diff and the publish comparison name the offer.
