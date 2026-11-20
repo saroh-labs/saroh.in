@@ -432,6 +432,8 @@ e2e_stack() {
     export SITE_ACCOUNT_AREA=on
     # Many workers share one seeded login: the per-person ceiling (04-F9) is off here.
     export MEMBER_REQUESTS_PER_MINUTE=0
+    # Asha sets up a business in every setup spec: the set-ups-a-day ceiling (DEC-227) is off here.
+    export BUSINESS_CREATES_PER_DAY=0
     # The link preview tool's spec serves its pages on this machine, which
     # the API's SSRF guard refuses; this test-only list lets it reach them.
     # The API won't boot with it under NODE_ENV=production.

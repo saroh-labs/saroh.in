@@ -778,6 +778,9 @@ jobs:
       # Many browser-test workers share one seeded login: the per-person
       # request ceiling (04-F9) would refuse them. Off here only.
       MEMBER_REQUESTS_PER_MINUTE: "0"
+      # Asha (`founder`) sets up a business in every setup spec, far past a
+      # person's set-ups a day (DEC-227). Off here only.
+      BUSINESS_CREATES_PER_DAY: "0"
       # The link preview spec serves its pages on this runner, which the
       # API's SSRF guard refuses; this test-only list lets it reach them.
       # The API refuses to boot with it under NODE_ENV=production.

@@ -1,6 +1,6 @@
 import { ConflictException, HttpException, HttpStatus } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { prisma } from "@saroh/database";
+import { outsideOrgContext, prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
 import { env } from "../../env";
@@ -99,33 +99,38 @@ async function lockPeople(tx: Tx, userIds: readonly string[]) {
  * Whether `userId` already owns as many Free businesses on `edition` as
  * they may, `exceptOrganizationId` left out, and of the paused ones only
  * those marked before `before` (the one marked last is the one paused).
+ * The person's other businesses are read outside the caller's row-level
+ * security, on their own connection (a business's request sees only its
+ * own rows), as `holdPayerOffersInTx` reads the payer's; callers in a
+ * transaction hold the person's lock first.
  */
 async function atLimit(
-    tx: Pick<Tx, "organization" | "user">,
     userId: string,
     edition: Edition,
     exceptOrganizationId?: string,
     before?: Date,
 ): Promise<boolean> {
-    const [owned, user] = await Promise.all([
-        tx.organization.count({
-            where: {
-                ...ownedFreeWhere(userId, edition, exceptOrganizationId),
-                ...(before
-                    ? {
-                          OR: [
-                              { freeLimitPausedAt: null },
-                              { freeLimitPausedAt: { lt: before } },
-                          ],
-                      }
-                    : {}),
-            },
-        }),
-        tx.user.findUnique({
-            where: { id: userId },
-            select: { extraFreeBusinesses: true },
-        }),
-    ]);
+    const [owned, user] = await outsideOrgContext(() =>
+        Promise.all([
+            prisma.organization.count({
+                where: {
+                    ...ownedFreeWhere(userId, edition, exceptOrganizationId),
+                    ...(before
+                        ? {
+                              OR: [
+                                  { freeLimitPausedAt: null },
+                                  { freeLimitPausedAt: { lt: before } },
+                              ],
+                          }
+                        : {}),
+                },
+            }),
+            prisma.user.findUnique({
+                where: { id: userId },
+                select: { extraFreeBusinesses: true },
+            }),
+        ]),
+    );
     return owned >= 1 + Math.max(0, user?.extraFreeBusinesses ?? 0);
 }
 
@@ -141,7 +146,7 @@ export async function assertMayOwnAnotherFreeInTx(
     edition: Edition,
 ): Promise<void> {
     for (const userId of await lockPeople(tx, userIds)) {
-        if (await atLimit(tx, userId, edition)) {
+        if (await atLimit(userId, edition)) {
             throw new ConflictException({
                 message: FREE_BUSINESS_TAKEN_MESSAGE,
                 details: { code: "FREE_BUSINESS_TAKEN" },
@@ -184,7 +189,7 @@ export async function settleFreeLimitInTx(
         ).map((o) => o.userId);
     let over = false;
     for (const userId of await lockPeople(tx, owners)) {
-        if (await atLimit(tx, userId, org.edition, organizationId)) {
+        if (await atLimit(userId, org.edition, organizationId)) {
             over = true;
             break;
         }
@@ -236,7 +241,6 @@ export async function freeLimitPaused(
     for (const { userId } of org.memberships) {
         if (
             await atLimit(
-                db,
                 userId,
                 org.edition,
                 organizationId,

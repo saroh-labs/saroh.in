@@ -671,6 +671,8 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
                 planId: plan.id,
                 cycle: "month",
                 kind: "TRIAL",
+                // The migrations' check: only NEW starts at authorisation.
+                startAt: new Date(),
                 status: "OPEN",
                 provider: "razorpay",
                 providerSubscriptionId: uniq("sub"),
@@ -704,6 +706,7 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
                         planId: plan.id,
                         cycle: "month",
                         kind: "TRIAL",
+                        startAt: new Date(),
                         status: "OPEN",
                         provider: "razorpay",
                         providerSubscriptionId: uniq("sub"),
@@ -738,7 +741,11 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
         const open = await openTrial(first.orgId);
         await prisma.billingCheckout.update({
             where: { id: open.id },
-            data: { couponId: coupon.id, kind: "NEW" },
+            data: {
+                couponId: coupon.id,
+                discountPaise: 100,
+                discountCharges: 1,
+            },
         });
         const now = new Date();
         expect(await couponUsedByPayer(coupon.id, second.orgId, now)).toBe(

@@ -713,7 +713,10 @@ export async function hadPaidPlanOrLaunchOffer(
         return invoice !== null || paid !== null || launch !== null;
     };
     if (await had([organizationId])) return "this";
-    return (await had(await samePayer(prisma, organizationId)))
+    // Other businesses' rows: outside this one's row-level security.
+    return (await outsideOrgContext(async () =>
+        had(await samePayer(prisma, organizationId)),
+    ))
         ? "other"
         : null;
 }
@@ -728,25 +731,28 @@ export async function couponUsedByPayer(
     organizationId: string,
     now: Date,
 ): Promise<boolean> {
-    const ids = await samePayer(prisma, organizationId);
-    const others = ids.filter((id) => id !== organizationId);
-    const [redeemed, held] = await Promise.all([
-        prisma.pricingCouponRedemption.findFirst({
-            where: { couponId, organizationId: { in: ids } },
-            select: { id: true },
-        }),
-        others.length > 0
-            ? prisma.billingCheckout.findFirst({
-                  where: {
-                      couponId,
-                      organizationId: { in: others },
-                      ...offerHeld(now),
-                  },
-                  select: { id: true },
-              })
-            : null,
-    ]);
-    return redeemed !== null || held !== null;
+    // Other businesses' rows: outside this one's row-level security.
+    return outsideOrgContext(async () => {
+        const ids = await samePayer(prisma, organizationId);
+        const others = ids.filter((id) => id !== organizationId);
+        const [redeemed, held] = await Promise.all([
+            prisma.pricingCouponRedemption.findFirst({
+                where: { couponId, organizationId: { in: ids } },
+                select: { id: true },
+            }),
+            others.length > 0
+                ? prisma.billingCheckout.findFirst({
+                      where: {
+                          couponId,
+                          organizationId: { in: others },
+                          ...offerHeld(now),
+                      },
+                      select: { id: true },
+                  })
+                : null,
+        ]);
+        return redeemed !== null || held !== null;
+    });
 }
 
 /** Said when a launch offer was had by a business sharing this one's payer. */

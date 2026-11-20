@@ -68,7 +68,7 @@ export async function catalogueOfVersion(
  * or is checking out with it (said at checkout); null: none has.
  */
 export async function trialTakenBy(
-    db: Pick<Tx, "billingCheckout" | "organization">,
+    db: Pick<Tx, "billingCheckout">,
     organizationId: string,
     now: Date = new Date(),
 ): Promise<"this" | "other" | null> {
@@ -77,17 +77,20 @@ export async function trialTakenBy(
         select: { id: true },
     });
     if (own) return "this";
-    const others = (await samePayer(db, organizationId)).filter(
-        (id) => id !== organizationId,
-    );
-    if (others.length === 0) return null;
-    const other = await db.billingCheckout.findFirst({
-        where: {
-            organizationId: { in: others },
-            kind: "TRIAL",
-            ...offerHeld(now),
-        },
-        select: { id: true },
+    // Other businesses' rows: outside this one's row-level security.
+    const other = await outsideOrgContext(async () => {
+        const others = (await samePayer(prisma, organizationId)).filter(
+            (id) => id !== organizationId,
+        );
+        if (others.length === 0) return null;
+        return prisma.billingCheckout.findFirst({
+            where: {
+                organizationId: { in: others },
+                kind: "TRIAL",
+                ...offerHeld(now),
+            },
+            select: { id: true },
+        });
     });
     return other ? "other" : null;
 }
