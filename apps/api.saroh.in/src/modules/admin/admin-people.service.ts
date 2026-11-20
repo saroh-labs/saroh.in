@@ -331,6 +331,12 @@ export class AdminPeopleService {
         reason: string,
     ) {
         const why = requireReason(reason);
+        // Staff never grant themselves an exception (N7).
+        if (userId === staff.userId) {
+            throw new ForbiddenException(
+                "You can't change your own free businesses. Ask another staff member.",
+            );
+        }
         return prisma.$transaction(async (tx) => {
             const user = await tx.user.findUnique({
                 where: { id: userId },

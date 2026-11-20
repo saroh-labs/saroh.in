@@ -79,6 +79,17 @@ describe("WhatsappCommsProvider keys", () => {
         expect(isKeysRefused(err)).toBe(true);
     });
 
+    it.each([10, 200])(
+        "a send refused for permission (code %i, accepted on save) needs attention (N10)",
+        async (code) => {
+            answer(400, { error: { code } });
+            const err = await new WhatsappCommsProvider()
+                .send({ to: "919800000000", body: "hi", credentials })
+                .catch((e: unknown) => e);
+            expect(isKeysRefused(err)).toBe(true);
+        },
+    );
+
     it("any other refusal is a plain failure", async () => {
         answer(400, { error: { code: 131047 } });
         const err = await new WhatsappCommsProvider()

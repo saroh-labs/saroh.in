@@ -200,6 +200,11 @@ model Organization {
   // it after that. Code reads it from here, never from the address a request
   // came through.
   edition Edition @default(INDIA)
+  // Set when it moved to Free (or gained an owner, or was restored) while an
+  // owner already owned as many Free businesses on its edition as they may
+  // (DEC-227): it keeps everything but its websites take no orders or
+  // bookings while that owner is still over. Null for every other business.
+  freeLimitPausedAt DateTime?
   // ISO 4217, chosen at setup by a Global business: its one currency. Null for
   // a business from before, whose currency comes from what it sells (DEC-030).
   currency String?

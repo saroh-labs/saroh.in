@@ -19,7 +19,7 @@ const tx = {
     staffMember: { count: jest.fn() },
     organizationInvitation: { findMany: jest.fn() },
     merchantPaymentProvider: { count: jest.fn() },
-    communicationProvider: { count: jest.fn() },
+    communicationProvider: { findMany: jest.fn() },
     businessProfile: { findUnique: jest.fn() },
     service: { findFirst: jest.fn() },
     store: { count: jest.fn() },
@@ -78,6 +78,7 @@ import {
     crossesNotice,
     MeteringService,
     PLAN_LIMIT_NOTICE_TYPE,
+    rowGate,
 } from "./metering.service";
 import { bookingsPaused, moduleLocked } from "./plan-limit-errors";
 import { limitLevel, limitNoticeWords } from "./plan-limit-notice.handler";
@@ -467,9 +468,23 @@ describe("what each count asks", () => {
 
     it("adds connected messaging to connected payment providers", async () => {
         tx.merchantPaymentProvider.count.mockResolvedValue(1);
-        tx.communicationProvider.count.mockResolvedValue(1);
+        tx.communicationProvider.findMany.mockResolvedValue([
+            { status: "CONNECTED", channel: "EMAIL", provider: "RESEND" },
+        ]);
         expect(await countUsage(tx as never, "org", "integrations", now)).toBe(
             2,
+        );
+    });
+
+    it("leaves out a retired messaging row that can't send (N11)", async () => {
+        tx.merchantPaymentProvider.count.mockResolvedValue(0);
+        tx.communicationProvider.findMany.mockResolvedValue([
+            { status: "CONNECTED", channel: "EMAIL", provider: "SENDGRID" },
+            { status: "CONNECTED", channel: "WHATSAPP", provider: "TWILIO" },
+            { status: "CONNECTED", channel: "WHATSAPP", provider: "META" },
+        ]);
+        expect(await countUsage(tx as never, "org", "integrations", now)).toBe(
+            1,
         );
     });
 
@@ -790,7 +805,7 @@ describe("hasRoom: the connect's check, asked before offering it (DEC-086)", () 
     // `integrations`: 1 on Plan A, 2 on Plan B, no cap on Plan C.
     function connections(n: number) {
         tx.merchantPaymentProvider.count.mockResolvedValue(n);
-        tx.communicationProvider.count.mockResolvedValue(0);
+        tx.communicationProvider.findMany.mockResolvedValue([]);
     }
 
     it("is room when the plan includes it with room for one more", async () => {
@@ -854,6 +869,33 @@ describe("hasRoom: the connect's check, asked before offering it (DEC-086)", () 
         await expect(meter.hasRoom("org", "integrations")).rejects.toThrow(
             "down",
         );
+    });
+});
+
+describe("rowGate: storage a plan leaves out (N4)", () => {
+    const cell = (moduleId: string, state: "on" | "locked") => ({
+        moduleId,
+        state,
+        limit: state === "on" ? 1 : null,
+        soft: false,
+    });
+
+    it("reads storage that isn't included as open, never every upload locked", () => {
+        expect(rowGate(cell("storage", "locked") as never, false)).toBe("open");
+    });
+
+    it("still locks another row the plan leaves out", () => {
+        expect(rowGate(cell("products", "locked") as never, false)).toBe(
+            "locked",
+        );
+    });
+
+    it("keeps an included hard storage cell hard", () => {
+        expect(rowGate(cell("storage", "on") as never, false)).toEqual({
+            key: "storageGb",
+            limit: 1,
+            soft: false,
+        });
     });
 });
 

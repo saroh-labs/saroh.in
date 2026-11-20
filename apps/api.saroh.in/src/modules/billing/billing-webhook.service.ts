@@ -17,6 +17,7 @@ import {
 } from "../audit/audit.service";
 import { CommissionQueue } from "../commission/commission-queue";
 import { creditInTx } from "../messaging/wallet.service";
+import { settleFreeLimitInTx } from "../organizations/free-business";
 import type { EndedAddons } from "./addon-charges";
 import {
     clearAddonsInTx,
@@ -1551,6 +1552,11 @@ export class BillingWebhookService {
             where: { id: sub.id },
             data: { status: target, ...stamp, ...due, ...settled },
         });
+        // Ended (a trial or plan cancelled at once): Free now, never
+        // refused; past the one-Free rule it pauses (DEC-227).
+        if (target === "CANCELLED") {
+            await settleFreeLimitInTx(tx, sub.organizationId);
+        }
         // Paid by the provider's retry or link while a Pay now checkout was
         // open: that checkout is dropped, so paying it too reads as a double
         // charge and is refunded (DEC-164), never a second plan.

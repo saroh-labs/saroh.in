@@ -39,15 +39,19 @@ import type { CheckoutStartDto } from "../orders/checkout.dto";
 import {
     assertMayOwnAnotherFreeInTx,
     FREE_BUSINESS_TAKEN_MESSAGE,
+    freeLimitPaused,
+    settleFreeLimitInTx,
 } from "../organizations/free-business";
 import { OrganizationOnboardingService } from "../organizations/organization-onboarding.service";
 import {
     automaticCouponFor,
+    couponUsedByPayer,
     hadPaidPlanOrLaunchOffer,
 } from "../pricing/coupons.service";
 import { FixedWindowRateLimiter } from "../rate-limits/fixed-window";
 import { PLAN_LIMIT_NOTICE_TYPE } from "./metering.service";
-import { trialTakenBy } from "./offers";
+import { holdPayerOffersInTx, trialTakenBy } from "./offers";
+import { overLimit } from "./over-limit.service";
 import { ORDERS_PAUSED_MESSAGE } from "./plan-limit-errors";
 
 const tag = `${process.pid}-${Date.now()}`;
@@ -429,24 +433,135 @@ describe("one business on Free per person (DEC-227, M-4)", () => {
         expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     });
 
-    it("refuses moving a paid business down to Free while its owner has another on Free", async () => {
+    it("counts a business still on a trial as Free for a set-up (N1)", async () => {
+        const owner = await person();
+        const trial = await business(HARD, {
+            planId: "grow",
+            ownerId: owner.id,
+        });
+        await prisma.subscription.update({
+            where: { organizationId: trial.orgId },
+            data: { status: "TRIALING" },
+        });
+        await expect(make(onboarding(), owner.id)).rejects.toThrow(
+            FREE_BUSINESS_TAKEN_MESSAGE,
+        );
+    });
+
+    it("counts each edition on its own (N8)", async () => {
         const owner = await person();
         await business(HARD, { ownerId: owner.id });
+        await expect(
+            prisma.$transaction((tx) =>
+                assertMayOwnAnotherFreeInTx(tx, [owner.id], "INDIA"),
+            ),
+        ).rejects.toThrow(FREE_BUSINESS_TAKEN_MESSAGE);
+        await prisma.$transaction((tx) =>
+            assertMayOwnAnotherFreeInTx(tx, [owner.id], "GLOBAL"),
+        );
+    });
+
+    /** Move a business to Free now, as a cancel or an ended term does. */
+    async function toFree(orgId: string) {
+        const free = await prisma.plan.findUniqueOrThrow({
+            where: {
+                key_version_interval: {
+                    key: "catalog.free",
+                    version: HARD,
+                    interval: "month",
+                },
+            },
+        });
+        await prisma.subscription.update({
+            where: { organizationId: orgId },
+            data: { planId: free.id, status: "ACTIVE" },
+        });
+        return prisma.$transaction((tx) => settleFreeLimitInTx(tx, orgId));
+    }
+
+    it("never refuses a move down: the business that moved last pauses, and un-pauses when the other goes (N2)", async () => {
+        const owner = await person();
+        const kept = await business(HARD, { ownerId: owner.id });
         const paid = await business(HARD, {
             planId: "grow",
             ownerId: owner.id,
         });
-        await expect(
-            prisma.$transaction((tx) =>
-                assertMayOwnAnotherFreeInTx(tx, [owner.id], paid.orgId),
-            ),
-        ).rejects.toThrow(FREE_BUSINESS_TAKEN_MESSAGE);
-        // Its own Free business alone never stops it.
-        const solo = await person();
-        const only = await business(HARD, { planId: "grow", ownerId: solo.id });
-        await prisma.$transaction((tx) =>
-            assertMayOwnAnotherFreeInTx(tx, [solo.id], only.orgId),
+        const site = await prisma.site.create({
+            data: { organizationId: paid.orgId, name: "Paid", slug: uniq("s") },
+        });
+        expect(await toFree(paid.orgId)).toBe(true);
+        expect(await freeLimitPaused(paid.orgId)).toBe(true);
+        expect(await freeLimitPaused(kept.orgId)).toBe(false);
+        overLimit.forget(paid.orgId);
+        expect((await overLimit.pausedNow(paid.orgId))?.siteIds).toContain(
+            site.id,
         );
+        // The owner is told why, and what to do.
+        expect(
+            await prisma.notification.count({
+                where: { organizationId: paid.orgId, type: "plan.changed" },
+            }),
+        ).toBe(1);
+        // The other Free business closes: it takes orders again.
+        await prisma.organization.update({
+            where: { id: kept.orgId },
+            data: { lifecycleStatus: "DELETED_RETAINED" },
+        });
+        expect(await freeLimitPaused(paid.orgId)).toBe(false);
+    });
+
+    it("pauses a trial that ends on Free while they own another (N1, N2)", async () => {
+        const owner = await person({ extraFreeBusinesses: 1 });
+        await business(HARD, { ownerId: owner.id });
+        const trial = await business(HARD, {
+            planId: "grow",
+            ownerId: owner.id,
+        });
+        await prisma.subscription.update({
+            where: { organizationId: trial.orgId },
+            data: { status: "TRIALING" },
+        });
+        // Room for two: the trial ending on Free is the second, not paused.
+        expect(await toFree(trial.orgId)).toBe(false);
+        await prisma.user.update({
+            where: { id: owner.id },
+            data: { extraFreeBusinesses: 0 },
+        });
+        expect(await freeLimitPaused(trial.orgId)).toBe(false);
+        // Without the exception, a later move down pauses.
+        const third = await business(HARD, {
+            planId: "grow",
+            ownerId: owner.id,
+        });
+        expect(await toFree(third.orgId)).toBe(true);
+        expect(await freeLimitPaused(third.orgId)).toBe(true);
+    });
+
+    it("pauses a Free business that gains an owner already at the limit, never refusing (N5)", async () => {
+        const newOwner = await person();
+        await business(HARD, { ownerId: newOwner.id });
+        const theirs = await business(HARD);
+        await prisma.membership.create({
+            data: {
+                organizationId: theirs.orgId,
+                userId: newOwner.id,
+                role: "OWNER",
+            },
+        });
+        expect(
+            await prisma.$transaction((tx) =>
+                settleFreeLimitInTx(tx, theirs.orgId, [newOwner.id]),
+            ),
+        ).toBe(true);
+        expect(await freeLimitPaused(theirs.orgId)).toBe(true);
+    });
+
+    it("keeps businesses a person owned before the rule unpaused", async () => {
+        const owner = await person();
+        const a = await business(HARD, { ownerId: owner.id });
+        const b = await business(HARD, { ownerId: owner.id });
+        expect(await freeLimitPaused(a.orgId)).toBe(false);
+        expect(await freeLimitPaused(b.orgId)).toBe(false);
     });
 
     it("limits how many businesses one person sets up in a day", async () => {
@@ -540,5 +655,107 @@ describe("the trial and the launch discount are once per person (DEC-227, M-2, M
 
         const stranger = await business(HARD);
         expect(await hadPaidPlanOrLaunchOffer(stranger.orgId)).toBeNull();
+    });
+
+    async function openTrial(orgId: string) {
+        const plan = await prisma.plan.findFirstOrThrow({
+            where: { version: HARD },
+        });
+        return prisma.billingCheckout.create({
+            data: {
+                organizationId: orgId,
+                planId: plan.id,
+                cycle: "month",
+                kind: "TRIAL",
+                status: "OPEN",
+                provider: "razorpay",
+                providerSubscriptionId: uniq("sub"),
+                providerPlanId: uniq("plan"),
+                pricePaise: 100,
+                expiresAt: new Date(Date.now() + 30 * MINUTE),
+            },
+        });
+    }
+
+    it("counts an open trial checkout of the same person, and lets one of two at once through (N3)", async () => {
+        const owner = await person();
+        const first = await business(HARD, { ownerId: owner.id });
+        const second = await business(HARD, { ownerId: owner.id });
+        await openTrial(first.orgId);
+        expect(await trialTakenBy(prisma, second.orgId)).toBe("other");
+        // Its own open checkout never counts against itself.
+        expect(await trialTakenBy(prisma, first.orgId)).toBeNull();
+
+        const a = await business(HARD, { ownerId: (await person()).id });
+        const b = await business(HARD, { ownerId: a.ownerId });
+        const start = (orgId: string) =>
+            prisma.$transaction(async (tx) => {
+                await holdPayerOffersInTx(tx, orgId, true, new Date());
+                await new Promise((r) => setTimeout(r, 50));
+                const plan = await tx.plan.findFirstOrThrow({
+                    where: { version: HARD },
+                });
+                await tx.billingCheckout.create({
+                    data: {
+                        organizationId: orgId,
+                        planId: plan.id,
+                        cycle: "month",
+                        kind: "TRIAL",
+                        status: "OPEN",
+                        provider: "razorpay",
+                        providerSubscriptionId: uniq("sub"),
+                        providerPlanId: uniq("plan"),
+                        pricePaise: 100,
+                        expiresAt: new Date(Date.now() + 30 * MINUTE),
+                    },
+                });
+            });
+        const results = await Promise.allSettled([
+            start(a.orgId),
+            start(b.orgId),
+        ]);
+        expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    });
+
+    it("counts a coupon held by another open checkout of the same person (N3)", async () => {
+        const owner = await person();
+        const first = await business(HARD, { ownerId: owner.id });
+        const second = await business(HARD, { ownerId: owner.id });
+        const coupon = await prisma.pricingCoupon.create({
+            data: {
+                code: uniq("HELD")
+                    .toUpperCase()
+                    .replace(/[^A-Z0-9]/g, ""),
+                discountPaise: 100,
+                months: 1,
+                maxRedemptions: 1000,
+                planIds: ["grow"],
+            },
+        });
+        const open = await openTrial(first.orgId);
+        await prisma.billingCheckout.update({
+            where: { id: open.id },
+            data: { couponId: coupon.id, kind: "NEW" },
+        });
+        const now = new Date();
+        expect(await couponUsedByPayer(coupon.id, second.orgId, now)).toBe(
+            true,
+        );
+        expect(await couponUsedByPayer(coupon.id, first.orgId, now)).toBe(
+            false,
+        );
+    });
+
+    it("matches a GSTIN however it was typed (N9)", async () => {
+        const first = await business(HARD);
+        await trialDone(first.orgId);
+        await prisma.businessProfile.create({
+            data: { organizationId: first.orgId, taxId: "29ABCDE1234F1Z5" },
+        });
+        const typed = await business(HARD);
+        await prisma.businessProfile.create({
+            data: { organizationId: typed.orgId, taxId: "29abcde 1234-f1z5" },
+        });
+        expect(await trialTakenBy(prisma, typed.orgId)).toBe("other");
     });
 });

@@ -40,6 +40,7 @@ import {
     joinsBookable,
     linkDiaryPerson,
 } from "./diary-invite";
+import { settleFreeLimitInTx } from "./free-business";
 import type { InviteSendLimit } from "./invite-send-limit";
 import { inviteSendLimit } from "./invite-send-limit";
 import { hashInviteToken } from "./invite-token";
@@ -711,6 +712,12 @@ export class OrganizationMembersService {
                     tokenHash: `accepted:${invitation.id}`,
                 },
             });
+            // A new Owner past the one-Free rule pauses it (DEC-227).
+            if (roleKey === "OWNER") {
+                await settleFreeLimitInTx(tx, invitation.organizationId, [
+                    user.id,
+                ]);
+            }
             // The team's "Someone joins the team" (F14), with the join.
             await enqueueTeamAlert(tx, invitation.organizationId, {
                 event: "team",
@@ -819,6 +826,10 @@ export class OrganizationMembersService {
                         },
                         update: {},
                     });
+                }
+                // A new Owner past the one-Free rule pauses it (DEC-227).
+                if (dto.role === "OWNER" && membership.role !== "OWNER") {
+                    await settleFreeLimitInTx(tx, ctx.organizationId, [userId]);
                 }
                 await ledger?.(tx, { from: membership.role, to: dto.role });
             },

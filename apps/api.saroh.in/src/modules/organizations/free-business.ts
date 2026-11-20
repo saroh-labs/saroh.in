@@ -1,18 +1,31 @@
 import { ConflictException, HttpException, HttpStatus } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import { env } from "../../env";
-import { holdXactLock } from "../billing/metering.service";
+import { holdXactLock } from "../billing/xact-lock";
+import { noticeOf } from "../notifications/notice-target";
 import type { WindowLimiter } from "../rate-limits/shared-window";
 import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { OrganizationLifecycleStatus } from "./organization-lifecycle.policy";
 
 /**
  * One business on Free per person (M-4, DEC-227). A person may own (the
- * OWNER role, not any other) one business that isn't on a paid plan, plus
- * whatever exception staff granted them (`User.extraFreeBusinesses`, from
- * the console). A business that is closing or deleted doesn't count; one
- * on a paid plan does only once that plan has ended or been set to end.
+ * OWNER role, not any other) one business that isn't on a paid plan on
+ * each edition, plus whatever exception staff granted them
+ * (`User.extraFreeBusinesses`, from the console). A business that is
+ * closing or deleted doesn't count; one on a paid plan does once that plan
+ * has ended or been set to end, and while it is only a trial (a trial that
+ * ends unpaid is on Free).
+ *
+ * Setting a business up past the rule is refused. A move down to Free is
+ * never refused (20 Nov, owner): the business that moved last (or gained
+ * the owner, or was restored) is marked (`freeLimitPausedAt`) and its
+ * websites take no orders or bookings while the owner is still over
+ * ({@link freeLimitPaused}, read by `overLimit.pausedNow`). Nothing else
+ * changes, and it un-pauses on its own once it, or another of the owner's,
+ * is upgraded or closed.
  *
  * Asked under a lock per person (`free-business:<userId>`), so two set-ups
  * or a set-up and a move to Free at once can't both pass.
@@ -20,11 +33,11 @@ import { OrganizationLifecycleStatus } from "./organization-lifecycle.policy";
 
 type Tx = Pick<
     Prisma.TransactionClient,
-    "organization" | "user" | "$executeRaw" | "$queryRaw"
+    "organization" | "user" | "membership" | "$executeRaw" | "$queryRaw"
 >;
 
 export const FREE_BUSINESS_TAKEN_MESSAGE =
-    "You already have a free business. Upgrade it, or choose a paid plan for the new one.";
+    "You already own a business on the Free plan. Move that one to a paid plan in Plan and billing, then set up the new one, or write to us.";
 
 /** Businesses still standing: not closing, not deleted. */
 const STANDING = {
@@ -36,62 +49,203 @@ const STANDING = {
     },
 } satisfies Prisma.OrganizationWhereInput;
 
-/** On a paid plan that hasn't ended and isn't set to end. */
+/** On a paid plan, past any trial, that hasn't ended and isn't set to end. */
 const STAYS_PAID = {
     subscription: {
         is: {
-            status: { not: "CANCELLED" },
+            status: { notIn: ["CANCELLED", "TRIALING"] },
             cancelAtPeriodEnd: false,
             plan: { priceCents: { gt: 0 } },
         },
     },
 } satisfies Prisma.OrganizationWhereInput;
 
-/** The businesses this person owns that are (or are going) on Free. */
+/** On Free now: no live paid plan (a trial still running is paid). */
+const ON_FREE_NOW = {
+    NOT: {
+        subscription: {
+            is: {
+                status: { not: "CANCELLED" },
+                plan: { priceCents: { gt: 0 } },
+            },
+        },
+    },
+} satisfies Prisma.OrganizationWhereInput;
+
+/** The businesses this person owns on `edition` that are (or are going) on Free. */
 export function ownedFreeWhere(
     userId: string,
+    edition: Edition,
     exceptOrganizationId?: string,
 ): Prisma.OrganizationWhereInput {
     return {
         ...STANDING,
+        edition,
         memberships: { some: { userId, role: "OWNER" } },
         NOT: STAYS_PAID,
         ...(exceptOrganizationId ? { id: { not: exceptOrganizationId } } : {}),
     };
 }
 
-/**
- * Refuse (409 `FREE_BUSINESS_TAKEN`) when each of these people already
- * owns as many Free businesses as they may, `exceptOrganizationId` left
- * out (the business moving to Free). Takes each person's lock first, in
- * one order, for the rest of the transaction.
- */
-export async function assertMayOwnAnotherFreeInTx(
-    tx: Tx,
-    userIds: readonly string[],
-    exceptOrganizationId?: string,
-): Promise<void> {
+async function lockPeople(tx: Tx, userIds: readonly string[]) {
     const people = [...new Set(userIds)].sort();
     for (const userId of people) {
         await holdXactLock(tx, `free-business:${userId}`);
     }
-    for (const userId of people) {
-        const [owned, user] = await Promise.all([
-            tx.organization.count({
-                where: ownedFreeWhere(userId, exceptOrganizationId),
-            }),
-            tx.user.findUnique({
-                where: { id: userId },
-                select: { extraFreeBusinesses: true },
-            }),
-        ]);
-        if (owned >= 1 + Math.max(0, user?.extraFreeBusinesses ?? 0)) {
+    return people;
+}
+
+/**
+ * Whether `userId` already owns as many Free businesses on `edition` as
+ * they may, `exceptOrganizationId` left out, and of the paused ones only
+ * those marked before `before` (the one marked last is the one paused).
+ */
+async function atLimit(
+    tx: Pick<Tx, "organization" | "user">,
+    userId: string,
+    edition: Edition,
+    exceptOrganizationId?: string,
+    before?: Date,
+): Promise<boolean> {
+    const [owned, user] = await Promise.all([
+        tx.organization.count({
+            where: {
+                ...ownedFreeWhere(userId, edition, exceptOrganizationId),
+                ...(before
+                    ? {
+                          OR: [
+                              { freeLimitPausedAt: null },
+                              { freeLimitPausedAt: { lt: before } },
+                          ],
+                      }
+                    : {}),
+            },
+        }),
+        tx.user.findUnique({
+            where: { id: userId },
+            select: { extraFreeBusinesses: true },
+        }),
+    ]);
+    return owned >= 1 + Math.max(0, user?.extraFreeBusinesses ?? 0);
+}
+
+/**
+ * Refuse (409 `FREE_BUSINESS_TAKEN`) setting up a business on `edition`
+ * when one of these people already owns as many Free businesses there as
+ * they may. Takes each person's lock first, in one order, for the rest of
+ * the transaction.
+ */
+export async function assertMayOwnAnotherFreeInTx(
+    tx: Tx,
+    userIds: readonly string[],
+    edition: Edition,
+): Promise<void> {
+    for (const userId of await lockPeople(tx, userIds)) {
+        if (await atLimit(tx, userId, edition)) {
             throw new ConflictException({
                 message: FREE_BUSINESS_TAKEN_MESSAGE,
                 details: { code: "FREE_BUSINESS_TAKEN" },
             });
         }
     }
+}
+
+/** What the owner reads when a business is paused by the rule. */
+export const FREE_LIMIT_PAUSED_WORDS = {
+    title: (name: string) => `${name} has stopped taking orders and bookings`,
+    body: "You already own another business on the Free plan, and each person can own one. Everything in this business is kept, but its website isn't taking orders or bookings. Choose a paid plan for it in Plan and billing, or upgrade or close your other free business, and it starts again at once.",
+};
+
+/**
+ * After a business moved to Free, gained an owner, or was restored: mark
+ * it when an owner (`onlyUserIds`, else every owner) already owns as many
+ * Free businesses on its edition as they may, and tell the business once;
+ * a move that leaves nobody over clears the mark. Never refuses. A
+ * business not on Free now is left as it is (a move set for a later date
+ * is settled when it is applied). True when it is marked.
+ */
+export async function settleFreeLimitInTx(
+    tx: Tx & Pick<Prisma.TransactionClient, "notification">,
+    organizationId: string,
+    onlyUserIds?: readonly string[],
+): Promise<boolean> {
+    const org = await tx.organization.findFirst({
+        where: { id: organizationId, ...STANDING, ...ON_FREE_NOW },
+        select: { name: true, edition: true, freeLimitPausedAt: true },
+    });
+    if (!org) return false;
+    const owners =
+        onlyUserIds ??
+        (
+            await tx.membership.findMany({
+                where: { organizationId, role: "OWNER" },
+                select: { userId: true },
+            })
+        ).map((o) => o.userId);
+    let over = false;
+    for (const userId of await lockPeople(tx, owners)) {
+        if (await atLimit(tx, userId, org.edition, organizationId)) {
+            over = true;
+            break;
+        }
+    }
+    if (over === (org.freeLimitPausedAt !== null)) return over;
+    // A check of one new owner only adds a mark; it never clears another's.
+    if (!over && onlyUserIds) return false;
+    await tx.organization.update({
+        where: { id: organizationId },
+        data: { freeLimitPausedAt: over ? new Date() : null },
+    });
+    if (over) {
+        await tx.notification.create({
+            data: {
+                organizationId,
+                // It opens Plan and billing.
+                ...noticeOf("plan.changed", {}),
+                title: FREE_LIMIT_PAUSED_WORDS.title(org.name),
+                body: FREE_LIMIT_PAUSED_WORDS.body,
+            },
+        });
+    }
+    return over;
+}
+
+/**
+ * Whether the rule pauses this business now: marked, on Free now, and an
+ * owner still owns as many other Free businesses on its edition as they
+ * may (counting only those marked before it).
+ */
+export async function freeLimitPaused(
+    organizationId: string,
+    db: Pick<Prisma.TransactionClient, "organization" | "user"> = prisma,
+): Promise<boolean> {
+    const org = await db.organization.findFirst({
+        where: {
+            id: organizationId,
+            freeLimitPausedAt: { not: null },
+            ...STANDING,
+            ...ON_FREE_NOW,
+        },
+        select: {
+            edition: true,
+            freeLimitPausedAt: true,
+            memberships: { where: { role: "OWNER" }, select: { userId: true } },
+        },
+    });
+    if (!org?.freeLimitPausedAt) return false;
+    for (const { userId } of org.memberships) {
+        if (
+            await atLimit(
+                db,
+                userId,
+                org.edition,
+                organizationId,
+                org.freeLimitPausedAt,
+            )
+        )
+            return true;
+    }
+    return false;
 }
 
 /** Set-ups a day for one person, unset. */
