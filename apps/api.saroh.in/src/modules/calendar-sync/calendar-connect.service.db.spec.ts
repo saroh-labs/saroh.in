@@ -12,7 +12,6 @@
  */
 import { randomBytes } from "node:crypto";
 
-import { ForbiddenException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -21,7 +20,7 @@ import { planMeter } from "../billing/metering.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { roleDenial } from "../organizations/organization-policy";
 import { markLapsed } from "./calendar-access";
-import { overAllowance, pausedBecause } from "./calendar-allowed";
+import { calendarPlan, overAllowance, pausedBecause } from "./calendar-allowed";
 import { CalendarConnectService } from "./calendar-connect.service";
 import { CALENDAR_BUSY_TYPE } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
@@ -162,15 +161,15 @@ describe("connecting Google Calendar", () => {
 
     it("refuses a plan without connected providers", async () => {
         const { ctx } = await person();
-        const locked = new ForbiddenException({
-            message: "Your plan doesn't include this.",
-            details: { code: "MODULE_LOCKED" },
-        });
+        // Off the catalogue, or a plan that can't be read, is locked (P3).
         const spy = jest
-            .spyOn(planMeter, "assertIncluded")
-            .mockRejectedValueOnce(locked);
-        await expect(service.start(ctx)).rejects.toBe(locked);
-        expect(spy).toHaveBeenCalledWith(ctx.organizationId, "integrations");
+            .spyOn(calendarPlan, "locked")
+            .mockResolvedValueOnce("unread");
+        await expect(service.start(ctx)).rejects.toMatchObject({
+            status: 403,
+            response: { details: { code: "MODULE_LOCKED" } },
+        });
+        expect(spy).toHaveBeenCalledWith(ctx.organizationId);
         spy.mockRestore();
     });
 
@@ -429,6 +428,29 @@ describe("connecting Google Calendar", () => {
         ).resolves.toMatch(/calendar=expired$/);
     });
 
+    it("keeps only the latest consent's state: starting again ends the earlier one (L6)", async () => {
+        const { ctx } = await person();
+        const first = await service.start(ctx);
+        const second = await service.start(ctx);
+        const stateOf = (url: string) =>
+            new URL(url).searchParams.get("state") ?? "";
+        const resolve = () => Promise.resolve(ctx);
+        await expect(
+            service.callback(
+                { code: "c1", state: stateOf(first.url) },
+                ctx.userId,
+                resolve,
+            ),
+        ).resolves.toMatch(/calendar=expired$/);
+        await expect(
+            service.callback(
+                { code: "c2", state: stateOf(second.url) },
+                ctx.userId,
+                resolve,
+            ),
+        ).resolves.toMatch(/calendar=connected$/);
+    });
+
     it("sends the browser back to the app when the key is missing (GC-15)", async () => {
         const { ctx } = await person();
         const { url } = await service.start(ctx);
@@ -476,8 +498,8 @@ describe("connecting Google Calendar", () => {
         const { ctx } = await person();
         await connectFlow(ctx);
         const spy = jest
-            .spyOn(planMeter, "isIncluded")
-            .mockResolvedValue(false);
+            .spyOn(calendarPlan, "locked")
+            .mockResolvedValue("unread");
         try {
             await expect(service.status(ctx)).resolves.toMatchObject({
                 state: "PAUSED",

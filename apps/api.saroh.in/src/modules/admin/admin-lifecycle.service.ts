@@ -321,6 +321,7 @@ export class AdminLifecycleService {
                 version: true,
                 name: true,
                 active: true,
+                priceCents: true,
             },
         });
         if (!plan) throw new NotFoundException("Plan not found");
@@ -356,6 +357,10 @@ export class AdminLifecycleService {
                 },
                 update: { planId: plan.id },
             });
+            // Free by a staff move: paused past the one-Free rule (DEC-227).
+            const freeLimitPaused =
+                plan.priceCents === 0 &&
+                (await settleFreeLimitInTx(tx, organization.id));
 
             await this.ledger(tx, {
                 command: { ...command, reason },
@@ -366,6 +371,7 @@ export class AdminLifecycleService {
                     fromPlanId: existing?.planId ?? null,
                     toPlanId: plan.id,
                     toPlan: `${plan.key}@${plan.version}`,
+                    ...(freeLimitPaused ? { freeLimitPaused: true } : {}),
                 },
             });
             // The business's own history shows the plan it moved to, by the

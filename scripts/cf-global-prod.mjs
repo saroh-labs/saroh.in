@@ -147,8 +147,10 @@ export function globalProductionConfig(
                 ),
                 vars: {
                     ...vars,
-                    // Off on Global until a consent decision (KTD10).
+                    // Off on Global until a consent decision (KTD10):
+                    // recordings, and page visits counted on an opt-out basis.
                     NEXT_PUBLIC_POSTHOG_REPLAY: "off",
+                    NEXT_PUBLIC_POSTHOG_ANALYTICS: "off",
                     NEXT_PUBLIC_EDITION: "GLOBAL",
                     ...gated,
                 },

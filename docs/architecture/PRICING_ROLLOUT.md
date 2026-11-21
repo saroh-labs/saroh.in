@@ -236,11 +236,15 @@ and the admin's usage lines and impact (`ImpactService`).
   `variants`; "Add module" makes an id of its own, which governs nothing):
   it arrives with no limit on any plan and hidden from the pricing page,
   so adding it changes nothing until a number is set and published.
-  Every other row the product reads by id (`MODULE_MAP`: `social`,
-  `ask-ai`, `google-accounts`, …) is offered the same way when missing,
-  but arrives off on every plan, so adding it never grants anything:
-  Social and Ask AI stay locked and Google accounts a person stays at one
-  until a plan is turned on and published.
+  Every other row the product reads by id (`MODULE_MAP`) is offered the
+  same way when missing, with cells that keep every answer the API gives
+  without it (`missingReads`, `knownRowCells`): a row read as off when
+  missing (`social`, `ask-ai`, `google-accounts`, the API keys and
+  webhooks, `site-trackers`) arrives off on every plan; any other arrives
+  on with no limit, on the plans its registry module is on for today (a
+  paid-only one on priced plans only). Rows no cell can match (`sites`,
+  `locations`, `payments`, `subscriptions`) are never offered.
+  `billing/known-row.spec.ts` checks each row on every sample plan.
 
 ## A business's own domain (DEC-139)
 

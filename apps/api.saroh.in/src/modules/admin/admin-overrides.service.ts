@@ -21,6 +21,7 @@ import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { enqueuePlanChangeNotice } from "../billing/plan-change-notice.handler";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FlagKey } from "../feature-flags/flags";
+import { settleFreeLimitInTx } from "../organizations/free-business";
 import type { MoveNoticePayload } from "../pricing/moves.service";
 import {
     noticeDaysFor,
@@ -462,6 +463,10 @@ export class AdminOverridesService {
                         pendingFrom: null,
                     },
                 });
+                // Free by a staff move: paused past the one-Free rule (DEC-227).
+                if (target.priceCents === 0) {
+                    await settleFreeLimitInTx(tx, command.organizationId);
+                }
             } else {
                 // 30 days' notice when the price changes (DEC-161), else 7.
                 const noticeDays = noticeDaysFor(sub.plan, target);

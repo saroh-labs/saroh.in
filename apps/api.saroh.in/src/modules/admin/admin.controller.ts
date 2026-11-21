@@ -125,8 +125,9 @@ export class AdminController {
     async listAudit(
         @CurrentUser() user: AuthUser,
         @Query() query: ListAdminAuditDto,
+        @ServedEdition() edition: Edition | null,
     ) {
-        const page = await this.adminAudit.list(query);
+        const page = await this.adminAudit.list(query, edition);
         await this.adminAudit.recordRead({
             actorUserId: user.id,
             permission: AdminPermission.AuditRead,
@@ -138,6 +139,8 @@ export class AdminController {
                     query.actorUserId !== undefined ||
                     query.organizationId !== undefined ||
                     query.action !== undefined ||
+                    query.actor !== undefined ||
+                    query.business !== undefined ||
                     query.cursor !== undefined,
                 ),
                 resultCount: page.items.length,

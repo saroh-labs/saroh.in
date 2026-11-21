@@ -19,7 +19,7 @@ import {
     AuditOutcome,
     AuditService,
 } from "../audit/audit.service";
-import { planMeter } from "../billing/metering.service";
+import { holdXactLock } from "../billing/xact-lock";
 import { GOOGLE_BUSY_FRESH_MS } from "../bookings/staff-availability";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { assertWithinReach } from "../organizations/organization-members.service";
@@ -29,6 +29,7 @@ import type { SealedConnection } from "./calendar-access";
 import { accessTokenFor, SEALED_CONNECTION } from "./calendar-access";
 import {
     accountsAllowed,
+    assertCalendarPlan,
     overAllowance,
     pausedBecause,
 } from "./calendar-allowed";
@@ -50,6 +51,11 @@ import type {
     DisconnectView,
     GoogleCalendarOptionView,
 } from "./dto";
+import {
+    bookingsCalendarChoices,
+    calendarReads,
+    takeOrRefuse,
+} from "./google-changes";
 import type {
     GoogleCalendarEntry,
     GoogleCalendarPort,
@@ -126,6 +132,14 @@ export class CalendarConnectService {
         const user = await prisma.user.findUnique({
             where: { id: ctx.userId },
             select: { email: true },
+        });
+        // Only the latest consent is good (L6): a script starting over and
+        // over can't fill the table.
+        await prisma.verification.deleteMany({
+            where: {
+                identifier: { startsWith: stateKey("") },
+                value: ctx.userId,
+            },
         });
         const nonce = newNonce();
         const state = signState(
@@ -318,6 +332,7 @@ export class CalendarConnectService {
         accountId: string,
     ): Promise<GoogleCalendarOptionView[]> {
         const { google, person } = await this.gate(ctx);
+        await takeCalendarRead(ctx);
         const connection = await this.connectionOf(ctx, person, accountId);
         const entries = await this.calendarsOf(google, connection);
         return entries.map((e) => ({
@@ -339,6 +354,7 @@ export class CalendarConnectService {
         dto: ChooseCalendarsDto,
     ): Promise<CalendarStatusView> {
         const { google, person } = await this.gate(ctx);
+        await takeCalendarRead(ctx);
         const connection = await this.connectionOf(ctx, person, accountId);
         const { scopes } =
             await prisma.googleCalendarConnection.findUniqueOrThrow({
@@ -354,6 +370,14 @@ export class CalendarConnectService {
             dto.writeTo === undefined
                 ? (current?.calendarId ?? null)
                 : dto.writeTo;
+        if (writeTo && writeTo !== current?.calendarId) {
+            // A new "bookings go to" can be followed by a move (L1).
+            await takeOrRefuse(
+                bookingsCalendarChoices,
+                ctx,
+                "You've changed where your bookings go a few times today. Try again tomorrow.",
+            );
+        }
         const busy = [...new Set(dto.checkBusy)];
         const chosen = new Set([...(writeTo ? [writeTo] : []), ...busy]);
         if (writeTo && !granted.events) {
@@ -562,7 +586,10 @@ export class CalendarConnectService {
             if (allowed !== null) {
                 // One connect at a time per person, so two consents
                 // finishing together can't both pass the allowance.
-                await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`google-calendar-connect:${person.membershipId}`}))`;
+                await holdXactLock(
+                    tx,
+                    `google-calendar-connect:${person.membershipId}`,
+                );
                 const live = await tx.googleCalendarConnection.count({
                     where: {
                         organizationId: ctx.organizationId,
@@ -675,7 +702,7 @@ export class CalendarConnectService {
         ) {
             throw new NotFoundException("Google Calendar isn't available yet.");
         }
-        await planMeter.assertIncluded(ctx.organizationId, "integrations");
+        await assertCalendarPlan(ctx.organizationId);
         const person = await this.personOf(ctx);
         if (!this.google) {
             throw new ServiceUnavailableException(
@@ -827,4 +854,13 @@ const isStale = (at: Date | null, now: Date = new Date()) =>
 function reasonOf(error: unknown): string {
     if (isGoogleError(error)) return `${error.kind}:${error.detail}`;
     return error instanceof Error ? error.name : "error";
+}
+
+/** Each list or choice asks Google (L4): about 30 per 10 minutes a person. */
+function takeCalendarRead(ctx: OrganizationContext): Promise<void> {
+    return takeOrRefuse(
+        calendarReads,
+        ctx,
+        "You've looked at your Google calendars a lot just now. Try again in a few minutes.",
+    );
 }

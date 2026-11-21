@@ -4,6 +4,7 @@ import {
     emailOf,
     GOOGLE_CALL_TIMEOUT_MS,
     GoogleCalendarClient,
+    MAX_PAGES,
 } from "./google-calendar.client";
 import type { EventInput } from "./google-calendar.port";
 import { grantedParts, isPartial, SCOPES } from "./google-calendar.port";
@@ -354,6 +355,44 @@ describe("busy reads and guest limits (GC-01, GC-04, GC-09, GC-10, GC-12)", () =
         expect(first.searchParams.get("singleEvents")).toBe("true");
         expect(first.searchParams.get("fields")).toContain("attendees");
         expect(new URL(calls[1].url).searchParams.get("pageToken")).toBe("p2");
+    });
+
+    it("stops a busy read after MAX_PAGES pages and keeps what it read (S4)", async () => {
+        const pages = Array.from({ length: MAX_PAGES + 2 }, (_, i) =>
+            json(200, {
+                timeZone: "UTC",
+                items: [
+                    {
+                        id: `e${i}`,
+                        start: at("2027-01-04T05:00:00Z"),
+                        end: at("2027-01-04T06:00:00Z"),
+                    },
+                ],
+                nextPageToken: `p${i + 1}`,
+            }),
+        );
+        const { fetch, calls } = fetchOf(...pages);
+        const busy = await client(fetch).busyEvents(
+            "at",
+            "primary",
+            new Date("2027-01-01T00:00:00Z"),
+            new Date("2027-03-01T00:00:00Z"),
+        );
+        expect(calls).toHaveLength(MAX_PAGES);
+        expect(busy).toHaveLength(MAX_PAGES);
+    });
+
+    it("stops a calendar list after MAX_PAGES pages (S4)", async () => {
+        const pages = Array.from({ length: MAX_PAGES + 2 }, (_, i) =>
+            json(200, {
+                items: [{ id: `c${i}`, summary: "C", accessRole: "owner" }],
+                nextPageToken: `p${i + 1}`,
+            }),
+        );
+        const { fetch, calls } = fetchOf(...pages);
+        const list = await client(fetch).listCalendars("at");
+        expect(calls).toHaveLength(MAX_PAGES);
+        expect(list).toHaveLength(MAX_PAGES);
     });
 
     it("waits on Google for seconds, not a quarter of a minute", () => {

@@ -1,5 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 /**
  * A legal hold on a business (DEC-122, owner 10 Oct).
@@ -33,9 +35,12 @@ import type { Prisma } from "@saroh/database";
  * data.
  */
 
-/** What a member of a held business is told. Names no reason. */
-export const LEGAL_HOLD_MESSAGE =
-    "This business's data is on hold. Write to contact@saroh.in.";
+/** What a member of a held business is told, with its edition's address. Names no reason. */
+export const legalHoldMessage = (edition?: Edition | null): string =>
+    `This business's data is on hold. Write to ${editionProfile(edition).supportEmail}.`;
+
+/** India's wording, as every business had before Global. */
+export const LEGAL_HOLD_MESSAGE = legalHoldMessage("INDIA");
 
 /** `details.code` on a refusal, and the reason an audit row records. */
 export const LEGAL_HOLD_CODE = "LEGAL_HOLD";
@@ -102,9 +107,9 @@ export async function heldOrganizationIds(db: HoldReader): Promise<string[]> {
 }
 
 /** The refusal a member or an owner gets (409, `details.code` LEGAL_HOLD). */
-export function legalHoldRefusal(): ConflictException {
+export function legalHoldRefusal(edition?: Edition | null): ConflictException {
     return new ConflictException({
-        message: LEGAL_HOLD_MESSAGE,
+        message: legalHoldMessage(edition),
         details: { code: LEGAL_HOLD_CODE, reason: "legal-hold" },
     });
 }

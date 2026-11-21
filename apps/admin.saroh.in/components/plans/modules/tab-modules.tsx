@@ -215,7 +215,7 @@ export function TabModules() {
                             No {row.name} row: {row.what}{" "}
                             {row.off
                                 ? "Added off on every plan."
-                                : "Added with no limit on every plan."}
+                                : "Added with no limit wherever a plan has it today."}
                         </span>
                         <AddButton onClick={() => addKnown(row.id)}>
                             Add {row.name} row

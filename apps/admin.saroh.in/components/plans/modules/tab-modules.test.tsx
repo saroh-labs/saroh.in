@@ -297,7 +297,11 @@ describe("All modules", () => {
 
     it("offers the Variants row to a catalogue without it, and adds it under its id (DEC-158)", async () => {
         open();
-        expect(screen.getByText(/No Variants row: The sizes/)).toBeTruthy();
+        expect(
+            screen.getByText(
+                /No Variants row: The sizes.*Added with no limit wherever a plan has it today\./,
+            ),
+        ).toBeTruthy();
         // A feature row says it goes in off, so adding it grants nothing.
         expect(
             screen.getByText(

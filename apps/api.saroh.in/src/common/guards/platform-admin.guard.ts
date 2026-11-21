@@ -10,7 +10,6 @@ import { prisma } from "@saroh/database";
 import { editionOfHost } from "@saroh/edition";
 import type { IncomingHttpHeaders } from "node:http";
 
-import { env } from "../../env";
 import { AdminAuditOutcome } from "../../modules/admin/admin-audit.service";
 import {
     AdminPermission,
@@ -26,6 +25,7 @@ import {
     assertSessionFresh,
     auditOnce,
 } from "./admin-session";
+import { isBootstrapAdmin } from "./bootstrap-admin";
 
 interface PlatformAdminRequest {
     method?: string;
@@ -226,15 +226,4 @@ function resolveActiveRoles(
     return Object.values(AdminRole).filter((role) => active.has(role));
 }
 
-/** True when `email` is listed in the break-glass `ADMIN_ALLOWLIST`. */
-export function isBootstrapAdmin(email: string | null | undefined): boolean {
-    const normalized = email?.trim().toLowerCase();
-    if (!normalized) return false;
-
-    const allow = (env.ADMIN_ALLOWLIST ?? "")
-        .split(",")
-        .map((entry) => entry.trim().toLowerCase())
-        .filter(Boolean);
-
-    return allow.includes(normalized);
-}
+export { isBootstrapAdmin } from "./bootstrap-admin";

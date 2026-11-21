@@ -1,7 +1,7 @@
 /**
  * Whose Google busy times may block slots in a business now (#1047, GC-02,
- * GC-03): the memberships still allowed to sync, or null when none are
- * (the flag or the plan off). Google Calendar registers it at boot
+ * GC-03, P4): the connections still allowed to sync, or null when none
+ * are (the flag or the plan off). Google Calendar registers it at boot
  * (`CalendarSyncModule`, from `calendar-sync/calendar-allowed.ts`): the
  * answer reads the plan and the team, whose modules import the slot
  * engine, so the slot engine can't import them back.

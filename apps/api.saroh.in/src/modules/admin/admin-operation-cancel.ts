@@ -7,6 +7,11 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
+import {
+    adminStepUpMaxAge,
+    assertSessionFresh,
+    STEP_UP_PERMISSIONS,
+} from "../../common/guards/admin-session";
 import type { AdminAuditService } from "./admin-audit.service";
 import { AdminAuditOutcome } from "./admin-audit.service";
 import type { AdminPermission } from "./admin-permissions";
@@ -22,6 +27,8 @@ export interface CancelOperationInput {
     operationId: string;
     reason: string;
     idempotencyKey: string;
+    /** The request's session: a step-up kind needs a recent sign-in (A5). */
+    session?: { createdAt?: Date | string };
 }
 
 /**
@@ -66,6 +73,11 @@ export async function cancelOperation(
         throw new ForbiddenException(
             `Cancelling this needs the ${permission ?? "operation's"} permission.`,
         );
+    }
+    // The route is `platform:read`, so the guard's step-up never sees the
+    // operation's own permission: ask for it here.
+    if (STEP_UP_PERMISSIONS.has(permission)) {
+        assertSessionFresh(input.session, adminStepUpMaxAge());
     }
 
     return prisma.$transaction(async (tx) => {

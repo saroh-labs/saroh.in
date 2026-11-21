@@ -216,15 +216,13 @@ export async function loadPeople(
                 staffId: true,
                 startAt: true,
                 endAt: true,
-                connection: { select: { membershipId: true } },
+                connectionId: true,
             },
         }),
     ]);
     const counted =
         google.length > 0 ? await googleBusyCounted(organizationId) : null;
-    const googleBusy = google.filter((b) =>
-        counted?.has(b.connection.membershipId),
-    );
+    const googleBusy = google.filter((b) => counted?.has(b.connectionId));
     const pick = <T extends { staffId: string | null }>(
         rows: T[],
         id: string,

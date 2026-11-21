@@ -43,6 +43,13 @@ export const STEP_UP_PERMISSIONS: ReadonlySet<AdminPermission> = new Set([
     AdminPermission.WebhooksReplay,
     AdminPermission.JobsRetry,
     AdminPermission.OrganizationViewAs,
+    // Review A5 (21 Nov): a payout marked paid can't be undone, an account
+    // manager gets a business's data, a tracker switched back on loads
+    // third-party code on a merchant's page, and a search page goes public.
+    AdminPermission.TeamPay,
+    AdminPermission.AccountsAssign,
+    AdminPermission.OrganizationTrackersWrite,
+    AdminPermission.SearchPagesPublish,
 ]);
 
 export function isMutating(method: string | undefined): boolean {

@@ -564,7 +564,24 @@ describe("the security review's fixes (09-calendar-v2)", () => {
         });
     });
 
-    it("queues one job per booking however often it's asked, and limits a business's changes (M2)", async () => {
+    it("lets a person move their bookings only a few times a day (L1)", async () => {
+        const { ctx, orgId, staffId } = await setUp();
+        await booking(orgId, staffId);
+        const once = new CalendarBookingsService(
+            flags,
+            sync,
+            undefined,
+            new FixedWindowRateLimiter(1, 86_400_000),
+        );
+        await expect(once.moveBookings(ctx)).resolves.toMatchObject({
+            moving: 1,
+        });
+        await expect(once.moveBookings(ctx)).rejects.toMatchObject({
+            status: 429,
+        });
+    });
+
+    it("queues one job per booking however often it's asked, and limits a person's changes (M2, L9)", async () => {
         const { ctx, orgId, staffId } = await setUp();
         const b = await booking(orgId, staffId);
         await service.setBookingMeeting(ctx, b.id, {
@@ -591,7 +608,7 @@ describe("the security review's fixes (09-calendar-v2)", () => {
         await expect(limited.moveBookings(ctx)).rejects.toMatchObject({
             status: 429,
         });
-        // Another business has its own hour.
+        // Another person, here another business, has their own hour.
         const other = await setUp();
         await expect(
             limited.setBusinessMeetAccess(other.ctx, "OPEN"),

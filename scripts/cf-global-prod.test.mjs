@@ -30,6 +30,7 @@ for (const dir of [
         assert.deepEqual(out.routes, []);
         assert.equal(out.vars.NEXT_PUBLIC_EDITION, "GLOBAL");
         assert.equal(out.vars.NEXT_PUBLIC_POSTHOG_REPLAY, "off");
+        assert.equal(out.vars.NEXT_PUBLIC_POSTHOG_ANALYTICS, "off");
         for (const key of Object.keys(out.vars))
             assert.ok(
                 key !== "PRELAUNCH_GATE" &&

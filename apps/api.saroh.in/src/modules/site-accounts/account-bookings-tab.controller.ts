@@ -22,6 +22,7 @@ import type {
     AccountTreatment,
 } from "./account-bookings-view";
 import { AccountBookingsService } from "./account-bookings.service";
+import { takeBookingChange } from "./booking-change-limit";
 import type { CustomerContext } from "./customer-context.decorator";
 import { CurrentCustomer } from "./customer-context.decorator";
 import { CustomerSessionGuard } from "./customer-session.guard";
@@ -83,16 +84,18 @@ export class AccountBookingsTabController {
         @Body() dto: AccountBookingTimeDto,
     ): Promise<AccountBookingRow> {
         await assertTakingBookings(customer);
+        await takeBookingChange(customer, ref);
         return this.bookings.move(customer, ref, dto.startAt);
     }
 
     @Post("bookings/:ref/cancel")
     @HttpCode(HttpStatus.OK)
     @Header("Cache-Control", "no-store")
-    cancel(
+    async cancel(
         @CurrentCustomer() customer: CustomerContext,
         @Param("ref") ref: string,
     ): Promise<AccountCancelResult> {
+        await takeBookingChange(customer, ref);
         return this.bookings.cancel(customer, ref);
     }
 

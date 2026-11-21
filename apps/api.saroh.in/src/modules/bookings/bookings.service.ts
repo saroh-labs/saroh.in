@@ -26,6 +26,7 @@ import {
     reassignNote,
     staffWithTargets,
 } from "../calendar-sync/calendar-target";
+import { takeGoogleChange } from "../calendar-sync/google-changes";
 import { resyncMeetAccess } from "../calendar-sync/meet-access";
 import { googleMeetReady } from "../calendar-sync/meet-ready";
 import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
@@ -563,6 +564,13 @@ export class BookingsService {
             });
         }
         if (dto.visits !== undefined) data.visits = dto.visits;
+        if (
+            dto.meetAccess !== undefined &&
+            dto.meetAccess !== service.meetAccess
+        ) {
+            // Its upcoming Meets are synced again (L5): a Google change.
+            await takeGoogleChange(ctx);
+        }
         if (dto.meetAccess !== undefined) data.meetAccess = dto.meetAccess;
         if (dto.showOnBookingPage !== undefined) {
             data.showOnBookingPage = dto.showOnBookingPage;
@@ -1284,6 +1292,9 @@ export class BookingsService {
             booking.id,
             person,
         );
+        // Its event comes off one calendar and goes on another, a new
+        // Google invitation each time (L2): the Google change budget.
+        if (googleCalendar) await takeGoogleChange(ctx);
         const moved = await moveFoundBooking(
             booking,
             service,

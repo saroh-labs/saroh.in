@@ -1,4 +1,11 @@
-import { EDITIONS, hostsFor, merchantSitesFor, urlOf } from "@saroh/edition";
+import type { Edition } from "@saroh/edition";
+import {
+    EDITIONS,
+    editionOfHost,
+    hostsFor,
+    merchantSitesFor,
+    urlOf,
+} from "@saroh/edition";
 
 /**
  * The trusted first-party origins, shared by the betterAuth config, the
@@ -70,11 +77,16 @@ export function isTrustedOrigin(origin: string): boolean {
  * and a freshly verified account lands in onboarding. Each caller names its
  * own.
  *
+ * Given `edition` (the one this sign-in serves), a destination on the other
+ * edition's hosts is dropped too: the session is per edition, so following
+ * it lands the person signed out.
+ *
  * SERVER-SIDE, like everything else in this module: the trusted list comes
  * from an env var the browser never sees.
  */
 export function safeDestination(
     redirect: string | string[] | undefined,
+    edition?: Edition,
 ): string | null {
     // A repeated ?redirect= gives an array. Take the first rather than
     // guessing which one was meant.
@@ -92,7 +104,9 @@ export function safeDestination(
             : candidate;
     }
 
-    return isTrustedOrigin(candidate) ? candidate : null;
+    if (!isTrustedOrigin(candidate)) return null;
+    const other = edition ? editionOfHost(new URL(candidate).host) : null;
+    return other && other !== edition ? null : candidate;
 }
 
 /**

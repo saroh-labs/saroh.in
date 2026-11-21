@@ -773,7 +773,11 @@ on autopay (`providers/RAZORPAY_USD.md`), so a plan in a currency outside
 (`cardOnly` on the handoff), no first-month offer; each month's order
 carries the add-ons held then, whole, never prorated (`monthAddonLines`);
 one bought mid-month is a whole month paid at once on an order of its
-own, held once paid (`onAddonOrder`, invoice source `ADDON`); when
+own, held once paid (`onAddonOrder`, invoice source `ADDON`). A year
+paid once carries the add-ons held on its renewal and on a move to it that
+starts at the period's end (SCHEDULED, from a month or another year); once
+that move is paid, more can't be bought until it starts (`leavingWhy`,
+02-plans P2). When
 the month ends the next falls due (`openMonthDueInTx`, DEC-210's 7 days),
 then Free. Its invoice is an export (`taxType` EXPORT): no tax, its own
 series (`SAROH_INVOICE_PREFIX_GLOBAL`), the LUT note from

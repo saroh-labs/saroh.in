@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { DateTime } from "luxon";
 
 import type {
@@ -39,6 +40,15 @@ const EVENTS_PAGE = 2500;
 /** Only the parts of an event a busy read needs. */
 const BUSY_FIELDS =
     "timeZone,nextPageToken,items(id,status,transparency,eventType,start,end,organizer(self),attendees(self,organizer,responseStatus),extendedProperties(private(sarohBookingId)))";
+
+/**
+ * The most pages a calendar list or a busy read follows (S4): one Google
+ * with no end of pages must not hold the shared calendar lane. What was
+ * read is kept, and the cut is logged.
+ */
+export const MAX_PAGES = 10;
+
+const logger = new Logger("GoogleCalendarClient");
 
 /** Google's free/busy reads a window this long at most per call; longer ones are split. */
 const FREEBUSY_SPAN_MS = 30 * 86_400_000;
@@ -165,6 +175,7 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
     async listCalendars(accessToken: string): Promise<GoogleCalendarEntry[]> {
         const out: GoogleCalendarEntry[] = [];
         let pageToken: string | undefined;
+        let pages = 0;
         do {
             const url = new URL(`${CALENDAR}/users/me/calendarList`);
             url.searchParams.set("maxResults", "250");
@@ -189,7 +200,12 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
                 });
             }
             pageToken = body.nextPageToken;
-        } while (pageToken);
+        } while (pageToken && ++pages < MAX_PAGES);
+        if (pageToken) {
+            logger.warn(
+                `google_calendar_list_truncated pages=${MAX_PAGES} calendars=${out.length}`,
+            );
+        }
         return out;
     }
 
@@ -201,6 +217,7 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
     ): Promise<BusyEvent[]> {
         const out: BusyEvent[] = [];
         let pageToken: string | undefined;
+        let pages = 0;
         do {
             const url = new URL(
                 `${CALENDAR}/calendars/${encodeURIComponent(calendarId)}/events`,
@@ -223,7 +240,12 @@ export class GoogleCalendarClient implements GoogleCalendarPort {
                 if (busy) out.push(busy);
             }
             pageToken = body.nextPageToken;
-        } while (pageToken);
+        } while (pageToken && ++pages < MAX_PAGES);
+        if (pageToken) {
+            logger.warn(
+                `google_calendar_busy_truncated pages=${MAX_PAGES} events=${out.length}`,
+            );
+        }
         return out;
     }
 

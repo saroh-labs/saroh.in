@@ -1,8 +1,11 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
+import { isBootstrapAdmin } from "../../common/guards/bootstrap-admin";
 import { getRequestContext } from "../../common/logging/request-context";
+import { byBusinessIds, editionWhere } from "./admin-edition";
 import type { AdminPermission } from "./admin-permissions";
 
 const MAX_PAGE_SIZE = 100;
@@ -33,6 +36,9 @@ export interface AdminAuditInput {
     idempotencyKey?: string;
     metadata?: Record<string, unknown>;
 }
+
+/** How the ledger names an actor with no staff grant (A1). */
+export const NON_STAFF_ACTOR = "Non-staff account";
 
 export interface AdminAuditListInput {
     cursor?: string;
@@ -105,13 +111,24 @@ export class AdminAuditService {
         }
     }
 
-    async list(input: AdminAuditListInput = {}): Promise<AdminAuditPage> {
+    /**
+     * The ledger, newest first. Only staff are named or searched (A1, 21
+     * Nov): a merchant refused at `/admin` shows as "Non-staff account", so
+     * `audit:read` never turns into a lookup of merchants' names and
+     * emails. `edition` keeps the rows to that console's businesses (and
+     * rows of no business), as every other list does.
+     */
+    async list(
+        input: AdminAuditListInput = {},
+        edition: Edition | null = null,
+    ): Promise<AdminAuditPage> {
         const limit = clampLimit(input.limit);
         // The ledger has no relations by design; names resolve to ids here.
         const actorIds = input.actor?.trim()
             ? (
                   await prisma.user.findMany({
                       where: {
+                          platformAdmin: { isNot: null },
                           OR: [
                               {
                                   name: {
@@ -136,6 +153,7 @@ export class AdminAuditService {
             ? (
                   await prisma.organization.findMany({
                       where: {
+                          ...editionWhere(edition),
                           name: {
                               contains: input.business.trim(),
                               mode: "insensitive",
@@ -146,6 +164,7 @@ export class AdminAuditService {
                   })
               ).map((o) => o.id)
             : null;
+        const inEdition = await byBusinessIds(edition);
         const rows = await prisma.adminAuditEvent.findMany({
             where: {
                 AND: [
@@ -156,6 +175,7 @@ export class AdminAuditService {
                     input.action ? { action: input.action } : {},
                     actorIds ? { actorUserId: { in: actorIds } } : {},
                     businessIds ? { organizationId: { in: businessIds } } : {},
+                    inEdition,
                 ],
             },
             ...(input.cursor ? { cursor: { id: input.cursor }, skip: 1 } : {}),
@@ -187,7 +207,12 @@ export class AdminAuditService {
                 where: {
                     id: { in: [...new Set(page.map((r) => r.actorUserId))] },
                 },
-                select: { id: true, name: true, email: true },
+                select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    platformAdmin: { select: { id: true } },
+                },
             }),
             prisma.organization.findMany({
                 where: {
@@ -205,7 +230,14 @@ export class AdminAuditService {
             }),
         ]);
         const userName = new Map(
-            users.map((u) => [u.id, u.name?.trim() ? u.name : u.email]),
+            users.map((u) => [
+                u.id,
+                u.platformAdmin || isBootstrapAdmin(u.email)
+                    ? u.name?.trim()
+                        ? u.name
+                        : u.email
+                    : NON_STAFF_ACTOR,
+            ]),
         );
         const orgName = new Map(orgs.map((o) => [o.id, o.name]));
         const items = page.map((row) => ({

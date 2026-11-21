@@ -61,7 +61,15 @@ const STATUS_WORDS: Record<string, MessageStatusWords> = {
 };
 
 /** The words for `status`; a status this screen doesn't know reads as itself. */
-export function messageStatusWords(status: string): MessageStatusWords {
+export function messageStatusWords(
+    status: string,
+    channel?: string,
+): MessageStatusWords {
+    // On the business's own WhatsApp number Meta took the message, and no
+    // delivery report comes back (04 S14): say only that.
+    if (status === "SENT" && channel === "WHATSAPP") {
+        return { label: "Sent to WhatsApp", variant: "default", sent: true };
+    }
     return (
         STATUS_WORDS[status] ?? {
             label: status,

@@ -25,6 +25,8 @@ import helmet from "helmet";
 import { AppModule } from "./app.module";
 import { pinForwardedFor } from "./common/client-ip";
 import { corsDelegate } from "./common/cors";
+import { onQuietSendFailed } from "./common/email";
+import { emailSendFailed } from "./common/email-send-health";
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { globalAccessGate } from "./common/global-access";
 import { OriginGuard } from "./common/guards/origin.guard";
@@ -105,6 +107,7 @@ const DEV_HOSTNAMES = [
 ];
 
 async function bootstrap() {
+    onQuietSendFailed((security) => emailSendFailed(security));
     installProcessGuards();
 
     // Better Auth reads the raw request body, so Nest's body parser must be

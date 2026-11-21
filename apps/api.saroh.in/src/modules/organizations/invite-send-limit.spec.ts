@@ -16,7 +16,9 @@ const roomy = () => ({
     address: w(100),
     inviter: w(100),
     overall: w(1000),
+    overallAlerted: w(1),
 });
+const alerts = () => ({ send: jest.fn().mockResolvedValue(1) });
 
 describe("inviteAddressKey (07 F4)", () => {
     it("reads one address however it is written", () => {
@@ -27,6 +29,7 @@ describe("inviteAddressKey (07 F4)", () => {
             "some@gmail.com",
         );
         expect(inviteAddressKey("SOME@gmail.com")).toBe("some@gmail.com");
+        expect(inviteAddressKey('"some"@example.com')).toBe("some@example.com");
         expect(inviteAddressKey("not-an-address")).toBe("not-an-address");
     });
 });
@@ -83,18 +86,22 @@ describe("InviteSendLimit (A-02, 07 F4)", () => {
         ).resolves.toBe(200);
     });
 
-    it("caps one account across the businesses it invites for, and every send overall", async () => {
+    it("caps one account across the businesses it invites for", async () => {
         const limit = new InviteSendLimit({ ...roomy(), inviter: w(2) });
         await limit.take("org-a", "u1", "a@example.com");
         await limit.take("org-b", "u1", "b@example.com");
         await expect(
             status(limit.take("org-c", "u1", "c@example.com")),
         ).resolves.toBe(429);
+    });
 
-        const all = new InviteSendLimit({ ...roomy(), overall: w(1) });
-        await all.take("org-a", "u1", "a@example.com");
-        await expect(
-            status(all.take("org-b", "u2", "b@example.com")),
-        ).resolves.toBe(429);
+    it("never refuses past the overall line, and alerts staff once (L8)", async () => {
+        const sender = alerts();
+        const all = new InviteSendLimit({ ...roomy(), overall: w(1) }, sender);
+        const out = [];
+        for (const org of ["org-a", "org-b", "org-c"])
+            out.push(await status(all.take(org, org, `${org}@example.com`)));
+        expect(out).toEqual([200, 200, 200]);
+        expect(sender.send).toHaveBeenCalledTimes(1);
     });
 });

@@ -51,6 +51,13 @@ describe("messageStatusWords", () => {
         expect(messageStatusWords("UNKNOWN").variant).not.toBe("neutral");
     });
 
+    it("WhatsApp sent on the business's own number says only that WhatsApp took it", () => {
+        expect(messageStatusWords("SENT", "WHATSAPP").label).toBe(
+            "Sent to WhatsApp",
+        );
+        expect(messageStatusWords("SENT", "EMAIL").label).toBe("Sent");
+    });
+
     it("a status it doesn't know reads as itself", () => {
         expect(messageStatusWords("SOMETHING_NEW")).toEqual({
             label: "SOMETHING_NEW",

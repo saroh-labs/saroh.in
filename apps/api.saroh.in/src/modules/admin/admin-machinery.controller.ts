@@ -1,4 +1,4 @@
-import { Body, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Get, Param, Post, Query, Req } from "@nestjs/common";
 import type { Edition } from "@saroh/edition";
 
 import type { PlatformAdminInfo } from "../../common/decorators/platform-admin-context.decorator";
@@ -173,12 +173,14 @@ export class AdminMachineryController {
         @PlatformAdminContext() staff: PlatformAdminInfo,
         @Param("operationId") operationId: string,
         @Body() dto: OperatorReasonDto,
+        @Req() request: { session?: { createdAt?: Date | string } },
     ) {
         return this.operations.cancel({
             staff,
             operationId,
             reason: dto.reason,
             idempotencyKey: dto.idempotencyKey,
+            session: request.session,
         });
     }
 

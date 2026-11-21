@@ -93,6 +93,48 @@ describe("rows the product knows by id (DEC-158)", () => {
         expect(knownRowsMissing(c)).toEqual([]);
     });
 
+    it("never offers a row no cell reads the same as missing", () => {
+        const ids = knownRowsMissing(blankCatalog()).map((r) => r.id);
+        for (const id of ["sites", "locations", "payments", "subscriptions"]) {
+            expect(ids).not.toContain(id);
+        }
+    });
+
+    it("adds an open row on every plan, so nothing is taken away (P1)", () => {
+        const c = starterCatalog();
+        c.modules = c.modules.filter(
+            (m) => !["qr-branding", "integrations", "roles"].includes(m.id),
+        );
+        for (const id of ["qr-branding", "integrations", "roles"]) {
+            expect(knownRowsMissing(c).find((r) => r.id === id)?.off).toBe(
+                false,
+            );
+            expect(addKnownRow(c, id)).toBe(id);
+            const row = c.modules.find((m) => m.id === id);
+            for (const p of c.plans) {
+                expect(row?.cells[p.id]).toMatchObject({
+                    inc: true,
+                    limit: null,
+                });
+            }
+        }
+        expect(validateCatalog(c).ok).toBe(true);
+    });
+
+    it("adds a paid-only module's row on priced plans only, as it reads today", () => {
+        const c = starterCatalog();
+        c.modules = c.modules.filter((m) => m.id !== "courses");
+        c.plans[0].pricePaise = 0;
+        c.plans[1].pricePaise = 100;
+        expect(addKnownRow(c, "courses")).toBe("courses");
+        const row = c.modules.find((m) => m.id === "courses");
+        expect(row?.cells[c.plans[0].id]).toEqual({
+            inc: false,
+            off: "locked",
+        });
+        expect(row?.cells[c.plans[1].id]).toMatchObject({ inc: true });
+    });
+
     it("adds it under its own id, beside Products, capping nothing yet", () => {
         const c = starterCatalog();
         c.modules = c.modules.filter((m) => m.id !== "variants");

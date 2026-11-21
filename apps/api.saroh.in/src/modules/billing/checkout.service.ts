@@ -1229,9 +1229,11 @@ export class CheckoutService {
             !catalog ||
             quote.payment !== "ONE_TIME" ||
             // A year paid once carries them on its renewal (review 19 Nov,
-            // H-1); a new year starts with none.
+            // H-1) and on a move to it that starts at the period's end, from
+            // a month or another year (02-plans P2); a new year starts with
+            // none.
             (target.interval === "year"
-                ? quote.kind !== "RENEW"
+                ? quote.kind !== "RENEW" && quote.kind !== "SCHEDULED"
                 : autopayTakes(target.currency) ||
                   (quote.kind !== "NEW" && quote.kind !== "RENEW"))
         ) {

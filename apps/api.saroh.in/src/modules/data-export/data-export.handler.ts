@@ -8,7 +8,7 @@ import { sendDataExportReadyEmail } from "../../common/email";
 import { businessTimezone } from "../bookings/staff-availability";
 import { keepJobLease } from "../jobs/job-lease";
 import { OBJECT_STORAGE } from "../media/object-storage.provider";
-import { LEGAL_HOLD_MESSAGE } from "../organizations/legal-hold";
+import { legalHoldMessage } from "../organizations/legal-hold";
 import { lifecycleAllows } from "../organizations/organization-lifecycle.policy";
 import { buildDataExport } from "./data-export-build";
 import {
@@ -88,7 +88,10 @@ export class DataExportHandler {
         // Put on legal hold since it was asked for (DEC-122): no export
         // is made while the hold lasts.
         if (row.organization.legalHoldAt) {
-            await this.fail(exportId, LEGAL_HOLD_MESSAGE);
+            await this.fail(
+                exportId,
+                legalHoldMessage(row.organization.edition),
+            );
             return;
         }
         await prisma.dataExport.updateMany({

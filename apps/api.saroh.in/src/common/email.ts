@@ -30,6 +30,19 @@ const FROM =
     env.SENDER_EMAIL_ID ??
     editionProfile("INDIA").defaultSenders.mail;
 
+/**
+ * Told when a mail nobody waits on fails. Set at boot to `emailSendFailed`
+ * (`email-send-health.ts`); a setter, since that module's owner alert sends
+ * through this file.
+ */
+let quietSendFailed: (security: string | null) => Promise<unknown> = () =>
+    Promise.resolve();
+export function onQuietSendFailed(
+    handler: (security: string | null) => Promise<unknown>,
+): void {
+    quietSendFailed = handler;
+}
+
 function getTransporter(): Transporter | null {
     const host = env.SMTP_HOST ?? env.SMTP_HOSTNAME;
     const port = env.SMTP_PORT;
@@ -161,14 +174,21 @@ export async function send(
  * {@link send} for a mail nobody waits on: a failure is logged, never an
  * unhandled rejection. The line names no address and no subject.
  */
-function sendQuietly(edition: Edition, mail: OutgoingMail): void {
+function sendQuietly(
+    edition: Edition,
+    mail: OutgoingMail,
+    /** A security notice's kind: its failure alerts staff at once (04 S13). */
+    security: string | null = null,
+): void {
     send(edition, mail).catch((error: unknown) => {
         structuredLogger.error("email_send_failed", {
             edition,
             reason: error instanceof Error ? error.name : "unknown error",
             responseCode: (error as { responseCode?: unknown } | null)
                 ?.responseCode,
+            ...(security ? { notice: security } : {}),
         });
+        void quietSendFailed(security).catch(() => undefined);
     });
 }
 
@@ -510,11 +530,15 @@ export function sendSignInEmailChangedNotice(
         console.info(`[Sign-in email changed] (no SMTP) notice to ${to}`);
         return Promise.resolve();
     }
-    sendQuietly(edition, {
-        to,
-        subject: "Your Saroh sign-in email was changed",
-        html,
-    });
+    sendQuietly(
+        edition,
+        {
+            to,
+            subject: "Your Saroh sign-in email was changed",
+            html,
+        },
+        "sign-in email changed",
+    );
     return Promise.resolve();
 }
 
@@ -543,13 +567,17 @@ export function sendOwnerChangedNotice(
         console.info(`[Owner changed] (no SMTP) notice to ${to}`);
         return Promise.resolve();
     }
-    sendQuietly(edition, {
-        to,
-        subject: change.added
-            ? `A new Owner was added to ${change.business}`
-            : `An Owner was removed from ${change.business}`,
-        html,
-    });
+    sendQuietly(
+        edition,
+        {
+            to,
+            subject: change.added
+                ? `A new Owner was added to ${change.business}`
+                : `An Owner was removed from ${change.business}`,
+            html,
+        },
+        "Owner changed",
+    );
     return Promise.resolve();
 }
 

@@ -261,9 +261,11 @@ export function billedCycle(sub: SarohSubscription | null): Cycle {
     return sub?.billingCycle === "year" ? "year" : "month";
 }
 
-/** "₹111 a month", "₹1,110 a year", or "₹0". */
+/** "₹111 a month", "₹1,110 a year", or "₹0" (in the edition's plan money). */
 export function priceWords(pricePaise: number, cycle: Cycle): string {
-    return pricePaise > 0 ? `${planMoney(pricePaise)} ${per(cycle)}` : "₹0";
+    return pricePaise > 0
+        ? `${planMoney(pricePaise)} ${per(cycle)}`
+        : planMoney(0);
 }
 
 /** Whether the picker offers yearly, and how many months it gives free. */

@@ -180,6 +180,22 @@ describe("CommunicationsService.connectProvider", () => {
         expect(providerUpsert).not.toHaveBeenCalled();
     });
 
+    it("refuses a relay address, which would skip the key check (04 S12)", async () => {
+        const service = new CommunicationsService();
+        await expect(
+            service.connectProvider(ctx(), {
+                channel: "WHATSAPP",
+                provider: "META",
+                credentials: {
+                    accessToken: SECRET,
+                    phoneNumberId: "123",
+                    baseUrl: "https://relay.example.com",
+                },
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(providerUpsert).not.toHaveBeenCalled();
+    });
+
     it("denies a MEMBER (comms:manage is OWNER/ADMIN-only) before any I/O", async () => {
         const service = new CommunicationsService();
         await expect(

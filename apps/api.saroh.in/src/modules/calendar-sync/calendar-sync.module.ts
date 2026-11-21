@@ -9,7 +9,7 @@ import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import { JobsModule } from "../jobs/jobs.module";
 import { setMemberLeavingHook } from "../organizations/member-leaving";
 import { OrganizationContextModule } from "../organizations/organization-context.module";
-import { googleBusyAllowed } from "./calendar-allowed";
+import { googleBusyConnections } from "./calendar-allowed";
 import { CalendarBookingsService } from "./calendar-bookings.service";
 import {
     CALENDAR_BUSY_TYPE,
@@ -67,7 +67,7 @@ export class CalendarSyncModule implements OnModuleInit, OnModuleDestroy {
 
     async onModuleInit(): Promise<void> {
         // Slot reads count a person's Google busy times only while allowed.
-        setGoogleBusyGate(googleBusyAllowed);
+        setGoogleBusyGate(googleBusyConnections);
         // Someone leaving the team lets go of their calendar (GC-09).
         setMemberLeavingHook(async (organizationId, membershipId) => {
             await this.releases.releaseMember(organizationId, membershipId);

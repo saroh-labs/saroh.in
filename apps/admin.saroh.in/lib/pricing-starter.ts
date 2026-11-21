@@ -1,6 +1,7 @@
-import type { Catalog, Cell } from "@saroh/pricing-catalog";
+import type { Catalog } from "@saroh/pricing-catalog";
 import {
     AUTOPAY_CHARGES_DEFAULT,
+    knownRowCells,
     limitWithin,
     MODULE_MAP,
 } from "@saroh/pricing-catalog";
@@ -81,41 +82,53 @@ export function blankCatalog(): Catalog {
  * (DEC-233), `ask-ai`, `social` and the rest. "Add module" gives a row an
  * id of its own, which governs nothing, so a row the product knows has to
  * be added under its id: these are offered on the Modules tab. `off` says
- * the row goes in off on every plan (see {@link addKnownRow}).
+ * the row goes in off on every plan, because the product reads it missing
+ * as off; else it goes in on where the product gives it today, with no
+ * limit (see {@link addKnownRow}). A row no cell reads the same as missing
+ * (`sites`, `locations`, `payments`, `subscriptions`) is never offered.
  */
 export function knownRowsMissing(
     catalog: Catalog,
 ): { id: string; name: string; what: string; off: boolean }[] {
     const has = new Set(catalog.modules.map((m) => m.id));
     return SEED_CATALOG.modules
-        .filter((m) => Object.hasOwn(MODULE_MAP, m.id) && !has.has(m.id))
+        .filter(
+            (m) =>
+                Object.hasOwn(MODULE_MAP, m.id) &&
+                MODULE_MAP[m.id].missingReads !== "neither" &&
+                !has.has(m.id),
+        )
         .map((m) => ({
             id: m.id,
             name: m.name,
             what: m.what,
-            off: limitWithin(m.id) !== "product",
+            off: MODULE_MAP[m.id].missingReads === "locked",
         }));
 }
 
 /**
  * Add one of {@link knownRowsMissing} to a draft, under its own id, hidden
- * from the pricing page until it has words, so adding it never grants
- * anything:
- * - a cap inside one product (`variants`) goes on every plan with no limit:
- *   without the row it caps nothing, so nothing changes until a number is
- *   set. It goes beside Products where the draft has that row.
- * - every other row goes OFF on every plan: Social and Ask AI read off as
- *   locked, Google accounts a person as one (DEC-233), so Free never gets
- *   one by accident. It goes in the seed's group where the draft has it.
- * Else in the first group. Returns its id, or null when it can't be added.
+ * from the pricing page until it has words. Its cells keep every answer the
+ * product gives without the row (`knownRowCells`), so publishing it takes
+ * nothing away and grants nothing:
+ * - a row the product reads missing as off (Social, Ask AI, Google accounts
+ *   a person at one, the API keys) goes OFF on every plan;
+ * - every other row goes on with no limit, on the plans its registry
+ *   module is on for today (a paid-only one on priced plans only).
+ * A cap inside one product (`variants`) goes beside Products where the
+ * draft has that row; any other in the seed's group where the draft has
+ * it; else in the first group. Returns its id, or null when it can't be
+ * added.
  */
 export function addKnownRow(catalog: Catalog, id: string): string | null {
     const known = knownRowsMissing(catalog).find((m) => m.id === id);
     const from = SEED_CATALOG.modules.find((m) => m.id === id);
-    if (!known || !from) return null;
-    const beside = known.off
-        ? -1
-        : catalog.modules.findIndex((m) => m.id === "products");
+    const cells = knownRowCells(catalog, id);
+    if (!known || !from || !cells) return null;
+    const beside =
+        limitWithin(id) === "product"
+            ? catalog.modules.findIndex((m) => m.id === "products")
+            : -1;
     const group =
         beside >= 0
             ? catalog.modules[beside].group
@@ -123,25 +136,13 @@ export function addKnownRow(catalog: Catalog, id: string): string | null {
               ? from.group
               : catalog.groups[0]?.id;
     if (!group) return null;
-    const cell: Cell = known.off
-        ? { inc: false, off: "locked" }
-        : {
-              inc: true,
-              text: "No limit",
-              card: "",
-              limit: null,
-              per: "",
-              soft: false,
-          };
     const row = {
         id,
         name: from.name,
         group,
         pricing: "hidden" as const,
         what: from.what,
-        cells: Object.fromEntries(
-            catalog.plans.map((p) => [p.id, { ...cell }]),
-        ),
+        cells,
     };
     if (beside >= 0) catalog.modules.splice(beside + 1, 0, row);
     else catalog.modules.push(row);

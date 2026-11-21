@@ -119,7 +119,7 @@ export function PlanChooser({
         }
         // Checked now, against the paid plans on offer here (UX-046).
         const plans = shown
-            .filter((r) => r.cta !== null && r.price !== "₹0")
+            .filter((r) => r.cta !== null && r.price !== planMoney(0))
             .map((r) => r.planId);
         startCheck(async () => {
             const res = await runAction(() =>
