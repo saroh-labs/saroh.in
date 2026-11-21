@@ -145,6 +145,8 @@ const CLASS_LEVEL_WITHIN: Record<string, string[]> = {
  * finishing the rollout and would in fact break the thing the runbook protects.
  */
 const NEVER: Record<string, string> = {
+    "sites/website-area.controller.ts":
+        "the deployment's one Website area switch (DEC-240), read by every signed-in app before any business is open",
     "messaging/messaging.controller.ts":
         "Saroh-sent codes are paid from the wallet with their own per-module switch, not a plan module",
     "product-reviews/public-product-reviews.controller.ts":
