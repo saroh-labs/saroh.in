@@ -1,6 +1,7 @@
 import { ConflictException } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
-import { editionProfile, type Edition } from "@saroh/edition";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 /**
  * A legal hold on a business (DEC-122, owner 10 Oct).

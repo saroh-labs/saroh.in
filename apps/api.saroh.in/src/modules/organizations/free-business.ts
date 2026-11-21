@@ -1,7 +1,8 @@
 import { ConflictException, HttpException, HttpStatus } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { outsideOrgContext, prisma } from "@saroh/database";
-import { editionProfile, type Edition } from "@saroh/edition";
+import type { Edition } from "@saroh/edition";
+import { editionProfile } from "@saroh/edition";
 
 import { env } from "../../env";
 import { holdXactLock } from "../billing/xact-lock";
