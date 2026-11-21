@@ -49,7 +49,7 @@ export function MessageHistory({ messages }: { messages: LeadMessage[] }) {
         <ol className="space-y-3">
             {messages.map((message, index) => {
                 const { status, at } = displayStatus(message);
-                const words = messageStatusWords(status);
+                const words = messageStatusWords(status, message.channel);
                 const latest = message.deliveries.at(-1);
                 return (
                     <li

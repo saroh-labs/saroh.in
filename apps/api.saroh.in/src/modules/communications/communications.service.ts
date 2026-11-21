@@ -52,7 +52,6 @@ import {
     isSupportedComms,
     sendable,
 } from "./providers/provider.port";
-import { relayBase } from "./providers/relay-base";
 import type {
     AutopayTemplate,
     InvoiceMailVars,
@@ -264,14 +263,16 @@ export class CommunicationsService {
         }
 
         const credentials = this.normalizeCredentials(input.credentials);
-        // A relay is a merchant's address the API will call: refused now
-        // rather than on the first send.
-        await relayBase(credentials.baseUrl, "").catch((error: Error) => {
+        // A relay address would skip the key check below and save as
+        // connected unchecked (04 S12); the screens never send one, so the
+        // API takes none either. A row saved with one before keeps working.
+        if ("baseUrl" in credentials) {
             throw new BadRequestException({
-                message: error.message,
+                message:
+                    "A relay address can't be saved. Use the provider's own keys.",
                 field: "baseUrl",
             });
-        });
+        }
 
         // The key must work before it is kept (UX-012); Resend's sending
         // domain must be verified too. 400 when the provider refuses.

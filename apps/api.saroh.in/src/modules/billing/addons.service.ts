@@ -115,7 +115,7 @@ const SUB_SELECT = {
     pendingPlanId: true,
     pendingFrom: true,
     cancelAtPeriodEnd: true,
-    pendingPlan: { select: { priceCents: true } },
+    pendingPlan: { select: { priceCents: true, interval: true } },
     billingCycle: true,
     plan: {
         select: {
@@ -507,9 +507,13 @@ function addonViews(
  * after the period for it to be billed on (review 19 Nov, M-1). Less can.
  */
 function leavingWhy(sub: Sub): string | null {
-    return sub.cancelAtPeriodEnd || sub.pendingPlan?.priceCents === 0
-        ? "Your plan is moving to Free, so no more add-ons can be added. Keep your plan to add more."
-        : null;
+    if (sub.cancelAtPeriodEnd || sub.pendingPlan?.priceCents === 0)
+        return "Your plan is moving to Free, so no more add-ons can be added. Keep your plan to add more.";
+    // The year's order already carries what is held (02-plans P2): more
+    // bought now would ride the whole year unpaid.
+    if (sub.pendingPlan?.interval === "year")
+        return "Your new yearly plan is paid with the add-ons you hold now. Add more once it starts.";
+    return null;
 }
 
 /** More bought on a year paid once: what is left of the year, per add-on. */

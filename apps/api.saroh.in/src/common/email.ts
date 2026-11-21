@@ -15,6 +15,7 @@ import {
     codeSubject,
     siteAccountEmailFooter,
 } from "../modules/site-accounts/sender-name";
+import { emailSendFailed } from "./email-send-health";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
 import { structuredLogger } from "./logging/structured-logger";
@@ -161,14 +162,21 @@ export async function send(
  * {@link send} for a mail nobody waits on: a failure is logged, never an
  * unhandled rejection. The line names no address and no subject.
  */
-function sendQuietly(edition: Edition, mail: OutgoingMail): void {
+function sendQuietly(
+    edition: Edition,
+    mail: OutgoingMail,
+    /** A security notice's kind: its failure alerts staff at once (04 S13). */
+    security: string | null = null,
+): void {
     send(edition, mail).catch((error: unknown) => {
         structuredLogger.error("email_send_failed", {
             edition,
             reason: error instanceof Error ? error.name : "unknown error",
             responseCode: (error as { responseCode?: unknown } | null)
                 ?.responseCode,
+            ...(security ? { notice: security } : {}),
         });
+        void emailSendFailed(security).catch(() => undefined);
     });
 }
 
@@ -510,11 +518,15 @@ export function sendSignInEmailChangedNotice(
         console.info(`[Sign-in email changed] (no SMTP) notice to ${to}`);
         return Promise.resolve();
     }
-    sendQuietly(edition, {
-        to,
-        subject: "Your Saroh sign-in email was changed",
-        html,
-    });
+    sendQuietly(
+        edition,
+        {
+            to,
+            subject: "Your Saroh sign-in email was changed",
+            html,
+        },
+        "sign-in email changed",
+    );
     return Promise.resolve();
 }
 
@@ -543,13 +555,17 @@ export function sendOwnerChangedNotice(
         console.info(`[Owner changed] (no SMTP) notice to ${to}`);
         return Promise.resolve();
     }
-    sendQuietly(edition, {
-        to,
-        subject: change.added
-            ? `A new Owner was added to ${change.business}`
-            : `An Owner was removed from ${change.business}`,
-        html,
-    });
+    sendQuietly(
+        edition,
+        {
+            to,
+            subject: change.added
+                ? `A new Owner was added to ${change.business}`
+                : `An Owner was removed from ${change.business}`,
+            html,
+        },
+        "Owner changed",
+    );
     return Promise.resolve();
 }
 

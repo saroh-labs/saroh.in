@@ -111,19 +111,21 @@ async function lockPeople(tx: Tx, userIds: readonly string[]) {
  * they may, `exceptOrganizationId` left out, and of the paused ones only
  * those marked before `before` (the one marked last is the one paused).
  * The person's other businesses are read outside the caller's row-level
- * security, on their own connection (a business's request sees only its
- * own rows), as `holdPayerOffersInTx` reads the payer's; callers in a
- * transaction hold the person's lock first.
+ * security (a business's request sees only its own rows): on `tx`'s own
+ * connection when one is given ({@link unscopedInTx}), so a transaction
+ * never waits on a second pool connection (04 S2); else outside the org
+ * context. Callers in a transaction hold the person's lock first.
  */
 async function atLimit(
     userId: string,
     edition: Edition,
     exceptOrganizationId?: string,
     before?: Date,
+    tx?: Tx,
 ): Promise<boolean> {
-    const [owned, user] = await outsideOrgContext(() =>
+    const read = (db: Pick<Tx, "organization" | "user">) =>
         Promise.all([
-            prisma.organization.count({
+            db.organization.count({
                 where: {
                     ...ownedFreeWhere(userId, edition, exceptOrganizationId),
                     ...(before
@@ -136,13 +138,34 @@ async function atLimit(
                         : {}),
                 },
             }),
-            prisma.user.findUnique({
+            db.user.findUnique({
                 where: { id: userId },
                 select: { extraFreeBusinesses: true },
             }),
-        ]),
-    );
+        ]);
+    const [owned, user] = tx
+        ? await unscopedInTx(tx, () => read(tx))
+        : await outsideOrgContext(() => read(prisma));
     return owned >= 1 + Math.max(0, user?.extraFreeBusinesses ?? 0);
+}
+
+/**
+ * Run `fn`'s reads on `tx` with the business scope lifted (the policies'
+ * unset-GUC branch, as a job runs), then put the scope back. A failed read
+ * aborts the transaction, which drops the local setting with it.
+ */
+async function unscopedInTx<T>(
+    tx: Pick<Tx, "$executeRaw" | "$queryRaw">,
+    fn: () => Promise<T>,
+): Promise<T> {
+    const rows = await tx.$queryRaw<{ id: string | null }[]>`
+        SELECT NULLIF(current_setting('app.current_organization_id', true), '') AS id`;
+    const scoped = rows[0]?.id ?? null;
+    if (!scoped) return fn();
+    await tx.$executeRaw`SELECT set_config('app.current_organization_id', '', true)`;
+    const result = await fn();
+    await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${scoped}, true)`;
+    return result;
 }
 
 /**
@@ -157,7 +180,7 @@ export async function assertMayOwnAnotherFreeInTx(
     edition: Edition,
 ): Promise<void> {
     for (const userId of await lockPeople(tx, userIds)) {
-        if (await atLimit(userId, edition)) {
+        if (await atLimit(userId, edition, undefined, undefined, tx)) {
             throw new ConflictException({
                 message: freeBusinessTakenMessage(edition),
                 details: { code: "FREE_BUSINESS_TAKEN" },
@@ -200,7 +223,7 @@ export async function settleFreeLimitInTx(
         ).map((o) => o.userId);
     let over = false;
     for (const userId of await lockPeople(tx, owners)) {
-        if (await atLimit(userId, org.edition, organizationId)) {
+        if (await atLimit(userId, org.edition, organizationId, undefined, tx)) {
             over = true;
             break;
         }

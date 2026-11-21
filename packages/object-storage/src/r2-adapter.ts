@@ -100,6 +100,9 @@ function isNotFound(error: unknown): boolean {
     return name === "NotFound" || name === "NoSuchKey" || status === 404;
 }
 
+/** Connect within 3 s, answer within 10 s, per attempt. */
+export const R2_TIMEOUTS = { connectionTimeout: 3_000, requestTimeout: 10_000 };
+
 /**
  * Create an {@link ObjectStorage} backed by Cloudflare R2 (via the S3 SDK).
  *
@@ -138,6 +141,9 @@ export function createR2Storage(config: R2StorageConfig): ObjectStorage {
             },
             // R2 requires path-style addressing.
             forcePathStyle: true,
+            // A slow R2 must not hold a caller (a sweep's transaction, a
+            // request) for the socket's lifetime (04 S3).
+            requestHandler: R2_TIMEOUTS,
         });
 
     const presign = config.presign ?? defaultPresigner;

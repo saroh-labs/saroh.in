@@ -1,7 +1,9 @@
-import { HttpException, HttpStatus } from "@nestjs/common";
+import { HttpException, HttpStatus, Logger } from "@nestjs/common";
 import { createHash } from "node:crypto";
 
 import { env } from "../../env";
+import type { OwnerAlert } from "../ai/ops/owner-alert";
+import { OwnerAlertSender } from "../ai/ops/owner-alert";
 import type { WindowLimiter } from "../rate-limits/shared-window";
 import { SharedRateLimiter } from "../rate-limits/shared-window";
 
@@ -17,8 +19,14 @@ export interface InviteWindows {
     address: WindowLimiter;
     /** One signed-in account, across every business it can invite for. */
     inviter: WindowLimiter;
-    /** Every invitation Saroh sends. */
+    /**
+     * Every invitation Saroh sends. Alert-only (02-limits L8): past it,
+     * staff hear once a day and the send goes ahead, so a ring of throwaway
+     * accounts can't stop every business's invitations.
+     */
     overall: WindowLimiter;
+    /** One alert a day when `overall` is passed. */
+    overallAlerted: WindowLimiter;
 }
 
 const window = (name: string, limit: number) =>
@@ -37,6 +45,7 @@ function defaultWindows(): InviteWindows {
         ),
         inviter: window("invite-sends-inviter", 100),
         overall: window("invite-sends-overall", 5000),
+        overallAlerted: window("invite-sends-overall-alerted", 1),
     };
 }
 
@@ -66,8 +75,9 @@ const BUSY = {
     business:
         "Your business has sent enough invitations today. Try again tomorrow.",
     inviter: "You've sent enough invitations today. Try again tomorrow.",
-    overall: "Invitations are busy right now. Try again later.",
 };
+
+type HardWindow = Exclude<keyof InviteWindows, "overall" | "overallAlerted">;
 
 /**
  * Invitation emails, counted per send (A-02, 07 F4) in Redis
@@ -78,8 +88,15 @@ const BUSY = {
  */
 export class InviteSendLimit {
     private readonly windows: InviteWindows;
+    private readonly logger = new Logger(InviteSendLimit.name);
 
-    constructor(windows: Partial<InviteWindows> = {}) {
+    constructor(
+        windows: Partial<InviteWindows> = {},
+        private readonly alerts: Pick<
+            OwnerAlertSender,
+            "send"
+        > = new OwnerAlertSender(),
+    ) {
         this.windows = { ...defaultWindows(), ...windows };
     }
 
@@ -93,21 +110,20 @@ export class InviteSendLimit {
         // The caller's own windows first, the shared ones last, stopping at
         // the first refusal: a business past its share never counts against
         // the address's window, so it can't use up anyone else's.
-        const keys: Record<keyof InviteWindows, string> = {
+        const keys: Record<HardWindow, string> = {
             businessAddress: `${organizationId}:${to}`,
             business: organizationId,
             inviter: inviterUserId,
             address: to,
-            overall: "all",
         };
-        let refused: keyof InviteWindows | undefined;
-        for (const name of Object.keys(keys) as (keyof InviteWindows)[]) {
+        let refused: HardWindow | undefined;
+        for (const name of Object.keys(keys) as HardWindow[]) {
             if (!(await this.windows[name].take(keys[name]))) {
                 refused = name;
                 break;
             }
         }
-        if (!refused) return;
+        if (!refused) return this.countOverall();
         const wait = await this.windows[refused].retryAfterSeconds(
             keys[refused],
         );
@@ -119,6 +135,25 @@ export class InviteSendLimit {
             },
             HttpStatus.TOO_MANY_REQUESTS,
         );
+    }
+
+    /** Count the send overall; past the line, tell staff once a day. */
+    private async countOverall(): Promise<void> {
+        if (await this.windows.overall.take("all")) return;
+        if (!(await this.windows.overallAlerted.take("all"))) return;
+        this.logger.error(
+            "invite_sends_overall_high: invitations sent today passed the overall line; sends go on",
+        );
+        const alert: OwnerAlert = {
+            subject: "Saroh: invitation emails are unusually high today",
+            lines: [
+                "More invitation emails went out today than the overall daily line.",
+                "Invitations still send. Each business, inviter and address keeps its own limit.",
+                "Check the API log for invite_sends_overall_high and look for new accounts sending many invitations.",
+            ],
+            path: "/health",
+        };
+        void this.alerts.send(alert);
     }
 }
 

@@ -1101,7 +1101,7 @@ describe("add-ons", () => {
     });
 });
 
-describe("add-ons are always paid for (review 19 Nov 2026, H-1 and M-1)", () => {
+describe("add-ons are always paid for (review 19 Nov 2026, H-1 and M-1; 21 Nov P2)", () => {
     /** An order paid at the provider, as Razorpay's `order.paid` reads. */
     async function orderPaid(order: string, amount: number) {
         evt += 1;
@@ -1183,6 +1183,45 @@ describe("add-ons are always paid for (review 19 Nov 2026, H-1 and M-1)", () => 
         );
         expect(quote.kind).toBe("RENEW");
         expect(quote.addonsNowPaise).toBeGreaterThan(2 * 111);
+    });
+
+    it("P2: a monthly plan moved to yearly pays the add-ons it holds on the year's order, and no more can be bought before the year starts", async () => {
+        await install(
+            OFFERS((c) => {
+                c.plans[1]!.trial = undefined;
+            }),
+        );
+        const ctx = await business();
+        await onPaidPlan(ctx, "b");
+        await addons.set(ctx, "things-pack", 1);
+
+        const quote = await checkout.quote(ctx, { plan: "b", cycle: "year" });
+        const r = await checkout.changePlan(ctx, { plan: "b", cycle: "year" });
+        if (r.kind === "TO_FREE") throw new Error("expected a checkout");
+        const order = fake.orders.created.at(-1)!;
+        await orderPaid(`fake_order_${r.checkout.id}`, order.amountPaise);
+
+        if (quote.kind === "NEW") {
+            // A new year starts with none.
+            expect(await prisma.subscriptionAddon.count()).toBe(0);
+            return;
+        }
+        expect(quote.kind).toBe("SCHEDULED");
+        // Charged: the year's order carries the add-on for the whole year.
+        expect(quote.addonsNowPaise).toBeGreaterThan(111);
+        const carried = await prisma.subscriptionAddonCharge.findMany({
+            where: { providerSubscriptionId: `fake_order_${r.checkout.id}` },
+        });
+        expect(carried).toEqual([
+            expect.objectContaining({ addonId: "things-pack", quantity: 1 }),
+        ]);
+        expect(
+            carried[0]!.periodEnd.getTime() - carried[0]!.periodStart.getTime(),
+        ).toBeGreaterThan(360 * DAY);
+        // More now would ride the year unpaid.
+        await expect(addons.set(ctx, "things-pack", 2)).rejects.toMatchObject({
+            status: 409,
+        });
     });
 
     it("M-1: once a move to Free is scheduled, no more can be bought; less still can", async () => {

@@ -556,6 +556,32 @@ describe("one business on Free per person (DEC-227, M-4)", () => {
         expect(await freeLimitPaused(theirs.orgId)).toBe(true);
     });
 
+    it("reads the owner's other businesses on the transaction's own connection, with the scope put back (04 S2)", async () => {
+        const newOwner = await person();
+        await business(HARD, { ownerId: newOwner.id });
+        const theirs = await business(HARD);
+        await prisma.membership.create({
+            data: {
+                organizationId: theirs.orgId,
+                userId: newOwner.id,
+                role: "OWNER",
+            },
+        });
+        const [over, scope] = await prisma.$transaction(async (tx) => {
+            // Scoped to this business, as a request's transaction is.
+            await tx.$executeRaw`SELECT set_config('app.current_organization_id', ${theirs.orgId}, true)`;
+            const paused = await settleFreeLimitInTx(tx, theirs.orgId, [
+                newOwner.id,
+            ]);
+            const rows = await tx.$queryRaw<{ id: string }[]>`
+                SELECT current_setting('app.current_organization_id', true) AS id`;
+            return [paused, rows[0]?.id];
+        });
+        // The other business was seen, and the scope is the business's again.
+        expect(over).toBe(true);
+        expect(scope).toBe(theirs.orgId);
+    });
+
     it("keeps businesses a person owned before the rule unpaused", async () => {
         const owner = await person();
         const a = await business(HARD, { ownerId: owner.id });
