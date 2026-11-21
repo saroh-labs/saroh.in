@@ -31,6 +31,7 @@ import {
     signInState,
 } from "./admin-people-reads";
 import { AdminPermission } from "./admin-permissions";
+import { refuseStaffTarget } from "./admin-sign-in-help.service";
 import type { PeopleFilter } from "./sign-in-help-rules";
 
 export type { PersonRow } from "./admin-people-reads";
@@ -298,12 +299,21 @@ export class AdminPeopleService {
         reason: string,
     ) {
         const why = requireReason(reason);
+        // Another console's person is a 404, as the detail read is (A3).
+        const person = await prisma.user.findFirst({
+            where: { id: userId, ...inEditionWhere(staff.edition) },
+            select: { id: true, email: true },
+        });
+        if (!person) throw new NotFoundException("Person not found");
+        // Support can't sign a Platform owner out, again and again (A3).
+        await refuseStaffTarget(this.audit, staff, person, {
+            permission: AdminPermission.OrganizationPeopleWrite,
+            action: "person.sessions.ended",
+            reason: why,
+            own: "You can't end your own sessions here. Sign out instead.",
+            other: "They are Saroh staff. Only a Platform owner can end their sessions.",
+        });
         return prisma.$transaction(async (tx) => {
-            const user = await tx.user.findUnique({
-                where: { id: userId },
-                select: { id: true },
-            });
-            if (!user) throw new NotFoundException("Person not found");
             const ended = await tx.session.deleteMany({ where: { userId } });
             await this.audit.write(tx, {
                 actorUserId: staff.userId,
@@ -338,8 +348,9 @@ export class AdminPeopleService {
             );
         }
         return prisma.$transaction(async (tx) => {
-            const user = await tx.user.findUnique({
-                where: { id: userId },
+            // Another console's person is a 404, as the detail read is (A4).
+            const user = await tx.user.findFirst({
+                where: { id: userId, ...inEditionWhere(staff.edition) },
                 select: { extraFreeBusinesses: true },
             });
             if (!user) throw new NotFoundException("Person not found");

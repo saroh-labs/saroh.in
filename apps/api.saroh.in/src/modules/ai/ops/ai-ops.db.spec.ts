@@ -562,4 +562,37 @@ describe("Request more's grant", () => {
             false,
         );
     });
+
+    it("adds nothing and reopens the request when its ledger row can't be written (A7)", async () => {
+        const b = await business();
+        const now = new Date();
+        const window = await meterWindow(prisma, b.id, now);
+        const request = await prisma.aiRequest.create({
+            data: {
+                organizationId: b.id,
+                userId: b.ownerId,
+                windowKey: window.key,
+            },
+        });
+        await expect(
+            requests.grant(request.id, "staff-x", 1, "launch week", now, () =>
+                Promise.reject(new Error("ledger down")),
+            ),
+        ).rejects.toThrow("ledger down");
+        expect(
+            await prisma.subscriptionAddon.findFirst({
+                where: { organizationId: b.id },
+            }),
+        ).toBeNull();
+        expect(
+            await prisma.job.count({
+                where: { type: AI_GRANT_END_TYPE, organizationId: b.id },
+            }),
+        ).toBe(0);
+        expect(
+            await prisma.aiRequest.findUniqueOrThrow({
+                where: { id: request.id },
+            }),
+        ).toMatchObject({ status: "OPEN", packs: null, packsEndAt: null });
+    });
 });

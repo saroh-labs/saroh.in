@@ -85,8 +85,9 @@ export class AiRequestsService {
      * for the business, for this period only (owner, 13 Nov 2026): their
      * removal is queued for just before the period ends (`ai.grant.end`).
      * Staff only; the console's guard checks who (U8). Claimed first, so a
-     * second grant of the same request adds nothing; put back to open, and
-     * anything added taken off again, when it can't be done whole.
+     * second grant of the same request adds nothing; put back to open when
+     * it can't be done whole (the add-on and its ledger row are one
+     * transaction, so nothing is left to take off).
      */
     async grant(
         requestId: string,
@@ -106,41 +107,40 @@ export class AiRequestsService {
             reason,
             packs,
         });
-        let added: string | null = null;
+        // Set on the add-on's transaction; a change that held nothing leaves it.
+        const done = { held: false };
         try {
-            ({ addonId: added } = await this.addons.addBySaroh(
+            // The add-on, the end of the grant and its ledger row commit
+            // together, so a crash can't leave packs granted unrecorded (A7).
+            await this.addons.addBySaroh(
                 request.organizationId,
                 ASK_AI_MODULE,
                 packs,
                 staffUserId,
                 now,
-            ));
-            const addonId = added;
-            const window = await outsideOrgContext(() =>
-                meterWindow(prisma, request.organizationId, now),
-            );
-            await outsideOrgContext(() =>
-                prisma.$transaction(async (tx) => {
+                async (tx, addonId) => {
+                    const window = await meterWindow(
+                        tx,
+                        request.organizationId,
+                        now,
+                    );
                     await scheduleGrantEnd(tx, {
                         requestId,
                         addonId,
                         organizationId: request.organizationId,
                         periodEnd: window.end,
                     });
-                    // The grant's last step: its ledger row commits with it.
                     await audit?.(tx, request.organizationId);
-                }),
+                    done.held = true;
+                },
             );
-        } catch (error) {
-            if (added) {
-                await this.addons.removeBySaroh(
-                    request.organizationId,
-                    added,
-                    packs,
-                    staffUserId,
-                    now,
+            if (!done.held) {
+                throw new ConflictException(
+                    "Saroh can't add this for the business right now.",
                 );
             }
+        } catch (error) {
+            // Nothing was added: put the request back to open.
             await outsideOrgContext(() =>
                 prisma.aiRequest.update({
                     where: { id: requestId },

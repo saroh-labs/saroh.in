@@ -41,7 +41,23 @@ export interface ModuleMapEntry {
      * total. Only a write that adds to one thing past the cap is refused.
      */
     within?: LimitWithin;
+    /**
+     * How the API reads a business whose catalogue version has no row with
+     * this id, which is what the admin's "add known row" has to keep:
+     * - `locked`: off (Social, Ask AI, the API keys and webhooks, a site's
+     *   own trackers) or the same as off (Google accounts: one either way);
+     * - `open`: on with no cap; under a registry module, as that module reads
+     *   on each plan today (a paid-only one on priced plans only);
+     * - `neither`: no cell reads the same, so the row is never added for an
+     *   operator: a fixed floor (one website, the legacy locations), or a
+     *   row read as open on its own while its siblings decide its registry
+     *   module (payments and subscriptions, under Payments).
+     */
+    missingReads: MissingReads;
 }
+
+/** See {@link ModuleMapEntry.missingReads}. */
+export type MissingReads = "locked" | "open" | "neither";
 
 /** What a per-item cap is counted inside: one product, or one person. */
 export type LimitWithin = "product" | "person";
@@ -51,36 +67,52 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: "WEBSITE",
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** How many websites; `sites` was an unsold entitlement before (DEC-018). */
     sites: {
         registry: "WEBSITE",
         limitKey: "sites",
         legacyEntitlementKey: null,
+        missingReads: "neither",
     },
     /** Places customers visit (a `SHOP` location); an online-only one never counts. */
     locations: {
         registry: null,
         limitKey: "shopLocations",
         legacyEntitlementKey: null,
+        missingReads: "neither",
     },
-    themes: { registry: "WEBSITE", limitKey: null, legacyEntitlementKey: null },
-    review: { registry: "WEBSITE", limitKey: null, legacyEntitlementKey: null },
+    themes: {
+        registry: "WEBSITE",
+        limitKey: null,
+        legacyEntitlementKey: null,
+        missingReads: "open",
+    },
+    review: {
+        registry: "WEBSITE",
+        limitKey: null,
+        legacyEntitlementKey: null,
+        missingReads: "open",
+    },
     blog: {
         registry: "WEBSITE",
         limitKey: "blogPosts",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** Site visits in a month: soft, so a busy site is never turned away. */
     visits: {
         registry: "WEBSITE",
         limitKey: "visitsPerMonth",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     products: {
         registry: "COMMERCE",
         limitKey: "products",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /**
      * Variants one product may have (DEC-158): a cap inside each product,
@@ -92,18 +124,21 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: "variantsPerProduct",
         legacyEntitlementKey: null,
+        missingReads: "open",
         within: "product",
     },
     orders: {
         registry: "COMMERCE",
         limitKey: "ordersPerMonth",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** Invite-only product reviews, under Commerce on every plan. */
     reviews: {
         registry: "COMMERCE",
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /**
      * Taking money online through the business's own Razorpay or Cashfree.
@@ -113,49 +148,67 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: "PAYMENTS",
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "neither",
     },
     /** Memberships that renew; they take money, so they sit under Payments. */
     subscriptions: {
         registry: "PAYMENTS",
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "neither",
     },
     bookings: {
         registry: "APPOINTMENTS",
         limitKey: "bookingsPerMonth",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** Courses with dated sessions: paid plans only (05-P-02). A switch. */
     courses: {
         registry: "COURSES",
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** Class packs: paid plans only (05-P-02). A switch. */
     "class-packs": {
         registry: "CLASS_PACKS",
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** Invoicing needs no module (DEC-070); a row so the cards can say so. */
-    invoicing: { registry: null, limitKey: null, legacyEntitlementKey: null },
+    invoicing: {
+        registry: null,
+        limitKey: null,
+        legacyEntitlementKey: null,
+        missingReads: "open",
+    },
     /** Media storage in GB: hard or soft as each plan's cell says (DEC-227). */
     storage: {
         registry: null,
         limitKey: "storageGb",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /** Everyone in the business, whatever their role (DEC-155). */
     members: {
         registry: null,
         limitKey: "teamMembers",
         legacyEntitlementKey: "teamMembers",
+        missingReads: "open",
     },
-    roles: { registry: null, limitKey: null, legacyEntitlementKey: null },
+    roles: {
+        registry: null,
+        limitKey: null,
+        legacyEntitlementKey: null,
+        missingReads: "open",
+    },
     integrations: {
         registry: null,
         limitKey: "integrations",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     /**
      * Google accounts one person may connect for Google Calendar (DEC-233):
@@ -167,6 +220,7 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: "googleAccountsPerPerson",
         legacyEntitlementKey: null,
+        missingReads: "locked",
         within: "person",
     },
     /**
@@ -178,6 +232,7 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
     /**
      * A QR code in the business's own style, its print files and its scan
@@ -188,6 +243,7 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: null,
         legacyEntitlementKey: null,
+        missingReads: "open",
     } /**
      * The public API and MCP (plan 2026-11-10-001, U4): requests a minute per
      * surface, read by `rate-limits/caps.ts`, and how many keys and webhook
@@ -198,26 +254,31 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: "api.mcp.rpm",
         legacyEntitlementKey: null,
+        missingReads: "open",
     },
     "api-secret": {
         registry: null,
         limitKey: "api.secret.rpm",
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
     "api-storefront": {
         registry: null,
         limitKey: "api.storefront.rpm",
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
     "api-keys": {
         registry: null,
         limitKey: "api.keys.max",
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
     webhooks: {
         registry: null,
         limitKey: "webhooks.max",
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
     /**
      * Ask AI (DEC-220): questions a month, counted over the billing period
@@ -229,6 +290,7 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: "aiQuestionsPerMonth",
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
     /**
      * Saroh Social: posts Saroh publishes to the business's Instagram,
@@ -242,6 +304,7 @@ export const MODULE_MAP: Readonly<Record<string, ModuleMapEntry>> = {
         registry: null,
         limitKey: "socialPostsPerMonth",
         legacyEntitlementKey: null,
+        missingReads: "locked",
     },
 };
 

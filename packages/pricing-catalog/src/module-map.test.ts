@@ -54,10 +54,12 @@ describe("module map (KTD-8)", () => {
         expect(MODULE_MAP.invoicing.registry).toBeNull();
         expect(catalogueModulesFor("COMMUNICATIONS")).toEqual([]);
         // A merchant's own trackers (DEC-108) are a switch under no module.
+        // Missing reads as off: the page never renders them (closed on doubt).
         expect(MODULE_MAP["site-trackers"]).toEqual({
             registry: null,
             limitKey: null,
             legacyEntitlementKey: null,
+            missingReads: "locked",
         });
         expect(catalogueModulesFor("WEBSITE")).not.toContain("site-trackers");
         // A branded QR code is a switch under no module, as trackers are.
@@ -65,6 +67,7 @@ describe("module map (KTD-8)", () => {
             registry: null,
             limitKey: null,
             legacyEntitlementKey: null,
+            missingReads: "open",
         });
         expect(catalogueModulesFor("WEBSITE")).not.toContain("qr-branding");
     });
@@ -75,6 +78,7 @@ describe("module map (KTD-8)", () => {
             limitKey: "variantsPerProduct",
             legacyEntitlementKey: null,
             within: "product",
+            missingReads: "open",
         });
         expect(limitWithin("variants")).toBe("product");
         // Under no registry module: the row never decides whether Commerce is on.

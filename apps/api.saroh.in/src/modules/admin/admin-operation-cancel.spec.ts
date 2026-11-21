@@ -16,6 +16,7 @@ import {
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    UnauthorizedException,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
@@ -48,6 +49,7 @@ const permissionFor = (kind: string) =>
 function run(
     permissions: AdminPermission[] = [AdminPermission.JobsRetry],
     reason = "Wrong jobs picked",
+    session: Date = new Date(),
 ) {
     const audit = { write: jest.fn() };
     const result = cancelOperation(
@@ -58,6 +60,7 @@ function run(
             operationId: "op_1",
             reason,
             idempotencyKey: "key-12345",
+            session: { createdAt: session },
         },
     );
     return { audit, result };
@@ -114,6 +117,16 @@ describe("cancelOperation (#907)", () => {
     it("needs the permission the operation was started under", async () => {
         const { result } = run([AdminPermission.PlatformRead]);
         await expect(result).rejects.toBeInstanceOf(ForbiddenException);
+        expect(opStop).not.toHaveBeenCalled();
+    });
+
+    it("needs a recent sign-in for a step-up kind, as the guard would (A5)", async () => {
+        const { result } = run(
+            undefined,
+            undefined,
+            new Date(Date.now() - 24 * 60 * 60 * 1000),
+        );
+        await expect(result).rejects.toBeInstanceOf(UnauthorizedException);
         expect(opStop).not.toHaveBeenCalled();
     });
 

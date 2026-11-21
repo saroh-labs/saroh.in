@@ -90,8 +90,8 @@ export function OperatorDialog({
     quickReasons?: readonly string[];
     reasonLabel?: string;
     /**
-     * Opened from elsewhere: whether it is open. Mount it when it opens, so
-     * each opening is a fresh attempt with its own idempotency key.
+     * Opened from elsewhere: whether it is open. Each opening is a fresh
+     * attempt with its own idempotency key, mounted or not.
      */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -109,6 +109,20 @@ export function OperatorDialog({
     const [typed, setTyped] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
+
+    // Opened again by its parent (a dialog that stays mounted while closed):
+    // a fresh attempt, so a used key and the last reason never carry over
+    // into a replay of the old success (A2, 21 Nov).
+    const [wasOpen, setWasOpen] = useState(open);
+    if (open !== wasOpen) {
+        setWasOpen(open);
+        if (open) {
+            setKey(crypto.randomUUID());
+            setReason("");
+            setTyped("");
+            setError(null);
+        }
+    }
 
     const nameOk = confirmName === undefined || typed.trim() === confirmName;
     const reasonOk = !reasonRequired || reason.trim().length >= 4;

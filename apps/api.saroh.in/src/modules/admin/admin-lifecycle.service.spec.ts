@@ -634,6 +634,34 @@ describe("AdminLifecycleService — plan, trial and limits", () => {
         );
     });
 
+    it("settles the one-Free rule on a move to a free plan only (DEC-227)", async () => {
+        const findFirst = prisma.organization.findFirst as jest.Mock;
+        for (const [priceCents, asked] of [
+            [0, true],
+            [100, false],
+        ] as const) {
+            findFirst.mockClear();
+            planFind.mockResolvedValue({ ...pro, priceCents });
+            subFind.mockResolvedValue(null);
+            const { service } = build();
+            await service.changePlan({
+                staff,
+                organizationId: "org_1",
+                reason: "Moved down on request",
+                planId: "plan_pro",
+            });
+            if (asked) {
+                expect(findFirst).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        where: expect.objectContaining({ id: "org_1" }),
+                    }),
+                );
+            } else {
+                expect(findFirst).not.toHaveBeenCalled();
+            }
+        }
+    });
+
     it("tells the business's own history which plan it moved to (#509)", async () => {
         planFind.mockResolvedValue({ ...pro, name: "Pro" });
         subFind.mockResolvedValue({

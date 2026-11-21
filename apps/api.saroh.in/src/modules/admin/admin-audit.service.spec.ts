@@ -7,6 +7,7 @@ jest.mock("@saroh/database", () => ({
         user: { findMany: jest.fn() },
         organization: { findMany: jest.fn() },
     },
+    outsideOrgContext: (fn: () => unknown) => fn(),
 }));
 
 jest.mock("../../common/logging/request-context", () => ({
@@ -137,6 +138,7 @@ describe("AdminAuditService", () => {
                         { action: "flags.global.set" },
                         {},
                         {},
+                        {},
                     ],
                 },
                 cursor: { id: "event_before" },
@@ -153,7 +155,12 @@ describe("AdminAuditService", () => {
         findUsers
             .mockResolvedValueOnce([{ id: "user_1" }])
             .mockResolvedValueOnce([
-                { id: "user_1", name: "Asha", email: "asha@example.com" },
+                {
+                    id: "user_1",
+                    name: "Asha",
+                    email: "asha@example.com",
+                    platformAdmin: { id: "pa_1" },
+                },
             ]);
         findOrgs
             .mockResolvedValueOnce([{ id: "org_1" }])
@@ -185,5 +192,42 @@ describe("AdminAuditService", () => {
                 organizationName: "Rye Bakery",
             }),
         );
+    });
+
+    it("names and searches staff only, and keeps to the console's edition (A1)", async () => {
+        findUsers.mockReset();
+        findOrgs.mockReset();
+        findUsers.mockResolvedValueOnce([]).mockResolvedValueOnce([
+            {
+                id: "merchant_1",
+                name: "Ravi",
+                email: "ravi@example.com",
+                platformAdmin: null,
+            },
+        ]);
+        findOrgs
+            .mockResolvedValueOnce([{ id: "org_in" }]) // the edition's ids
+            .mockResolvedValueOnce([]); // the page's names
+        findMany.mockResolvedValue([
+            {
+                id: "e1",
+                actorUserId: "merchant_1",
+                organizationId: null,
+                createdAt: new Date(),
+            },
+        ]);
+
+        const page = await service.list({ actor: "ravi" }, "INDIA" as never);
+
+        expect(findUsers.mock.calls[0][0].where).toEqual(
+            expect.objectContaining({ platformAdmin: { isNot: null } }),
+        );
+        expect(findMany.mock.calls.at(-1)[0].where.AND).toContainEqual({
+            OR: [
+                { organizationId: null },
+                { organizationId: { in: ["org_in"] } },
+            ],
+        });
+        expect(page.items[0].actorName).toBe("Non-staff account");
     });
 });

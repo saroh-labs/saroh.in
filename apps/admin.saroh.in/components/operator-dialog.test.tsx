@@ -35,4 +35,35 @@ describe("OperatorDialog", () => {
         const [input] = onSubmit.mock.calls[0] as [OperatorSubmit];
         expect(input.idempotencyKey).toMatch(/\S{8,}/);
     });
+
+    it("starts afresh each time its parent opens it again (A2)", async () => {
+        const onSubmit = vi.fn().mockResolvedValue({ ok: true });
+        const props = {
+            title: "Turn it on for everyone?",
+            effect: <p>Everyone gets it.</p>,
+            submitLabel: "Turn on for everyone",
+            onSubmit,
+            onOpenChange: vi.fn(),
+        };
+        const { rerender } = render(<OperatorDialog {...props} open />);
+        fireEvent.change(screen.getByRole("textbox"), {
+            target: { value: "first time round" },
+        });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Turn on for everyone" }),
+        );
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+        rerender(<OperatorDialog {...props} open={false} />);
+        rerender(<OperatorDialog {...props} open />);
+        expect(screen.getByRole("textbox")).toHaveProperty("value", "");
+        fireEvent.change(screen.getByRole("textbox"), {
+            target: { value: "second time round" },
+        });
+        fireEvent.click(
+            screen.getByRole("button", { name: "Turn on for everyone" }),
+        );
+        await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
+        const [[a], [b]] = onSubmit.mock.calls as [OperatorSubmit][];
+        expect(b.idempotencyKey).not.toBe(a.idempotencyKey);
+    });
 });

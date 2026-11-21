@@ -1,6 +1,12 @@
 jest.mock("@saroh/database", () => {
     const prisma = {
-        user: { findUnique: jest.fn(), findMany: jest.fn() },
+        user: {
+            findUnique: jest.fn(),
+            findFirst: jest.fn(),
+            findMany: jest.fn(),
+            update: jest.fn(),
+        },
+        platformAdmin: { findUnique: jest.fn(async () => null) },
         session: {
             deleteMany: jest.fn(),
             findFirst: jest.fn(async () => null),
@@ -97,7 +103,10 @@ beforeEach(() => jest.clearAllMocks());
 
 describe("AdminPeopleService", () => {
     it("ends every session, which is what signs a person out", async () => {
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue({ id: "u1" });
+        (prisma.user.findFirst as jest.Mock).mockResolvedValue({
+            id: "u1",
+            email: "u1@example.com",
+        });
         (prisma.session.deleteMany as jest.Mock).mockResolvedValue({
             count: 3,
         });
@@ -119,11 +128,65 @@ describe("AdminPeopleService", () => {
     });
 
     it("refuses to end sessions for nobody", async () => {
-        (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+        (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
         const { service } = build();
         await expect(
             service.endSessions(staff, "ghost", "Compromised"),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it("reads the person on the console's edition only (A3, A4)", async () => {
+        (prisma.user.findFirst as jest.Mock).mockResolvedValue(null);
+        const { service } = build();
+        const india = { ...staff, edition: "INDIA" } as PlatformAdminInfo;
+        await expect(
+            service.endSessions(india, "u1", "Compromised"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            service.setExtraFreeBusinesses(india, "u1", 1, "Agreed by email"),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        for (const [args] of (prisma.user.findFirst as jest.Mock).mock
+            .calls as [{ where: Record<string, unknown> }][]) {
+            expect(args.where).toMatchObject({
+                id: "u1",
+                OR: expect.any(Array),
+            });
+        }
+        expect(prisma.user.update).not.toHaveBeenCalled();
+    });
+
+    it("lets only a Platform owner end a staff member's sessions (A3)", async () => {
+        (prisma.user.findFirst as jest.Mock).mockResolvedValue({
+            id: "owner_1",
+            email: "owner@example.com",
+        });
+        (prisma.platformAdmin.findUnique as jest.Mock).mockResolvedValue({
+            revokedAt: null,
+        });
+        const { service, audit } = build();
+        await expect(
+            service.endSessions(staff, "owner_1", "Incident"),
+        ).rejects.toBeInstanceOf(ForbiddenException);
+        expect(prisma.session.deleteMany).not.toHaveBeenCalled();
+        expect(audit.write).toHaveBeenCalledWith(
+            prisma,
+            expect.objectContaining({
+                action: "person.sessions.ended",
+                outcome: "DENIED",
+            }),
+        );
+
+        (prisma.session.deleteMany as jest.Mock).mockResolvedValue({
+            count: 1,
+        });
+        const owner = {
+            ...staff,
+            userId: "owner_2",
+            roles: ["PLATFORM_OWNER"],
+        } as PlatformAdminInfo;
+        await expect(
+            service.endSessions(owner, "owner_1", "Incident"),
+        ).resolves.toEqual({ ended: 1 });
     });
 
     it("changes a role as the operator, through the business's own rules", async () => {

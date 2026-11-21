@@ -418,35 +418,59 @@ export class AdminSignInHelpService {
      * Platform owner (review A1): only a Platform owner may act on staff,
      * and never on their own account through this path.
      */
-    private async refuseStaffTarget(
+    private refuseStaffTarget(
         staff: PlatformAdminInfo,
         target: { id: string; email: string },
         action: string,
         reason: string,
     ): Promise<void> {
-        if (!(await isSarohStaff(target))) return;
-        if (
-            staff.roles.includes(AdminRole.PlatformOwner) &&
-            staff.userId !== target.id
-        ) {
-            return;
-        }
-        await this.audit.write(prisma, {
-            actorUserId: staff.userId,
+        return refuseStaffTarget(this.audit, staff, target, {
             permission: AdminPermission.PeopleSignInHelp,
             action,
-            targetType: "user",
-            targetId: target.id,
             reason,
-            outcome: AdminAuditOutcome.Denied,
-            metadata: { staffTarget: true },
+            own: "You can't use sign-in help on your own account.",
+            other: "They are Saroh staff. Only a Platform owner can give them sign-in help.",
         });
-        throw new ForbiddenException(
-            staff.userId === target.id
-                ? "You can't use sign-in help on your own account."
-                : "They are Saroh staff. Only a Platform owner can give them sign-in help.",
-        );
     }
+}
+
+/**
+ * "Staff can't target more senior staff" for a write on a person: on Saroh
+ * staff only a Platform owner may act, and never on themselves. A refusal
+ * is a DENIED ledger row, then a 403 with `own` or `other` as its words.
+ */
+export async function refuseStaffTarget(
+    audit: AdminAuditService,
+    staff: PlatformAdminInfo,
+    target: { id: string; email: string },
+    refusal: {
+        permission: AdminPermission;
+        action: string;
+        reason: string;
+        own: string;
+        other: string;
+    },
+): Promise<void> {
+    if (!(await isSarohStaff(target))) return;
+    if (
+        staff.roles.includes(AdminRole.PlatformOwner) &&
+        staff.userId !== target.id
+    ) {
+        return;
+    }
+    await audit.write(prisma, {
+        actorUserId: staff.userId,
+        permission: refusal.permission,
+        action: refusal.action,
+        targetType: "user",
+        targetId: target.id,
+        reason: refusal.reason,
+        outcome: AdminAuditOutcome.Denied,
+        metadata: { staffTarget: true },
+    });
+    throw new ForbiddenException(
+        staff.userId === target.id ? refusal.own : refusal.other,
+    );
 }
 
 async function findPerson(userId: string) {
