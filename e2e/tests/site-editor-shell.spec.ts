@@ -102,15 +102,37 @@ for (const size of SIZES) {
                 "On every page",
             );
 
-            // More › Width › Tablet: the canvas bar says so; back to Desk.
+            // Undo and Redo side by side; no Ask AI on the desk bar (it is
+            // the right column's tab).
+            await expect(
+                bar.getByRole("button", { name: "Redo" }),
+            ).toBeDisabled();
+            await expect(
+                bar.getByRole("button", { name: "Ask AI" }),
+            ).toHaveCount(0);
+
+            // The canvas bar's width switch and zoom (owner, 21 Nov).
             const canvasBar = page.locator("[data-canvas-bar]");
-            await expect(canvasBar).toContainText("Desk view");
-            await bar.getByRole("button", { name: /^More: desk/ }).click();
-            await page.getByRole("menuitemradio", { name: "Tablet" }).click();
-            await expect(canvasBar).toContainText("Tablet view");
-            await bar.getByRole("button", { name: /^More: desk/ }).click();
-            await page.getByRole("menuitemradio", { name: "Desk" }).click();
-            await expect(canvasBar).toContainText("Desk view");
+            const width = canvasBar.getByRole("radiogroup", {
+                name: "Preview width",
+            });
+            await expect(
+                width.getByRole("radio", { name: "Desk" }),
+            ).toBeChecked();
+            await width.getByRole("radio", { name: "Tablet" }).click();
+            await expect(
+                width.getByRole("radio", { name: "Tablet" }),
+            ).toBeChecked();
+            await width.getByRole("radio", { name: "Desk" }).click();
+            await canvasBar.getByRole("button", { name: "Zoom out" }).click();
+            await expect(
+                canvasBar.getByRole("button", { name: /^Zoom: 75%/ }),
+            ).toBeVisible();
+            await canvasBar.getByRole("button", { name: "Zoom in" }).click();
+            // One line, whatever the window.
+            expect(
+                await canvasBar.evaluate((el) => el.clientHeight),
+            ).toBeLessThanOrEqual(48);
 
             // The chip opens the Publish sheet; Escape puts it away.
             await chip.click();
