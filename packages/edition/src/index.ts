@@ -74,6 +74,8 @@ export interface EditionProfile {
      * end in `_GLOBAL` (stage 10, KTD5 and KTD6).
      */
     envSuffix: "" | "_GLOBAL";
+    /** Where a person writes to Saroh: the address a refusal or help line names. */
+    supportEmail: string;
     /** Saroh's senders on the edition's own domain, until their env names are set. */
     defaultSenders: { mail: string; codes: string };
     /**
@@ -105,6 +107,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         paymentProviders: ["RAZORPAY", "CASHFREE"],
         onlinePaymentsOnEveryPlan: false,
         envSuffix: "",
+        supportEmail: "contact@saroh.in",
         defaultSenders: {
             mail: "Saroh <noreply@saroh.in>",
             codes: "codes@saroh.in",
@@ -130,6 +133,7 @@ export const EDITION_PROFILES: Record<Edition, EditionProfile> = {
         paymentProviders: ["STRIPE"],
         onlinePaymentsOnEveryPlan: true,
         envSuffix: "_GLOBAL",
+        supportEmail: "support@saroh.tech",
         defaultSenders: {
             mail: "Saroh <noreply@saroh.tech>",
             codes: "codes@saroh.tech",

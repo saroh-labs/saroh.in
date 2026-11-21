@@ -84,7 +84,7 @@ export function toDataExportView(row: DataExport): DataExportView {
  *
  * **Refused while the business is on legal hold** (DEC-122): asking for an
  * export and making a link both answer "This business's data is on hold.
- * Write to contact@saroh.in.", and each refusal is on the business's audit
+ * Write to <the edition's support address>.", and each refusal is on the business's audit
  * trail as DENIED. The list still reads.
  */
 @Injectable()
@@ -235,7 +235,7 @@ export class DataExportService {
             metadata: { reason: LEGAL_HOLD_CODE },
             actorRoleKey: ctx.roleKey,
         });
-        throw legalHoldRefusal();
+        throw legalHoldRefusal(ctx.edition);
     }
 }
 

@@ -1,3 +1,4 @@
+import { hostsFor, urlOf } from "@saroh/edition";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -341,6 +342,17 @@ describe("safeDestination — where to land after sign-in (#222)", () => {
 
     it("refuses a javascript: URL", () => {
         expect(safeDestination("javascript:alert(1)")).toBe(null);
+    });
+
+    it("drops a destination on the other edition, when told which one this is", () => {
+        const india = urlOf(hostsFor("INDIA", "production").app);
+        const global = urlOf(hostsFor("GLOBAL", "production").app);
+        process.env.BETTER_AUTH_TRUSTED_ORIGINS = `${india},${global}`;
+        expect(safeDestination(`${global}/a`, "INDIA")).toBe(null);
+        expect(safeDestination(`${india}/a`, "GLOBAL")).toBe(null);
+        expect(safeDestination(`${india}/a`, "INDIA")).toBe(`${india}/a`);
+        expect(safeDestination(`${global}/a`, "GLOBAL")).toBe(`${global}/a`);
+        expect(safeDestination("/a", "GLOBAL")).toBe("/a");
     });
 });
 

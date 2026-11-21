@@ -1,3 +1,4 @@
+import { planMoney } from "./money";
 import type { NextCharge } from "./plan";
 
 /**
@@ -57,7 +58,7 @@ export function nextParts(
     opts: { firstMonth?: boolean; cycle?: Cycle; price?: string | null } = {},
 ): StatusPart[] {
     const price =
-        opts.price && opts.price !== "₹0" && opts.price !== "Free"
+        opts.price && opts.price !== planMoney(0) && opts.price !== "Free"
             ? [{ lead: opts.price }]
             : [];
     switch (next.kind) {

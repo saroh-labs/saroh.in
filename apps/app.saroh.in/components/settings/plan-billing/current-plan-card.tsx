@@ -12,6 +12,7 @@ import { CalendarClock, Check } from "lucide-react";
 import Link from "next/link";
 
 import { ViewerDate } from "@/components/shared/dates/viewer-date";
+import { planMoney } from "@/lib/saroh-billing/money";
 import type { PickerRow } from "@/lib/saroh-billing/plan-view";
 
 import { RefreshButton } from "./refresh-button";
@@ -54,7 +55,7 @@ export function CurrentPlanCard({
     const way = canChange ? (
         <Button asChild className="max-desk:w-full">
             <Link href={PLANS_HREF}>
-                {row.amount === "₹0" ? planLabel() : "Change plan"}
+                {row.amount === planMoney(0) ? planLabel() : "Change plan"}
             </Link>
         </Button>
     ) : (

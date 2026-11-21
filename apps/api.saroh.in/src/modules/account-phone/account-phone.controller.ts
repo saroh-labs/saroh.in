@@ -91,6 +91,7 @@ export class PhoneSignInController {
         @Req() req: Request,
         @Res({ passthrough: true }) res: Response,
     ): Promise<{ signedIn: true }> {
+        refusePhoneOnGlobal(req.headers.host);
         const headers = fromNodeHeaders(req.headers);
         const cookies = await this.phones.signIn({
             phoneE164: dto.phone,
@@ -143,6 +144,7 @@ export class AccountPhoneController {
         @ClientAddress() ip: string,
         @Req() req: Request,
     ): Promise<{ phoneE164: string; phoneVerifiedAt: Date }> {
+        refusePhoneOnGlobal(req.headers.host);
         return this.phones.add({
             userId: user.id,
             phoneE164: dto.phone,

@@ -5,6 +5,7 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { Edition } from "@saroh/edition";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { AuditAction, auditMetadata } from "../audit/audit.service";
@@ -14,7 +15,7 @@ import {
 } from "../bookings/booking-cancel";
 import {
     LEGAL_HOLD_CODE,
-    LEGAL_HOLD_MESSAGE,
+    legalHoldMessage,
     legalHoldRefusal,
     onLegalHold,
     onLegalHoldLocked,
@@ -126,7 +127,9 @@ export class PrivacyRemovalService {
                 view: {
                     contactId,
                     name: fullName(contact),
-                    refusals: held ? [HOLD_REFUSAL, ...refusals] : refusals,
+                    refusals: held
+                        ? [holdRefusal(ctx.edition), ...refusals]
+                        : refusals,
                     goes,
                     stays,
                 },
@@ -151,7 +154,7 @@ export class PrivacyRemovalService {
                 findContact(tx, organizationId, contactId),
             );
             await this.recordHoldRefusal(ctx, contactId);
-            throw legalHoldRefusal();
+            throw legalHoldRefusal(ctx.edition);
         }
 
         // 1. The refusals, before anything is touched.
@@ -186,7 +189,7 @@ export class PrivacyRemovalService {
                 FOR UPDATE`;
             // A hold placed since step 0 waits on this lock or stops here.
             if (await onLegalHoldLocked(tx, organizationId)) {
-                throw legalHoldRefusal();
+                throw legalHoldRefusal(ctx.edition);
             }
             await findContact(tx, organizationId, contactId);
             refuse(await refusalsFor(tx, organizationId, contactId));
@@ -312,10 +315,10 @@ export class PrivacyRemovalService {
 }
 
 /** The preview's first refusal for a business on legal hold. */
-const HOLD_REFUSAL: RemovalRefusal = {
+const holdRefusal = (edition: Edition | undefined): RemovalRefusal => ({
     reason: "legal-hold",
-    message: LEGAL_HOLD_MESSAGE,
-};
+    message: legalHoldMessage(edition),
+});
 
 function refuse(refusals: RemovalRefusal[]): void {
     if (refusals.length === 0) return;

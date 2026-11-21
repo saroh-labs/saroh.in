@@ -1,7 +1,7 @@
 import { ConflictException, HttpException, HttpStatus } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 import { outsideOrgContext, prisma } from "@saroh/database";
-import type { Edition } from "@saroh/edition";
+import { editionProfile, type Edition } from "@saroh/edition";
 
 import { env } from "../../env";
 import { holdXactLock } from "../billing/xact-lock";
@@ -38,6 +38,17 @@ type Tx = Pick<
 
 export const FREE_BUSINESS_TAKEN_MESSAGE =
     "You already own a business on the Free plan. Move that one to a paid plan in Plan and billing, then set up the new one, or write to us.";
+
+/**
+ * The refusal on `edition`: where Saroh bills nobody (Global launches
+ * Free-only, P6) there is no paid plan to move to, so it says close.
+ * shortcut: reads the edition, not the business's SAROH_BILLING_GLOBAL flag;
+ * reword when Global's paid plans open.
+ */
+export const freeBusinessTakenMessage = (edition: Edition): string =>
+    editionProfile(edition).sarohBilling
+        ? FREE_BUSINESS_TAKEN_MESSAGE
+        : "You already own a business on the Free plan. Close that one, then set up the new one, or write to us.";
 
 /** Businesses still standing: not closing, not deleted. */
 const STANDING = {
@@ -148,7 +159,7 @@ export async function assertMayOwnAnotherFreeInTx(
     for (const userId of await lockPeople(tx, userIds)) {
         if (await atLimit(userId, edition)) {
             throw new ConflictException({
-                message: FREE_BUSINESS_TAKEN_MESSAGE,
+                message: freeBusinessTakenMessage(edition),
                 details: { code: "FREE_BUSINESS_TAKEN" },
             });
         }

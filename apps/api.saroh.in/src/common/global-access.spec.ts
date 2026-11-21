@@ -125,6 +125,35 @@ describe("globalAccessGate (Global behind the key, 16 Nov 2026)", () => {
         expect(write.next).not.toHaveBeenCalled();
     });
 
+    it("lets signed webhooks and Google Calendar's callback in, and nothing beside them", () => {
+        for (const [method, path] of [
+            ["POST", "/public/webhooks/stripe/org_1"],
+            ["POST", "/public/billing/webhooks/stripe"],
+            ["GET", "/integrations/google-calendar/callback"],
+        ]) {
+            const { next } = run(gate, {
+                headers: { host: "api.saroh.tech" },
+                method,
+                path,
+            });
+            expect(next).toHaveBeenCalled();
+        }
+        for (const [method, path] of [
+            ["GET", "/public/webhooks/stripe/org_1"],
+            ["POST", "/public/webhooks/meta"],
+            ["POST", "/public/webhooks/stripe/org_1/extra"],
+            ["POST", "/integrations/google-calendar/callback"],
+            ["POST", "/public/payments/checkout"],
+        ]) {
+            const { next } = run(gate, {
+                headers: { host: "api.saroh.tech" },
+                method,
+                path,
+            });
+            expect(next).not.toHaveBeenCalled();
+        }
+    });
+
     it("lets a CORS preflight through, which carries no cookies", () => {
         const { next } = run(gate, {
             headers: { host: "api.saroh.tech" },

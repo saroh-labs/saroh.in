@@ -13,7 +13,10 @@ import type { NextFunction, Request, Response } from "express";
  *
  * Off unless `GLOBAL_API_ACCESS_KEY` is set: India's addresses, and Global
  * once it opens (unset it), are untouched. Health checks and the published
- * plans (saroh.tech's build reads them, with no cookie) stay open.
+ * plans (saroh.tech's build reads them, with no cookie) stay open. So do
+ * the payment and billing webhooks (the provider sends no cookie; each checks
+ * its HMAC over the raw body) and Google Calendar's OAuth callback (Google's
+ * redirect; it checks its signed state and the session itself).
  */
 export const GLOBAL_ACCESS_COOKIE = "saroh-dev-access";
 /** India's site, where a visitor without the key goes. */
@@ -24,6 +27,9 @@ const GLOBAL_ROOT = hostsFor("GLOBAL", "production").site;
 const OPEN = [
     { method: "GET", path: /^\/health(\/.*)?$/ },
     { method: "GET", path: /^\/public\/pricing\/?$/ },
+    { method: "POST", path: /^\/public\/webhooks\/[^/]+\/[^/]+\/?$/ },
+    { method: "POST", path: /^\/public\/billing\/webhooks\/[^/]+\/?$/ },
+    { method: "GET", path: /^\/integrations\/google-calendar\/callback\/?$/ },
 ];
 
 export const isGlobalHost = (host: string | undefined) => {

@@ -1,4 +1,6 @@
-import { safeDestination } from "@saroh/auth/origins";
+import { safeDestination as trustedDestination } from "@saroh/auth/origins";
+
+import { env } from "@/env";
 
 import { getAppUrl } from "./app-urls";
 
@@ -15,7 +17,12 @@ import { getAppUrl } from "./app-urls";
  * production list.
  */
 
-export { safeDestination } from "@saroh/auth/origins";
+/** The trusted destination, kept to this build's edition (the session is per edition). */
+export function safeDestination(
+    redirect: string | string[] | undefined,
+): string | null {
+    return trustedDestination(redirect, env.NEXT_PUBLIC_EDITION ?? "INDIA");
+}
 
 /**
  * Where someone lands when there is nowhere better to send them: Saroh

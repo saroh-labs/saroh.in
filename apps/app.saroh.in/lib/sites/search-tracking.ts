@@ -12,6 +12,7 @@ import {
     extractVerificationCode,
 } from "@saroh/block-contract";
 
+import { PROFILE } from "@/lib/edition";
 import {
     HELP_TOPICS,
     helpArticleUrl,
@@ -269,7 +270,7 @@ export function trackerRunsLine(kind: TrackerKind): string {
 export const PRIVACY_NOTE =
     "Without one, visitors see a short notice we write listing your tools.";
 
-export const SUPPORT_EMAIL = "contact@saroh.in";
+export const SUPPORT_EMAIL = PROFILE.supportEmail;
 
 export const SWITCHED_OFF_LINE =
     "Saroh has switched off trackers on this site.";
