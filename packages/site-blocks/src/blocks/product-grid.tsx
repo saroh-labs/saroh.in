@@ -22,6 +22,7 @@ import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
 import { cardLink, listCard, listPhoto } from "./list-layout";
 import { LeadGrid } from "./product-grid-lead";
@@ -457,19 +458,19 @@ function ProductCards({
             cutOff={said(content.cutOff)}
             more={
                 feed.moreHref ? (
-                    <a
+                    <SiteLink
                         href={feed.moreHref}
                         className={cn(textButton, "shrink-0")}
                     >
                         See all products
-                    </a>
+                    </SiteLink>
                 ) : feed.atShop ? null : base !== null ? (
-                    <a
+                    <SiteLink
                         href={base || "/"}
                         className={cn(textButton, "shrink-0")}
                     >
                         Shop <span aria-hidden="true">→</span>
-                    </a>
+                    </SiteLink>
                 ) : (
                     <span className="text-site-accent-text shrink-0 text-sm font-semibold">
                         Shop <span aria-hidden="true">→</span>
@@ -532,7 +533,7 @@ function ProductCards({
                                     className={cn(card(p), "min-w-0")}
                                 >
                                     {base !== null ? (
-                                        <a
+                                        <SiteLink
                                             href={`${base}/${encodeURIComponent(p.slug)}`}
                                             className={cn(
                                                 "group grid cursor-pointer content-start gap-1.5",
@@ -540,7 +541,7 @@ function ProductCards({
                                             )}
                                         >
                                             {inner}
-                                        </a>
+                                        </SiteLink>
                                     ) : (
                                         <div className="grid content-start gap-1.5">
                                             {inner}
@@ -553,7 +554,7 @@ function ProductCards({
                         return (
                             <li key={p.slug} className="min-w-0">
                                 {base !== null ? (
-                                    <a
+                                    <SiteLink
                                         href={`${base}/${encodeURIComponent(p.slug)}`}
                                         className={cn(
                                             card(p),
@@ -562,7 +563,7 @@ function ProductCards({
                                         )}
                                     >
                                         {inner}
-                                    </a>
+                                    </SiteLink>
                                 ) : (
                                     <div className={card(p)}>{inner}</div>
                                 )}
@@ -871,7 +872,7 @@ function BareGrid({
                 return (
                     <li key={p.slug} className="text-site-fg min-w-0">
                         {base !== null ? (
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(p.slug)}`}
                                 className={cn(
                                     "group block cursor-pointer rounded-[var(--site-radius)]",
@@ -879,7 +880,7 @@ function BareGrid({
                                 )}
                             >
                                 {inner}
-                            </a>
+                            </SiteLink>
                         ) : (
                             <div>{inner}</div>
                         )}

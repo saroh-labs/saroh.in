@@ -22,6 +22,7 @@ import {
 } from "../prices/pack-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
 import {
     PriceFrame,
@@ -436,14 +437,14 @@ function PackCards({
                     {label}
                 </button>
             ) : feed.askHref && !stopped ? (
-                <a
+                <SiteLink
                     href={askAboutHref(feed.askHref, pack.name, "pack")}
                     aria-label={`${label}: ${pack.name}`}
                     className={classes}
                     {...mark}
                 >
                     {label}
-                </a>
+                </SiteLink>
             ) : null;
             return (
                 <li
@@ -575,7 +576,7 @@ function PackCards({
                                         {label}
                                     </button>
                                 ) : feed.askHref && !stopped ? (
-                                    <a
+                                    <SiteLink
                                         href={askAboutHref(
                                             feed.askHref,
                                             pack.name,
@@ -585,7 +586,7 @@ function PackCards({
                                         className={liveButton}
                                     >
                                         {label}
-                                    </a>
+                                    </SiteLink>
                                 ) : null}
                             </span>
                         </li>

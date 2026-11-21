@@ -13,6 +13,7 @@ import { LookIcon } from "../look-icons";
 import { formatAmount } from "../product/product-page";
 import type { ShopListingCard } from "../product/shop-listing";
 import { useQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import { said } from "./look-front";
 import type { PublicService } from "./service-words";
 import { servicePriceWords } from "./service-words";
@@ -352,7 +353,7 @@ export default function GalleryLookbook({
             "text-site-accent-text inline-flex min-h-11 items-center gap-1 text-[15px] font-semibold";
         const name = said(img.name) ?? said(img.alt);
         return href ? (
-            <a
+            <SiteLink
                 href={href}
                 aria-label={name ? `${words}: ${name}` : undefined}
                 className={cn(
@@ -362,7 +363,7 @@ export default function GalleryLookbook({
                 )}
             >
                 {inner}
-            </a>
+            </SiteLink>
         ) : (
             // The editor's canvas, or a read still on its way: the words
             // show, and go nowhere.

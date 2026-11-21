@@ -4,6 +4,7 @@ import type { LookId } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
 import { useQrSource, withQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import { frontButton } from "./look-front";
 import type { PublicService } from "./service-words";
 import { formatDuration, servicePriceWords } from "./service-words";
@@ -53,7 +54,7 @@ export function NoTimesYet({
         <span data-no-times="" className="text-site-muted text-[13px]">
             {NO_TIMES_YET} ·{" "}
             {askHref ? (
-                <a
+                <SiteLink
                     href={askHref}
                     aria-label={`Ask about ${service.name}`}
                     className={cn(
@@ -62,7 +63,7 @@ export function NoTimesYet({
                     )}
                 >
                     Ask
-                </a>
+                </SiteLink>
             ) : (
                 "Ask"
             )}
@@ -129,7 +130,7 @@ export function ServiceCards({
                                 {price}
                             </span>
                             {bookHref ? (
-                                <a
+                                <SiteLink
                                     href={serviceHref(
                                         bookHref,
                                         service.id,
@@ -149,7 +150,7 @@ export function ServiceCards({
                                     }
                                 >
                                     {words}
-                                </a>
+                                </SiteLink>
                             ) : (
                                 <span
                                     className={

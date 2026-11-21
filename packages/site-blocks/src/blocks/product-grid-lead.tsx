@@ -5,6 +5,7 @@ import { cn } from "../lib/utils";
 import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import type { ShopListingCard } from "../product/shop-listing";
+import { SiteLink } from "../site-link";
 
 /**
  * The Product grid's `lead` look (industry templates U2): the first product
@@ -73,7 +74,7 @@ export function LeadGrid({
                         )}
                     >
                         {base !== null ? (
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(p.slug)}`}
                                 className={cn(
                                     card,
@@ -82,7 +83,7 @@ export function LeadGrid({
                                 )}
                             >
                                 {body}
-                            </a>
+                            </SiteLink>
                         ) : (
                             <div className={card}>{body}</div>
                         )}

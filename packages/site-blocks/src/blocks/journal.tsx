@@ -9,6 +9,7 @@ import { DEFAULT_API_URL } from "../api-url";
 import { siteImage } from "../lib/site-image";
 import { cn, trimTrailingSlashes } from "../lib/utils";
 import type { LookProps } from "../look-context";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
 import type { ArchiveYear } from "./journal-archive";
 import { JournalArchive, JournalArchiveByYear } from "./journal-archive";
@@ -574,10 +575,13 @@ function JournalCards({
                     All {total} {total === 1 ? "entry" : "entries"}
                 </LookAllPosts>
             ) : (
-                <a href={index || "/"} className={cn(textButton, "shrink-0")}>
+                <SiteLink
+                    href={index || "/"}
+                    className={cn(textButton, "shrink-0")}
+                >
                     All {total} {total === 1 ? "entry" : "entries"}{" "}
                     <span aria-hidden="true">→</span>
-                </a>
+                </SiteLink>
             )
         ) : content.showTotal ? (
             <span
@@ -671,9 +675,12 @@ function JournalCards({
         <JournalFrame
             title={title}
             more={
-                <a href={base || "/"} className={cn(textButton, "shrink-0")}>
+                <SiteLink
+                    href={base || "/"}
+                    className={cn(textButton, "shrink-0")}
+                >
                     All posts <span aria-hidden="true">→</span>
-                </a>
+                </SiteLink>
             }
         >
             <ul
@@ -691,7 +698,7 @@ function JournalCards({
                     if (list) {
                         return (
                             <li key={post.slug} className="min-w-0">
-                                <a
+                                <SiteLink
                                     href={`${base}/${encodeURIComponent(post.slug)}`}
                                     className={cn(
                                         listCard(Boolean(image)),
@@ -730,13 +737,13 @@ function JournalCards({
                                             </span>
                                         ) : null}
                                     </span>
-                                </a>
+                                </SiteLink>
                             </li>
                         );
                     }
                     return (
                         <li key={post.slug} className="min-w-0">
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(post.slug)}`}
                                 className={cn(
                                     "border-site-border bg-site-surface text-site-fg hover:border-site-fg/40 group grid h-full min-w-0 cursor-pointer content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border pb-4 transition-[border-color,transform] active:scale-[0.99]",
@@ -774,7 +781,7 @@ function JournalCards({
                                 {label ? (
                                     <span className={cardLink}>{label}</span>
                                 ) : null}
-                            </a>
+                            </SiteLink>
                         </li>
                     );
                 })}

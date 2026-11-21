@@ -3,6 +3,7 @@ import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { ShopListingCard } from "../product/shop-listing";
+import { SiteLink } from "../site-link";
 import type { LeadShow } from "./product-grid-lead";
 
 /**
@@ -74,7 +75,7 @@ export function PlatesGrid({
                         )}
                     >
                         {base !== null ? (
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(p.slug)}`}
                                 className={cn(
                                     cell,
@@ -83,7 +84,7 @@ export function PlatesGrid({
                                 )}
                             >
                                 {body}
-                            </a>
+                            </SiteLink>
                         ) : (
                             <div className={cell}>{body}</div>
                         )}

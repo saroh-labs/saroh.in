@@ -1,6 +1,7 @@
 import type { LookId } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
+import { SiteLink } from "../site-link";
 import { FRONT_RING, FRONT_TYPE } from "./look-front";
 
 /**
@@ -40,7 +41,7 @@ export function JournalArchive({
         <ol className="border-site-border border-t">
             {rows.map((row) => (
                 <li key={row.key} className="border-site-border border-b">
-                    <a
+                    <SiteLink
                         href={row.href}
                         className={cn(
                             "text-site-fg group grid gap-x-6 gap-y-1 py-4 sm:grid-cols-[9rem_minmax(0,1fr)]",
@@ -68,7 +69,7 @@ export function JournalArchive({
                                 </span>
                             ) : null}
                         </span>
-                    </a>
+                    </SiteLink>
                 </li>
             ))}
         </ol>
@@ -127,7 +128,7 @@ export function JournalArchiveByYear({
                     <ol className="grid gap-2.5">
                         {group.rows.map((row) => (
                             <li key={row.key}>
-                                <a
+                                <SiteLink
                                     href={row.href}
                                     className={cn(
                                         "text-site-fg coarse:min-h-11 group grid grid-cols-[4.125rem_minmax(0,1fr)] gap-x-4",
@@ -155,7 +156,7 @@ export function JournalArchiveByYear({
                                             </span>
                                         ) : null}
                                     </span>
-                                </a>
+                                </SiteLink>
                             </li>
                         ))}
                     </ol>
@@ -177,7 +178,7 @@ function LookArchive({ rows, look }: { rows: ArchiveRow[]; look: LookId }) {
         <ol className="border-site-border border-t">
             {rows.map((row) => (
                 <li key={row.key} className="border-site-border border-b">
-                    <a
+                    <SiteLink
                         href={row.href}
                         className={cn(
                             "text-site-fg group grid min-h-11 gap-x-8 gap-y-1.5 py-5 min-[700px]:grid-cols-[10rem_minmax(0,1fr)]",
@@ -215,7 +216,7 @@ function LookArchive({ rows, look }: { rows: ArchiveRow[]; look: LookId }) {
                                 </span>
                             ) : null}
                         </span>
-                    </a>
+                    </SiteLink>
                 </li>
             ))}
         </ol>

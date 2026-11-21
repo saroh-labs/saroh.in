@@ -8,6 +8,7 @@ import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import { LookIcon } from "../look-icons";
 import { useQrSource, withQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import {
     FRONT_RING,
     FRONT_TYPE,
@@ -66,7 +67,7 @@ export function SeeAllServices({
 }) {
     const source = useQrSource();
     return (
-        <a
+        <SiteLink
             href={withQrSource(href, source)}
             className={
                 look
@@ -78,7 +79,7 @@ export function SeeAllServices({
             }
         >
             See all services
-        </a>
+        </SiteLink>
     );
 }
 
@@ -273,7 +274,7 @@ function Rows({
                     : null;
                 const duration = formatDuration(service.durationMinutes);
                 const name = href ? (
-                    <a
+                    <SiteLink
                         href={href}
                         data-service-row-link=""
                         className={cn(
@@ -288,14 +289,14 @@ function Rows({
                         {look === "folio" ? (
                             <LookIcon name="arrow" look={look} size={16} />
                         ) : null}
-                    </a>
+                    </SiteLink>
                 ) : (
                     service.name
                 );
                 // Book stays in every look (U8: Quiet had dropped it); Quiet
                 // draws it as a 44px text link, the row still the way in.
                 const book = href ? (
-                    <a
+                    <SiteLink
                         href={href}
                         aria-label={`${words}: ${service.name}`}
                         className={frontButton(
@@ -310,7 +311,7 @@ function Rows({
                         )}
                     >
                         {words}
-                    </a>
+                    </SiteLink>
                 ) : label ? (
                     // The editor's canvas has no booking page: the words
                     // show, and go nowhere.

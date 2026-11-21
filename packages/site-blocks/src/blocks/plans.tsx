@@ -30,6 +30,7 @@ import { JoinSheet } from "../prices/join-sheet";
 import { planBrowsePrice, planEvery, planPrice } from "../prices/plan-words";
 import { askAboutHref } from "../shop/ask-about-ordering";
 import { NotTakingOrders } from "../shop/not-taking-orders";
+import { SiteLink } from "../site-link";
 import { FeedFailed } from "./feed-failed";
 import type { PacksFeed } from "./packs";
 import PacksSection from "./packs";
@@ -598,13 +599,13 @@ function PlanCards({
                         );
                     }
                     return feed.joinHref && !stopped ? (
-                        <a
+                        <SiteLink
                             href={joinHref(feed.joinHref, plan.name)}
                             aria-label={`${label}: ${plan.name}`}
                             className={classes}
                         >
                             {label}
-                        </a>
+                        </SiteLink>
                     ) : null;
                 }}
             />
@@ -680,14 +681,14 @@ function PlanCards({
                                 {label}
                             </button>
                         ) : feed.joinHref && !stopped ? (
-                            <a
+                            <SiteLink
                                 href={joinHref(feed.joinHref, plan.name)}
                                 aria-label={`${label}: ${plan.name}`}
                                 className={classes}
                                 {...primary}
                             >
                                 {label}
-                            </a>
+                            </SiteLink>
                         ) : null;
                         return (
                             <li
@@ -823,7 +824,7 @@ function PlanCards({
                                         {label}
                                     </button>
                                 ) : feed.joinHref && !stopped ? (
-                                    <a
+                                    <SiteLink
                                         href={joinHref(
                                             feed.joinHref,
                                             plan.name,
@@ -836,7 +837,7 @@ function PlanCards({
                                         )}
                                     >
                                         {label}
-                                    </a>
+                                    </SiteLink>
                                 ) : null}
                             </span>
                         </li>

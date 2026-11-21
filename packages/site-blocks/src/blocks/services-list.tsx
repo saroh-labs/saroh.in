@@ -12,6 +12,7 @@ import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { useQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import { CtaButton, ctaClasses } from "./cta";
 import type { PublicService, ServicesFeed } from "./service-words";
 import { formatDuration, servicePriceWords } from "./service-words";
@@ -321,7 +322,7 @@ export default function ServicesListSection({
                                             </span>
                                         ) : null}
                                         {bookHref ? (
-                                            <a
+                                            <SiteLink
                                                 href={serviceHref(
                                                     bookHref,
                                                     service.id,
@@ -338,7 +339,7 @@ export default function ServicesListSection({
                                                 )}
                                             >
                                                 {label ?? "Book"}
-                                            </a>
+                                            </SiteLink>
                                         ) : label ? (
                                             // The editor's canvas has no
                                             // booking page: the merchant's
@@ -566,7 +567,7 @@ function PriceCard({
                 {content.cta ? (
                     <CtaButton content={content.cta} />
                 ) : bookHref ? (
-                    <a
+                    <SiteLink
                         href={serviceHref(bookHref, service.id, source)}
                         aria-label={`${words}: ${service.name}`}
                         className={cn(
@@ -576,7 +577,7 @@ function PriceCard({
                         )}
                     >
                         {words}
-                    </a>
+                    </SiteLink>
                 ) : (
                     // The editor's canvas has no booking page: the words
                     // show, and go nowhere.

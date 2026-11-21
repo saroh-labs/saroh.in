@@ -5,6 +5,7 @@ import type { LookId, RenderedServicesList } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
 import { LookIcon } from "../look-icons";
 import { useQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import { said } from "./look-front";
 import type { PublicService } from "./service-words";
 import { formatDuration, servicePriceWords } from "./service-words";
@@ -123,7 +124,7 @@ export function ServicesMenu({
                                         ) : null}
                                     </span>
                                     {bookHref ? (
-                                        <a
+                                        <SiteLink
                                             href={serviceHref(
                                                 bookHref,
                                                 service.id,
@@ -136,7 +137,7 @@ export function ServicesMenu({
                                             )}
                                         >
                                             {book}
-                                        </a>
+                                        </SiteLink>
                                     ) : (
                                         // The editor's canvas has no booking
                                         // page: the words show, and go nowhere.

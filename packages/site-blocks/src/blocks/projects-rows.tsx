@@ -2,6 +2,7 @@ import type { RenderedProjects } from "@saroh/block-contract";
 import { isSafeHref } from "@saroh/block-contract";
 
 import { cn } from "../lib/utils";
+import { SiteLink } from "../site-link";
 
 /**
  * The Projects block's `rows` look (template polish), as the developer
@@ -63,7 +64,7 @@ export function ProjectRows({
                             <h3 className="font-site-heading text-[calc(1.03125rem*var(--site-heading-scale))] font-semibold leading-snug [overflow-wrap:anywhere]">
                                 {title}
                                 {link ? (
-                                    <a
+                                    <SiteLink
                                         href={link}
                                         rel={
                                             /^https?:\/\//i.test(link)
@@ -79,7 +80,7 @@ export function ProjectRows({
                                         <span className="sr-only">
                                             : {title}
                                         </span>
-                                    </a>
+                                    </SiteLink>
                                 ) : null}
                             </h3>
                             {summary ? (
