@@ -6849,3 +6849,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Symptom:** opening a post showed "Couldn't load this post", or logged "Cannot read properties of null (reading 'commands')" from `SlashMenu`, even though `editor.commands` was only used inside a click handler.
 - **Cause:** the React Compiler memoises the handler on the property path `editor.commands` and reads it during render. Tiptap's `commands` is a getter that throws until the editor is mounted, and with `immediatelyRender: false` the first render has no mounted editor.
 - **Fix:** render the menus only once `editor` exists, and call `editor.chain().focus().run()` instead of reading `editor.commands` in render scope. A Tiptap getter (`commands`, `view`, `state`) never goes in a component body or a closure the compiler can lift; keep it inside an effect or a chain call.
+
+### The pending mark under tabs never showed: `.skeleton-sweep` overrode `absolute` (21 Nov 2026)
+
+- **Symptom:** `LinkPending` (the bar under a pressed tab) never appeared, on any `TabStrip`, admin pager or `SectionList`. Its unit tests passed, because a DOM without layout can't see where the bar is placed.
+- **Cause:** `.skeleton-sweep` in `globals.css` sets `position: relative`. Unlayered CSS beats Tailwind's `@layer utilities`, so the `absolute` on the same element lost.
+- **Fix:** an outer span takes `absolute` and the inner span takes `.skeleton-sweep`. Never put a class from `globals.css` that sets `position` on the same element as a position utility. Check a positioned loading mark in a browser on Slow 3G, not only in a unit test.
