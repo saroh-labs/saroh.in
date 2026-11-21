@@ -1,6 +1,7 @@
 "use client";
 
 import { Chip } from "@saroh/ui/chip";
+import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { ListToolbar } from "@saroh/ui/list-toolbar";
 import { useRouter } from "next/navigation";
@@ -71,6 +72,12 @@ export function UsersToolbar({
                 narrowed === "search" ? "Clear search" : "Clear filters"
             }
             count={count}
+            // The old rows stay, greyed, until the new ones land.
+            aria-busy={pending || undefined}
+            className={cn(
+                "[&~*]:transition-opacity",
+                pending && "[&~*]:opacity-60",
+            )}
         />
     );
 }

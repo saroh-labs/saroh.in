@@ -1,8 +1,10 @@
 "use client";
 
+import { cn } from "@saroh/ui/lib/utils";
 import { ListSearch } from "@saroh/ui/list-search";
 import { ListFilter, ListToolbar } from "@saroh/ui/list-toolbar";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 
 import type { BillingTab, Query } from "@/lib/billing-filters";
 import {
@@ -35,7 +37,11 @@ export function BillingToolbar({ counts }: { counts: BillingCounts | null }) {
     const params = useSearchParams();
     const query: Query = Object.fromEntries(params.entries());
     const tab = tabOf(pathname);
-    const go = (href: string) => router.push(href, { scroll: false });
+    // The open tab's rows stay, greyed, until the filtered ones land (a
+    // search-param change shows no loading.tsx).
+    const [pending, startTransition] = useTransition();
+    const go = (href: string) =>
+        startTransition(() => router.push(href, { scroll: false }));
     const set = (change: Query) => go(withFilter(pathname, query, change));
     const narrowed = isNarrowed(tab, query);
 
@@ -49,11 +55,14 @@ export function BillingToolbar({ counts }: { counts: BillingCounts | null }) {
                     placeholder={BILLING_SEARCH_PLACEHOLDER}
                     describe="A business's name, an invoice number, or a Razorpay id: pay_, sub_, cust_ or order_."
                     defaultValue={query.q ?? ""}
+                    searching={pending}
                     onSearch={(term) => {
                         if (term === (query.q ?? "")) return;
-                        router.replace(searchHref(pathname, query, term), {
-                            scroll: false,
-                        });
+                        startTransition(() =>
+                            router.replace(searchHref(pathname, query, term), {
+                                scroll: false,
+                            }),
+                        );
                     }}
                 />
             }
@@ -64,6 +73,11 @@ export function BillingToolbar({ counts }: { counts: BillingCounts | null }) {
                     ? "Clear search"
                     : "Clear filters"
             }
+            aria-busy={pending || undefined}
+            className={cn(
+                "[&~*]:transition-opacity",
+                pending && "[&~*]:opacity-60",
+            )}
         />
     );
 }

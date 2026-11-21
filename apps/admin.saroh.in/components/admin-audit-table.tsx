@@ -1,5 +1,7 @@
 import { buttonVariants } from "@saroh/ui/button";
 import { EmptyState } from "@saroh/ui/empty-state";
+import { cn } from "@saroh/ui/lib/utils";
+import { LinkPending } from "@saroh/ui/link-pending";
 import { ScrollX } from "@saroh/ui/scroll-x";
 import {
     TableBody,
@@ -124,12 +126,16 @@ export function AdminAuditTable({
                             pathname: "/audit",
                             query: withoutCursor(query),
                         }}
-                        className={buttonVariants({
-                            variant: "ghost",
-                            size: "sm",
-                        })}
+                        className={cn(
+                            "relative",
+                            buttonVariants({
+                                variant: "ghost",
+                                size: "sm",
+                            }),
+                        )}
                     >
                         Back to newest
+                        <LinkPending />
                     </Link>
                 ) : (
                     <span />
@@ -143,12 +149,16 @@ export function AdminAuditTable({
                                 cursor: page.nextCursor,
                             },
                         }}
-                        className={buttonVariants({
-                            variant: "outline",
-                            size: "sm",
-                        })}
+                        className={cn(
+                            "relative",
+                            buttonVariants({
+                                variant: "outline",
+                                size: "sm",
+                            }),
+                        )}
                     >
                         Older events
+                        <LinkPending />
                     </Link>
                 )}
             </div>

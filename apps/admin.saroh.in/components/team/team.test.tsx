@@ -728,12 +728,11 @@ describe("Payouts and commission need team:pay", () => {
 });
 
 describe("/team needs team:read", () => {
-    it("shows the no-access panel inside the shell without it", async () => {
+    it("shows the no-access panel without it (the root layout draws the shell)", async () => {
         identity.getStaffIdentity.mockResolvedValue(
             staff(["leads:read" as AdminPermission]),
         );
         render((await TeamLayout({ children: <p>tab</p> })) as ReactElement);
-        expect(screen.getByTestId("shell")).toBeTruthy();
         expect(screen.getByText("Not authorized")).toBeTruthy();
         expect(screen.queryByText("tab")).toBeNull();
     });

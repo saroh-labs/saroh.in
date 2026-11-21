@@ -1,7 +1,6 @@
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
 import { ReleaseTable } from "@/components/releases/release-table";
 import { FailedPanel } from "@/components/states/failed-panel";
@@ -27,7 +26,7 @@ export default async function ReleasesPage() {
     }
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Releases"]}
@@ -45,6 +44,6 @@ export default async function ReleasesPage() {
                     />
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

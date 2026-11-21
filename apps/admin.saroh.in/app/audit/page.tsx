@@ -1,12 +1,10 @@
-import { Button, buttonVariants } from "@saroh/ui/button";
-import { Input } from "@saroh/ui/input";
-import { Label } from "@saroh/ui/label";
+import { buttonVariants } from "@saroh/ui/button";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
 import { AdminAuditTable } from "@/components/admin-audit-table";
-import { AdminShell } from "@/components/admin-shell";
+import { FilterBar, FilterText } from "@/components/filter-bar";
 import { NotAuthorized } from "@/components/not-authorized";
 import { requireStaff } from "@/lib/console";
 import { listAudit } from "@/lib/control-plane";
@@ -40,7 +38,7 @@ export default async function AuditPage({
     if (!page) return <NotAuthorized email={staff.email} staff={staff} />;
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Audit trail"]}
@@ -63,34 +61,31 @@ export default async function AuditPage({
                     }
                 />
 
-                <form
-                    action="/audit"
-                    className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-3 lg:grid-cols-[1fr_1fr_1fr_auto]"
-                >
-                    <FilterField
+                {/* The house filter bar: the old rows stay, greyed, while the
+                    filtered ones load, instead of a whole-page reload. The
+                    header keeps Clear filters, so the bar doesn't repeat it. */}
+                <FilterBar action="/audit" active={false}>
+                    <FilterText
                         label="Actor ID"
                         name="actorUserId"
                         defaultValue={query.actorUserId}
                     />
-                    <FilterField
+                    <FilterText
                         label="Business ID"
                         name="organizationId"
                         defaultValue={query.organizationId}
                     />
-                    <FilterField
+                    <FilterText
                         label="Action"
                         name="action"
                         defaultValue={query.action}
                         placeholder="flags.organization.set"
                     />
-                    <Button type="submit" className="self-end">
-                        Apply filters
-                    </Button>
-                </form>
+                </FilterBar>
 
                 <AdminAuditTable page={page} query={query} />
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 
@@ -98,32 +93,4 @@ function clean(value?: string): string | undefined {
     const trimmed = value?.trim();
     if (!trimmed) return undefined;
     return trimmed;
-}
-
-function FilterField({
-    label,
-    name,
-    defaultValue,
-    placeholder,
-}: {
-    label: string;
-    name: string;
-    defaultValue?: string;
-    placeholder?: string;
-}) {
-    return (
-        <div className="grid gap-1.5">
-            <Label htmlFor={name} className="text-xs text-muted-foreground">
-                {label}
-            </Label>
-            <Input
-                id={name}
-                type="search"
-                name={name}
-                defaultValue={defaultValue}
-                placeholder={placeholder}
-                className="min-w-0"
-            />
-        </div>
-    );
 }

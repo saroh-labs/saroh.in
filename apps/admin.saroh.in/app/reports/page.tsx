@@ -5,7 +5,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { MarkDone } from "@/components/business-reports/mark-done";
 import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { Pager } from "@/components/operations/pager";
@@ -46,7 +45,7 @@ export default async function ReportsPage({
     const seesContact = can(staff, "organization:pii:read");
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Reports"]}
@@ -181,6 +180,6 @@ export default async function ReportsPage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

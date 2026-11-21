@@ -1,4 +1,6 @@
 import { buttonVariants } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
+import { LinkPending } from "@saroh/ui/link-pending";
 import Link from "next/link";
 
 /**
@@ -29,20 +31,28 @@ export function NumberPager({
             {page > 1 && (
                 <Link
                     href={href(page - 1)}
-                    className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    className={cn(
+                        "relative",
+                        buttonVariants({ variant: "ghost", size: "sm" }),
+                    )}
                 >
                     Previous page
+                    <LinkPending />
                 </Link>
             )}
             {hasNext && (
                 <Link
                     href={href(page + 1)}
-                    className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                    })}
+                    className={cn(
+                        "relative",
+                        buttonVariants({
+                            variant: "outline",
+                            size: "sm",
+                        }),
+                    )}
                 >
                     Next page
+                    <LinkPending />
                 </Link>
             )}
         </nav>

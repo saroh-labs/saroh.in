@@ -4,7 +4,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { ResolveAiReport } from "@/components/ask-ai/ask-ai-actions";
 import { Facts, Panel } from "@/components/panel";
 import { read, readReport } from "@/lib/ask-ai";
@@ -26,11 +25,10 @@ export default async function AskAiReportPage({
 }) {
     const gate = await requireStaff("ai-reports:read");
     if (!gate.ok) return gate.screen;
-    const { staff } = gate;
     const report = await read(readReport((await params).reportId));
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Ask AI", "Report"]}
@@ -111,7 +109,7 @@ export default async function AskAiReportPage({
                     </Panel>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

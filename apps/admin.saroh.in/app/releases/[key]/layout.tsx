@@ -2,7 +2,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
 import { ReleaseHeader } from "@/components/releases/release-header";
 import { ReleaseTabs } from "@/components/releases/release-tabs";
@@ -31,18 +30,18 @@ export default async function ReleaseLayout({
     }
     if (read.status === "failed") {
         return (
-            <AdminShell staff={staff}>
+            <>
                 <PageContainer width="full">
                     <FailedPanel things="this release" />
                 </PageContainer>
-            </AdminShell>
+            </>
         );
     }
     const flag = read.flags.find((f) => f.key === decodeURIComponent(key));
     if (!flag) notFound();
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <ReleaseHeader
                     flag={flag}
@@ -52,6 +51,6 @@ export default async function ReleaseLayout({
                 <ReleaseTabs releaseKey={flag.key} />
                 {children}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

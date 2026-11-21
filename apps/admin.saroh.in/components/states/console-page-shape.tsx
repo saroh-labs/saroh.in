@@ -2,21 +2,24 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { Skeleton } from "@saroh/ui/skeleton";
 
 import { PanelSkeleton } from "./panel-skeleton";
+import { TableSkeleton } from "./table-skeleton";
 
 /** Which shape a console address draws while it loads. */
 export type ConsoleSkeleton = "list" | "board" | "detail";
 
 /**
- * The page's own shape while it loads, without the frame: for a section
- * whose layout keeps the console drawn (Search pages), and inside
- * `ConsoleLoading`'s frame.
+ * The page's own shape while it loads, inside the console's frame (the
+ * root layout keeps it drawn).
  */
 export function ConsolePageShape({
     shape,
     label,
+    columns,
 }: {
     shape: ConsoleSkeleton;
     label: string;
+    /** A list that is a table: its column count. */
+    columns?: number;
 }) {
     return (
         <PageContainer width="full">
@@ -71,7 +74,11 @@ export function ConsolePageShape({
                 ) : (
                     <>
                         <Skeleton aria-hidden className="h-10 rounded-[11px]" />
-                        <PanelSkeleton label={label} rows={8} />
+                        {columns ? (
+                            <TableSkeleton label={label} columns={columns} />
+                        ) : (
+                            <PanelSkeleton label={label} rows={8} />
+                        )}
                     </>
                 )}
             </div>

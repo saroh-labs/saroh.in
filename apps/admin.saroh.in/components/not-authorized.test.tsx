@@ -5,17 +5,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StaffIdentity } from "@/lib/control-plane";
 
-vi.mock("@/components/admin-shell", () => ({
-    AdminShell: ({ children }: { children: React.ReactNode }) => (
-        <div data-testid="shell">{children}</div>
-    ),
-}));
 vi.mock("@/components/sign-out-button", () => ({
     SignOutButton: () => <button type="button">Sign out</button>,
 }));
 
 const { NotAuthorized, NoAccessPanel } = await import("./not-authorized");
-const { AdminShell } = await import("@/components/admin-shell");
 
 afterEach(cleanup);
 
@@ -28,16 +22,13 @@ const support: StaffIdentity = {
 };
 
 describe("NotAuthorized", () => {
-    it("renders inside the console shell for staff who lack the permission", () => {
+    it("renders the panel alone for staff who lack the permission: the root layout draws the shell", () => {
         const element = NotAuthorized({
             email: "support@example.com",
             staff: support,
-        }) as ReactElement<{ staff: StaffIdentity }>;
-        expect(element.type).toBe(AdminShell);
-        expect(element.props.staff).toBe(support);
+        }) as ReactElement;
 
         render(element);
-        expect(screen.getByTestId("shell")).toBeTruthy();
         expect(screen.getByText("Not authorized")).toBeTruthy();
         expect(screen.getByRole("link", { name: "Go to Home" })).toBeTruthy();
         // Sign out lives in the shell's header, not in the panel.
@@ -46,7 +37,6 @@ describe("NotAuthorized", () => {
 
     it("keeps the bare page, with only Sign out, for someone who is not staff", () => {
         render(<NotAuthorized email="stranger@example.com" />);
-        expect(screen.queryByTestId("shell")).toBeNull();
         expect(
             screen.getByText(
                 "stranger@example.com does not have access to this area.",

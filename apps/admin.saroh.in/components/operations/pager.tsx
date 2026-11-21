@@ -1,4 +1,6 @@
 import { buttonVariants } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
+import { LinkPending } from "@saroh/ui/link-pending";
 import Link from "next/link";
 
 /** "First page" and "Next page" for a cursor-paged list driven by the query string. */
@@ -24,20 +26,28 @@ export function Pager({
             {params.cursor && (
                 <Link
                     href={href(undefined)}
-                    className={buttonVariants({ variant: "ghost", size: "sm" })}
+                    className={cn(
+                        "relative",
+                        buttonVariants({ variant: "ghost", size: "sm" }),
+                    )}
                 >
                     First page
+                    <LinkPending />
                 </Link>
             )}
             {nextCursor && (
                 <Link
                     href={href(nextCursor)}
-                    className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                    })}
+                    className={cn(
+                        "relative",
+                        buttonVariants({
+                            variant: "outline",
+                            size: "sm",
+                        }),
+                    )}
                 >
                     Next page
+                    <LinkPending />
                 </Link>
             )}
         </nav>

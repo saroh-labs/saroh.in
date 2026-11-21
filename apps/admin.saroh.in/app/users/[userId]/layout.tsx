@@ -3,7 +3,6 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { UserActions } from "@/components/users/user-actions";
 import { UserTabs } from "@/components/users/user-tabs";
 import { can, requireStaff } from "@/lib/console";
@@ -35,7 +34,7 @@ export default async function UserLayout({
     const name = displayName(person);
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Users", name]}
@@ -63,6 +62,6 @@ export default async function UserLayout({
                 <UserTabs userId={person.id} />
                 {children}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

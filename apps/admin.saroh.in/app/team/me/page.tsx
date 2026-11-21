@@ -2,7 +2,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { redirect } from "next/navigation";
 
-import { AdminShell } from "@/components/admin-shell";
 import { ClaimPlatformOwnerDialog } from "@/components/claim-platform-owner-dialog";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { requireStaff } from "@/lib/console";
@@ -24,7 +23,7 @@ export default async function YourPage() {
         redirect(`/team/${encodeURIComponent(staff.platformAdminId)}`);
     }
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Team", "Your page"]}
@@ -38,6 +37,6 @@ export default async function YourPage() {
                     }
                 />
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

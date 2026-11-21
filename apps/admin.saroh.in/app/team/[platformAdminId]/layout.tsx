@@ -3,7 +3,6 @@ import { PageHeader } from "@saroh/ui/page-header";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { MemberBody } from "@/components/team/member-body";
 import { can, requireStaff } from "@/lib/console";
@@ -46,11 +45,11 @@ export default async function TeamMemberLayout({
             notFound();
         }
         return (
-            <AdminShell staff={staff}>
+            <>
                 <PageContainer width="full">
                     <FailedPanel things="this teammate" />
                 </PageContainer>
-            </AdminShell>
+            </>
         );
     }
     const access = member
@@ -65,7 +64,7 @@ export default async function TeamMemberLayout({
     const name = member ? memberName(member) : null;
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 {member && name ? (
                     <PageHeader
@@ -87,6 +86,6 @@ export default async function TeamMemberLayout({
                     {children}
                 </MemberBody>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

@@ -4,7 +4,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { RecheckDomain } from "@/components/operations/recheck-domain";
 import { Panel } from "@/components/panel";
 import { can, requireStaff } from "@/lib/console";
@@ -27,7 +26,7 @@ export default async function ProvidersPage() {
     const canRecheck = can(staff, "providers:recheck");
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Providers"]}
@@ -142,7 +141,7 @@ export default async function ProvidersPage() {
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

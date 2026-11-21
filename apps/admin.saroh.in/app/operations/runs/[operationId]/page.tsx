@@ -5,7 +5,6 @@ import { ProgressBar } from "@saroh/ui/progress-bar";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { AutoRefresh } from "@/components/operations/auto-refresh";
 import { CancelOperation } from "@/components/operations/cancel-operation";
 import { Facts, Panel } from "@/components/panel";
@@ -96,7 +95,7 @@ export default async function OperationPage({
           : "Finished";
 
     return (
-        <AdminShell staff={gate.staff}>
+        <>
             <PageContainer width="full">
                 <AutoRefresh active={running} />
                 <PageHeader
@@ -182,6 +181,6 @@ export default async function OperationPage({
                     )}
                 </Panel>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

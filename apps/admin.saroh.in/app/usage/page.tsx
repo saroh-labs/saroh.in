@@ -5,7 +5,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { StorageTable } from "@/components/usage/storage-table";
 import { requireStaff } from "@/lib/console";
 import { plural } from "@/lib/format";
@@ -40,7 +39,6 @@ export default async function UsagePage({
 }) {
     const gate = await requireStaff("organization:read");
     if (!gate.ok) return gate.screen;
-    const { staff } = gate;
 
     const raw = await searchParams;
     const order = readOrder(raw.order);
@@ -50,7 +48,7 @@ export default async function UsagePage({
     );
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Usage"]}
@@ -106,7 +104,7 @@ export default async function UsagePage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

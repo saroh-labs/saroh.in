@@ -2,7 +2,6 @@ import { siteUrlOf } from "@saroh/edition";
 import { PageContainer } from "@saroh/ui/page-container";
 import { Suspense } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { NoAccessPanel } from "@/components/not-authorized";
 import { PlansFailed } from "@/components/plans/plans-failed";
 import { PlansHeader } from "@/components/plans/plans-header";
@@ -40,7 +39,7 @@ export default async function PlansPage({
     const tab = tabFrom((await searchParams).tab);
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <Suspense
                     fallback={
@@ -53,7 +52,7 @@ export default async function PlansPage({
                     <PlansLoaded staff={staff} tab={tab} />
                 </Suspense>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 
