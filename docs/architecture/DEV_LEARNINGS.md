@@ -6837,3 +6837,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Symptom:** `post-approval.spec.ts` passed with `pnpm exec jest`, but failed under `pnpm prepush`. The failing case was "unset under development counts as on".
 - **Cause:** the gate and CI set `SKIP_ENV_VALIDATION=1`, and then the API's `env` is `process.env`. Assigning `undefined` to a `process.env` key stores the string `"undefined"`, so the switch read as set and off.
 - **Fix:** a spec unsets a variable with `delete env.X` and never assigns `undefined`. To reproduce a gate-only failure, run the spec with `SKIP_ENV_VALIDATION=1 CI=1`.
+
+### Opening a post autosaved it: Tiptap's `setEditable` emits an update (21 Nov 2026)
+
+- **Symptom:** opening a live post showed "Unsaved changes", autosaved to "Saved · just now" and raised the post's "changes waiting" count, with no edit.
+- **Cause:** the desk post editor calls `editor.setEditable(!previewing)` on mount. Tiptap's `setEditable(editable, emitUpdate = true)` fires `onUpdate`, so the rich text handed back the HTML it already held and `usePostDraft` marked the post dirty.
+- **Fix:** `setEditable(x, false)` (`posts/editor/post-shell.tsx`, as `description-editor.tsx` already did), and `usePostDraft`'s `set` ignores a value equal to the one held. `post-shell.test.tsx` stands in an editor that re-reports its value on mount and checks nothing saves. Any Tiptap call that is not an edit (`setEditable`, `setContent`) passes `emitUpdate: false`.
