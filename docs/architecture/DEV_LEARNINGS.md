@@ -6831,3 +6831,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Symptom:** on batch-2026-11-18-2 every saroh.app page answered 500 in `next dev`; unit tests, lint and typecheck all passed.
 - **Cause:** Tailwind scans every file under `packages/site-blocks/src`, tests included, for class names. A lookahead `(?!-visible\))` in `component-theme.test.tsx` read as an arbitrary-value class and crashed the CSS build.
 - **Fix:** written `(?![-]visible\))`. The quick gate builds no CSS, so this only shows in a page render or CI's build: after a change to site-blocks, open one template render (or let CI build) before calling it done.
+
+### An API spec passed alone and failed in the gate: `env.X = undefined` stored "undefined" (21 Nov 2026)
+
+- **Symptom:** `post-approval.spec.ts` passed with `pnpm exec jest`, but failed under `pnpm prepush`. The failing case was "unset under development counts as on".
+- **Cause:** the gate and CI set `SKIP_ENV_VALIDATION=1`, and then the API's `env` is `process.env`. Assigning `undefined` to a `process.env` key stores the string `"undefined"`, so the switch read as set and off.
+- **Fix:** a spec unsets a variable with `delete env.X` and never assigns `undefined`. To reproduce a gate-only failure, run the spec with `SKIP_ENV_VALIDATION=1 CI=1`.
