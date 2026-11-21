@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@saroh/ui/toast";
 import { ConciergeBell, Copy, FilePlus, LayoutGrid } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { useOpenPageId } from "../page-switch";
 
 import {
     AddBlockPanel,
@@ -374,6 +375,7 @@ export function AddPageFor({
     onClose: () => void;
 }) {
     const router = useRouter();
+    const openPageId = useOpenPageId(model.siteId);
     const { draft } = model;
     function opened(next: SitePage) {
         onClose();
@@ -387,7 +389,7 @@ export function AddPageFor({
             router.refresh();
             return;
         }
-        router.push(`/sites/${model.siteId}?page=${next.id}`);
+        openPageId(next.id);
         router.refresh();
     }
     return (

@@ -13,9 +13,9 @@ import {
     PanelTop,
     Plus,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import { useState } from "react";
+import { useOpenPageId } from "../page-switch";
 
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
@@ -60,7 +60,7 @@ export function PagesTree({
 }) {
     const { pages, pageId, siteId, readOnly, draft, selection, edits } = model;
     const { sections } = draft;
-    const router = useRouter();
+    const openPageId = useOpenPageId(siteId);
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [dropIndex, setDropIndex] = useState<number | null>(null);
 
@@ -74,7 +74,7 @@ export function PagesTree({
             showError(blocked);
             return;
         }
-        router.push(`/sites/${siteId}?page=${id}`);
+        openPageId(id);
     }
 
     /** ↑ ↓ walk the rows; Alt+↑ ↓ move the section, with Undo. */

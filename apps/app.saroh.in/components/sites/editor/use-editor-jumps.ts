@@ -1,5 +1,5 @@
 import { showError } from "@saroh/ui/toast";
-import { useRouter } from "next/navigation";
+import { useOpenPageId } from "./page-switch";
 
 import type {
     EditorInspectorTab,
@@ -47,7 +47,7 @@ export function useEditorJumps({
     /** Close the pre-publish check a flag was opened from. */
     closeCheck: () => void;
 }) {
-    const router = useRouter();
+    const openPageId = useOpenPageId(siteId);
 
     /**
      * Open the block a note is about. A note names a block by KEY, and only
@@ -63,7 +63,7 @@ export function useEditorJumps({
                 return;
             }
             pendingNote = { pageId: jumpPageId, sectionKey };
-            router.push(`/sites/${siteId}?page=${jumpPageId}`);
+            openPageId(jumpPageId);
             return;
         }
         const index = sections.findIndex((sec) => sec.key === sectionKey);
@@ -84,7 +84,7 @@ export function useEditorJumps({
     ) {
         closeCheck();
         if (jumpPageId !== null && jumpPageId !== pageId) {
-            router.push(`/sites/${siteId}?page=${jumpPageId}`);
+            openPageId(jumpPageId);
             return;
         }
         if (sectionIndex !== null) {

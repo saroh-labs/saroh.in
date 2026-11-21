@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import type { SiteEditorProps } from "@/components/sites/editor/site-editor-props";
 import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
+import { PageSwitchProvider } from "./page-switch";
 import { SiteEditor } from "./site-editor";
 
 /**
@@ -46,11 +47,13 @@ export function SiteEditorHost(props: SiteEditorProps) {
     };
 
     return (
-        <SiteEditor
-            key={generation}
-            {...props}
-            reloadDraft={reloadDraft}
-            initialSheet={sheet}
-        />
+        <PageSwitchProvider siteId={props.siteId}>
+            <SiteEditor
+                key={generation}
+                {...props}
+                reloadDraft={reloadDraft}
+                initialSheet={sheet}
+            />
+        </PageSwitchProvider>
     );
 }

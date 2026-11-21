@@ -10,6 +10,7 @@ import { AddPageFor, AddPanel } from "../add/add-panel";
 import type { EditorTopBarProps } from "../editor-bar";
 import type { EditorPanelsProps } from "../editor-panels";
 import { EditorPanels } from "../editor-panels";
+import { PageRegion } from "../page-switch";
 import { COMMAND_MENU_READY, CommandMenu } from "../panels/command-menu";
 import { FeedbackPanel } from "../panels/feedback-panel";
 import { HistoryPanel } from "../panels/history-panel";
@@ -195,13 +196,17 @@ export function EditorShell({
                                 onBack={() => viewport.setPreviewing(false)}
                             />
                         ) : (
-                            canvas
+                            <PageRegion shape="canvas">{canvas}</PageRegion>
                         )}
                     </main>
                 }
                 inspector={
                     <RightColumn askAi={model.askAi}>
-                        <InspectorFrame>{inspector}</InspectorFrame>
+                        <InspectorFrame>
+                            <PageRegion shape="inspector">
+                                {inspector}
+                            </PageRegion>
+                        </InspectorFrame>
                     </RightColumn>
                 }
             />

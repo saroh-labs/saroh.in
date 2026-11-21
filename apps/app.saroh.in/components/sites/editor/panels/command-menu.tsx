@@ -21,8 +21,8 @@ import {
     Settings2,
     Sparkles,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState } from "react";
+import { useOpenPageId } from "../page-switch";
 
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
@@ -83,7 +83,6 @@ export function findMatches(row: FindRow, query: string): boolean {
  * finds On this site. The short link row waits (C5).
  */
 export function CommandMenu({ model, open, onOpenChange }: CommandMenuProps) {
-    const router = useRouter();
     const [query, setQuery] = useState("");
     const [settings, setSettings] = useState<FindSettings | null>(null);
     const [asked, setAsked] = useState(false);
@@ -92,6 +91,7 @@ export function CommandMenu({ model, open, onOpenChange }: CommandMenuProps) {
         setSettings(which);
     };
     const { page, pages, pageId, siteId, readOnly, selection, draft } = model;
+    const openPageId = useOpenPageId(siteId);
     const writes = !readOnly && model.canUpdateSite;
     const askAi = model.askAi && !readOnly;
 
@@ -118,7 +118,7 @@ export function CommandMenu({ model, open, onOpenChange }: CommandMenuProps) {
             draft.onlyHeldBack ? unfinishedPhrase(draft.heldBack) : undefined,
         );
         if (blocked !== null) return showError(blocked);
-        router.push(`/sites/${siteId}?page=${id}`);
+        openPageId(id);
     }
 
     function ask() {
