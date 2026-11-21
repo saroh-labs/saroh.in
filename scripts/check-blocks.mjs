@@ -262,6 +262,9 @@ const SITE_LAYER_ALLOWED = new Set([
     // classes (POST_EMBED_CARD).
     "apps/app.saroh.in/components/sites/posts/editor/writing-surface.tsx",
     "apps/app.saroh.in/components/sites/posts/phone/phone-surface.tsx",
+    // A reviewer reads the same post on that page ground (U17): the
+    // writing surface's read-only twin, in the site's ink.
+    "apps/app.saroh.in/components/sites/posts/review/review-body.tsx",
     "apps/app.saroh.in/components/sites/rich-text/rich-text-editor.tsx",
 ]);
 

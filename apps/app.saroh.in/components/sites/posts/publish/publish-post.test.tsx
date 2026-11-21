@@ -303,7 +303,8 @@ describe("Publish post (U18)", () => {
     });
 
     it("names whoever last changed each part since it went live", () => {
-        const live = post.liveCopy!;
+        const live = post.liveCopy;
+        if (!live) throw new Error("the fixture post has a live copy");
         const view = {
             title: live.title,
             content: live.content,
