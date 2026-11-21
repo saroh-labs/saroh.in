@@ -1,10 +1,10 @@
+import type { Edition } from "@saroh/edition";
 import {
     EDITIONS,
     editionOfHost,
     hostsFor,
     merchantSitesFor,
     urlOf,
-    type Edition,
 } from "@saroh/edition";
 
 /**

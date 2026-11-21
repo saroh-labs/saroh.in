@@ -29,6 +29,7 @@ describe("inviteAddressKey (07 F4)", () => {
             "some@gmail.com",
         );
         expect(inviteAddressKey("SOME@gmail.com")).toBe("some@gmail.com");
+        expect(inviteAddressKey('"some"@example.com')).toBe("some@example.com");
         expect(inviteAddressKey("not-an-address")).toBe("not-an-address");
     });
 });

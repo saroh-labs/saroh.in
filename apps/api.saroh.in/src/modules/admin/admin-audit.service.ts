@@ -3,7 +3,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 import type { Edition } from "@saroh/edition";
 
-import { isBootstrapAdmin } from "../../common/guards/platform-admin.guard";
+import { isBootstrapAdmin } from "../../common/guards/bootstrap-admin";
 import { getRequestContext } from "../../common/logging/request-context";
 import { byBusinessIds, editionWhere } from "./admin-edition";
 import type { AdminPermission } from "./admin-permissions";

@@ -223,6 +223,10 @@ describe("the edition profiles (DEC-204 item 7)", () => {
         },
         defaultZone: { INDIA: "Asia/Kolkata", GLOBAL: "UTC" },
         hinglishCaptions: { INDIA: true, GLOBAL: false },
+        supportEmail: {
+            INDIA: "contact@saroh.in",
+            GLOBAL: "support@saroh.tech",
+        },
     };
     for (const [fact, byEdition] of Object.entries(facts)) {
         it(`answers ${fact} as each edition did before the profile`, () => {

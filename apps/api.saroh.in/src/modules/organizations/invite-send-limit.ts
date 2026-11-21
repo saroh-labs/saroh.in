@@ -54,7 +54,8 @@ function defaultWindows(): InviteWindows {
  * no dots (07 F4), so `x+1@` and `x.y@gmail.com` don't buy a fresh budget.
  */
 export function inviteAddressKey(email: string): string {
-    const lower = email.trim().toLowerCase();
+    // Quotes around the local part name the same mailbox (`"x"@a` is `x@a`).
+    const lower = email.trim().toLowerCase().replaceAll('"', "");
     const at = lower.lastIndexOf("@");
     if (at < 1) return lower;
     let local = lower.slice(0, at).split("+")[0] || lower.slice(0, at);

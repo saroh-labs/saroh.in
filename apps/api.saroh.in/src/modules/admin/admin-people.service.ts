@@ -531,15 +531,24 @@ export class AdminPeopleService {
             await record(tx, detail);
         };
         const ctx = operatorContext(staff, organizationId);
-        const result =
+        const result = await (
             request.kind === "REMOVE"
-                ? await this.members.remove(ctx, request.userId, confirmInTx)
-                : await this.members.updateRole(
+                ? this.members.remove(ctx, request.userId, confirmInTx)
+                : this.members.updateRole(
                       ctx,
                       request.userId,
                       { role: request.role ?? "" },
                       confirmInTx,
-                  );
+                  )
+        ).catch((error: unknown) => {
+            // Two staff confirming at once: the loser's transaction conflicts.
+            if ((error as { code?: string }).code === "P2034") {
+                throw new ConflictException(
+                    "That change was confirmed a moment ago.",
+                );
+            }
+            throw error;
+        });
         await this.tellOwners(organizationId, request, owners);
         return result;
     }

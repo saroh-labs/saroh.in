@@ -15,7 +15,6 @@ import {
     codeSubject,
     siteAccountEmailFooter,
 } from "../modules/site-accounts/sender-name";
-import { emailSendFailed } from "./email-send-health";
 import type { WelcomeMail } from "./email-welcome";
 import { welcomeEmail } from "./email-welcome";
 import { structuredLogger } from "./logging/structured-logger";
@@ -30,6 +29,19 @@ const FROM =
     env.EMAIL_FROM ??
     env.SENDER_EMAIL_ID ??
     editionProfile("INDIA").defaultSenders.mail;
+
+/**
+ * Told when a mail nobody waits on fails. Set at boot to `emailSendFailed`
+ * (`email-send-health.ts`); a setter, since that module's owner alert sends
+ * through this file.
+ */
+let quietSendFailed: (security: string | null) => Promise<unknown> = () =>
+    Promise.resolve();
+export function onQuietSendFailed(
+    handler: (security: string | null) => Promise<unknown>,
+): void {
+    quietSendFailed = handler;
+}
 
 function getTransporter(): Transporter | null {
     const host = env.SMTP_HOST ?? env.SMTP_HOSTNAME;
@@ -176,7 +188,7 @@ function sendQuietly(
                 ?.responseCode,
             ...(security ? { notice: security } : {}),
         });
-        void emailSendFailed(security).catch(() => undefined);
+        void quietSendFailed(security).catch(() => undefined);
     });
 }
 
