@@ -52,7 +52,14 @@ const PATTERNS: {
 }[] = [
     {
         kind: "money",
-        re: /(?:₹|rs\.?|inr|\$|€|£)\s?(\d[\d,]*(?:\.\d+)?)/gi,
+        // Any currency sign before the number.
+        re: /\p{Sc}\s?(\d[\d,]*(?:\.\d+)?)/gu,
+        key: (m) => `money:${num(m[1])}`,
+    },
+    {
+        kind: "money",
+        // A currency code ("USD 20") or "Rs", as written: case matters.
+        re: /\b(?:[A-Z]{3}|Rs\.?)\s?(\d[\d,]*(?:\.\d+)?)/g,
         key: (m) => `money:${num(m[1])}`,
     },
     {

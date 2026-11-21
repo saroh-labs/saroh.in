@@ -691,6 +691,7 @@ function EditorSurface({
                 ) : null}
                 {/* The editor is null on the first render (immediatelyRender
                     off): the menus wait for it rather than read null. */}
+                {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- null at first render whatever Tiptap's types say (see above) */}
                 {editor ? (
                     <>
                         <FormatBar
