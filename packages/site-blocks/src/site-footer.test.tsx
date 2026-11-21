@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
@@ -26,13 +26,6 @@ const WEEK: OpeningHoursDay[] = DAYS.map((day) => ({
     close: day === "SAT" ? "14:00" : "18:00",
     closed: day === "SUN",
 }));
-
-const NAV = [
-    { label: "Home", href: "/" },
-    { label: "About", href: "/about" },
-    { label: "Shop", href: "/shop", kind: "SHOP" },
-    { label: "Contact", href: "/contact", kind: "CONTACT" },
-];
 
 const ALL: SiteContact = {
     phone: "+919845012345",
@@ -76,7 +69,6 @@ describe("the footer with every fact", () => {
                 footer={{ format: "markdown", value: "Baked every morning" }}
                 name="Rye & Co."
                 contact={ALL}
-                navigation={NAV}
                 credit={{ href: "https://saroh.in/?ref=k7m2p9qa" }}
                 now={WEDNESDAY}
             />,
@@ -91,25 +83,9 @@ describe("the footer with every fact", () => {
         expect(footer.querySelector("[data-site-footer-name]")).toHaveClass(
             "font-site-heading",
         );
-        expect(headings(2)).toEqual(["Find us", "Get in touch", "Pages"]);
-    });
-
-    it("lists the site's menu, every page in it", () => {
-        all();
-        const pages = screen.getByRole("navigation", { name: "Pages" });
-        const links = within(pages).getAllByRole("link");
-        expect(links.map((a) => a.textContent)).toEqual([
-            "Home",
-            "About",
-            "Shop",
-            "Contact",
-        ]);
-        expect(links.map((a) => a.getAttribute("href"))).toEqual([
-            "/",
-            "/about",
-            "/shop",
-            "/contact",
-        ]);
+        // Hours, Visit, Talk (U8): never the header's menu again.
+        expect(headings(2)).toEqual(["Hours", "Visit", "Talk"]);
+        expect(screen.queryByRole("navigation")).toBeNull();
     });
 
     it("gives the address as an <address> with Get directions", () => {
@@ -123,19 +99,19 @@ describe("the footer with every fact", () => {
 
     it("lays the week out by day, closed days stated, today marked", () => {
         all();
-        const place = screen.getByRole("heading", { name: "Find us" });
+        const place = screen.getByRole("heading", { name: "Hours" });
         expect(week(place.parentElement)).toEqual([
             { days: "Monday to Friday", hours: "9am to 6pm", today: true },
             { days: "Saturday", hours: "10am to 2pm", today: false },
             { days: "Sunday", hours: "Closed", today: false },
         ]);
-        // Today is marked by weight and by a word a screen reader says:
-        // never by a tint of the footer's colour nobody checked.
+        // Today is marked by weight and a "Today" tag (U8): never by a
+        // tint of the footer's colour nobody checked.
         const today = document.querySelector("[data-today]");
         expect(today?.querySelector("dt")).toHaveClass("font-bold");
         expect(today?.querySelector("dd")).toHaveClass("font-bold");
-        expect(today?.querySelector("dt .sr-only")?.textContent).toBe(
-            ", today",
+        expect(today?.querySelector("dt")?.textContent).toBe(
+            "Monday to Friday, Today",
         );
         expect(document.querySelectorAll("[data-today]")).toHaveLength(1);
     });
@@ -216,15 +192,10 @@ describe("the footer with some of the facts", () => {
                 contact={{ phone: "+919845012345", address: null }}
             />,
         );
-        expect(headings(2)).toEqual(["Get in touch"]);
+        expect(headings(2)).toEqual(["Talk"]);
         expect(screen.queryByRole("navigation")).toBeNull();
         expect(document.querySelector("address")).toBeNull();
         expect(document.querySelector("[data-site-hours]")).toBeNull();
-    });
-
-    it("lists the pages alone for a site with a menu and no contact", () => {
-        render(<SiteFooter footer={null} name="Rye" navigation={NAV} />);
-        expect(headings(2)).toEqual(["Pages"]);
     });
 
     it("gives a place with no hours its address and directions, and no week", () => {
@@ -239,7 +210,7 @@ describe("the footer with some of the facts", () => {
                 }}
             />,
         );
-        expect(headings(2)).toEqual(["Find us"]);
+        expect(headings(2)).toEqual(["Visit"]);
         expect(headings(3)).toEqual([]);
         expect(
             screen.getByRole("link", { name: "Get directions" }),
@@ -266,50 +237,6 @@ describe("the footer with some of the facts", () => {
         );
         expect(screen.queryByText("Opening hours")).toBeNull();
         expect(screen.queryByText("Closed")).toBeNull();
-    });
-
-    it("follows the modules, as the header's menu does", () => {
-        render(
-            <SiteFooter
-                footer={null}
-                name="Rye"
-                navigation={NAV}
-                modules={{ SHOP: "off" }}
-            />,
-        );
-        expect(
-            within(screen.getByRole("navigation", { name: "Pages" }))
-                .getAllByRole("link")
-                .map((a) => a.textContent),
-        ).toEqual(["Home", "About", "Contact"]);
-    });
-
-    it("lists Shop while the shop serves, and keeps links inside a draft preview", () => {
-        render(
-            <SiteFooter
-                footer={null}
-                name="Rye"
-                navigation={[
-                    { label: "Home", href: "/" },
-                    { label: "About", href: "/about" },
-                ]}
-                shopServes
-                basePath="/preview/tok"
-            />,
-        );
-        const links = within(
-            screen.getByRole("navigation", { name: "Pages" }),
-        ).getAllByRole("link");
-        expect(links.map((a) => a.textContent)).toEqual([
-            "Home",
-            "Shop",
-            "About",
-        ]);
-        expect(links.map((a) => a.getAttribute("href"))).toEqual([
-            "/preview/tok",
-            "/preview/tok/shop",
-            "/preview/tok/about",
-        ]);
     });
 });
 
@@ -341,8 +268,10 @@ describe("the footer with none of the facts", () => {
 
     it("knows when there is nothing to lay out", () => {
         expect(hasFooterFacts(null)).toBe(false);
-        expect(hasFooterFacts({ phone: " ", address: null }, [])).toBe(false);
-        expect(hasFooterFacts(null, [{ label: "Home", href: "/" }])).toBe(true);
+        expect(hasFooterFacts({ phone: " ", address: null })).toBe(false);
+        expect(hasFooterFacts({ phone: "+919845012345", address: null })).toBe(
+            true,
+        );
     });
 
     it("never draws a heading with nothing under it", () => {
@@ -391,12 +320,12 @@ describe("the footer with several places", () => {
                 now={WEDNESDAY}
             />,
         );
-        // A place with no name of its own is still a column: "Find us".
+        // A place with no name of its own is still a column: "Visit".
         expect(headings(2)).toEqual([
             "Indiranagar",
             "Koramangala",
-            "Find us",
-            "Get in touch",
+            "Visit",
+            "Talk",
         ]);
         expect(
             Array.from(document.querySelectorAll("footer address")).map(
@@ -415,7 +344,7 @@ describe("the footer with several places", () => {
             { days: "Sunday", hours: "Closed", today: false },
         ]);
         // The place with no hours lists none.
-        const third = screen.getByRole("heading", { name: "Find us" });
+        const third = screen.getByRole("heading", { name: "Visit" });
         expect(week(third.parentElement)).toEqual([]);
     });
 });
@@ -494,11 +423,10 @@ describe("the left layout keeps its row under the columns", () => {
                 }}
                 name="Rye"
                 contact={ALL}
-                navigation={NAV}
                 credit={{ href: "https://saroh.in/?ref=k7m2p9qa" }}
             />,
         );
-        expect(headings(2)).toEqual(["Find us", "Get in touch", "Pages"]);
+        expect(headings(2)).toEqual(["Hours", "Visit", "Talk"]);
         // The row says the name, so nothing leads the columns with it.
         expect(container.querySelector("[data-site-footer-name]")).toBeNull();
         expect(screen.getByText("Rye")).toHaveClass("font-site-heading");

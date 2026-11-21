@@ -1,7 +1,10 @@
 import type { AskAiDraftKind } from "@saroh/api-contract";
+import type { SectionType } from "@saroh/block-contract";
+import { blockHeading } from "@saroh/block-contract";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../../common/types/organization-context";
+import { sectionWords } from "../../mcp/tools/section-words";
 import { money, when } from "../../mcp/tools/v1-bridge";
 import {
     customerById,
@@ -70,6 +73,18 @@ export interface DraftSpec {
     note?: string;
     /** Said after a confirmed create, beside "Added". */
     addedNote?: string;
+    /** Said after a confirmed edit instead of "Done." */
+    doneWords?: string;
+    /**
+     * Check this (RULES §5): the words the business already says where the
+     * change lands (a page's), read to tell given facts from new ones.
+     */
+    pageText?: (
+        r: ReadContext,
+        input: Record<string, unknown>,
+    ) => Promise<string>;
+    /** What the card says its suggestion is based on. */
+    basedOn?: string;
     undoNote?: string;
 }
 
@@ -98,6 +113,9 @@ const LABELS: Record<string, string> = {
     title: "Title",
     body: "Post",
     site: "Website",
+    heading: "Heading",
+    subheading: "Subheading",
+    button_label: "Button label",
 };
 
 export function labelOf(field: string, currency?: string | null): string {
@@ -363,8 +381,77 @@ async function readBlogPost(
 
 const TELLS_CUSTOMER = "The customer is told when you confirm.";
 
+/** A section's draft id: `<siteId>:<pageId>:<sectionKey>`. */
+const sectionTarget = (input: Record<string, unknown>) =>
+    `${String(input.site_id)}:${String(input.page_id)}:${String(input.section_key)}`;
+const sectionIds = (id: string) => {
+    const [site_id = "", page_id = "", ...key] = id.split(":");
+    return { site_id, page_id, section_key: key.join(":") };
+};
+
+/** The page's sections as `get_page` gives them, content parsed. */
+async function pageSections(
+    r: ReadContext,
+    ids: { site_id: string; page_id: string },
+) {
+    const page = await r.read("get_page", ids);
+    if (!page) return null;
+    const sections = (page.sections ?? []) as {
+        section_key: string;
+        type: string;
+        content: { text: string } | null;
+    }[];
+    return {
+        title: (page.title as { text: string } | undefined)?.text ?? "",
+        sections: sections.map((s) => ({
+            key: s.section_key,
+            type: s.type,
+            text: s.content?.text ?? "",
+            content: s.content ? (JSON.parse(s.content.text) as unknown) : null,
+        })),
+    };
+}
+
+/** A section's words as the card shows them, read from the draft. */
+async function readSection(
+    r: ReadContext,
+    id: string,
+): Promise<TargetState | null> {
+    const ids = sectionIds(id);
+    const page = await pageSections(r, ids);
+    const section = page?.sections.find((s) => s.key === ids.section_key);
+    if (!page || !section) return null;
+    return {
+        name: `${page.title} · ${blockHeading(section.type as SectionType)}`,
+        updatedAt: null,
+        fields: sectionWords(section.content),
+    };
+}
+
 /** The business write tools Ask AI drafts (Ask AI's `draftTools`). */
 export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
+    edit_section: {
+        kind: "section",
+        targetOf: sectionTarget,
+        read: readSection,
+        undo(id, before, after) {
+            return {
+                tool: "edit_section",
+                input: { ...sectionIds(id), ...changed(before, after) },
+            };
+        },
+        note: "Applies to your website's draft. Visitors see it when you publish.",
+        doneWords: "Saved · goes live when you publish",
+        undoNote: "Put back in your draft.",
+        basedOn: "What you asked and this section's words now",
+        async pageText(r, input) {
+            const page = await pageSections(r, {
+                site_id: String(input.site_id),
+                page_id: String(input.page_id),
+            });
+            return page?.sections.map((s) => s.text).join("\n") ?? "";
+        },
+    },
     create_product: {
         kind: "product",
         madeOf: madeIn("product", "product_id"),

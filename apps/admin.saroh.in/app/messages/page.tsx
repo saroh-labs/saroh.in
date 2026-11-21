@@ -4,7 +4,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { HandledToggle } from "@/components/messages/handled-toggle";
 import { Pager } from "@/components/operations/pager";
@@ -54,7 +53,7 @@ export default async function MessagesPage({
     const canHandle = can(staff, "reports:resolve");
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Messages"]}
@@ -124,7 +123,7 @@ export default async function MessagesPage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

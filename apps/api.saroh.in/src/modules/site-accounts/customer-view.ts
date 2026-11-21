@@ -54,6 +54,8 @@ export interface AccountView {
     phone: string | null;
     /** The verified phone they sign in with by WhatsApp (DEC-196), or null. */
     signInPhone: string | null;
+    /** Their GSTIN for their invoices (R16), or null. */
+    gstin: string | null;
     businessName: string;
     tabs: AccountTab[];
     /** What the business offers, for which Home cards to draw. */
@@ -400,7 +402,7 @@ function blankToNull(value: string | null | undefined): string | null {
 
 export function accountView(input: {
     account: { email: string | null; phoneE164?: string | null };
-    contact: Named & { phone: string | null };
+    contact: Named & { phone: string | null; gstin?: string | null };
     businessName: string;
     tabs: AccountTab[];
     offers: { appointments: boolean; orders: boolean; plans: boolean };
@@ -414,6 +416,7 @@ export function accountView(input: {
         email: input.account.email,
         phone: blankToNull(input.contact.phone),
         signInPhone: input.account.phoneE164 ?? null,
+        gstin: input.contact.gstin ?? null,
         businessName: input.businessName,
         tabs: input.tabs.map((t) => ({ key: t.key, label: t.label })),
         offers: {

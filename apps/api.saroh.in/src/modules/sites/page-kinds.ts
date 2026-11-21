@@ -121,35 +121,78 @@ export const MODULE_PAGE_DEFAULTS: Record<ModulePageKind, KindDefaults> = {
  * route answers it before any page, counts the scan and forwards, so a page
  * under it would never be reached.
  *
+ * `/autopay`, `/share` and `/cookie-notice` are saroh.app routes too
+ * (`app/[domain]/…`); `page-kinds.spec.ts` checks every top-level route
+ * folder there is in this list, so the two never drift apart.
+ *
  * `purpose` finishes the sentence "/book is …" in the merchant's words.
  */
 export const RESERVED_PAGE_PATHS: readonly {
     root: string;
     kind: PageKind | null;
     purpose: string;
+    /** "your booking page", for "Hidden behind …". */
+    name: string;
 }[] = [
-    { root: "/book", kind: "BOOK", purpose: "your booking page" },
-    { root: "/shop", kind: "SHOP", purpose: "your online shop" },
-    { root: "/checkout", kind: null, purpose: "where your customers pay" },
+    {
+        root: "/book",
+        kind: "BOOK",
+        purpose: "your booking page",
+        name: "your booking page",
+    },
+    {
+        root: "/shop",
+        kind: "SHOP",
+        purpose: "your online shop",
+        name: "your online shop",
+    },
+    {
+        root: "/checkout",
+        kind: null,
+        purpose: "where your customers pay",
+        name: "your checkout",
+    },
     {
         root: "/pay",
         kind: null,
         purpose: "where your customers pay a link you sent",
+        name: "your pay links",
     },
     {
         root: "/paid",
         kind: null,
         purpose: "where your customers come back to after paying online",
+        name: "your payment page",
+    },
+    {
+        root: "/autopay",
+        kind: null,
+        purpose: "where your customers set up autopay",
+        name: "your autopay page",
     },
     {
         root: "/account",
         kind: null,
         purpose: "where your customers see their account",
+        name: "your customers' account page",
     },
     {
         root: "/q",
         kind: null,
         purpose: "where your QR codes open",
+        name: "your QR codes",
+    },
+    {
+        root: "/share",
+        kind: null,
+        purpose: "where your share links open",
+        name: "your share links",
+    },
+    {
+        root: "/cookie-notice",
+        kind: null,
+        purpose: "your cookie notice",
+        name: "your cookie notice",
     },
 ];
 

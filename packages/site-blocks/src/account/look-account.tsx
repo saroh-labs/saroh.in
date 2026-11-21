@@ -36,9 +36,9 @@ import { ICON } from "./tab-bar";
  *   the foot (VA19–24 phone) and Live in its dock's place (VB19–24 phone):
  *   `StickyActions` then draws neither Book's bar nor the site's dock on
  *   an account page, so the phone still has one fixed bar.
- * - **On a desk** Folio keeps the row, under "Your account at …" with
- *   Sign out (VA20); Quiet and Live move the tabs to a column on the left
- *   from 1000px (VD20, VB20).
+ * - **On a desk** (from 1000px, the looks' desk) every look moves the tabs
+ *   to the side menu, a column on the left with Sign out under it: one
+ *   account design for every look (DEC-229, plan U13; VD20, VB20).
  * - The page's one heading (h1) is the tab's title, or Home's greeting.
  *
  * Everything inside wears the look through `accountLookRules`.
@@ -51,23 +51,16 @@ const TITLE: Record<LookId, string> = {
     live: "font-site-heading text-site-fg text-[calc(2.25rem*var(--site-heading-scale,1))] font-extrabold leading-[1.04] tracking-[-0.03em] min-[700px]:text-[calc(3rem*var(--site-heading-scale,1))]",
 };
 
-/** Whether the tabs become a column on a desk (from 1000px). */
-const SIDE: Record<LookId, boolean> = {
-    folio: false,
-    quiet: true,
-    live: true,
-};
-
 /** A tab, in the row and (Quiet, Live) in the column. */
 const TAB: Record<LookId, string> = {
-    folio: "text-site-body hover:text-site-fg aria-[current=page]:text-site-fg aria-[current=page]:shadow-[inset_0_-1px_0_hsl(var(--site-fg))] text-[14.5px]",
+    folio: "text-site-body hover:text-site-fg aria-[current=page]:text-site-fg aria-[current=page]:shadow-[inset_0_-1px_0_hsl(var(--site-fg))] text-[14.5px] min-[1000px]:aria-[current=page]:shadow-none min-[1000px]:aria-[current=page]:font-semibold",
     quiet: "text-site-body hover:text-site-fg aria-[current=page]:text-site-fg aria-[current=page]:underline aria-[current=page]:decoration-1 aria-[current=page]:underline-offset-8 text-[15px] min-[1000px]:aria-[current=page]:no-underline min-[1000px]:aria-[current=page]:font-semibold",
     live: "rounded-full px-4 text-[14.5px] font-semibold text-site-fg hover:bg-site-accent-soft aria-[current=page]:bg-site-fg aria-[current=page]:text-site-bg min-[1000px]:justify-start min-[1000px]:gap-3 min-[1000px]:rounded-site-s min-[1000px]:px-3 min-[1000px]:aria-[current=page]:bg-site-surface min-[1000px]:aria-[current=page]:text-site-fg",
 };
 
 /** The row's own band per look. */
 const ROW: Record<LookId, string> = {
-    folio: "gap-7 border-b border-site-border",
+    folio: "gap-7 border-b border-site-border min-[1000px]:border-b-0",
     quiet: "gap-6 border-b border-site-border min-[1000px]:border-b-0",
     live: "gap-1",
 };
@@ -260,7 +253,6 @@ export function AccountLookTabs({
         };
     }, [current]);
 
-    const side = SIDE[look];
     return (
         <nav
             aria-label="Account pages"
@@ -269,22 +261,19 @@ export function AccountLookTabs({
                 "min-w-0",
                 // Folio's and Live's phone keep them in the bar at the foot.
                 lookHasAccountBar(look) && "max-[699px]:hidden",
-                side && "min-[1000px]:sticky min-[1000px]:top-28",
+                "min-[1000px]:sticky min-[1000px]:top-28",
             )}
         >
-            {side ? (
-                <p className="text-site-muted mb-4 hidden text-[12px] font-semibold uppercase tracking-[0.16em] min-[1000px]:block">
-                    Your account
-                </p>
-            ) : null}
+            <p className="text-site-muted mb-4 hidden text-[12px] font-semibold uppercase tracking-[0.16em] min-[1000px]:block">
+                Your account
+            </p>
             <div className="relative">
                 <div
                     ref={row}
                     className={cn(
                         "flex min-w-0 items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
                         ROW[look],
-                        side &&
-                            "min-[1000px]:flex-col min-[1000px]:items-stretch min-[1000px]:gap-1 min-[1000px]:overflow-visible",
+                        "min-[1000px]:flex-col min-[1000px]:items-stretch min-[1000px]:gap-1 min-[1000px]:overflow-visible",
                     )}
                 >
                     {tabs.map((tab) => {
@@ -328,7 +317,7 @@ export function AccountLookTabs({
                     className={cn(
                         "from-site-bg pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r to-transparent transition-opacity duration-[var(--site-motion-base,140ms)]",
                         edges.start ? "opacity-100" : "opacity-0",
-                        side && "min-[1000px]:hidden",
+                        "min-[1000px]:hidden",
                     )}
                 />
                 <span
@@ -337,7 +326,7 @@ export function AccountLookTabs({
                     className={cn(
                         "from-site-bg pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l to-transparent transition-opacity duration-[var(--site-motion-base,140ms)]",
                         edges.end ? "opacity-100" : "opacity-0",
-                        side && "min-[1000px]:hidden",
+                        "min-[1000px]:hidden",
                     )}
                 />
             </div>
@@ -423,7 +412,6 @@ export function AccountLookSignOut({
  */
 export function AccountLookFrame({
     look,
-    businessName,
     tabs,
     name = null,
     unreadMessages = 0,
@@ -433,6 +421,7 @@ export function AccountLookFrame({
     children,
 }: {
     look: LookId;
+    /** The business, named by the site's own header around the account. */
     businessName: string;
     tabs: AccountTab[];
     name?: string | null;
@@ -442,21 +431,12 @@ export function AccountLookFrame({
     signOut?: () => Promise<{ ok: boolean }>;
     children: ReactNode;
 }) {
-    const side = SIDE[look] && tabs.length > 0;
+    const side = tabs.length > 0;
     const out = signOut ? <AccountLookSignOut signOut={signOut} /> : null;
     return (
         <div data-account-look={look} className="font-site-body text-site-body">
             <style>{accountLookRules(look)}</style>
             <div className="max-w-site-content mx-auto px-[var(--site-page-margin)] pb-[calc(var(--site-section-padding)*0.75)] pt-5 min-[700px]:pt-10">
-                {look === "folio" && tabs.length > 0 ? (
-                    // VA20: whose account this is, and Sign out, above the row.
-                    <div className="mb-1 hidden items-center justify-between gap-4 min-[700px]:flex">
-                        <p className="text-site-muted text-[12px] font-semibold uppercase tracking-[0.16em]">
-                            Your account at {businessName}
-                        </p>
-                        {out}
-                    </div>
-                ) : null}
                 <div
                     className={cn(
                         side &&
@@ -468,7 +448,7 @@ export function AccountLookFrame({
                             look={look}
                             tabs={tabs}
                             unreadMessages={unreadMessages}
-                            footer={look === "folio" ? null : out}
+                            footer={out}
                         />
                     ) : null}
                     <main

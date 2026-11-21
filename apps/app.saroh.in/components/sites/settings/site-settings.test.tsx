@@ -143,7 +143,7 @@ describe("the site's settings show whether publishing needs approval (T13)", () 
         expect(html).toContain('aria-label="Publishing needs approval"');
         const text = words(html);
         expect(text).toContain(
-            "Only an approved test release can go live. You can still go live without approval, and it's recorded.",
+            "Pages and posts go live once a reviewer, an admin or the owner approves them. You can still go live without approval, and it's recorded.",
         );
         expect(text).not.toContain("only the owner can change this");
     });
@@ -161,7 +161,9 @@ describe("the site's settings show whether publishing needs approval (T13)", () 
         expect(text).toContain(
             "Needs approval On · only the owner can change this",
         );
-        expect(text).toContain("Only an approved test release can go live.");
+        expect(text).toContain(
+            "Pages and posts go live once a reviewer, an admin or the owner approves them.",
+        );
         expect(text).not.toContain("it's recorded");
     });
 
@@ -372,7 +374,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
         expect(words(html)).toContain("Section");
         expect(html).toMatch(/<button[^>]*role="combobox"/);
         expect(tabsOf(html)).toEqual([
-            ["Address", "true"],
+            ["Web address", "true"],
             ["Search and sharing", "false"],
             ["Menu and footer", "false"],
             ["Contact and social", "false"],
@@ -419,7 +421,7 @@ describe("the groups, from a side list (owner, 9 Oct)", () => {
         expect(html).not.toContain('data-settings-group="shop"');
         expect(html).not.toContain('data-settings-group="advanced"');
         expect(tabsOf(html).map(([name]) => name)).toEqual([
-            "Address",
+            "Web address",
             "Search and sharing",
             "Menu and footer",
             "Contact and social",

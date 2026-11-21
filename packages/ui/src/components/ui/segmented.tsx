@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+
 import * as React from "react";
 import { cn } from "../../lib/utils";
+import { LinkPending } from "./link-pending";
 
 export interface SegmentedOption<V extends string = string> {
     value: V;
@@ -147,9 +149,10 @@ export function Segmented<V extends string = string>({
                             aria-current={on ? "page" : undefined}
                             data-state={on ? "on" : "off"}
                             aria-label={o.name}
-                            className={cls(on, o.className)}
+                            className={cls(on, cn("relative", o.className))}
                         >
                             {inner(o)}
+                            <LinkPending />
                         </Link>
                     );
                 })}

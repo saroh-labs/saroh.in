@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import { instantiateTemplate } from "../instantiate";
 import type { TemplateContext } from "../manifest";
 import { getTemplate, listTemplates } from "../registry";
-import { BLOGS_TEMPLATE_ID, blogsTemplate } from "./blogs";
+import { BLOGS_TEMPLATE_ID, blogsTemplateV1 } from "./blogs";
 
 /** Every string anywhere in a section's content, however deeply nested. */
 function strings(value: unknown): string[] {
@@ -47,18 +47,19 @@ const profiles: [string, TemplateContext][] = [
 ];
 
 function pages(ctx: TemplateContext) {
-    return instantiateTemplate(blogsTemplate, ctx).pages;
+    return instantiateTemplate(blogsTemplateV1, ctx).pages;
 }
 
 describe("blogs@1 (industry templates U8)", () => {
-    it("is registered as the latest blogs template", () => {
+    it("stays registered as version 1 for the sites made from it (KD10)", () => {
         expect(BLOGS_TEMPLATE_ID).toBe("blogs");
-        expect(getTemplate("blogs")).toBe(blogsTemplate);
-        expect(listTemplates()).toContain(blogsTemplate);
+        expect(getTemplate("blogs", 1)).toBe(blogsTemplateV1);
+        // A new site starts on version 2 (U9); version 1 is no longer offered.
+        expect(listTemplates()).not.toContain(blogsTemplateV1);
     });
 
     it("says what the gallery shows: a journal for creators and coaches", () => {
-        expect(blogsTemplate).toMatchObject({
+        expect(blogsTemplateV1).toMatchObject({
             name: "Blogs",
             slug: "blogs",
             shape: "journal",
@@ -69,7 +70,7 @@ describe("blogs@1 (industry templates U8)", () => {
     });
 
     it("ships Red then Indigo, both in Newsreader", () => {
-        const styles = blogsTemplate.styles ?? [];
+        const styles = blogsTemplateV1.styles ?? [];
         expect(styles.map((s) => s.id)).toEqual(["red", "indigo"]);
         for (const preset of styles) {
             expect(preset.style.fontPair).toBe("newsreader");
@@ -78,7 +79,7 @@ describe("blogs@1 (industry templates U8)", () => {
     });
 
     it("draws the design's exact colours: warm white and one red, bone and one indigo", () => {
-        const [red, indigo] = blogsTemplate.styles ?? [];
+        const [red, indigo] = blogsTemplateV1.styles ?? [];
         expect(red.style.palette).toMatchObject({
             bg: "#FCFBF8",
             fg: "#1A1714",
@@ -98,7 +99,7 @@ describe("blogs@1 (industry templates U8)", () => {
     });
 
     it("sets the design's type: a 44px lead, 18.5px body, labels as small capitals, a 980px page", () => {
-        for (const preset of blogsTemplate.styles ?? []) {
+        for (const preset of blogsTemplateV1.styles ?? []) {
             expect(preset.style.type).toEqual({
                 displaySize: 44,
                 bodySize: 18.5,
@@ -116,7 +117,7 @@ describe("blogs@1 (industry templates U8)", () => {
             { label: "Archive", href: "/#archive" },
             { label: "About", href: "/#about" },
         ]);
-        expect(blogsTemplate.footer).toEqual({
+        expect(blogsTemplateV1.footer).toEqual({
             line: "Your city · how often you write, and since when",
             layout: "left",
         });
@@ -195,7 +196,7 @@ describe("blogs@1 (industry templates U8)", () => {
             /Meera|Bengaluru|studio|retainer|minutes|feed|newsletter|subscribe/i,
         );
         // Nor does the footer the owner starts with.
-        expect(blogsTemplate.footer?.line).not.toMatch(
+        expect(blogsTemplateV1.footer?.line).not.toMatch(
             /Bengaluru|monthly|since \d|feed/i,
         );
     });

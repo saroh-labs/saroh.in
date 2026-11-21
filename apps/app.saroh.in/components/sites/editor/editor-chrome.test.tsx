@@ -148,10 +148,10 @@ const bar: TopBarActionProps = {
     openNotes: 0,
 };
 
-describe("TopBarActions with test releases", () => {
-    it("draws the Test release split only while they are on", () => {
+describe("TopBarActions with test links", () => {
+    it("draws the Test link split only while they are on", () => {
         expect(renderToStaticMarkup(<TopBarActions {...bar} />)).not.toContain(
-            "Test release",
+            "Test link",
         );
         const html = renderToStaticMarkup(
             <TopBarActions
@@ -163,8 +163,8 @@ describe("TopBarActions with test releases", () => {
                 }}
             />,
         );
-        expect(html).toContain("Test release");
-        expect(html).toContain('aria-label="More test release actions"');
+        expect(html).toContain("Test link");
+        expect(html).toContain('aria-label="More test link actions"');
     });
 
     it("Publish reads Needs approval, and only an owner can press it", () => {
@@ -188,7 +188,7 @@ describe("TopBarActions (UX-081, UX-035, UX-068)", () => {
         expect(html).not.toMatch(/>3</);
     });
 
-    it("folds Preview, Feedback and Test release into More when narrow", () => {
+    it("folds Preview, Feedback and Test link into More when narrow", () => {
         const html = renderToStaticMarkup(
             <TopBarActions
                 {...bar}
@@ -197,9 +197,9 @@ describe("TopBarActions (UX-081, UX-035, UX-068)", () => {
                 testRelease={{ onOpenList: () => undefined, count: 0 }}
             />,
         );
-        expect(html).toContain("More: preview, feedback and test releases");
+        expect(html).toContain("More: preview, feedback and test links");
         expect(html).not.toContain(">Preview<");
-        expect(html).not.toContain("Test release");
+        expect(html).not.toContain("Test link");
         expect(html).toContain("Publish");
         expect(html).toContain("Share");
     });

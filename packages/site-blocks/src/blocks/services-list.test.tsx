@@ -295,3 +295,108 @@ describe("a free service under a look (DEC-172, VD01, VA01)", () => {
         );
     });
 });
+
+describe("servicesList cards and menu (DEC-227, U5)", () => {
+    const colour: PublicService = {
+        id: "fixture-colour",
+        name: "Full colour",
+        description: null,
+        durationMinutes: 120,
+        priceCents: 9000,
+        currency: "GBP",
+        noTimesSoon: true,
+    };
+    const extra: PublicService = {
+        id: "fixture-extra",
+        name: "Fringe trim",
+        description: null,
+        durationMinutes: 15,
+        priceCents: 800,
+        currency: "GBP",
+    };
+
+    it("Menu with two groups and one ungrouped service: three headings, Book on every row", () => {
+        render(
+            <ServicesListSection
+                content={{
+                    variant: "menu",
+                    heading: "Price list",
+                    serviceIds: [cut.id, colour.id, extra.id],
+                    groups: [
+                        { name: "Hair", serviceIds: [cut.id] },
+                        { name: "Colour", serviceIds: [colour.id] },
+                    ],
+                }}
+                services={[cut, colour, extra]}
+                bookHref="/book"
+            />,
+        );
+        expect(
+            screen
+                .getAllByRole("heading", { level: 3 })
+                .map((h) => h.textContent),
+        ).toEqual(["Hair", "Colour", "More"]);
+        for (const s of [cut, colour, extra]) {
+            const book = screen.getByRole("link", { name: `Book: ${s.name}` });
+            expect(book.getAttribute("href")).toBe(`/book?service=${s.id}`);
+        }
+        expect(screen.getByText("£38")).toBeTruthy();
+        expect(screen.getByText("45 min")).toBeTruthy();
+        expect(screen.getByText("2 hr")).toBeTruthy();
+    });
+
+    it("a service with no times soon says No times yet · Ask, and keeps Book", () => {
+        render(
+            <ServicesListSection
+                content={{ variant: "menu", serviceIds: [colour.id] }}
+                services={[colour]}
+                feed={{ services: [colour], askHref: "/contact#enquiry" }}
+                bookHref="/book"
+            />,
+        );
+        expect(screen.getByText(/No times yet/)).toBeTruthy();
+        expect(
+            screen
+                .getByRole("link", { name: "Ask about Full colour" })
+                .getAttribute("href"),
+        ).toBe("/contact#enquiry");
+        expect(
+            screen.getByRole("link", { name: "Book: Full colour" }),
+        ).toBeTruthy();
+    });
+
+    it("the old Show as: Cards draws the same cards as the cards look", () => {
+        const old = render(
+            <ServicesListSection
+                content={{ serviceIds: [cut.id], layout: "cards" }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        const before = old.container.innerHTML;
+        old.unmount();
+        const now = render(
+            <ServicesListSection
+                content={{ serviceIds: [cut.id], variant: "cards" }}
+                services={[cut]}
+                bookHref="/book"
+            />,
+        );
+        expect(now.container.innerHTML).toBe(before);
+    });
+
+    it("the menu look wins over Show as: Cards", () => {
+        render(
+            <ServicesListSection
+                content={{
+                    serviceIds: [cut.id],
+                    layout: "cards",
+                    variant: "menu",
+                }}
+                services={[cut]}
+            />,
+        );
+        expect(document.querySelector("[data-services-menu]")).toBeTruthy();
+        expect(document.querySelector("ul.grid")).toBeNull();
+    });
+});

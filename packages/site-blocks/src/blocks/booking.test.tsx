@@ -318,7 +318,7 @@ describe("booking block — each free time is a way in", () => {
             />,
         );
         expect(
-            await screen.findByText(/Nothing free in the next 14 days/),
+            await screen.findByText(/No open times in the next 14 days/),
         ).toBeInTheDocument();
         expect(
             screen.getByRole("link", { name: "Call +91 80409 92210" }),
@@ -337,7 +337,7 @@ describe("booking block — each free time is a way in", () => {
                 bookHref="/book"
             />,
         );
-        await screen.findByText(/Nothing free in the next 14 days/);
+        await screen.findByText(/No open times in the next 14 days/);
         expect(screen.queryByRole("link", { name: /^Call/ })).toBeNull();
         expect(screen.queryByRole("link", { name: /WhatsApp/ })).toBeNull();
     });
@@ -355,5 +355,117 @@ describe("booking block — each free time is a way in", () => {
         expect(
             screen.getByRole("link", { name: "Call +91 80409 92210" }),
         ).toBeInTheDocument();
+    });
+});
+
+describe("booking block — Next open (U6)", () => {
+    const NEXT = {
+        ...CONTENT,
+        variant: "nextOpen",
+        beforeYouBook: "Bring any recent reports.",
+    } as RenderedBooking;
+    /** Fourteen days from Tue 17 Nov; `open` lists the days with a 10:00 time. */
+    function fortnight(open: number[], closed: number[] = []) {
+        const list = Array.from({ length: 14 }, (_, i) => {
+            const d = new Date(Date.UTC(2026, 10, 17 + i));
+            const date = d.toISOString().slice(0, 10);
+            return {
+                date,
+                open: open.includes(i),
+                closed: closed.includes(i),
+                starts: open.includes(i)
+                    ? [
+                          {
+                              startAt: `${date}T04:30:00.000Z`,
+                              endAt: `${date}T05:15:00.000Z`,
+                              staffId: null,
+                              staffName: null,
+                              placesLeft: null,
+                          },
+                      ]
+                    : [],
+            };
+        });
+        return {
+            timezone: "Asia/Kolkata",
+            kind: "one",
+            capacity: 1,
+            days: list,
+            staff: [],
+        };
+    }
+
+    it("shows the next three open days, links each time and day, and the owner's note", async () => {
+        stubFetch(json(fortnight([1, 2, 4, 6], [0, 5])));
+        render(
+            <BookingSection
+                content={NEXT}
+                apiUrl="https://api"
+                bookHref="/book"
+            />,
+        );
+        const first = await screen.findByRole("link", {
+            name: "Book Wed 18 Nov at 10:00 am, open",
+        });
+        expect(first).toHaveAttribute(
+            "href",
+            "/book?service=svc_1&date=2026-11-18&start=10%3A00",
+        );
+        expect(screen.getByText("Tomorrow")).toBeTruthy();
+        // Three days only; the fourth open day is in the strip, not a row.
+        expect(
+            screen.queryByRole("link", { name: /Mon 23 Nov at/ }),
+        ).toBeNull();
+        expect(
+            screen.getByRole("link", { name: "Mon 23 Nov, open times" }),
+        ).toHaveAttribute("href", "/book?service=svc_1&date=2026-11-23");
+        // Today is closed: greyed, plain, not a link.
+        expect(screen.getByLabelText("Tue 17 Nov, closed").tagName).toBe(
+            "SPAN",
+        );
+        expect(screen.getByLabelText("Sun 22 Nov, closed").tagName).toBe(
+            "SPAN",
+        );
+        expect(screen.getByText(/Bring any recent reports/)).toBeTruthy();
+        expect(
+            screen.getByRole("link", { name: "See every time" }),
+        ).toHaveAttribute("href", "/book?service=svc_1");
+        expect(document.body.textContent).not.toMatch(/\bFree\b/);
+    });
+
+    it("with nothing open in two weeks, says so and asks", async () => {
+        stubFetch(json(fortnight([])));
+        render(
+            <BookingSection
+                content={NEXT}
+                apiUrl="https://api"
+                bookHref="/book"
+                askHref="/contact#enquiry"
+                reach={{ phone: "+910000001006", whatsapp: null }}
+            />,
+        );
+        expect(
+            await screen.findByText("No open times in the next two weeks"),
+        ).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Ask us" })).toHaveAttribute(
+            "href",
+            "/contact#enquiry",
+        );
+    });
+
+    it("a failed read says booking still works, with Try again", async () => {
+        stubFetch(json({}, 500));
+        render(
+            <BookingSection
+                content={NEXT}
+                apiUrl="https://api"
+                bookHref="/book"
+            />,
+        );
+        expect(await screen.findByText(/Open times didn.t load/)).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+        expect(
+            screen.getByRole("link", { name: "Booking page" }),
+        ).toHaveAttribute("href", "/book?service=svc_1");
     });
 });

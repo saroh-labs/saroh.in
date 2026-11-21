@@ -33,6 +33,11 @@ export interface MeApi {
     phoneAdd?: Required<
         Pick<SignInApi, "requestPhoneCode" | "verifyPhoneCode">
     >;
+    /**
+     * Their GSTIN for their invoices (R16); empty removes it. Left out by an
+     * older caller: no GST card.
+     */
+    saveGstin?: (gstin: string) => Promise<DetailsResult>;
     addNote: (text: string) => Promise<NoteResult>;
     signOut: () => Promise<{ ok: boolean }>;
     signOutEverywhere: () => Promise<{ ok: boolean }>;

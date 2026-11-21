@@ -21,7 +21,7 @@ import {
     STARTER_IMAGE_BRIEFS,
     starterLine,
     starterPrimaryAction,
-    starterTemplate,
+    starterTemplateV4 as starterTemplate,
 } from "./starter-v4";
 
 /** A business with nothing switched on and nothing said about it. */
@@ -118,10 +118,11 @@ function pieces(html: string): string[] {
 }
 
 describe("starter@4 (DEC-141)", () => {
-    it("is the starter new sites start from, beside the three before it", () => {
+    it("is registered beside the three before it, and kept for its sites", () => {
         expect(starterTemplate.id).toBe(STARTER_TEMPLATE_ID);
         expect(starterTemplate.version).toBe(4);
-        expect(getTemplate(STARTER_TEMPLATE_ID)).toBe(starterTemplate);
+        // v5 (U10) is the newest now; v4 keeps resolving for its sites.
+        expect(getTemplate(STARTER_TEMPLATE_ID, 4)).toBe(starterTemplate);
         for (const version of [1, 2, 3]) {
             expect(getTemplate(STARTER_TEMPLATE_ID, version)?.version).toBe(
                 version,

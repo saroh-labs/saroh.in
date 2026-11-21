@@ -166,6 +166,7 @@ test("saroh.in's release switches: on in dev, left out (off) in production", () 
         "NEXT_PUBLIC_SOCIAL",
         "NEXT_PUBLIC_DEVELOPERS",
         "NEXT_PUBLIC_DOCS",
+        "NEXT_PUBLIC_WEBSITE_LIBRARY",
     ];
     const dev = buildVars("apps/saroh.in", "development", new Date(0));
     const prod = buildVars("apps/saroh.in", "production", new Date(8.64e15));

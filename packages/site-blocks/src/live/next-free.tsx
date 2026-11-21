@@ -21,7 +21,7 @@ import type { LiveRead } from "./use-live-read";
 import { useLiveRead } from "./use-live-read";
 
 /**
- * "Next free" under a look (DEC-172, plan U8, #1042), read in the
+ * "Next open" under a look (DEC-172, plan U8, #1042), read in the
  * browser from the site's `today` read, which names the soonest time any
  * service on the booking page can still be booked at (`nextFree`). Per
  * service, never per person (Phase 2, #1041).
@@ -33,7 +33,7 @@ import { useLiveRead } from "./use-live-read";
  *   that time;
  * - Live's Now strip (VB01): pills, "Now · checked 5:20 pm", "Open now ·
  *   closes 9pm" and "6:00 pm · Vinyasa flow · 3 places left · Book";
- * - the phone's Book bar (VD01): "Next free: today, 6:00 pm".
+ * - the phone's Book bar (VD01): "Next open: today, 6:00 pm".
  *
  * Until the read answers, and whenever it fails or finds nothing free, the
  * slot keeps the plain "See times" the cached page was sent with, at the
@@ -120,7 +120,7 @@ export function HeroNextFree({
                 pick={pickNext}
                 reserve="min-h-[76px]"
                 className="flex w-full flex-col justify-start gap-1"
-                label="Next free"
+                label="Next open"
                 loading={fallback}
                 fallback={fallback}
                 fresh={(next, at) => (
@@ -152,7 +152,7 @@ export function HeroNextFree({
                 "flex w-full min-w-0 flex-col justify-center gap-0.5",
                 look === "quiet" && "min-[700px]:items-center",
             )}
-            label="Next free"
+            label="Next open"
             loading={fallback}
             fallback={fallback}
             fresh={(next) => (
@@ -211,7 +211,7 @@ function FolioSentence({
         // over the length beside the sentence.
         <div className="grid w-full gap-2.5 min-[700px]:grid-cols-[auto_minmax(0,1fr)] min-[700px]:items-center min-[700px]:gap-x-5 min-[700px]:gap-y-1 min-[700px]:[grid-template-areas:'c_s'_'m_s']">
             <p className="text-site-muted text-[12px] font-semibold uppercase tracking-[0.18em] min-[700px]:self-end min-[700px]:[grid-area:c]">
-                Next free
+                Next open
             </p>
             <Link
                 href={href}
@@ -264,7 +264,7 @@ function SlotLine({
                 className="text-site-body w-full text-[15px] tabular-nums leading-[1.6] min-[700px]:w-auto"
             >
                 <span className="text-site-muted mr-3 text-[12px] font-medium uppercase tracking-[0.22em]">
-                    Next free
+                    Next open
                 </span>
                 <span className="text-site-fg font-medium">
                     {item.serviceName}
@@ -367,7 +367,7 @@ function NowStrip({
             ) : null}
             <Link
                 href={href}
-                aria-label={`Next free: ${item.serviceName}, ${nextFreeWhen(item, today.date)}${places ? `, ${places}` : ""}`}
+                aria-label={`Next open: ${item.serviceName}, ${nextFreeWhen(item, today.date)}${places ? `, ${places}` : ""}`}
                 className={cn(PILL, "max-[699px]:order-first", FRONT_RING)}
             >
                 <span data-live-value="" className="tabular-nums">
@@ -388,7 +388,7 @@ function NowStrip({
 }
 
 /**
- * The Book bar's line (VD01's bar): "Next free: today, 6:00 pm", or
+ * The Book bar's line (VD01's bar): "Next open: today, 6:00 pm", or
  * nothing at the same height. The bar's own button is the way in, so a
  * failed read shows nothing here, never "See times" twice.
  */
@@ -421,7 +421,7 @@ function BarLine({ next }: { next: Next }) {
             data-live-value=""
             className="text-site-body truncate text-[13px] tabular-nums leading-[18px]"
         >
-            Next free: {nextFreeWhen(next.item, next.today.date)}
+            Next open: {nextFreeWhen(next.item, next.today.date)}
         </p>
     );
 }

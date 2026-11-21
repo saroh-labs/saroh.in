@@ -25,7 +25,6 @@ import type {
     VerifyResult,
 } from "./api";
 import {
-    callLine,
     codeDigits,
     looksLikeEmail,
     looksLikePhone,
@@ -693,22 +692,21 @@ export function ProblemText({
     let body: ReactNode;
     switch (problem.reason) {
         case "unavailable": {
-            const call = callLine(businessName, phone);
-            body = (
+            // The problem, then the way out (DEC-229): call the business.
+            const number = phone?.trim();
+            body = number ? (
                 <>
-                    {UNAVAILABLE_TEXT}
-                    {call ? (
-                        <>
-                            <br />
-                            <a
-                                href={`tel:${phone?.replace(/[^\d+]/g, "")}`}
-                                className="underline"
-                            >
-                                {call}
-                            </a>
-                        </>
-                    ) : null}
+                    {`${UNAVAILABLE_TEXT}, or call ${businessName}.`}
+                    <br />
+                    <a
+                        href={`tel:${number.replace(/[^\d+]/g, "")}`}
+                        className="inline-flex min-h-11 items-center font-semibold underline"
+                    >
+                        {`Call ${number}`}
+                    </a>
                 </>
+            ) : (
+                `${UNAVAILABLE_TEXT}.`
             );
             break;
         }

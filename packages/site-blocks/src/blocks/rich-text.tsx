@@ -4,6 +4,7 @@ import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import { FRONT_WRAP } from "./look-front";
+import { DESK_ONLY, PHONE_ONLY, phoneVersion } from "./phone-text";
 
 /**
  * `richText` v1 — authored rich content.
@@ -72,7 +73,7 @@ export default function RichTextSection({
      * fallbacks are the prose plugin's 1rem and no cap of its own, which is
      * what every text block has always drawn.
      */
-    const prose =
+    const proseOf = (value: string, only?: string) =>
         content.format === "html" ? (
             <div
                 {...marks}
@@ -80,14 +81,30 @@ export default function RichTextSection({
                    text colour (#189), and `dark:prose-invert` is gone with
                    them: once a palette is chosen, a visitor's OS setting
                    must not repaint a storefront its owner picked. */
-                className={`prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
+                className={`${only ? `${only} ` : ""}prose prose-headings:font-site-heading prose-headings:text-site-fg prose-p:text-site-fg/80 prose-a:text-site-accent-text prose-strong:text-site-fg prose-li:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]${labels}`}
                 // Sanitized at publish (see the safety note above).
-                dangerouslySetInnerHTML={{ __html: content.value }}
+                dangerouslySetInnerHTML={{ __html: value }}
             />
         ) : (
-            <div className="prose prose-p:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]">
-                <p className="whitespace-pre-wrap">{content.value}</p>
+            <div
+                className={cn(
+                    only,
+                    "prose prose-p:text-site-fg/80 max-w-[var(--site-measure,none)] text-[length:var(--site-body-size,1rem)]",
+                )}
+            >
+                <p className="whitespace-pre-wrap">{value}</p>
             </div>
+        );
+    // A shorter body for a phone (KD9): both in the page, CSS shows one.
+    const phoneBody = phoneVersion(content.phoneBody, content.value);
+    const prose =
+        phoneBody === null ? (
+            proseOf(content.value)
+        ) : (
+            <>
+                {proseOf(content.value, DESK_ONLY)}
+                {proseOf(phoneBody, PHONE_ONLY)}
+            </>
         );
 
     /*
@@ -158,6 +175,7 @@ export default function RichTextSection({
                         {...siteImage("below", {
                             src: image.src,
                             width: image.width,
+                            focus: image.focus,
                             sizes: folio
                                 ? "100vw"
                                 : "(min-width: 1280px) 1280px, 100vw",
@@ -199,6 +217,7 @@ export default function RichTextSection({
                 {...siteImage("below", {
                     src: image.src,
                     width: image.width,
+                    focus: image.focus,
                     sizes: "(min-width: 1280px) 1280px, 100vw",
                 })}
                 className="bg-site-surface mb-8 aspect-video h-auto w-full rounded-[var(--site-radius)] object-cover"
@@ -247,6 +266,7 @@ export default function RichTextSection({
                     {...siteImage("below", {
                         src: image.src,
                         width: image.width,
+                        focus: image.focus,
                         sizes: "(min-width: 768px) 50vw, 100vw",
                     })}
                     className={

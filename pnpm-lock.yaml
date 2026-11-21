@@ -176,6 +176,9 @@ importers:
       '@saroh/site-blocks':
         specifier: workspace:*
         version: link:../../packages/site-blocks
+      '@saroh/templates':
+        specifier: workspace:*
+        version: link:../../packages/templates
       '@saroh/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -1050,6 +1053,9 @@ importers:
       '@saroh/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@saroh/block-contract':
+        specifier: workspace:*
+        version: link:../../packages/block-contract
       '@saroh/error-tracking':
         specifier: workspace:*
         version: link:../../packages/error-tracking

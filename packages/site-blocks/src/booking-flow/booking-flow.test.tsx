@@ -1999,7 +1999,7 @@ describe("sign-in at the last step (A9)", () => {
 
         expect(
             await screen.findByText(
-                "That time has gone. We've chosen the next free one: Sun 20 Sep at 8:00 am.",
+                "That time has gone. We've chosen the next open one: Sun 20 Sep at 8:00 am.",
             ),
         ).toBeInTheDocument();
         expect(
@@ -2037,9 +2037,7 @@ describe("sign-in at the last step (A9)", () => {
         expect(alert).toHaveTextContent(
             "We couldn't send your code. Try again in a few minutes",
         );
-        expect(alert).toHaveTextContent(
-            "Or call Pulse Fitness on +91 80 4120 8800",
-        );
+        expect(alert).toHaveTextContent("Call +91 80 4120 8800");
         expect(bookCalls()).toHaveLength(0);
     });
 
@@ -2077,7 +2075,7 @@ describe("sign-in at the last step (A9)", () => {
         expect(alert).toHaveTextContent(
             "We couldn't send your code. Try again in a few minutes",
         );
-        expect(alert).not.toHaveTextContent(/Or call/);
+        expect(alert).not.toHaveTextContent(/call/i);
         expect(bookCalls()).toHaveLength(0);
     });
 

@@ -27,6 +27,7 @@ import {
 } from "@/components/sites/section-fields/cta-action-fields";
 import { ImageBrief } from "@/components/sites/section-fields/image-brief";
 import { OptionSwitch } from "@/components/sites/section-fields/option-switch";
+import { PhoneTextField } from "@/components/sites/section-fields/phone-text-field";
 import type { SectionFieldsProps } from "@/components/sites/section-fields/props";
 
 /**
@@ -266,6 +267,17 @@ export function PersonFields({
                     pages={pages}
                     onChange={(action) =>
                         patch({ cta: withCtaAction(c.cta, action) })
+                    }
+                />
+            ) : null}
+            {c.cta?.label.trim() ? (
+                <PhoneTextField
+                    label="Button"
+                    value={c.cta.phoneLabel}
+                    fallback={c.cta.label}
+                    maxLength={40}
+                    onChange={(phoneLabel) =>
+                        patch({ cta: c.cta && { ...c.cta, phoneLabel } })
                     }
                 />
             ) : null}

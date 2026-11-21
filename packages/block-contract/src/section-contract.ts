@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { COMPONENT_STYLE_OPTIONS } from "./component-styles";
 import { parseSectionFrame } from "./section-frame";
 
 /**
@@ -68,6 +69,47 @@ import { parseSectionFrame } from "./section-frame";
 const paddingOverride = z.number().int().min(24).max(96).optional();
 
 /**
+ * A section's frame (website editor plan KTD-E5): hidden on a phone, the
+ * ground it sits on, and its spacing, set from the inspector's Visibility
+ * and Style tabs. One optional `frame` object beside every block's own
+ * fields, read for every block at once by `parseSectionContent` (as the
+ * anchor and band are, `section-frame.ts`), so no schema repeats it and a
+ * block added later can't strip it. ABSENT is exactly today's page.
+ *
+ * - `hideOn: "phone"`: left out below the phone width by CSS alone, so the
+ *   page stays one HTML document for every screen (and for Google).
+ * - `tone`: `page` is the page's own ground; `tint`, `brand` and `dark` are
+ *   the existing `--site-*` bands (surface, accent, inverse).
+ * - `spacing`: the site look's own spacing choices, applied to this section.
+ *
+ * Strict: an unknown key or value is refused, never quietly dropped.
+ */
+export const SECTION_TONES = ["page", "tint", "brand", "dark"] as const;
+export type SectionTone = (typeof SECTION_TONES)[number];
+
+export const sectionFrameSettingsSchema = z
+    .object({
+        hideOn: z.literal("phone").optional(),
+        tone: z.enum(SECTION_TONES).optional(),
+        spacing: z.enum(COMPONENT_STYLE_OPTIONS.spacing).optional(),
+    })
+    .strict();
+export type SectionFrameSettings = z.infer<typeof sectionFrameSettingsSchema>;
+
+/**
+ * The `frame` a section's raw content carries, as the renderer may use it:
+ * whatever fails the schema is dropped, never thrown (the content is a
+ * published snapshot, checked when it was saved).
+ */
+export function sectionFrameSettingsOf(content: unknown): SectionFrameSettings {
+    if (content === null || typeof content !== "object") return {};
+    const parsed = sectionFrameSettingsSchema.safeParse(
+        (content as { frame?: unknown }).frame,
+    );
+    return parsed.success ? parsed.data : {};
+}
+
+/**
  * Which of the block's looks this section wears (#254).
  *
  * ON THE AUTHORING SHAPE, not only the rendered one. #252 Step 1 reserved
@@ -133,10 +175,18 @@ const linkHref = z
         "A link must be a web address, an email or phone link, or a path on this site",
     );
 
+/**
+ * A button's shorter words for a phone (KD9, DEC-227): both are in the page
+ * and CSS shows one per width, so nothing loads on tap. ABSENT or empty, the
+ * phone shows the button's own label.
+ */
+const phoneLabel = z.string().trim().max(40).optional();
+
 const ctaSchema = z.object({
     label: z.string().min(1),
     href: linkHref,
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    phoneLabel,
 });
 
 /**
@@ -184,6 +234,7 @@ const ctaSchemaV2 = z.object({
     label: z.string().min(1),
     action: ctaActionSchema,
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    phoneLabel,
 });
 
 /** Digits and a leading +, nothing else — what tel: and wa.me both want. */
@@ -232,11 +283,24 @@ export function ctaHref(
     }
 }
 
+/**
+ * The photo's focus point (U46d, `fix/WXKMedia`): the place, in percent
+ * from the left and the top, that stays in view however a screen crops
+ * it. Drawn as `object-position`; absent, the photo is centred as before.
+ */
+export const imageFocusSchema = z.object({
+    x: z.number().min(0).max(100),
+    y: z.number().min(0).max(100),
+});
+
+export type ImageFocus = z.infer<typeof imageFocusSchema>;
+
 const imageSchema = z.object({
     src: z.string().min(1),
     alt: z.string().default(""),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    focus: imageFocusSchema.optional(),
 });
 
 /** How long an image brief may run (KTD-5). */
@@ -276,6 +340,44 @@ const imageBrief = z.string().trim().max(IMAGE_BRIEF_MAX).optional();
  * (and v2, which extends v1) in place, as `paddingOverride` did: every
  * existing hero validates and renders exactly as before.
  */
+/** What a hero's answer panel answers first (KD14). Stored ids; never renamed. */
+export const HERO_PANEL_KINDS = [
+    "today",
+    "nextFree",
+    "sameDayCall",
+    "consultation",
+    "pickup",
+] as const;
+export type HeroPanelKind = (typeof HERO_PANEL_KINDS)[number];
+
+/**
+ * The Same-day call panel's words when the owner writes none (DEC-228).
+ * Never "emergency": a business that cannot promise one must not say it.
+ */
+export const SAME_DAY_CALL_WORDS = "Same-day? Call the desk";
+
+/**
+ * The answer panel's typed parts, each read only by the kinds that use it:
+ * `words` the panel's line (Same-day call; ABSENT, {@link
+ * SAME_DAY_CALL_WORDS}), `phone` the number to call (ABSENT, the
+ * business's own), `orderBy` and `where` Pickup's "Order by 9 pm" and
+ * "From the counter, MG Road". The live kinds ignore them.
+ */
+const heroPanel = z.object({
+    kind: z.enum(HERO_PANEL_KINDS),
+    words: z.string().trim().max(160).optional(),
+    phone: phone.optional(),
+    orderBy: z.string().trim().max(80).optional(),
+    where: z.string().trim().max(160).optional(),
+});
+
+/** The person a hero names beside its heading: the team member's shape. */
+const heroByline = z.object({
+    image: imageSchema.optional(),
+    name: z.string().trim().min(1).max(120),
+    role: z.string().trim().max(160).optional(),
+});
+
 const heroV1 = z.object({
     variant,
     padding: paddingOverride,
@@ -302,8 +404,29 @@ const heroV1 = z.object({
         .object({
             label: z.string().trim().min(1).max(60),
             href: linkHref,
+            phoneLabel,
         })
         .optional(),
+    /**
+     * The `answer` look's panel beside the heading (DEC-228, KD14): what it
+     * answers first. `today` and `nextFree` read the booking page live,
+     * `consultation` the one service's price and length; `sameDayCall` and
+     * `pickup` are the owner's words. ABSENT, the answer look reads as Today.
+     */
+    panel: heroPanel.optional(),
+    /**
+     * A row under the buttons: Open now, Directions and Call, read live
+     * from the business's hours, address and phone. ABSENT, none.
+     */
+    answerRow: z.boolean().optional(),
+    /** Who is behind the business, beside the heading. ABSENT, none. */
+    byline: heroByline.optional(),
+    /**
+     * A shorter line for a phone (KD9): both are in the page, CSS shows one.
+     * ABSENT or empty, the phone shows `subheading`. The heading has no
+     * phone version on purpose: one h1, the same on every width.
+     */
+    phoneLine: z.string().trim().max(200).optional(),
 });
 
 /**
@@ -391,6 +514,13 @@ const richTextV1 = z.object({
      * face.
      */
     factsStyle: z.enum(TEXT_FACTS_STYLES).optional(),
+    /**
+     * A shorter body for a phone (KD9, DEC-227), in `format` like `value`
+     * and sanitized like it. Both are in the page and CSS shows one, so
+     * search engines read the phone version too. ABSENT or empty, the
+     * phone shows `value`.
+     */
+    phoneBody: z.string().optional(),
 });
 
 /** cta v1 — a standalone call-to-action button. */
@@ -400,6 +530,7 @@ const ctaV1 = z.object({
     label: z.string().min(1),
     href: linkHref,
     style: z.enum(["primary", "secondary", "link"]).default("primary"),
+    phoneLabel,
 });
 
 /**
@@ -461,8 +592,28 @@ export const GALLERY_CAPTION_MAX = 200;
 export const CAPTION_PLACEMENTS = ["below", "over"] as const;
 const captionPlacement = z.enum(CAPTION_PLACEMENTS).optional();
 
+/**
+ * Where a Lookbook photo leads (DEC-228): a service ("Book"), a product
+ * ("See the product") or a page, by id, so a rename cannot orphan it. The
+ * page's path is resolved at publish as a button's is (`to-rendered.ts`);
+ * a service or product is read live.
+ */
+const galleryLinkSchema = z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("service"), serviceId: z.string().min(1) }),
+    z.object({ kind: z.literal("product"), productId: z.string().min(1) }),
+    z.object({ kind: z.literal("page"), pageId: z.string().min(1) }),
+]);
+
 const galleryImageSchema = imageSchema.extend({
     caption: z.string().trim().max(GALLERY_CAPTION_MAX).optional(),
+    /**
+     * The `lookbook` look's words per photo: its `name`, a `fromPrice` the
+     * owner types ("From ₹1,800"; ABSENT, a linked service's or product's
+     * own price is read) and its `link`. The other looks ignore them.
+     */
+    name: z.string().trim().max(120).optional(),
+    fromPrice: z.string().trim().max(40).optional(),
+    link: galleryLinkSchema.optional(),
 });
 
 const galleryV2 = z
@@ -709,6 +860,20 @@ const servicesListV1 = z.object({
     followUpLine: z.string().trim().max(300).optional(),
     includesLabel: z.string().trim().max(60).optional(),
     includes: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
+    /**
+     * The `menu` look's headings (DEC-227): each group's name over the
+     * services named in it, in its order. A listed service in no group
+     * goes under "More". ABSENT, one list. The other looks ignore it.
+     */
+    groups: z
+        .array(
+            z.object({
+                name: z.string().trim().min(1).max(80),
+                serviceIds: z.array(z.string().min(1)).max(24),
+            }),
+        )
+        .max(8)
+        .optional(),
 });
 
 /**
@@ -741,6 +906,8 @@ const visitUsV1 = z.object({
     storeId: z.string().min(1).optional(),
     showMap: z.boolean().optional(),
     showHours: z.boolean().optional(),
+    /** A line of the owner's own under the address, "Parking at the back". */
+    extraLine: z.string().trim().max(160).optional(),
 });
 
 /**
@@ -832,6 +999,34 @@ const plansV1 = z.object({
     /** Display options (G16): ABSENT, cards with their prices. */
     layout: listLayout,
     showPrices: z.boolean().optional(),
+    /**
+     * What the block offers (DEC-228): plans, class packs or both. ABSENT,
+     * plans, as the block always drew.
+     */
+    show: z.enum(["plans", "packs", "both"]).optional(),
+    /**
+     * The `compare` look's rows, typed until plans carry what they include:
+     * a row's `label` ("Evening classes") and, per plan or pack by `id`,
+     * the words in its cell ("Every one"; ABSENT words, "Included"). A plan
+     * or pack with no cell in a row does not include it. ABSENT, no rows.
+     */
+    includes: z
+        .array(
+            z.object({
+                label: z.string().trim().min(1).max(120),
+                cells: z
+                    .array(
+                        z.object({
+                            id: z.string().trim().min(1).max(64),
+                            words: z.string().trim().max(60).optional(),
+                        }),
+                    )
+                    .max(12)
+                    .optional(),
+            }),
+        )
+        .max(12)
+        .optional(),
 });
 
 /**
@@ -1022,10 +1217,25 @@ const productGridV1 = z.object({
      * per row and ignores it.
      */
     phoneColumns: z.union([z.literal(1), z.literal(2)]).optional(),
+    /**
+     * A − / + stepper on each card that adds to the bag where it stands,
+     * in place of opening the product (DEC-227). ABSENT, off.
+     */
+    addInPlace: z.boolean().optional(),
+    /**
+     * The owner's own Pre-order tag words, "Pre-order for Saturday": shown
+     * on the cards, typed until products carry it. ABSENT, no tag. The
+     * cut-off line is `cutOff` above.
+     */
+    preorderWords: z.string().trim().max(60).optional(),
 });
 
 /** How many classes a Timetable may be limited to (U2). */
 export const TIMETABLE_MAX_SERVICES = 24;
+
+/** The bounds of a Timetable's "places left from" (KD8). */
+export const TIMETABLE_PLACES_FROM_MIN = 1;
+export const TIMETABLE_PLACES_FROM_MAX = 10;
 
 /**
  * timetable v1 — the week's class sessions, read live (industry templates U2).
@@ -1076,6 +1286,17 @@ const timetableV1 = z.object({
      * (template polish). Derived, never typed. ABSENT, not shown.
      */
     showCounts: z.boolean().optional(),
+    /**
+     * Say how many places are left from this many down (KD8): 3 says "3
+     * left" and nothing at 4. Set, it replaces both the live default and
+     * the classic rule; ABSENT ("Automatic") keeps them.
+     */
+    placesFrom: z
+        .number()
+        .int()
+        .min(TIMETABLE_PLACES_FROM_MIN)
+        .max(TIMETABLE_PLACES_FROM_MAX)
+        .optional(),
 });
 
 /**
@@ -1275,6 +1496,11 @@ const bookingV1 = z.object({
     description: z.string().optional(),
     submitLabel: z.string().optional(),
     successMessage: z.string().optional(),
+    /**
+     * The owner's "Before you book" note ("Come ten minutes early; bring
+     * any reports"), typed until services carry it. ABSENT, none.
+     */
+    beforeYouBook: z.string().trim().max(600).optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -1339,8 +1565,9 @@ const REGISTRY: Record<string, SectionContract> = {
         type: "richText",
         version: 1,
         schema: richTextV1,
-        // `value` is authored HTML/markdown → sanitize before publish.
-        sanitizedFields: ["value"],
+        // `value` and its phone version are authored HTML/markdown →
+        // sanitize before publish.
+        sanitizedFields: ["value", "phoneBody"],
     },
     [key("cta", 1)]: {
         type: "cta",
@@ -1774,10 +2001,38 @@ export function parseSectionContent(
             },
         };
     }
+    // The `frame` object (KTD-E5), read off the raw content the same way.
+    // Absent or empty is no frame, so `{}` never counts as a change.
+    const rawSettings = (content as { frame?: unknown }).frame;
+    const settings =
+        rawSettings === undefined || rawSettings === null
+            ? null
+            : sectionFrameSettingsSchema.safeParse(rawSettings);
+    if (settings && !settings.success) {
+        return {
+            success: false,
+            error: {
+                code: "INVALID_CONTENT",
+                type,
+                version,
+                issues: settings.error.issues.map((issue) => ({
+                    ...issue,
+                    path: ["frame", ...issue.path],
+                })),
+                message: `Invalid frame for section "${type}" v${version}`,
+            },
+        };
+    }
+    const own =
+        settings && Object.keys(settings.data).length > 0
+            ? { frame: settings.data }
+            : {};
+
     const parsed: unknown = result.data;
+    const extra = { ...frame.frame, ...own };
     const data: unknown =
-        Object.keys(frame.frame).length > 0
-            ? { ...(parsed as Record<string, unknown>), ...frame.frame }
+        Object.keys(extra).length > 0
+            ? { ...(parsed as Record<string, unknown>), ...extra }
             : parsed;
 
     return { success: true, data, contract };

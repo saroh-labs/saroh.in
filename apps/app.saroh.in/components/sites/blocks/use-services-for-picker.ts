@@ -13,8 +13,12 @@ import type {
  * editor, never inline in the site editor. A failed read is kept distinct
  * from an empty one, so a picker never says "No services yet" or calls a
  * chosen service deleted because the read failed (review of #255).
+ * A price changed in the editor's price sheet (U48) reads them again.
  */
-export function useServicesForPicker(): ServicesLoad {
+export function useServicesForPicker(
+    /** Bump it to read again, keeping the rows on screen meanwhile. */
+    version = 0,
+): ServicesLoad {
     const [read, setRead] = useState<
         | "loading"
         | { ok: true; services: ServiceOption[] }
@@ -34,7 +38,7 @@ export function useServicesForPicker(): ServicesLoad {
         return () => {
             active = false;
         };
-    }, [attempt]);
+    }, [attempt, version]);
 
     if (read === "loading") return { status: "loading" };
     if (read.ok) return { status: "ready", services: read.services };

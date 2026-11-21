@@ -23,7 +23,7 @@ import {
     listOrganizations,
 } from "@/lib/organizations/service";
 import { stepFromQuery } from "@/lib/organizations/setup-steps";
-import { galleryTemplateOf } from "@/lib/organizations/trade";
+import { galleryTemplateOf, tradeOfTemplate } from "@/lib/organizations/trade";
 import { readInviteIntent } from "@/lib/saroh-billing/invite-intent";
 import { inviteNote, inviteToTake } from "@/lib/saroh-billing/launch-offer";
 import {
@@ -79,6 +79,11 @@ export const metadata: Metadata = { title: "Set up Saroh" };
  * and the business keeps it (`startTemplate`) so Turn on Website and New
  * site start on it. Only while templates are offered (DEC-135).
  *
+ * saroh.in's website library Try panel arrives as `?name=&trade=` (U12),
+ * checked by accounts: the name fills the form (an invite's name wins) and
+ * the trade starts the chips. Prefill only; nothing is kept until the
+ * business is made.
+ *
  * An owner who has a billing profile already (DEC-167, R7) is asked who
  * Saroh bills for the new business, between its name and what to do
  * first. Someone with none isn't: their first is made from the business.
@@ -117,6 +122,12 @@ export default async function OnboardingPage({
     const gallery = templateChoiceOn()
         ? galleryTemplateOf(query.template, listTemplates())
         : null;
+    // The library's Try (U12): prefill only, checked again here.
+    const triedName =
+        typeof query.name === "string"
+            ? query.name.trim().slice(0, 120) || undefined
+            : undefined;
+    const triedTrade = tradeOfTemplate([String(query.trade ?? "")]);
     // Removed from the business they were in: said, not set up as new.
     const jar = await cookies();
     const activeId = jar.get(ACTIVE_ORG_COOKIE)?.value;
@@ -179,10 +190,11 @@ export default async function OnboardingPage({
                     checkout={checkoutIntent(intent)}
                     invite={inviteToTake(invite)}
                     gallery={gallery}
+                    defaultTrade={triedTrade}
                     defaultName={
-                        invite.kind === "ready" || invite.kind === "free"
+                        (invite.kind === "ready" || invite.kind === "free"
                             ? (invite.businessName ?? undefined)
-                            : undefined
+                            : undefined) ?? triedName
                     }
                     arrival={
                         left ? <Notice role="status">{left}</Notice> : null

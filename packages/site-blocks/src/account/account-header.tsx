@@ -76,7 +76,7 @@ export function AccountHeader({
         // Stays at the top on a phone. From tablet width up the tabs do
         // (`tab-bar.tsx`), and the header scrolls away with the page.
         <header className="bg-site-bg border-site-border font-site-body sticky top-0 z-30 border-b md:static md:border-b-0">
-            <div className="mx-auto flex max-w-[640px] items-center gap-2.5 px-[18px] py-3 md:max-w-[960px] md:gap-3.5 md:px-6 md:pb-4 md:pt-6">
+            <div className="mx-auto flex max-w-[640px] items-center gap-2.5 px-[18px] py-3 md:max-w-[960px] md:gap-3.5 md:px-6 md:pb-4 md:pt-6 lg:max-w-[1200px]">
                 <Link
                     href={homeHref}
                     aria-label={`Back to the site: ${businessName}`}

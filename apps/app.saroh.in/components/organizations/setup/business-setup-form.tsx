@@ -151,6 +151,7 @@ function SetupSteps({
     arrival,
     note,
     gallery,
+    defaultTrade,
     billingProfiles,
     ready,
 }: SetupFormProps & {
@@ -174,7 +175,11 @@ function SetupSteps({
     const form = useForm<SetupValues>({
         resolver: zodResolver(setupSchema(needsName, billing)),
         ...PAGE_FORM,
-        defaultValues: startingAnswers(draft, defaultName, gallery?.trade),
+        defaultValues: startingAnswers(
+            draft,
+            defaultName,
+            gallery?.trade ?? defaultTrade,
+        ),
     });
     const { isSubmitting } = form.formState;
     // Set up, and on the way in: the push takes a moment, and the button
@@ -510,6 +515,11 @@ interface SetupFormProps {
      * for the website picker.
      */
     gallery?: GalleryTemplate | null;
+    /**
+     * The trade picked in saroh.in's website library Try panel (`?trade=`,
+     * U12): it starts the trade chips there, as a gallery template does.
+     */
+    defaultTrade?: Trade | null;
     /**
      * The owner's billing profiles (DEC-167). With any, setup asks who
      * Saroh bills for the business; with none, it isn't asked, and the

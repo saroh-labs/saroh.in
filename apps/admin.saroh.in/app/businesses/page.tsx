@@ -4,7 +4,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { BusinessTable } from "@/components/business/business-table";
 import { FilterBar, FilterSelect, FilterText } from "@/components/filter-bar";
 import { FailedPanel } from "@/components/states/failed-panel";
@@ -65,7 +64,7 @@ export default async function BusinessesPage({
     const canSearchEmail = can(staff, "organization:pii:read");
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Businesses"]}
@@ -185,7 +184,7 @@ export default async function BusinessesPage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

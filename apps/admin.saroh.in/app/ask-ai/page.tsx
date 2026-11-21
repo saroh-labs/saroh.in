@@ -4,7 +4,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import {
     AiHaltSwitch,
     DecideAiRequest,
@@ -63,7 +62,7 @@ export default async function AskAiPage({
     const halted = summary.status === "ok" && summary.data.halted;
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Product", "Ask AI"]}
@@ -327,6 +326,6 @@ export default async function AskAiPage({
                     )}
                 </div>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

@@ -8,6 +8,7 @@ import {
     starterTemplate,
     starterTemplateV1,
     starterTemplateV3,
+    starterTemplateV4,
 } from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
@@ -116,5 +117,45 @@ describe("the starter template, rendered", () => {
                 "/templates/starter/gallery-1.jpg",
             ]),
         );
+    });
+});
+
+describe("starter@5, drawn (U10)", () => {
+    it("says what and where beside the Stamp, with the trade's words on its one action", () => {
+        const business: TemplateContext = {
+            organizationName: "Sample Salon",
+            description: "Haircuts and colour in Pune",
+            area: "Pune",
+            modules: ["WEBSITE", "APPOINTMENTS"],
+            serviceIds: ["svc_cut"],
+            trade: "salon",
+        };
+        const [home] = instantiateTemplate(starterTemplate, business).pages;
+        const hero = home.sections[0];
+        const { container } = render(
+            <SectionRenderer
+                siteName="Sample Salon"
+                town="Pune"
+                section={{
+                    type: "hero",
+                    content: toRendered("hero", hero.content, {
+                        resolvePage: () => undefined,
+                    }),
+                }}
+            />,
+        );
+        const view = within(container);
+        expect(
+            view.getByRole("heading", { level: 1, name: "Sample Salon" }),
+        ).toBeTruthy();
+        expect(view.getByText("Haircuts and colour in Pune")).toBeTruthy();
+        // No photo: the Stamp, never a grey box.
+        expect(container.querySelector("[data-site-stamp]")).not.toBeNull();
+        expect(
+            view
+                .getAllByRole("link")
+                .map((a) => [a.textContent, a.getAttribute("href")]),
+        ).toEqual([["Book a chair", "/book"]]);
+        expect(getTemplate(STARTER_TEMPLATE_ID, 4)).toBe(starterTemplateV4);
     });
 });

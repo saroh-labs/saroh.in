@@ -324,6 +324,8 @@ digest })` from `@saroh/ui/lib/report-error` (#103): it logs, and it forwards
   width differs from its parent's. `components/shared/page/page-chrome.test.ts`
   fails on a page with no loader of its width, on one that falls back to
   Home's, and on a loader drawn by hand.
+  A change INSIDE a screen greys only the region that changes, never the
+  frame: `frontend-data-and-state.md` → "Loading inside a screen".
 
 ### States are part of the product
 

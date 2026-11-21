@@ -5,6 +5,7 @@ import { useSyncExternalStore } from "react";
 import type {
     LookId,
     RenderedBooking,
+    RenderedGallery,
     RenderedHours,
     RenderedJournal,
     RenderedPacks,
@@ -19,6 +20,7 @@ import { blockFixture } from "@saroh/block-contract";
 
 import type { Slot } from "./blocks/booking";
 import BookingSection from "./blocks/booking";
+import GallerySection from "./blocks/gallery";
 import HoursSection from "./blocks/hours";
 import type { JournalPost } from "./blocks/journal";
 import JournalSection from "./blocks/journal";
@@ -47,8 +49,8 @@ export const SAMPLE_SERVICES: PublicService[] = [
         name: "Cut and finish",
         description: "Wash, cut and blow-dry.",
         durationMinutes: 45,
-        priceCents: 3800,
-        currency: "GBP",
+        priceCents: 60000,
+        currency: "INR",
     },
     {
         id: "fixture-colour",
@@ -56,8 +58,8 @@ export const SAMPLE_SERVICES: PublicService[] = [
         description:
             "Root to tip, with a toner. Patch test needed 48 hours before.",
         durationMinutes: 120,
-        priceCents: 9500,
-        currency: "GBP",
+        priceCents: 250000,
+        currency: "INR",
     },
     {
         id: "fixture-consult",
@@ -380,6 +382,34 @@ const LIVE_DATA_PREVIEWS: Partial<
         <PlansSection
             content={content as RenderedPlans}
             feed={{ plans: SAMPLE_PLANS, joinHref: "/contact#enquiry" }}
+            // Show = packs or both (DEC-228) draws these.
+            packs={{
+                packs: SAMPLE_PACKS,
+                payOnline: false,
+                askHref: "/contact#enquiry",
+            }}
+        />
+    ),
+    // A lookbook's links read services and products; the others draw as
+    // they would anyway.
+    gallery: (content) => (
+        <GallerySection
+            content={content as RenderedGallery}
+            bookHref="/book"
+            linked={{
+                services: [
+                    ...SAMPLE_SERVICES,
+                    {
+                        id: "fixture-class",
+                        name: "Bread class",
+                        description: null,
+                        durationMinutes: 120,
+                        priceCents: 250000,
+                        currency: "INR",
+                    },
+                ],
+                products: { "sample-sourdough": SAMPLE_PRODUCTS[0] ?? null },
+            }}
         />
     ),
     packs: (content) => (

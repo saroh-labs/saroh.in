@@ -1,7 +1,11 @@
 import type { RenderedHours, RenderedTimetable } from "@saroh/block-contract";
 import { toRendered } from "@saroh/block-contract";
 import type { TemplateContext } from "@saroh/templates";
-import { gymTemplate, instantiateTemplate } from "@saroh/templates";
+import {
+    gymTemplateV1 as gymTemplate,
+    gymTemplate as gymTemplateV2,
+    instantiateTemplate,
+} from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -208,5 +212,82 @@ describe("the gym template, rendered live", () => {
             "Your first visit",
             "Where and when",
         ]);
+    });
+});
+
+describe("gym@2, rendered live (U10)", () => {
+    /** Home's sections, each drawn as the live site draws it under `look`. */
+    function renderHomeV2(look?: "live") {
+        const [home] = instantiateTemplate(gymTemplateV2, everythingOn).pages;
+        const resolvePage = () => undefined;
+        return render(
+            <main>
+                {home.sections.map((section) => (
+                    <SectionRenderer
+                        key={section.order}
+                        look={look}
+                        siteId="site-gym"
+                        bookHref="/book"
+                        fixtures={{
+                            timetable: SAMPLE_TIMETABLE,
+                            visit: SAMPLE_VISIT,
+                            // Before the sample week starts: no class is done.
+                            now: "2026-10-04T00:00:00.000Z",
+                        }}
+                        plans={{
+                            plans: SAMPLE_PLANS,
+                            joinHref: "/contact#enquiry",
+                        }}
+                        packs={{
+                            packs: SAMPLE_PACKS,
+                            payOnline: false,
+                            askHref: "/contact#enquiry",
+                        }}
+                        section={{
+                            type: section.type,
+                            content: toRendered(section.type, section.content, {
+                                resolvePage,
+                            }),
+                        }}
+                    />
+                ))}
+            </main>,
+        );
+    }
+
+    it("opens on today's classes and the first class free, with one Book a class", () => {
+        const { container } = renderHomeV2();
+        const first = container.querySelectorAll("section")[0];
+        expect(first.getAttribute("data-site-answer-hero")).toBe("today");
+        expect(first.textContent).toMatch(/first class is free/i);
+        const main = within(first)
+            .getAllByRole("link")
+            .filter((a) => a.textContent === "Book a class");
+        expect(main.map((a) => a.getAttribute("href"))).toEqual(["/book"]);
+    });
+
+    it("keeps Book on every class row under the Live look", () => {
+        const { container } = renderHomeV2("live");
+        const week = SAMPLE_TIMETABLE.sessions.filter((s) => {
+            const day = new Date(`${s.date}T00:00:00Z`).getUTCDay();
+            return day >= 1 && day <= 5;
+        });
+        const actions = Array.from(container.querySelectorAll("a")).filter(
+            (a) =>
+                /^(Book|Join)/.test(a.getAttribute("aria-label") ?? "") &&
+                a.getAttribute("href")?.startsWith("/book"),
+        );
+        expect(week.length).toBeGreaterThan(0);
+        for (const session of week) {
+            expect(
+                actions.some((a) =>
+                    (a.getAttribute("aria-label") ?? "").includes(
+                        session.serviceName,
+                    ),
+                ),
+                session.serviceName,
+            ).toBe(true);
+        }
+        expect(actions.length).toBeGreaterThanOrEqual(week.length);
     });
 });

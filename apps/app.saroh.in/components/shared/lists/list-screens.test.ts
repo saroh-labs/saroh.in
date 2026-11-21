@@ -158,6 +158,12 @@ describe("a list draws the one toolbar", () => {
                     "the product editor's search over a long variants list, inside a section card that has no list toolbar",
                 "components/sites/blocks/add-block-panel.tsx":
                     "a phone's Add a block sheet: a search over the blocks to add, in a sheet with no list toolbar (DEC-185)",
+                "components/sites/editor/add/add-panel.tsx":
+                    "the editor's Add panel: one search over pages and sections to add, in a side panel with no list toolbar (U46e)",
+                "components/sites/editor/add/from-your-business.tsx":
+                    "Add › A service: a search over services to pick, inside the Add panel (U46e)",
+                "components/sites/editor/sheets/photo-sheet.tsx":
+                    "the photo sheet's search over the business's photos, inside the sheet beside Upload (U46d)",
             },
         );
     });
@@ -236,7 +242,9 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
         "components/commerce/product-settings/product-settings.tsx":
             "Product settings' sub-pages: Categories, Options, Fields and the rest",
         "components/sites/looks/style-panel.tsx":
-            "a phone's Brand sheet: Look, Type, Colour and Spacing, each its own options (DEC-185)",
+            "a phone's Brand sheet: Look, Colours, Fonts, Logo and Buttons and shapes, one group at a time (WXBBrandPhone)",
+        "components/sites/looks/legacy/style-panel.tsx":
+            "today's phone Brand sheet while the Website area is off: Look, Type, Colour and Spacing, each its own options (DEC-185)",
         "components/commerce/stock/stock-screen.tsx":
             "Levels, Log and Checks: three views of stock with different columns",
         "components/customers/data-requests/customers-tabs.tsx":
@@ -254,6 +262,14 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
         "components/organizations/team/team-screen.tsx":
             "People and Roles: who is here, and what each role can do",
         "components/sites/editor/editor-chrome.tsx": "the site editor's panels",
+        "components/sites/editor/inspector/site-inspector.tsx":
+            "a section's inspector: Content, Style, Visibility and Feedback, each its own panel",
+        "components/sites/editor/phone/section-sheet.tsx":
+            "a section's sheet on a phone: Content, Style, Visibility and Feedback, each its own panel",
+        "components/sites/editor/shell/right-column.tsx":
+            "the editors' right column: Edit (the inspector) and Ask AI, two panels",
+        "components/sites/posts/editor/post-inspector.tsx":
+            "a post's inspector: Details, Search and sharing, Feedback (U15)",
         "components/sites/header/website-header.tsx":
             "Website's sub-pages: Pages, Posts, Forms, Review, Settings",
         "components/stores/catalogue/products-tabs.tsx":
@@ -354,7 +370,7 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             'an attention toggle is for "Needs …": anything else is a ListFilter',
             (code) =>
                 toggles(code) === 1 &&
-                !/<AttentionToggle\b[\s\S]*?label="Needs (?:you|attention)"/.test(
+                !/<AttentionToggle\b[\s\S]*?label="Needs (?:you|attention|fixing)"/.test(
                     code,
                 ),
         );

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { skeletonFor } from "./console-loading";
+import { columnsFor, skeletonFor } from "./console-loading";
 
 describe("skeletonFor", () => {
     it.each([
@@ -22,5 +22,17 @@ describe("skeletonFor", () => {
         ["/flags/anything", "list"],
     ] as const)("%s draws a %s", (path, shape) => {
         expect(skeletonFor(path)).toBe(shape);
+    });
+});
+
+describe("columnsFor", () => {
+    it.each([
+        ["/businesses", 6],
+        ["/billing/invoices", 8],
+        ["/audit/", 7],
+        ["/users", undefined],
+        ["/businesses/org_1/overview", undefined],
+    ] as const)("%s draws %s columns", (path, columns) => {
+        expect(columnsFor(path)).toBe(columns);
     });
 });

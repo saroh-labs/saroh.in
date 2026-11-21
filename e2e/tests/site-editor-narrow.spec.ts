@@ -41,7 +41,9 @@ async function openEditor(page: Page) {
 
 /** The first hero's label on the page, which selects it. */
 const heroChip = (page: Page) =>
-    page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
+    page
+        .getByRole("button", { name: /^Top of the page section, \d+ of \d+/ })
+        .first();
 
 test.describe("the site editor on a phone", { tag: "@serial" }, () => {
     test.use({ viewport: PHONE, hasTouch: true, isMobile: true });
@@ -113,12 +115,14 @@ test.describe("the site editor on a phone", { tag: "@serial" }, () => {
         const sheet = page.getByRole("dialog");
         await expect(sheet).toBeVisible();
         await expect(
-            sheet.getByRole("heading", { level: 2, name: "Hero" }),
+            sheet.getByRole("heading", { level: 2, name: "Top of the page" }),
         ).toBeVisible();
         // The modal sheet hides the page from assistive tech, so the chip is
         // found by its label here rather than its role.
         await expect(
-            page.locator('button[aria-label^="Hero block,"]').first(),
+            page
+                .locator('button[aria-label^="Top of the page section,"]')
+                .first(),
         ).toHaveAttribute("aria-pressed", "true");
         // And the page is drawn beside the rail, not squeezed into the
         // divider's 1px column (it drew blank there).

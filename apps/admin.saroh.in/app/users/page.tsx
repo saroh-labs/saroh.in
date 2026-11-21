@@ -1,9 +1,10 @@
 import { buttonVariants } from "@saroh/ui/button";
+import { cn } from "@saroh/ui/lib/utils";
+import { LinkPending } from "@saroh/ui/link-pending";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import Link from "next/link";
 
-import { AdminShell } from "@/components/admin-shell";
 import { EmptyPanel } from "@/components/states/empty-panel";
 import { FailedPanel } from "@/components/states/failed-panel";
 import { UserList } from "@/components/users/user-list";
@@ -43,7 +44,6 @@ export default async function UsersPage({
 }) {
     const gate = await requireStaff("organization:pii:read");
     if (!gate.ok) return gate.screen;
-    const { staff } = gate;
     const params = await searchParams;
     const query = readUserListQuery(params);
     const pageNumber = readUserPage(params.page);
@@ -60,7 +60,7 @@ export default async function UsersPage({
     const first = (pageNumber - 1) * PAGE_SIZE + 1;
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Users"]}
@@ -120,12 +120,16 @@ export default async function UsersPage({
                                             query,
                                             pageNumber - 1,
                                         )}
-                                        className={buttonVariants({
-                                            variant: "ghost",
-                                            size: "sm",
-                                        })}
+                                        className={cn(
+                                            "relative",
+                                            buttonVariants({
+                                                variant: "ghost",
+                                                size: "sm",
+                                            }),
+                                        )}
                                     >
                                         Previous page
+                                        <LinkPending />
                                     </Link>
                                 )}
                                 {result?.nextPage && (
@@ -134,12 +138,16 @@ export default async function UsersPage({
                                             query,
                                             result.nextPage,
                                         )}
-                                        className={buttonVariants({
-                                            variant: "outline",
-                                            size: "sm",
-                                        })}
+                                        className={cn(
+                                            "relative",
+                                            buttonVariants({
+                                                variant: "outline",
+                                                size: "sm",
+                                            }),
+                                        )}
                                     >
                                         Next page
+                                        <LinkPending />
                                     </Link>
                                 )}
                             </nav>
@@ -147,7 +155,7 @@ export default async function UsersPage({
                     </>
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

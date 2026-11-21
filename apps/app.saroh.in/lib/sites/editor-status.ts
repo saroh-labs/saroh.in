@@ -10,9 +10,9 @@
  * Order is priority: work that is not safe outranks everything, then what a
  * reviewer is waiting on, then whether the saved draft is live.
  *
- * Since G2 the pill is still true after a reload: "Published", "Not published
- * · 2 blocks, footer" or "Not published yet", all worked out from the
- * server's count of what publishing would change. Nothing new is stored. When
+ * Since G2 the pill is still true after a reload, in the one status form
+ * (RULES §1): "Live", "Live · 7 changes waiting" or "Not live yet", all
+ * worked out from the server's change units, the number Publish shows. Nothing new is stored. When
  * that count is missing the pill says so, and never claims "Published".
  */
 
@@ -42,8 +42,8 @@ export interface EditorStatusInput {
     };
     neverPublished: boolean;
     /**
-     * What publishing would change, in the pill's short words ("2 blocks,
-     * footer"), as the server counted it. Null when nothing is waiting or
+     * What waits for Publish, from the server's change units ("7 changes
+     * waiting"). Null when nothing is waiting or
      * the count is missing; `pendingKnown` tells the two apart.
      */
     pending: string | null;
@@ -77,7 +77,7 @@ export function editorStatus(input: EditorStatusInput): EditorStatus {
     }
 
     if (input.neverPublished) {
-        return { label: "Not published yet", tone: "attention" };
+        return { label: "Not live yet", tone: "attention" };
     }
     if (!input.pendingKnown) {
         return { label: PENDING_UNKNOWN, tone: "attention" };
@@ -88,7 +88,7 @@ export function editorStatus(input: EditorStatusInput): EditorStatus {
         return input.review.outcome === "APPROVED" &&
             !input.review.approvalIsStale
             ? { label: "Approved", tone: "done" }
-            : { label: `Not published · ${input.pending}`, tone: "attention" };
+            : { label: `Live · ${input.pending}`, tone: "attention" };
     }
-    return { label: "Published", tone: "done" };
+    return { label: "Live", tone: "done" };
 }

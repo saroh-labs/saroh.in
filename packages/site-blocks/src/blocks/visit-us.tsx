@@ -1,27 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
 import type { LookId, RenderedVisitUs } from "@saroh/block-contract";
-import { ctaHref } from "@saroh/block-contract";
+import { ctaHref, resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
-import {
-    openState,
-    openStateText,
-    weekdayIn,
-    weekSummary,
-} from "../lib/opening-hours";
+import { useBrowserNow } from "../lib/browser-now";
+import { openState, openStateText, weekSummary } from "../lib/opening-hours";
 import { phoneText } from "../lib/phone";
 import type { PublicVisit } from "../lib/public-visit";
 import { usePublicVisit } from "../lib/use-public-visit";
 import { cn } from "../lib/utils";
-import { LiveFact } from "../live/live-fact";
-import type { LiveRead } from "../live/use-live-read";
 import type { LookProps } from "../look-context";
 import { LookIcon } from "../look-icons";
 import { hoursRows } from "./hours";
 import { FRONT_TYPE, FRONT_WRAP, frontButton } from "./look-front";
+import { OpenLine, useBrowserWeekday, VisitUsMap } from "./visit-us-map";
 
 /**
  * `visitUs` v1 — one place's address, hours and phone, read live (G8).
@@ -104,6 +97,8 @@ export default function VisitUsSection({
     /** The moment "Open now" is worked out for. Tests pin it. */
     now?: Date;
 }) {
+    // "Open now" is the browser's (R18): the cached card never says it.
+    const browserNow = useBrowserNow(now);
     const storeId = said(content.storeId);
     // The same read the Opening hours block makes: the chosen shop, or with
     // none the business's own place (template polish).
@@ -162,15 +157,16 @@ export default function VisitUsSection({
     if (!place) return null;
     const showHours = content.showHours !== false;
     const hours = showHours ? weekSummary(place.hours) : null;
-    const status = showHours
-        ? // A closure day reads closed here as it does in the hero (G-2).
-          openState(
-              place.hours,
-              now ?? new Date(),
-              place.timezone,
-              place.closedDates,
-          )
-        : null;
+    const status =
+        showHours && browserNow !== null
+            ? // A closure day reads closed here as it does in the hero (G-2).
+              openState(
+                  place.hours,
+                  new Date(browserNow),
+                  place.timezone,
+                  place.closedDates,
+              )
+            : null;
     const address = said(place.address);
     const directions =
         content.showMap !== false && address ? directionsHref(address) : null;
@@ -178,6 +174,24 @@ export default function VisitUsSection({
     // A business's own place may be only a name (template polish): with no
     // address, hours or phone the card would say nothing.
     if (!address && !hours && !phone) return null;
+    const extraLine = said(content.extraLine);
+
+    if (resolveVariant("visitUs", content) === "map") {
+        return (
+            <VisitUsMap
+                look={look}
+                title={title}
+                address={address}
+                extraLine={extraLine}
+                week={showHours ? place.hours : null}
+                timeZone={place.timezone}
+                now={now}
+                closedDates={place.closedDates ?? []}
+                phone={phone}
+                directions={directions}
+            />
+        );
+    }
 
     if (look) {
         return (
@@ -191,6 +205,7 @@ export default function VisitUsSection({
                 closedDates={place.closedDates ?? []}
                 phone={phone}
                 directions={directions}
+                extraLine={extraLine}
             />
         );
     }
@@ -234,6 +249,14 @@ export default function VisitUsSection({
                         </span>
                     ) : null}
                     {hours ? <span className="block">{hours}</span> : null}
+                </p>
+            ) : null}
+            {extraLine ? (
+                <p
+                    data-visit-extra=""
+                    className="mt-1.5 text-sm leading-relaxed opacity-85"
+                >
+                    {extraLine}
                 </p>
             ) : null}
             {status ? (
@@ -407,9 +430,12 @@ function LookVisit({
     closedDates,
     phone,
     directions,
+    extraLine = null,
 }: {
     look: LookId;
     title: string;
+    /** The owner's own line under the address, "Parking at the back". */
+    extraLine?: string | null;
     address: string | null;
     week: PublicVisit["hours"];
     timeZone: string;
@@ -422,7 +448,9 @@ function LookVisit({
     const type = FRONT_TYPE[look];
     const measure = VISIT[look];
     const rows = hoursRows(week, true);
-    const today = rows ? weekdayIn(now ?? new Date(), timeZone) : null;
+    // Marked in the browser only (R18): the cached page marks no day.
+    const browserToday = useBrowserWeekday(timeZone, now);
+    const today = rows ? browserToday : null;
     const live = look === "live";
     const card = "bg-site-surface rounded-site-photo";
     const todayRow = rows?.find((r) => r.day === today);
@@ -475,6 +503,14 @@ function LookVisit({
                 ) : null}
             </>
         );
+    const extra = extraLine ? (
+        <p
+            data-visit-extra=""
+            className="text-site-body text-[15px] leading-relaxed"
+        >
+            {extraLine}
+        </p>
+    ) : null;
     const hours = rows ? (
         <dl data-visit-hours="" className={measure.hours}>
             {rows.map((row) => {
@@ -542,6 +578,7 @@ function LookVisit({
                             )}
                         >
                             {head}
+                            {extra}
                             {open}
                             {actions}
                         </div>
@@ -563,6 +600,7 @@ function LookVisit({
                     <div className={measure.grid}>
                         <div className="grid min-w-0 content-start gap-4">
                             {head}
+                            {extra}
                             {open}
                         </div>
                         <div className="grid min-w-0 content-start gap-7">
@@ -573,74 +611,5 @@ function LookVisit({
                 )}
             </div>
         </section>
-    );
-}
-
-/**
- * "Open now · closes 9 pm" under a look, as a live fact (U8's
- * `LiveFact`): a box of a fixed height from the first paint, worked out in
- * the browser from the place's hours on the business's clock and again
- * each minute, so it is never left saying Open after closing. When it
- * can't be said (no hours for today), the line says today's hours
- * instead, never a guess (VD07). Visit us is read in the browser, so the
- * cached page never carries it.
- */
-function OpenLine({
-    week,
-    timeZone,
-    now: fixed,
-    closedDates,
-    todayHours,
-}: {
-    week: PublicVisit["hours"];
-    timeZone: string;
-    now?: Date;
-    closedDates: readonly string[];
-    todayHours: string | null;
-}) {
-    const [tick, setTick] = useState(() => Date.now());
-    useEffect(() => {
-        if (fixed) return;
-        const timer = setInterval(() => setTick(Date.now()), 60_000);
-        return () => clearInterval(timer);
-    }, [fixed]);
-    const at = fixed ?? new Date(tick);
-    const read: LiveRead<Date> = {
-        status: "fresh",
-        data: at,
-        fetchedAt: at.getTime(),
-    };
-    return (
-        <LiveFact
-            read={read}
-            reserve="min-h-[26px]"
-            className="text-site-fg flex items-center gap-2 text-[15px] font-semibold"
-            pick={(moment) => {
-                const state = week
-                    ? openState(week, moment, timeZone, closedDates)
-                    : null;
-                return state
-                    ? { text: openStateText(state), open: state.open }
-                    : null;
-            }}
-            fresh={(value) => (
-                <span
-                    data-visit-open=""
-                    className="inline-flex items-center gap-2"
-                >
-                    <span
-                        aria-hidden="true"
-                        className={cn(
-                            "inline-block size-2 rounded-full",
-                            value.open ? "bg-site-accent" : "bg-site-muted",
-                        )}
-                    />
-                    {value.text}
-                </span>
-            )}
-            fallback={
-                todayHours ? <span data-visit-open="">{todayHours}</span> : null
-            }
-        />
     );
 }

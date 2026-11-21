@@ -23,7 +23,7 @@ export type PaidKind = StyleKind;
 
 /** What the Style panel asks of a choice before taking it. */
 export interface StyleChoiceRules {
-    /** Marked "Paid plans": not free for this site. */
+    /** Marked "Paid plans": not free for this site, and not on its plan. */
     isPaid: (kind: PaidKind, id: string) => boolean;
     /**
      * Refused here: paid, the plan leaves it off, and it isn't what the
@@ -63,7 +63,11 @@ export function styleChoiceRules(
         colourways,
     };
     return {
-        isPaid: (kind, id) => isPaidStyle(access.free, kind, id, colourways),
+        // "Paid plans" is said only where the plan leaves it off: on a plan
+        // that includes paid styles the catalogue opens them all (DEC-177).
+        isPaid: (kind, id) =>
+            !access.paidIncluded &&
+            isPaidStyle(access.free, kind, id, colourways),
         refuses: (kind, id) =>
             !access.paidIncluded && needsPaidPlan(ctx, kind, id),
     };

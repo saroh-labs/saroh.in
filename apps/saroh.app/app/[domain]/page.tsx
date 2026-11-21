@@ -7,6 +7,8 @@ import {
     findHomePage,
     getSiteForHost,
     getSiteForPage,
+    hasOwnHead,
+    pageHead,
     siteOriginFor,
 } from "@/lib/publication";
 import { getSiteContact } from "@/lib/site-contact";
@@ -33,7 +35,36 @@ export async function generateMetadata({
     const { domain } = await params;
     const resolved = await getSiteForHost(domain);
     if (resolved?.mode !== "live") return {};
-    return canonical(resolved, domain, "/");
+    const home = findHomePage(resolved.snapshot);
+    if (!home || !hasOwnHead(home)) return canonical(resolved, domain, "/");
+
+    // The home page's own Google title, text, share image or "Show on
+    // Google" off (KTD-7), each else the site's as the layout draws it. The
+    // whole card is restated: Next replaces the layout's openGraph, not merges.
+    const { site } = resolved.snapshot;
+    const head = pageHead(home, site);
+    const title =
+        head.title ?? (site.seoTitle?.trim() ? site.seoTitle : site.name);
+    const { description, images } = head;
+    return {
+        title,
+        description,
+        ...(head.robots ? { robots: head.robots } : {}),
+        openGraph: {
+            title,
+            description,
+            images,
+            url: "/",
+            siteName: site.name,
+        },
+        twitter: {
+            card: images ? "summary_large_image" : "summary",
+            title,
+            description,
+            images,
+        },
+        ...canonical(resolved, domain, "/"),
+    };
 }
 
 export default async function SiteHomePage({

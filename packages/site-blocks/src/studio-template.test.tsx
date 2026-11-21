@@ -1,6 +1,6 @@
 import { toRendered } from "@saroh/block-contract";
 import type { TemplateContext } from "@saroh/templates";
-import { instantiateTemplate, studioTemplate } from "@saroh/templates";
+import { instantiateTemplate, studioTemplateV1 } from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +24,7 @@ const full: TemplateContext = {
 };
 
 function renderHome(ctx: TemplateContext) {
-    const page = instantiateTemplate(studioTemplate, ctx).pages[0];
+    const page = instantiateTemplate(studioTemplateV1, ctx).pages[0];
     const resolvePage = () => undefined;
     // The API gives every enquiry its Form when it makes the site
     // (`site-create.ts`); a section without one draws nothing.

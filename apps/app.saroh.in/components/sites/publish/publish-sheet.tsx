@@ -9,6 +9,10 @@ import { X } from "lucide-react";
 import { useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import type { SharePage } from "@/components/sites/share/share-page-sheet";
+import { SharePageSheet } from "@/components/sites/share/share-page-sheet";
+import { formatDate } from "@/lib/format/datetime";
+import { publishLabel } from "@/lib/sites/leave-out";
 import { pendingChangeCount } from "@/lib/sites/pending";
 import type {
     Flag,
@@ -18,10 +22,15 @@ import type {
 } from "@/lib/sites/service";
 import { OVERRIDE_RECORD } from "@/lib/sites/test-releases";
 import type { WebAddressFix } from "./address-fix";
-import { APPROVAL_LINE, publishWaitsFor } from "./pre-publish-words";
-import { GoingLive, PublishFlags } from "./publish-list";
-import { PublishLiveBody, PublishLiveFoot } from "./publish-live";
+import { PrePublishChecks } from "./pre-publish-checks";
+import { CHECK_TYPES, publishWaitsFor } from "./pre-publish-words";
+import { PublishChanges } from "./publish-changes";
+import { ApprovalLine, GoingLive, PublishFlags } from "./publish-list";
+import { LeftOutLine, PublishLiveBody, PublishLiveFoot } from "./publish-live";
+import type { PublishMore } from "./publish-more";
+import { MoreRow } from "./publish-more";
 import type { WentLive } from "./use-publish";
+import type { PublishChanges as Changes } from "./use-publish-changes";
 
 /**
  * Publish (DEC-185): one sheet over the editor — from the right on a desk,
@@ -35,9 +44,22 @@ import type { WentLive } from "./use-publish";
  * The approval rules stay as they were (DEC-071, #278): with "Publishing
  * needs approval" only an owner's Publish goes through, as the recorded
  * override; an open request for changes is published past and recorded.
+ *
+ * U11 (WXMPublish): "N changes waiting" by who made them, each with Leave
+ * out; the checks on top; posts said apart; "Publish 4 of 5 changes now";
+ * afterwards Tell people. With per-change approval (DEC-226) a teammate's
+ * waiting change is left out by default and only an owner puts it in, as
+ * the recorded override. The same sheet from the site header's status
+ * chip and the editor's Publish; a phone's is the whole screen.
  */
 export function PublishSheet({
     open,
+    siteId,
+    changes = null,
+    more,
+    share = null,
+    onAsk,
+    onFlagsChanged,
     phone,
     pages,
     flags,
@@ -62,7 +84,16 @@ export function PublishSheet({
     onJump,
 }: {
     open: boolean;
-    /** From the foot, in thumb's reach; from the right on a desk. */
+    siteId: string;
+    /** The changes by person (U7); null: today's one-line summary. */
+    changes?: Changes | null;
+    more?: PublishMore;
+    /** The page Tell people opens on, once published (U12). */
+    share?: { page: SharePage; business: string; host: string } | null;
+    onAsk?: (name: string) => void;
+    /** A photo was described in the checks: read the flags again. */
+    onFlagsChanged: () => void;
+    /** The whole screen on a phone, Publish pinned; from the right on a desk. */
     phone: boolean;
     pages: SitePage[];
     flags: Flag[];
@@ -80,7 +111,7 @@ export function PublishSheet({
     pendingChanges: number | null;
     pendingSiteChanges: readonly string[] | null;
     /** "Approval also shows as a line in the pre-publish check" (spec §2). */
-    review: ReviewState;
+    review: ReviewState | null;
     needsApproval?: boolean;
     canOverride?: boolean;
     /** A scheduled go-live won't run over this publish (KTD-14). */
@@ -93,33 +124,67 @@ export function PublishSheet({
     addressFix?: WebAddressFix | null;
     /** An address was chosen here: the flags are read again. */
     onAddressSaved: (host: string) => void;
-    onPublish: () => void;
+    onPublish: (choice: { leaveOut: string[]; overriding: boolean }) => void;
     onClose: () => void;
     onJump: (pageId: string | null, sectionIndex: number | null) => void;
 }) {
     const zone = useBusinessZone();
     // The address chosen in this sheet, said as "Fixed" until it closes.
     const [fixedHost, setFixedHost] = useState<string | null>(null);
+    const [sharing, setSharing] = useState(false);
     const shown = flags.filter(
         (f) => !(fixedHost && f.type === "addressMissing"),
     );
     const blockers = shown.filter((f) => f.blocking);
-    const waitsFor = publishWaitsFor({ blockers, unsaved });
-    const label =
-        needsApproval || review.outstanding
-            ? "Publish without approval"
-            : neverPublished
-              ? "Publish site"
+    // The checks have their own box on top (U10); the rest stay listed,
+    // but never "Changes visitors cannot see yet": that is this sheet's
+    // own subject.
+    const listed = flags.filter(
+        (f) =>
+            f.type !== "unpublishedChanges" &&
+            (f.blocking === true || !CHECK_TYPES.has(f.type)),
+    );
+    const list = changes?.read === "ready" ? changes.changes : null;
+    // Per-change approval (U9) replaces the whole-site refusal when sent.
+    const perChange = list?.approvalRequired !== undefined;
+    const siteWide = needsApproval && !perChange;
+    const total = list?.count ?? 0;
+    const included = list
+        ? list.units.filter((u) => !changes?.leftOut.has(u.key)).length
+        : 0;
+    const overriding = changes?.overriding === true;
+    const nothingIn = total > 0 && included === 0;
+    const waitsFor =
+        publishWaitsFor({ blockers, unsaved }) ??
+        (nothingIn
+            ? "Everything is left out. Include a change to publish"
+            : null);
+    const label = error
+        ? "Try again"
+        : siteWide || review?.outstanding
+          ? "Publish without approval"
+          : neverPublished
+            ? "Publish site"
+            : total > 0
+              ? publishLabel(total, included)
               : "Publish changes";
-    const changes = pendingChangeCount(pendingChanges, pendingSiteChanges);
+    const changesCount = pendingChangeCount(pendingChanges, pendingSiteChanges);
     const footLine = publishing
-        ? neverPublished || changes === 0
+        ? neverPublished || changesCount === 0
             ? "Putting the site live…"
-            : `Putting ${count(changes, "change")} live…`
+            : `Putting ${count(included || changesCount, "change")} live…`
         : waitsFor;
+    const title = wentLive
+        ? "Published"
+        : total > 0
+          ? `${count(total, "change")} waiting`
+          : neverPublished
+            ? "Publish site"
+            : "Publish changes";
 
     const close = () => {
         setFixedHost(null);
+        setSharing(false);
         onClose();
     };
 
@@ -138,19 +203,13 @@ export function PublishSheet({
                 className={cn(
                     "flex flex-col gap-0 bg-background p-0",
                     phone
-                        ? "max-h-[85dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
-                        : "w-[440px] max-w-[92vw] sm:max-w-[440px]",
+                        ? "h-dvh max-h-dvh rounded-none pb-[env(safe-area-inset-bottom)]"
+                        : "w-[448px] max-w-[92vw] sm:max-w-[448px]",
                 )}
             >
-                {phone ? (
-                    <span
-                        aria-hidden
-                        className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-border"
-                    />
-                ) : null}
                 <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
                     <SheetTitle className="flex-1 font-sans text-base">
-                        {wentLive ? "Published" : label}
+                        {title}
                     </SheetTitle>
                     <SheetClose asChild>
                         <Button
@@ -167,57 +226,49 @@ export function PublishSheet({
 
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
                     {wentLive ? (
-                        <PublishLiveBody live={wentLive} />
+                        <>
+                            <PublishLiveBody live={wentLive} />
+                            <LeftOutLine live={wentLive} changes={changes} />
+                        </>
                     ) : (
                         <>
-                            <GoingLive
-                                {...{
-                                    neverPublished,
-                                    pendingKnown,
-                                    pendingSummary,
-                                    pendingChanges,
-                                    pendingSiteChanges,
-                                }}
+                            {list?.livePublishedAt ? (
+                                <p className="text-sm text-muted-foreground">
+                                    Visitors still see the version published on{" "}
+                                    {formatDate(list.livePublishedAt, zone)}.
+                                    {total > 0
+                                        ? " Leave out anything that isn’t ready: it stays in the draft and nothing is lost."
+                                        : ""}
+                                </p>
+                            ) : null}
+                            <PrePublishChecks
+                                siteId={siteId}
+                                flags={flags}
+                                pages={pages}
+                                onShow={(f) => onJump(f.pageId, f.sectionIndex)}
+                                onChanged={onFlagsChanged}
                             />
-                            {needsApproval ? (
+                            {siteWide ? (
                                 <Notice tone="error" role="note">
                                     {canOverride
-                                        ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
-                                        : "This site goes live only from an approved test release. Make a test release and ask for a review."}
+                                        ? `This site goes live only from an approved test link. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
+                                        : "This site goes live only from an approved test link. Make a test link and ask for a review."}
+                                </Notice>
+                            ) : null}
+                            {overriding ? (
+                                <Notice tone="error" role="note">
+                                    {`You put in changes nobody has approved yet. ${OVERRIDE_RECORD}`}
                                 </Notice>
                             ) : null}
                             {scheduledWarning ? (
                                 <Notice>{scheduledWarning}</Notice>
                             ) : null}
-                            {review.latestApproval === null ? null : (
-                                <p
-                                    className={
-                                        APPROVAL_LINE[
-                                            review.latestApproval.outcome
-                                        ].approved
-                                            ? "rounded-md bg-muted px-3 py-2 text-sm text-foreground"
-                                            : "rounded-md border px-3 py-2 text-sm text-muted-foreground"
-                                    }
-                                >
-                                    {APPROVAL_LINE[
-                                        review.latestApproval.outcome
-                                    ].text(review.latestApproval, zone)}
-                                    {review.openNotes > 0
-                                        ? `, with ${count(review.openNotes, "note")} still open.`
-                                        : "."}
-                                    {review.outstanding ? (
-                                        <span className="mt-1 block">
-                                            A reviewer&apos;s request for
-                                            changes is still open. Publishing
-                                            now goes ahead without approval, and
-                                            records that it did, here and in
-                                            version history.
-                                        </span>
-                                    ) : null}
-                                </p>
-                            )}
+                            {review ? (
+                                <ApprovalLine review={review} zone={zone} />
+                            ) : null}
                             <PublishFlags
-                                flags={flags}
+                                part="blockers"
+                                flags={listed}
                                 pages={pages}
                                 addressFix={addressFix}
                                 fixedHost={fixedHost}
@@ -225,6 +276,62 @@ export function PublishSheet({
                                     setFixedHost(host);
                                     onAddressSaved(host);
                                 }}
+                                onJump={onJump}
+                            />
+                            {list && total > 0 ? (
+                                <PublishChanges
+                                    siteId={siteId}
+                                    changes={list}
+                                    leftOut={changes?.leftOut ?? new Set()}
+                                    canOverride={canOverride}
+                                    zone={zone}
+                                    onToggle={(key) => changes?.toggle(key)}
+                                    onAsk={onAsk}
+                                />
+                            ) : changes?.read === "loading" ? (
+                                <p
+                                    className="text-sm text-muted-foreground"
+                                    aria-busy
+                                >
+                                    Reading what changed…
+                                </p>
+                            ) : (
+                                <>
+                                    {changes?.read === "failed" ? (
+                                        <p className="text-sm">
+                                            Couldn’t list the changes one by
+                                            one.{" "}
+                                            <Button
+                                                type="button"
+                                                variant="link"
+                                                size="inline"
+                                                className="font-semibold"
+                                                onClick={() =>
+                                                    void changes.load()
+                                                }
+                                            >
+                                                Try again
+                                            </Button>
+                                        </p>
+                                    ) : null}
+                                    <GoingLive
+                                        {...{
+                                            neverPublished,
+                                            pendingKnown,
+                                            pendingSummary,
+                                            pendingChanges,
+                                            pendingSiteChanges,
+                                        }}
+                                    />
+                                </>
+                            )}
+                            <PublishFlags
+                                part="advice"
+                                flags={listed}
+                                pages={pages}
+                                addressFix={addressFix}
+                                fixedHost={fixedHost}
+                                onAddressSaved={onAddressSaved}
                                 onJump={onJump}
                             />
                             {/*
@@ -251,68 +358,102 @@ export function PublishSheet({
                             live={wentLive}
                             phone={phone}
                             onDone={close}
+                            onTellPeople={
+                                share ? () => setSharing(true) : undefined
+                            }
                         />
                     ) : (
-                        <div
-                            className={cn(
-                                "flex gap-2",
-                                phone
-                                    ? "flex-col"
-                                    : "flex-wrap items-center justify-end",
-                            )}
-                        >
-                            {error ? (
-                                <p
-                                    role="alert"
-                                    className="mr-auto text-sm text-destructive-subtle-foreground"
-                                >
-                                    {error.message}
-                                    {error.detail ? (
-                                        <span className="block text-xs text-muted-foreground">
-                                            {error.detail}
-                                        </span>
-                                    ) : null}
-                                </p>
-                            ) : footLine ? (
-                                <p
-                                    data-publish-waits=""
-                                    className="mr-auto text-xs text-muted-foreground"
-                                >
-                                    {footLine}
-                                </p>
-                            ) : null}
-                            <Button
-                                type="button"
-                                variant={phone ? "ghost" : "outline"}
-                                disabled={publishing}
-                                onClick={close}
-                                className={cn(phone && "order-last")}
+                        <div className="grid gap-2">
+                            {more ? <MoreRow more={more} /> : null}
+                            <div
+                                className={cn(
+                                    "flex gap-2",
+                                    phone
+                                        ? "flex-col"
+                                        : "flex-wrap items-center justify-end",
+                                )}
                             >
-                                Not now
-                            </Button>
-                            <Button
-                                type="button"
-                                // An owner's override is the destructive kind
-                                // of publish: it goes past a rule the
-                                // business set.
-                                variant={
-                                    needsApproval ? "destructive" : "default"
-                                }
-                                disabled={
-                                    unsaved ||
-                                    blockers.length > 0 ||
-                                    (needsApproval && !canOverride)
-                                }
-                                onClick={onPublish}
-                                busy={publishing}
-                                busyLabel="Publishing…"
-                            >
-                                {label}
-                            </Button>
+                                {error ? (
+                                    <p
+                                        role="alert"
+                                        className="mr-auto text-sm text-destructive-subtle-foreground"
+                                    >
+                                        {error.message}
+                                        {error.detail ? (
+                                            <span className="block text-xs text-muted-foreground">
+                                                {error.detail}
+                                            </span>
+                                        ) : (
+                                            <span className="block text-xs text-muted-foreground">
+                                                What you left out is kept.
+                                            </span>
+                                        )}
+                                    </p>
+                                ) : footLine ? (
+                                    <p
+                                        data-publish-waits=""
+                                        className="mr-auto text-xs text-muted-foreground"
+                                    >
+                                        {footLine}
+                                    </p>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    variant={phone ? "ghost" : "outline"}
+                                    disabled={publishing}
+                                    onClick={close}
+                                    className={cn(phone && "order-last")}
+                                >
+                                    Not now
+                                </Button>
+                                <Button
+                                    type="button"
+                                    // An owner's override is the destructive
+                                    // kind of publish: it goes past a rule
+                                    // the business set.
+                                    variant={
+                                        siteWide || overriding
+                                            ? "destructive"
+                                            : "default"
+                                    }
+                                    disabled={
+                                        unsaved ||
+                                        blockers.length > 0 ||
+                                        nothingIn ||
+                                        (siteWide && !canOverride)
+                                    }
+                                    onClick={() =>
+                                        onPublish({
+                                            leaveOut: list
+                                                ? Array.from(
+                                                      changes?.leftOut ?? [],
+                                                  )
+                                                : [],
+                                            overriding,
+                                        })
+                                    }
+                                    busy={publishing}
+                                    busyLabel="Publishing…"
+                                    data-publish-now=""
+                                >
+                                    {label}
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </div>
             </SheetContent>
+            {share && wentLive ? (
+                <SharePageSheet
+                    open={sharing}
+                    onClose={() => setSharing(false)}
+                    siteId={siteId}
+                    page={share.page}
+                    business={share.business}
+                    host={share.host}
+                    justPublished
+                />
+            ) : null}
         </Sheet>
     );
 }

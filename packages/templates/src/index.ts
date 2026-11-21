@@ -133,8 +133,8 @@ export type {
     InstantiatedTemplate,
 } from "./instantiate";
 
-// The starter production template: `starterTemplate` is the latest (v4,
-// DEC-141); `starterTemplateV3`, `starterTemplateV2` and `starterTemplateV1`
+// The starter production template: `starterTemplate` is the latest (v5,
+// U10); `starterTemplateV4` (DEC-141), `starterTemplateV3`, `starterTemplateV2` and `starterTemplateV1`
 // are the versions earlier sites came from.
 export {
     HERO_PROMPT,
@@ -151,9 +151,10 @@ export {
     starterPrimaryAction,
     starterSells,
     starterServiceIds,
-    starterTemplate,
+    starterTemplateV4,
 } from "./templates/starter-v4";
 export type { StarterAction } from "./templates/starter-v4";
+export { starterActionV5, starterTemplate } from "./templates/starter-v5";
 
 // One true line about a business, from what it already told Saroh.
 export {
@@ -188,8 +189,9 @@ export { WRITING_TEMPLATE_ID, writingTemplate } from "./templates/writing";
 export {
     BLOGS_GALLERY_SAMPLE,
     BLOGS_TEMPLATE_ID,
-    blogsTemplate,
+    blogsTemplateV1,
 } from "./templates/blogs";
+export { blogsTemplate } from "./templates/blogs-v2";
 
 // The Personal/consultant template (DEC-070, K14): the default for "Just me".
 export {
@@ -212,35 +214,46 @@ export {
     CERAMICS_GALLERY_SAMPLE,
     CERAMICS_TEMPLATE_ID,
     ceramicsSellsProducts,
-    ceramicsTemplate,
+    ceramicsTemplateV1,
 } from "./templates/ceramics";
+export { CERAMICS_HERO_BRIEF, ceramicsTemplate } from "./templates/ceramics-v2";
 // The Gym industry template (industry templates plan, U6).
 export {
     GYM_GALLERY_SAMPLE,
+    GYM_PLACES_FROM,
     GYM_TEMPLATE_ID,
     gymTemplate,
+    gymTemplateV1,
 } from "./templates/gym";
 // The Bakery industry template (industry templates plan, U4).
 export {
     BAKERY_GALLERY_SAMPLE,
     BAKERY_IMAGE_BRIEFS,
     BAKERY_TEMPLATE_ID,
-    bakeryTemplate,
+    bakeryTemplateV1,
 } from "./templates/bakery";
+export {
+    BAKERY_ORDER_PATH,
+    BAKERY_PICKUP_WORDS,
+    bakeryTemplate,
+} from "./templates/bakery-v2";
 // Studio, the gallery's "Portfolio" (industry templates plan, U10).
 export {
     STUDIO_GALLERY_SAMPLE,
     STUDIO_PROJECT_BRIEFS,
     STUDIO_TEMPLATE_ID,
     studioHasEmail,
-    studioTemplate,
+    studioTemplateV1,
 } from "./templates/studio";
+export { STUDIO_PROJECT_PATH, studioTemplate } from "./templates/studio-v2";
 // Developer (industry templates U9): a one-page portfolio for an independent
 // engineer.
 export {
+    DEVELOPER_CASE_STUDY_PATH,
     DEVELOPER_GALLERY_SAMPLE,
     DEVELOPER_TEMPLATE_ID,
     developerTemplate,
+    developerTemplateV1,
 } from "./templates/developer";
 // The Dietician industry template (industry templates plan, U7).
 export {
@@ -248,6 +261,7 @@ export {
     DIETICIAN_TEMPLATE_ID,
     dieticianServiceIds,
     dieticianTemplate,
+    dieticianTemplateV1,
 } from "./templates/dietician";
 // Salon and Clinic, designed in code (industry templates plan, U11).
 export {
@@ -255,6 +269,7 @@ export {
     CLINIC_TEMPLATE_ID,
     clinicServiceIds,
     clinicTemplate,
+    clinicTemplateV1,
 } from "./templates/clinic";
 export {
     PRANA_GALLERY_SAMPLE,
@@ -263,9 +278,11 @@ export {
 } from "./templates/prana";
 export {
     SALON_GALLERY_SAMPLE,
+    SALON_LOOKBOOK_BRIEF,
     SALON_TEMPLATE_ID,
     salonServiceIds,
     salonTemplate,
+    salonTemplateV1,
 } from "./templates/salon";
 
 // Every gallery template's sample words, by id (KTD-6): the gallery's

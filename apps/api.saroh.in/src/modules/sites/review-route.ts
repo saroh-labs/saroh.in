@@ -34,13 +34,16 @@ export interface ApprovalRow {
  *
  * The timestamp is excluded — it is the one field guaranteed to differ between
  * two builds of identical work, and including it would make every approval
- * stale the instant it was written.
+ * stale the instant it was written. So are the ids in `keys`.
  */
 export function draftFingerprint(snapshot: unknown): string {
-    const { publishedAt: _ignored, ...rest } = (snapshot ?? {}) as Record<
-        string,
-        unknown
-    >;
+    // `keys` names pages and sections (change units, U7); it is not the
+    // work, so an approval of the same draft still covers it.
+    const {
+        publishedAt: _ignored,
+        keys: _ids,
+        ...rest
+    } = (snapshot ?? {}) as Record<string, unknown>;
     return createHash("sha256").update(stableJson(rest)).digest("hex");
 }
 

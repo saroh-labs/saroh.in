@@ -59,7 +59,9 @@ async function openPublish(page: Page) {
 }
 
 const heroChip = (page: Page) =>
-    page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
+    page
+        .getByRole("button", { name: /^Top of the page section, \d+ of \d+/ })
+        .first();
 
 test.describe("Publish is a sheet", { tag: "@serial" }, () => {
     test("says what goes live, then turns into the result", async ({
@@ -216,9 +218,10 @@ test.describe("the phone editor without bottom tabs", () => {
 
     test("Brand is one sheet with its tabs", async ({ page }) => {
         await openEditor(page);
-        const sheet = await brandTab(page, "Spacing");
-        await expect(sheet.locator("input[type=range]").first()).toBeVisible();
-        await brandTab(page, "Colour");
+        // One group at a time (U24b, WXBBrandPhone); no sliders.
+        const sheet = await brandTab(page, "Buttons and shapes");
+        await expect(sheet.locator("input[type=range]")).toHaveCount(0);
+        await brandTab(page, "Colours");
         await expect(
             sheet.getByRole("radiogroup", { name: "Colour" }),
         ).toBeVisible();
@@ -256,7 +259,9 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         const down = tools.getByRole("button", { name: "Move down" });
         await expect(down).toBeEnabled();
         await down.click();
-        await expect(page.getByText("Hero moved down").first()).toBeVisible();
+        await expect(
+            page.getByText("Top of the page moved down").first(),
+        ).toBeVisible();
         await page.getByRole("button", { name: "Undo" }).last().click();
         await expect(heroChip(page)).toBeVisible();
     });
@@ -270,7 +275,10 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         await sheet.getByLabel("Search blocks").fill("contact");
         // By its name: the list filters a beat after typing, and the first
         // row before it does is Hero.
-        await sheet.getByRole("button", { name: "Add Contact" }).click();
+        // Contact is now Visit us's Talk to us layout, found by its old name (KD5).
+        await sheet
+            .getByRole("button", { name: "Add Visit us · Talk to us" })
+            .click();
         // Its settings rise; the toolbar is on the new block.
         const tools = page.getByRole("toolbar", { name: "Block actions" });
         await expect(tools).toBeVisible({ timeout: 15_000 });

@@ -1,4 +1,9 @@
-import type { TemplateContext, TemplateManifest } from "../manifest";
+import type {
+    TemplateContext,
+    TemplateManifest,
+    TemplateSection,
+} from "../manifest";
+import { resolveContent } from "../manifest";
 
 /**
  * `developer` — the Portfolio shape for one independent engineer (industry
@@ -150,7 +155,8 @@ const NEUTRALS = {
     accentFg: "#FFFFFF",
 } as const;
 
-export const developerTemplate: TemplateManifest = {
+/** `developer@1`, as it shipped: kept for the sites made from it. */
+export const developerTemplateV1: TemplateManifest = {
     id: DEVELOPER_TEMPLATE_ID,
     version: 1,
     name: "Developer",
@@ -316,6 +322,127 @@ export const developerTemplate: TemplateManifest = {
                         successMessage: "Thanks, your message has been sent.",
                         fields: ENQUIRY_FIELDS.map((f) => ({ ...f })),
                     }),
+                },
+            ],
+        },
+    ],
+};
+
+/*
+ * `developer@2` (plan 2026-11-18-001 U10, board TP Developer): OVERDRIVE
+ * on the hire. A client comes to ask "can I hire them, and when", and v1
+ * answered that at the bottom. Now the hero carries Work with me (to the
+ * enquiry, `#hire`) and Read the case study, and the availability callout
+ * is the next thing on the page. The case study moves to a page of its own
+ * (`/case-study`), told in full; Home keeps the intro, the work, the rates
+ * and the enquiry. For new sites only (KD10).
+ */
+
+/** The case study's own page. */
+export const DEVELOPER_CASE_STUDY_PATH = "/case-study";
+
+const V1_HOME = developerTemplateV1.pages[0]?.sections ?? [];
+const [V1_INTRO, V1_CASE, V1_AVAILABILITY] = V1_HOME.filter(
+    (s) => s.type === "richText",
+);
+const V1_WORK = V1_HOME.filter((s) => s.type !== "richText");
+
+function v1Section(section: TemplateSection | undefined): TemplateSection {
+    if (!section) throw new Error("developer@1 changed shape");
+    return section;
+}
+
+/** `developer@2`: the one new sites start from. */
+export const developerTemplate: TemplateManifest = {
+    ...developerTemplateV1,
+    version: 2,
+    description:
+        "A portfolio for an independent engineer: a way to hire you and when you're free first, then who you are, your work as a list, your rates and an enquiry, with one project in depth on its own page.",
+    pages: [
+        {
+            path: "/",
+            title: "Home",
+            isHome: true,
+            sections: [
+                {
+                    // The name, their own line, Work with me and the case
+                    // study: the hire first.
+                    type: "hero",
+                    contractVersion: 1,
+                    content: (ctx: TemplateContext) => {
+                        const own = ownWords(ctx);
+                        return {
+                            variant: "centered",
+                            heading: ctx.organizationName,
+                            ...(own ? { subheading: own } : {}),
+                            cta: {
+                                label: "Work with me",
+                                href: "/#hire",
+                                style: "primary",
+                            },
+                            secondaryCta: {
+                                label: "Read the case study",
+                                href: DEVELOPER_CASE_STUDY_PATH,
+                            },
+                        };
+                    },
+                },
+                // When you are free, straight under it.
+                v1Section(V1_AVAILABILITY),
+                v1Section(V1_INTRO),
+                // The work, the rates, and the enquiry, now `#hire`.
+                ...V1_WORK.filter((s) => s.type !== "hero").map((s) =>
+                    s.type === "enquiry"
+                        ? {
+                              ...s,
+                              content: (ctx: TemplateContext) => ({
+                                  ...(resolveContent(s.content, ctx) as Record<
+                                      string,
+                                      unknown
+                                  >),
+                                  anchor: "hire",
+                                  navLabel: "Work with me",
+                              }),
+                          }
+                        : s,
+                ),
+            ],
+        },
+        {
+            path: DEVELOPER_CASE_STUDY_PATH,
+            title: "Case study",
+            inMenu: true,
+            sections: [
+                {
+                    type: "hero",
+                    contractVersion: 1,
+                    content: {
+                        variant: "none",
+                        heading: "Case study",
+                        subheading:
+                            "One project in depth: the problem, the constraints, what I decided and what changed.",
+                    },
+                },
+                {
+                    // v1's case study, told in full; the page itself is in
+                    // the menu, so the section is not listed again.
+                    ...v1Section(V1_CASE),
+                    content: (ctx: TemplateContext) => {
+                        const { navLabel: _listed, ...rest } = resolveContent(
+                            v1Section(V1_CASE).content,
+                            ctx,
+                        ) as Record<string, unknown>;
+                        return rest;
+                    },
+                },
+                {
+                    type: "cta",
+                    contractVersion: 1,
+                    content: {
+                        label: "Work with me",
+                        href: "/#hire",
+                        style: "primary",
+                    },
                 },
             ],
         },

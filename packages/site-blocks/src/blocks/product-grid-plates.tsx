@@ -3,6 +3,7 @@ import { formatAmount } from "../lib/money";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { ShopListingCard } from "../product/shop-listing";
+import { SiteLink } from "../site-link";
 import type { LeadShow } from "./product-grid-lead";
 
 /**
@@ -74,7 +75,7 @@ export function PlatesGrid({
                         )}
                     >
                         {base !== null ? (
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(p.slug)}`}
                                 className={cn(
                                     cell,
@@ -83,7 +84,7 @@ export function PlatesGrid({
                                 )}
                             >
                                 {body}
-                            </a>
+                            </SiteLink>
                         ) : (
                             <div className={cell}>{body}</div>
                         )}
@@ -143,7 +144,7 @@ function Plate({
                     <span
                         className={cn(
                             "block truncate",
-                            lead ? "text-[13px]" : "text-[11.5px]",
+                            lead ? "text-[13px]" : "text-[12px]",
                         )}
                     >
                         {line}
@@ -162,7 +163,7 @@ function Plate({
                             </span>
                         ) : null}
                         {p.soldOut ? (
-                            <span className="shrink-0 rounded-[2px] border border-current px-1.5 text-[11px] uppercase leading-[1.5] tracking-[0.06em]">
+                            <span className="shrink-0 rounded-[2px] border border-current px-1.5 text-[12px] uppercase leading-[1.5] tracking-[0.06em]">
                                 Sold out
                             </span>
                         ) : null}

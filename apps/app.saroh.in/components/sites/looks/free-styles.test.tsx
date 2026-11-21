@@ -216,9 +216,19 @@ function picker(title: string, trigger: string): HTMLElement {
     if (!el) throw new Error(`No ${title} open`);
     return el;
 }
-const gallery = () => picker("Change look", "[data-look-change]");
-const typefaces = () => picker("Typeface", "[data-typeface-change]");
-const colourways = () => picker("Colourway", '[data-colour-row="Colourway"]');
+/** The Look group: its four cards are in the panel (U24b). */
+const gallery = () => {
+    const el = host.querySelector<HTMLElement>("[data-brand-look]");
+    if (!el) throw new Error("No Look group");
+    return el;
+};
+const typefaces = () => picker("Fonts", "[data-typeface-change]");
+/** The Colours group: the colourways as chips (U24b). */
+const colourways = () => {
+    const el = host.querySelector<HTMLElement>('[data-brand-group="Colours"]');
+    if (!el) throw new Error("No Colours group");
+    return el;
+};
 const within = (el: HTMLElement, selector: string, name: string) => {
     const found = Array.from(el.querySelectorAll<HTMLElement>(selector)).find(
         (r) => r.textContent.includes(name),
@@ -267,11 +277,11 @@ const button = (within: ParentNode, name: string) => {
 describe("the Paid plans mark", () => {
     it("marks a paid look, typeface and colourway, and nothing free", () => {
         render();
-        // Looks: one mark for the group, in the gallery's foot.
-        expect(gallery().textContent).toContain(
-            "Paid plans Quiet, Folio and Live",
-        );
-        expect(look("Classic").textContent).not.toContain("Paid plans");
+        // Looks: each paid card says so under its name.
+        for (const name of ["Quiet", "Folio", "Live"]) {
+            expect(look(name).textContent).toContain("· paid plans");
+        }
+        expect(look("Classic").textContent).not.toContain("paid plans");
         // Typefaces: the group's heading, once.
         const group = (name: string) =>
             face(name).closest("[cmdk-group]")?.textContent ?? "";
@@ -356,6 +366,10 @@ describe("a paid choice on a plan without themes", () => {
 
     it("lets colours change: they're never paid", () => {
         const { onChange } = render();
+        // The six rows open from "Edit each colour" (U24b).
+        const edit = host.querySelector("[data-edit-colours]");
+        if (!edit) throw new Error("No Edit each colour");
+        press(edit);
         press(
             within(
                 picker("Accent", '[data-colour-row="Accent"]'),
@@ -422,14 +436,15 @@ describe("Preview", () => {
         expect(onChoose).not.toHaveBeenCalled();
         expect(onChange).not.toHaveBeenCalled();
         expect(actions.updateSiteStyle).not.toHaveBeenCalled();
-        // The card still shows Classic, and the keyboard is back on Change,
-        // the gallery having made way for the dialog (the dialog hands it
-        // back on the next tick, as Radix does).
+        // Classic is still chosen, and the keyboard is back on the
+        // Preview that opened it (the dialog hands it back on the next
+        // tick, as Radix does).
         expect(lookNow()).toBe("classic");
         await act(() => new Promise((r) => setTimeout(r, 0)));
-        expect(document.activeElement).toBe(
-            host.querySelector("[data-look-change]"),
-        );
+        expect(
+            (document.activeElement as HTMLElement | null)?.dataset
+                .lookPreviewOpen,
+        ).toBeTruthy();
     });
 
     it("refuses Use this look for a paid look on this plan, and stays open", () => {

@@ -6,6 +6,7 @@ import { productCardsOf, productGridQuery } from "@saroh/site-blocks";
 import { shopFetch } from "./catalogue";
 import { dontCachePage, listsProducts } from "./page-cache/site-rules";
 import { productGridFeeds } from "./product-grid-feed";
+import { getCheckoutOptions } from "./shop-checkout";
 
 /**
  * A Product grid's products (round-2 G12), server to server, never cached:
@@ -47,19 +48,37 @@ function queryOf(content: unknown): string | null {
  * The Product grids' feeds for a live page, by section index, or undefined
  * when the page has none. Cards open the site's `/shop/<product>`.
  */
-export function getProductGridFeeds(
+export async function getProductGridFeeds(
     sections: readonly { type: string; content: unknown }[],
     siteId: string | null,
     /** The page is the Shop page itself (UX-082). */
     atShop = false,
 ): Promise<(ProductGridFeed | undefined)[] | undefined> {
-    return productGridFeeds(
-        sections,
-        "/shop",
-        queryOf,
-        (query) =>
-            siteId ? getGridProducts(siteId, query) : Promise.resolve([]),
-        atShop,
+    const [feeds, checkout] = await Promise.all([
+        productGridFeeds(
+            sections,
+            "/shop",
+            queryOf,
+            (query) =>
+                siteId ? getGridProducts(siteId, query) : Promise.resolve([]),
+            atShop,
+        ),
+        // A card's Add fills the bag only where the site takes orders now,
+        // as the product page's Add does: the header's read, shared.
+        siteId && sections.some(addsInPlace)
+            ? getCheckoutOptions(siteId)
+            : null,
+    ]);
+    const bagSite = checkout?.canOrder ? siteId : null;
+    return bagSite ? feeds?.map((f) => f && { ...f, bagSite }) : feeds;
+}
+
+/** A grid whose cards add to the bag in place (DEC-227). */
+function addsInPlace(section: { type: string; content: unknown }): boolean {
+    return (
+        section.type === "productGrid" &&
+        (section.content as { addInPlace?: unknown } | null)?.addInPlace ===
+            true
     );
 }
 

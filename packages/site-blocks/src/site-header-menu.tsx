@@ -233,6 +233,49 @@ export function SiteNavRow({ items: all }: { items: SiteNavItem[] }) {
     );
 }
 
+/** At most this many pages in a phone header's row; Menu has them all (U8). */
+export const PHONE_ROW_MAX = 3;
+
+/**
+ * The phone header's second row (U8, board TPSystem): the first three
+ * pages as plain 44px links, so the pages someone came for are one tap
+ * away without opening Menu. Menu still lists every page. The caller hides
+ * it from 700px up (`min-[700px]:hidden`); Classic's pills start at 820px,
+ * so between the two its Menu alone has them. In-page entries whose section isn't
+ * on the page leave, as in the desk row.
+ */
+export function PhonePageRow({
+    items: all,
+    className,
+}: {
+    items: SiteNavItem[];
+    className: string;
+}) {
+    const current = useCurrentPath();
+    const items = useShownInPageItems(all).slice(0, PHONE_ROW_MAX);
+    if (items.length === 0) return null;
+    return (
+        <nav
+            aria-label="Top pages"
+            data-site-phone-row=""
+            className={`flex min-w-0 items-center gap-5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${className}`}
+        >
+            {items.map((item) => (
+                <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={
+                        isCurrent(item.href, current) ? "page" : undefined
+                    }
+                    className={`text-site-body hover:text-site-fg aria-[current=page]:text-site-fg focus-visible:ring-site-fg inline-flex min-h-11 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-sm text-[15px] font-semibold decoration-1 underline-offset-[6px] hover:underline focus-visible:outline-none focus-visible:ring-2 active:opacity-70 aria-[current=page]:underline ${MOVES}`}
+                >
+                    {item.label}
+                </Link>
+            ))}
+        </nav>
+    );
+}
+
 /**
  * The header's main button at the desk. Drawn here, in the browser's half,
  * for one reason: on the page it opens it says so (`aria-current`), since
@@ -419,55 +462,5 @@ export function SiteMenu({
                 </>
             ) : null}
         </>
-    );
-}
-
-/**
- * The site's menu again at the foot of the page, as a list. Every page is
- * here, the one the header's main button opens included: the footer is
- * where someone looks for a page by name, not a second ask.
- *
- * In the browser's half for the same reason the header's row is: an entry
- * that jumps to a section showing nothing leaves (`useShownInPageItems`).
- * With no entry left it draws nothing, its heading included.
- */
-export function SiteFooterMenu({
-    items: all,
-    heading,
-    headingClassName,
-    linkClassName,
-}: {
-    items: SiteNavItem[];
-    heading: string;
-    headingClassName: string;
-    linkClassName: string;
-}) {
-    const current = useCurrentPath();
-    const items = useShownInPageItems(all);
-    const headingId = useId();
-    if (items.length === 0) return null;
-    return (
-        <nav aria-labelledby={headingId} data-site-footer-menu="">
-            <h2 id={headingId} className={headingClassName}>
-                {heading}
-            </h2>
-            <ul className="m-0 grid list-none gap-0.5 p-0">
-                {items.map((item) => (
-                    <li key={item.href}>
-                        <Link
-                            href={item.href}
-                            aria-current={
-                                isCurrent(item.href, current)
-                                    ? "page"
-                                    : undefined
-                            }
-                            className={linkClassName}
-                        >
-                            {item.label}
-                        </Link>
-                    </li>
-                ))}
-            </ul>
-        </nav>
     );
 }

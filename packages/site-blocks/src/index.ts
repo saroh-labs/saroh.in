@@ -34,8 +34,15 @@ export type { SiteFixtures } from "./site-fixtures";
 export {
     FEED_BACKED_SECTIONS,
     sectionRendersNothing,
+    showsPacks,
     withoutEmptyInPageEntries,
 } from "./section-empty";
+// Server-safe: the town in an address, for the hero's Stamp.
+export { townOf } from "./blocks/stamp";
+// Typing on the page in the editor (U47d): the editor provides the host;
+// with none, a marker draws its words and nothing else.
+export { EditableTextContext } from "./editable-text";
+export type { EditableTextHost } from "./editable-text";
 export type { FeedsFor, SectionFeeds } from "./section-empty";
 
 export {
@@ -126,11 +133,13 @@ export {
 // Called by saroh.app's server: from a module with no "use client".
 export type { ProductGridFeed } from "./blocks/product-grid";
 export { default as RichTextSection } from "./blocks/rich-text";
+export { formatDuration, servicePriceWords } from "./blocks/service-words";
 export { default as ServicesListSection } from "./blocks/services-list";
 export type { PublicService, ServicesFeed } from "./blocks/services-list";
 export { default as TestimonialsSection } from "./blocks/testimonials";
 export { default as VisitUsSection, directionsHref } from "./blocks/visit-us";
 export { productCardsOf, productGridQuery } from "./lib/product-grid-read";
+export { POST_EMBED_CARD } from "./post-embed-card";
 // Server-safe (not in the "use client" block): saroh.app reads it for the
 // booking page's header on the server (E6).
 export {
@@ -373,12 +382,7 @@ export type { PayInstructionsCardProps } from "./pay-instructions/pay-instructio
 
 // Not a page block: signing in on a merchant's site (ADR-011, plan A, A3).
 // The site's server actions arrive as `api`; the sheet never calls the API.
-export {
-    UNAVAILABLE_TEXT,
-    callLine,
-    retryText,
-    sheetWays,
-} from "./account/api";
+export { UNAVAILABLE_TEXT, retryText, sheetWays } from "./account/api";
 export type {
     CodeRequestResult,
     SignInApi,

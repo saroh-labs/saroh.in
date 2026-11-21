@@ -1001,6 +1001,22 @@ each row is read against it; the release check refuses `ask-ai` until then.
 | WT4 | "Change it later … Saroh shows you the preview first, then asks before it replaces any pages."                                                                                     | DEC-216; APP `components/sites/templates/template-row.tsx`                              | Backed     | —                                       |
 | WT5 | NOT on the page: switching template "without losing work"                                                                                                                          | U8 test                                                                                 | Not backed | A change replaces pages after a confirm |
 
+### 17.6 Website library (`website-library`)
+
+saroh.in `/website-library` (DEC-228, plan 2026-11-18-001 U11), words in
+IN `content/website-library.ts`. Shown while `NEXT_PUBLIC_WEBSITE_LIBRARY`
+is on.
+
+| ID  | Claim                                                                                                                 | Backed by                                                                                                        | Status     | What's missing                              |
+| --- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------- | ------------------------------------------- |
+| WL1 | "Every preview is drawn live by the same code that draws Saroh websites"                                              | IN `app/(library-preview)/`: `BlockFixturePreview` and `SiteTheme` from `@saroh/site-blocks`, as saroh.app draws | Backed     | Looks' own faces are not loaded in previews |
+| WL2 | The blocks and their layouts listed, one entry per family (Contact and Hours under Visit us, Class packs under Plans) | `BLOCK_META`, `blockFamilies` (`packages/block-contract/src/fixtures.ts`)                                        | Backed     | —                                           |
+| WL3 | "Prices, classes, products and hours come from your business, so you add them once" (each block's linked line)        | Each block's read: services, products, plans and packs, timetable, journal, visit us (`BLOCK_META` descriptions) | Backed     | —                                           |
+| WL4 | Four looks, the colourways of real templates and component styles, chosen in the toolbar                              | `LOOKS`, template `styles`, `COMPONENT_STYLE_OPTIONS` (`@saroh/block-contract`)                                  | Backed     | —                                           |
+| WL5 | "Can I mix blocks from different templates? Yes": any block can be added to any page                                  | The editor's Add panel (`addableSections`)                                                                       | Backed     | —                                           |
+| WL6 | Subscribe shown as "Coming", with no form (DEC-222)                                                                   | `COMING_BLOCKS`                                                                                                  | Backed     | —                                           |
+| WL7 | NOT on the page: which looks are paid, any price or plan                                                              | DEC-207 rule; `content/website-library.ts`                                                                       | Not backed | A rule, not a claim                         |
+
 ## Keeping this current
 
 When a switch in the first table turns on, or a claim changes, update its

@@ -277,7 +277,7 @@ describe("a project's photo and link (K11)", () => {
         expect(flags.map((f) => [f.type, f.field])).toEqual([
             ["brokenLink", "items"],
         ]);
-        expect(flags[0].message).toMatch(/\/work\/menus/);
+        expect(flags[0].message).toMatch(/a page that doesn.t exist/);
     });
 
     it("says nothing about a hidden block", () => {
@@ -319,6 +319,32 @@ describe("missing images", () => {
             ["/"],
         );
         expect(flags.filter((f) => f.type === "missingImage")).toHaveLength(2);
+    });
+
+    it("says the merchant's words: no hero, no block (RULES §1)", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        heading: "",
+                        subheading: "Lorem ipsum",
+                        cta: { label: "Go", href: "/nowhere" },
+                    },
+                },
+                {
+                    type: "hero",
+                    content: {
+                        heading: "Fresh bread, baked every morning",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags.length).toBeGreaterThan(2);
+        for (const f of flags) {
+            expect(f.message).not.toMatch(/\b(hero|block)\b/i);
+        }
     });
 });
 
@@ -852,7 +878,7 @@ describe("module pages and reserved addresses (G14)", () => {
             {
                 type: "reservedAddress",
                 message:
-                    "This page can't be seen: /book is your booking page. Change its path so visitors can reach it.",
+                    "This page can't be reached at /book: that link is your booking page. Give it its own link so visitors can open it.",
                 pageId: "walk",
                 sectionIndex: null,
                 field: "path",
@@ -898,7 +924,7 @@ describe("module pages and reserved addresses (G14)", () => {
         expect(reserved(flags).map((f) => [f.pageId, f.message])).toEqual([
             [
                 "acct",
-                "This page can't be seen: /account is where your customers see their account. Change its path so visitors can reach it.",
+                "This page can't be reached at /account: that link is where your customers see their account. Give it its own link so visitors can open it.",
             ],
         ]);
     });
@@ -1455,7 +1481,7 @@ describe("the first starters' stock sentences (DEC-141)", () => {
             ).filter(
                 (f) =>
                     f.type === "placeholderText" &&
-                    f.message.includes("rich text block still has") &&
+                    f.message.includes("text section still has") &&
                     f.message.includes("template's placeholder words"),
             );
             expect(texts.length).toBeGreaterThan(0);

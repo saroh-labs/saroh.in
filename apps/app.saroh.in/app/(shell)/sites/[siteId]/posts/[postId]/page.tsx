@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
 import { PostEditor } from "@/components/sites/posts/post-editor";
@@ -10,6 +10,8 @@ import { requireSession } from "@/lib/session";
 import { readShareSetup } from "@/lib/share-item/read";
 import { getSite, listComments } from "@/lib/sites/service";
 import { readWebAddressLinks } from "@/lib/sites/share-links-read";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
+import { withQuery } from "@/lib/sites/with-query";
 
 // One read for the tab's title and the page.
 const readPost = cache((siteId: string, postId: string) =>
@@ -41,10 +43,21 @@ export async function generateMetadata({
  */
 export default async function EditPostPage({
     params,
+    searchParams,
 }: {
     params: Promise<{ siteId: string; postId: string }>;
+    searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { siteId, postId } = await params;
+    // With the Website area on, a post opens in the desk editor (U15, KTD-E7).
+    if (websiteAreaOn()) {
+        redirect(
+            withQuery(
+                `/sites/${siteId}/write/${postId}`,
+                (await searchParams) ?? {},
+            ),
+        );
+    }
     await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();

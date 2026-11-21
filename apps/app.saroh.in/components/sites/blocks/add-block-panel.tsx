@@ -1,5 +1,6 @@
 "use client";
 
+import type { BlockFamily } from "@saroh/block-contract";
 import { BLOCK_META } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { cn } from "@saroh/ui/lib/utils";
@@ -10,7 +11,7 @@ import { useState } from "react";
 import {
     SECTION_HINTS,
     SECTION_LABELS,
-    addableSections,
+    addableFamilies,
 } from "@/components/sites/editor/editor-constants";
 import type { SectionType } from "@/lib/sites/service";
 import { ListSearch } from "@saroh/ui/list-search";
@@ -27,7 +28,9 @@ import { addBlockGroups } from "./block-kinds";
  *   disabled WITH the reason rather than left out.
  *
  * Picking a block with more than one look asks which look first, with real
- * previews (#267); one look inserts straight away.
+ * previews (#267); one look inserts straight away. A family (Visit us, Plans;
+ * KD5) is one card with a button per layout, each inserting its own section
+ * type exactly as a block of its own did.
  */
 export function AddBlockPanel({
     onPick,
@@ -35,9 +38,15 @@ export function AddBlockPanel({
     shopOpen = false,
     packsOpen = false,
     search = false,
+    query: searched,
 }: {
     /** A search over the blocks' names and lines (a phone's sheet, DEC-185). */
     search?: boolean;
+    /**
+     * Search results only, for a query typed elsewhere (Rail › Add's own
+     * search, U46e): no search box, no Browse button, no Every page group.
+     */
+    query?: string;
     /** A block was chosen. `looks` says whether a look still has to be picked. */
     onPick: (type: SectionType, looks: number) => void;
     /**
@@ -50,37 +59,41 @@ export function AddBlockPanel({
     /** Class packs is rolled out and on: its block is offered (DEC-057). */
     packsOpen?: boolean;
 }) {
-    const [query, setQuery] = useState("");
+    const [own, setQuery] = useState("");
+    const results = searched !== undefined;
+    const query = searched ?? own;
     const q = query.trim().toLowerCase();
-    const { structure, business } = addBlockGroups(
-        addableSections(shopOpen, packsOpen).filter(
-            (t) =>
-                q === "" ||
-                `${SECTION_LABELS[t]} ${SECTION_HINTS[t]}`
-                    .toLowerCase()
-                    .includes(q),
-        ),
+    const families = addableFamilies(shopOpen, packsOpen, q);
+    // A family sits in the group of its leading layout.
+    const groups = addBlockGroups(families.map((f) => f.layouts[0].type));
+    const structure = families.filter((f) =>
+        groups.structure.includes(f.layouts[0].type),
+    );
+    const business = families.filter((f) =>
+        groups.business.includes(f.layouts[0].type),
     );
 
     return (
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-2 pb-4 pt-4">
-            {search ? (
+            {search && !results ? (
                 <ListSearch
                     placeholder="Search blocks"
                     onSearch={setQuery}
                     shortcut={false}
                 />
             ) : null}
-            <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full gap-1.5"
-                onClick={onBrowse}
-            >
-                <LayoutGrid aria-hidden className="size-4" />
-                Browse with previews
-            </Button>
+            {results ? null : (
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5"
+                    onClick={onBrowse}
+                >
+                    <LayoutGrid aria-hidden className="size-4" />
+                    Browse with previews
+                </Button>
+            )}
             {q !== "" && structure.length + business.length === 0 ? (
                 <p className="px-2 text-sm text-muted-foreground">
                     No block matches “{query.trim()}”.
@@ -88,33 +101,15 @@ export function AddBlockPanel({
             ) : null}
             {structure.length === 0 ? null : (
                 <Group label="Structure">
-                    {structure.map((t) => (
-                        <Entry
-                            key={t}
-                            icon={SECTION_ICONS[t]}
-                            label={SECTION_LABELS[t]}
-                            hint={SECTION_HINTS[t]}
-                            looks={BLOCK_META[t].variants.length}
-                            onClick={() =>
-                                onPick(t, BLOCK_META[t].variants.length)
-                            }
-                        />
+                    {structure.map((f) => (
+                        <FamilyEntry key={f.head} family={f} onPick={onPick} />
                     ))}
                 </Group>
             )}
             {business.length === 0 ? null : (
                 <Group label="From your business">
-                    {business.map((t) => (
-                        <Entry
-                            key={t}
-                            icon={SECTION_ICONS[t]}
-                            label={SECTION_LABELS[t]}
-                            hint={SECTION_HINTS[t]}
-                            looks={BLOCK_META[t].variants.length}
-                            onClick={() =>
-                                onPick(t, BLOCK_META[t].variants.length)
-                            }
-                        />
+                    {business.map((f) => (
+                        <FamilyEntry key={f.head} family={f} onPick={onPick} />
                     ))}
                 </Group>
             )}
@@ -136,7 +131,7 @@ export function AddBlockPanel({
     );
 }
 
-function Group({
+export function Group({
     label,
     children,
 }: {
@@ -151,8 +146,74 @@ function Group({
     );
 }
 
+/**
+ * One catalogue entry. A lone layout is one button, named as the editor
+ * names the section ("Visit us · Talk to us" when a search found only it);
+ * a family lists its layouts under its name.
+ */
+export function FamilyEntry({
+    family,
+    onPick,
+}: {
+    family: BlockFamily;
+    onPick: (type: SectionType, looks: number) => void;
+}) {
+    const looks = (t: SectionType) => BLOCK_META[t].variants.length;
+    if (family.layouts.length === 1) {
+        const t = family.layouts[0].type;
+        return (
+            <Entry
+                icon={SECTION_ICONS[t]}
+                label={SECTION_LABELS[t]}
+                hint={SECTION_HINTS[t]}
+                looks={looks(t)}
+                onClick={() => onPick(t, looks(t))}
+            />
+        );
+    }
+    const Icon = SECTION_ICONS[family.head];
+    return (
+        <li>
+            <section
+                aria-label={family.name}
+                className="rounded-lg border px-3 py-2.5"
+            >
+                <span className="flex items-start gap-3">
+                    <Icon
+                        aria-hidden
+                        className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                    />
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-[0.8125rem] font-medium">
+                            {family.name}
+                        </span>
+                        <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
+                            {SECTION_HINTS[family.head]}
+                        </span>
+                    </span>
+                </span>
+                <ul className="mt-2 flex flex-wrap gap-1.5 pl-7">
+                    {family.layouts.map((l) => (
+                        <li key={l.type}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                aria-label={`Add ${SECTION_LABELS[l.type]}`}
+                                onClick={() => onPick(l.type, looks(l.type))}
+                            >
+                                {l.label}
+                            </Button>
+                        </li>
+                    ))}
+                </ul>
+            </section>
+        </li>
+    );
+}
+
 /** One block to add. Without `onClick` it is shown disabled, with its hint as the reason. */
-function Entry({
+export function Entry({
     icon: Icon,
     label,
     hint,

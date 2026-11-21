@@ -95,6 +95,8 @@ function client(opts: { gstRate: Rate; paper?: unknown[] }) {
             update: jest.fn().mockResolvedValue({}),
         },
         bookingEvent: { create: jest.fn().mockResolvedValue({ id: "ev_1" }) },
+        // No GSTIN saved on the contact (R16).
+        contact: { findFirst: jest.fn().mockResolvedValue(null) },
         invoice: {
             findMany: jest.fn().mockResolvedValue(opts.paper ?? []),
             findFirst: jest.fn().mockResolvedValue(null),

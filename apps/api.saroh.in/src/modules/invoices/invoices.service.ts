@@ -25,6 +25,7 @@ import {
 } from "../payments/charge-under-way";
 import { businessPayLinkProvider } from "../payments/pay-link-provider";
 import { assertBusinessDetails } from "./business-details";
+import { contactBillToGst } from "./contact-gstin";
 import type {
     CreditInvoiceDto,
     InvoiceInputDto,
@@ -1352,12 +1353,6 @@ export class InvoicesService {
         input: IssueInvoiceInput,
     ): Promise<{ id: string; number: string }> {
         const profile = await loadTaxProfile(tx, organizationId);
-        const doc = this.price(
-            input.lines,
-            profile,
-            { billToGstin: null, billToState: null, billToAddress: null },
-            input.tax ?? "0",
-        );
         // The renewal job and a sale name a contact read before this
         // transaction: a merge since then points it at the survivor (C9).
         const resolved = await resolveContact(
@@ -1370,6 +1365,14 @@ export class InvoicesService {
         }
         const contactId = resolved.id;
         const billTo = await this.billTo(tx, organizationId, contactId);
+        // The GSTIN they saved in their account, as it stands now (R16).
+        const gst = await contactBillToGst(tx, organizationId, contactId);
+        const doc = this.price(
+            input.lines,
+            profile,
+            { ...gst, billToAddress: null },
+            input.tax ?? "0",
+        );
         const issuedAt = input.issuedAt ?? new Date();
         const number = await numberFor(
             tx,
@@ -1385,6 +1388,7 @@ export class InvoicesService {
                 number,
                 contactId,
                 ...billTo,
+                ...gst,
                 currency: input.currency,
                 ...documentColumns(doc),
                 issuedAt,

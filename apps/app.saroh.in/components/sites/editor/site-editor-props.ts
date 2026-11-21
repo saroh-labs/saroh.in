@@ -1,5 +1,6 @@
 import type { ReviewCan } from "@/components/sites/editor/read-only";
 import type { EditorSheet } from "@/components/sites/editor/use-editor-layout";
+import type { SiteIconSource } from "@/components/sites/looks/brand-groups";
 import type { WebAddressFix } from "@/components/sites/publish/address-fix";
 import type { TemplateRowSource } from "@/components/sites/templates/template-row";
 import type { SiteChangeKind } from "@/lib/sites/pending";
@@ -67,6 +68,11 @@ export interface SiteEditorProps {
     initialPendingChanges: number | null;
     /** Site-level settings publishing would change (#282). Null before the first publish. */
     initialPendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * The change units waiting (U7): the status chip's number, Overview's
+     * own (KTD-E3). Absent: the two counts above, summed.
+     */
+    initialPendingUnits?: number | null;
     initialSections: Section[];
     /** Which edit of the draft `initialSections` are (#285). */
     initialRevision: number;
@@ -147,4 +153,13 @@ export interface SiteEditorProps {
      * site has none (DEC-185). Null when it can't be read.
      */
     webAddressFix?: WebAddressFix | null;
+    /** Ask AI's panel is on here (`askAiOn`); the shell's bar offers it (U46). */
+    askAi?: boolean;
+    /** Brand › Logo and tab icon (U24b); null for a reader. */
+    siteIcon?: SiteIconSource | null;
+    /**
+     * The business's phone as the site shows it (`readSiteContact`), for
+     * the link picker's Call and WhatsApp (U47d); null when it has none.
+     */
+    businessPhone?: string | null;
 }

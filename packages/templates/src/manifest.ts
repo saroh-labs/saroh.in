@@ -87,6 +87,11 @@ export interface TemplateContext {
     hasPlace?: boolean;
     /** It has a week of opening hours saved. */
     hasHours?: boolean;
+    /**
+     * The trade the business said it is (DEC-216), for the words of a
+     * template's main button ("Book a chair"). Absent: not said.
+     */
+    trade?: TemplateKind;
 }
 
 /**

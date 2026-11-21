@@ -5,7 +5,7 @@ import { instantiateTemplate } from "./instantiate";
 import type { TemplateContext } from "./manifest";
 import { isOwnerNote } from "./placeholders";
 import { HERO_PROMPT, starterTemplateV3 } from "./templates/starter";
-import { starterTemplate } from "./templates/starter-v4";
+import { starterTemplateV4 as starterTemplate } from "./templates/starter-v4";
 import type { PagePlan, PlannedSection, StoredPage } from "./upgrade";
 import { planTemplateUpgrade, sameAsMade, withBoundSections } from "./upgrade";
 

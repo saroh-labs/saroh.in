@@ -220,7 +220,11 @@ export function BlockInspector({
                     </ul>
                 ) : null}
 
-                <SectionFrameFields section={section} onChange={onChange} />
+                <SectionFrameFields
+                    key={section.key}
+                    section={section}
+                    onChange={onChange}
+                />
 
                 <SectionPadding
                     section={section}

@@ -315,6 +315,21 @@ describe("servicesList", () => {
         ) as { cta: { href: string } };
         expect(rendered.cta.href).toBe("/book");
     });
+
+    it("reads the old Show as: Cards as the cards look; a named look wins", () => {
+        expect(resolveVariant("servicesList", { layout: "cards" })).toBe(
+            "cards",
+        );
+        expect(resolveVariant("servicesList", { layout: "list" })).toBe(
+            "default",
+        );
+        expect(
+            resolveVariant("servicesList", {
+                layout: "cards",
+                variant: "menu",
+            }),
+        ).toBe("menu");
+    });
 });
 
 /** G8 — Visit us binds a place by id and reads it live. */

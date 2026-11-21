@@ -200,7 +200,7 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
         ).toHaveAttribute("href", "/account/orders?order=ord_1");
     });
 
-    it("what changed leads; then a held place, money owed, a booking, an order, a message; then what they hold", () => {
+    it("one order (DEC-229): waiting on you, what's next, what's new, plan and packs, the latest order", () => {
         const changes: AccountChange[] = [
             {
                 kind: "order",
@@ -227,14 +227,14 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
             />,
         );
         expect(headings()).toEqual([
-            "Since you were last here",
             "A place is held for you",
             "To pay",
             "Next up",
-            "Your orders",
+            "Waiting for a place",
+            "Since you were last here",
             "Messages",
             "Your courses",
-            "Waiting for a place",
+            "Your orders",
         ]);
         // Nothing left to offer: a booking and an order are under way.
         expect(screen.queryByText("More you can do here")).toBeNull();
@@ -389,7 +389,15 @@ describe("Home, in the order that matters to this customer (DEC-142)", () => {
         expect(grid?.className).toMatch(/\bgrid\b/);
         expect(grid?.className).toMatch(/\bmd:grid-cols-2\b/);
         // Three half-width cards: the first takes the row, none sits alone.
-        const cards = Array.from(grid?.children ?? []);
+        // "Waiting on you" is a group that draws no box (DEC-229): its
+        // cards sit in the grid.
+        const group = grid?.querySelector(":scope > [role=group]");
+        expect(group?.className).toBe("contents");
+        const cards = Array.from(
+            grid?.querySelectorAll(
+                ":scope > section, :scope > [role=group] > section",
+            ) ?? [],
+        );
         expect(cards.map((c) => c.getAttribute("aria-labelledby"))).toEqual([
             "account-to-pay",
             "account-next",

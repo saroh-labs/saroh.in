@@ -1,4 +1,5 @@
 import type { RenderedFaq } from "@saroh/block-contract";
+import { EditableText } from "../editable-text";
 import type { LookProps } from "../look-context";
 
 /**
@@ -22,11 +23,15 @@ export default function FaqSection({
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
             {content.intro ? (
-                <p className="text-site-body mt-3 text-lg">{content.intro}</p>
+                <p className="text-site-body mt-3 text-lg">
+                    <EditableText field="intro">{content.intro}</EditableText>
+                </p>
             ) : null}
 
             <div className="border-site-border mt-8 border-t">

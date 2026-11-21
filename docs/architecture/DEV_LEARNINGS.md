@@ -6984,3 +6984,32 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Cause:** `free-business.ts`'s `atLimit`, `trialTakenBy`'s other businesses, `couponUsedByPayer` and `hadPaidPlanOrLaunchOffer` read the person's or payer's OTHER businesses through the caller's client; inside one business's request (`OrgRlsInterceptor`, or the RLS suite's wrapper of `overLimit.pausedNow`) row-level security shows only that business, so the rule never saw the other one. A real production bug once RLS is on. The N3 fixtures wrote TRIAL checkouts without `startAt` and a coupon without its discount. Asha owns seeded Free businesses and sets up one per spec, past both new limits.
 - **Fix:** those reads go through `outsideOrgContext(... prisma ...)`, as `couponPlacesTaken` and `holdPayerOffersInTx` already did; the fixtures set `startAt` and the discount; the seed gives Asha staff's exception (`extraFreeBusinesses`), and the browser stack (CI, prepush) sets `BUSINESS_CREATES_PER_DAY=0`.
 - **Rule:** a read across businesses (same owner, payer, GSTIN) is made outside the org context, never through the caller's client or `tx`. A new per-person limit is checked against the seeded people the browser specs act as, before the push.
+### A regex in a site-blocks test broke every merchant page's CSS (18 Nov 2026)
+
+- **Symptom:** on batch-2026-11-18-2 every saroh.app page answered 500 in `next dev`; unit tests, lint and typecheck all passed.
+- **Cause:** Tailwind scans every file under `packages/site-blocks/src`, tests included, for class names. A lookahead `(?!-visible\))` in `component-theme.test.tsx` read as an arbitrary-value class and crashed the CSS build.
+- **Fix:** written `(?![-]visible\))`. The quick gate builds no CSS, so this only shows in a page render or CI's build: after a change to site-blocks, open one template render (or let CI build) before calling it done.
+
+### An API spec passed alone and failed in the gate: `env.X = undefined` stored "undefined" (21 Nov 2026)
+
+- **Symptom:** `post-approval.spec.ts` passed with `pnpm exec jest`, but failed under `pnpm prepush`. The failing case was "unset under development counts as on".
+- **Cause:** the gate and CI set `SKIP_ENV_VALIDATION=1`, and then the API's `env` is `process.env`. Assigning `undefined` to a `process.env` key stores the string `"undefined"`, so the switch read as set and off.
+- **Fix:** a spec unsets a variable with `delete env.X` and never assigns `undefined`. To reproduce a gate-only failure, run the spec with `SKIP_ENV_VALIDATION=1 CI=1`.
+
+### Opening a post autosaved it: Tiptap's `setEditable` emits an update (21 Nov 2026)
+
+- **Symptom:** opening a live post showed "Unsaved changes", autosaved to "Saved · just now" and raised the post's "changes waiting" count, with no edit.
+- **Cause:** the desk post editor calls `editor.setEditable(!previewing)` on mount. Tiptap's `setEditable(editable, emitUpdate = true)` fires `onUpdate`, so the rich text handed back the HTML it already held and `usePostDraft` marked the post dirty.
+- **Fix:** `setEditable(x, false)` (`posts/editor/post-shell.tsx`, as `description-editor.tsx` already did), and `usePostDraft`'s `set` ignores a value equal to the one held. `post-shell.test.tsx` stands in an editor that re-reports its value on mount and checks nothing saves. Any Tiptap call that is not an edit (`setEditable`, `setContent`) passes `emitUpdate: false`.
+
+### The post editor crashed on `editor.commands` in a click handler (21 Nov 2026)
+
+- **Symptom:** opening a post showed "Couldn't load this post", or logged "Cannot read properties of null (reading 'commands')" from `SlashMenu`, even though `editor.commands` was only used inside a click handler.
+- **Cause:** the React Compiler memoises the handler on the property path `editor.commands` and reads it during render. Tiptap's `commands` is a getter that throws until the editor is mounted, and with `immediatelyRender: false` the first render has no mounted editor.
+- **Fix:** render the menus only once `editor` exists, and call `editor.chain().focus().run()` instead of reading `editor.commands` in render scope. A Tiptap getter (`commands`, `view`, `state`) never goes in a component body or a closure the compiler can lift; keep it inside an effect or a chain call.
+
+### The pending mark under tabs never showed: `.skeleton-sweep` overrode `absolute` (21 Nov 2026)
+
+- **Symptom:** `LinkPending` (the bar under a pressed tab) never appeared, on any `TabStrip`, admin pager or `SectionList`. Its unit tests passed, because a DOM without layout can't see where the bar is placed.
+- **Cause:** `.skeleton-sweep` in `globals.css` sets `position: relative`. Unlayered CSS beats Tailwind's `@layer utilities`, so the `absolute` on the same element lost.
+- **Fix:** an outer span takes `absolute` and the inner span takes `.skeleton-sweep`. Never put a class from `globals.css` that sets `position` on the same element as a position utility. Check a positioned loading mark in a browser on Slow 3G, not only in a unit test.

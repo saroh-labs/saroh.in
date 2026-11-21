@@ -1,21 +1,26 @@
 import type { TemplateManifest } from "./manifest";
-import { bakeryTemplate } from "./templates/bakery";
-import { blogsTemplate } from "./templates/blogs";
-import { ceramicsTemplate } from "./templates/ceramics";
-import { clinicTemplate } from "./templates/clinic";
-import { developerTemplate } from "./templates/developer";
-import { dieticianTemplate } from "./templates/dietician";
-import { gymTemplate } from "./templates/gym";
+import { bakeryTemplateV1 } from "./templates/bakery";
+import { bakeryTemplate } from "./templates/bakery-v2";
+import { blogsTemplateV1 } from "./templates/blogs";
+import { blogsTemplate } from "./templates/blogs-v2";
+import { ceramicsTemplateV1 } from "./templates/ceramics";
+import { ceramicsTemplate } from "./templates/ceramics-v2";
+import { clinicTemplate, clinicTemplateV1 } from "./templates/clinic";
+import { developerTemplate, developerTemplateV1 } from "./templates/developer";
+import { dieticianTemplate, dieticianTemplateV1 } from "./templates/dietician";
+import { gymTemplate, gymTemplateV1 } from "./templates/gym";
 import { personalTemplate, personalTemplateV1 } from "./templates/personal";
 import { portfolioTemplate, portfolioTemplateV1 } from "./templates/portfolio";
-import { salonTemplate } from "./templates/salon";
+import { salonTemplate, salonTemplateV1 } from "./templates/salon";
 import {
     starterTemplateV1,
     starterTemplateV2,
     starterTemplateV3,
 } from "./templates/starter";
-import { starterTemplate } from "./templates/starter-v4";
-import { studioTemplate } from "./templates/studio";
+import { starterTemplateV4 } from "./templates/starter-v4";
+import { starterTemplate } from "./templates/starter-v5";
+import { studioTemplateV1 } from "./templates/studio";
+import { studioTemplate } from "./templates/studio-v2";
 import { writingTemplate } from "./templates/writing";
 
 /** Registry key for an `id@version` pair. */
@@ -38,20 +43,30 @@ const REGISTRY: Record<string, TemplateManifest> = Object.fromEntries(
         starterTemplateV1,
         starterTemplateV2,
         starterTemplateV3,
+        starterTemplateV4,
         starterTemplate,
         personalTemplateV1,
         personalTemplate,
         portfolioTemplateV1,
         portfolioTemplate,
         writingTemplate,
+        blogsTemplateV1,
         blogsTemplate,
+        ceramicsTemplateV1,
         ceramicsTemplate,
+        gymTemplateV1,
         gymTemplate,
+        bakeryTemplateV1,
         bakeryTemplate,
+        studioTemplateV1,
         studioTemplate,
+        developerTemplateV1,
         developerTemplate,
+        dieticianTemplateV1,
         dieticianTemplate,
+        salonTemplateV1,
         salonTemplate,
+        clinicTemplateV1,
         clinicTemplate,
     ].map((t) => [key(t.id, t.version), t]),
 );

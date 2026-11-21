@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { BLOCK_META } from "./fixtures";
+import { COMING_BLOCKS } from "./coming-blocks";
+import {
+    BLOCK_META,
+    blockFamilies,
+    blockHeading,
+    blockSearchText,
+} from "./fixtures";
 import { parseRenderedContent } from "./rendered";
 import type { SectionType } from "./section-contract";
 import { SECTION_TYPES } from "./section-contract";
@@ -92,5 +98,83 @@ describe("block fixtures", () => {
         expect(Object.keys(TO_RENDERED).sort()).toEqual(
             [...SECTION_TYPES].sort(),
         );
+    });
+});
+
+/** The 17-block catalogue (U3, KD5, KD6): families are a view, never a type change. */
+describe("block families", () => {
+    const families = blockFamilies(SECTION_TYPES);
+
+    it("reads Highlights, People and Text, with the old names as aliases", () => {
+        expect(BLOCK_META.features.label).toBe("Highlights");
+        expect(BLOCK_META.person.label).toBe("People");
+        expect(BLOCK_META.richText.label).toBe("Text");
+        expect(blockSearchText("features")).toContain("features");
+        expect(blockSearchText("richText")).toContain("rich text");
+    });
+
+    it("lists Visit us once, with Address and hours, Hours and Talk to us", () => {
+        const visit = families.filter((f) => f.head === "visitUs");
+        expect(visit).toHaveLength(1);
+        expect(visit[0].name).toBe("Visit us");
+        expect(visit[0].layouts[0]).toEqual({
+            type: "visitUs",
+            label: "Address and hours",
+        });
+        expect(visit[0].layouts.map((l) => l.label).sort()).toEqual([
+            "Address and hours",
+            "Hours",
+            "Talk to us",
+        ]);
+        const plans = families.find((f) => f.head === "plans");
+        expect(plans?.layouts).toEqual([
+            { type: "plans", label: "Plans" },
+            { type: "packs", label: "Class packs" },
+        ]);
+    });
+
+    it("heads a member section with its family", () => {
+        expect(blockHeading("hours")).toBe("Visit us · Hours");
+        expect(blockHeading("contact")).toBe("Visit us · Talk to us");
+        expect(blockHeading("packs")).toBe("Plans · Class packs");
+        expect(blockHeading("plans")).toBe("Plans");
+        expect(blockHeading("hero")).toBe("Top of the page");
+    });
+
+    it("names every section in a merchant's words (RULES §1)", () => {
+        // The editor's tag, inspector, History and Publish all read this.
+        const banned =
+            /\b(hero|call to action|cta|block|entry|entries|html)\b/i;
+        for (const type of SECTION_TYPES) {
+            expect(blockHeading(type), type).not.toMatch(banned);
+        }
+        expect(blockSearchText("hero")).toContain("hero");
+        expect(blockSearchText("cta")).toContain("call to action");
+    });
+
+    it("finds a family layout by its old name", () => {
+        expect(blockSearchText("contact")).toContain("contact");
+        expect(blockSearchText("hours")).toContain("opening hours");
+        expect(blockSearchText("packs")).toContain("class packs");
+    });
+
+    it("names only family heads that exist and lead their own family", () => {
+        for (const type of SECTION_TYPES) {
+            const of = (BLOCK_META[type] as { family?: { of: SectionType } })
+                .family?.of;
+            if (of) {
+                expect(
+                    (BLOCK_META[of] as { family?: { of: SectionType } }).family
+                        ?.of,
+                ).toBe(of);
+            }
+        }
+    });
+
+    it("counts 17 built blocks, plus Subscribe as Coming and never a section type", () => {
+        expect(families).toHaveLength(17);
+        expect(COMING_BLOCKS.map((b) => b.name)).toEqual(["Subscribe"]);
+        expect(SECTION_TYPES as readonly string[]).not.toContain("subscribe");
+        expect(COMING_BLOCKS[0].family).toBe("Words");
     });
 });

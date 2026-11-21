@@ -7,6 +7,7 @@ import {
     createSiteFromTemplateTool,
     deletePageTool,
     editPageTool,
+    editSectionTool,
     getPageTool,
     getPublishRequestTool,
     getSiteTool,
@@ -21,7 +22,6 @@ import {
 } from "@saroh/api-contract";
 import type { SectionType } from "@saroh/block-contract";
 import {
-    BLOCK_META,
     blockExample,
     getSectionContract,
     latestContractVersion,
@@ -97,6 +97,9 @@ import {
     ToolError,
 } from "../tool-registry";
 import { quoteUntrusted, untrusted } from "../untrusted";
+import { sectionTypeListing } from "./section-types";
+import type { SectionWordField } from "./section-words";
+import { SECTION_WORD_FIELDS, withWords } from "./section-words";
 import type { SiteFromTemplatePayload } from "./site-from-template.job";
 import {
     describeSiteJob,
@@ -480,22 +483,11 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         module: "WEBSITE",
         hints: READ_ONLY,
         run({ type }) {
-            const types = SECTION_TYPES.map((t) => ({
-                type: t,
-                label: BLOCK_META[t].label,
-                description: BLOCK_META[t].description,
-                variants: BLOCK_META[t].variants.map((v) => v.id),
-            }));
+            const { types, families, text } = sectionTypeListing();
             if (!type) {
                 return Promise.resolve({
-                    text: [
-                        `${types.length} section types. Call again with type for one type's fields and an example.`,
-                        ...types.map(
-                            (t) =>
-                                `- ${t.type} (${t.label}): ${t.description} Variants: ${t.variants.join(", ")}.`,
-                        ),
-                    ].join("\n"),
-                    data: { types, schema: null, example: null },
+                    text,
+                    data: { types, families, schema: null, example: null },
                 });
             }
             if (!(SECTION_TYPES as readonly string[]).includes(type)) {
@@ -525,7 +517,14 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 ]
                     .filter(Boolean)
                     .join("\n"),
-                data: { types: one, schema, example },
+                data: {
+                    types: one,
+                    families: families.filter((f) =>
+                        f.layouts.some((l) => l.type === type),
+                    ),
+                    schema,
+                    example,
+                },
             });
         },
     });
@@ -573,7 +572,9 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 };
             });
             const text = [
-                `Page ${quoteUntrusted("title", page.title)} at ${page.path} (page_id ${page_id}): ${views.length} sections, top to bottom.`,
+                // Said which copy it is (editor audit, 21 Nov): the draft the
+                // person is editing, never the live page.
+                `Page ${quoteUntrusted("title", page.title)} at ${page.path} (page_id ${page_id}), its draft as saved now (the version being edited, which may differ from the live site): ${views.length} sections, top to bottom.`,
                 ...views.map(
                     (v) =>
                         `- section_key ${v.section_key}: ${v.type}${v.hidden ? " (hidden)" : ""}. ${v.content ? quoteUntrusted("content", v.content.text) : "Content cut for size: call get_page with this section_key."}`,
@@ -840,6 +841,69 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                         [page_id]: out.revision,
                     }),
                     summary: "Edited sections of a page in the website draft.",
+                },
+            };
+        },
+    });
+
+    const editSection = defineTool({
+        name: "edit_section",
+        title: "Change a section's words",
+        description:
+            "Use this when the person wants one section's heading, the line under it (subheading) or its main button's words changed on their website draft. Text only; take section_key from get_page and never add a price, offer, time, phone number or claim the person didn't give. Don't use it to add, move or hide sections: use edit_page. Example: edit_section with a hero's section_key and heading \"Packaging that arrives in one piece\".",
+        contract: editSectionTool,
+        capability: "section:write",
+        module: "WEBSITE",
+        hints: WRITE,
+        async run(input, call: McpCall) {
+            const { site_id, page_id, section_key } = input;
+            const words = Object.fromEntries(
+                SECTION_WORD_FIELDS.flatMap((f) =>
+                    input[f] === undefined ? [] : [[f, input[f]]],
+                ),
+            ) as Partial<Record<SectionWordField, string>>;
+            const out = await saveSections(call, site_id, page_id, (list) => {
+                const s = list.find((x) => x.key === section_key);
+                if (!s) {
+                    throw new ToolError(
+                        `There is no section ${section_key} on this page.`,
+                        "Call get_page for the page's section_key values.",
+                    );
+                }
+                // An old contract's content moves to the newest first, as
+                // edit_page and the editor do when they touch a section.
+                const lifted = liftToLatest(
+                    s.type,
+                    s.contractVersion,
+                    (s.content ?? {}) as Record<string, unknown>,
+                );
+                const next = withWords(lifted.content, words);
+                if (next.missing.length) {
+                    throw new ToolError(
+                        `This ${s.type} section has no ${next.missing.join(" or ").replace(/_/g, " ")}.`,
+                        "Change only the words get_page shows for it.",
+                    );
+                }
+                s.contractVersion = lifted.version;
+                s.content = next.content;
+                return [`changed the words of section ${section_key}`];
+            });
+            return {
+                text: [
+                    `Changed the draft of page ${page_id}: ${out.changed.join("; ")}. ${DRAFT_ONLY}`,
+                    linksText(out.links),
+                ].join("\n"),
+                data: {
+                    site_id,
+                    page_id,
+                    changed: out.changed,
+                    links: out.links,
+                },
+                activity: {
+                    target: revisionsTarget(site_id, {
+                        [page_id]: out.revision,
+                    }),
+                    summary: "Changed a section's words in the website draft.",
                 },
             };
         },
@@ -1293,6 +1357,7 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
         addPage,
         updatePage,
         editPage,
+        editSection,
         removeSection,
         deletePage,
         updateSettings,

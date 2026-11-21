@@ -4,7 +4,7 @@
  * without a page, a clock or a network.
  *
  * A merchant's page is kept in the page cache and sent to every visitor
- * alike, so nothing that changes by the minute ("Next free", "3 places
+ * alike, so nothing that changes by the minute ("Next open", "3 places
  * left", "Open now") is in its HTML. Each is read in the visitor's browser
  * and shown only while it is true:
  *

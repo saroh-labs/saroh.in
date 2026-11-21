@@ -1,4 +1,3 @@
-import { AdminShell } from "@/components/admin-shell";
 import { searchPagesGate } from "@/lib/search-pages";
 
 /**
@@ -14,5 +13,5 @@ export default async function SearchPagesConsoleLayout({
 }) {
     const gate = await searchPagesGate();
     if (!gate.ok) return gate.screen;
-    return <AdminShell staff={gate.staff}>{children}</AdminShell>;
+    return children;
 }

@@ -4,7 +4,6 @@ import { Notice } from "@saroh/ui/notice";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { AdminShell } from "@/components/admin-shell";
 import { DeployButton } from "@/components/deployments/deploy-button";
 import { AutoRefresh } from "@/components/operations/auto-refresh";
 import { Panel } from "@/components/panel";
@@ -33,11 +32,10 @@ export const metadata = { title: "Deployments" };
 export default async function DeploymentsPage() {
     const gate = await requireStaff("deployments:run");
     if (!gate.ok) return gate.screen;
-    const { staff } = gate;
     const view = await getDeployments().catch(() => undefined);
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Deployments"]}
@@ -50,7 +48,7 @@ export default async function DeploymentsPage() {
                     <Board view={view} />
                 )}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

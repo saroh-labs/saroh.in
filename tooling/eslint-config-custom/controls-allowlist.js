@@ -227,8 +227,41 @@ export const RAW_ALLOWED = {
     "components/sites/editor/editor-rail.tsx": ["button"],
     // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
     "components/sites/looks/colour-picker.tsx": ["button"],
+    // button: Brand's "Customise components" row, two lines that open the list (DEC-227)
+    "components/sites/looks/component-styles.tsx": ["button"],
+    // button, input: today's Brand panel, parked behind the Website area switch (owner, 20 Nov)
+    "components/sites/looks/legacy/component-styles.tsx": ["button"],
+    "components/sites/looks/legacy/style-panel.tsx": ["input"],
     // button: a row or card that is one button, a row that opens
     "components/sites/editor/editor-top-bar.tsx": ["button"],
+    // button: the page picker and the phone's page and ⋯ More, moved from editor-top-bar.tsx (U46)
+    "components/sites/editor/phone/phone-top-bar.tsx": ["button"],
+    // button: the desk bar's page picker (page over site) and status chip (U46)
+    "components/sites/editor/shell/desk-top-bar.tsx": ["button"],
+    // button: the post bar's post picker and status chip (U15)
+    "components/sites/posts/editor/post-top-bar.tsx": ["button"],
+    // button: the phone post editor's writing tools and format panel toggles (U16)
+    "components/sites/posts/phone/writing-tools.tsx": ["button"],
+    // button: the phone Add sheet's tiles and rows, and More's rows, each one button (U16)
+    "components/sites/posts/phone/phone-menus.tsx": ["button"],
+    // button: Details' Search and sharing row, two lines that open its sheet (U16)
+    "components/sites/posts/phone/details-sheet.tsx": ["button"],
+    // button: a heading row of a post's outline, pressed to scroll there (U15)
+    "components/sites/posts/editor/posts-left-panel.tsx": ["button"],
+    // button, input: the format bar's toggles and link box over a selection, and the add menu's rows (U15)
+    "components/sites/rich-text/writing-menus.tsx": ["button", "input"],
+    // button: a rail tab, its icon over its word (U46)
+    "components/sites/editor/shell/editor-trail.tsx": ["button"],
+    // button: a row of the Pages tree, one button (U46)
+    "components/sites/editor/shell/pages-tree.tsx": ["button"],
+    // button: the one phone editor's bar cells, icon over word (U49)
+    "components/sites/editor/phone/phone-bar.tsx": ["button"],
+    // button: a section sheet's action tiles, icon over word, and its More row (U49)
+    "components/sites/editor/phone/section-sheet.tsx": ["button"],
+    // button: a row of the phone's Sections sheet, one button (U49)
+    "components/sites/editor/phone/sections-sheet.tsx": ["button"],
+    // button: the phone's page picker (page over site) and a reader's rows (U49)
+    "components/sites/editor/phone/page-menu-sheet.tsx": ["button"],
     // button: a phone's floating pill, Blocks · + · Brand (DEC-185)
     "components/sites/editor/edit-pill.tsx": ["button"],
     // button: a bottom sheet's grip, pulled or pressed to make it taller
@@ -241,6 +274,8 @@ export const RAW_ALLOWED = {
     "components/sites/editor/top-bar-actions.tsx": ["button"],
     // input: a file picker
     "components/shared/fields/media-picker.tsx": ["input"],
+    // button: a photo in the library, one button; input: a file picker (U46d)
+    "components/sites/editor/sheets/photo-sheet.tsx": ["button", "input"],
     // button: a row or card that is one button, an option in a list
     "components/sites/pages/pages-panel.tsx": ["button"],
     // button: a colour swatch in the toolbar; input: a field its screen draws itself
@@ -249,8 +284,6 @@ export const RAW_ALLOWED = {
     "components/sites/section-fields/padding.tsx": ["input"],
     // button: a block's name tag on the canvas
     "components/sites/canvas/section-preview.tsx": ["button"],
-    // input: a slider
-    "components/sites/looks/style-panel.tsx": ["input"],
     // input: a file picker
     "components/stores/import/csv-import.tsx": ["input"],
     // button: a post picture that is one button, picked from a row or swiped to (#1375)

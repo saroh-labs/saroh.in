@@ -19,6 +19,8 @@ jest.mock("@saroh/database", () => {
             findFirst: jest.fn(),
             updateMany: jest.fn(),
         },
+        // No GSTIN saved on the contact (R16).
+        contact: { findFirst: jest.fn().mockResolvedValue(null) },
         invoice: {
             findFirst: jest.fn(),
             create: jest.fn(),

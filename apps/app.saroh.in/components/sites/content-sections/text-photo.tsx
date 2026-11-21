@@ -6,6 +6,7 @@ import { Input } from "@saroh/ui/input";
 import { useId } from "react";
 
 import { MediaPicker } from "@/components/shared/fields/media-picker";
+import { PhotoSheetButton } from "@/components/sites/editor/sheets/photo-sheet-opener";
 import type { RichTextContent } from "@/lib/sites/service";
 
 import { ImageBrief } from "@/components/sites/section-fields/image-brief";
@@ -77,6 +78,10 @@ export function TextPhotoFields({
                         }
                     />
                 </div>
+                <PhotoSheetButton
+                    field="image"
+                    hasPhoto={image !== undefined}
+                />
                 <ImageBrief brief={brief} hasImage={image !== undefined} />
                 <div className="flex items-center justify-between gap-2">
                     <p className="text-xs text-muted-foreground">

@@ -17,6 +17,11 @@ import type { PlansContent, Section } from "@/lib/sites/service";
 
 import { PlansFields } from "./plans";
 
+vi.mock("@/lib/sites/actions", () => ({
+    listPlansForCompare: () =>
+        Promise.resolve([{ id: "pl_full", name: "Full" }]),
+}));
+
 let root: Root;
 let host: HTMLDivElement;
 
@@ -188,5 +193,34 @@ describe("the Plans block in the editor (G9)", () => {
         const section = emptySection("plans");
         expect(section.type).toBe("plans");
         expect(section.content).toEqual({ title: "Plans" });
+    });
+});
+
+describe("Show and Compare's rows (DEC-228)", () => {
+    it("stores Show, with plans as absent", () => {
+        const onChange = render({ title: "Join" });
+        click(choice("Show", "Both"));
+        expect(lastContent(onChange).show).toBe("both");
+        const back = render({ show: "packs" });
+        click(choice("Show", "Plans"));
+        expect(lastContent(back).show).toBeUndefined();
+    });
+
+    it("adds a row and ticks a plan in it, under Compare only", async () => {
+        render({});
+        expect(host.textContent).not.toContain("What each includes");
+        const onChange = render({
+            variant: "compare",
+            includes: [{ label: "Open gym" }],
+        } as PlansContent);
+        await act(async () => {
+            await Promise.resolve();
+        });
+        const toggle = host.querySelector<HTMLElement>('[role="switch"]');
+        if (!toggle) throw new Error("No plan switch");
+        click(toggle);
+        expect(lastContent(onChange).includes).toEqual([
+            { label: "Open gym", cells: [{ id: "pl_full" }] },
+        ]);
     });
 });

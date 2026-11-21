@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+
 import type { ComponentType, ReactNode } from "react";
 import { useRef } from "react";
 import { cn } from "../../lib/utils";
+import { LinkPending } from "./link-pending";
 import { useEdgeFade } from "./scroll-x";
 
 export interface SectionItem<V extends string = string> {
@@ -118,9 +120,10 @@ export function SectionList<V extends string = string>({
                 id={`${idPrefix}-${item.value}`}
                 href={item.href ?? "#"}
                 aria-current={on ? "page" : undefined}
-                className={cls}
+                className={cn(cls, "relative")}
             >
                 {body}
+                <LinkPending />
             </Link>
         ) : (
             <button

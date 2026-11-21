@@ -58,6 +58,8 @@ export interface TimetableShow {
     trainer: boolean;
     places: boolean;
     bookHref?: string;
+    /** Places left from this many down (KD8); absent, the live rule. */
+    placesFrom?: number;
 }
 
 /** Places left are said only when true and this few or fewer (U8). */
@@ -71,9 +73,12 @@ export { PLACES_SHOWN_AT_MOST as FEW_PLACES } from "../live/live-words";
 export function placesLine(
     session: Pick<TimetableSession, "placesLeft">,
     showCount: boolean,
+    placesFrom?: number,
 ): { text: string; tone: "full" | "last" | "few" } | null {
     if (session.placesLeft <= 0) return { text: "Full", tone: "full" };
-    const words = showCount ? placesLeftWords(session.placesLeft) : null;
+    const words = showCount
+        ? placesLeftWords(session.placesLeft, { from: placesFrom })
+        : null;
     if (!words) return null;
     return { text: words, tone: session.placesLeft === 1 ? "last" : "few" };
 }
@@ -374,7 +379,7 @@ function WeekColumns({ look, days, byDay, show, paidWith }: DayProps) {
 }
 
 /**
- * Live's list (VB01 "Next free"): the classes in one row of cards, in
+ * Live's list (VB01 "Next open"): the classes in one row of cards, in
  * time order, sharing the row on a desk (188px at least) and 212px each
  * on a phone, scrolling sideways when they run past the page. A card says the day ("Today", "Tomorrow", then the date), the
  * time large, the class, who · how long · price, its places as a tag,
@@ -822,7 +827,7 @@ function wordsOf(
         who,
         // A pack or membership that covers it, else the class's price.
         price: paidWith ?? sessionPrice(session),
-        places: placesLine(session, show.places),
+        places: placesLine(session, show.places, show.placesFrom),
     };
 }
 

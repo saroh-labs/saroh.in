@@ -1,3 +1,8 @@
+import type { ComponentStyles } from "./component-styles";
+import {
+    componentStyleVariables,
+    pickComponentStyles,
+} from "./component-styles";
 import type { FontPairKey } from "./fonts";
 import { DEFAULT_FONT_PAIR, fontPairVariables, isFontPairKey } from "./fonts";
 import type { LookId } from "./looks";
@@ -209,6 +214,21 @@ export interface SiteStyle {
      * chose nothing must not report a change.
      */
     look?: LookId;
+    /**
+     * Component styles (DEC-227, KD1): only the components the owner
+     * changed, by option id (`component-styles.ts`). ABSENT until they
+     * change one, for the reason `look` is; a key equal to the look's
+     * default is kept, and only "Reset to <look>" removes the object.
+     */
+    components?: ComponentStyles;
+    /**
+     * The merchant's one brand colour (U24b, "Colours from my brand
+     * colour"), `#RRGGBB`. When present, `palette` is the one
+     * `brandPalette` derives from it: the API re-derives it on every save
+     * and never keeps a palette a client sent with it. ABSENT for today's
+     * sites, for the reason `look` is.
+     */
+    brandColour?: string;
 }
 
 /** The look a site has before anyone chooses anything: today's appearance. */
@@ -372,6 +392,8 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         ...(style.palette ? paletteVariables(style.palette) : {}),
         // Its type scale: nothing at all for a site without one.
         ...typeScaleVariables(style.type),
+        // Component choices, by word (DEC-227): none for a site with none.
+        ...componentStyleVariables(style.components),
     };
     // A look draws in safe colours (KD4); Classic keeps exactly these.
     return withLookColours(style, vars);
@@ -444,6 +466,7 @@ export function presetSiteStyle(input: {
     palette?: unknown;
     type?: unknown;
     look?: unknown;
+    components?: unknown;
 }): SiteStyle {
     const style = defaultSiteStyle();
     for (const row of STYLE_ROW_KEYS) {
@@ -481,5 +504,7 @@ export function presetSiteStyle(input: {
         }
     }
     if (look.ok && look.look) style.look = look.look;
+    const components = pickComponentStyles(input.components);
+    if (components) style.components = components;
     return style;
 }

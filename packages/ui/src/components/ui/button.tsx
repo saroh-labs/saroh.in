@@ -24,7 +24,9 @@ const buttonVariants = cva(
      * disabled button on a muted panel keeps its shape. A disabled label
      * still clears 4.5:1: WCAG exempts disabled text and the brand declines the
      * exemption, because permissions depend on reading it. Pair a disabled
-     * button with a nearby reason ("Refunds need a manager").
+     * button with a nearby reason ("Refunds need a manager"). Ghost is the
+     * exception: it has no fill to begin with, so disabled keeps it flat and
+     * only the label quietens.
      *
      * BUSY IS NOT DISABLED. "Please wait" and "you can't" are different
      * things to be told: a busy button keeps its colour and its width, says
@@ -60,7 +62,9 @@ const buttonVariants = cva(
                     "border border-border bg-card text-card-foreground hover:border-border-strong hover:bg-accent hover:text-accent-foreground active:border-border-strong active:bg-accent-active",
                 secondary:
                     "bg-secondary text-secondary-foreground hover:bg-secondary-hover active:bg-accent-active",
-                ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent-active",
+                // A disabled ghost stays flat: a fill on a control that never
+                // had one reads as pressed (editor audit, 21 Nov).
+                ghost: "hover:bg-accent hover:text-accent-foreground active:bg-accent-active disabled:bg-transparent disabled:shadow-none",
                 // Ink, not Saffron: in the product the accent belongs to the active
                 // state and nothing else, and a link is not a state.
                 link: "text-primary underline-offset-4 hover:underline active:text-muted-foreground disabled:bg-transparent disabled:shadow-none",

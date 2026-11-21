@@ -22,10 +22,24 @@ export type AskAiLanguage = z.infer<typeof askAiLanguage>;
  * name), with the record's id where there is one. The browser says it, so
  * the model reads it as a pointer, never as an instruction; the tools still
  * check every read. Absent: the whole business (AF 7).
+ *
+ * In the website editors (owner, 21 Nov): `site_page` is a page open in the
+ * editor (id `<siteId>:<pageId>`), `site_section` one of its sections or
+ * its header or footer (`<siteId>:<pageId>:<sectionKey>`), `post` a blog
+ * post (`<siteId>:<postId>`). The site's id travels too: `get_page` needs it.
  */
 export const askAiAbout = z.strictObject({
-    kind: z.enum(["calendar", "customer", "order", "product", "booking"]),
-    id: z.string().min(1).max(64).optional(),
+    kind: z.enum([
+        "calendar",
+        "customer",
+        "order",
+        "product",
+        "booking",
+        "site_page",
+        "site_section",
+        "post",
+    ]),
+    id: z.string().min(1).max(200).optional(),
     label: z.string().trim().min(1).max(80),
 });
 export type AskAiAbout = z.infer<typeof askAiAbout>;
@@ -50,6 +64,15 @@ export const ASK_AI_STARTERS = [
     "What do they usually order?",
     "When did they last come?",
     "Why did they stop coming?",
+    // A page in the website editor.
+    "What could make this page clearer?",
+    "Is anything missing for a first-time visitor?",
+    // A section in the website editor.
+    "How could this section's words be clearer?",
+    "Is this section's main button clear?",
+    // A blog post in its editor.
+    "Suggest a better title for this post",
+    "Suggest a few headings for this post",
 ] as const;
 export type AskAiStarter = (typeof ASK_AI_STARTERS)[number];
 

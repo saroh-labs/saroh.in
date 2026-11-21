@@ -921,6 +921,22 @@ the Privacy Policy states both.
 - A queued job still runs with `SITE_TEST_RELEASES` off (KTD-16): it is a
   go-live the merchant was told would happen.
 
+## Scheduled post — **Current** (editor redesign U17a)
+
+- **`post.go_live`** is Publish post › Later (`content/post-go-live.handler.ts`).
+  Scheduling writes `Post.scheduledAt`, `scheduledByUserId` and one PENDING
+  job (`runAt` = the instant, payload `{ postId, at }`) on one transaction
+  (`content/post-schedule.ts`); moving it drops the waiting job first.
+- **The post's row is the lock** (`FOR UPDATE` in `publishPostInTx`, taken
+  after the plan meter's advisory lock). A run whose `scheduledAt` no longer
+  equals its `at` (moved, cancelled, published or taken off by hand) does
+  nothing, so two runs for one instant publish once.
+- It publishes the draft as it is then, as the person who scheduled it.
+  A clear no-go (they left, can't write sections, the plan paused the post
+  or has no room) clears the schedule and writes a `not_published`
+  revision with the reason, and never retries; the last failed attempt
+  records the same. Nobody is alerted yet (History shows it).
+
 ## Site page cache — **Current** (#863)
 
 - **`site.pages.revalidate`** tells the merchant sites' Worker which kept

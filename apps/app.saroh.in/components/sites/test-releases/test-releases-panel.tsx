@@ -48,7 +48,7 @@ export function TestReleasesPanel({
         <div className="flex min-h-0 flex-1 flex-col">
             <div className="grid shrink-0 gap-2 border-b px-4 pb-3">
                 <h2 className="font-display text-[17px] font-semibold tracking-[-0.02em]">
-                    Test releases
+                    Test links
                 </h2>
                 <p className="text-[12.5px] leading-normal text-muted-foreground">
                     A frozen copy of your site on its own test address, for
@@ -66,7 +66,7 @@ export function TestReleasesPanel({
                         onClick={() => state.setMaking(true)}
                     >
                         <Plus aria-hidden className="size-4" />
-                        Make a test release
+                        Make a test link
                     </Button>
                 ) : null}
             </div>
@@ -75,7 +75,7 @@ export function TestReleasesPanel({
                 {read.state === "failed" ? (
                     <FailedState
                         size="panel"
-                        title={couldntLoad("test releases")}
+                        title={couldntLoad("test links")}
                         retrying={retrying}
                         onRetry={() => {
                             setRetrying(true);
@@ -87,7 +87,7 @@ export function TestReleasesPanel({
                 ) : releases.length === 0 ? (
                     <EmptyState
                         size="panel"
-                        title="No test releases yet"
+                        title="No test links yet"
                         description={
                             abilities.canUpdate
                                 ? "Make one to share this version before it goes live."

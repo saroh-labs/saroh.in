@@ -64,8 +64,8 @@ export function SiteViewBeacon({
             },
         });
         if (!body) return;
-        registerVisitSender((step, origin) =>
-            send(visitStepBody(step, origin)),
+        registerVisitSender((step, origin, path) =>
+            send(visitStepBody(step, origin, path)),
         );
         seeVisitPage(Date.now(), {
             referrer: document.referrer,

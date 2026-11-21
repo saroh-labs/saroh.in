@@ -59,6 +59,7 @@ export function siteState(
     const pending = pendingChangeCount(
         site.pendingSectionChanges,
         site.pendingSiteChanges,
+        site.pendingChanges,
     );
     if (pending > 0) {
         return {
@@ -73,7 +74,7 @@ export function siteState(
 }
 
 /**
- * "Live · published 17 Oct" or "Not published yet": the whole status for
+ * "Live · published 17 Oct" or "Not live yet": the whole status for
  * someone who can't edit — the shell header and the editor's top bar.
  */
 export function readerSiteState(
@@ -82,7 +83,7 @@ export function readerSiteState(
 ): { label: string; tone: SiteStateTone } {
     const at = site.currentPublication?.publishedAt;
     if (!site.currentPublicationId && !at) {
-        return { label: "Not published yet", tone: "draft" };
+        return { label: "Not live yet", tone: "draft" };
     }
     return {
         label: at ? `Live · published ${formatDate(at, timeZone)}` : "Live",
@@ -105,7 +106,7 @@ export function pageState(
 ): { state: PageState; label: string } {
     if (page.hidden) return { state: "hidden", label: "Hidden" };
     if (!site.currentPublicationId) {
-        return { state: "unpublished", label: "Not published yet" };
+        return { state: "unpublished", label: "Not live yet" };
     }
     return { state: "live", label: "Live" };
 }

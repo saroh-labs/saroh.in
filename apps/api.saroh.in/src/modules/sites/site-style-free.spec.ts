@@ -199,3 +199,22 @@ describe("paidStyleParts, on the shared fixtures", () => {
         expect(parts.length > 0).toBe(c.refused);
     });
 });
+
+describe("component styles are free on every plan (DEC-227, KD4)", () => {
+    it("never counts a component choice as paid", () => {
+        const next: SiteStyle = {
+            ...made(),
+            components: {
+                buttons: "square",
+                cards: "raised",
+                images: "arch",
+                headings: "display",
+                spacing: "compact",
+                tags: "tag",
+                links: "arrow",
+            },
+        };
+        expect(paid(next)).toEqual([]);
+        expect(paid(next, { stored: undefined })).toEqual([]);
+    });
+});

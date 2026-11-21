@@ -3,6 +3,7 @@
 import type { RenderedHero } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
+import { EditableText } from "../editable-text";
 import { openState, openStateText } from "../lib/opening-hours";
 import type { PublicVisit } from "../lib/public-visit";
 import { siteImage } from "../lib/site-image";
@@ -11,6 +12,7 @@ import { cn } from "../lib/utils";
 import { CtaButton } from "./cta";
 import { HeroHeading } from "./hero-heading";
 import type { HeroLevel } from "./hero-level";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero's `fullBleed` look (industry templates U2): the photo fills the
@@ -98,6 +100,7 @@ export default function FullBleedHero({
                         src,
                         width: content.image?.width,
                         sizes: "100vw",
+                        focus: content.image?.focus,
                     })}
                     className="absolute inset-0 -z-20 size-full object-cover"
                 />
@@ -130,11 +133,16 @@ export default function FullBleedHero({
                         level={level}
                         className="font-site-heading text-balance text-[clamp(calc(40px*var(--site-heading-scale)),8vw,calc(var(--site-display-size,76px)*var(--site-heading-scale)))] font-semibold leading-[1.02] tracking-[-0.035em]"
                     >
-                        {content.heading}
+                        <EditableText field="heading">
+                            {content.heading}
+                        </EditableText>
                     </HeroHeading>
                     {content.subheading ? (
                         <p className="mt-4 max-w-[46ch] text-pretty text-base leading-[1.55] opacity-90 sm:text-lg">
-                            {content.subheading}
+                            <PhoneText
+                                text={content.subheading}
+                                phone={content.phoneLine}
+                            />
                         </p>
                     ) : null}
                     {content.cta ? (

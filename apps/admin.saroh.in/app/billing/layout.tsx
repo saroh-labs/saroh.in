@@ -2,7 +2,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Suspense } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { BillingToolbar } from "@/components/billing/billing-toolbar";
 import { getBillingCounts } from "@/lib/billing";
 import { requireStaff } from "@/lib/console";
@@ -25,7 +24,7 @@ export default async function BillingLayout({
     const counts = await getBillingCounts().catch(() => null);
 
     return (
-        <AdminShell staff={gate.staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Money", "Billing"]}
@@ -37,6 +36,6 @@ export default async function BillingLayout({
                 </Suspense>
                 {children}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

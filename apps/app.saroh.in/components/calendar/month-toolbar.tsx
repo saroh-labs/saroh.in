@@ -8,6 +8,7 @@ import Link from "next/link";
 import { MonthStep } from "@/components/calendar/month-step";
 import type { CalendarView } from "@/components/calendar/view-switch";
 import { ViewSwitch } from "@/components/calendar/view-switch";
+import { useScreenLink } from "@/components/shared/page/screen-pending";
 import type { Edge } from "@/lib/calendar/range";
 
 interface Step {
@@ -49,6 +50,7 @@ export function MonthToolbar({
     /** What to show: the one filter button. */
     filter: React.ReactNode;
 }) {
+    const screenLink = useScreenLink();
     const edgeNote = prev.edge?.note ?? next.edge?.note;
     return (
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 max-[759px]:gap-x-0.5">
@@ -93,7 +95,12 @@ export function MonthToolbar({
                         size="sm"
                         className="max-[759px]:h-11 max-[759px]:rounded-[10px] max-[759px]:px-3.5"
                     >
-                        <Link href={current.href}>{current.label}</Link>
+                        <Link
+                            href={current.href}
+                            onNavigate={screenLink(current.href)}
+                        >
+                            {current.label}
+                        </Link>
                     </Button>
                 )}
             </div>

@@ -1,0 +1,6 @@
+/* A merchant's page, for the website library's previews (KD11): the blocks'
+   own classes only, never saroh.in's tokens. */
+@config "../../tailwind.library-preview.config.ts";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

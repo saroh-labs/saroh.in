@@ -290,47 +290,14 @@ function states(at: string, duration: string): string {
  * MOTION. Small, and only for a visitor who has not asked for less.
  *
  * - The phone menu's panel drops in over 180ms and the page dims behind it.
- * - A SECTION RISES A LITTLE AS IT COMES INTO VIEW, tied to the scroll
- *   itself (`animation-timeline: view()`), with no script. That matters:
- *   the content is in the page's HTML and fully visible with scripts off,
- *   to a crawler, in print, and in any browser that does not know scroll
- *   timelines (the whole rule sits behind `@supports`, which asks for the
- *   exact range it uses, and such a browser simply shows the section: a
- *   range it misread would fade a section across the whole screen). What
- *   is already on screen when the page
- *   loads is past its entrance and is never hidden, so the page's first
- *   paint is not delayed.
- * - Once a section has come in, the animation lets go of it completely
- *   (it fills backwards only), so it leaves no transform or stacking
- *   context behind for a sheet or a menu inside the section to be caught
- *   by.
- * - Only on a real site's document (`:root`). A scoped theme is the
- *   editor's canvas or a catalog tile, where a section fading in as the
- *   merchant scrolls their own work would be noise.
+ * - NOTHING WAITS FOR A SCROLL (U8, the 17 Nov critique): a section is
+ *   visible at rest. The old scroll-linked rise left every section below
+ *   the fold at opacity 0 in captures, thumbnails and print.
  *
  * Transform and opacity only; nothing moves the layout.
  */
 function motion(at: string): string {
-    const entrance =
-        at === ":root"
-            ? `
-            @media screen and (prefers-reduced-motion: no-preference) {
-                @supports (animation-timeline: view()) and (animation-range: entry 0% entry 180px) {
-                    ${at} [data-site-section] > * {
-                        animation: site-rise var(--site-ease) backwards;
-                        animation-timeline: view();
-                        animation-range: entry 0% entry 180px;
-                    }
-                }
-            }`
-            : "";
     return `
-            @keyframes site-rise {
-                from {
-                    opacity: 0;
-                    transform: translateY(14px);
-                }
-            }
             @keyframes site-menu-in {
                 from {
                     opacity: 0;
@@ -349,7 +316,7 @@ function motion(at: string): string {
                 ${at} [data-site-menu-scrim] {
                     animation: site-fade-in 180ms var(--site-ease) both;
                 }
-            }${entrance}`;
+            }`;
 }
 
 /**
@@ -358,9 +325,8 @@ function motion(at: string): string {
  * moments (a hero unmasking, a frame drawing, a ticket springing) are cut
  * or shortened to fit; where a board and DEC-172 disagree, DEC-172 wins.
  *
- * - NOTHING MOVES ON SCROLL. Classic's sections rise as they come into
- *   view; under a look every section is visible at rest, never hidden
- *   waiting for a scroll (WV2Motion, WV2Tech: screen readers and captures
+ * - NOTHING MOVES ON SCROLL. As on Classic, every section is visible at
+ *   rest, never hidden waiting for a scroll (WV2Motion, WV2Tech: screen readers and captures
  *   met blanks). No parallax.
  * - `site-rise` is a fade and a rise of the look's distance (8px) over
  *   its slow step (200ms); `site-fade-in` is a fade alone. A block asks

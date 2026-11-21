@@ -44,7 +44,7 @@ export type {
  * knows about, and the exhaustive `Record<SectionType, …>` maps in the editor
  * start demanding their entries instead of silently accepting six.
  */
-import type { LookId, SectionType } from "@saroh/block-contract";
+import type { HeroPanelKind, LookId, SectionType } from "@saroh/block-contract";
 import type { SiteChangeKind } from "./pending";
 
 export type { SectionType };
@@ -72,6 +72,8 @@ export interface CtaValue {
     href?: string;
     action?: CtaAction;
     style?: CtaStyle;
+    /** Shorter words for a phone (KD9); absent, the label. */
+    phoneLabel?: string;
 }
 
 export interface ImageValue {
@@ -96,7 +98,27 @@ export interface HeroContent {
     /** `false`: the `none` look's heading is for screen readers only. */
     titleVisible?: boolean;
     /** A quieter link beside the button, drawn by the looks (DEC-172). */
-    secondaryCta?: { label: string; href: string };
+    secondaryCta?: { label: string; href: string; phoneLabel?: string };
+    /** The answer look's panel (DEC-228); absent, Today. */
+    panel?: HeroPanel;
+    /** Open now, Directions and Call under the buttons. */
+    answerRow?: boolean;
+    /** Who is behind the business, beside the heading. */
+    byline?: { image?: ImageValue; name: string; role?: string };
+    /** A shorter line for a phone (KD9); absent, the subheading. */
+    phoneLine?: string;
+}
+
+/** What a hero's answer panel answers first (mirror of the contract). */
+export interface HeroPanel {
+    kind: HeroPanelKind;
+    /** Same-day call's line; absent, the contract's default words. */
+    words?: string;
+    /** Same-day call's number; absent, the business's own. */
+    phone?: string;
+    /** Pickup's "Order by 9 pm" and where. */
+    orderBy?: string;
+    where?: string;
 }
 
 export interface RichTextContent {
@@ -112,6 +134,8 @@ export interface RichTextContent {
     callout?: { label?: string; text: string };
     /** The text's h3s as small capitals part labels. */
     partLabels?: boolean;
+    /** A shorter body for a phone (KD9); absent, `value`. */
+    phoneBody?: string;
 }
 
 export type CtaContent = CtaValue;
@@ -119,7 +143,16 @@ export type CtaContent = CtaValue;
 export type GalleryLayout = "grid" | "carousel" | "masonry";
 
 /** A gallery photo, with an optional line under it (gallery@2, U2). */
-export type GalleryImage = ImageValue & { caption?: string };
+export type GalleryImage = ImageValue & {
+    caption?: string;
+    /** The lookbook look's words and link per photo (DEC-228). */
+    name?: string;
+    fromPrice?: string;
+    link?:
+        | { kind: "service"; serviceId: string }
+        | { kind: "product"; productId: string }
+        | { kind: "page"; pageId: string };
+};
 
 export interface GalleryContent {
     images: GalleryImage[];
@@ -229,6 +262,8 @@ export interface ServicesListContent {
     followUpLine?: string;
     includesLabel?: string;
     includes?: string[];
+    /** The menu look's headings, each over its services (DEC-227). */
+    groups?: { name: string; serviceIds: string[] }[];
 }
 
 /** "Show as" (G16): side by side, or one per row. */
@@ -244,6 +279,8 @@ export interface VisitUsContent {
     storeId?: string;
     showMap?: boolean;
     showHours?: boolean;
+    /** A line of the owner's own under the address. */
+    extraLine?: string;
 }
 
 /**
@@ -286,6 +323,10 @@ export interface PlansContent {
     /** Display options (G16). Absent: cards, with prices. */
     layout?: ListLayout;
     showPrices?: boolean;
+    /** Plans, class packs or both; absent, plans. */
+    show?: "plans" | "packs" | "both";
+    /** The compare look's rows: per plan or pack id, the cell's words. */
+    includes?: { label: string; cells?: { id: string; words?: string }[] }[];
 }
 
 /**
@@ -321,6 +362,10 @@ export interface ProductGridContent {
     columns?: 3 | 4 | 5;
     /** Across on a phone, the owner's choice; absent, the look's own. */
     phoneColumns?: 1 | 2;
+    /** A − / + stepper on each card (DEC-227). */
+    addInPlace?: boolean;
+    /** The owner's Pre-order tag words. */
+    preorderWords?: string;
 }
 
 /**
@@ -349,6 +394,8 @@ export interface TimetableContent {
     weekdaysOnly?: boolean;
     /** "13 sessions across 5 days" under the title. */
     showCounts?: boolean;
+    /** Places left from this many down (KD8); absent, "Automatic". */
+    placesFrom?: number;
 }
 
 /**
@@ -441,6 +488,8 @@ export interface BookingContent {
      */
     submitLabel?: string;
     successMessage?: string;
+    /** The owner's "Before you book" note. */
+    beforeYouBook?: string;
 }
 
 /** Content shape keyed by section type. */
@@ -610,8 +659,30 @@ export interface SiteSummary {
      * first publish. Described through `describePendingChanges`.
      */
     pendingSiteChanges?: SiteChangeKind[] | null;
+    /**
+     * How many things publishing would change, one per change unit (U7):
+     * the number the status chip, Overview, phone bar and All sites show.
+     * Null before the first publish; absent from an older API.
+     */
+    pendingChanges?: number | null;
     /** A claimed hostname that has not verified yet, if any. */
     pendingDomain?: string | null;
+    /**
+     * Visits in the last 7 days, from the analytics rollups (plan
+     * 2026-11-18-001 U3). Absent from an API that doesn't send it yet: the
+     * All sites card then leaves the figure out, never shows 0.
+     */
+    visitsLast7Days?: number | null;
+    /**
+     * The last thing done to the site, for the All sites card ("Ritika
+     * edited 2h ago", "Mohit published 9 Nov"). Absent until the API sends
+     * it; `by` is null when nobody is named (A4: earlier changes).
+     */
+    lastActivity?: {
+        kind: "edited" | "published";
+        by: string | null;
+        at: string;
+    } | null;
 }
 
 /** A menu entry names a page; the label is optional and defaults to its title. */
@@ -660,6 +731,16 @@ export interface SitePage {
      * saved (#908). Absent from an API older than #908.
      */
     updatedAt?: string;
+    /**
+     * The page's own Google title and text, share image and "Show on
+     * Google" off (KTD-7); null falls back to the site's. Absent from an
+     * API older than the website area's U1.
+     */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    shareImageMediaId?: string | null;
+    shareImageUrl?: string | null;
+    noindex?: boolean;
 }
 
 /**
@@ -839,6 +920,8 @@ export interface PageDraft {
     /** What publishing would change, site-wide, as of this read (#190). */
     pendingSectionChanges: number | null;
     pendingSiteChanges: SiteChangeKind[] | null;
+    /** The change units waiting (U7): the one number every surface shows. */
+    pendingChanges?: number | null;
 }
 
 export interface CreateSiteInput {
@@ -867,6 +950,10 @@ export type SitesResult<T> =
            * else's work — so the screen offers to reload rather than to retry.
            */
           conflict?: boolean;
+          /** With `conflict`: who saved the draft since (C12), if known. */
+          by?: string | null;
+          /** With `conflict`: the newer save was this person's own. */
+          you?: boolean;
           /**
            * An address to offer instead of one the API refused (G14's
            * `details.suggestion`): taken, or one of the site's own routes.
@@ -891,6 +978,13 @@ export type SitesResult<T> =
 async function sitesBase(): Promise<string | null> {
     const orgId = await getActiveOrgId();
     return orgId ? `/organizations/${orgId}/sites` : null;
+}
+
+/** A 409's `error.details`: who saved the draft since (C12). */
+function conflictDetails(data: unknown): { by?: string | null; you?: boolean } {
+    const error = (data as { error?: { details?: unknown } } | null)?.error;
+    const details = typeof error === "object" ? error.details : undefined;
+    return typeof details === "object" && details !== null ? details : {};
 }
 
 /** Extract a human message (+ optional index) from a JSON error body. */
@@ -1011,6 +1105,171 @@ export async function getSite(siteId: string): Promise<SiteDetail | null> {
     return getJson<SiteDetail>(`${base}/${siteId}`);
 }
 
+/**
+ * A site's Overview (plan 2026-11-18-001 U4), `GET …/sites/:id/overview`:
+ * the last 7 days' results (null for someone who can't read Insights; a
+ * part is null when its module is off), what needs doing, and activity.
+ */
+export interface SiteOverview {
+    results: {
+        from: string;
+        to: string;
+        days: { date: string; visits: number }[];
+        visits: number;
+        questions: number;
+        started: number | null;
+        paid: number | null;
+        sells: { bookings: boolean; shop: boolean };
+    } | null;
+    needsDoing: {
+        pageId: string;
+        title: string;
+        path: string;
+        issues: (
+            "googleText" | "shareImage" | "brokenLink" | "hiddenByRoute"
+        )[];
+        /** With `hiddenByRoute`: the built-in route the page is hidden behind. */
+        hiddenBehind?: { root: string; name: string; purpose: string };
+    }[];
+    activity: {
+        kind:
+            | "published"
+            | "restored"
+            | "test_link_live"
+            | "post_published"
+            | "page_settings"
+            | "saved"
+            | "approval_on"
+            | "approval_off"
+            | "look_updated"
+            | "draft_rolled_back";
+        at: string;
+        by: string | null;
+        subject: string | null;
+    }[];
+    lastPublished: { at: string; by: string | null } | null;
+    /** Each page's last edit, named when it was its settings (Pages, U5). */
+    pageEdits?: { pageId: string; at: string; by: string | null }[];
+}
+
+/** One thing publishing would change (API `change-units.ts`, U7). */
+export interface ChangeUnit {
+    /** `section:<pageId>:<sectionKey>`, `page:<pageId>` or `site:<kind>`. */
+    key: string;
+    kind: "section" | "page" | "site";
+    change: "added" | "changed" | "moved" | "removed" | "hidden";
+    /** "Changed · Top of the page". */
+    label: string;
+    /** The page's title, or "Every page". */
+    where: string;
+    pageId: string | null;
+    fingerprint: string;
+    /** Null: changed before names were kept. */
+    editedBy: string | null;
+    editedAt: string | null;
+    /** Units that go out, or are left out, with this one. */
+    requires: string[];
+    /** Its approval (DEC-226, U9). */
+    approval: ChangeApproval;
+}
+
+/** Someone who may approve a change (DEC-226). */
+export interface ChangeApprover {
+    id: string;
+    name: string;
+    role: "REVIEWER" | "OWNER" | "ADMIN";
+}
+
+/** A change's approval (API `change-approvals.ts`, U9). */
+export interface ChangeApproval {
+    /** `not-needed`: made last by an owner or admin. */
+    state: "not-needed" | "waiting" | "approved" | "asked";
+    by?: { id: string; name: string | null };
+    at?: string;
+    /** What needs changing, when asked. */
+    reason?: string;
+    /** An approval a later edit no longer matches. */
+    voided: boolean;
+    /** Who may approve it; never its last editor. */
+    approvers: ChangeApprover[];
+}
+
+/** What publishing would change, by who changed it (U7). */
+export interface SiteChanges {
+    siteId: string;
+    livePublishedAt: string | null;
+    /** `units.length`; null before the first publish. */
+    count: number | null;
+    units: ChangeUnit[];
+    /** Newest first; `userId` null: changed before names were kept. */
+    groups: {
+        userId: string | null;
+        name: string | null;
+        you: boolean;
+        units: string[];
+    }[];
+    /** Posts not live yet: each goes live with its own Publish post. */
+    posts: { id: string; title: string; updatedAt: string }[];
+    /**
+     * "Publishing needs approval" applies: a teammate's change goes out
+     * only once approved; the rest are left out by default.
+     */
+    approvalRequired: boolean;
+}
+
+/**
+ * Approve waiting changes, or ask for changes with a reason (DEC-226, U9).
+ * Requires `site:approve`; never on a change you made.
+ */
+export async function recordChangeVerdict(
+    siteId: string,
+    units: string[],
+    outcome: ReviewerVerdict,
+    reason?: string,
+): Promise<SitesResult<{ recorded: number }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(
+        `${base}/${siteId}/changes/${outcome === "APPROVED" ? "approve" : "ask"}`,
+        {
+            method: "POST",
+            body: JSON.stringify({
+                units,
+                ...(outcome === "CHANGES_REQUESTED" ? { reason } : {}),
+            }),
+        },
+    );
+    const data = (await res.json().catch(() => null)) as {
+        recorded?: number;
+    } | null;
+    if (res.ok && typeof data?.recorded === "number") {
+        return { ok: true, data: { recorded: data.recorded } };
+    }
+    return { ok: false, ...readError(data, "Couldn't record that.") };
+}
+
+/** Null on a 404 / no active org; throws on a real failure. */
+export async function getSiteChanges(
+    siteId: string,
+): Promise<SiteChanges | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    return getJson<SiteChanges>(`${base}/${siteId}/changes`);
+}
+
+/** Null on a 404 / no active org; throws on a real failure. */
+export async function getSiteOverview(
+    siteId: string,
+): Promise<SiteOverview | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    return getJson<SiteOverview>(`${base}/${siteId}/overview`);
+}
+
 /** The current editable draft for a page (the API creates one if none). Null on
  * a 404 / no active org; throws on a real failure. */
 export async function getPageDraft(
@@ -1101,6 +1360,7 @@ export async function saveDraftSections(
         revision?: number;
         pendingSectionChanges?: number | null;
         pendingSiteChanges?: SiteChangeKind[] | null;
+        pendingChanges?: number | null;
     }>
 > {
     const base = await sitesBase();
@@ -1121,10 +1381,13 @@ export async function saveDraftSections(
         revision?: number;
         pendingSectionChanges?: number | null;
         pendingSiteChanges?: SiteChangeKind[] | null;
+        pendingChanges?: number | null;
         message?: string;
         error?: string;
         code?: string;
         index?: number;
+        by?: string | null;
+        you?: boolean;
     } | null;
     if (res.status === 409) {
         /*
@@ -1135,9 +1398,14 @@ export async function saveDraftSections(
         return {
             ok: false,
             conflict: true,
+            // Who saved it since (C12); null when the API can't say. The
+            // error filter carries it in `error.details`.
+            by: conflictDetails(data).by ?? data?.by ?? null,
+            // The newest save was this person's own, in another tab.
+            you: (conflictDetails(data).you ?? data?.you) === true,
             ...readError(
                 data,
-                "Someone else saved this page while you were editing.",
+                "This page was saved somewhere else while you were editing.",
             ),
         };
     }
@@ -1154,6 +1422,7 @@ export async function saveDraftSections(
                  */
                 pendingSectionChanges: data?.pendingSectionChanges ?? null,
                 pendingSiteChanges: data?.pendingSiteChanges ?? null,
+                pendingChanges: data?.pendingChanges ?? null,
             },
         };
     }
@@ -1168,20 +1437,37 @@ export async function publishSite(
      * refused from anyone else, and recorded when it goes through.
      */
     override = false,
-): Promise<SitesResult<{ publicationId?: string; bypassed: boolean }>> {
+    /**
+     * Change unit keys to keep out of this publish (U8): they go live as
+     * they are live now and stay waiting in the draft.
+     */
+    leaveOut: string[] = [],
+): Promise<
+    SitesResult<{
+        publicationId?: string;
+        bypassed: boolean;
+        /** Units left out with them because they needed them. */
+        alsoLeftOut: string[];
+    }>
+> {
     const base = await sitesBase();
     if (!base)
         return {
             ok: false,
             error: "No business is open. Choose one and try again.",
         };
+    const body = {
+        ...(override ? { override: true } : {}),
+        ...(leaveOut.length > 0 ? { leaveOut } : {}),
+    };
     const res = await apiFetch(`${base}/${siteId}/publish`, {
         method: "POST",
-        ...(override ? { body: JSON.stringify({ override: true }) } : {}),
+        ...(Object.keys(body).length > 0 ? { body: JSON.stringify(body) } : {}),
     });
     const data = (await res.json().catch(() => null)) as {
         publicationId?: string;
         bypassed?: boolean;
+        alsoLeftOut?: string[];
         message?: string;
         error?: string;
     } | null;
@@ -1191,6 +1477,7 @@ export async function publishSite(
             data: {
                 publicationId: data?.publicationId,
                 bypassed: data?.bypassed === true,
+                alsoLeftOut: data?.alsoLeftOut ?? [],
             },
         };
     }
@@ -1367,7 +1654,8 @@ export async function getPublication(
 
 /**
  * Put a past version back. Appends a new publication rather than deleting the
- * ones after it, so this can itself be undone.
+ * ones after it, so this can itself be undone. Parked for the Website area
+ * off (`restoresAsDraft`, owner 20 Nov 2026).
  */
 export async function restorePublication(
     siteId: string,
@@ -1687,6 +1975,8 @@ export interface SiteCommentView {
     editable: boolean;
     /** You wrote it (DEC-200, U4). Absent from an older API: not yours. */
     mine?: boolean;
+    /** The words a note is pinned to (U17a); null or absent: the whole post. */
+    quote?: string | null;
 }
 
 /**
@@ -1883,7 +2173,12 @@ export async function createComment(
               testReleaseId?: string;
           }
         /** A note on a draft post (DEC-200 U8). */
-        | { postId: string; body: string },
+        | {
+              postId: string;
+              body: string;
+              /** The words of the post it is pinned to (U17a), ≤500. */
+              quote?: string;
+          },
 ): Promise<SitesResult<{ id: string }>> {
     const base = await sitesBase();
     if (!base)
@@ -2129,7 +2424,12 @@ export type FlagType =
     // A Product grid (G12) naming products that aren't on sale there.
     | "productsNotOnSale"
     // The site has no web address (DEC-069, L5): the one flag that blocks.
-    | "addressMissing";
+    | "addressMissing"
+    // Check before publish (U10): a typed price that isn't Services', a
+    // "free" that isn't, a photo with no description.
+    | "priceMismatch"
+    | "freeClaim"
+    | "photoNoDescription";
 
 export interface Flag {
     type: FlagType;
@@ -2139,6 +2439,8 @@ export interface Flag {
     field: string | null;
     /** The API refuses to publish until this is fixed (only `addressMissing`). */
     blocking?: boolean;
+    /** `photoNoDescription`: the photo, so "Describe it" can show it. */
+    photoSrc?: string;
 }
 
 export interface SiteFlags {
@@ -2192,6 +2494,14 @@ export interface UpdatePageInput {
     hidden?: boolean;
     /** "Show in menu" (G14). */
     inMenu?: boolean;
+    /** Null (or blank) clears it, and the site's own is used. */
+    seoTitle?: string | null;
+    seoDescription?: string | null;
+    /** A library photo; null clears the share image. */
+    shareImageMediaId?: string | null;
+    shareImageUrl?: string | null;
+    /** "Show on Google" off. */
+    noindex?: boolean;
 }
 
 /**
@@ -2242,6 +2552,26 @@ export async function updatePage(
         (Partial<SitePage> & { message?: string; error?: string }) | null;
     if (res.ok && data?.id) return { ok: true, data: data as SitePage };
     return { ok: false, ...readError(data, "Couldn't update the page.") };
+}
+
+/** Copy a page's draft to `<link>-copy`, hidden and out of the menu (U5). */
+export async function duplicatePage(
+    siteId: string,
+    pageId: string,
+): Promise<SitesResult<SitePage>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/pages/${pageId}/duplicate`, {
+        method: "POST",
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SitePage> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SitePage };
+    return { ok: false, ...readError(data, "Couldn't copy the page.") };
 }
 
 /** Delete a page and everything on it. The home page cannot be deleted. */
@@ -2428,4 +2758,72 @@ export async function revokePreviewLink(
         ok: false,
         ...readError(data, "Couldn't turn this link off."),
     };
+}
+
+/**
+ * An old page link that forwards to a page (website area KTD-3): made for
+ * the merchant when a published page's link changes (AUTO), or added by
+ * them for a link printed somewhere else (OWN). Mirrors the API's
+ * `SiteRedirectView`.
+ */
+export interface SiteRedirect {
+    id: string;
+    fromPath: string;
+    toPath: string;
+    /** The page it opens; null when that page is gone. */
+    toTitle: string | null;
+    source: "AUTO" | "OWN";
+    /** The live site forwards it already; else it waits for Publish. */
+    live: boolean;
+    createdAt: string;
+}
+
+/** The site's old links that forward, or null when they couldn't be read. */
+export async function listSiteRedirects(
+    siteId: string,
+): Promise<SiteRedirect[] | null> {
+    const base = await sitesBase();
+    if (!base) return null;
+    const res = await apiFetch(`${base}/${siteId}/redirects`);
+    if (!res.ok) return null;
+    return (await res.json()) as SiteRedirect[];
+}
+
+export async function createSiteRedirect(
+    siteId: string,
+    input: { fromPath: string; toPath: string },
+): Promise<SitesResult<SiteRedirect>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/redirects`, {
+        method: "POST",
+        body: JSON.stringify(input),
+    });
+    const data = (await res.json().catch(() => null)) as
+        (Partial<SiteRedirect> & { message?: string; error?: string }) | null;
+    if (res.ok && data?.id) return { ok: true, data: data as SiteRedirect };
+    return { ok: false, ...readError(data, "Couldn't add the old link.") };
+}
+
+/** Stop forwarding one of the merchant's own old links (OWN only). */
+export async function removeSiteRedirect(
+    siteId: string,
+    redirectId: string,
+): Promise<SitesResult<{ removed: true }>> {
+    const base = await sitesBase();
+    if (!base)
+        return {
+            ok: false,
+            error: "No business is open. Choose one and try again.",
+        };
+    const res = await apiFetch(`${base}/${siteId}/redirects/${redirectId}`, {
+        method: "DELETE",
+    });
+    if (res.ok) return { ok: true, data: { removed: true } };
+    const data: unknown = await res.json().catch(() => null);
+    return { ok: false, ...readError(data, "Couldn't remove the old link.") };
 }

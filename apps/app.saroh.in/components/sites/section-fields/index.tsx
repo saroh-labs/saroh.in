@@ -48,16 +48,21 @@ export function SectionFields({
     services,
     pages,
     onChange,
+    variant = true,
 }: {
     section: Section;
     services: ServicesLoad;
     /** The site's pages, so a button can pick one rather than type a path. */
     pages: SitePage[];
     onChange: (next: Section) => void;
+    /** The look picker; the new inspector draws it in Style instead (U47). */
+    variant?: boolean;
 }) {
     return (
         <div className="grid gap-3">
-            <VariantField section={section} onChange={onChange} />
+            {variant ? (
+                <VariantField section={section} onChange={onChange} />
+            ) : null}
             {perTypeFields({ section, services, pages, onChange })}
         </div>
     );

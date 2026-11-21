@@ -22,9 +22,9 @@ import {
  * for changes, an owner publishes anyway — and one browser context cannot tell
  * that story, which is why nothing had told it before.
  *
- * Restore is the other half. It puts an older snapshot live, so it can go past
- * an outstanding change request the same way a publish can, and #279 asks it
- * to say so before it happens rather than after.
+ * Restore is the other half. Since 20 Nov 2026 it puts an older version
+ * back as the DRAFT: nothing goes live until Publish, which asks for any
+ * approval as every publish does.
  *
  * These run against the seeded stack and CHANGE it: they publish, and they
  * restore. Written to survive that — nothing asserts a count of versions or
@@ -189,53 +189,42 @@ test.describe("publishing past a change request", { tag: "@serial" }, () => {
 });
 
 test.describe("taking a version back", { tag: "@serial" }, () => {
-    test("asks first, and says what restoring would go past", async ({
+    /*
+     * Restore copies a version into the DRAFT (owner, 20 Nov 2026): nothing
+     * goes live until Publish, so a change request is not gone past and
+     * the confirm says only that the draft is replaced.
+     */
+    test("asks first, and says it goes live only when you publish", async ({
         page,
-        browser,
     }) => {
         await signIn(page, demoUser);
         const id = await siteId(page);
 
-        // A second version to restore TO — the seed publishes once, so without
+        // A second version to restore — the seed publishes once, so without
         // this there is nothing but the live one and no Restore to press.
         await page.goto(`${urls.APP_URL}/sites/${id}`);
         await publishFromEditor(page);
 
-        const reviewer = await asReviewer(browser);
-        // In the editor, read-only (DEC-200); a change request says what
-        // (UX-043).
-        await reviewer.goto(`${urls.APP_URL}/sites/${id}`);
-        await askForChanges(reviewer, "The hero heading is last season's.");
-
         await page.goto(`${urls.APP_URL}/sites/${id}/versions`);
-
-        const restore = page.getByRole("button", { name: "Restore" }).first();
+        const restore = page
+            .getByRole("button", { name: /^Restore .+ as the draft$/ })
+            .first();
         await expect(restore).toBeVisible({ timeout: 30_000 });
         await restore.click();
-
-        /*
-         * Never a one-click revert: putting an older snapshot live undoes
-         * everything published since, and the confirm is the only place that
-         * is said. With a change request outstanding it says MORE than "yes,
-         * restore" — restoring would go past it (#279).
-         */
         await expect(
-            page.getByRole("button", { name: "Restore without approval" }),
-        ).toBeVisible();
-        await expect(
-            page.getByRole("button", { name: "Cancel" }).first(),
+            page.getByText(
+                "This replaces your draft with this version. It goes live only when you publish.",
+            ),
         ).toBeVisible();
 
-        // Cancelling leaves the live version where it was.
+        // Cancelling leaves the draft where it was.
         await page.getByRole("button", { name: "Cancel" }).first().click();
         await expect(
-            page.getByRole("button", { name: "Restore without approval" }),
+            page.getByRole("button", { name: "Restore as the draft" }),
         ).toHaveCount(0);
-
-        await reviewer.context().close();
     });
 
-    test("puts the older version live, and says which one is live now", async ({
+    test("puts the older version in the draft and leaves the live one live", async ({
         page,
     }) => {
         await signIn(page, demoUser);
@@ -245,35 +234,35 @@ test.describe("taking a version back", { tag: "@serial" }, () => {
         await publishFromEditor(page);
 
         await page.goto(`${urls.APP_URL}/sites/${id}/versions`);
+        const main = page.getByRole("main");
+        const liveBefore = await main
+            .locator("div", { has: page.getByText("Live", { exact: true }) })
+            .last()
+            .textContent();
 
-        /*
-         * "Live" is a marked badge, not the top row — after a restore the live
-         * version is not the newest by content, and a list that implied
-         * otherwise would be lying about what visitors are seeing.
-         */
-        const live = page.locator("div", { has: page.getByText("Live") });
-        await expect(live.first()).toBeVisible();
-
-        const restore = page.getByRole("button", { name: "Restore" }).first();
+        const restore = page
+            .getByRole("button", { name: /^Restore .+ as the draft$/ })
+            .first();
         await expect(restore).toBeVisible({ timeout: 30_000 });
         await restore.click();
         await page
-            .getByRole("button", {
-                name: /^(Yes, restore|Restore without approval)$/,
-            })
+            .getByRole("button", { name: "Restore as the draft" })
             .click();
 
-        // `.first()`: the shell mounts a toaster per breakpoint, so a toast is
-        // in the DOM twice and only one of them is the visible one.
+        // `.first()`: the shell mounts a toaster per breakpoint.
         await expect(
-            page.getByText(/That version is live again/i).first(),
+            page.getByText(/That version is your draft now/i).first(),
         ).toBeVisible({ timeout: 30_000 });
 
-        // Still exactly one version marked live afterwards — a restore moves
-        // the badge, it does not add a second.
+        // Nothing went live: the same one version is marked live.
+        await expect(main.getByText("Live", { exact: true })).toHaveCount(1);
         await expect(
-            page.getByRole("main").getByText("Live", { exact: true }),
-        ).toHaveCount(1);
+            main
+                .locator("div", {
+                    has: page.getByText("Live", { exact: true }),
+                })
+                .last(),
+        ).toHaveText(liveBefore ?? "");
     });
 });
 

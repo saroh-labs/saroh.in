@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 
 import type { LookId, RenderedEnquiry } from "@saroh/block-contract";
+import { sitePagePathOf } from "@saroh/block-contract";
 import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
 import { SitePhoneInput } from "../phone-input";
@@ -24,7 +25,10 @@ import { FRONT_TYPE, frontButton } from "./look-front";
  * public endpoint:
  *
  *   POST ${NEXT_PUBLIC_API_URL}/public/forms/${formId}/submit
- *   body: { data: Record<string,string>, idempotencyKey }
+ *   body: { data: Record<string,string>, idempotencyKey, pagePath? }
+ *
+ * `pagePath` is the page the form is on (DEC-235), the path alone and never
+ * a private page's (`sitePagePathOf`), so the page's results count it.
  *
  * The endpoint derives the owning organization from the Form (never from this
  * client), validates `data` against the Form's fields, and creates the
@@ -235,7 +239,13 @@ function EnquiryForm({
                 {
                     method: "POST",
                     headers: { "content-type": "application/json" },
-                    body: JSON.stringify({ data: values, idempotencyKey }),
+                    body: JSON.stringify({
+                        data: values,
+                        idempotencyKey,
+                        pagePath:
+                            sitePagePathOf(window.location.pathname) ??
+                            undefined,
+                    }),
                 },
             );
 

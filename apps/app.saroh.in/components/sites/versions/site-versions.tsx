@@ -13,20 +13,18 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { runAction } from "@/lib/api/run-action";
-import { restorePublication } from "@/lib/sites/actions";
-import type { RestoreGate, VersionBadgeTone } from "@/lib/sites/release-review";
 import {
-    releaseTitle,
-    RESTORE_OVERRIDE_LINE,
-    restoreGate,
-    versionRowCopy,
-} from "@/lib/sites/release-review";
+    RESTORE_AS_DRAFT_LINE,
+    restoreLabel,
+} from "@/components/sites/versions/restore-version";
+import { runAction } from "@/lib/api/run-action";
+import type { VersionBadgeTone } from "@/lib/sites/release-review";
+import { releaseTitle, versionRowCopy } from "@/lib/sites/release-review";
 import type { SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { releaseStatusCopy } from "@/lib/sites/test-releases";
+import { restoreVersionAsDraft } from "@/lib/sites/version-restore-actions";
 import { FailedRead } from "@saroh/ui/failed-read";
-import { Notice } from "@saroh/ui/notice";
 
 const BADGE: Record<
     VersionBadgeTone,
@@ -51,13 +49,9 @@ export type ScheduledGoLives =
 /**
  * A site's publish history, and a way back (#194).
  *
- * Restoring APPENDS a new publication carrying the chosen snapshot rather than
- * deleting the ones after it. Nothing is lost, and a restore can itself be
- * restored — which is what makes trying one safe.
- *
- * The confirm states what will change rather than asking "are you sure?": the
- * merchant is replacing what the public currently sees, and the date they are
- * replacing it with is the fact that decides it.
+ * Restore copies a version into the draft (owner, 20 Nov 2026): nothing
+ * goes live until Publish, and the versions list is untouched, so trying
+ * one is safe. The confirm says so rather than asking "are you sure?".
  *
  * Since DEC-071 (T12) each version says which test release it went live
  * from, an owner's override sits beside a bypass, and a go-live that is
@@ -66,42 +60,22 @@ export type ScheduledGoLives =
 export function SiteVersions({
     siteId,
     publications,
-    changesRequested,
     canRestore,
-    needsApproval = false,
-    canOverride = false,
     scheduled = null,
 }: {
     siteId: string;
     publications: SitePublication[];
     /**
-     * Whether this caller may put a version back (#275). Restoring is a
-     * publish, so it needs `site:publish`; without it the control is absent
-     * rather than disabled — a Restore that refuses on the press is where a
-     * merchant currently learns the rule.
+     * Whether this caller may restore a version as the draft: the editor's
+     * own write (`section:write`). Without it the control is absent.
      */
     canRestore: boolean;
-    /**
-     * A reviewer's change request is outstanding (#279). Restoring still works,
-     * because the rule is recorded, not prevented. But the confirm says so
-     * before it happens, as the pre-publish check does for a publish.
-     */
-    changesRequested: boolean;
-    /** "Publishing needs approval" is on for the site (DEC-071, R10). */
-    needsApproval?: boolean;
-    /** An owner who can publish: may restore past that setting (Q3). */
-    canOverride?: boolean;
     scheduled?: ScheduledGoLives;
 }) {
     const zone = useBusinessZone();
     const router = useRouter();
     const [confirming, setConfirming] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
-    const gate = restoreGate({
-        publishNeedsApproval: needsApproval,
-        canOverride,
-    });
-
     const upcoming = <ScheduledList siteId={siteId} scheduled={scheduled} />;
 
     if (publications.length === 0) {
@@ -117,28 +91,20 @@ export function SiteVersions({
         );
     }
 
-    const current = publications.find((p) => p.isCurrent);
-
     function onRestore(publicationId: string) {
-        const override = gate.kind === "override";
         startTransition(async () => {
             const res = await runAction(() =>
-                restorePublication(siteId, publicationId, override),
+                restoreVersionAsDraft(siteId, publicationId),
             );
             if (!res) return;
             if (!res.ok) {
                 showError(res.error);
-                // The setting was turned on since this page was read: the
-                // refusal says so, and the page reads it again.
-                if (res.code === "APPROVAL_REQUIRED") router.refresh();
                 return;
             }
             setConfirming(null);
             router.refresh();
             showSuccess(
-                override || res.data.bypassed
-                    ? "That version is live again. Going live without approval is recorded in this list."
-                    : "That version is live again.",
+                "That version is your draft now. It goes live when you publish.",
             );
         });
     }
@@ -225,19 +191,12 @@ export function SiteVersions({
                                         <div className="flex gap-2">
                                             <Button
                                                 size="sm"
-                                                variant={
-                                                    gate.kind === "override"
-                                                        ? "destructive"
-                                                        : "brand"
-                                                }
+                                                variant="brand"
                                                 onClick={() => onRestore(p.id)}
                                                 busy={pending}
                                                 busyLabel="Restoring…"
                                             >
-                                                {gate.kind === "override" ||
-                                                changesRequested
-                                                    ? "Restore without approval"
-                                                    : "Yes, restore"}
+                                                Restore as the draft
                                             </Button>
                                             <Button
                                                 size="sm"
@@ -254,69 +213,23 @@ export function SiteVersions({
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            disabled={gate.kind === "blocked"}
                                             onClick={() => setConfirming(p.id)}
                                         >
-                                            Restore
+                                            {restoreLabel(p.publishedAt, zone)}
                                         </Button>
                                     )}
                                 </div>
                             </div>
 
-                            {!p.isCurrent &&
-                            canRestore &&
-                            gate.kind === "blocked" ? (
-                                // Why Restore is off, beside it, not only on
-                                // the press (frontend-design-system.md).
-                                <p className="text-xs text-muted-foreground">
-                                    {gate.why}
-                                </p>
-                            ) : null}
-
                             {confirming === p.id ? (
-                                <RestoreConfirm
-                                    gate={gate}
-                                    current={current}
-                                    changesRequested={changesRequested}
-                                />
+                                <p className="border-t pt-3 text-sm text-muted-foreground">
+                                    {RESTORE_AS_DRAFT_LINE}
+                                </p>
                             ) : null}
                         </CardContent>
                     </Card>
                 );
             })}
-        </div>
-    );
-}
-
-function RestoreConfirm({
-    gate,
-    current,
-    changesRequested,
-}: {
-    gate: RestoreGate;
-    current: SitePublication | undefined;
-    changesRequested: boolean;
-}) {
-    const zone = useBusinessZone();
-    return (
-        <div className="space-y-2 border-t pt-3">
-            <p className="text-sm text-muted-foreground">
-                This replaces what visitors see now
-                {current
-                    ? ` (published ${formatDateTime(current.publishedAt, zone, { year: "always" })})`
-                    : ""}
-                . Nothing is deleted. This version is published again as a new
-                entry, so you can undo it from this same list. Your unpublished
-                draft is left alone.
-                {changesRequested && gate.kind !== "override"
-                    ? " A reviewer has asked for changes, so this goes live without their approval, and this list will record that it did."
-                    : null}
-            </p>
-            {gate.kind === "override" ? (
-                <Notice tone="error" role="note">
-                    {RESTORE_OVERRIDE_LINE}
-                </Notice>
-            ) : null}
         </div>
     );
 }

@@ -2,12 +2,13 @@
 
 import { inPageNavigation, mergeInPageNavigation } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
-import type { ReactNode, RefObject, UIEvent } from "react";
+import type { ComponentProps, ReactNode, RefObject, UIEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 
 import type { HeldBackSection } from "@/components/sites/blocks/saveable-sections";
 import type { Device } from "@/components/sites/editor/editor-constants";
 import { DEVICE_WIDTH } from "@/components/sites/editor/editor-constants";
+import { changedSinceLine } from "@/components/sites/editor/save-failed";
 import type {
     EditorInspectorTab,
     EditorRailTab,
@@ -93,7 +94,7 @@ const PREVIEW_NOTE =
 
 /**
  * The canvas: the page, drawn with the real site blocks, in a window whose
- * bar names its address. Moved out of `site-editor.tsx` (#260).
+ * bar names its address (with the Website area on, the canvas bar does). Moved out of `site-editor.tsx` (#260).
  *
  * Preview (G5) is this same canvas and the same renderer with the editing
  * tools taken away — no outlines, labels or pins, and no window bar — so
@@ -132,13 +133,29 @@ export function EditorCanvas({
     selectedChrome,
     selectChrome,
     notesByKey,
+    changedByKey,
     dirty,
     onlyHeldBack,
     heldBack,
     blockTools,
+    textEdit,
+    conflictBy = null,
+    conflictYou = false,
+    saveFailed = null,
+    windowBar = true,
 }: {
+    /** The window bar round the page; off where the canvas bar names it. */
+    windowBar?: boolean;
+    /** Who saved the page since this editor opened it (C12), if known. */
+    conflictBy?: string | null;
+    /** The newer save was this person's own, in another tab. */
+    conflictYou?: boolean;
+    /** Couldn't save, with Try again (`SaveFailedNotice`), over the page. */
+    saveFailed?: ReactNode;
     /** A phone's toolbar on the selected block (DEC-185). */
     blockTools?: (index: number) => ReactNode;
+    /** Typing on the page (U47d): the selected section's words' host. */
+    textEdit?: ComponentProps<typeof DraftPreview>["textEdit"];
     canvasRef: RefObject<HTMLDivElement | null>;
     onCanvasScroll: (e: UIEvent<HTMLDivElement>) => void;
     /** Someone else saved this page while this editor was open (#285). */
@@ -172,6 +189,8 @@ export function EditorCanvas({
     selectedChrome: FixedPart | null;
     selectChrome: (part: FixedPart) => void;
     notesByKey: Map<string, number>;
+    /** A reader's marks: what changed since live, per section key. */
+    changedByKey?: ReadonlyMap<string, string>;
     /**
      * Work not yet saved — the page, the look, the name or the footer —
      * which holds a page switch back (review G-3).
@@ -229,6 +248,7 @@ export function EditorCanvas({
                 : {
                       selectedIndex,
                       blockTools,
+                      textEdit,
                       onSelect: (index: number) => {
                           setRail("sections");
                           setSelectedIndex(index);
@@ -236,6 +256,7 @@ export function EditorCanvas({
                       selectedChrome,
                       onSelectChrome: selectChrome,
                       notesByKey,
+                      changedByKey,
                       onOpenNotes: (index: number) => {
                           setSelectedIndex(index);
                           setInspector("feedback");
@@ -270,15 +291,26 @@ export function EditorCanvas({
              * one, so it is offered, never done automatically.
              */}
             {conflict ? (
-                <Notice tone="error" className="mx-auto mb-4 max-w-xl">
+                <Notice
+                    tone="error"
+                    // Pinned to the top of the canvas, so it is seen
+                    // wherever the page is scrolled (editor audit F3).
+                    className="sticky top-3 z-20 mx-auto mb-4 max-w-xl shadow-md"
+                    data-save-conflict=""
+                >
                     <p className="font-medium">
-                        Someone else saved this page while you were editing.
+                        {changedSinceLine(
+                            conflictBy,
+                            pages.find((p) => p.id === pageId)?.title ??
+                                "this page",
+                            conflictYou,
+                        )}
                     </p>
                     <p className="mt-1 text-muted-foreground">
-                        Nothing you have written has been lost, and nothing more
-                        will save until you reload. Reloading shows their
-                        version and discards yours, so copy anything you want to
-                        keep first.
+                        Nothing you have written here has been lost, and nothing
+                        more will save until you reload. Reloading shows the
+                        saved version and discards this one, so copy anything
+                        you want to keep first.
                     </p>
                     <Button
                         type="button"
@@ -290,7 +322,9 @@ export function EditorCanvas({
                         Reload the latest
                     </Button>
                 </Notice>
-            ) : null}
+            ) : (
+                saveFailed
+            )}
 
             {/*
              * The first-run nudge (spec §5), in the spec's own words.
@@ -340,10 +374,10 @@ export function EditorCanvas({
             >
                 {/*
                  * The page sits in a window whose bar names the
-                 * address it lives at (#340): this is the merchant's
-                 * website, not a mock-up of one, and the bar says
-                 * where a customer would find it. Preview drops the
-                 * window: it is the site, edge to edge (G5).
+                 * address it lives at (#340). With the Website area on,
+                 * the canvas bar above says that, so the page stands on
+                 * its own as the boards draw it (editor audit, 21 Nov).
+                 * Preview drops the window: it is the site, edge to edge.
                  */}
                 <div
                     className={
@@ -352,7 +386,7 @@ export function EditorCanvas({
                             : "overflow-hidden rounded-lg border shadow-xl shadow-black/10 dark:shadow-black/40"
                     }
                 >
-                    {previewing ? null : (
+                    {previewing || !windowBar ? null : (
                         <div className="flex h-9 items-center gap-3 border-b bg-muted px-3">
                             <span aria-hidden="true" className="flex gap-1.5">
                                 <span className="size-2 rounded-full bg-foreground/15" />
@@ -360,7 +394,7 @@ export function EditorCanvas({
                                 <span className="size-2 rounded-full bg-foreground/15" />
                             </span>
                             <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-                                {address ? `${address}/` : "Not published yet"}
+                                {address ? `${address}/` : "Not live yet"}
                             </span>
                             {address ? (
                                 <span className="ml-auto hidden shrink-0 text-[0.6875rem] text-muted-foreground xl:inline">

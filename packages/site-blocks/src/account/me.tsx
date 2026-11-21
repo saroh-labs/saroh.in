@@ -6,7 +6,9 @@ import { useState, useSyncExternalStore } from "react";
 
 import { destructiveAlertClasses } from "../alert";
 import { focusRing } from "../booking-flow/styles";
+import { NO_CAPTURE_ATTRS, NO_CAPTURE_CLASS } from "../consent-events";
 import { cn } from "../lib/utils";
+import { useSiteBusiness } from "../site-business";
 import type { SignInOptions } from "./api";
 import type { AccountDataRequest } from "./data-request";
 import { DataRequestCard } from "./data-request";
@@ -15,7 +17,7 @@ import { TO_PAY_ID } from "./details-model";
 import { EmailChoice } from "./email-choice";
 import { InvoicesDue } from "./invoices-due";
 import type { MeApi } from "./me-api";
-import { DetailsSheet, NoteSheet } from "./me-sheets";
+import { DetailsSheet, GstinSheet, NoteSheet } from "./me-sheets";
 import type { AccountNote, AccountReceipt, AccountView, Block } from "./model";
 import { accountDate, accountMoney } from "./model";
 import {
@@ -108,7 +110,7 @@ export interface MeProps {
     api: MeApi;
 }
 
-type Open = "details" | "email" | "phone" | "note" | null;
+type Open = "details" | "email" | "phone" | "note" | "gstin" | null;
 
 /** Where "Not now" on the WhatsApp ask is kept, in this browser. */
 export const PHONE_ASK_DISMISSED_KEY = "saroh:phone-ask-dismissed";
@@ -213,6 +215,13 @@ export function Me({
     }
 
     const shownNotes = notes?.ok ? [...sent, ...notes.value] : sent;
+    // A GST business's customer may save their GSTIN (R16); an older API or
+    // caller sends no field or no action, and the card stays away.
+    const saveGstin = api.saveGstin;
+    const gstCard =
+        (useSiteBusiness().taxSystem ?? "gst") === "gst" &&
+        account.gstin !== undefined &&
+        saveGstin !== undefined;
 
     return (
         <div className="grid gap-3.5 md:gap-4">
@@ -307,6 +316,52 @@ export function Me({
                     />
                 ) : null}
             </AccountCard>
+
+            {gstCard ? (
+                <AccountCard
+                    labelledBy="me-gst"
+                    title="Business details for GST"
+                    lead={
+                        account.gstin
+                            ? undefined
+                            : "Buying for a business? Add your GSTIN and it prints on your invoices from now on."
+                    }
+                    actions={
+                        account.gstin ? undefined : (
+                            <button
+                                type="button"
+                                className={buttonClasses(false)}
+                                onClick={() => setOpen("gstin")}
+                            >
+                                Add GSTIN
+                            </button>
+                        )
+                    }
+                >
+                    {account.gstin ? (
+                        <AccountRow
+                            title={
+                                <span
+                                    {...NO_CAPTURE_ATTRS}
+                                    className={NO_CAPTURE_CLASS}
+                                >
+                                    GSTIN {account.gstin}
+                                </span>
+                            }
+                            sub="On your invoices from now on"
+                            actions={
+                                <button
+                                    type="button"
+                                    className={smallButton}
+                                    onClick={() => setOpen("gstin")}
+                                >
+                                    Change
+                                </button>
+                            }
+                        />
+                    ) : null}
+                </AccountCard>
+            ) : null}
 
             {account.healthNotes && notes ? (
                 <AccountCard
@@ -458,6 +513,21 @@ export function Me({
                     </p>
                 ) : null}
             </section>
+
+            {saveGstin ? (
+                <GstinSheet
+                    key={account.gstin ?? ""}
+                    open={open === "gstin"}
+                    account={account}
+                    onClose={() => setOpen(null)}
+                    save={saveGstin}
+                    onSaved={(next) => {
+                        setAccount(next);
+                        setOpen(null);
+                        setSaid(next.gstin ? "Saved." : "Removed.");
+                    }}
+                />
+            ) : null}
 
             <DetailsSheet
                 open={open === "details"}

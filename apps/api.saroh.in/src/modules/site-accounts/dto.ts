@@ -220,6 +220,16 @@ export class UpdateDetailsDto {
         message: "Enter a phone number the team can reach you on",
     })
     phone?: string;
+
+    /**
+     * Their GSTIN, for their invoices (R16); empty removes it. Checked by
+     * the service with the one GSTIN check (`gst-states.ts`), field named.
+     */
+    @IsOptional()
+    @Transform(trim)
+    @IsString()
+    @MaxLength(32)
+    gstin?: string;
 }
 
 /**

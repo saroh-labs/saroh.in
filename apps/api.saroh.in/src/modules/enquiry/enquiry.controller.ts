@@ -38,6 +38,7 @@ export class EnquiryController {
             dto.data,
             dto.idempotencyKey,
             ipHash,
+            dto.pagePath,
         );
     }
 }

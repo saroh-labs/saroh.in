@@ -13,6 +13,7 @@ import { linkPreview } from "./link-preview";
 import { qrCodeMaker } from "./qr-code-maker";
 import { solutionList } from "./solutions";
 import { WAITLIST_PAGE } from "./waitlist";
+import { LIBRARY, LIBRARY_PATH } from "./website-library";
 
 /**
  * What every main page says to a search engine (12 Oct 2026): a title that
@@ -94,13 +95,20 @@ const PAGES: Listed[] = [
         title: WAITLIST_PAGE.seoTitle,
         description: WAITLIST_PAGE.seoDescription,
     },
+    {
+        path: LIBRARY_PATH,
+        title: pageTitle(LIBRARY.seoTitle),
+        description: LIBRARY.seoDescription,
+        phrase: LIBRARY.phrase,
+        firstScreen: `${LIBRARY.title} ${LIBRARY.lead}`,
+    },
 ];
 
 const lower = (text: string) => text.toLowerCase();
 
 describe("search titles and descriptions", () => {
     it("covers Home, the nine features, the four solutions and the pages beside them", () => {
-        expect(PAGES).toHaveLength(1 + 9 + 4 + 8);
+        expect(PAGES).toHaveLength(1 + 9 + 4 + 9);
     });
 
     it.each(PAGES)("$path: the title fits, with the brand once, last", (p) => {
@@ -160,8 +168,8 @@ describe("the category phrase", () => {
             p.phrase !== undefined && p.firstScreen !== undefined,
     );
 
-    it("is on Home, every feature and every solution", () => {
-        expect(withPhrase).toHaveLength(1 + featureList.length + 4);
+    it("is on Home, every feature, every solution and the website library", () => {
+        expect(withPhrase).toHaveLength(1 + featureList.length + 4 + 1);
     });
 
     it.each(withPhrase)(

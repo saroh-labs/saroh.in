@@ -2,7 +2,6 @@ import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 
-import { AdminShell } from "@/components/admin-shell";
 import { FilterBar, FilterSelect } from "@/components/filter-bar";
 import { Pager } from "@/components/operations/pager";
 import { FailedPanel } from "@/components/states/failed-panel";
@@ -77,7 +76,7 @@ export default async function WaitlistPage({
     );
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Help customers", "Waitlist"]}
@@ -206,6 +205,6 @@ export default async function WaitlistPage({
                 {/* After the list, so on a phone the people come first. */}
                 {summary && <WaitlistBreakdowns summary={summary} />}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

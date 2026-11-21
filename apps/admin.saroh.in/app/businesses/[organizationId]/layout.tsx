@@ -2,7 +2,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { AdminShell } from "@/components/admin-shell";
 import { BusinessHeader } from "@/components/business/business-header";
 import {
     businessGate,
@@ -49,7 +48,7 @@ export default async function BusinessLayout({
     const overview = await readOverview(organizationId).catch(() => null);
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <BusinessHeader
                     summary={summary}
@@ -71,6 +70,6 @@ export default async function BusinessLayout({
                 />
                 {children}
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }

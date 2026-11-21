@@ -9,6 +9,8 @@ jest.mock("@saroh/database", () => {
         ...actual,
         prisma: {
             site: { findFirst: jest.fn(), update: jest.fn() },
+            // Who changed the look, footer or menu (change units, U7).
+            $executeRaw: jest.fn().mockResolvedValue(1),
         },
     };
 });

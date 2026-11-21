@@ -88,7 +88,7 @@ export function MoreSheet({
                         <Row
                             icon={<UserCheck />}
                             label="Ask a teammate to review"
-                            hint="Puts the site In review. Reviewers comment on blocks, and publishing still works."
+                            hint="Puts the site In review. Reviewers comment on sections, and publishing still works."
                             disabled={p.asking}
                             onClick={then(p.askForReview)}
                         />
@@ -103,18 +103,18 @@ export function MoreSheet({
             )}
 
             {release ? (
-                <Group title="Test releases">
+                <Group title="Test links">
                     {release.onMake && !readOnly ? (
                         <Row
                             icon={<Plus />}
-                            label="Make a test release"
+                            label="Make a test link"
                             hint="Freeze the draft to share and go live with later"
                             onClick={then(release.onMake)}
                         />
                     ) : null}
                     <Row
                         icon={<FlaskConical />}
-                        label="Test releases"
+                        label="Test links"
                         count={release.count}
                         onClick={then(release.onOpenList)}
                     />

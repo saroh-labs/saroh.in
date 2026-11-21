@@ -85,7 +85,7 @@ export interface PublicToday {
      * stays full-width: a shop-only business gets no panel.
      */
     appointments: boolean;
-    /** Whether any service offered is a class — "On today" vs "Free today". */
+    /** Whether any service offered is a class — "On today" vs "Open today". */
     classes: boolean;
     items: TodayItem[];
     /** The business's week (DEC-034), for the open-or-closed line. */

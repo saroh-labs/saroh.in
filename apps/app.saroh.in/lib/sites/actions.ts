@@ -2,10 +2,12 @@
 
 import type { VisitPlacesRead } from "@/lib/stores/storefronts";
 import { listVisitPlaces } from "@/lib/stores/storefronts";
+import { listPlans } from "@/lib/subscriptions/service";
 import type { LookId } from "@saroh/block-contract";
 
 import type { GridCatalogueRead } from "./grid-catalogue";
 import { readGridCatalogue } from "./grid-catalogue";
+import { withPhotoDescription } from "./photo-description";
 import { savePublishNeedsApproval } from "./publish-approval-read";
 import type { SearchTrackingSave } from "./search-tracking";
 import { saveSearchTracking as saveSearchTrackingApi } from "./search-tracking-read";
@@ -29,16 +31,21 @@ import {
     createPage as createPageApi,
     createPreviewLink as createPreviewLinkApi,
     createSite as createSiteApi,
+    createSiteRedirect as createSiteRedirectApi,
     deleteComment as deleteCommentApi,
     deletePage as deletePageApi,
+    duplicatePage as duplicatePageApi,
     fillDetails as fillDetailsApi,
+    getPageDraft,
     getReviewState as getReviewStateApi,
     getSiteFlags as getSiteFlagsApi,
     listComments as listCommentsApi,
     listDraftVersions as listDraftVersionsApi,
     listPreviewLinks as listPreviewLinksApi,
     publishSite as publishSiteApi,
+    recordChangeVerdict as recordChangeVerdictApi,
     recordPageView as recordPageViewApi,
+    removeSiteRedirect as removeSiteRedirectApi,
     requestReview as requestReviewApi,
     restorePublication as restorePublicationApi,
     revokePreviewLink as revokePreviewLinkApi,
@@ -78,6 +85,32 @@ export async function saveDraftSections(
     return saveDraftSectionsApi(siteId, pageId, sections, revision);
 }
 
+/**
+ * "Describe it" (plan U10): write one photo's description into the page's
+ * draft through the same save the editor uses, against the revision just
+ * read, so it waits for Publish like any edit and a teammate's newer save
+ * is never overwritten.
+ */
+export async function describePhoto(
+    siteId: string,
+    pageId: string,
+    sectionIndex: number,
+    path: string,
+    alt: string,
+) {
+    const draft = await getPageDraft(siteId, pageId);
+    const sections = draft
+        ? withPhotoDescription(draft.sections, sectionIndex, path, alt)
+        : null;
+    if (!draft || !sections) {
+        return {
+            ok: false as const,
+            error: "This photo has moved or gone since the check. Open the page to describe it there.",
+        };
+    }
+    return saveDraftSectionsApi(siteId, pageId, sections, draft.revision);
+}
+
 /** Leave a note on a section (#277). */
 export async function createComment(
     siteId: string,
@@ -101,6 +134,16 @@ export async function createApproval(
     return createApprovalApi(siteId, outcome, testReleaseId, reason);
 }
 
+/** Approve, or ask for changes on, waiting changes (DEC-226, U9). */
+export async function recordChangeVerdict(
+    siteId: string,
+    units: string[],
+    outcome: ReviewerVerdict,
+    reason?: string,
+) {
+    return recordChangeVerdictApi(siteId, units, outcome, reason);
+}
+
 /** Take back the draft's open review request (UX-068). */
 export async function withdrawReview(siteId: string) {
     return withdrawReviewApi(siteId);
@@ -111,9 +154,16 @@ export async function requestReview(siteId: string, testReleaseId?: string) {
     return requestReviewApi(siteId, testReleaseId);
 }
 
-/** `override`: an owner past "Publishing needs approval" (DEC-071). */
-export async function publishSite(siteId: string, override = false) {
-    return publishSiteApi(siteId, override);
+/**
+ * `override`: an owner past "Publishing needs approval" (DEC-071).
+ * `leaveOut`: change unit keys that stay in the draft (U8).
+ */
+export async function publishSite(
+    siteId: string,
+    override = false,
+    leaveOut: string[] = [],
+) {
+    return publishSiteApi(siteId, override, leaveOut);
 }
 
 export async function updateSiteSettings(
@@ -129,6 +179,8 @@ export async function saveSiteIcon(siteId: string, mediaId: string | null) {
 }
 
 /**
+ * Today's restore: the version goes live again. Parked for the Website area
+ * off (`restoresAsDraft`, owner 20 Nov 2026); on, it is restored as the draft.
  * `override`: an owner's restore past "Publishing needs approval"
  * (DEC-071, Q3), recorded as one.
  */
@@ -223,6 +275,10 @@ export async function deletePage(siteId: string, pageId: string) {
     return deletePageApi(siteId, pageId);
 }
 
+export async function duplicatePage(siteId: string, pageId: string) {
+    return duplicatePageApi(siteId, pageId);
+}
+
 /** Re-read the site's flags. Called after a save, so the dots settle with it. */
 export async function getSiteFlags(siteId: string) {
     return getSiteFlagsApi(siteId);
@@ -278,6 +334,18 @@ export async function revokePreviewLink(siteId: string, linkId: string) {
     return revokePreviewLinkApi(siteId, linkId);
 }
 
+/** Links and sharing: forward an old link of the merchant's to a page. */
+export async function createSiteRedirect(
+    siteId: string,
+    input: { fromPath: string; toPath: string },
+) {
+    return createSiteRedirectApi(siteId, input);
+}
+
+export async function removeSiteRedirect(siteId: string, redirectId: string) {
+    return removeSiteRedirectApi(siteId, redirectId);
+}
+
 /**
  * The shops a Visit us block can show (G8). A read, but the editor is a
  * client component and reaches the API only through an action.
@@ -293,6 +361,23 @@ export async function listVisitPlacesForPicker(): Promise<VisitPlacesRead> {
  */
 export async function listGridCatalogue(): Promise<GridCatalogueRead> {
     return readGridCatalogue();
+}
+
+/**
+ * The plans on sale, by name, for a Plans block's Compare rows (DEC-228):
+ * each row's cells are kept by plan id. Null when the read failed, so the
+ * editor never calls a chosen plan gone because of it.
+ */
+export async function listPlansForCompare(): Promise<
+    { id: string; name: string }[] | null
+> {
+    try {
+        return (await listPlans())
+            .filter((plan) => plan.status === "ACTIVE")
+            .map(({ id, name }) => ({ id, name }));
+    } catch {
+        return null;
+    }
 }
 
 /**

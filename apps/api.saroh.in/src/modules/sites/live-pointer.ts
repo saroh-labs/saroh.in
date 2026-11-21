@@ -152,6 +152,17 @@ export interface PutLiveInput {
      * it, so the draft's own review never reads a release's go-live.
      */
     testReleaseId?: string | null;
+    /**
+     * Change unit keys a publish kept in the draft (U8): recorded in an
+     * audit event with the publication.
+     */
+    leftOut?: readonly string[];
+    /**
+     * A publish whose every change is approved or was made last by an
+     * owner or admin (DEC-226, U9): what "Publishing needs approval" asks
+     * of a direct publish. The caller left the rest out.
+     */
+    unitsApproved?: boolean;
 }
 
 export interface PutLiveResult {
@@ -176,8 +187,8 @@ export interface PutLiveResult {
  *
  * Refused before anything is written: 403 for an override from anyone but
  * an owner, and 409 `APPROVAL_REQUIRED` while the setting is on, unless a
- * test release approved by someone else is going live, or an owner
- * overrides.
+ * test release approved by someone else is going live, a publish carries
+ * only approved changes (`unitsApproved`), or an owner overrides.
  */
 export async function putLive(
     tx: LiveTx,
@@ -214,12 +225,13 @@ export async function putLive(
     // here is refused. On: only a release someone else approved goes live,
     // and an owner's override is the one way past it.
     const approved =
-        gate === "release" &&
-        releaseApproved(
-            verdicts,
-            { fingerprint: input.fingerprint },
-            actor.userId,
-        );
+        gate === "release"
+            ? releaseApproved(
+                  verdicts,
+                  { fingerprint: input.fingerprint },
+                  actor.userId,
+              )
+            : input.source === "publish" && input.unitsApproved === true;
     // Switched on under a plan without the approval row, it stops applying
     // (DEC-103).
     const needsApproval = await approvalApplies(
@@ -284,6 +296,25 @@ export async function putLive(
                 outcome: "BYPASSED",
                 publicationId: publication.id,
                 ...releaseClosing(input),
+            },
+            select: { id: true },
+        });
+    }
+
+    if (input.leftOut && input.leftOut.length > 0) {
+        await tx.auditEvent.create({
+            data: {
+                action: AuditAction.SitePublishLeftOut,
+                actorUserId: actor.userId,
+                organizationId: site.organizationId,
+                targetType: "publication",
+                targetId: publication.id,
+                outcome: AuditOutcome.Success,
+                metadata: auditMetadata(undefined, {
+                    siteId: site.id,
+                    source: input.source,
+                    leftOut: [...input.leftOut],
+                }),
             },
             select: { id: true },
         });

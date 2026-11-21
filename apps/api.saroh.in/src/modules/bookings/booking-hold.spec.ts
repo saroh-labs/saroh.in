@@ -47,6 +47,8 @@ function makeTx() {
         // Google Calendar (#1047): nobody here is connected.
         googleCalendarEvent: { count: jest.fn().mockResolvedValue(0) },
         googleCalendarConnection: { count: jest.fn().mockResolvedValue(0) },
+        // No GSTIN saved on the contact (R16).
+        contact: { findFirst: jest.fn().mockResolvedValue(null) },
         invoice: {
             create: jest.fn().mockResolvedValue({ id: "inv_1" }),
             findFirst: jest.fn(),

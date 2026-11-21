@@ -2,6 +2,7 @@ import type { LookId } from "@saroh/block-contract";
 
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
+import { SiteLink } from "../site-link";
 import { FRONT_RING, FRONT_TYPE, FRONT_WRAP, frontButton } from "./look-front";
 
 /**
@@ -89,9 +90,9 @@ export function LookAllPosts({
     children: React.ReactNode;
 }) {
     return (
-        <a href={href} className={frontButton(look, "link", "shrink-0")}>
+        <SiteLink href={href} className={frontButton(look, "link", "shrink-0")}>
             {children}
-        </a>
+        </SiteLink>
     );
 }
 
@@ -170,7 +171,7 @@ export function LookPostCards({
                         data-journal-card={post.image ? "photo" : "text"}
                         className="min-w-0"
                     >
-                        <a
+                        <SiteLink
                             href={post.href}
                             className={cn(
                                 "text-site-fg group grid h-full min-w-0 cursor-pointer gap-3",
@@ -199,7 +200,7 @@ export function LookPostCards({
                                     {words}
                                 </>
                             )}
-                        </a>
+                        </SiteLink>
                     </li>
                 );
             })}
@@ -264,7 +265,7 @@ export function LookLead({
                     </p>
                 ) : null}
                 <Title className={cn(type.h2, "[overflow-wrap:anywhere]")}>
-                    <a
+                    <SiteLink
                         href={post.href}
                         className={cn(
                             "rounded-site-s underline-offset-[6px] hover:underline hover:decoration-1",
@@ -272,7 +273,7 @@ export function LookLead({
                         )}
                     >
                         {post.title}
-                    </a>
+                    </SiteLink>
                 </Title>
                 {post.dek ? (
                     <p className="text-site-body text-[19px] leading-snug [text-wrap:pretty]">
@@ -303,10 +304,13 @@ export function LookLead({
                 </div>
             ) : null}
             <p className={cn(centred && "text-center")}>
-                <a href={post.href} className={frontButton(look, "link")}>
+                <SiteLink
+                    href={post.href}
+                    className={frontButton(look, "link")}
+                >
                     Continue reading
                     <span className="sr-only">: {post.title}</span>
-                </a>
+                </SiteLink>
             </p>
         </article>
     );

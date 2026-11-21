@@ -126,6 +126,30 @@ describe("a block's frame fields", () => {
     });
 });
 
+describe("Label above (R17)", () => {
+    const hasField = () => host.textContent.includes("Label above the heading");
+
+    it("shows on a section that already has one", () => {
+        renderFrame(textSection({ eyebrow: "Classes" }));
+        expect(hasField()).toBe(true);
+        expect(input("Label above the heading").value).toBe("Classes");
+    });
+
+    it("is not offered on a new section", () => {
+        renderFrame(textSection());
+        expect(hasField()).toBe(false);
+    });
+
+    it("stays while the merchant clears it", () => {
+        const onChange = renderFrame(textSection({ eyebrow: "Classes" }));
+        type(input("Label above the heading"), "");
+        expect(lastContent(onChange)).not.toHaveProperty("eyebrow");
+        // The editor hands the cleared section back; the field stays put.
+        renderFrame(textSection());
+        expect(hasField()).toBe(true);
+    });
+});
+
 describe("the none hero's heading switch", () => {
     function renderHero(content: Record<string, unknown>) {
         const onChange = vi.fn<(next: Section) => void>();

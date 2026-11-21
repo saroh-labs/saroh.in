@@ -358,3 +358,117 @@ describe("the Plans block's words (G9)", () => {
         expect(askedFromSearch("")).toBeNull();
     });
 });
+
+describe("Plans Show and Compare (DEC-228, U5)", () => {
+    const PACK = {
+        id: "pk_ten",
+        name: "Ten classes",
+        description: null,
+        credits: 10,
+        validityDays: 90,
+        price: "2800.00",
+        currency: "INR",
+        kind: "CLASSES" as const,
+        singlePrice: null,
+    };
+    const packs = { packs: [PACK], payOnline: false, askHref: "/contact" };
+
+    it("Show = both with no plans on sale: the packs lead, under the block's title, and no empty note", () => {
+        render(
+            <PlansSection
+                content={{ title: "What it costs", show: "both" }}
+                feed={{ plans: [], joinHref: "/contact" }}
+                packs={packs}
+            />,
+        );
+        expect(
+            screen
+                .getAllByRole("heading", { level: 2 })
+                .map((h) => h.textContent),
+        ).toEqual(["What it costs"]);
+        expect(screen.getByText("Ten classes")).toBeTruthy();
+        expect(screen.queryByText(/coming soon|No plans/i)).toBeNull();
+    });
+
+    it("Show = both with plans: plans first, then the packs", () => {
+        render(
+            <PlansSection
+                content={{ title: "Join", show: "both" }}
+                feed={{ plans: PLANS, joinHref: "/contact" }}
+                packs={packs}
+            />,
+        );
+        const text = document.body.textContent;
+        expect(text.indexOf("Monthly box")).toBeLessThan(
+            text.indexOf("Ten classes"),
+        );
+    });
+
+    it("Show = packs draws the packs alone", () => {
+        render(
+            <PlansSection
+                content={{ title: "Packs", show: "packs" }}
+                feed={{ plans: PLANS, joinHref: "/contact" }}
+                packs={packs}
+            />,
+        );
+        expect(screen.queryByText("Monthly box")).toBeNull();
+        expect(screen.getByText("Ten classes")).toBeTruthy();
+    });
+
+    it("on a live page that read no packs, draws none rather than a note", () => {
+        render(
+            <PlansSection
+                content={{ title: "Packs", show: "packs" }}
+                feed={{ plans: PLANS, joinHref: "/contact" }}
+                siteId="site_1"
+            />,
+        );
+        expect(document.body.textContent).toBe("");
+    });
+
+    it("Compare: ticks per column in words; a plan not on sale is no column", () => {
+        render(
+            <PlansSection
+                content={{
+                    variant: "compare",
+                    title: "Which one fits",
+                    includes: [
+                        {
+                            label: "Evening classes",
+                            cells: [
+                                { id: "p_month", words: "Every one" },
+                                { id: "p_gone", words: "Every one" },
+                            ],
+                        },
+                        { label: "Open gym", cells: [{ id: "p_week" }] },
+                    ],
+                }}
+                feed={{ plans: PLANS, joinHref: "/contact" }}
+            />,
+        );
+        const table = screen.getByRole("table");
+        expect(within(table).getAllByRole("columnheader")).toHaveLength(3);
+        const evening = within(table).getByRole("row", {
+            name: /Evening classes/,
+        });
+        expect(evening.textContent).toContain("Every one");
+        expect(evening.textContent).toContain("Not included");
+        const gym = within(table).getByRole("row", { name: /Open gym/ });
+        expect(gym.textContent).toContain("Included");
+        expect(within(table).getByText("Most chosen")).toBeTruthy();
+        expect(
+            within(table).getAllByRole("link", { name: /Ask about joining/ }),
+        ).toHaveLength(2);
+    });
+
+    it("feed failure says so with Try again", () => {
+        render(
+            <PlansSection
+                content={{ variant: "compare", title: "Plans" }}
+                feed={{ plans: [], joinHref: null, failed: true }}
+            />,
+        );
+        expect(screen.getByRole("button", { name: "Try again" })).toBeTruthy();
+    });
+});

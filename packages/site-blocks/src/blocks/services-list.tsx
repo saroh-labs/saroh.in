@@ -8,14 +8,17 @@ import { resolveVariant } from "@saroh/block-contract";
 import { destructiveAlertClasses } from "../alert";
 import { DEFAULT_API_URL } from "../api-url";
 import { quietFill } from "../booking-flow/styles";
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
-import { useQrSource, withQrSource } from "../qr-source";
+import { useQrSource } from "../qr-source";
+import { SiteLink } from "../site-link";
 import { CtaButton, ctaClasses } from "./cta";
-import { frontButton } from "./look-front";
 import type { PublicService, ServicesFeed } from "./service-words";
 import { formatDuration, servicePriceWords } from "./service-words";
+import { focusRing, ServiceCards, serviceHref } from "./services-cards";
 import LookServices, { SeeAllServices } from "./services-look";
+import { ServicesMenu } from "./services-menu";
 
 export {
     formatDuration,
@@ -93,6 +96,7 @@ export default function ServicesListSection({
     const source = useQrSource();
     const given = feed?.services ?? services;
     const moreHref = feed?.moreHref ?? null;
+    const askHref = feed?.askHref ?? null;
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", services: given } : { kind: "loading" },
     );
@@ -143,8 +147,19 @@ export default function ServicesListSection({
     };
 
     if (state.kind === "ready" && state.services.length === 0) return null;
+    /*
+     * The `cards` look (DEC-227) is the older "Show as: Cards" (G16): with
+     * no variant it resolves to `cards` (`variants.ts`), and the default
+     * look still honours it, since both could be picked before. Every
+     * other look wins over `layout`. Nothing on a live page moves.
+     */
+    const variant = resolveVariant("servicesList", content);
+    const cards =
+        variant === "cards" ||
+        (variant === "default" && content.layout === "cards");
+    const menu = variant === "menu";
     // One appointment, one price (template polish).
-    if (resolveVariant("servicesList", content) === "priceCard") {
+    if (variant === "priceCard") {
         return (
             <PriceCardSection
                 content={content}
@@ -159,7 +174,7 @@ export default function ServicesListSection({
 
     // Under a look (U6), a list is the look's rows; cards and the price
     // card keep their own layouts, restyled by the look's tokens.
-    if (look && content.layout !== "cards") {
+    if (look && !cards && !menu) {
         return (
             <LookServices
                 content={content}
@@ -182,7 +197,7 @@ export default function ServicesListSection({
                 // Cards sit on the page's width, level with the Plans and
                 // Product grid beside them (the design's Book and Prices
                 // pages); a list keeps its reading column.
-                content.layout === "cards"
+                cards || menu
                     ? "mx-auto w-full max-w-screen-xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
                     : "mx-auto w-full max-w-3xl px-5 py-[var(--site-section-padding)] sm:px-[var(--site-page-margin)]"
             }
@@ -192,11 +207,15 @@ export default function ServicesListSection({
                     data-site-title=""
                     className="font-site-heading text-site-fg text-[calc(1.875rem*var(--site-heading-scale))] font-bold tracking-tight"
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </h2>
             ) : null}
             {content.intro ? (
-                <p className="text-site-body mt-3 text-lg">{content.intro}</p>
+                <p className="text-site-body mt-3 text-lg">
+                    <EditableText field="intro">{content.intro}</EditableText>
+                </p>
             ) : null}
 
             {state.kind === "loading" ? (
@@ -243,7 +262,7 @@ export default function ServicesListSection({
                         Try again
                     </button>
                 </div>
-            ) : content.layout === "cards" ? (
+            ) : cards ? (
                 <>
                     <ServiceCards
                         services={state.services}
@@ -251,6 +270,18 @@ export default function ServicesListSection({
                         showDescriptions={showDescriptions}
                         label={label}
                         bookHref={bookHref}
+                        askHref={askHref}
+                        look={look}
+                    />
+                    <ListFoot content={content} moreHref={moreHref} />
+                </>
+            ) : menu ? (
+                <>
+                    <ServicesMenu
+                        content={content}
+                        services={state.services}
+                        bookHref={bookHref}
+                        askHref={askHref}
                         look={look}
                     />
                     <ListFoot content={content} moreHref={moreHref} />
@@ -267,7 +298,8 @@ export default function ServicesListSection({
                                     key={service.id}
                                     className="border-site-border flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b py-5"
                                 >
-                                    <div className="min-w-0 flex-1">
+                                    {/* A floor, so on a phone the length, price and Book wrap below the words instead of squeezing them to a column. */}
+                                    <div className="min-w-[min(100%,14rem)] flex-1">
                                         <h3 className="font-site-heading text-site-fg text-[calc(1.125rem*var(--site-heading-scale))] font-semibold">
                                             {service.name}
                                         </h3>
@@ -290,7 +322,7 @@ export default function ServicesListSection({
                                             </span>
                                         ) : null}
                                         {bookHref ? (
-                                            <a
+                                            <SiteLink
                                                 href={serviceHref(
                                                     bookHref,
                                                     service.id,
@@ -302,12 +334,12 @@ export default function ServicesListSection({
                                                         : `Book ${service.name}`
                                                 }
                                                 className={cn(
-                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70",
+                                                    "text-site-fg coarse:min-h-11 ml-3 inline-flex cursor-pointer items-center justify-center rounded-sm font-semibold underline underline-offset-4 hover:no-underline active:opacity-70 max-[699px]:min-h-11 max-[699px]:min-w-11",
                                                     focusRing,
                                                 )}
                                             >
                                                 {label ?? "Book"}
-                                            </a>
+                                            </SiteLink>
                                         ) : label ? (
                                             // The editor's canvas has no
                                             // booking page: the merchant's
@@ -354,124 +386,6 @@ function ListFoot({
 function said(value: string | null | undefined): string | null {
     const trimmed = value?.trim();
     return trimmed === undefined || trimmed === "" ? null : trimmed;
-}
-
-/**
- * The booking page, opened on one service. On a page a QR code's scan
- * opened, the link carries the scan's tag on (`qr-source.ts`).
- */
-function serviceHref(
-    bookHref: string,
-    serviceId: string,
-    source: string | null,
-): string {
-    return withQrSource(
-        `${bookHref}?service=${encodeURIComponent(serviceId)}`,
-        source,
-    );
-}
-
-const focusRing =
-    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
-
-/*
- * The design's card button: the merchant's accent, the site's radius.
- * 38px under a mouse, 44px under a finger.
- */
-const cardButton =
-    "coarse:h-11 inline-flex h-[38px] shrink-0 items-center whitespace-nowrap rounded-[var(--site-radius)] bg-site-accent px-3.5 text-[13.5px] font-bold text-site-accent-fg";
-
-/**
- * "Show as: Cards" (G16): the services side by side, as the Customer Site
- * design draws a Book page — how long, the name, a line about it, the price
- * and a button that opens the booking page on that service.
- */
-function ServiceCards({
-    services,
-    showPrices,
-    showDescriptions,
-    label,
-    bookHref,
-    look,
-}: {
-    services: PublicService[];
-    showPrices: boolean;
-    showDescriptions: boolean;
-    /** The merchant's button words; null keeps "Book". */
-    label: string | null;
-    bookHref?: string;
-    /** Under a look, a card takes the look's card corner, not its button's. */
-    look?: LookId;
-}) {
-    const source = useQrSource();
-    const words = label ?? "Book";
-    return (
-        <ul className="mt-8 grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr))]">
-            {services.map((service) => {
-                const price = showPrices ? servicePriceWords(service) : null;
-                return (
-                    <li
-                        key={service.id}
-                        className={
-                            look
-                                ? "border-site-border bg-site-surface text-site-fg rounded-site-s grid min-w-0 content-start gap-1.5 overflow-hidden border p-4"
-                                : "border-site-border bg-site-surface text-site-fg grid min-w-0 content-start gap-1.5 overflow-hidden rounded-[calc(var(--site-radius)*1.4)] border p-4"
-                        }
-                    >
-                        <span className="text-site-muted text-[11.5px] font-bold uppercase tracking-[0.08em]">
-                            {formatDuration(service.durationMinutes)}
-                        </span>
-                        <h3 className="font-site-heading text-[calc(1.1875rem*var(--site-heading-scale))] font-semibold leading-tight tracking-[-0.015em]">
-                            {service.name}
-                        </h3>
-                        {showDescriptions && service.description ? (
-                            <p className="text-site-body whitespace-pre-line text-[13.5px] leading-normal [text-wrap:pretty]">
-                                {service.description}
-                            </p>
-                        ) : null}
-                        <span className="mt-1.5 flex items-center gap-2.5">
-                            <span className="flex-1 text-base font-bold tabular-nums">
-                                {price}
-                            </span>
-                            {bookHref ? (
-                                <a
-                                    href={serviceHref(
-                                        bookHref,
-                                        service.id,
-                                        source,
-                                    )}
-                                    aria-label={`${words}: ${service.name}`}
-                                    className={
-                                        // Under a look, one filled button a
-                                        // view: a card's Book is quiet.
-                                        look
-                                            ? frontButton(look, "quiet")
-                                            : cn(
-                                                  cardButton,
-                                                  "cursor-pointer transition-[opacity,transform] hover:opacity-90 active:scale-[0.98]",
-                                                  focusRing,
-                                              )
-                                    }
-                                >
-                                    {words}
-                                </a>
-                            ) : (
-                                <span
-                                    className={
-                                        look
-                                            ? frontButton(look, "quiet")
-                                            : cardButton
-                                    }
-                                >
-                                    {words}
-                                </span>
-                            )}
-                        </span>
-                    </li>
-                );
-            })}
-        </ul>
-    );
 }
 
 /**
@@ -551,12 +465,16 @@ function PriceCardSection({
                                 data-site-title=""
                                 className="font-site-heading text-[calc(1.6875rem*var(--site-heading-scale))] font-semibold tracking-[-0.01em]"
                             >
-                                {heading}
+                                <EditableText field="heading">
+                                    {heading}
+                                </EditableText>
                             </h2>
                         ) : null}
                         {intro ? (
                             <p className="text-site-body mt-3 max-w-[var(--site-measure,62ch)] whitespace-pre-line text-[length:var(--site-body-size,1rem)] leading-relaxed">
-                                {intro}
+                                <EditableText field="intro">
+                                    {intro}
+                                </EditableText>
                             </p>
                         ) : null}
                         {includes.length > 0 ? (
@@ -649,7 +567,7 @@ function PriceCard({
                 {content.cta ? (
                     <CtaButton content={content.cta} />
                 ) : bookHref ? (
-                    <a
+                    <SiteLink
                         href={serviceHref(bookHref, service.id, source)}
                         aria-label={`${words}: ${service.name}`}
                         className={cn(
@@ -659,7 +577,7 @@ function PriceCard({
                         )}
                     >
                         {words}
-                    </a>
+                    </SiteLink>
                 ) : (
                     // The editor's canvas has no booking page: the words
                     // show, and go nowhere.

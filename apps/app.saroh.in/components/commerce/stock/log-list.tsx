@@ -1,5 +1,6 @@
 "use client";
 
+import { useScreenGo } from "@/components/shared/page/screen-pending";
 import { DEFAULT_BUSINESS_ZONE } from "@/lib/format/business-zone";
 import { formatTime } from "@/lib/format/datetime";
 import { EmptyState, FailedState } from "@saroh/ui/data-state";
@@ -83,6 +84,8 @@ export function LogList({
     paging: StockListPage;
 }) {
     const router = useRouter();
+    // Filters and pages in the screen's transition: the rows grey.
+    const go = useScreenGo();
     const narrowed =
         filter.kind !== "all" ||
         filter.store !== "all" ||
@@ -107,10 +110,7 @@ export function LogList({
                         label="Kind of change"
                         value={filter.kind}
                         onValueChange={(id) =>
-                            router.push(
-                                href({ kind: id === "all" ? undefined : id }),
-                                { scroll: false },
-                            )
+                            go(href({ kind: id === "all" ? undefined : id }))
                         }
                         options={LOG_KINDS.map((k) => ({
                             value: k.id,
@@ -135,11 +135,10 @@ export function LogList({
                                 })),
                             ]}
                             onValueChange={(v) =>
-                                router.push(
+                                go(
                                     href({
                                         store: v === "all" ? undefined : v,
                                     }),
-                                    { scroll: false },
                                 )
                             }
                         />
@@ -157,25 +156,17 @@ export function LogList({
                             })),
                         ]}
                         onValueChange={(v) =>
-                            router.push(href({ product: v || undefined }), {
-                                scroll: false,
-                            })
+                            go(href({ product: v || undefined }))
                         }
                     />
                     {/* The day of the change: on its own line on a phone. */}
                     <DateRangeFilter
                         value={filter}
-                        onChange={(patch) =>
-                            router.push(href(patch), { scroll: false })
-                        }
+                        onChange={(patch) => go(href(patch))}
                     />
                 </>
             }
-            onClear={
-                narrowed
-                    ? () => router.push(cleared, { scroll: false })
-                    : undefined
-            }
+            onClear={narrowed ? () => go(cleared) : undefined}
             count={
                 log !== "failed"
                     ? logCountWords(log.total ?? log.entries.length)
@@ -410,7 +401,7 @@ export function LogList({
                 to={(n) => ({ href: href({ page: n }) })}
                 onSize={(size) => {
                     rememberPageSize(STOCK_LISTS.log, size);
-                    router.push(href({ size }), { scroll: false });
+                    go(href({ size }));
                 }}
             />
             <p

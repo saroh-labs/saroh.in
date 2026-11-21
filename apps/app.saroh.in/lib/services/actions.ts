@@ -208,7 +208,15 @@ export async function listAvailability(
 export async function listServicesForPicker(): Promise<
     | {
           ok: true;
-          services: { id: string; name: string; status: Service["status"] }[];
+          services: Pick<
+              Service,
+              | "id"
+              | "name"
+              | "status"
+              | "durationMinutes"
+              | "priceCents"
+              | "currency"
+          >[];
       }
     | { ok: false; forbidden: boolean }
 > {
@@ -220,6 +228,10 @@ export async function listServicesForPicker(): Promise<
             id: s.id,
             name: s.name,
             status: s.status,
+            // The editor's "From Services" rows (U47) show both.
+            durationMinutes: s.durationMinutes,
+            priceCents: s.priceCents,
+            currency: s.currency,
         })),
     };
 }

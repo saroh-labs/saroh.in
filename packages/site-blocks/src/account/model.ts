@@ -40,6 +40,11 @@ export interface AccountView {
      * Absent from an older API.
      */
     signInPhone?: string | null;
+    /**
+     * Their GSTIN, printed on invoices made after it is saved (R16), or
+     * null. Absent from an older API: no GST card.
+     */
+    gstin?: string | null;
     businessName: string;
     tabs: AccountTab[];
     offers: { appointments: boolean; orders: boolean; plans: boolean };

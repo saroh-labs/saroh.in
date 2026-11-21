@@ -35,10 +35,13 @@ import { CategoryRow } from "./category-row";
 export function PostCategoriesSheet({
     siteId,
     categories,
+    trigger = <Button variant="outline">Categories</Button>,
 }: {
     siteId: string;
     /** `null`: the list could not be read, which is not "none yet". */
     categories: PostCategory[] | null;
+    /** The button that opens it; the post editor's left panel has its own. */
+    trigger?: React.ReactElement;
 }) {
     const router = useRouter();
     const arriving = useSearchParams().get(CATEGORIES_PARAM) === "1";
@@ -96,7 +99,7 @@ export function PostCategoriesSheet({
     return (
         <FormSheet
             open={open}
-            trigger={<Button variant="outline">Categories</Button>}
+            trigger={trigger}
             title="Post categories"
             description="Group this site's posts. A post with no category shows as Uncategorized."
             doneOnly

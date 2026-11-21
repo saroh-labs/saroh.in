@@ -32,7 +32,21 @@ export interface CreatedPage {
     hidden: boolean;
     kind: PageKind;
     inMenu: boolean;
+    seoTitle: string | null;
+    seoDescription: string | null;
+    shareImageMediaId: string | null;
+    shareImageUrl: string | null;
+    noindex: boolean;
 }
+
+/** A page's own Google title and text, share image and "Show on Google" (KTD-7). */
+export const PAGE_HEAD_SELECT = {
+    seoTitle: true,
+    seoDescription: true,
+    shareImageMediaId: true,
+    shareImageUrl: true,
+    noindex: true,
+} satisfies Prisma.PageSelect;
 
 export const PAGE_VIEW_SELECT = {
     id: true,
@@ -42,6 +56,7 @@ export const PAGE_VIEW_SELECT = {
     hidden: true,
     kind: true,
     inMenu: true,
+    ...PAGE_HEAD_SELECT,
 } satisfies Prisma.PageSelect;
 
 /** "Book page", for "This site already has a Book page". */

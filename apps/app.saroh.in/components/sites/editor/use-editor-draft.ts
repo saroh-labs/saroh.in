@@ -53,6 +53,7 @@ export function useEditorDraft({
     recordSaved: (
         sections: number | null,
         site: SiteChangeKind[] | null,
+        units?: number | null,
     ) => void;
     /** Flags settle after a save, not per keystroke. */
     refreshFlags: () => Promise<void>;
@@ -86,7 +87,38 @@ export function useEditorDraft({
      */
     const [revision, setRevision] = useState(initialRevision);
     const [conflict, setConflict] = useState(false);
+    // Who saved the page since this editor opened it (C12), if the API said.
+    const [conflictBy, setConflictBy] = useState<string | null>(null);
+    // The newest save was this person's own, from another tab or window.
+    const [conflictYou, setConflictYou] = useState(false);
+    // Set while a save writes form ids into the blocks: Undo's history
+    // folds that into the step before, as it isn't the merchant's.
+    const stamping = useRef(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    /*
+     * Another page opened under the same editor (the frame stays mounted
+     * across `?page=`): everything here is the page's, so it starts again
+     * from the new page's sections. Adjusted while rendering, as React
+     * advises for state that follows a prop. A save still in flight for the
+     * last page is dropped when it lands (`pageNow`).
+     */
+    const pageNow = useRef(pageId);
+    const [seededFor, setSeededFor] = useState(pageId);
+    if (seededFor !== pageId) {
+        setSeededFor(pageId);
+        setSections(initialSections);
+        setSavedSections(initialSections);
+        setRevision(initialRevision);
+        setSaving(false);
+        setErrorIndex(null);
+        setErrorMessage(null);
+        setLastSavedAt(null);
+        setSaveError(false);
+        setConflict(false);
+        setConflictBy(null);
+        setConflictYou(false);
+    }
 
     const sectionsJson = JSON.stringify(sections);
     const dirty = sectionsJson !== lastSavedJson;
@@ -227,9 +259,14 @@ export function useEditorDraft({
      * timer, and nothing on screen reads it.
      */
     const failedJson = useRef<string | null>(null);
+    useEffect(() => {
+        pageNow.current = pageId;
+        failedJson.current = null;
+    }, [pageId]);
 
-    async function onSave(auto = false) {
-        if (readOnly) return;
+    /** Save now; true once the server holds what is on screen. */
+    async function onSave(auto = false): Promise<boolean> {
+        if (readOnly) return false;
         setSaving(true);
         setErrorIndex(null);
         setErrorMessage(null);
@@ -246,6 +283,8 @@ export function useEditorDraft({
             // Said below, as any other failed sync is.
             { quiet: true },
         )) ?? { ok: false as const, index: 0, error: UNREACHED };
+        // The page changed while the forms synced: this save was the last page's.
+        if (pageNow.current !== pageId) return false;
         if (!synced.ok) {
             setSaving(false);
             // Not saved, and the bar has to say so (#281). A failed form sync
@@ -254,15 +293,17 @@ export function useEditorDraft({
             setSaveError(true);
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
+            // The section may not be the one open: the toast names it.
             showError(synced.error);
             // Recorded like any other failed save, so the autosave does not
             // send the same draft again every 1.5s with a fresh toast.
             failedJson.current = JSON.stringify(sections);
-            return;
+            return false;
         }
         // Stamp ONLY the new formIds onto what is on screen now (#281).
         const found = newFormIds(sections, synced.sections);
         if (found.length > 0) {
+            stamping.current = true;
             setSections((current) =>
                 stampFormIds(current, found, sections.length),
             );
@@ -296,7 +337,7 @@ export function useEditorDraft({
             setSaving(false);
             failedJson.current = null;
             setSaveError(false);
-            return;
+            return true;
         }
         const res = await saveDraftSections(
             siteId,
@@ -305,8 +346,10 @@ export function useEditorDraft({
             revision,
         ).catch(() => ({
             ok: false as const,
-            error: "Couldn't reach Saroh. Your work is still here. It will save again with your next edit.",
+            error: "Couldn't reach Saroh.",
         }));
+        // Another page opened while this one saved: nothing here is its.
+        if (pageNow.current !== pageId) return res.ok;
         setSaving(false);
         if (res.ok) {
             failedJson.current = null;
@@ -321,6 +364,7 @@ export function useEditorDraft({
             recordSaved(
                 res.data.pendingSectionChanges ?? null,
                 res.data.pendingSiteChanges ?? null,
+                res.data.pendingChanges,
             );
             // An autosave that announces itself every few seconds is noise; the
             // bar already states when it last saved.
@@ -332,7 +376,7 @@ export function useEditorDraft({
              * would make editing feel slower for no benefit.
              */
             void refreshFlags();
-            return;
+            return true;
         }
         failedJson.current = JSON.stringify(synced.sections);
         setSaveError(true);
@@ -340,15 +384,34 @@ export function useEditorDraft({
             // Stops the autosave loop from retrying a save that can only lose
             // one side's work. The banner offers the reload instead.
             setConflict(true);
+            setConflictBy(res.by ?? null);
+            setConflictYou(res.you === true);
         }
         if ("index" in res && typeof res.index === "number") {
             // The server counts positions in what was SENT; the editor's list
             // may have held-back sections in between.
             setErrorIndex(plan.sentFrom[res.index] ?? res.index);
             setErrorMessage(res.error);
+            // The section may not be the one open: the toast names it.
+            showError(res.error);
         }
-        showError(res.error);
+        /*
+         * One message, where the merchant is working (editor audit F3):
+         * the conflict notice, or Couldn't save with Try again. Never a
+         * toast as well, which went off-screen and
+         * promised a retry that didn't come.
+         */
+        return false;
     }
+
+    // Back online after a save failed: try it again, without being asked.
+    useEffect(() => {
+        if (readOnly || !saveError || conflict) return;
+        const again = () => void onSave(true);
+        window.addEventListener("online", again);
+        return () => window.removeEventListener("online", again);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `onSave` is new each render
+    }, [readOnly, saveError, conflict, sections]);
 
     /*
      * Autosave, debounced.
@@ -399,13 +462,23 @@ export function useEditorDraft({
 
     return {
         sections,
+        /** The draft revision this editor holds (#285), for a restore's 409. */
+        revision,
         dirty,
         saving,
         saveError,
         lastSavedAt,
         conflict,
+        conflictBy,
+        conflictYou,
+        stamping,
         errorIndex,
         errorMessage,
+        /**
+         * Couldn't save's Try again (RULES §4): the same save, now. Never
+         * after a conflict, where it could only lose one side's work.
+         */
+        retry: () => (conflict ? Promise.resolve(false) : onSave()),
         heldBack,
         onlyHeldBack,
         heldBackAt,

@@ -10,6 +10,7 @@ import {
     CreatePageDto,
     CreateTestReleaseDto,
     CreateTestReleaseLinkDto,
+    PublishOptionsDto,
     RequestReviewDto,
     ReviewTargetQueryDto,
     SetCommentResolvedDto,
@@ -333,6 +334,30 @@ describe("UpdateCommentBodyDto: a note's new words follow the rules of a new not
     ])("refuses %s (400)", async (_label, body) => {
         await expect(
             pipe.transform(body, asBody(UpdateCommentBodyDto)),
+        ).rejects.toThrow(BadRequestException);
+    });
+});
+
+describe("PublishOptionsDto (U8)", () => {
+    it("takes a list of change keys, and none", async () => {
+        await expect(
+            pipe.transform(
+                { leaveOut: ["section:p1:k1"], override: true },
+                asBody(PublishOptionsDto),
+            ),
+        ).resolves.toMatchObject({ leaveOut: ["section:p1:k1"] });
+        await expect(
+            pipe.transform({}, asBody(PublishOptionsDto)),
+        ).resolves.toEqual({});
+    });
+
+    it.each([
+        ["a key that is not text", { leaveOut: [1] }],
+        ["not a list", { leaveOut: "section:p1:k1" }],
+        ["a key too long", { leaveOut: ["x".repeat(301)] }],
+    ])("refuses %s (400)", async (_label, body) => {
+        await expect(
+            pipe.transform(body, asBody(PublishOptionsDto)),
         ).rejects.toThrow(BadRequestException);
     });
 });

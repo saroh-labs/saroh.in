@@ -37,10 +37,11 @@ import {
  * design's compact header (the business's letter back to the site and the
  * tab's title; DEC-073 #10) instead of the site's header and footer.
  *
- * One layout at every width (DEC-142): the header, the account's tabs, then
- * the page. On a phone the tabs are the bar fixed to the foot of the
- * screen; from tablet width up they are a row under the header, and the
- * page has room for two columns. The order in the page is the same.
+ * One layout at every width (DEC-142, DEC-229): the header, the account's
+ * tabs, then the page. On a phone the tabs are the bar fixed to the foot of
+ * the screen; from tablet width up they are a row under the header, and the
+ * page has room for two columns; on a desk (1024px up) they are the side
+ * menu beside the page. The order in the page is the same.
  *
  * Switched off (`SITE_ACCOUNT_AREA`), every account page is a 404. Signed
  * out, the page asks the visitor to sign in, and the sheet keeps them on
@@ -188,17 +189,20 @@ export default async function AccountLayout({
                 name={lookup.account.name}
             />
             {/* Before the page in the document at every width: fixed to the
-                foot of a phone's screen, a row under the header beyond it. */}
-            <AccountTabBar
-                tabs={lookup.account.tabs}
-                unreadMessages={lookup.account.unreadMessages ?? 0}
-            />
-            <main
-                data-site-page=""
-                className={`${COLUMN} pb-[96px] pt-4 md:pb-16 md:pt-6`}
-            >
-                {children}
-            </main>
+                foot of a phone's screen, a row under the header beyond it,
+                the side menu beside the page on a desk. */}
+            <div className="lg:mx-auto lg:grid lg:max-w-[1200px] lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-10 lg:px-6">
+                <AccountTabBar
+                    tabs={lookup.account.tabs}
+                    unreadMessages={lookup.account.unreadMessages ?? 0}
+                />
+                <main
+                    data-site-page=""
+                    className={`${COLUMN} pb-[96px] pt-4 md:pb-16 md:pt-6 lg:mx-0 lg:max-w-none lg:px-0`}
+                >
+                    {children}
+                </main>
+            </div>
         </>
     );
 }

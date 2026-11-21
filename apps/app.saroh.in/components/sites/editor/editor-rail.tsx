@@ -15,11 +15,16 @@ import type {
     EditorRailTab,
     FixedPart,
 } from "@/components/sites/editor/use-editor-selection";
+import type { SiteIconSource } from "@/components/sites/looks/brand-groups";
+import { BrandReadOnly as LegacyBrandReadOnly } from "@/components/sites/looks/legacy/brand-read-only";
+import { StylePanel as LegacyStylePanel } from "@/components/sites/looks/legacy/style-panel";
+import type { LookChanges } from "@/components/sites/looks/look-changes";
 import type { LookChoices } from "@/components/sites/looks/look-picker";
 import { StylePanel } from "@/components/sites/looks/style-panel";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { Tip } from "@saroh/ui/tooltip";
 import { BrandReadOnly } from "./brand-read-only";
 import { EditorTabs, railRowState } from "./editor-chrome";
@@ -75,7 +80,28 @@ export function EditorRail({
     onPicked,
     templateRow = null,
     templateName,
+    hideTabs = false,
+    lookChanges,
+    siteIcon,
+    asideHosted = false,
+    styleDenied = false,
 }: {
+    /** The site and its tab icon: Brand draws Logo and tab icon (U24b). */
+    siteIcon?: SiteIconSource;
+    /** The desk inspector draws Brand's aside (`BrandAside`). */
+    asideHosted?: boolean;
+    /**
+     * Not a reader, but the API refuses this person's look changes (no
+     * `site:update`, C11): Brand reads, and says who can change it.
+     */
+    styleDenied?: boolean;
+    /** This visit's changes to the look, each with Undo (U24b). */
+    lookChanges?: LookChanges;
+    /**
+     * The new shell's rail of tabs (U46) chooses the panel, so this draws
+     * none of its own.
+     */
+    hideTabs?: boolean;
     /** The Brand tab's Template row (DEC-216); null draws none. */
     templateRow?: ReactNode;
     /** The site's template as a Reviewer reads it; null: not recorded; absent: no row. */
@@ -145,7 +171,7 @@ export function EditorRail({
     return (
         <aside className="flex min-h-0 flex-1 flex-col">
             {/* A Reviewer's Blocks sheet keeps Page | Brand (RVD2Phone). */}
-            {phone && !readOnly ? null : (
+            {(phone && !readOnly) || hideTabs ? null : (
                 <EditorTabs
                     label="Editor panels"
                     tabs={
@@ -157,12 +183,38 @@ export function EditorRail({
                     onSelect={selectTab}
                 />
             )}
-            {tab === "brand" && readOnly ? (
+            {/* Off, today's Brand panel exactly as it was (owner, 20 Nov). */}
+            {tab === "brand" && !websiteAreaOn() ? (
+                readOnly ? (
+                    <LegacyBrandReadOnly
+                        style={style}
+                        options={styleOptions}
+                        looks={looks?.available === true}
+                        template={templateName}
+                    />
+                ) : (
+                    <LegacyStylePanel
+                        style={style}
+                        options={styleOptions}
+                        onChange={setStyle}
+                        onReset={resetStyle}
+                        saving={styleSaving}
+                        dirty={styleDirty}
+                        looks={looks}
+                        rules={styleRules}
+                        onTry={tryStyle}
+                        heroInText={heroDrawsInText(sections, style.look)}
+                        phoneTabs={phone}
+                        templateRow={templateRow}
+                    />
+                )
+            ) : tab === "brand" && (readOnly || styleDenied) ? (
                 <BrandReadOnly
                     style={style}
                     options={styleOptions}
                     looks={looks?.available === true}
                     template={templateName}
+                    denied={!readOnly && styleDenied}
                 />
             ) : tab === "brand" ? (
                 <StylePanel
@@ -178,6 +230,9 @@ export function EditorRail({
                     heroInText={heroDrawsInText(sections, style.look)}
                     phoneTabs={phone}
                     templateRow={templateRow}
+                    changes={lookChanges}
+                    siteIcon={siteIcon}
+                    asideHosted={asideHosted}
                 />
             ) : (
                 <>

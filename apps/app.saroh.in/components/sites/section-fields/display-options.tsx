@@ -33,8 +33,9 @@ export function DisplayOptions({
     highlight,
     button,
 }: {
-    layout: ListLayout;
-    onLayout: (next: ListLayout) => void;
+    /** Absent: no Show as, where the block's look says it instead. */
+    layout?: ListLayout;
+    onLayout?: (next: ListLayout) => void;
     photos?: Shown;
     descriptions?: Shown;
     prices?: Shown;
@@ -51,13 +52,15 @@ export function DisplayOptions({
 }) {
     return (
         <div className="grid gap-3">
-            <ChoiceField
-                label="Show as"
-                options={LAYOUTS}
-                value={layout}
-                onChange={onLayout}
-                note="Cards sit side by side. A list is one per row with the photo on the left."
-            />
+            {layout && onLayout ? (
+                <ChoiceField
+                    label="Show as"
+                    options={LAYOUTS}
+                    value={layout}
+                    onChange={onLayout}
+                    note="Cards sit side by side. A list is one per row with the photo on the left."
+                />
+            ) : null}
             {photos ? (
                 <ChoiceField
                     label="Photos"

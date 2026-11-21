@@ -270,6 +270,21 @@ export class ReadsController {
         ]);
     });
 
+    it("reads a long path Prettier wrapped, trailing comma and all", () => {
+        const wrapped = `
+@Controller(
+    "organizations/:organizationId/things/:thingId/uses",
+)
+export class UsesController {
+    @Post()
+    add() {}
+}
+`;
+        expect(
+            writeRoutesIn(wrapped, "uses.controller.ts").map((r) => r.key),
+        ).toEqual(["POST organizations/:organizationId/things/:thingId/uses"]);
+    });
+
     it("refuses a computed controller path rather than miss its routes", () => {
         expect(() =>
             writeRoutesIn(

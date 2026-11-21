@@ -210,7 +210,7 @@ describe("a starter site nobody touched", () => {
 
         expect(await record(siteId)).toMatchObject({
             templateId: "starter",
-            templateVersion: 4,
+            templateVersion: 5,
             templateStyleId: "stone",
             style: { fontPair: "source-serif-inter" },
             footer: { value: "", layout: "left" },
@@ -242,7 +242,7 @@ describe("a starter site nobody touched", () => {
             outcome: "SUCCESS",
             metadata: {
                 from: "starter@3",
-                to: "starter@4",
+                to: "starter@5",
                 style: "applied",
                 footer: "applied",
                 pagesReplaced: 1,
@@ -299,7 +299,7 @@ describe("a starter site nobody touched", () => {
             styleApplied: 1,
             footerApplied: 1,
             counts: { pagesReplaced: 1, pagesHidden: 1, modulePagesAdded: 1 },
-            moves: { "starter@3 → starter@4": 1 },
+            moves: { "starter@3 → starter@5": 1 },
         });
 
         expect(await draft(siteId)).toEqual(before);
@@ -364,7 +364,7 @@ describe("a starter site its owner has worked on", () => {
         // Their accent, not a colourway; and no colourway recorded for it.
         expect(recorded.style).toEqual({ colours: { accent: "teal" } });
         expect(recorded).toMatchObject({
-            templateVersion: 4,
+            templateVersion: 5,
             templateStyleId: null,
             // Still serving the version they published.
             currentPublicationId: published.publicationId,

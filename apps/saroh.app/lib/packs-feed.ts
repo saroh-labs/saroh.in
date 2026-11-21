@@ -1,4 +1,5 @@
 import type { PacksFeed, PublicPack } from "@saroh/site-blocks";
+import { showsPacks } from "@saroh/site-blocks";
 
 /**
  * The Class packs block's packs, for a page that has one (round-2 G20), as
@@ -8,8 +9,11 @@ import type { PacksFeed, PublicPack } from "@saroh/site-blocks";
  *
  * Pure apart from `read`, so the rule is testable without the app's env.
  */
-export function hasPacks(sections: readonly { type: string }[]): boolean {
-    return sections.some((section) => section.type === "packs");
+export function hasPacks(
+    sections: readonly { type: string; content?: unknown }[],
+): boolean {
+    // A Plans block that sells packs too reads them (DEC-228).
+    return sections.some(showsPacks);
 }
 
 /** The packs on sale, and whether Buy can be paid online now. */
@@ -23,7 +27,7 @@ export interface PacksRead {
 }
 
 export async function packsFeed(
-    sections: readonly { type: string }[],
+    sections: readonly { type: string; content?: unknown }[],
     /** The page with the site's enquiry form, or null when it has none. */
     askHref: string | null,
     read: () => Promise<PacksRead>,

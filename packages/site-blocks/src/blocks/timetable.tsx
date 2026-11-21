@@ -7,6 +7,7 @@ import { resolveVariant } from "@saroh/block-contract";
 
 import { DEFAULT_API_URL } from "../api-url";
 import type { CreditFor } from "../booking-flow/api";
+import { useBrowserNow } from "../lib/browser-now";
 import { clockWords } from "../lib/clock";
 import type {
     PlacesWord,
@@ -18,6 +19,7 @@ import {
     fills,
     isPublicTimetable,
     isWeekday,
+    placesFromOf,
     placesWord,
     sessionHref,
     timetableQuery,
@@ -29,6 +31,7 @@ import { checkedWords } from "../live/live-words";
 import { refreshLiveRead, useLiveRead } from "../live/use-live-read";
 import type { LookProps } from "../look-context";
 import { LookTimetable, LookTimetableNote } from "./timetable-look";
+import { dateOn, nowWords, TimetableToday } from "./timetable-today";
 
 /**
  * `timetable` v1 — the week's class sessions, read live (industry templates
@@ -94,6 +97,8 @@ type TimetableProps = LookProps & {
     bookHref?: string;
     /** A sample week to draw instead of fetching (catalog, tests). */
     timetable?: PublicTimetable;
+    /** The moment Done and the now line are worked out for. Tests pin it. */
+    now?: Date;
 };
 
 /**
@@ -136,7 +141,9 @@ function lookLede(
     content: RenderedTimetable,
     week: PublicTimetable,
 ): string | null {
-    const counts = content.showCounts ? weekCounts(week.sessions) : null;
+    const counts = content.showCounts
+        ? weekCounts(week.sessions, placesFromOf(content))
+        : null;
     const lede = [counts ? `${counts.line}.` : null, said(content.intro)]
         .filter(Boolean)
         .join(" ");
@@ -186,6 +193,25 @@ function LiveLookTimetable({
     const { week, days } = shownWeek(content, read.data);
     if (week.sessions.length === 0) return null;
     const counts = showsCount(read.status);
+    const show = {
+        trainer: content.showTrainer !== false,
+        // A count only while the answer is fresh (U8).
+        places: content.showPlacesLeft !== false && counts,
+        bookHref,
+        placesFrom: placesFromOf(content),
+    };
+    if (resolveVariant("timetable", content) === "today") {
+        return (
+            <TimetableToday
+                content={content}
+                look={look}
+                title={title}
+                lede={said(content.intro)}
+                week={week}
+                show={show}
+            />
+        );
+    }
     return (
         <LookTimetable
             content={content}
@@ -194,12 +220,7 @@ function LiveLookTimetable({
             lede={lookLede(content, week)}
             week={week}
             days={days}
-            show={{
-                trainer: content.showTrainer !== false,
-                // A count only while the answer is fresh (U8).
-                places: content.showPlacesLeft !== false && counts,
-                bookHref,
-            }}
+            show={show}
             checked={
                 counts && read.fetchedAt !== undefined
                     ? `Places ${checkedWords(read.fetchedAt, week.timezone).toLowerCase()}`
@@ -222,7 +243,12 @@ function TimetableBlock({
     timetable: given,
     look: siteLook,
     credit,
+    now: pinned,
 }: TimetableProps) {
+    // A sample week (catalog, tests) is not today's: Done and the now line
+    // are read against the clock only for a live read, or a pinned moment.
+    const browserNow = useBrowserNow(pinned);
+    const now = given && !pinned ? null : browserNow;
     const query = timetableQuery(content.serviceIds);
     const [state, setState] = useState<LoadState>(
         given ? { kind: "ready", timetable: given } : { kind: "loading" },
@@ -305,14 +331,34 @@ function TimetableBlock({
     const { week, days } = shownWeek(content, state.timetable);
     if (week.sessions.length === 0) return null;
     const accent = look === "accent";
+    const placesFrom = placesFromOf(content);
     const show: Show = {
         trainer: content.showTrainer !== false,
         places: content.showPlacesLeft !== false,
         bookHref,
         accent,
+        placesFrom,
+        now,
     };
     const grid = look === "grid" || accent;
-    const counts = content.showCounts ? weekCounts(week.sessions) : null;
+    const counts = content.showCounts
+        ? weekCounts(week.sessions, placesFrom)
+        : null;
+
+    if (look === "today") {
+        return (
+            <TimetableToday
+                content={content}
+                look={siteLook}
+                title={title}
+                lede={siteLook ? lookLede(content, week) : intro}
+                week={week}
+                show={show}
+                now={pinned}
+                clock={!given || pinned !== undefined}
+            />
+        );
+    }
 
     if (siteLook) {
         return (
@@ -327,6 +373,7 @@ function TimetableBlock({
                     trainer: show.trainer,
                     places: show.places,
                     bookHref,
+                    placesFrom,
                 }}
                 credit={credit}
             />
@@ -366,6 +413,10 @@ interface Show {
     bookHref?: string;
     /** The accent look (template polish): filling sessions on the accent. */
     accent?: boolean;
+    /** Places left from this many down (KD8); absent, a fifth. */
+    placesFrom?: number;
+    /** The browser's clock (null before it is read): Done and the now line. */
+    now?: number | null;
 }
 
 function uniqueDays(sessions: TimetableSession[]): string[] {
@@ -376,7 +427,7 @@ const focusRing =
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-site-accent focus-visible:ring-offset-2 focus-visible:ring-offset-site-bg";
 
 const textButton = cn(
-    "cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 hover:underline",
+    "coarse:inline-flex coarse:min-h-11 coarse:items-center cursor-pointer rounded-[var(--site-radius)] text-sm font-semibold text-site-accent-text underline-offset-4 hover:underline",
     focusRing,
 );
 
@@ -472,7 +523,7 @@ function Places({
     if (!word) return null;
     if (onAccent) {
         return (
-            <span className="text-site-accent-fg inline-block whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.08em]">
+            <span className="text-site-accent-fg inline-block whitespace-nowrap text-[12px] font-semibold uppercase tracking-[0.08em]">
                 {word.text}
             </span>
         );
@@ -480,7 +531,7 @@ function Places({
     return (
         <span
             className={cn(
-                "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[11.5px] font-bold",
+                "inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-[12px] font-bold",
                 TONE[word.tone],
             )}
         >
@@ -502,8 +553,17 @@ function Session({
     // The accent look (template polish) always says Fills fast or Full on
     // a filling cell, whatever "places left" says: the colour is never the
     // only signal.
-    const lit = show.accent === true && fills(session);
-    const word = placesWord(session, show.places || lit);
+    // Started or over, once the browser has read its clock (R18): Done,
+    // and no longer a link. The cached page never says it.
+    const done =
+        show.now !== null &&
+        show.now !== undefined &&
+        Date.parse(session.startAt) <= show.now;
+    const lit =
+        !done && show.accent === true && fills(session, show.placesFrom);
+    const word: PlacesWord | null = done
+        ? { text: "Done", tone: "full" }
+        : placesWord(session, show.places || lit, show.placesFrom);
     const full = session.placesLeft <= 0;
     const trainer = show.trainer ? said(session.staffName) : null;
     const body = (
@@ -555,9 +615,14 @@ function Session({
         : cn(
               "border-site-border bg-site-surface text-site-fg rounded-[var(--site-radius)] border p-2.5",
               layout,
+              done && "text-site-muted",
           );
-    if (full || !show.bookHref) {
-        return <div className={box}>{body}</div>;
+    if (done || full || !show.bookHref) {
+        return (
+            <div className={box} data-timetable-done={done ? "" : undefined}>
+                {body}
+            </div>
+        );
     }
     return (
         <a
@@ -590,6 +655,15 @@ function DayList({
         <div className="grid gap-5">
             {days.map((date) => {
                 const sessions = week.sessions.filter((s) => s.date === date);
+                // The now line sits between the last class that started
+                // and the next, on today, once the browser knows the time.
+                const now = show.now ?? null;
+                const today = now === null ? null : dateOn(now, week.timezone);
+                const started =
+                    now === null || date !== today
+                        ? 0
+                        : sessions.filter((s) => Date.parse(s.startAt) <= now)
+                              .length;
                 return (
                     <section key={date} aria-label={dayLabel(date, true)}>
                         <h3 className="font-site-heading border-site-border mb-2 border-b pb-1.5 text-[17px] font-semibold">
@@ -597,8 +671,16 @@ function DayList({
                         </h3>
                         {sessions.length > 0 ? (
                             <ul className="grid gap-2">
-                                {sessions.map((s) => (
+                                {sessions.map((s, i) => (
                                     <li key={`${s.serviceId}:${s.startAt}`}>
+                                        {now !== null &&
+                                        started > 0 &&
+                                        i === started ? (
+                                            <NowLine
+                                                at={now}
+                                                timeZone={week.timezone}
+                                            />
+                                        ) : null}
                                         <Session
                                             session={s}
                                             show={show}
@@ -606,6 +688,16 @@ function DayList({
                                         />
                                     </li>
                                 ))}
+                                {now !== null &&
+                                started > 0 &&
+                                started === sessions.length ? (
+                                    <li>
+                                        <NowLine
+                                            at={now}
+                                            timeZone={week.timezone}
+                                        />
+                                    </li>
+                                ) : null}
                             </ul>
                         ) : (
                             <p className="text-site-muted text-sm">
@@ -616,6 +708,22 @@ function DayList({
                 );
             })}
         </div>
+    );
+}
+
+/** "Now 4:10 pm" on a rule, drawn only once the browser has read its clock. */
+function NowLine({ at, timeZone }: { at: number; timeZone: string }) {
+    return (
+        <span
+            aria-hidden="true"
+            data-timetable-now=""
+            className="relative mb-2 flex h-[30px] items-center"
+        >
+            <span className="bg-site-accent absolute inset-x-0 top-1/2 h-0.5" />
+            <span className="bg-site-accent text-site-accent-fg relative rounded-[4px] px-2 py-1 text-[12px] font-bold tabular-nums">
+                {nowWords(at, timeZone)}
+            </span>
+        </span>
     );
 }
 

@@ -20,12 +20,15 @@
  *
  * Where a visit came from (U15) rides the same beacon: the visit's steps
  * (visit, looked, started and, since DEC-181, paid) carry one of five
- * groups and the merchant's own link label, never the path, the address,
- * an order or anything about the visitor
+ * groups and the merchant's own link label, never the address, an order or
+ * anything about the visitor; `started` alone also carries the site page it
+ * began on, the path only and never a private page's (DEC-235)
  * (`@saroh/site-blocks/visit-source`, {@link visitStepBody}).
  */
 
 import type { VisitOrigin, VisitStep } from "@saroh/site-blocks/visit-source";
+
+import { sitePagePathOf } from "@saroh/block-contract";
 
 import { isPrivateSitePath } from "./private-paths";
 
@@ -107,19 +110,22 @@ const STEP_TYPES: Record<VisitStep, string> = {
 };
 
 /**
- * The body for one step of a visit: where it came from and nothing else.
- * No path, no referrer, no id.
+ * The body for one step of a visit: where it came from and, for a start
+ * only, the site page it began on (DEC-235). No referrer, no id.
  */
 export function visitStepBody(
     step: VisitStep,
     origin: VisitOrigin,
+    path: string | null = null,
 ): Record<string, unknown> {
+    const properties: Record<string, string> = { source: origin.source };
+    if (origin.ref) properties.ref = origin.ref;
+    const page = step === "started" ? sitePagePathOf(path) : null;
+    if (page) properties.path = page;
     return {
         type: STEP_TYPES[step],
         schemaVersion: 1,
         consent: "anonymous",
-        properties: origin.ref
-            ? { source: origin.source, ref: origin.ref }
-            : { source: origin.source },
+        properties,
     };
 }

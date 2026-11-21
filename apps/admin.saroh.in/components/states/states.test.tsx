@@ -6,6 +6,7 @@ import { ChangedRow } from "../changed-row";
 import { EmptyPanel } from "./empty-panel";
 import { FailedPanel } from "./failed-panel";
 import { PanelSkeleton } from "./panel-skeleton";
+import { TableSkeleton } from "./table-skeleton";
 
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -62,5 +63,22 @@ describe("shared console states", () => {
             </ChangedRow>,
         );
         expect(row?.hasAttribute("data-just-changed")).toBe(false);
+    });
+});
+
+describe("TableSkeleton", () => {
+    it("draws the table's own columns in the head and every row", () => {
+        const { container } = render(
+            <TableSkeleton label="Loading audit" columns={7} rows={3} />,
+        );
+        expect(screen.getByRole("status").getAttribute("aria-busy")).toBe(
+            "true",
+        );
+        expect(screen.getByText("Loading audit")).toBeTruthy();
+        const head = container.querySelector("[data-list-head]");
+        expect(head?.children).toHaveLength(7);
+        const rows = head?.nextElementSibling?.children;
+        expect(rows).toHaveLength(3);
+        expect(rows?.[0].children).toHaveLength(7);
     });
 });

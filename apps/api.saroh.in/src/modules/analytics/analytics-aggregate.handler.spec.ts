@@ -374,6 +374,40 @@ describe("AnalyticsAggregateHandler — where visits came from (U15)", () => {
         expect(rowOf("site.visit", "", "", "")).toMatchObject({ count: 2 });
     });
 
+    it("breaks a page's results down by path once they carry one (KTD-E8)", async () => {
+        eventFindMany.mockResolvedValue([
+            step("enquiry.submitted", {
+                formId: "f",
+                leadId: "l",
+                path: "/bridal?x=1",
+            }),
+            step("site.started", { source: "direct", path: "/bridal" }),
+            // From before paths: counted in the totals alone.
+            step("enquiry.submitted", { formId: "f", leadId: "l2" }),
+            // A private page is never rolled up by path.
+            step("site.paid", { source: "direct", path: "/account/orders" }),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(
+            rowOf("enquiry.submitted", "site_1", "path", "/bridal"),
+        ).toMatchObject({ count: 1 });
+        expect(rowOf("enquiry.submitted", "site_1", "", "")).toMatchObject({
+            count: 2,
+        });
+        expect(
+            rowOf("site.started", "site_1", "path", "/bridal"),
+        ).toMatchObject({ count: 1 });
+        expect(
+            aggregateUpsert.mock.calls
+                .map((c) => c[0].create)
+                .filter(
+                    (r) => r.type === "site.paid" && r.dimension === "path",
+                ),
+        ).toEqual([]);
+    });
+
     it("leaves site.view's own rollups as they were: no source dimension", async () => {
         eventFindMany.mockResolvedValue([
             step("site.view", {

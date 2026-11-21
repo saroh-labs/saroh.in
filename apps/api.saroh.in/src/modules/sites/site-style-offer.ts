@@ -91,7 +91,8 @@ export function assertTemplateLookOffered(
         ...(current ? [current] : []),
         ...templateColourways(template).map((c) => c.style),
     ];
-    if (next.palette) {
+    // A brand colour's palette is derived by `parseSiteStyle`, never typed.
+    if (next.palette && !next.brandColour) {
         const palette = next.palette;
         const ok = offered.some(
             (s) => s.palette !== undefined && samePalette(s.palette, palette),

@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import { BusinessZoneProvider } from "@/components/shared/dates/business-zone";
 import { ReviewPanel } from "@/components/sites/review/review-panel";
-import { RESTORE_NEEDS_OWNER } from "@/lib/sites/release-review";
 import type { ReviewState, SitePublication } from "@/lib/sites/service";
 import type { TestRelease } from "@/lib/sites/test-releases";
 
@@ -14,13 +13,15 @@ vi.mock("next/navigation", () => ({
 }));
 // Server-only: nothing here calls them.
 vi.mock("@/lib/sites/actions", () => ({
-    restorePublication: vi.fn(),
     createApproval: vi.fn(),
     requestReview: vi.fn(),
     setCommentResolved: vi.fn(),
     listPreviewLinks: vi.fn(),
     createPreviewLink: vi.fn(),
     revokePreviewLink: vi.fn(),
+}));
+vi.mock("@/lib/sites/version-restore-actions", () => ({
+    restoreVersionAsDraft: vi.fn(),
 }));
 
 /**
@@ -73,7 +74,6 @@ function render(
         <SiteVersions
             siteId="site_1"
             publications={history}
-            changesRequested={false}
             canRestore
             {...over}
         />,
@@ -100,24 +100,21 @@ describe("version history (T12)", () => {
         );
     });
 
-    it("links a go-live to the test release it came from", () => {
+    it("links a go-live to the test link it came from", () => {
         const html = render();
-        expect(text(html)).toContain("From test release 2 · Diwali menu");
+        expect(text(html)).toContain("From test link 2 · Diwali menu");
         expect(html).toContain('href="/sites/site_1/releases/rel_2"');
         expect(text(html)).toContain("Went live by Asha");
     });
 
-    it("keeps Restore for an owner, and says why it's off for anyone else, while approval is needed", () => {
-        const owner = text(render({ needsApproval: true, canOverride: true }));
-        expect(owner).toContain("Restore");
-        expect(owner).not.toContain(RESTORE_NEEDS_OWNER);
-
-        const admin = render({ needsApproval: true, canOverride: false });
-        expect(text(admin)).toContain(RESTORE_NEEDS_OWNER);
-        expect(admin).toMatch(/<button[^>]*disabled[^>]*>Restore<\/button>/);
-
-        // Off: as before.
-        expect(text(render())).not.toContain(RESTORE_NEEDS_OWNER);
+    it("offers Restore <date> as the draft on every past version, never on the live one, and only to someone who can edit", () => {
+        const out = text(render());
+        // Four versions, one live: three restores, each with its date.
+        expect(out.match(/Restore [^<]*? as the draft/g)).toHaveLength(3);
+        expect(out).not.toContain("without approval Restore");
+        expect(text(render({ canRestore: false }))).not.toMatch(
+            /Restore .* as the draft/,
+        );
     });
 
     it("lists a scheduled go-live above the versions, and says when it couldn't check", () => {
@@ -154,7 +151,7 @@ describe("version history (T12)", () => {
                 zone: "Asia/Kolkata",
             },
         });
-        expect(text(html)).toContain("Test release 3 · Weekend menu");
+        expect(text(html)).toContain("Test link 3 · Weekend menu");
         expect(text(html)).toContain("Scheduled");
         expect(text(html)).toMatch(/Goes live .* by Asha/);
         expect(html).toContain('href="/sites/site_1/releases/rel_3"');
@@ -191,12 +188,12 @@ describe("the review panel says what it reviews (T12)", () => {
         expect(text(panel({}))).toContain("Reviewing Draft");
     });
 
-    it("names the test release, and leaves the draft's preview links out", () => {
+    it("names the test link, and leaves the draft's preview links out", () => {
         const html = panel({
             release: { id: "rel_2", number: 2, name: "Diwali menu" },
         });
-        expect(text(html)).toContain("Reviewing Test release 2 · Diwali menu");
-        expect(text(html)).toContain("No notes on this test release yet.");
+        expect(text(html)).toContain("Reviewing Test link 2 · Diwali menu");
+        expect(text(html)).toContain("No notes on this test link yet.");
         expect(text(html)).not.toContain("preview");
     });
 
@@ -216,7 +213,6 @@ describe("version times in the business's zone (UX-008)", () => {
             <SiteVersions
                 siteId="site_1"
                 publications={[version({ id: "pub_x", publishedAt })]}
-                changesRequested={false}
                 canRestore
             />
         );

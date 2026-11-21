@@ -2,6 +2,7 @@
 
 import type { AskAiDraftCard, AskAiDraftResult } from "@saroh/api-contract";
 import { Button } from "@saroh/ui/button";
+import { CheckRow } from "@saroh/ui/check-row";
 import { Input } from "@saroh/ui/input";
 import { cn } from "@saroh/ui/lib/utils";
 import { Notice } from "@saroh/ui/notice";
@@ -24,7 +25,14 @@ import { upgradeHref } from "@/lib/billing/access";
 import type { CustomerPick } from "@/lib/customers/picker";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { WHO_CAN_CHANGE_PLAN } from "@saroh/ui/lib/state-copy";
-import { draftWords, editorHref, recordHref, valueText } from "./words";
+import { saySiteDraftChanged } from "./open";
+import {
+    draftWords,
+    editorHref,
+    recordHref,
+    valueText,
+    wordDiff,
+} from "./words";
 
 /**
  * A draft Ask AI made, for the person to check (boards 4, 5, 14, 15, 16).
@@ -42,6 +50,21 @@ import { draftWords, editorHref, recordHref, valueText } from "./words";
 /** Fields typed on the card are numbers when the tool takes a number. */
 const NUMERIC = new Set(["price", "stock", "duration_minutes", "capacity"]);
 
+/**
+ * What a card became (applied, undone), by draft: a card drawn again (the
+ * editor's right column switching tabs, the editor reading its draft
+ * again after Apply) shows where it got to, not the draft it began as.
+ */
+const settled = new Map<
+    string,
+    { card: AskAiDraftCard; result: AskAiDraftResult }
+>();
+
+/** Tests draw the same draft ids again. */
+export function forgetSettledDrafts() {
+    settled.clear();
+}
+
 export function DraftCard({
     card: first,
     phone = false,
@@ -51,12 +74,18 @@ export function DraftCard({
     phone?: boolean;
     now?: () => Date;
 }) {
-    const [card, setCard] = useState(first);
-    const [result, setResult] = useState<AskAiDraftResult | null>(null);
+    const [card, setCard] = useState(
+        () => settled.get(first.draftId)?.card ?? first,
+    );
+    const [result, setResult] = useState<AskAiDraftResult | null>(
+        () => settled.get(first.draftId)?.result ?? null,
+    );
     const [typed, setTyped] = useState<Record<string, string>>({});
     const [who, setWho] = useState<CustomerPick | null>(null);
     const [cancelled, setCancelled] = useState(false);
     const [busy, setBusy] = useState(false);
+    // Check this (RULES §5): the facts the person said are right.
+    const [sure, setSure] = useState<ReadonlySet<string>>(new Set());
     const router = useRouter();
     const words = draftWords(card);
     const big = phone ? "coarse:h-11 h-11" : "";
@@ -72,6 +101,19 @@ export function DraftCard({
         setCard(res.data.card);
         setResult(res.data);
         setTyped({});
+        settled.set(res.data.card.draftId, {
+            card: res.data.card,
+            result: res.data,
+        });
+        // A section's words changed in the website's draft: the open
+        // editor reads it again (owner, 21 Nov).
+        const outcome = res.data.outcome;
+        if (
+            res.data.card.kind === "section" &&
+            (outcome === "done" || outcome === "undone")
+        ) {
+            saySiteDraftChanged(res.data.card.targetId?.split(":")[0] ?? "");
+        }
     };
 
     const confirm = async () => {
@@ -84,10 +126,16 @@ export function DraftCard({
         settle(
             await runAction(
                 () =>
-                    confirmDraft(
-                        card.draftId,
-                        card.missing.length ? fields : undefined,
-                    ),
+                    card.checks?.length
+                        ? confirmDraft(
+                              card.draftId,
+                              undefined,
+                              Array.from(sure),
+                          )
+                        : confirmDraft(
+                              card.draftId,
+                              card.missing.length ? fields : undefined,
+                          ),
                 { setBusy },
             ),
         );
@@ -153,7 +201,7 @@ export function DraftCard({
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    {openId ? (
+                    {openId && card.kind !== "section" ? (
                         <Button
                             asChild
                             variant="outline"
@@ -245,105 +293,122 @@ export function DraftCard({
             className="overflow-hidden rounded-xl border-[1.5px] border-foreground bg-card"
         >
             <div className="flex items-center gap-2 border-b border-muted bg-neutral-50 px-3.5 py-2.5 dark:bg-muted">
-                <span className="label inline-flex h-5 items-center rounded-md bg-foreground px-[7px] text-background">
+                <span className="inline-flex h-5 items-center rounded-md bg-foreground px-[7px] text-[11px] font-semibold text-background">
                     {words.tag}
                 </span>
                 <span className="ml-auto text-[12.5px] text-muted-foreground">
                     {card.status === "expired" ? "No longer open" : words.state}
                 </span>
             </div>
-            <dl className="m-0 grid grid-cols-[104px_minmax(0,1fr)] gap-x-3 px-3.5 py-1">
-                {card.tool === "update_orders_status" ? (
-                    // AF 8: which orders, before the step they move to.
-                    <Row first label="Orders">
-                        {card.targetName}
-                    </Row>
-                ) : null}
-                {card.fields
-                    .filter((f) => !missingIds.has(f.field))
-                    .map((f, i) => (
-                        <Row
-                            key={f.field}
-                            first={
-                                i === 0 && card.tool !== "update_orders_status"
-                            }
-                            label={f.label}
-                        >
-                            {card.action === "edit" &&
-                            valueText(f.old, f.field) ? (
-                                <>
-                                    <span className="font-normal text-muted-foreground line-through">
-                                        {valueText(f.old, f.field)}
-                                    </span>
-                                    <span className="block font-semibold">
-                                        {valueText(f.new, f.field)}
-                                    </span>
-                                </>
-                            ) : (
-                                valueText(f.new, f.field)
-                            )}
+            {card.kind === "section" ? (
+                <SectionWords
+                    card={card}
+                    open={open}
+                    sure={sure}
+                    onSure={(id, on) =>
+                        setSure((all) => {
+                            const next = new Set(all);
+                            if (on) next.add(id);
+                            else next.delete(id);
+                            return next;
+                        })
+                    }
+                />
+            ) : (
+                <dl className="m-0 grid grid-cols-[104px_minmax(0,1fr)] gap-x-3 px-3.5 py-1">
+                    {card.tool === "update_orders_status" ? (
+                        // AF 8: which orders, before the step they move to.
+                        <Row first label="Orders">
+                            {card.targetName}
                         </Row>
-                    ))}
-                {open
-                    ? card.missing.map((m, i) => (
-                          <Row
-                              key={m.field}
-                              first={i === 0 && card.fields.length === 0}
-                              label={m.label}
-                          >
-                              {m.field === "customer_id" ? (
-                                  // Who a booking is for (AF 4): one of the
-                                  // business's customers, picked by search.
-                                  <CustomerPicker
-                                      value={who}
-                                      allowAdd={false}
-                                      showAttention={false}
-                                      onPick={(pick) => {
-                                          setWho(pick);
-                                          setTyped((t) => ({
-                                              ...t,
-                                              customer_id:
-                                                  pick?.kind === "contact"
-                                                      ? pick.id
-                                                      : "",
-                                          }));
-                                      }}
-                                  />
-                              ) : (
-                                  <Input
-                                      aria-label={`${m.label}, needed`}
-                                      className={cn(
-                                          "h-[34px] rounded-lg border-[1.5px] border-foreground px-2.5 font-medium placeholder:font-normal placeholder:text-destructive-subtle-foreground",
-                                          phone && "h-11",
-                                      )}
-                                      inputMode={
-                                          NUMERIC.has(m.field)
-                                              ? "decimal"
-                                              : undefined
-                                      }
-                                      placeholder={`Type the ${m.label.toLowerCase()}`}
-                                      value={typed[m.field] ?? ""}
-                                      onChange={(e) =>
-                                          setTyped((t) => ({
-                                              ...t,
-                                              [m.field]: e.target.value,
-                                          }))
-                                      }
-                                  />
-                              )}
-                              <span
-                                  data-ph-unmask=""
-                                  // A prompt, not an error: nothing was tried yet.
-                                  className="mt-1 block text-[12.5px] text-muted-foreground"
+                    ) : null}
+                    {card.fields
+                        .filter((f) => !missingIds.has(f.field))
+                        .map((f, i) => (
+                            <Row
+                                key={f.field}
+                                first={
+                                    i === 0 &&
+                                    card.tool !== "update_orders_status"
+                                }
+                                label={f.label}
+                            >
+                                {card.action === "edit" &&
+                                valueText(f.old, f.field) ? (
+                                    <>
+                                        <span className="font-normal text-muted-foreground line-through">
+                                            {valueText(f.old, f.field)}
+                                        </span>
+                                        <span className="block font-semibold">
+                                            {valueText(f.new, f.field)}
+                                        </span>
+                                    </>
+                                ) : (
+                                    valueText(f.new, f.field)
+                                )}
+                            </Row>
+                        ))}
+                    {open
+                        ? card.missing.map((m, i) => (
+                              <Row
+                                  key={m.field}
+                                  first={i === 0 && card.fields.length === 0}
+                                  label={m.label}
                               >
-                                  {m.field === "customer_id"
-                                      ? "Needed to book it"
-                                      : "Needed to add it"}
-                              </span>
-                          </Row>
-                      ))
-                    : null}
-            </dl>
+                                  {m.field === "customer_id" ? (
+                                      // Who a booking is for (AF 4): one of the
+                                      // business's customers, picked by search.
+                                      <CustomerPicker
+                                          value={who}
+                                          allowAdd={false}
+                                          showAttention={false}
+                                          onPick={(pick) => {
+                                              setWho(pick);
+                                              setTyped((t) => ({
+                                                  ...t,
+                                                  customer_id:
+                                                      pick?.kind === "contact"
+                                                          ? pick.id
+                                                          : "",
+                                              }));
+                                          }}
+                                      />
+                                  ) : (
+                                      <Input
+                                          aria-label={`${m.label}, needed`}
+                                          className={cn(
+                                              "h-[34px] rounded-lg border-[1.5px] border-foreground px-2.5 font-medium placeholder:font-normal placeholder:text-destructive-subtle-foreground",
+                                              phone && "h-11",
+                                          )}
+                                          inputMode={
+                                              NUMERIC.has(m.field)
+                                                  ? "decimal"
+                                                  : undefined
+                                          }
+                                          placeholder={`Type the ${m.label.toLowerCase()}`}
+                                          value={typed[m.field] ?? ""}
+                                          onChange={(e) =>
+                                              setTyped((t) => ({
+                                                  ...t,
+                                                  [m.field]: e.target.value,
+                                              }))
+                                          }
+                                      />
+                                  )}
+                                  <span
+                                      data-ph-unmask=""
+                                      // A prompt, not an error: nothing was tried yet.
+                                      className="mt-1 block text-[12.5px] text-muted-foreground"
+                                  >
+                                      {m.field === "customer_id"
+                                          ? "Needed to book it"
+                                          : "Needed to add it"}
+                                  </span>
+                              </Row>
+                          ))
+                        : null}
+                </dl>
+            )}
             {open && card.missing.length ? (
                 <Notice
                     tone="neutral"
@@ -384,7 +449,11 @@ export function DraftCard({
                             type="button"
                             className={big}
                             onClick={confirm}
-                            disabled={busy || !missingDone}
+                            disabled={
+                                busy ||
+                                !missingDone ||
+                                (card.checks ?? []).some((c) => !sure.has(c.id))
+                            }
                             aria-busy={busy}
                         >
                             {words.confirm}
@@ -420,11 +489,132 @@ export function DraftCard({
                         className="ml-1 min-h-11 px-1.5 text-[13px] text-foreground underline decoration-border-strong underline-offset-[3px] min-[760px]:min-h-0"
                         onClick={() => setCancelled(true)}
                     >
-                        Cancel
+                        {card.kind === "section" ? "Not now" : "Cancel"}
                     </Button>
                 ) : null}
             </div>
         </div>
+    );
+}
+
+/**
+ * A section's words (owner, 21 Nov; plan U42): the section's name, then
+ * Now and New for each field, the words that differ marked; then Check
+ * this for every fact the owner never gave (RULES §5), each ticked before
+ * Apply; and what the suggestion is based on.
+ */
+function SectionWords({
+    card,
+    open,
+    sure,
+    onSure,
+}: {
+    card: AskAiDraftCard;
+    open: boolean;
+    sure: ReadonlySet<string>;
+    onSure: (id: string, on: boolean) => void;
+}) {
+    const checks = card.checks ?? [];
+    return (
+        <div data-section-words="" className="flex flex-col gap-3 px-3.5 py-3">
+            <b className="text-sm [overflow-wrap:anywhere]">
+                {card.targetName}
+            </b>
+            {card.fields.map((f) => {
+                const diff = wordDiff(
+                    valueText(f.old, f.field),
+                    valueText(f.new, f.field),
+                );
+                return (
+                    <div key={f.field} className="flex flex-col gap-1">
+                        <span className="label text-muted-foreground">
+                            {f.label}
+                        </span>
+                        <p className="m-0 text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">
+                            <span
+                                data-ph-unmask=""
+                                className="mr-1.5 text-[12px] font-semibold"
+                            >
+                                Now
+                            </span>
+                            <Words words={diff.now} mark="del" />
+                        </p>
+                        <p className="m-0 text-[13.5px] font-medium [overflow-wrap:anywhere]">
+                            <span
+                                data-ph-unmask=""
+                                className="mr-1.5 text-[12px] font-semibold text-muted-foreground"
+                            >
+                                New
+                            </span>
+                            <Words words={diff.next} mark="ins" />
+                        </p>
+                    </div>
+                );
+            })}
+            {checks.length ? (
+                <div
+                    data-check-this=""
+                    className="flex flex-col gap-1.5 rounded-lg border border-warning-subtle-foreground/40 bg-warning-subtle px-3 py-2.5 text-warning-subtle-foreground"
+                >
+                    <b className="flex items-center gap-1.5 text-[13px]">
+                        <TriangleAlert aria-hidden className="size-3.5" />
+                        Check this
+                    </b>
+                    {checks.map((c) => (
+                        <CheckRow
+                            key={c.id}
+                            checked={sure.has(c.id)}
+                            disabled={!open}
+                            onChange={(on) => onSure(c.id, on)}
+                            className="items-start text-foreground"
+                        >
+                            <span>
+                                <b>“{c.words}”</b> is right.{" "}
+                                <span className="text-muted-foreground">
+                                    {c.why}.
+                                </span>
+                            </span>
+                        </CheckRow>
+                    ))}
+                </div>
+            ) : null}
+            {card.basedOn ? (
+                <p className="m-0 text-[12.5px] text-muted-foreground">
+                    Based on: {card.basedOn}.
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+/** Words drawn as text, the changed ones marked. */
+function Words({
+    words,
+    mark,
+}: {
+    words: { word: string; changed: boolean }[];
+    mark: "del" | "ins";
+}) {
+    if (!words.length) return <span data-ph-unmask="">(none)</span>;
+    return (
+        <>
+            {words.map((w, i) => (
+                <span key={i}>
+                    {i ? " " : null}
+                    {!w.changed ? (
+                        w.word
+                    ) : mark === "del" ? (
+                        <del className="rounded-sm bg-destructive-subtle px-0.5 text-destructive-subtle-foreground">
+                            {w.word}
+                        </del>
+                    ) : (
+                        <ins className="rounded-sm bg-success-subtle px-0.5 text-success-subtle-foreground no-underline">
+                            {w.word}
+                        </ins>
+                    )}
+                </span>
+            ))}
+        </>
     );
 }
 

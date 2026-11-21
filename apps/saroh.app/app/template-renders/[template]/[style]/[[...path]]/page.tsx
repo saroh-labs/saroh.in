@@ -95,9 +95,6 @@ export default async function TemplateRenderPage({
                         look={look}
                         footer={render.footer}
                         name={render.name}
-                        // The header's menu again at the foot, as live.
-                        navigation={render.navigation}
-                        shopServes={render.shopServes}
                     />
                 }
             >

@@ -15,6 +15,7 @@ import {
     flowStaff,
 } from "@/components/bookings/new-booking/setup";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { ScreenPending } from "@/components/shared/page/screen-pending";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { rowNotice, takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
@@ -228,7 +229,9 @@ export default async function BookingsPage({
     const gcLine = rowNotice(access, "bookings").on
         ? null
         : bookingsCalendarLine(calendarRead);
+    // A day, a week, a person: only the diary greys (`ScreenPending`).
     const screen = (
+        <ScreenPending>
         <CalendarScreen
             layout={layout}
             date={date}
@@ -295,6 +298,7 @@ export default async function BookingsPage({
                 ) : null
             }
         />
+        </ScreenPending>
     );
     return (
         <PageContainer width="full">

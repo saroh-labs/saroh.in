@@ -181,7 +181,7 @@ describe("On today (G18)", () => {
         expect(screen.queryByText(/Open now/)).toBeNull();
     });
 
-    it("says Free today for a business with appointments and no classes", () => {
+    it("says Open today for a business with appointments and no classes", () => {
         render(
             <OnTodayHero
                 content={HERO}
@@ -189,7 +189,7 @@ describe("On today (G18)", () => {
             />,
         );
         expect(
-            screen.getByRole("heading", { name: "Free today" }),
+            screen.getByRole("heading", { name: "Open today" }),
         ).toBeInTheDocument();
     });
 

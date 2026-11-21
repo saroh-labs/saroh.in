@@ -322,3 +322,24 @@ describe("each write tool's draft", () => {
         ).toEqual({ orderStage: true });
     });
 });
+
+describe("edit_section's Undo (owner, 21 Nov)", () => {
+    it("puts back only the words the confirmed edit changed, in the draft", () => {
+        const before = state({ heading: "Old words", button_label: "Browse" });
+        const after = state({ heading: "New words", button_label: "Browse" });
+        const undo = DRAFT_SPECS.edit_section.undo?.("s1:p1:k1", before, after);
+        expect(undo).toEqual({
+            tool: "edit_section",
+            input: {
+                site_id: "s1",
+                page_id: "p1",
+                section_key: "k1",
+                heading: "Old words",
+            },
+        });
+        expect(DRAFT_SPECS.edit_section.kind).toBe("section");
+        expect(DRAFT_SPECS.edit_section.doneWords).toBe(
+            "Saved · goes live when you publish",
+        );
+    });
+});

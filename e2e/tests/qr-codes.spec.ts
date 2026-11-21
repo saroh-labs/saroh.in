@@ -264,8 +264,9 @@ test("the Website header's QR button opens the code Settings › Share lists", a
 
     await page.goto(`/open/${NORTHWIND_ORG}`);
     await page.goto(`/sites/${siteId}/pages`);
+    // Today's tabs say "Website"; the Website area (on in CI) says "Pages".
     await expect(
-        page.getByRole("heading", { name: "Website", level: 1 }),
+        page.getByRole("heading", { name: /^(Website|Pages)$/, level: 1 }),
     ).toBeVisible();
 
     await page

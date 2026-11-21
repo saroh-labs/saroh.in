@@ -3,6 +3,7 @@
 import { Button } from "@saroh/ui/button";
 import { EmptyState, LoadingState } from "@saroh/ui/data-state";
 import { FailedRead } from "@saroh/ui/failed-read";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { useState } from "react";
 
 import type { BillingProfile, OwnedBusiness } from "@/lib/billing-profiles";
@@ -19,10 +20,35 @@ import { AddProfileSheet } from "./profile-sheet";
 
 export function LoadingProfiles({
     what = "your billing profiles",
+    cards = false,
 }: {
     what?: string;
+    /** The list's shape: a card per profile, as `ProfileCard` draws it. */
+    cards?: boolean;
 }) {
-    return <LoadingState rows={3} label={`Loading ${what}`} />;
+    if (!cards) return <LoadingState rows={3} label={`Loading ${what}`} />;
+    return (
+        <div
+            aria-busy="true"
+            aria-live="polite"
+            className="flex flex-col gap-2.5"
+        >
+            <span className="sr-only">{`Loading ${what}`}</span>
+            {[0, 1].map((i) => (
+                <div
+                    key={i}
+                    aria-hidden
+                    className="border-border bg-card flex items-center gap-3 rounded-xl border px-3.5 py-3.5 md:gap-3.5 md:px-[18px] md:py-4"
+                >
+                    <div className="flex min-w-0 flex-1 flex-col gap-[7px]">
+                        <Skeleton className="h-4 w-48 rounded-[4px]" />
+                        <div className="bg-muted/70 h-3 w-72 max-w-full rounded-[4px]" />
+                        <div className="bg-muted/70 mt-1 h-5 w-24 rounded-[4px]" />
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
 }
 
 export const EMPTY_TITLE = "No billing profiles yet";

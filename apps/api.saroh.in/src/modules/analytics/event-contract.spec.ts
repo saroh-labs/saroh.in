@@ -310,3 +310,60 @@ describe("event-contract — site.view keeps its promises on the server (U15 pri
         }
     });
 });
+
+describe("event-contract — the page a start or an enquiry came from (DEC-235)", () => {
+    it("keeps site.started's page path, cut to the path alone", () => {
+        expect(
+            validateEventProperties("site.started", 1, {
+                source: "direct",
+                path: "/bridal/?ref=diwali-post#prices",
+            }),
+        ).toEqual({ source: "direct", path: "/bridal" });
+    });
+
+    it("keeps enquiry.submitted's page path", () => {
+        expect(
+            validateEventProperties("enquiry.submitted", 1, {
+                formId: "f1",
+                leadId: "l1",
+                path: "/contact?name=Asha",
+            }),
+        ).toEqual({ formId: "f1", leadId: "l1", path: "/contact" });
+    });
+
+    it.each(["site.visit", "site.looked", "site.paid"])(
+        "%s still keeps no path",
+        (type) => {
+            expect(
+                validateEventProperties(type, 1, {
+                    source: "direct",
+                    path: "/bridal",
+                }),
+            ).toEqual({ source: "direct" });
+        },
+    );
+
+    it.each([
+        "/account/bookings/abc",
+        "/checkout",
+        "/book/claim/token",
+        "https://example.com/bridal",
+        "//example.com",
+        "bridal",
+        42,
+    ])("drops the path %s, never the event", (path) => {
+        expect(
+            validateEventProperties("site.started", 1, {
+                source: "other",
+                path,
+            }),
+        ).toEqual({ source: "other" });
+        expect(
+            validateEventProperties("enquiry.submitted", 1, {
+                formId: "f1",
+                leadId: "l1",
+                path,
+            }),
+        ).toEqual({ formId: "f1", leadId: "l1" });
+    });
+});

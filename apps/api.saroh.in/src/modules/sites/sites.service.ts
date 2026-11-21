@@ -5,6 +5,7 @@ import {
     Injectable,
     NotFoundException,
     Optional,
+    ServiceUnavailableException,
 } from "@nestjs/common";
 import type { PageKind } from "@saroh/database";
 import {
@@ -15,13 +16,16 @@ import {
     repeatedAnchor,
 } from "@saroh/database";
 import type { LookId } from "@saroh/templates";
+import { randomUUID } from "node:crypto";
 import { isDeepStrictEqual } from "node:util";
+import { publishCheckFlags } from "./publish-checks";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ActivationEvents } from "../analytics/activation-events";
 import { EntitlementService } from "../billing/entitlement.service";
 import { keptPostsOnSite } from "../content/post-paused";
 import { parsePostsPrefix } from "../content/posts-prefix";
+import { MediaService } from "../media/media.service";
 import {
     checkoutReadiness,
     readinessMessage,
@@ -32,7 +36,29 @@ import {
     authorize,
     ROLE_DENIED,
 } from "../organizations/organization-policy";
+import type { ChangeVerdict, UnitApproval } from "./change-approvals";
+import {
+    editorsOf,
+    heldForApproval,
+    readUnitVerdicts,
+    recordUnitVerdicts,
+    unitApprovals,
+} from "./change-approvals";
+import type {
+    ChangeGroup,
+    ChangeStamp,
+    ChangeStamps,
+    ChangeUnit,
+} from "./change-units";
+import {
+    carryStamps,
+    changeUnits,
+    groupByPerson,
+    leaveOutOf,
+    readDraftEditors,
+} from "./change-units";
 import { domainPausedHere } from "./domain-paused";
+import { stampDraftEditors } from "./draft-editors";
 import type {
     CreateApprovalDto,
     CreateCommentDto,
@@ -43,7 +69,11 @@ import type {
     UpdateSiteSettingsDto,
 } from "./dto";
 import { lockSite, putLive, readReviewStanding } from "./live-pointer";
-import { createModulePage, PAGE_VIEW_SELECT } from "./module-page-create";
+import {
+    createModulePage,
+    PAGE_HEAD_SELECT,
+    PAGE_VIEW_SELECT,
+} from "./module-page-create";
 import type { PublicModulePageStates } from "./module-pages";
 import {
     addableModulePageKinds,
@@ -55,7 +85,7 @@ import { isModulePageKind, MODULE_PAGE_DEFAULTS } from "./page-kinds";
 import { pageUpdatedAt, pageUpdatedSelect } from "./page-updated";
 import type { SiteChangeKind } from "./pending-changes";
 import {
-    countPendingSectionChanges,
+    pageHead,
     pagePathResolver,
     pendingSiteChanges,
     toPendingPages,
@@ -67,7 +97,9 @@ import type { Renderability } from "./publication-renderability";
 import { checkRenderability } from "./publication-renderability";
 import {
     approvalApplies,
+    approvalRequired,
     assertOverrideAllowed,
+    changesAwaitApproval,
     isOwner,
     setPublishNeedsApproval,
 } from "./publish-approval";
@@ -97,6 +129,7 @@ import {
     assertSiteInOrg,
     getOrCreateDraftVersion,
     reviewerScope,
+    suggestFreePath,
 } from "./site-access";
 import type { SiteDefaults } from "./site-address";
 import { siteDefaults } from "./site-address";
@@ -137,6 +170,9 @@ import {
     resolveSiteNavigation,
     withInPageNavigation,
 } from "./site-navigation";
+import { siteCardExtras } from "./site-overview";
+import { snapshotRedirects } from "./site-redirects";
+import { dropRedirectsAt, followPageMove } from "./site-redirects.service";
 import type { SiteStyle, SiteStyleOptions } from "./site-style";
 import {
     parseSiteStyle,
@@ -282,6 +318,13 @@ export interface PageView {
     kind: PageKind;
     /** "Show in menu" (G14). */
     inMenu: boolean;
+    /** The page's own head (KTD-7); null falls back to the site's. */
+    seoTitle: string | null;
+    seoDescription: string | null;
+    shareImageMediaId: string | null;
+    shareImageUrl: string | null;
+    /** "Show on Google" off. */
+    noindex: boolean;
 }
 
 /** A section as returned by the draft-editing endpoints. */
@@ -334,6 +377,49 @@ export interface PageDraftView {
      * image, style, menu, footer, page list. Null before the first publish.
      */
     pendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * How many things publishing would change, one per change unit (U7):
+     * the number every surface shows. Null before the first publish.
+     */
+    pendingChanges: number | null;
+}
+
+/** What `GET …/sites/:siteId/changes` answers (change units, U7). */
+/** Someone who may approve a change (DEC-226). */
+export interface ChangeApprover {
+    id: string;
+    name: string;
+    role: "REVIEWER" | "OWNER" | "ADMIN";
+}
+
+export interface SiteChangesView {
+    siteId: string;
+    /** When the version visitors see went live; null before the first. */
+    livePublishedAt: Date | null;
+    /** `units.length`; null before the first publish (nothing to diff). */
+    count: number | null;
+    units: (ChangeUnit & {
+        /** Approved, asked about or waiting (DEC-226, U9), and by whom. */
+        approval: {
+            state: UnitApproval["state"];
+            by?: { id: string; name: string | null };
+            at?: string;
+            reason?: string;
+            /** An approval a later edit no longer matches. */
+            voided: boolean;
+            /** Who may approve it, for "Waiting for Kavya's approval". */
+            approvers: ChangeApprover[];
+        };
+    })[];
+    /**
+     * "Publishing needs approval" applies (on, and the plan has it,
+     * DEC-103): a teammate's change waiting goes out only once approved.
+     */
+    approvalRequired: boolean;
+    /** By person, newest first; `userId` null is "Earlier changes". */
+    groups: (ChangeGroup & { name: string | null; you: boolean })[];
+    /** Posts not live yet: each has its own Publish post. */
+    posts: { id: string; title: string; updatedAt: Date }[];
 }
 
 /** What a publish returns: the new immutable Publication + the live pointer. */
@@ -350,6 +436,11 @@ export interface PublishResult {
     overridden: boolean;
     /** Which route this publish took (#278). */
     route: ReviewRoute;
+    /**
+     * Changes left out with the ones asked because they need them (U8): a
+     * new page's sections, a menu linking to a left-out page.
+     */
+    alsoLeftOut?: string[];
 }
 
 /**
@@ -529,6 +620,12 @@ export interface SiteDetailView {
         kind: PageKind;
         /** "Show in menu" (G14). */
         inMenu: boolean;
+        /** The page's own head (KTD-7); null falls back to the site's. */
+        seoTitle: string | null;
+        seoDescription: string | null;
+        shareImageMediaId: string | null;
+        shareImageUrl: string | null;
+        noindex: boolean;
         /**
          * When the page was last changed — renamed, moved, hidden or its
          * sections saved (#908, `pageUpdatedAt`).
@@ -559,6 +656,11 @@ export interface SiteDetailView {
      * image, style, menu, footer, page list. Null before the first publish.
      */
     pendingSiteChanges: SiteChangeKind[] | null;
+    /**
+     * How many things publishing would change, one per change unit (U7):
+     * the number every surface shows. Null before the first publish.
+     */
+    pendingChanges: number | null;
     /**
      * The template the site was made from and the style chosen with it
      * (KTD-7). Null for a site made before that was recorded.
@@ -713,6 +815,11 @@ const draftSiteSelect = {
     // Not part of the snapshot: what a Publication is stamped with (KTD-7).
     templateId: true,
     templateVersion: true,
+    // Old page links that forward (KTD-3), as the next publish carries them.
+    redirects: {
+        where: { removedAt: null },
+        select: { fromPath: true, toPath: true },
+    },
     pages: {
         // A hidden page does not travel, for the same reason a
         // hidden section does not: a Publication is immutable once
@@ -729,6 +836,11 @@ const draftSiteSelect = {
             // shows in the menu decides the resolved navigation.
             kind: true,
             inMenu: true,
+            // The page's own head (KTD-7).
+            seoTitle: true,
+            seoDescription: true,
+            shareImageUrl: true,
+            noindex: true,
             versions: {
                 where: { status: "DRAFT" },
                 orderBy: { createdAt: "desc" },
@@ -746,6 +858,8 @@ const draftSiteSelect = {
                             type: true,
                             contractVersion: true,
                             content: true,
+                            // Into `snapshot.keys` (change units, U7).
+                            key: true,
                         },
                     },
                 },
@@ -753,6 +867,143 @@ const draftSiteSelect = {
         },
     },
 } satisfies Prisma.SiteSelect;
+
+/**
+ * The draft as {@link draftSiteSelect} loads it, with hidden pages and
+ * sections and who changed each (change units, U7). Hidden ones are kept so
+ * "Hidden" can be told from "Removed"; {@link visibleDraft} drops them again
+ * before a snapshot is built.
+ */
+const changesSiteSelect = {
+    ...draftSiteSelect,
+    draftEditors: true,
+    currentPublication: { select: { snapshot: true } },
+    redirects: {
+        where: { removedAt: null },
+        select: {
+            fromPath: true,
+            toPath: true,
+            createdByUserId: true,
+            createdAt: true,
+        },
+    },
+    pages: {
+        orderBy: { path: "asc" },
+        select: {
+            ...draftSiteSelect.pages.select,
+            hidden: true,
+            settingsEditedByUserId: true,
+            settingsEditedAt: true,
+            versions: {
+                where: { status: "DRAFT" },
+                orderBy: { createdAt: "desc" },
+                take: 1,
+                select: {
+                    sections: {
+                        orderBy: { order: "asc" },
+                        select: {
+                            type: true,
+                            contractVersion: true,
+                            content: true,
+                            key: true,
+                            hidden: true,
+                            lastEditedByUserId: true,
+                            lastEditedAt: true,
+                        },
+                    },
+                },
+            },
+        },
+    },
+} satisfies Prisma.SiteSelect;
+
+type ChangesSite = Prisma.SiteGetPayload<{ select: typeof changesSiteSelect }>;
+
+/** A {@link ChangesSite} as publish would see it: hidden pages and sections out. */
+function visibleDraft(site: ChangesSite): DraftSite {
+    return {
+        ...site,
+        pages: site.pages
+            .filter((p) => !p.hidden)
+            .map((p) => ({
+                ...p,
+                versions: p.versions.map((v) => ({
+                    sections: v.sections.filter((x) => !x.hidden),
+                })),
+            })),
+    };
+}
+
+/** A stamp from a user id and a time, or null when either is missing. */
+function stampOf(
+    userId: string | null | undefined,
+    at: Date | null | undefined,
+): ChangeStamp | null {
+    return userId && at ? { userId, at: at.toISOString() } : null;
+}
+
+/** The setting units a settings save touches (U7). */
+function settingsUnitKeys(data: Record<string, unknown>): string[] {
+    const has = (...fields: string[]) =>
+        fields.some((f) => data[f] !== undefined);
+    return [
+        has("name") ? "site:name" : null,
+        has("seoTitle", "seoDescription") ? "site:search" : null,
+        has(
+            "socialImageUrl",
+            "socialImageWidth",
+            "socialImageHeight",
+            "socialImageBytes",
+        )
+            ? "site:shareImage"
+            : null,
+        has("postsPrefix") ? "site:posts" : null,
+    ].filter((k): k is string => k !== null);
+}
+
+/** Who added each old link, by the link it forwards from. */
+function redirectStamps(
+    // Defaulted for a draft loaded by an older select (spec fixtures).
+    rows: ChangesSite["redirects"] = [],
+): Map<string, ChangeStamp | null> {
+    return new Map(
+        rows.map((r) => [r.fromPath, stampOf(r.createdByUserId, r.createdAt)]),
+    );
+}
+
+/** Who changed what in a draft, for {@link changeUnits}. */
+function changeStamps(site: ChangesSite): ChangeStamps {
+    const sections = new Map<
+        string,
+        { stamp: ChangeStamp | null; hidden: boolean }
+    >();
+    const pages = new Map<
+        string,
+        { stamp: ChangeStamp | null; hidden: boolean; title: string }
+    >();
+    for (const page of site.pages) {
+        pages.set(page.id, {
+            stamp: stampOf(page.settingsEditedByUserId, page.settingsEditedAt),
+            hidden: page.hidden,
+            title: page.title,
+        });
+        for (const section of page.versions[0]?.sections ?? []) {
+            sections.set(`${page.id}:${section.key}`, {
+                stamp: stampOf(
+                    section.lastEditedByUserId,
+                    section.lastEditedAt,
+                ),
+                hidden: section.hidden,
+            });
+        }
+    }
+    return {
+        sections,
+        pages,
+        redirects: redirectStamps(site.redirects),
+        draftEditors: readDraftEditors(site.draftEditors),
+    };
+}
 
 /** A site as {@link draftSiteSelect} loads it. */
 export type DraftSite = Prisma.SiteGetPayload<{
@@ -771,8 +1022,14 @@ export type ConfirmDraft = (
 
 /** What publishing a site would change (#190, #282). */
 interface PendingChanges {
-    /** How many sections would be added, removed or changed. */
+    /**
+     * How many sections would be added, removed, changed or moved: the
+     * section units among `units`, so "2 blocks" and "N changes waiting"
+     * are counted alike.
+     */
     sections: number;
+    /** Everything publishing would change, one unit each (U7). */
+    units: ChangeUnit[];
     /** Which site-level settings differ from what is live. */
     site: SiteChangeKind[];
     /** The look the live site is in; null for Classic (U16). */
@@ -836,6 +1093,8 @@ export class SitesService {
         private readonly entitlements: EntitlementService,
         /** The activation ledger, for the first publish (DEC-125). */
         @Optional() private readonly activation?: ActivationEvents,
+        /** The library photo a page's share image is chosen from (KTD-7). */
+        @Optional() private readonly media?: MediaService,
     ) {}
 
     /**
@@ -901,7 +1160,9 @@ export class SitesService {
                 currentPublicationId: true,
                 createdAt: true,
                 updatedAt: true,
-                currentPublication: { select: { publishedAt: true } },
+                currentPublication: {
+                    select: { publishedAt: true, publishedByUserId: true },
+                },
                 // A claim that is not VERIFIED is the case worth surfacing: the
                 // merchant thinks they have connected a domain and nothing
                 // routes to it yet.
@@ -915,11 +1176,13 @@ export class SitesService {
          * bare "has changes". One extra query for the whole page — sites per org
          * are a handful, not a feed.
          */
-        const pending = await this.pendingSectionChanges(
-            sites.map((s) => s.id),
-        );
+        const [pending, extras] = await Promise.all([
+            this.pendingSectionChanges(sites.map((s) => s.id)),
+            // All sites' visits and last edit or publish (website area U4).
+            siteCardExtras(ctx, sites),
+        ]);
 
-        return sites.map(({ claimedDomains, ...site }) => {
+        return sites.map(({ claimedDomains, currentPublication, ...site }) => {
             /*
              * Null before the first publish: unpublished work only means
              * something once there is something to compare against, and until
@@ -930,8 +1193,14 @@ export class SitesService {
             const pendingSiteChanges = changes?.site ?? null;
             return {
                 ...site,
+                currentPublication: currentPublication
+                    ? { publishedAt: currentPublication.publishedAt }
+                    : null,
+                visitsLast7Days: extras.get(site.id)?.visitsLast7Days ?? null,
+                lastActivity: extras.get(site.id)?.lastActivity ?? null,
                 pendingSectionChanges,
                 pendingSiteChanges,
+                pendingChanges: changes?.units.length ?? null,
                 /*
                  * Derived from the diff, not from a timestamp.
                  *
@@ -968,6 +1237,8 @@ export class SitesService {
      */
     private async pendingSectionChanges(
         siteIds: string[],
+        /** The version to diff against instead of each site's live one. */
+        against?: { snapshot: unknown },
     ): Promise<Map<string, PendingChanges | null>> {
         const byId = new Map<string, PendingChanges | null>();
         if (siteIds.length === 0) return byId;
@@ -975,35 +1246,274 @@ export class SitesService {
         const sites = await prisma.site.findMany({
             where: { id: { in: siteIds } },
             /*
-             * Exactly what publish loads (#282). The site block is then built by
-             * the same code publish runs, so this diff compares the bytes
-             * publishing would actually write, sections and settings alike.
+             * Exactly what publish loads (#282), plus hidden pages and
+             * sections and who changed what (U7). The site block is then
+             * built by the same code publish runs, so this diff compares the
+             * bytes publishing would actually write, sections and settings
+             * alike.
              */
-            select: {
-                ...draftSiteSelect,
-                currentPublication: { select: { snapshot: true } },
-            },
+            select: changesSiteSelect,
         });
 
         for (const site of sites) {
-            if (site.currentPublication === null) {
+            const live = against?.snapshot ?? site.currentPublication?.snapshot;
+            if (live === undefined || live === null) {
                 byId.set(site.id, null);
                 continue;
             }
-            const live = site.currentPublication.snapshot;
-            const pages = toPendingPages(site.pages);
+            const visible = visibleDraft(site);
+            const pages = toPendingPages(visible.pages);
             // Lenient: counting is a read, and one stale section must not
             // make the sites list throw.
-            const draft = this.buildSnapshot(site, new Date(0), {
+            const draft = this.buildSnapshot(visible, new Date(0), {
                 lenient: true,
             });
+            const units = changeUnits(draft, live, changeStamps(site));
             byId.set(site.id, {
-                sections: countPendingSectionChanges(pages, live),
-                site: pendingSiteChanges(draft.site, pages, live),
+                sections: units.filter((u) => u.kind === "section").length,
+                units,
+                site: pendingSiteChanges(
+                    draft.site,
+                    pages,
+                    live,
+                    (draft.redirects as unknown[] | undefined) ?? [],
+                ),
                 liveLook: snapshotLook(live) ?? null,
             });
         }
         return byId;
+    }
+
+    /**
+     * The change units of `draft` against `live`, with who changed each read
+     * of `tx`: what a publish names when it decides what needs approval
+     * (U9). Fingerprints are of the snapshot being published.
+     */
+    private async unitsInTx(
+        tx: Prisma.TransactionClient,
+        siteId: string,
+        draft: SiteSnapshot,
+        live: unknown,
+    ): Promise<ChangeUnit[]> {
+        const site = await tx.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: changesSiteSelect,
+        });
+        return changeUnits(draft, live, changeStamps(site));
+    }
+
+    /**
+     * Who may approve a change on the site (DEC-226): its reviewers, the
+     * business's admins and owners.
+     */
+    private async approversOf(
+        organizationId: string,
+        siteId: string,
+    ): Promise<ChangeApprover[]> {
+        const [reviewers, leads] = await Promise.all([
+            prisma.siteReviewer.findMany({
+                where: { organizationId, siteId },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    user: { select: { id: true, name: true, email: true } },
+                },
+            }),
+            prisma.membership.findMany({
+                where: { organizationId, role: { in: ["OWNER", "ADMIN"] } },
+                orderBy: { createdAt: "asc" },
+                select: {
+                    role: true,
+                    user: { select: { id: true, name: true, email: true } },
+                },
+            }),
+        ]);
+        const out = new Map<string, ChangeApprover>();
+        for (const r of reviewers) {
+            out.set(r.user.id, {
+                id: r.user.id,
+                name: r.user.name ?? r.user.email,
+                role: "REVIEWER",
+            });
+        }
+        for (const m of leads) {
+            out.set(m.user.id, {
+                id: m.user.id,
+                name: m.user.name ?? m.user.email,
+                role: m.role as "OWNER" | "ADMIN",
+            });
+        }
+        return [...out.values()];
+    }
+
+    /**
+     * The units waiting on a site the caller may see (reviewer-scoped, 404
+     * otherwise), for a verdict on them (U9).
+     */
+    private async waitingUnits(
+        ctx: OrganizationContext,
+        siteId: string,
+    ): Promise<ChangeUnit[]> {
+        await assertSiteInOrg(ctx, siteId);
+        return (
+            (await this.pendingSectionChanges([siteId])).get(siteId)?.units ??
+            []
+        );
+    }
+
+    /**
+     * Approve, or ask for changes on, waiting changes (DEC-226, U9).
+     * `site:approve`: a reviewer of this site, an admin or the owner; never
+     * on a change the caller made last (403). A reason is required to ask
+     * (the DTO). Asking tells whoever made each change.
+     */
+    async recordChangeVerdict(
+        ctx: OrganizationContext,
+        siteId: string,
+        input: { units: string[]; outcome: ChangeVerdict; reason?: string },
+    ): Promise<{ recorded: number }> {
+        authorize(ctx, "site:approve");
+        const units = await this.waitingUnits(ctx, siteId);
+        return prisma.$transaction((tx) =>
+            recordUnitVerdicts(tx, ctx, {
+                siteId,
+                units,
+                keys: input.units,
+                outcome: input.outcome,
+                reason: input.reason,
+            }),
+        );
+    }
+
+    /**
+     * What publishing would change, one unit at a time, who changed each and
+     * the posts that go live on their own (change units, U7). Every count of
+     * "changes waiting" is this list's length. `site:read`; a reviewer sees
+     * only a site they review.
+     */
+    async getChanges(
+        ctx: OrganizationContext,
+        siteId: string,
+        /**
+         * A past version to diff the draft against instead of the live one
+         * (History's Compare, website editor plan U47a). Not this site's: 404.
+         */
+        against?: string,
+    ): Promise<SiteChangesView> {
+        authorize(ctx, "site:read");
+        const site = await prisma.site.findFirst({
+            where: {
+                id: siteId,
+                organizationId: ctx.organizationId,
+                deletedAt: null,
+                ...reviewerScope(ctx),
+            },
+            select: {
+                id: true,
+                publishNeedsApproval: true,
+                currentPublication: { select: { publishedAt: true } },
+            },
+        });
+        if (!site) throw new NotFoundException(`Site "${siteId}" not found`);
+        let version: { snapshot: unknown } | undefined;
+        if (against !== undefined) {
+            const found = await prisma.publication.findFirst({
+                where: {
+                    id: against,
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    ...SITE_VERSION,
+                },
+                select: { snapshot: true },
+            });
+            if (!found) {
+                throw new NotFoundException(
+                    `Publication "${against}" not found`,
+                );
+            }
+            version = found;
+        }
+
+        const [pending, posts, approvalRequired, approvers] = await Promise.all(
+            [
+                this.pendingSectionChanges([siteId], version),
+                // Posts publish on their own (not units): those not live yet.
+                // shortcut: a live post edited since is not listed; add it when
+                // posts get draft-vs-live state (batch 3).
+                prisma.post.findMany({
+                    where: {
+                        siteId,
+                        currentPublicationId: null,
+                        status: { not: "ARCHIVED" },
+                    },
+                    orderBy: { updatedAt: "desc" },
+                    take: 20,
+                    select: { id: true, title: true, updatedAt: true },
+                }),
+                approvalApplies(ctx.organizationId, site.publishNeedsApproval),
+                this.approversOf(ctx.organizationId, siteId),
+            ],
+        );
+        const units = pending.get(siteId)?.units ?? null;
+        const groups = groupByPerson(units ?? []);
+        // Each unit's approval (DEC-226, U9), whether or not it applies.
+        const { rows, leads } = await readUnitVerdicts(prisma, {
+            organizationId: ctx.organizationId,
+            siteId,
+            editors: editorsOf(units ?? []),
+        });
+        const approvals = unitApprovals(units ?? [], rows, leads);
+        const people = [
+            ...groups.map((g) => g.userId),
+            ...[...approvals.values()].map((a) => a.byUserId),
+        ].filter((id): id is string => id !== null);
+        const users =
+            people.length > 0
+                ? await prisma.user.findMany({
+                      where: { id: { in: people } },
+                      select: { id: true, name: true, email: true },
+                  })
+                : [];
+        const names = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+        return {
+            siteId,
+            livePublishedAt: site.currentPublication?.publishedAt ?? null,
+            count: units?.length ?? null,
+            units: (units ?? []).map((u) => {
+                const a = approvals.get(u.key) ?? {
+                    state: "waiting" as const,
+                    byUserId: null,
+                    reason: null,
+                    at: null,
+                    voided: false,
+                };
+                return {
+                    ...u,
+                    approval: {
+                        state: a.state,
+                        ...(a.byUserId
+                            ? {
+                                  by: {
+                                      id: a.byUserId,
+                                      name: names.get(a.byUserId) ?? null,
+                                  },
+                              }
+                            : {}),
+                        ...(a.at ? { at: a.at } : {}),
+                        ...(a.reason ? { reason: a.reason } : {}),
+                        voided: a.voided,
+                        // Who may approve it: never its last editor.
+                        approvers: approvers.filter((p) => p.id !== u.editedBy),
+                    },
+                };
+            }),
+            approvalRequired,
+            groups: groups.map((g) => ({
+                ...g,
+                name: g.userId ? (names.get(g.userId) ?? null) : null,
+                you: g.userId === ctx.userId,
+            })),
+            posts,
+        };
     }
 
     /**
@@ -1066,6 +1576,7 @@ export class SitesService {
                         hidden: true,
                         kind: true,
                         inMenu: true,
+                        ...PAGE_HEAD_SELECT,
                         // The Pages tab's Updated column (#908).
                         ...pageUpdatedSelect,
                     },
@@ -1136,6 +1647,7 @@ export class SitesService {
             pendingSectionChanges: pending.get(site.id)?.sections ?? null,
             // The settings that travel into the snapshot too (#282).
             pendingSiteChanges: pending.get(site.id)?.site ?? null,
+            pendingChanges: pending.get(site.id)?.units.length ?? null,
             icon: await siteIconView(ctx.organizationId, {
                 iconUrl,
                 iconMediaId,
@@ -1286,6 +1798,13 @@ export class SitesService {
                 postsPrefix: true,
             },
         });
+        // Who changed which setting, for the Publish sheet (U7).
+        await stampDraftEditors(
+            prisma,
+            siteId,
+            ctx.userId,
+            settingsUnitKeys(data),
+        );
         return {
             ...site,
             publishNeedsApproval: await approvalApplies(
@@ -1331,6 +1850,7 @@ export class SitesService {
             data: { style: style as unknown as Prisma.InputJsonValue },
             select: { id: true },
         });
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:style"]);
         return { id: siteId, style };
     }
 
@@ -1381,6 +1901,7 @@ export class SitesService {
             },
             select: { id: true },
         });
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:footer"]);
         return { id: siteId, footer };
     }
 
@@ -1407,6 +1928,7 @@ export class SitesService {
             },
             select: { id: true },
         });
+        await stampDraftEditors(prisma, siteId, ctx.userId, ["site:menu"]);
         return { id: siteId, navigation };
     }
 
@@ -1719,6 +2241,7 @@ export class SitesService {
             // The editor's first read of the count, before any autosave.
             pendingSectionChanges: pending.get(siteId)?.sections ?? null,
             pendingSiteChanges: pending.get(siteId)?.site ?? null,
+            pendingChanges: pending.get(siteId)?.units.length ?? null,
         };
     }
 
@@ -1871,21 +2394,76 @@ export class SitesService {
                 dto.revision !== undefined &&
                 dto.revision !== version.revision
             ) {
+                /*
+                 * Who saved it since (C12): whoever last edited a section
+                 * of this draft. Said by name, never as presence; when it
+                 * was this person, from another tab or window, `you`
+                 * says so (editor audit, 21 Nov), never "someone else".
+                 */
+                const edits = await tx.section.findMany({
+                    where: {
+                        pageVersionId: version.id,
+                        lastEditedByUserId: { not: null },
+                    },
+                    orderBy: { lastEditedAt: "desc" },
+                    take: 1,
+                    select: { lastEditedByUserId: true },
+                });
+                const byId =
+                    edits.length > 0 ? edits[0].lastEditedByUserId : null;
+                const you = byId === ctx.userId;
+                const users =
+                    byId && !you
+                        ? await prisma.user.findMany({
+                              where: { id: byId },
+                              select: { name: true, email: true },
+                          })
+                        : [];
+                const by =
+                    users.length > 0 ? (users[0].name ?? users[0].email) : null;
                 throw new ConflictException({
-                    message:
-                        "Someone else saved this page while you were editing. Reload to see their version.",
+                    message: you
+                        ? "You saved this page in another tab or window while editing here. Reload to see that version."
+                        : "Someone else saved this page while you were editing. Reload to see their version.",
                     code: "DRAFT_REVISION_MISMATCH",
                     yours: dto.revision,
                     current: version.revision,
+                    by,
+                    you,
+                    // Only `details` reaches the client past the error
+                    // filter: who it was travels there.
+                    details: { by, you },
                 });
             }
+
+            /*
+             * Who changed what (change units, U7): read before the rows go,
+             * so a section this save leaves as it was keeps its stamp and
+             * only what changed is stamped with this person.
+             */
+            const previous = await tx.section.findMany({
+                where: { pageVersionId: version.id },
+                select: {
+                    key: true,
+                    type: true,
+                    contractVersion: true,
+                    content: true,
+                    hidden: true,
+                    lastEditedByUserId: true,
+                    lastEditedAt: true,
+                },
+            });
+            const carried = carryStamps(previous, validated, {
+                userId: ctx.userId,
+                at: new Date(),
+            });
 
             await tx.section.deleteMany({
                 where: { pageVersionId: version.id },
             });
             if (validated.length > 0) {
                 await tx.section.createMany({
-                    data: validated.map((s) => ({
+                    data: validated.map((s, i) => ({
                         pageVersionId: version.id,
                         organizationId: ctx.organizationId,
                         type: s.type,
@@ -1894,9 +2472,17 @@ export class SitesService {
                         content: s.content as Prisma.InputJsonValue,
                         hidden: s.hidden,
                         key: s.key,
+                        ...carried.stamps[i],
                     })),
                 });
             }
+            // A removed section has no row left to say who removed it.
+            await stampDraftEditors(
+                tx,
+                siteId,
+                ctx.userId,
+                carried.removed.map((key) => `section:${pageId}:${key}`),
+            );
             const sections = await tx.section.findMany({
                 where: { pageVersionId: version.id },
                 orderBy: { order: "asc" },
@@ -1938,6 +2524,7 @@ export class SitesService {
             ...draft,
             pendingSectionChanges: pending.get(siteId)?.sections ?? null,
             pendingSiteChanges: pending.get(siteId)?.site ?? null,
+            pendingChanges: pending.get(siteId)?.units.length ?? null,
         };
     }
 
@@ -1973,8 +2560,12 @@ export class SitesService {
          * `lenient` keeps a section that fails its contract instead of
          * throwing (#282). The pending-change count is a read and must not
          * fail; publish is not lenient.
+         *
+         * `invalid` is lenient too, and gathers each kept section with the
+         * reason it can't publish: publish then refuses only one that is
+         * still in what goes live (a left-out one stays in the draft, U8).
          */
-        options: { lenient?: boolean } = {},
+        options: { lenient?: boolean; invalid?: Map<unknown, string> } = {},
     ): SiteSnapshot {
         // v2 buttons name a page by id; the snapshot needs its path (#207).
         // Built from the pages this publish will write, so a hidden page
@@ -1999,19 +2590,18 @@ export class SitesService {
                      * this writes, not over the raw draft.
                      */
                     const result = toPublishableSection(section, resolvePage);
-                    if (!result.ok && options.lenient) {
-                        return {
+                    if (result.ok) return result.section;
+                    const message = `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`;
+                    if (options.lenient || options.invalid) {
+                        const kept = {
                             type: section.type,
                             contractVersion: section.contractVersion,
                             content: section.content,
                         };
+                        options.invalid?.set(kept, message);
+                        return kept;
                     }
-                    if (!result.ok) {
-                        throw new BadRequestException(
-                            `Cannot publish: page "${page.path}" has an invalid "${section.type}" section (${result.error})`,
-                        );
-                    }
-                    return result.section;
+                    throw new BadRequestException(message);
                 }),
             );
             return {
@@ -2023,9 +2613,21 @@ export class SitesService {
                 // every snapshot of a site without module pages is byte for
                 // byte what it was.
                 ...(isModulePageKind(page.kind) ? { kind: page.kind } : {}),
+                // The page's own Google title, text, share image and "Show
+                // on Google" (KTD-7), only those set.
+                ...pageHead(page),
                 sections,
             };
         });
+        /*
+         * Old page links that forward (KTD-3), only to a page this publish
+         * serves. Only when there are some: a site without keeps a snapshot
+         * byte for byte what it was.
+         */
+        const redirects = snapshotRedirects(
+            site.redirects,
+            new Set(pages.map((p) => p.path)),
+        );
 
         const publishedStyle = parseSiteStyle(site.style);
         const draftFooter = parseSiteFooter(site.footer);
@@ -2122,6 +2724,24 @@ export class SitesService {
                 ),
             },
             pages,
+            ...(redirects.length > 0 ? { redirects } : {}),
+            /*
+             * Each page's id and its sections' keys, by link (change units,
+             * U7): what lets the next draft be diffed section by section and
+             * a change be left out (U8). Not content: left out of the draft
+             * fingerprint, so an approval still covers the same work.
+             */
+            keys: Object.fromEntries(
+                site.pages.map((page) => [
+                    page.path,
+                    {
+                        id: page.id,
+                        sections: page.versions.flatMap((v) =>
+                            v.sections.map((x) => x.key),
+                        ),
+                    },
+                ]),
+            ),
             publishedAt: publishedAt.toISOString(),
         };
         return snapshot;
@@ -2153,7 +2773,15 @@ export class SitesService {
          * unless an owner overrides, and the override is recorded. 403
          * from anyone else.
          */
-        options: { override?: boolean; confirm?: ConfirmDraft } = {},
+        options: {
+            override?: boolean;
+            confirm?: ConfirmDraft;
+            /**
+             * Change units that stay in the draft and go out as they are
+             * live (U8, KTD-5): `leaveOutOf`.
+             */
+            leaveOut?: readonly string[];
+        } = {},
     ): Promise<PublishResult> {
         authorize(ctx, "site:publish");
         assertOverrideAllowed(ctx, options.override);
@@ -2168,34 +2796,108 @@ export class SitesService {
         }
 
         const publishedAt = new Date();
-        const snapshot = this.buildSnapshot(site, publishedAt);
         /*
-         * A template's note to the owner never goes live (DEC-141): the
-         * first starters put "Say what you do and where, in one line." under
-         * every headline, and customers read it. Refused in the words the
-         * pre-publish check uses, which names the block.
+         * Lenient here, with what can't publish gathered: a broken section
+         * that is left out stays in the draft and blocks nothing (U8). One
+         * still in what goes live is refused below, in the same words.
          */
-        if (hasOwnerNote(snapshot.pages)) {
-            throw new ConflictException({
-                message: OWNER_NOTE_MESSAGE,
-                details: { reason: "ownerNote" },
-            });
-        }
-        /*
-         * Approval gates nothing, and says so (#199, #278). The epic's rule: if
-         * a review was asked for and has not been answered for THIS draft,
-         * publishing is RECORDED as a bypass, not prevented.
-         *
-         * The fingerprint is of the snapshot about to be written, so an
-         * approval of an earlier draft does not cover this one.
-         */
-        const fingerprint = draftFingerprint(snapshot);
+        const invalid = new Map<unknown, string>();
+        const draftSnapshot = this.buildSnapshot(site, publishedAt, {
+            invalid,
+        });
+        const asked = options.leaveOut ?? [];
 
         const published = await prisma.$transaction(async (tx) => {
-            if (options.confirm) {
-                await lockSite(tx, site.id);
-                await options.confirm(tx, site);
+            await lockSite(tx, site.id);
+            if (options.confirm) await options.confirm(tx, site);
+            /*
+             * Leave out (U8) and per-change approval (U9): composed against
+             * the live version under the lock, so a publish that lands
+             * meanwhile is what left-out changes keep.
+             */
+            const current = await tx.site.findUniqueOrThrow({
+                where: { id: site.id },
+                select: {
+                    publishNeedsApproval: true,
+                    currentPublication: { select: { snapshot: true } },
+                },
+            });
+            const liveSnapshot = current.currentPublication?.snapshot ?? null;
+            const leaveOut = [...asked];
+            /*
+             * "Publishing needs approval" (DEC-226, KTD-6): a teammate's
+             * change nobody approved is left out and stays waiting; an
+             * owner's override takes everything, recorded by `putLive`. A
+             * first publish has no changes to name, and goes as before.
+             */
+            const gated =
+                liveSnapshot !== null &&
+                options.override !== true &&
+                (await approvalApplies(
+                    ctx.organizationId,
+                    current.publishNeedsApproval,
+                ));
+            if (gated) {
+                const units = await this.unitsInTx(
+                    tx,
+                    site.id,
+                    draftSnapshot,
+                    liveSnapshot,
+                );
+                const held = await heldForApproval(tx, {
+                    organizationId: ctx.organizationId,
+                    siteId: site.id,
+                    userId: ctx.userId,
+                    units,
+                });
+                const out = new Set([...leaveOut, ...held]);
+                // Nothing approved would go out: refused, as before U9.
+                if (units.every((u) => out.has(u.key))) {
+                    throw held.length > 0
+                        ? changesAwaitApproval(held)
+                        : approvalRequired();
+                }
+                leaveOut.push(...held.filter((k) => !asked.includes(k)));
             }
+            let snapshot = draftSnapshot;
+            let leftOut: string[] = [];
+            if (leaveOut.length > 0) {
+                const composed = leaveOutOf(
+                    draftSnapshot,
+                    liveSnapshot,
+                    leaveOut,
+                );
+                snapshot = composed.snapshot as unknown as SiteSnapshot;
+                leftOut = composed.leftOut;
+            }
+            const alsoLeftOut = leftOut.filter((k) => !asked.includes(k));
+            for (const page of snapshot.pages as { sections: unknown[] }[]) {
+                for (const section of page.sections) {
+                    const message = invalid.get(section);
+                    if (message) throw new BadRequestException(message);
+                }
+            }
+            /*
+             * A template's note to the owner never goes live (DEC-141): the
+             * first starters put "Say what you do and where, in one line."
+             * under every headline, and customers read it. Refused in the
+             * words the pre-publish check uses, which names the block.
+             */
+            if (hasOwnerNote(snapshot.pages)) {
+                throw new ConflictException({
+                    message: OWNER_NOTE_MESSAGE,
+                    details: { reason: "ownerNote" },
+                });
+            }
+            /*
+             * Approval gates nothing, and says so (#199, #278). The epic's
+             * rule: if a review was asked for and has not been answered for
+             * THIS draft, publishing is RECORDED as a bypass, not prevented.
+             *
+             * The fingerprint is of the snapshot about to be written, so an
+             * approval of an earlier draft does not cover this one.
+             */
+            const fingerprint = draftFingerprint(snapshot);
             /*
              * No web address, no publish (DEC-069, L5): the one pre-publish
              * flag that blocks (`checkAddress`). Asked here, beside the
@@ -2230,6 +2932,8 @@ export class SitesService {
                 fingerprint,
                 template: publicationTemplate(site),
                 publishedAt,
+                leftOut,
+                unitsApproved: gated,
             });
             return {
                 publicationId: live.publicationId,
@@ -2238,6 +2942,7 @@ export class SitesService {
                 bypassed: live.bypassed,
                 overridden: live.overridden,
                 route: live.route,
+                alsoLeftOut,
             };
         });
         // The first time one of the business's websites went live
@@ -2352,7 +3057,12 @@ export class SitesService {
         const post = await prisma.post.findFirst({
             where: {
                 siteId,
-                slug,
+                // The link it is LIVE at (U17a): a draft's new link isn't
+                // served until it is published, and the live one keeps
+                // working until then.
+                currentPublication: {
+                    snapshot: { path: ["post", "slug"], equals: slug },
+                },
                 currentPublicationId: { not: null },
                 // Offline with its business (#921).
                 site: {
@@ -2503,6 +3213,7 @@ export class SitesService {
                     // The live title while the post exists (DEC-200 U8).
                     post: { select: { title: true } },
                     body: true,
+                    quote: true,
                     resolvedAt: true,
                     createdAt: true,
                     author: { select: { id: true, name: true, email: true } },
@@ -2557,6 +3268,7 @@ export class SitesService {
             postId: c.postId,
             postTitle: c.post?.title ?? c.postTitle ?? null,
             body: c.body,
+            quote: c.quote,
             resolvedAt: c.resolvedAt,
             createdAt: c.createdAt,
             author: {
@@ -2871,6 +3583,7 @@ export class SitesService {
             sectionKey: target.sectionKey,
             authorUserId: ctx.userId,
             body: dto.body,
+            quote: dto.quote ?? null,
             ...(release ? { testReleaseId: release.id } : {}),
         });
     }
@@ -2908,6 +3621,7 @@ export class SitesService {
             postTitle: post.title,
             authorUserId: ctx.userId,
             body: dto.body,
+            quote: dto.quote ?? null,
         });
     }
 
@@ -3009,20 +3723,29 @@ export class SitesService {
             });
         }
 
-        return this.approvalWithAlert(ctx, {
-            siteId,
-            organizationId: ctx.organizationId,
-            byUserId: ctx.userId,
-            outcome: dto.outcome,
-            reason: reasonOf(dto),
-            // An approval names the draft it approved (#278), so later
-            // edits do not inherit it. A change request does not: it is
-            // about the work as a whole and stands until it is answered.
-            draftFingerprint:
-                dto.outcome === "APPROVED"
-                    ? await this.currentDraftFingerprint(ctx, siteId)
-                    : null,
-        });
+        // The verdict covers each change waiting now that the caller didn't
+        // make (DEC-226, U9): what Approve in the review approves.
+        const units = (await this.waitingUnits(ctx, siteId)).filter(
+            (u) => u.editedBy !== ctx.userId,
+        );
+        return this.approvalWithAlert(
+            ctx,
+            {
+                siteId,
+                organizationId: ctx.organizationId,
+                byUserId: ctx.userId,
+                outcome: dto.outcome,
+                reason: reasonOf(dto),
+                // An approval names the draft it approved (#278), so later
+                // edits do not inherit it. A change request does not: it is
+                // about the work as a whole and stands until it is answered.
+                draftFingerprint:
+                    dto.outcome === "APPROVED"
+                        ? await this.currentDraftFingerprint(ctx, siteId)
+                        : null,
+            },
+            units,
+        );
     }
 
     /**
@@ -3033,12 +3756,32 @@ export class SitesService {
     private approvalWithAlert(
         ctx: OrganizationContext,
         data: Prisma.SiteApprovalUncheckedCreateInput,
+        /** Changes the draft's verdict also answers (U9). */
+        units: ChangeUnit[] = [],
     ): Promise<{ id: string }> {
         return prisma.$transaction(async (tx) => {
             const approval = await tx.siteApproval.create({
                 data,
                 select: { id: true },
             });
+            if (
+                units.length > 0 &&
+                (data.outcome === "APPROVED" ||
+                    data.outcome === "CHANGES_REQUESTED")
+            ) {
+                // The draft's own alert already tells the team.
+                await tx.siteChangeApproval.createMany({
+                    data: units.map((u) => ({
+                        organizationId: ctx.organizationId,
+                        siteId: data.siteId,
+                        unitKey: u.key,
+                        unitFingerprint: u.fingerprint,
+                        byUserId: ctx.userId,
+                        outcome: data.outcome,
+                        reason: data.reason ?? null,
+                    })),
+                });
+            }
             await queueReviewAlert(
                 tx,
                 ctx.organizationId,
@@ -3632,6 +4375,8 @@ export class SitesService {
 
         // No web address (L5): the one flag that blocks, so it comes first.
         flags.unshift(...checkAddress(site.subdomain));
+        // Checks before publish (U10): advice only, after the site is read and authorized.
+        flags.push(...(await publishCheckFlags(ctx.organizationId, siteId)));
 
         // The two unimplementable types travel with the result so the editor
         // can say what is NOT being checked rather than implying nine.
@@ -3675,7 +4420,10 @@ export class SitesService {
             });
             if (!site)
                 throw new NotFoundException(`Site "${siteId}" not found`);
-            return createModulePage(ctx, site, dto.kind, dto);
+            const made = await createModulePage(ctx, site, dto.kind, dto);
+            // A page now has this link: it wins over an old link's forward.
+            await dropRedirectsAt(prisma, siteId, made.path);
+            return made;
         }
 
         // The DTO requires both for a free-form page; checked again so the
@@ -3687,16 +4435,24 @@ export class SitesService {
         }
         await assertPathIsFree(siteId, dto.path, { title: dto.title });
 
-        return prisma.page.create({
-            data: {
-                siteId,
-                organizationId: ctx.organizationId,
-                path: dto.path,
-                title: dto.title,
-                isHome: false,
-                ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
-            },
-            select: PAGE_VIEW_SELECT,
+        const path = dto.path;
+        const title = dto.title;
+        return prisma.$transaction(async (tx) => {
+            // A page now has this link: it wins over an old link's forward.
+            await dropRedirectsAt(tx, siteId, path);
+            return tx.page.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    path,
+                    title,
+                    isHome: false,
+                    ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: new Date(),
+                },
+                select: PAGE_VIEW_SELECT,
+            });
         });
     }
 
@@ -3763,17 +4519,175 @@ export class SitesService {
             );
         }
 
-        return prisma.page.update({
-            where: { id: pageId },
-            data: {
-                // ABSENT means leave alone, so each field is set only when sent.
-                ...(dto.title === undefined ? {} : { title: dto.title }),
-                ...(dto.path === undefined ? {} : { path: dto.path }),
-                ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
-                ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
-            },
-            select: PAGE_VIEW_SELECT,
+        const shareImage = await this.pageShareImage(ctx, dto);
+        const moved =
+            dto.path !== undefined && dto.path !== page.path ? dto.path : null;
+
+        return prisma.$transaction(async (tx) => {
+            /*
+             * A link change keeps the old link forwarding once published
+             * (KTD-3), in the same transaction as the move, so a page never
+             * moves without its forward.
+             */
+            if (moved) {
+                await followPageMove(tx, {
+                    organizationId: ctx.organizationId,
+                    siteId,
+                    oldPath: page.path,
+                    newPath: moved,
+                    userId: ctx.userId,
+                });
+            }
+            return tx.page.update({
+                where: { id: pageId },
+                data: {
+                    // ABSENT means leave alone, so each field is set only when sent.
+                    ...(dto.title === undefined ? {} : { title: dto.title }),
+                    ...(dto.path === undefined ? {} : { path: dto.path }),
+                    ...(dto.hidden === undefined ? {} : { hidden: dto.hidden }),
+                    ...(dto.inMenu === undefined ? {} : { inMenu: dto.inMenu }),
+                    ...(dto.seoTitle === undefined
+                        ? {}
+                        : { seoTitle: dto.seoTitle }),
+                    ...(dto.seoDescription === undefined
+                        ? {}
+                        : { seoDescription: dto.seoDescription }),
+                    ...shareImage,
+                    ...(dto.noindex === undefined
+                        ? {}
+                        : { noindex: dto.noindex }),
+                    // Who changed the page's settings, for the Publish
+                    // sheet's "changed by" (KTD-4).
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: new Date(),
+                },
+                select: PAGE_VIEW_SELECT,
+            });
         });
+    }
+
+    /**
+     * Copy a page (plan 2026-11-18-001 U5): its draft sections, under a new
+     * link `<link>-copy` (the next free one), hidden and out of the menu so
+     * nothing new shows until the merchant opens it and publishes. The copy
+     * is always a free-form page: a second Shop or Book page would answer
+     * no route. Requires `site:update`.
+     */
+    async duplicatePage(
+        ctx: OrganizationContext,
+        siteId: string,
+        pageId: string,
+    ): Promise<PageView> {
+        authorize(ctx, "site:update");
+        await assertSiteInOrg(ctx, siteId);
+        const page = await prisma.page.findFirst({
+            where: { id: pageId, siteId, organizationId: ctx.organizationId },
+            select: {
+                title: true,
+                path: true,
+                versions: {
+                    where: { status: "DRAFT" },
+                    orderBy: { createdAt: "desc" },
+                    take: 1,
+                    select: {
+                        sections: {
+                            orderBy: { order: "asc" },
+                            select: {
+                                type: true,
+                                contractVersion: true,
+                                content: true,
+                                hidden: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+        if (!page) {
+            throw new NotFoundException(`Page "${pageId}" not found`);
+        }
+        const base = page.path === "/" ? "/home" : page.path;
+        const path = await suggestFreePath(siteId, [`${base}-copy`]);
+        const sections = page.versions[0]?.sections ?? [];
+        return prisma.$transaction(async (tx) => {
+            // A page now has this link: it wins over an old link's forward.
+            await dropRedirectsAt(tx, siteId, path);
+            return tx.page.create({
+                data: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    path,
+                    title: `${page.title} (copy)`.slice(0, 200),
+                    isHome: false,
+                    hidden: true,
+                    inMenu: false,
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: new Date(),
+                    versions: {
+                        create: {
+                            organizationId: ctx.organizationId,
+                            status: "DRAFT",
+                            createdByUserId: ctx.userId,
+                            sections: {
+                                create: sections.map((section, order) => ({
+                                    organizationId: ctx.organizationId,
+                                    // New keys: notes stay on the original.
+                                    key: randomUUID(),
+                                    type: section.type,
+                                    contractVersion: section.contractVersion,
+                                    order,
+                                    content:
+                                        section.content as Prisma.InputJsonValue,
+                                    hidden: section.hidden,
+                                })),
+                            },
+                        },
+                    },
+                },
+                select: PAGE_VIEW_SELECT,
+            });
+        });
+    }
+
+    /**
+     * The share image fields a page update writes: a library photo (READY,
+     * this business's, a picture a share card can show) with its address
+     * taken now, a pasted address, or null for neither. Empty when the
+     * update leaves the share image alone.
+     */
+    private async pageShareImage(
+        ctx: OrganizationContext,
+        dto: UpdatePageDto,
+    ): Promise<{
+        shareImageMediaId?: string | null;
+        shareImageUrl?: string | null;
+    }> {
+        if (typeof dto.shareImageMediaId === "string") {
+            if (!this.media) {
+                throw new ServiceUnavailableException(
+                    "Photos can't be chosen right now. Try again in a moment.",
+                );
+            }
+            const media = await this.media.readyObject(
+                ctx.organizationId,
+                dto.shareImageMediaId,
+            );
+            if (!SHARE_IMAGE_TYPES.has(media.contentType) || !media.url) {
+                throw new BadRequestException({
+                    message:
+                        "Pick a JPG, PNG or WebP photo for the share image.",
+                    details: { field: "shareImageMediaId" },
+                });
+            }
+            return { shareImageMediaId: media.id, shareImageUrl: media.url };
+        }
+        if (dto.shareImageMediaId === null || dto.shareImageUrl !== undefined) {
+            return {
+                shareImageMediaId: null,
+                shareImageUrl: dto.shareImageUrl ?? null,
+            };
+        }
+        return {};
     }
 
     /**
@@ -3810,9 +4724,14 @@ export class SitesService {
         }
 
         await prisma.page.delete({ where: { id: pageId } });
+        // The page row is gone; who removed it is kept on the site (U7).
+        await stampDraftEditors(prisma, siteId, ctx.userId, [`page:${pageId}`]);
         return { deleted: true };
     }
 }
+
+/** What WhatsApp, Facebook and Google draw as a share card. */
+const SHARE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 /**
  * A few words naming a section, for a list that has to distinguish two heroes

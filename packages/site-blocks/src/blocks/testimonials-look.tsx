@@ -1,6 +1,7 @@
 import type { LookId, RenderedTestimonials } from "@saroh/block-contract";
 import type { ReactNode } from "react";
 
+import { EditableText } from "../editable-text";
 import { cn } from "../lib/utils";
 import {
     FRONT_RING,
@@ -61,7 +62,7 @@ export default function LookTestimonials({
                             "min-[700px]:pb-14 min-[700px]:text-center",
                     )}
                 >
-                    {heading}
+                    <EditableText field="heading">{heading}</EditableText>
                 </h2>
             ) : null}
         </>

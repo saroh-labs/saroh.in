@@ -32,6 +32,7 @@ import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 /** Grow › Social: Your posts and Create post, while Share is switched on (DEC-217). */
 export const SOCIAL_HREF = "/social";
@@ -778,8 +779,19 @@ export function navGroupsWithSites(
      * rail that lists it promises otherwise.
      */
     const mayAuthor = navCan(actor, "section:write");
-    const rowsFor = (siteId: string): NavChild[] =>
-        mayAuthor
+    // The Website area's Overview first while it is on (plan 2026-11-18-001).
+    const overview = (siteId: string): NavChild[] =>
+        websiteAreaOn()
+            ? [
+                  {
+                      href: `${WEBSITE_HREF}/${siteId}/overview`,
+                      label: "Overview",
+                  },
+              ]
+            : [];
+    const rowsFor = (siteId: string): NavChild[] => [
+        ...overview(siteId),
+        ...(mayAuthor
             ? [
                   // Pages lists them, the editor is where they are worked on
                   // — the route that has no rail of its own — Posts is its
@@ -797,7 +809,8 @@ export function navGroupsWithSites(
                   // A Reviewer reviews in the editor, read-only (DEC-200).
                   { href: `${WEBSITE_HREF}/${siteId}`, label: "Review" },
                   { href: `${WEBSITE_HREF}/${siteId}/posts`, label: "Posts" },
-              ];
+              ]),
+    ];
 
     return groups.map((group) => ({
         ...group,

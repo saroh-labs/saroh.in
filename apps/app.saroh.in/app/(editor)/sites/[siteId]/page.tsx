@@ -1,6 +1,10 @@
-import { FailedState } from "@saroh/ui/data-state";
+import { Button } from "@saroh/ui/button";
+import { EmptyState, FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
+import Link from "next/link";
 import { notFound, unstable_rethrow } from "next/navigation";
+
+import { PageContainer } from "@/components/shared/page/page-container";
 
 import { SiteEditorHost } from "@/components/sites/editor/site-editor-host";
 import type { TemplateRowSource } from "@/components/sites/templates/template-row";
@@ -10,6 +14,8 @@ import { resolveActiveOrganization } from "@/lib/organizations/service";
 import { requireSession } from "@/lib/session";
 import { parseSectionContent } from "@saroh/block-contract";
 
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
+import { readSiteContact } from "@/lib/organizations/settings-service";
 import { tradeOf } from "@/lib/organizations/trade";
 import type { Section } from "@/lib/sites/service";
 import {
@@ -26,6 +32,7 @@ import {
     readWebAddressLinks,
     RENDERER_APEX,
 } from "@/lib/sites/share-links-read";
+import { siteIconOf } from "@/lib/sites/site-icon";
 import { moduleStates } from "@/lib/sites/template-picker";
 import { templateChoiceOn } from "@/lib/sites/templates-switch";
 import { readTestReleases } from "@/lib/sites/test-releases-api";
@@ -62,7 +69,34 @@ export default async function SiteEditorPage({
      */
     const readOnly = !site.can.edit;
 
-    if (site.pages.length === 0) notFound();
+    if (site.pages.length === 0) {
+        /*
+         * Empty site, first time (`fix/WXKStates`, RULES §4): nothing to
+         * open, so the way in, not a 404. Pages is where a page is added
+         * and a look chosen; a reader is told nothing waits for them.
+         */
+        return (
+            <PageContainer>
+                <EmptyState
+                    title="No pages yet"
+                    description={
+                        readOnly
+                            ? "Pages show here once a teammate adds one."
+                            : "Add a page, or start from a look filled with your services, prices and hours."
+                    }
+                    action={
+                        readOnly ? undefined : (
+                            <Button asChild>
+                                <Link href={`/sites/${siteId}/pages`}>
+                                    Add a page
+                                </Link>
+                            </Button>
+                        )
+                    }
+                />
+            </PageContainer>
+        );
+    }
     /*
      * Which page is open is a URL question, not editor state: it survives a
      * reload, it can be linked to, and Back goes where the merchant expects.
@@ -76,7 +110,7 @@ export default async function SiteEditorPage({
     const activePage =
         site.pages.find((page) => page.id === requestedPageId) ?? homePage;
 
-    const [load, templateRow] = await Promise.all([
+    const [load, templateRow, contact] = await Promise.all([
         readOnly
             ? loadForReviewer(siteId, activePage.id)
             : loadForEditor(siteId, activePage.id),
@@ -85,6 +119,8 @@ export default async function SiteEditorPage({
         templateChoiceOn()
             ? readTemplateRow(site.template?.id ?? null)
             : Promise.resolve(null),
+        // The link picker's Call and WhatsApp (U47d); null leaves them empty.
+        readOnly ? Promise.resolve(null) : readSiteContact(),
     ]);
     if (load === "failed") {
         // RVD4: the read failed, said with the house's words (RVD4's "The
@@ -133,15 +169,16 @@ export default async function SiteEditorPage({
     // meant to simulate.
     return (
         <SiteEditorHost
-            // Keyed on the page so switching pages remounts the editor with
-            // that page's sections. Without it the new sections would arrive as
-            // props into state seeded from the old ones, and the merchant would
-            // see the previous page's content under the new page's name.
-            key={activePage.id}
+            // Not keyed on the page: the editor's frame stays mounted from
+            // page to page, and the page's own state (draft, Undo, canvas)
+            // starts again from these props when `pageId` changes
+            // (`use-editor-draft.ts`, `use-undo.ts`).
             siteId={siteId}
             pageId={activePage.id}
             pages={site.pages}
             readOnly={readOnly}
+            // Ask AI in the shell's bar (U46): never for a reader.
+            askAi={!readOnly && askAiOn()}
             // What a reader may do besides read: never offer a note box or
             // a verdict the API would refuse (a `site:read`-only role).
             reviewCan={{
@@ -167,6 +204,8 @@ export default async function SiteEditorPage({
              */
             initialPendingChanges={draft?.pendingSectionChanges ?? null}
             initialPendingSiteChanges={draft?.pendingSiteChanges ?? null}
+            // The chip's number is Overview's: the API's change units.
+            initialPendingUnits={draft?.pendingChanges ?? null}
             initialSections={initialSections}
             siteName={site.name}
             // The header and footer the canvas draws around the page (#336).
@@ -208,6 +247,17 @@ export default async function SiteEditorPage({
             livePublishedAt={site.currentPublication?.publishedAt ?? null}
             // The address the Publish sheet offers when the site has none
             // (DEC-185); only the owner, with changing on, may choose it.
+            // Brand › Logo and tab icon (U24b), for whoever may change it.
+            siteIcon={
+                site.can.manageSettings
+                    ? {
+                          siteId,
+                          siteName: site.name,
+                          saved: siteIconOf(site),
+                      }
+                    : null
+            }
+            businessPhone={contact?.contact.phone ?? null}
             webAddressFix={
                 webAddress
                     ? {
@@ -292,6 +342,7 @@ async function loadForReviewer(siteId: string, pageId: string) {
             revision: 0,
             pendingSectionChanges: null,
             pendingSiteChanges: null,
+            pendingChanges: null,
         },
         flags: NO_FLAGS,
         comments,

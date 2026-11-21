@@ -74,7 +74,12 @@ export type FlagType =
     // picked, because what it names isn't on sale at the storefront.
     | "productsNotOnSale"
     // The site has no web address (DEC-069, L5): the one flag that blocks.
-    | "addressMissing";
+    | "addressMissing"
+    // Check before publish (U10, `publish-checks.ts`): a typed price that
+    // isn't Services', a "free" that isn't, a photo with no description.
+    | "priceMismatch"
+    | "freeClaim"
+    | "photoNoDescription";
 
 /**
  * Flags that cannot be computed yet. Empty since #206 built the navigation
@@ -103,6 +108,8 @@ export interface Flag {
      * it; every other flag is advisory and leaves it out.
      */
     blocking?: true;
+    /** `photoNoDescription`: the photo, so "Describe it" can show it. */
+    photoSrc?: string;
 }
 
 /** One page's sections as the checks need them. */
@@ -357,7 +364,7 @@ function checkSection(
                 found.length > 60 ? `${found.slice(0, 57).trimEnd()}…` : found;
             at(
                 "placeholderText",
-                `This ${label} block still has the template's placeholder words in it ("${quoted}"). Replace them with your own before going live.`,
+                `This ${label} section still has the template's placeholder words in it ("${quoted}"). Replace them with your own before going live.`,
                 null,
             );
         }
@@ -390,7 +397,7 @@ function checkSection(
                 : sample.words;
         at(
             "placeholderText",
-            `This ${label} block still has sample words from the ${from} starter in it ("${quoted}"). Replace them with your own before going live.`,
+            `This ${label} section still has sample words from the ${from} starter in it ("${quoted}"). Replace them with your own before going live.`,
             null,
         );
     }
@@ -401,13 +408,13 @@ function checkSection(
             if (heading.trim() === "") {
                 at(
                     "emptyRequiredField",
-                    "This hero has no heading.",
+                    "The top of the page has no heading.",
                     "heading",
                 );
             } else if (looksLikePlaceholder(heading)) {
                 at(
                     "placeholderText",
-                    "The hero heading still has placeholder text in it.",
+                    "The top of the page's heading still has placeholder text in it.",
                     "heading",
                 );
             } else if (heading.length > HERO_HEADING_PHONE_LIMIT) {
@@ -431,7 +438,7 @@ function checkSection(
             } else if (sub !== "" && looksLikePlaceholder(sub)) {
                 at(
                     "placeholderText",
-                    "The hero subheading still has placeholder text in it.",
+                    "The top of the page's line under the heading still has placeholder text in it.",
                     "subheading",
                 );
             }
@@ -447,8 +454,8 @@ function checkSection(
                 at(
                     "missingImage",
                     brief
-                        ? `This hero has no image yet. It wants: ${brief}`
-                        : "This hero has no image.",
+                        ? `The top of the page has no photo yet. It wants: ${brief}`
+                        : "The top of the page has no photo.",
                     "image",
                 );
             }
@@ -458,7 +465,7 @@ function checkSection(
                 checkCtaTarget(
                     cta,
                     "cta",
-                    "The hero button",
+                    "The button at the top of the page",
                     at,
                     pagePaths,
                     pageIds,
@@ -574,7 +581,7 @@ function checkSection(
                 if (link !== "" && isBrokenInternalLink(link, pagePaths)) {
                     at(
                         "brokenLink",
-                        `The link for ${which} points at ${link}, which is not a page on this site.`,
+                        `The link for ${which} points at a page that doesn't exist.`,
                         "items",
                     );
                 }
@@ -589,7 +596,7 @@ function checkSection(
             if (str(photo.src).trim() !== "" && str(photo.alt).trim() === "") {
                 at(
                     "emptyRequiredField",
-                    "The photo in this person block has no description, so someone using a screen reader won't know what it shows.",
+                    "The photo in this person section has no description, so someone using a screen reader won't know what it shows.",
                     "image",
                 );
             }
@@ -598,7 +605,7 @@ function checkSection(
                 checkCtaTarget(
                     cta,
                     "cta",
-                    "The person block's button",
+                    "The person section's button",
                     at,
                     pagePaths,
                     pageIds,
@@ -683,7 +690,7 @@ function checkCtaTarget(
         } else if (isBrokenInternalLink(href, pagePaths)) {
             at(
                 "brokenLink",
-                `${subject} points at ${href}, which is not a page on this site.`,
+                `${subject} points at a page that doesn't exist.`,
                 field,
             );
         }
@@ -709,7 +716,7 @@ function checkCtaTarget(
             } else if (isBrokenInternalLink(href, pagePaths)) {
                 at(
                     "brokenLink",
-                    `${subject} points at ${href}, which is not a page on this site.`,
+                    `${subject} points at a page that doesn't exist.`,
                     field,
                 );
             } else if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(href)) {
@@ -888,7 +895,7 @@ export function checkSite(site: FlagSiteInput): Flag[] {
         }
         flags.push({
             type: "reservedAddress",
-            message: `This page can't be seen: ${reserved.root} is ${reserved.purpose}. Change its path so visitors can reach it.`,
+            message: `This page can't be reached at ${reserved.root}: that link is ${reserved.purpose}. Give it its own link so visitors can open it.`,
             pageId: page.id,
             sectionIndex: null,
             field: "path",

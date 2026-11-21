@@ -1,12 +1,11 @@
 "use client";
 
-import { Skeleton } from "@saroh/ui/skeleton";
 import { usePathname } from "next/navigation";
-
-import { ConsoleFrame } from "@/components/console-frame";
 
 import type { ConsoleSkeleton } from "./console-page-shape";
 import { ConsolePageShape } from "./console-page-shape";
+import { PanelSkeleton } from "./panel-skeleton";
+import { TableSkeleton } from "./table-skeleton";
 
 export type { ConsoleSkeleton } from "./console-page-shape";
 
@@ -18,6 +17,31 @@ const RECORDS = new Set([
     "releases",
     "search-pages",
 ]);
+
+/**
+ * The console's tables and how many columns each draws, so a list on its
+ * way is grey in the table's own shape. A list that isn't a table (Users,
+ * Waitlist, Messages) keeps the list skeleton.
+ */
+const TABLE_COLUMNS: Record<string, number> = {
+    "/businesses": 6,
+    "/billing/subscriptions": 6,
+    "/billing/invoices": 8,
+    "/billing/events": 4,
+    "/releases": 5,
+    "/search-pages": 6,
+    "/usage": 6,
+    "/operations/jobs": 6,
+    "/operations/webhooks": 5,
+    "/team/roles": 8,
+    "/audit": 7,
+    "/plans": 4,
+};
+
+/** How many columns a console address's table has, if it is a table. */
+export function columnsFor(pathname: string): number | undefined {
+    return TABLE_COLUMNS[pathname.replace(/\/$/, "") || "/"];
+}
 
 /**
  * Which shape a console address draws while it loads: a record's page
@@ -43,11 +67,9 @@ export function skeletonFor(pathname: string): ConsoleSkeleton {
 }
 
 /**
- * Every console page on its way (audits, 1 Nov: a click on a slow network
- * showed nothing): the console's frame with the rail's and the bar's
- * shapes, and the page's shape below, as Plans streams its own. One
- * component for every `loading.tsx` above a page that draws the shell;
- * a tab under a header the layout already drew takes `PanelSkeleton`.
+ * A console page on its way, inside the console's frame, which the root
+ * layout draws and which never blanks (owner, 21 Nov): the page's own
+ * shape, a table with its columns where the page is a table.
  */
 export default function ConsoleLoading() {
     const pathname = usePathname();
@@ -59,21 +81,23 @@ export default function ConsoleLoading() {
             : `Loading ${section}`;
 
     return (
-        <ConsoleFrame
-            search={<Skeleton className="h-9 w-full max-w-md rounded-md" />}
-            account={<Skeleton className="h-8 w-40 rounded-md" />}
-            rail={
-                <div
-                    aria-hidden
-                    className="sticky top-14 hidden h-[calc(100dvh-3.5rem)] w-16 shrink-0 flex-col gap-3 self-start border-r border-border px-3 py-5 min-[760px]:flex min-[1101px]:w-[238px]"
-                >
-                    {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-                        <Skeleton key={i} className="h-7 rounded-md" />
-                    ))}
-                </div>
-            }
-        >
-            <ConsolePageShape shape={shape} label={label} />
-        </ConsoleFrame>
+        <ConsolePageShape
+            shape={shape}
+            label={label}
+            columns={columnsFor(pathname)}
+        />
+    );
+}
+
+/**
+ * A tab's body on its way, under a header and tabs a layout already drew
+ * (Billing, Team): the open tab's table, or a panel where it isn't one.
+ */
+export function TabBodyLoading({ label }: { label: string }) {
+    const columns = columnsFor(usePathname());
+    return columns ? (
+        <TableSkeleton label={label} columns={columns} />
+    ) : (
+        <PanelSkeleton label={label} rows={8} />
     );
 }

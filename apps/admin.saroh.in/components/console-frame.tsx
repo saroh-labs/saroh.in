@@ -1,13 +1,19 @@
+"use client";
+
 import { Wordmark } from "@saroh/ui/wordmark";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { EDITION, EDITION_LABEL } from "@/lib/edition";
 
+/** A search page's preview is the page as saroh.in draws it, unframed. */
+const BARE = /^\/search-pages\/[^/]+\/preview\/?$/;
+
 /**
  * The console's frame: the sticky 56px bar and the rail beside the work
- * area. `AdminShell` fills it with the real pieces; `ConsoleLoading` with
- * their shapes, so a page on its way keeps the frame where it was. No
- * server imports, so a client loading screen can draw it.
+ * area. `AdminShell` fills it with the real pieces from the root layout,
+ * so it stays drawn while a page loads under it. Client only to leave the
+ * preview unframed.
  */
 export function ConsoleFrame({
     drawer,
@@ -24,6 +30,7 @@ export function ConsoleFrame({
     banner?: React.ReactNode;
     children: React.ReactNode;
 }) {
+    if (BARE.test(usePathname())) return children;
     return (
         <div className="flex min-h-screen flex-col">
             {/* Sticky, at a fixed 56px from 640px up, so the rail (from

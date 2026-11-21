@@ -596,7 +596,7 @@ describe("Live's list: VB01's Next free", () => {
             [
                 {
                     ...timetable,
-                    content: { title: "Next free", variant: "list" },
+                    content: { title: "Next open", variant: "list" },
                 },
             ],
             "live",
@@ -617,7 +617,7 @@ describe("Live's list: VB01's Next free", () => {
             [
                 {
                     ...timetable,
-                    content: { title: "Next free", variant: "list" },
+                    content: { title: "Next open", variant: "list" },
                 },
             ],
             "folio",

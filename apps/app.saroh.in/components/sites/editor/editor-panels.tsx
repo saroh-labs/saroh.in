@@ -29,37 +29,7 @@ import {
 } from "@/lib/sites/editor-prefs";
 import { PanelDivider } from "./editor-chrome";
 
-/**
- * Where the rail, the page and the inspector go (G4). On a desk they are three
- * columns with a drag handle between each (#340). Narrow, the inspector leaves
- * its column and opens over the page as a sheet when something is chosen. On
- * a phone the page fills the screen under one floating pill, Blocks · + ·
- * Brand, each opening its sheet from the foot (DEC-185), and a block's
- * settings rise in a sheet with no scrim, its toolbar still in reach.
- *
- * Preview (G5) puts the rail, the handles and the inspector away, kept
- * mounted where they are mounted, and the page takes the whole width.
- */
-export function EditorPanels({
-    layout,
-    viewport,
-    sheets,
-    selection,
-    setAdding,
-    dialogOpen,
-    hasSubject,
-    rail,
-    canvas,
-    inspector,
-    inspectorTitle,
-    pageTitle,
-    overlayOpen = false,
-    brandActions,
-    body,
-    setBody,
-    releases,
-    openNotes = 0,
-}: {
+export interface EditorPanelsProps {
     layout: EditorLayout;
     viewport: EditorViewport;
     sheets: EditorSheets;
@@ -91,7 +61,48 @@ export function EditorPanels({
     releases?: { open: boolean; onClose: () => void; content: ReactNode };
     /** The site's open notes, on a Reviewer's pill (DEC-200). */
     openNotes?: number;
-}) {
+    /**
+     * The new shell's rail of tabs (U46), a 64px column before the left
+     * panel on a desk or a narrow window; absent in today's chrome.
+     */
+    trail?: ReactNode;
+    /** The right column's drag bounds, when not the inspector's own. */
+    panelBounds?: { min: number; max: number; reset: number };
+}
+
+/**
+ * Where the rail, the page and the inspector go (G4). On a desk they are three
+ * columns with a drag handle between each (#340). Narrow, the inspector leaves
+ * its column and opens over the page as a sheet when something is chosen. On
+ * a phone the page fills the screen under one floating pill, Blocks · + ·
+ * Brand, each opening its sheet from the foot (DEC-185), and a block's
+ * settings rise in a sheet with no scrim, its toolbar still in reach.
+ *
+ * Preview (G5) puts the rail, the handles and the inspector away, kept
+ * mounted where they are mounted, and the page takes the whole width.
+ */
+export function EditorPanels({
+    layout,
+    viewport,
+    sheets,
+    selection,
+    setAdding,
+    dialogOpen,
+    hasSubject,
+    rail,
+    canvas,
+    inspector,
+    inspectorTitle,
+    pageTitle,
+    overlayOpen = false,
+    brandActions,
+    body,
+    setBody,
+    releases,
+    openNotes = 0,
+    trail,
+    panelBounds = { min: PANEL_MIN, max: PANEL_MAX, reset: PANEL_DEFAULT },
+}: EditorPanelsProps) {
     const { previewing, railWidth, panelWidth } = viewport;
     const { sheet, setSheet } = sheets;
     const wide = layout === "wide";
@@ -108,7 +119,7 @@ export function EditorPanels({
         setAdding(false);
     };
 
-    const columns = previewing
+    const panes = previewing
         ? "1fr"
         : wide
           ? // See `editorColumns` for how the widths are shared.
@@ -116,6 +127,8 @@ export function EditorPanels({
           : phone
             ? "minmax(0,1fr)"
             : narrowColumns(railWidth);
+    const withTrail = trail !== undefined && !phone;
+    const columns = withTrail && !previewing ? `64px ${panes}` : panes;
 
     return (
         <>
@@ -130,6 +143,7 @@ export function EditorPanels({
                 )}
                 style={{ "--editor-cols": columns } as React.CSSProperties}
             >
+                {withTrail ? <div {...tools}>{trail}</div> : null}
                 {phone ? null : (
                     <div {...tools}>
                         {rail}
@@ -168,9 +182,9 @@ export function EditorPanels({
                         <PanelDivider
                             label="Resize the inspector"
                             width={panelWidth}
-                            min={PANEL_MIN}
-                            max={PANEL_MAX}
-                            reset={PANEL_DEFAULT}
+                            min={panelBounds.min}
+                            max={panelBounds.max}
+                            reset={panelBounds.reset}
                             onResize={viewport.setPanelWidth}
                             onNudge={viewport.nudgePanel}
                             panelSide="right"
@@ -239,8 +253,8 @@ export function EditorPanels({
                     onClose={releases.onClose}
                     container={body}
                     side={phone ? "bottom" : "right"}
-                    title="Test releases"
-                    closeLabel="Close test releases"
+                    title="Test links"
+                    closeLabel="Close test links"
                     // Wider than the inspector: a release carries its links
                     // and five actions.
                     className={phone ? undefined : "w-[400px] max-w-[92%]"}

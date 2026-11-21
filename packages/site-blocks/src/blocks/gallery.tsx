@@ -4,6 +4,8 @@ import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LookProps } from "../look-context";
 import LookGallery from "./gallery-look";
+import type { LookbookLinked } from "./gallery-lookbook";
+import GalleryLookbook from "./gallery-lookbook";
 
 /**
  * `gallery` v1 — an ordered set of images. `carousel` degrades to a horizontal
@@ -17,9 +19,33 @@ export default function GallerySection({
     content,
     look,
     isOwnerPreview,
+    apiUrl,
+    siteId,
+    bookHref,
+    linked,
 }: LookProps & {
     content: RenderedGallery;
+    /** For a lookbook's linked services and products, read live. */
+    apiUrl?: string;
+    siteId?: string | null;
+    /** The site's booking page, for a lookbook's Book. */
+    bookHref?: string;
+    /** Sample linked items (catalog, tests): no read. */
+    linked?: LookbookLinked;
 }) {
+    // The lookbook (DEC-228) is its own arrangement under every look.
+    if (resolveVariant("gallery", content) === "lookbook") {
+        return (
+            <GalleryLookbook
+                content={content}
+                look={look}
+                apiUrl={apiUrl}
+                siteId={siteId}
+                bookHref={bookHref}
+                linked={linked}
+            />
+        );
+    }
     if (look) {
         return (
             <LookGallery

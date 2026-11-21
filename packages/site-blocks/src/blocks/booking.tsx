@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { RenderedBooking } from "@saroh/block-contract";
+import { resolveVariant } from "@saroh/block-contract";
 import { cn } from "../lib/utils";
 
 import { destructiveAlertClasses } from "../alert";
@@ -21,6 +22,8 @@ import type { LookProps } from "../look-context";
 import { useQrSource, withQrSource } from "../qr-source";
 import type { BusinessReach } from "../reach-links";
 import { ReachLinks } from "../reach-links";
+import type { OpenDay } from "./booking-next-open";
+import { BeforeYouBook, BookingNextOpen } from "./booking-next-open";
 import { ctaClasses } from "./cta";
 
 /**
@@ -63,7 +66,13 @@ export interface Slot {
 type SlotsState =
     | { kind: "loading" }
     /** `zone` is the business's; null for sample slots (the visitor's). */
-    | { kind: "ready"; slots: Slot[]; zone: string | null }
+    | {
+          kind: "ready";
+          slots: Slot[];
+          zone: string | null;
+          /** The read's days, closed and full ones too (Next open's strip). */
+          days?: OpenDay[];
+      }
     /** 404/410: the service can't be booked online. Retrying won't change it. */
     | { kind: "closed" }
     | { kind: "error"; message: string };
@@ -98,6 +107,12 @@ function groupByDay(slots: Slot[], zone: string): DayGroup[] {
     return groups;
 }
 
+/** Words the owner typed, or null for none. */
+function said(value: string | undefined): string | null {
+    const trimmed = value?.trim();
+    return trimmed === undefined || trimmed === "" ? null : trimmed;
+}
+
 const NOT_LOADED =
     "We couldn't load available times right now. Please try again shortly.";
 
@@ -107,7 +122,14 @@ export default function BookingSection({
     slots: givenSlots,
     bookHref,
     reach = null,
+    askHref = null,
+    look,
 }: LookProps & {
+    /**
+     * The page with the enquiry form, for Next open's "Ask us" when nothing
+     * is open. Null: the call and WhatsApp links only.
+     */
+    askHref?: string | null;
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
@@ -167,17 +189,25 @@ export default function BookingSection({
             // in the error state rather than throwing during render.
             const body: unknown = await res.json().catch(() => null);
             if (!isBookingDays(body)) return couldNotLoad;
+            // A class lists its full sessions too; only one with a place
+            // left is a time to offer here.
+            const open = (start: { placesLeft: number | null }) =>
+                start.placesLeft === null || start.placesLeft > 0;
             return {
                 kind: "ready",
                 zone: body.timezone,
-                // A class lists its full sessions too; only one with a
-                // place left is a time to offer here.
+                days: body.days.map((day) => ({
+                    date: day.date,
+                    closed: day.closed === true,
+                    starts: day.open
+                        ? day.starts
+                              .filter(open)
+                              .map(({ startAt, endAt }) => ({ startAt, endAt }))
+                        : [],
+                })),
                 slots: body.days
                     .flatMap((day) => day.starts)
-                    .filter(
-                        (start) =>
-                            start.placesLeft === null || start.placesLeft > 0,
-                    )
+                    .filter(open)
                     .map(({ startAt, endAt }) => ({ startAt, endAt })),
             };
         } catch {
@@ -236,6 +266,52 @@ export default function BookingSection({
                   source,
               )
             : undefined;
+    const beforeYouBook = said(content.beforeYouBook);
+
+    if (resolveVariant("booking", content) === "nextOpen") {
+        const dayHref = (date: string) =>
+            bookHref
+                ? withQrSource(
+                      `${bookHref}?service=${encodeURIComponent(serviceId)}&date=${date}`,
+                      source,
+                  )
+                : undefined;
+        return (
+            <BookingNextOpen
+                look={look}
+                title={said(content.title)}
+                description={said(content.description)}
+                beforeYouBook={beforeYouBook}
+                state={
+                    slotsState.kind === "ready" && zone
+                        ? {
+                              kind: "ready",
+                              zone,
+                              fromToday: slotsState.days !== undefined,
+                              days:
+                                  slotsState.days ??
+                                  groups.map((g) => ({
+                                      date: g.key,
+                                      closed: false,
+                                      starts: g.slots,
+                                  })),
+                          }
+                        : slotsState.kind === "ready"
+                          ? { kind: "loading" }
+                          : slotsState.kind === "error"
+                            ? { kind: "error" }
+                            : slotsState
+                }
+                onRetry={reload}
+                bookUrl={bookUrl}
+                dayHref={dayHref}
+                timeHref={(_date, slot) => timeUrl(slot)}
+                askHref={askHref}
+                reach={reach}
+            />
+        );
+    }
+
     const chip =
         "border-site-border text-site-fg coarse:min-h-11 inline-flex min-h-9 items-center rounded-[var(--site-radius)] whitespace-nowrap border px-3 text-sm tabular-nums";
 
@@ -252,12 +328,17 @@ export default function BookingSection({
             {content.description ? (
                 <p className="text-site-body mt-3">{content.description}</p>
             ) : null}
+            {beforeYouBook ? (
+                <div className="mt-6">
+                    <BeforeYouBook text={beforeYouBook} />
+                </div>
+            ) : null}
 
             {/* The next free times, at a glance. */}
             <div className="mt-8">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <h3 className="text-site-fg text-sm font-semibold">
-                        Next free times
+                        Next open times
                     </h3>
                     {zone ? (
                         <p className="text-site-muted text-xs">
@@ -294,7 +375,7 @@ export default function BookingSection({
                 ) : groups.length === 0 ? (
                     <div className="mt-4">
                         <p className="text-site-body text-sm">
-                            Nothing free in the next {DAYS_WINDOW} days. Get in
+                            No open times in the next {DAYS_WINDOW} days. Get in
                             touch and we&apos;ll find you a time.
                         </p>
                         <ReachLinks reach={reach} className="mt-1" />

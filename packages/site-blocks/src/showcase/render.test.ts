@@ -277,10 +277,14 @@ describe("templateRender", () => {
             ...DIETICIAN_GALLERY_SAMPLE.credentials,
         ]);
         expect(person.bio).toBe(DIETICIAN_GALLERY_SAMPLE.bio);
-        // Its consultation is the sample business's own service, listed.
-        expect(render?.sections.some((s) => s.type === "servicesList")).toBe(
-            true,
-        );
+        // Its consultation is the sample business's own service, in the
+        // hero's Consultation panel (dietician@2), the next open times
+        // under it.
+        expect(render?.sections[0]?.content).toMatchObject({
+            variant: "answer",
+            panel: { kind: "consultation" },
+        });
+        expect(render?.sections[1]?.type).toBe("booking");
     });
 
     it.each([
@@ -301,7 +305,7 @@ describe("templateRender", () => {
             );
             expect(person.image).toBeTruthy();
             for (const p of person.people) expect(p.image).toBeTruthy();
-            // Free today names the same people the section does.
+            // Open today names the same people the section does.
             for (const item of render?.fixtures.today?.items ?? []) {
                 expect(sample.map((p) => p.name)).toContain(item.staffName);
             }
@@ -310,7 +314,7 @@ describe("templateRender", () => {
 
     it("is drawn at one fixed weekday morning, open, whatever the clock says", () => {
         const now = new Date(FIXTURE_NOW);
-        // A Tuesday, 10:30 in India, on the day Free today is for.
+        // A Tuesday, 10:30 in India, on the day Open today is for.
         expect(
             new Intl.DateTimeFormat("en-GB", {
                 timeZone: FIXTURE_TIME_ZONE,
@@ -330,7 +334,7 @@ describe("templateRender", () => {
             expect(render?.fixtures.now).toBe(FIXTURE_NOW);
             const { visit, today } = render?.fixtures ?? {};
             // Every sample with hours is open then, so the open line and
-            // Free today never disagree.
+            // Open today never disagree.
             for (const hours of [visit?.hours, today?.hours]) {
                 if (!hours) continue;
                 expect(
@@ -672,10 +676,13 @@ describe("the starter's renders (DEC-141)", () => {
         ]);
         const render = templateRender("starter-salon", "clay", "/");
         expect(render?.action).toEqual({ label: "Book", href: "/book" });
+        // starter@5: what and where beside the Stamp, the answer row
+        // under the button (U10); no longer today's free times.
         expect(render?.sections[0]?.content).toMatchObject({
+            variant: "split",
             heading: "Meher Hair Studio",
             subheading: "Haircut, Colour and Bridal styling in Bengaluru",
-            onToday: true,
+            answerRow: true,
         });
         // The brief stays a note to the owner: no picture is drawn from it.
         expect(render?.sections[0]?.content).not.toHaveProperty("image");

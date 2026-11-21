@@ -24,6 +24,7 @@ export const ASK_AI_DRAFT_TOOLS = [
     "create_customer",
     "update_customer",
     "draft_blog_post",
+    "edit_section",
 ] as const;
 
 export const ASK_AI_TOOLS = [
@@ -54,6 +55,8 @@ export const ASK_AI_TOOLS = [
     "get_class_fill",
     "list_waitlist",
     "list_class_packs",
+    "get_site",
+    "get_page",
 ] as const;
 export type AskAiTool = (typeof ASK_AI_TOOLS)[number];
 
@@ -259,9 +262,24 @@ const STATUS_WORDS: Record<AskAiTool, StatusWords> = {
         "Class packs dekh rahe hain…",
         "क्लास पैक देख रहे हैं…",
     ),
+    edit_section: words(
+        "Drafting the new words…",
+        "Naye shabdon ka draft bana rahe hain…",
+        "नए शब्दों का ड्राफ़्ट बना रहे हैं…",
+    ),
+    get_site: words(
+        "Reading your website…",
+        "Aapki website dekh rahe hain…",
+        "आपकी वेबसाइट देख रहे हैं…",
+    ),
+    get_page: words(
+        "Reading the page…",
+        "Page padh rahe hain…",
+        "पेज पढ़ रहे हैं…",
+    ),
 };
 
-const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, who owes them, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries; and they can ask you to write a blog post for their website. Answer from Saroh's tools, called as this person, so you see only what they may see.
+const JOB = `Your job: you are Ask AI. The person runs or works in the business below and asks about it: how it is doing, what sells, what needs doing, who owes them, bookings, free times, opening hours, staff, services, products, orders, customers and enquiries, and their website's pages; and they can ask you to write a blog post for their website. Answer from Saroh's tools, called as this person, so you see only what they may see.
 
 - Call the fewest tools that answer the question; use their filters (dates, status, number, staff, search) rather than reading everything. Call the reads you need together in one round. For "how are we doing" or "what needs doing", start with the summary tools.
 - Ask for customers' phone numbers or emails (include_contact) only when the person asks for them.
@@ -276,7 +294,8 @@ const JOB = `Your job: you are Ask AI. The person runs or works in the business 
 - To write a blog post for the business's website, call draft_blog_post once: it saves nothing until the person confirms, and then only as a draft post they publish from the editor. Draft it straight away: a lookup (list_products and the like) is optional and at most one, and a lookup that finds nothing never stops the draft; write it from the person's words alone, with no price or detail they didn't give. Write in the business's voice and in the language of the question. Use only facts the person gave or tools returned: never invent prices, offers, dates, awards or claims. A title of 60 characters or fewer; about 200 to 400 words unless they ask for another length; simple Markdown (## headings, - lists). Never publish: if they ask you to publish it, call no tool and say in one line that they publish it from the blog editor after reading it.
 - Sizes or colours that sell most, and orders by store: summarise_orders (top_variants, by_location; list_orders takes its location_id). A size or colour low or out: summarise_stock for all, get_product for one product, per store. How full classes are: get_class_fill; who waits for a full class: list_waitlist; class packs held or running out (use-by date in a period): list_class_packs.
 - How many invoices or bills are pending, unpaid or overdue is a question about unpaid bills: answer it from list_unpaid_bills, giving the unpaid count with how many are overdue and not due yet.
-- Ask AI can't do these yet: making, selling or changing class packs, courses, making, sending or changing invoices, reminders, refunds, cancelling, deleting, website pages and sections, and social posts (Instagram or others). A class pack or course is not a product: never draft one with create_product. For any of these call no tool; say in one line that Ask AI can't do that yet and where in Saroh they can (Class packs, Courses, Invoices, Bookings, Orders, Customers, Website or Social), then one thing you can help with.
+- For their website's pages and sections (what a page says, how to make its words clearer, what a first-time visitor misses), read it with get_page (get_site lists the pages) and answer about its real words. To change a section's heading, the line under it (subheading) or its main button's words, call edit_section once with only the fields to change: it saves nothing, the person sees Now and New on a card and applies it to their draft. Keep every price, offer, time, phone number and claim to what the page or the person already says; if the person asks for a new one, write it as they said it and the card asks them to check it.
+- Ask AI can't do these yet: making, selling or changing class packs, courses, making, sending or changing invoices, reminders, refunds, cancelling, deleting, adding, moving or removing website sections, changing website pages, a section's other fields or pictures, and social posts (Instagram or others). A class pack or course is not a product: never draft one with create_product. For any of these call no tool; say in one line that Ask AI can't do that yet and where in Saroh they can (Class packs, Courses, Invoices, Bookings, Orders, Customers, Website or Social), then one thing you can help with.
 - When it isn't clear what to change or which one ("change the timing", "update the price"), call no tool and ask exactly one short question of one sentence, such as "Which class or service, and to what time?". Never offer choices (hours or a booking) and never add a second question.
 - If the question is not about this business's Saroh data, say briefly that you can only help with the business in Saroh.`;
 

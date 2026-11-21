@@ -116,22 +116,9 @@ function renderPicker(
     return onChoose;
 }
 
-/** The gallery behind the card's Change (DEC-184), opened if it isn't. */
-function openGallery() {
-    if (document.querySelector('[data-brand-picker][data-state="open"]')) {
-        return;
-    }
-    const change = host.querySelector<HTMLElement>("[data-look-change]");
-    if (change) act(() => change.click());
-}
-const inGallery = () => {
-    openGallery();
-    return Array.from(
-        document.querySelectorAll<HTMLElement>(
-            '[data-brand-picker][data-state="open"] [data-look-choice]',
-        ),
-    );
-};
+/** The four looks, drawn as cards in the panel (U24b, `WXBBrand`). */
+const inGallery = () =>
+    Array.from(document.querySelectorAll<HTMLElement>("[data-look-choice]"));
 const choices = () => inGallery().map((el) => el.dataset.lookChoice);
 const choice = (id: string) => {
     const el = inGallery().find((e) => e.dataset.lookChoice === id);
@@ -230,9 +217,8 @@ describe("choosing", () => {
 
     it("moves with the arrow keys, one tab stop", () => {
         const onChoose = renderPicker(classic);
-        openGallery();
         const stops = document.querySelectorAll(
-            '[data-brand-picker] [role="radio"][tabindex="0"]',
+            '[data-look-choice][role="radio"][tabindex="0"]',
         );
         expect(stops).toHaveLength(1);
         act(() => {
@@ -248,12 +234,11 @@ describe("choosing", () => {
 
     it("draws each look's phone in the business's colours and the look's corners", () => {
         renderPicker(classic);
-        openGallery();
         const quiet = document.querySelector<HTMLElement>(
-            '[data-brand-picker] [data-look-thumbnail="quiet"]',
+            '[data-look-thumbnail="quiet"]',
         );
         const folio = document.querySelector<HTMLElement>(
-            '[data-brand-picker] [data-look-thumbnail="folio"]',
+            '[data-look-thumbnail="folio"]',
         );
         expect(quiet?.getAttribute("aria-hidden")).toBe("true");
         // Quiet's button is a pill, Folio's square.
@@ -268,7 +253,7 @@ describe("the line under the row", () => {
     it("says a chosen look isn't live yet", () => {
         renderPicker(inLook(classic, "folio"), { liveLook: null });
         expect(host.textContent).toContain(
-            "Not published yet. Your site is Classic until you publish.",
+            "Not live yet. Your site stays Classic until you publish.",
         );
     });
 
@@ -302,7 +287,7 @@ describe("the line under the row", () => {
         expect(alert?.textContent).toBe(
             "Couldn't reach Saroh. The look stays Classic.",
         );
-        expect(host.textContent).not.toContain("Not published yet");
+        expect(host.textContent).not.toContain("Not live yet");
     });
 });
 
@@ -336,19 +321,21 @@ describe("Website › Style with the Look row", () => {
         renderPanel(inLook(classic, "quiet"), facts);
         expect(headings()).toEqual([
             "Look",
-            "Typeface",
-            "Colour",
-            "Spacing and shape",
+            "Colours",
+            "Fonts",
+            "Changes to the look",
         ]);
-        expect(host.querySelector("#style-cornerRadius")).not.toBeNull();
-        expect(host.textContent).toContain("Reset style…");
+        // The sliders are gone (U24b); spacing is in Buttons and shapes.
+        expect(host.querySelector('input[type="range"]')).toBeNull();
+        expect(host.textContent).toContain("Buttons and shapes");
+        expect(host.textContent).toContain("Reset to Quiet…");
     });
 
     it("draws no Look row without one to offer", () => {
         renderPanel(classic, { ...facts, available: false });
-        expect(headings()[0]).toBe("Typeface");
+        expect(headings()[0]).toBe("Colours");
         renderPanel(classic);
-        expect(headings()[0]).toBe("Typeface");
+        expect(headings()[0]).toBe("Colours");
     });
 });
 
@@ -375,5 +362,61 @@ describe("the preview's colours under a look", () => {
             fontPair: "editorial",
         });
         expect(inLook(styled, "folio")).toEqual({ ...styled, look: "folio" });
+    });
+});
+
+describe("switching look after customising components (DEC-227)", () => {
+    const customised: SiteStyle = {
+        ...inLook(classic, "folio"),
+        components: { buttons: "rounded", cards: "raised" },
+    };
+    const dialog = () =>
+        document.querySelector<HTMLElement>('[role="alertdialog"]');
+    const inDialog = (selector: string) =>
+        Array.from(dialog()?.querySelectorAll<HTMLElement>(selector) ?? []);
+    const press = async (words: string) => {
+        const el = inDialog("button").find((b) => b.textContent === words);
+        if (!el) throw new Error(`No "${words}"`);
+        await act(async () => {
+            el.click();
+            await Promise.resolve();
+        });
+    };
+
+    it("asks, Keep my changes chosen first, and keeps them", async () => {
+        const onChoose = renderPicker(customised);
+        const live = choice("live");
+        act(() => live.click());
+        expect(onChoose).not.toHaveBeenCalled();
+        expect(dialog()?.textContent).toContain(
+            "You changed 2 components from Folio.",
+        );
+        const keep = inDialog('[role="radio"]');
+        expect(keep[0]?.getAttribute("aria-checked")).toBe("true");
+        expect(dialog()?.textContent).toContain("Keep my 2 changes");
+        expect(dialog()?.textContent).toContain("Use Live’s styles");
+        await press("Switch to Live");
+        expect(onChoose).toHaveBeenCalledWith("live");
+    });
+
+    it("takes the new look's own with Use <look>'s styles", async () => {
+        const onChoose = renderPicker(customised);
+        const quiet = choice("quiet");
+        act(() => quiet.click());
+        const use = inDialog('[role="radio"]')[1];
+        act(() => use.click());
+        await press("Switch to Quiet");
+        expect(onChoose).toHaveBeenCalledWith("quiet", false);
+    });
+
+    it("asks nothing when no component differs from the look's own", () => {
+        const onChoose = renderPicker({
+            ...inLook(classic, "folio"),
+            components: { buttons: "square" },
+        });
+        const live = choice("live");
+        act(() => live.click());
+        expect(dialog()).toBeNull();
+        expect(onChoose).toHaveBeenCalledWith("live");
     });
 });

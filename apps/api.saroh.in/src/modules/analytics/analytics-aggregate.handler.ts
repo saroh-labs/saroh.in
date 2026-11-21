@@ -6,6 +6,9 @@ import { prisma } from "@saroh/database";
 import { planMeter } from "../billing/metering.service";
 import {
     ANALYTICS_RETENTION_DAYS,
+    ENQUIRY_SUBMITTED_TYPE,
+    SITE_PAID_TYPE,
+    SITE_STARTED_TYPE,
     SITE_VIEW_TYPE,
     sitePathOnly,
     VISIT_ORIGIN_TYPES,
@@ -57,6 +60,19 @@ interface Bucket {
     visitors: Set<string>;
 }
 
+/**
+ * The types with a `path` breakdown: a page's own results (website editor
+ * plan KTD-E8). Views always carry a path; a started checkout, a paid one and
+ * an enquiry get theirs counted from the day they carry one (forward only,
+ * no back-fill), so a page's part says "since" that day rather than 0.
+ */
+const PATH_TYPES: ReadonlySet<string> = new Set([
+    SITE_VIEW_TYPE,
+    SITE_STARTED_TYPE,
+    SITE_PAID_TYPE,
+    ENQUIRY_SUBMITTED_TYPE,
+]);
+
 /** The org-wide total of site views: the row visits a month are counted from. */
 function isVisitsTotal(bucket: Bucket): boolean {
     return (
@@ -70,7 +86,7 @@ function isVisitsTotal(bucket: Bucket): boolean {
  * Org-safe daily aggregate job (S7-002).
  *
  * Reads ONE org's `AnalyticsEvent`s for a UTC day, groups them by `(type,
- * siteId)` (plus a `path` dimension for `site.view`, and `source` and `ref`
+ * siteId)` (plus a `path` dimension for `PATH_TYPES`, and `source` and `ref`
  * dimensions for a visit's steps and paid orders, U15), and UPSERTS the
  * matching `AnalyticsDailyAggregate` rows.
  *
@@ -207,7 +223,7 @@ export class AnalyticsAggregateHandler {
      * Fold the day's events into aggregate buckets:
      *  - an org-wide (siteId="") total per `type`,
      *  - a per-site total per `(type, siteId)` for events that name a site,
-     *  - and, for `site.view`, the same two rollups broken down by `path`.
+     *  - and, for `PATH_TYPES`, the same two rollups broken down by `path`.
      *
      * A null/empty `siteId` only ever contributes to the org-wide (siteId="")
      * bucket, so it can never be double-counted against a per-site row.
@@ -256,8 +272,8 @@ export class AnalyticsAggregateHandler {
                 bump(site, type, TOTAL_DIM, TOTAL_DIM, visitorHash);
             }
 
-            // `site.view` also gets a `path` breakdown.
-            if (type === SITE_VIEW_TYPE) {
+            // A page's results (`PATH_TYPES`) also get a `path` breakdown.
+            if (PATH_TYPES.has(type)) {
                 const path = this.readPath(event.properties);
                 if (path !== null) {
                     bump(ALL_SITES, type, "path", path, visitorHash);

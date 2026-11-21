@@ -2,6 +2,7 @@ import type { LookId, RenderedHero } from "@saroh/block-contract";
 import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { EditableText } from "../editable-text";
 import { siteImage } from "../lib/site-image";
 import { cn } from "../lib/utils";
 import type { LiveToday } from "../live/next-free";
@@ -19,6 +20,7 @@ import {
 } from "./look-front";
 import { OwnerPhotoNote } from "./no-photo";
 import type { PublicToday } from "./on-today";
+import { PhoneText } from "./phone-text";
 
 /**
  * The hero under a look (DEC-172, plan U6, #1094), as each look's fixed
@@ -90,9 +92,15 @@ export default function LookHero({
     apiUrl,
     today,
     now,
+    row = null,
+    byline = null,
 }: {
     content: RenderedHero;
     look: LookId;
+    /** The Answer row, under the buttons (`answer-row.tsx`). */
+    row?: ReactNode;
+    /** The Byline, under the line (`byline.tsx`). */
+    byline?: ReactNode;
     level?: HeroLevel;
     priority?: boolean;
     isOwnerPreview?: boolean;
@@ -124,14 +132,34 @@ export default function LookHero({
                     level={level}
                     className={cn(HEADING[look], "[overflow-wrap:anywhere]")}
                 >
-                    {content.heading}
+                    <EditableText field="heading">
+                        {content.heading}
+                    </EditableText>
                 </HeroHeading>
             </>
         ),
-        line: content.subheading ? (
-            <p className={LINE[look]}>{content.subheading}</p>
-        ) : null,
-        button:
+        line:
+            content.subheading || byline ? (
+                <div
+                    className={cn(
+                        "flex flex-col gap-5",
+                        look === "quiet" && "min-[700px]:items-center",
+                    )}
+                >
+                    {content.subheading ? (
+                        <p className={LINE[look]}>
+                            <PhoneText
+                                text={content.subheading}
+                                phone={content.phoneLine}
+                            />
+                        </p>
+                    ) : null}
+                    {byline}
+                </div>
+            ) : null,
+        button: withRow(
+            look,
+            row,
             content.cta || second ? (
                 <div className={SECOND_ROW[look]}>
                     {content.cta ? (
@@ -149,6 +177,7 @@ export default function LookHero({
                     ) : null}
                 </div>
             ) : null,
+        ),
         door: frontDoor ? (
             <FrontDoorSlot
                 door={frontDoor}
@@ -184,6 +213,7 @@ export default function LookHero({
                         src: src.src,
                         width: src.width,
                         sizes,
+                        focus: src.focus,
                     })}
                     className={cn(
                         "rounded-site-photo bg-site-surface block w-full object-cover",
@@ -220,6 +250,22 @@ export default function LookHero({
                 <LiveHero {...parts} />
             )}
         </section>
+    );
+}
+
+/** The buttons with the Answer row under them, or either alone. */
+function withRow(look: LookId, row: ReactNode, buttons: ReactNode): ReactNode {
+    if (!row) return buttons;
+    return (
+        <div
+            className={cn(
+                "flex flex-col gap-3",
+                look === "quiet" && "min-[700px]:items-center",
+            )}
+        >
+            {buttons}
+            {row}
+        </div>
     );
 }
 

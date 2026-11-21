@@ -9,9 +9,10 @@ import { useEffect } from "react";
  * App-root error boundary. The control plane reads everything through
  * api.saroh.in, so an api that is down or restarting is the most likely thing
  * to land here — and it must land as a retry, not as a sign-out or Next's
- * default unstyled screen. See lib/session.ts. Drawn like the console's 404;
- * a client boundary can't ask who the staff member is, so it is the bare page
- * with the wordmark.
+ * default unstyled screen. See lib/session.ts. It renders inside the root
+ * layout, so staff keep the console's frame around it and only the screen
+ * is replaced; without the frame (not staff, or the API unwell) the
+ * wordmark says where they are.
  */
 export default function Error({
     error,
@@ -25,7 +26,7 @@ export default function Error({
     }, [error]);
 
     return (
-        <main className="flex min-h-screen items-center justify-center bg-background">
+        <main className="flex min-h-[70vh] items-center justify-center">
             <ErrorPage
                 mark={<Wordmark suffix="console" />}
                 description="The console couldn’t load this page. It’s usually temporary, so try again in a moment."

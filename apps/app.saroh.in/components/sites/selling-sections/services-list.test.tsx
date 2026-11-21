@@ -120,10 +120,15 @@ describe("the services list's display options (G16)", () => {
     });
 
     it("switches Services to a list without prices, storing the list as absent", () => {
-        const onChange = render({ layout: "cards" });
+        // An older section that chose cards under the list look.
+        const onChange = render({
+            layout: "cards",
+            variant: "default",
+        } as Partial<ServicesListContent>);
         click(choice("Show as", "List"));
         expect(lastContent(onChange)).toEqual({
             serviceIds: ["svc_cut"],
+            variant: "default",
             layout: undefined,
         });
 
@@ -135,10 +140,13 @@ describe("the services list's display options (G16)", () => {
         });
     });
 
-    it("shows services as cards without descriptions", () => {
+    it("shows services as cards (the Cards look) without descriptions", () => {
         const onChange = render({});
         click(choice("Show as", "Cards"));
-        expect(lastContent(onChange).layout).toBe("cards");
+        expect(lastContent(onChange)).toMatchObject({
+            variant: "cards",
+            layout: undefined,
+        });
         click(choice("Descriptions", "Hide"));
         expect(lastContent(onChange).showDescriptions).toBe(false);
     });
@@ -164,5 +172,33 @@ describe("the services list's display options (G16)", () => {
     it("keeps the section's own button below the list", () => {
         render({});
         expect(host.textContent).toContain("Button below the list");
+    });
+});
+
+describe("the menu look's headings (DEC-227)", () => {
+    it("adds a heading and puts a service under it", () => {
+        const onChange = render({
+            variant: "menu",
+        } as Partial<ServicesListContent>);
+        expect(host.textContent).not.toContain("Show as");
+        const add = Array.from(host.querySelectorAll("button")).find(
+            (b) => b.textContent.trim() === "Add a heading",
+        );
+        if (!add) throw new Error("No Add a heading");
+        click(add);
+        expect(lastContent(onChange).groups).toEqual([
+            { name: "", serviceIds: [] },
+        ]);
+
+        const named = render({
+            variant: "menu",
+            groups: [{ name: "Hair", serviceIds: [] }],
+        } as Partial<ServicesListContent>);
+        const toggle = host.querySelector<HTMLElement>('[role="switch"]');
+        if (!toggle) throw new Error("No service switch");
+        click(toggle);
+        expect(lastContent(named).groups).toEqual([
+            { name: "Hair", serviceIds: ["svc_cut"] },
+        ]);
     });
 });

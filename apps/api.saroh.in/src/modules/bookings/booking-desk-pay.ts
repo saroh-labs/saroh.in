@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import type { Prisma } from "@saroh/database";
 
+import { contactBillToGst } from "../invoices/contact-gstin";
 import { rateToBps } from "../invoices/gst";
 import type { GstPriceMode } from "../invoices/gst-price";
 import { assertRatesSet } from "../invoices/gst-rate-required";
@@ -267,6 +268,11 @@ export async function takeDeskPaymentInTx(
     } else {
         const profile = await loadTaxProfile(tx, organizationId);
         assertRatesSet(profile.registered, [billed]);
+        const gst = await contactBillToGst(
+            tx,
+            organizationId,
+            booking.contactId,
+        );
         const doc = buildManualInvoice(
             [
                 {
@@ -285,7 +291,7 @@ export async function takeDeskPaymentInTx(
                 },
             ],
             profile,
-            null,
+            gst.billToState,
             0,
         );
         const number = await numberFor(
@@ -305,6 +311,7 @@ export async function takeDeskPaymentInTx(
                 contactId: booking.contactId,
                 billToName: booking.bookerName,
                 billToEmail: booking.bookerEmail,
+                ...gst,
                 currency,
                 ...documentColumns(doc),
                 issuedAt: now,

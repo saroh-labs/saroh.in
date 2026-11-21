@@ -64,6 +64,8 @@ model User {
   // Relations
   stores       StoreOwner[] // Stores they own
   memberships  Membership[] // Organizations they belong to
+  // Post revisions they saved (editor redesign U17a).
+  postRevisionsSaved PostRevision[] @relation("PostRevisionSavedBy")
   storeMembers StoreMembers[] // Staff positions
 
   // Project-level access (S1-010): team memberships and direct project grants
@@ -368,6 +370,9 @@ model Organization {
   aiRequests           AiRequest[]
   aiReports            AiReport[]
   siteLinks            SiteLink[]
+  siteRedirects        SiteRedirect[]
+  siteChangeApprovals  SiteChangeApproval[]
+  postRevisions        PostRevision[]
   siteDraftSnapshots   SiteDraftSnapshot[]
   siteReviewPageViews  SiteReviewPageView[]
   qrScanDays           QrScanDay[]
@@ -994,6 +999,8 @@ model Media {
   siteIcons      Site[]            @relation("SiteIcon")
   // The posts the business made with it (Create post).
   sharePosts     SharePost[]       @relation("SharePostMedia")
+  // The pages that use it as their own share image.
+  pageShareImages Page[]           @relation("PageShareImage")
 
   @@index([organizationId])
   // The sweep of uploads never confirmed (M-5, DEC-227).
@@ -2459,12 +2466,72 @@ model Post {
   // Reviewers' notes on it (DEC-200 U8), not the public's `comments`.
   reviewNotes SiteComment[]
 
+  // The cover's description for people who can't see it, and the post's own
+  // Google title, Google text and share image (editor redesign U17a). Null
+  // falls back to the title, the short description and the cover.
+  imageAlt       String?
+  seoTitle       String?
+  seoDescription String?
+  shareImageUrl  String?
+
+  // Publish post › Later: when the `post.go_live` job puts the draft live,
+  // and who asked (it publishes as them). Cleared when it runs, is cancelled,
+  // or the post is published or taken off by hand.
+  scheduledAt       DateTime?
+  scheduledByUserId String?
+
+  // Links this post was live at before its link changed. Each forwards (308)
+  // to the current one while no live post holds it (page links do the same
+  // through SiteRedirect, KTD-3).
+  oldSlugs String[] @default([])
+
+  revisions PostRevision[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([siteId, slug])
   @@index([siteId])
   @@index([authorId])
+}
+
+/**
+ * A post as it stood at one moment (editor redesign U17a): one an hour while
+ * it is being written, plus one for each named event (`reason`), for History
+ * and Compare. Restore makes one the draft. Appended, never updated.
+ * Approval (O7, not built) adds reasons `sent`/`approved`, with the request's
+ * words in `note`; the verdict itself is a SiteChangeApproval on `post:<id>`.
+ */
+model PostRevision {
+  id     String @id @default(cuid())
+  postId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  title          String
+  content        String  @db.Text
+  excerpt        String?
+  image          String?
+  imageAlt       String?
+  seoTitle       String?
+  seoDescription String?
+  shareImageUrl  String?
+  slug           String
+  categoryId     String?
+  authorId       String?
+
+  savedByUserId String?
+  savedBy       User?    @relation("PostRevisionSavedBy", fields: [savedByUserId], references: [id], onDelete: SetNull)
+  // autosave | published | restored | ask_ai | not_published (`post-revisions.ts`).
+  reason        String
+  // Why, in words: a schedule that didn't go live says why here.
+  note          String?
+  createdAt     DateTime @default(now())
+
+  @@index([postId, createdAt])
+  @@index([organizationId])
 }
 
 /**
@@ -4149,6 +4216,10 @@ model Site {
   // The site's QR codes: short links at `/q/<code>` on its Saroh address.
   qrCodes          QrCode[]
   siteLinks        SiteLink[]
+  // Old page links that forward to a page (page links forward, KTD-3).
+  redirects        SiteRedirect[]
+  // A reviewer's, admin's or owner's verdict on one change (DEC-226, U9).
+  changeApprovals  SiteChangeApproval[]
   // What Undo puts back after starter content was copied in (DEC-182).
   draftSnapshots   SiteDraftSnapshot[]
   // "Tell me when it's back" asked on this site (DEC-174 U23).
@@ -4159,6 +4230,13 @@ model Site {
   // succeed only for an approved test release, unless an owner overrides,
   // and the override is recorded. Only an owner turns it on or off.
   publishNeedsApproval Boolean        @default(false)
+
+  // Who last changed each part of the draft that has no row of its own to
+  // carry it (change units, website area U7): `{ "<unit key>": { userId, at } }`
+  // for site settings ("site:footer"), removed sections and deleted pages.
+  // Null = nothing stamped yet ("Earlier changes").
+  draftEditors Json?
+
   // Who may review this site (#276).
   reviewers            SiteReviewer[]
 
@@ -4255,6 +4333,24 @@ model Page {
   // it had.
   inMenu Boolean @default(true)
 
+  // The page's own Google title and text and share image (KTD-7). Draft like
+  // every page setting: they reach visitors with the next publish. Unset
+  // falls back to the site's.
+  seoTitle          String?
+  seoDescription    String?
+  // From the photo library, its address taken when chosen (as the site
+  // icon's is), or a pasted address with no library object behind it.
+  shareImageMediaId String?
+  shareImageMedia   Media?  @relation("PageShareImage", fields: [shareImageMediaId], references: [id], onDelete: SetNull)
+  shareImageUrl     String?
+  // "Show on Google" off: the page asks search engines not to list it.
+  noindex           Boolean @default(false)
+
+  // Who last changed this page's settings, and when (for "changed by" on
+  // the Publish sheet). A plain id, as `SiteLink.createdByUserId` is.
+  settingsEditedByUserId String?
+  settingsEditedAt       DateTime?
+
   @@unique([siteId, path])
   @@unique([siteId, kind], map: "Page_siteId_module_kind_key", where: raw("kind <> 'FREE'"))
   @@index([siteId])
@@ -4334,6 +4430,10 @@ model SiteComment {
   postId    String?
   post      Post?   @relation(fields: [postId], references: [id], onDelete: SetNull)
   postTitle String?
+
+  // The words on the page the note is pinned to, as they were when it was
+  // written (editor redesign U17a). Null: about the whole section or post.
+  quote String?
 
   @@index([siteId, resolvedAt])
   @@index([pageId, sectionKey])
@@ -4549,6 +4649,12 @@ model Section {
   // its copy in the draft, and is simply left OUT of the published snapshot.
   // That is what lets a merchant park a section without deleting the work.
   hidden Boolean @default(false)
+
+  // Who last changed this section's content, place or visibility, and when
+  // (change units, website area U7). Carried by `key` across the
+  // delete-and-recreate of every save; a plain id, as on `Page`.
+  lastEditedByUserId String?
+  lastEditedAt       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -4835,6 +4941,67 @@ model SiteTrackingSettings {
 /// Insights › Where customers come from; any other `ref` a visit carries
 /// counts under its group with no label. Archived, never deleted, so the
 /// figures a label already counted keep their name.
+// How an old page link came to forward (KTD-3): AUTO when a published
+// page's link changed, OWN when the merchant added one (an old site's link).
+enum SiteRedirectSource {
+  AUTO
+  OWN
+}
+
+// An old page link that forwards to a page on the same site. Draft: rows
+// reach the site in the next publish's snapshot (`redirects`), never read
+// live. AUTO rows never expire (owner, O2); `removedAt` takes a row out of
+// the next publish and frees its old link.
+model SiteRedirect {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  fromPath String
+  toPath   String
+  source   SiteRedirectSource
+
+  createdByUserId String?
+  createdAt       DateTime  @default(now())
+  removedAt       DateTime?
+
+  // One forward per old link on a site among rows not removed.
+  @@unique([siteId, fromPath], map: "SiteRedirect_siteId_fromPath_live_key", where: raw("\"removedAt\" IS NULL"))
+  @@index([organizationId, siteId])
+}
+
+/**
+ * A verdict on one change waiting to go live (DEC-226, website area U9):
+ * a reviewer, an admin or the owner approves it, or asks for changes with a
+ * reason. Bound to the change unit's key and fingerprint (`change-units.ts`),
+ * so a later edit to that change voids it. Appended, never updated: the
+ * newest row for a key is its state.
+ */
+model SiteChangeApproval {
+  id     String @id @default(cuid())
+  siteId String
+  site   Site   @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // `section:<pageId>:<key>`, `page:<pageId>` or `site:<kind>`.
+  unitKey         String
+  // What the unit would publish when the verdict was given.
+  unitFingerprint String
+  byUserId        String
+  // APPROVED | CHANGES_REQUESTED
+  outcome         String
+  // What needs changing: required with CHANGES_REQUESTED.
+  reason          String?
+  createdAt       DateTime @default(now())
+
+  @@index([organizationId, siteId, createdAt])
+}
+
 model SiteLink {
   id     String @id @default(cuid())
   siteId String
@@ -5326,6 +5493,9 @@ model Contact {
   lastName  String?
   phone     String?
   company   String?
+  // Their GSTIN, saved by them in their site account's details (R16). Copied
+  // onto an invoice when it is made; an issued one keeps what it had.
+  gstin     String?
 
   // Free-form provenance, e.g. "enquiry:form:<id>" — where this contact first
   // entered the CRM. Never a tenant boundary; informational only.

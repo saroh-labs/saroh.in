@@ -77,7 +77,7 @@ export function GoLiveDialog({
             open={target !== null}
             size="lg"
             title={target ? `Go live with ${target.release.name}` : "Go live"}
-            description="Puts exactly this test release live, as it was frozen, whatever your draft says now."
+            description="Puts exactly this test link live, as it was frozen, whatever your draft says now."
             pending={busy}
             onClose={onClose}
         >

@@ -60,6 +60,7 @@ export function PagesPanel({
     flags,
     onClose,
     phone = false,
+    onPageSettings,
 }: {
     siteId: string;
     pages: SitePage[];
@@ -82,6 +83,11 @@ export function PagesPanel({
     onClose: () => void;
     /** In a phone's Pages sheet (DEC-185): each page with its address. */
     phone?: boolean;
+    /**
+     * With the Website area on (U5): open the page settings sheet, the same
+     * one as Website › Pages, instead of the settings drawn here.
+     */
+    onPageSettings?: (page: SitePage) => void;
 }) {
     const readOnly = useEditorReadOnly();
     const router = useRouter();
@@ -252,9 +258,14 @@ export function PagesPanel({
                                 : "Page settings"
                         }
                         open={open === "settings"}
-                        onToggle={() =>
-                            setOpen(open === "settings" ? "pages" : "settings")
-                        }
+                        onToggle={() => {
+                            if (onPageSettings && active) {
+                                onClose();
+                                onPageSettings(active);
+                                return;
+                            }
+                            setOpen(open === "settings" ? "pages" : "settings");
+                        }}
                         hint={
                             active && unseenBecause(active.id, flags)
                                 ? "Change path"

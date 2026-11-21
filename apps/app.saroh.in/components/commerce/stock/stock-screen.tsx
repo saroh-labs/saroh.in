@@ -1,5 +1,9 @@
 "use client";
 
+import {
+    PendingRegion,
+    ScreenPending,
+} from "@/components/shared/page/screen-pending";
 import { count as countOf, plural } from "@/lib/format/plural";
 import { Button } from "@saroh/ui/button";
 import { PageHeader } from "@saroh/ui/page-header";
@@ -203,139 +207,148 @@ export function StockScreen({
         },
     ];
 
+    // A filter, a page or a search in one transition: the rows grey.
     return (
-        <div className="flex flex-col gap-5">
-            <PageHeader
-                holdsData="description"
-                className="mb-0"
-                breadcrumb={["Sell", "Stock"]}
-                title="Stock"
-                description={stockSubline(business, storefronts) || undefined}
-                actions={
-                    canWrite ? (
-                        <>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setRecording(true)}
-                            >
-                                Record stock
-                            </Button>
-                            {storefronts.length > 1 ? (
+        <ScreenPending>
+            <div className="flex flex-col gap-5">
+                <PageHeader
+                    holdsData="description"
+                    className="mb-0"
+                    breadcrumb={["Sell", "Stock"]}
+                    title="Stock"
+                    description={
+                        stockSubline(business, storefronts) || undefined
+                    }
+                    actions={
+                        canWrite ? (
+                            <>
                                 <Button
                                     type="button"
                                     variant="outline"
-                                    onClick={() => setMoving(true)}
+                                    onClick={() => setRecording(true)}
                                 >
-                                    Move stock
+                                    Record stock
                                 </Button>
-                            ) : null}
-                            <Button
-                                type="button"
-                                disabled={counting}
-                                onClick={startCount}
-                            >
-                                Count stock
-                            </Button>
-                        </>
-                    ) : undefined
-                }
-            />
-
-            <TabStrip
-                label="Stock views"
-                value={tab}
-                tabs={tabs.map((t) => ({
-                    value: t.id,
-                    label: t.label,
-                    href: href({ tab: t.id === "levels" ? undefined : t.id }),
-                    count: t.count,
-                    countTone: t.tone,
-                    countSays: t.says,
-                }))}
-            />
-
-            <div className="flex flex-col gap-3.5">
-                {tab === "levels" ? (
-                    <>
-                        {counting ? (
-                            <Notice tone="info" role="note">
-                                <div className="flex flex-wrap items-baseline gap-2.5">
-                                    <strong data-ph-unmask="">Counting.</strong>
-                                    <span
-                                        data-ph-unmask=""
-                                        className="flex-[1_1_280px] text-pretty"
+                                {storefronts.length > 1 ? (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setMoving(true)}
                                     >
-                                        Type what&apos;s on the shelf. Leave a
-                                        box empty to skip it. Saroh records the
-                                        gap between what the log expected and
-                                        what you counted.
-                                    </span>
-                                </div>
-                            </Notice>
-                        ) : null}
-                        <LevelsPanel
-                            levels={levels}
-                            allStorefronts={storefronts}
-                            needsYou={needsYou}
-                            show={show}
-                            q={q}
+                                        Move stock
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    type="button"
+                                    disabled={counting}
+                                    onClick={startCount}
+                                >
+                                    Count stock
+                                </Button>
+                            </>
+                        ) : undefined
+                    }
+                />
+
+                <TabStrip
+                    label="Stock views"
+                    value={tab}
+                    tabs={tabs.map((t) => ({
+                        value: t.id,
+                        label: t.label,
+                        href: href({
+                            tab: t.id === "levels" ? undefined : t.id,
+                        }),
+                        count: t.count,
+                        countTone: t.tone,
+                        countSays: t.says,
+                    }))}
+                />
+
+                <PendingRegion rows className="flex flex-col gap-3.5">
+                    {tab === "levels" ? (
+                        <>
+                            {counting ? (
+                                <Notice tone="info" role="note">
+                                    <div className="flex flex-wrap items-baseline gap-2.5">
+                                        <strong data-ph-unmask="">
+                                            Counting.
+                                        </strong>
+                                        <span
+                                            data-ph-unmask=""
+                                            className="flex-[1_1_280px] text-pretty"
+                                        >
+                                            Type what&apos;s on the shelf. Leave
+                                            a box empty to skip it. Saroh
+                                            records the gap between what the log
+                                            expected and what you counted.
+                                        </span>
+                                    </div>
+                                </Notice>
+                            ) : null}
+                            <LevelsPanel
+                                levels={levels}
+                                allStorefronts={storefronts}
+                                needsYou={needsYou}
+                                show={show}
+                                q={q}
+                                href={href}
+                                counting={counting}
+                                values={values}
+                                onValue={onValue}
+                                paging={pages.levels}
+                            />
+                        </>
+                    ) : null}
+                    {tab === "log" && log ? (
+                        <LogList
+                            log={log}
+                            filter={logFilter}
+                            storefronts={storefronts}
+                            products={products}
                             href={href}
-                            counting={counting}
-                            values={values}
-                            onValue={onValue}
-                            paging={pages.levels}
+                            paging={pages.log}
                         />
+                    ) : null}
+                    {tab === "checks" ? (
+                        <ChecksList
+                            checks={checks}
+                            href={href}
+                            paging={pages.checks}
+                        />
+                    ) : null}
+                </PendingRegion>
+
+                {counting && tab === "levels" ? (
+                    <CountBar
+                        status={draft.status}
+                        canSave={draft.entered.length > 0 && !draft.bad}
+                        saving={saving}
+                        onCancel={count.cancel}
+                        onSave={() => void saveCount()}
+                    />
+                ) : null}
+                {guard.dialog}
+
+                {canWrite ? (
+                    <>
+                        {moving && storefronts.length > 1 ? (
+                            <MoveDialog
+                                open={moving}
+                                onOpenChange={setMoving}
+                                storefronts={storefronts}
+                            />
+                        ) : null}
+                        {recording ? (
+                            <EntrySheet
+                                open={recording}
+                                onOpenChange={setRecording}
+                                storefronts={storefronts}
+                            />
+                        ) : null}
                     </>
                 ) : null}
-                {tab === "log" && log ? (
-                    <LogList
-                        log={log}
-                        filter={logFilter}
-                        storefronts={storefronts}
-                        products={products}
-                        href={href}
-                        paging={pages.log}
-                    />
-                ) : null}
-                {tab === "checks" ? (
-                    <ChecksList
-                        checks={checks}
-                        href={href}
-                        paging={pages.checks}
-                    />
-                ) : null}
             </div>
-
-            {counting && tab === "levels" ? (
-                <CountBar
-                    status={draft.status}
-                    canSave={draft.entered.length > 0 && !draft.bad}
-                    saving={saving}
-                    onCancel={count.cancel}
-                    onSave={() => void saveCount()}
-                />
-            ) : null}
-            {guard.dialog}
-
-            {canWrite ? (
-                <>
-                    {moving && storefronts.length > 1 ? (
-                        <MoveDialog
-                            open={moving}
-                            onOpenChange={setMoving}
-                            storefronts={storefronts}
-                        />
-                    ) : null}
-                    {recording ? (
-                        <EntrySheet
-                            open={recording}
-                            onOpenChange={setRecording}
-                            storefronts={storefronts}
-                        />
-                    ) : null}
-                </>
-            ) : null}
-        </div>
+        </ScreenPending>
     );
 }

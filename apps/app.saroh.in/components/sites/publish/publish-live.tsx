@@ -2,17 +2,19 @@
 
 import { Button } from "@saroh/ui/button";
 import { CopyButton } from "@saroh/ui/copy-button";
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Megaphone } from "lucide-react";
 
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
+import { count } from "@/lib/format/plural";
 import { shareLink } from "@/lib/sites/share-links";
 import type { WentLive } from "./use-publish";
+import type { PublishChanges as Changes } from "./use-publish-changes";
 
 /**
  * The Publish sheet's result (wave G, DEC-185): the same sheet, turned into
  * where the site now is. A plain statement, announced politely, with the
  * address to copy and the one next thing worth doing, passing it on
- * (Share, and its QR code).
+ * (Tell people, U12; else Share and its QR code).
  */
 export function PublishLiveBody({ live }: { live: WentLive }) {
     const url = live.address ? `https://${live.address}` : null;
@@ -65,10 +67,13 @@ export function PublishLiveFoot({
     live,
     phone,
     onDone,
+    onTellPeople,
 }: {
     live: WentLive;
     phone: boolean;
     onDone: () => void;
+    /** Tell people (U12): the page's share sheet, after a publish. */
+    onTellPeople?: () => void;
 }) {
     const url = live.address ? `https://${live.address}` : null;
     // The same share button and QR code the first-run screens offer.
@@ -83,7 +88,19 @@ export function PublishLiveFoot({
             </a>
         </Button>
     ) : null;
-    const shareRow = share ? (
+    // Tell people when there is a page to tell them about; else the site's
+    // share button and QR code, as the first-run screens offer.
+    const shareRow = onTellPeople ? (
+        <Button
+            type="button"
+            variant="outline"
+            onClick={onTellPeople}
+            data-tell-people=""
+        >
+            <Megaphone aria-hidden />
+            Tell people
+        </Button>
+    ) : share ? (
         <ShareLinkButton link={share} className="mt-0 justify-start" />
     ) : null;
     const done = (
@@ -107,5 +124,30 @@ export function PublishLiveFoot({
                 {open}
             </div>
         </div>
+    );
+}
+
+/** After a publish that left some out: they still wait, and which went with them. */
+export function LeftOutLine({
+    live,
+    changes,
+}: {
+    live: WentLive;
+    changes: Changes | null;
+}) {
+    if (!live.leftOut) return null;
+    const labelOf = (key: string) =>
+        changes?.changes?.units.find((u) => u.key === key)?.label ?? null;
+    const also = (live.alsoLeftOut ?? [])
+        .map(labelOf)
+        .filter((l): l is string => l !== null);
+    return (
+        <p className="text-sm text-muted-foreground" data-left-out-line="">
+            {count(live.leftOut + also.length, "change")} left out, still
+            waiting in the draft.
+            {also.length > 0
+                ? ` Also left out, because they need one you left out: ${also.join(", ")}.`
+                : ""}
+        </p>
     );
 }

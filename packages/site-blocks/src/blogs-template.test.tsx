@@ -1,6 +1,6 @@
 import { toRendered } from "@saroh/block-contract";
 import type { TemplateContext } from "@saroh/templates";
-import { blogsTemplate, instantiateTemplate } from "@saroh/templates";
+import { blogsTemplateV1, instantiateTemplate } from "@saroh/templates";
 import { render, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
@@ -57,7 +57,7 @@ const POSTS: JournalPost[] = [
 ];
 
 function renderPage(path: string, journal: JournalFeed) {
-    const page = instantiateTemplate(blogsTemplate, ctx).pages.find(
+    const page = instantiateTemplate(blogsTemplateV1, ctx).pages.find(
         (p) => p.path === path,
     );
     if (!page) throw new Error(`No page at ${path}`);

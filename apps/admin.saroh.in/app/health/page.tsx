@@ -9,7 +9,6 @@ import { PageContainer } from "@saroh/ui/page-container";
 import { PageHeader } from "@saroh/ui/page-header";
 import { StatCard } from "@saroh/ui/stat-card";
 
-import { AdminShell } from "@/components/admin-shell";
 import { NotAuthorized } from "@/components/not-authorized";
 import { HealthBoard } from "@/components/operations/health-board";
 import { getMetrics, getStaffIdentity } from "@/lib/control-plane";
@@ -52,7 +51,7 @@ export default async function HealthPage() {
     }
 
     return (
-        <AdminShell staff={staff}>
+        <>
             <PageContainer width="full">
                 <PageHeader
                     breadcrumb={["Keep it running", "Health"]}
@@ -120,7 +119,7 @@ export default async function HealthPage() {
                     />
                 </section>
             </PageContainer>
-        </AdminShell>
+        </>
     );
 }
 

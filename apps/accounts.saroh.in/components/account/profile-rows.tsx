@@ -5,6 +5,7 @@ import { Button } from "@saroh/ui/button";
 import { phoneLabel } from "@saroh/ui/lib/phone";
 import { PageHeader } from "@saroh/ui/page-header";
 import { Absent, Row, Section } from "@saroh/ui/settings-rows";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
@@ -256,7 +257,10 @@ export function ProfileRows({
                         ) : sessionsFailed ? (
                             <Absent>Couldn&apos;t load</Absent>
                         ) : (
-                            <Absent>Loading…</Absent>
+                            <span role="status" aria-busy="true">
+                                <span className="sr-only">Loading</span>
+                                <Skeleton aria-hidden className="h-4 w-36" />
+                            </span>
                         )}
                     </Row>
                 </Section>

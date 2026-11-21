@@ -19,11 +19,8 @@ import type { SitePage, UpdatePageInput } from "@/lib/sites/service";
 import { Label } from "@saroh/ui/label";
 import { Notice } from "@saroh/ui/notice";
 
-/**
- * The editor's field caption (the eyebrow) on the shared `Label`, which
- * would otherwise set its own size and weight over it.
- */
-const CAPTION = `${FIELD_LABEL} text-[11px] font-semibold leading-[1.45]`;
+/** The editor's field caption, in sentence case like every other label. */
+const CAPTION = FIELD_LABEL;
 
 /**
  * The open page's own settings, in the editor's page menu (G16): its title,

@@ -145,9 +145,16 @@ export function useEditorViewport({
     const [previewing, setPreviewing] = useState(
         () => carried?.siteId === siteId && carried.pageId === pageId,
     );
+    // Another page under the same editor: Preview stays on only when the
+    // canvas's own link carried it (G5), as a fresh mount would.
+    const [previewFor, setPreviewFor] = useState(pageId);
+    if (previewFor !== pageId) {
+        setPreviewFor(pageId);
+        setPreviewing(carried?.siteId === siteId && carried.pageId === pageId);
+    }
     useEffect(() => {
         carried = null;
-    }, []);
+    }, [pageId]);
     const canvasRef = useRef<HTMLDivElement | null>(null);
 
     const [fitScale, setFitScale] = useState(1);
@@ -172,20 +179,22 @@ export function useEditorViewport({
         const ro = new ResizeObserver(measure);
         ro.observe(el);
         return () => ro.disconnect();
-    }, [device, previewing, narrow]);
+        // `pageId`: the canvas is drawn afresh for each page.
+    }, [device, previewing, narrow, pageId]);
     const scrollWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /*
-     * Restore where the merchant was scrolled to. Mount-only: re-running it on
-     * a later change would yank the canvas back mid-scroll, and the stored
-     * value is already being kept up to date by the handler below.
+     * Restore where the merchant was scrolled to. Once per page (the canvas
+     * is drawn afresh for each): re-running it on a later change would yank
+     * the canvas back mid-scroll, and the stored value is already being kept
+     * up to date by the handler below.
      */
     useEffect(() => {
         const el = canvasRef.current;
         if (el === null) return;
         el.scrollTop = initialScrollTop;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [pageId]);
 
     useEffect(() => {
         if (!previewing) return;

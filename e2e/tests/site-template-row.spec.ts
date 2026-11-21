@@ -33,8 +33,8 @@ interface SiteRow {
  */
 async function openBrand(page: Page, phone: boolean, reviewer = false) {
     if (phone && !reviewer) {
-        // The Brand sheet's own Template tab (board TPLEditorPhone).
-        await brandTab(page, "Template");
+        // The template is the Look tab's last line (U24b, WXBBrandPhone).
+        await brandTab(page, "Look");
         return;
     }
     if (phone) {

@@ -5,6 +5,7 @@ import { cn } from "../lib/utils";
 import { NamePlate } from "../product/name-plate";
 import { optionSummary } from "../product/option-summary";
 import type { ShopListingCard } from "../product/shop-listing";
+import { SiteLink } from "../site-link";
 
 /**
  * The Product grid's `lead` look (industry templates U2): the first product
@@ -73,7 +74,7 @@ export function LeadGrid({
                         )}
                     >
                         {base !== null ? (
-                            <a
+                            <SiteLink
                                 href={`${base}/${encodeURIComponent(p.slug)}`}
                                 className={cn(
                                     card,
@@ -82,7 +83,7 @@ export function LeadGrid({
                                 )}
                             >
                                 {body}
-                            </a>
+                            </SiteLink>
                         ) : (
                             <div className={card}>{body}</div>
                         )}
@@ -113,15 +114,17 @@ function LeadCard({
         <>
             {show.photo ? (
                 p.image ? (
-                    <img
-                        src={p.image.url}
-                        alt={p.image.alt}
-                        {...siteImage(lead ? "above" : "below", {
-                            src: p.image.url,
-                            sizes: "(min-width: 1024px) 33vw, 50vw",
-                        })}
-                        className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
-                    />
+                    <span data-site-photo="product" className="contents">
+                        <img
+                            src={p.image.url}
+                            alt={p.image.alt}
+                            {...siteImage(lead ? "above" : "below", {
+                                src: p.image.url,
+                                sizes: "(min-width: 1024px) 33vw, 50vw",
+                            })}
+                            className="bg-site-surface aspect-[4/5] w-full rounded-[var(--site-radius)] object-cover"
+                        />
+                    </span>
                 ) : (
                     // Its neighbours have photos: its name, in the photo's
                     // own box. (With no photo in the section at all, the
@@ -159,7 +162,7 @@ function LeadCard({
             {p.soldOut || eyebrow ? (
                 <span className="flex flex-wrap items-center gap-2">
                     {p.soldOut ? (
-                        <span className="bg-site-fg text-site-bg rounded-full px-2 py-0.5 text-[11.5px] font-bold">
+                        <span className="bg-site-fg text-site-bg rounded-full px-2 py-0.5 text-[12px] font-bold">
                             Sold out
                         </span>
                     ) : null}

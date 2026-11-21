@@ -423,8 +423,12 @@ export function AskAiPanel({
                         aria-hidden
                     />
                     Hints are counted from{" "}
-                    {about ? "this page" : "your business"}. Tapping one asks.
-                    Nothing runs until you do.
+                    {about?.kind === "post"
+                        ? "this post"
+                        : about
+                          ? "this page"
+                          : "your business"}
+                    . Tapping one asks. Nothing runs until you do.
                 </p>
             </>
         );

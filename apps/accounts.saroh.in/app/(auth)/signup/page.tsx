@@ -9,6 +9,7 @@ import {
     onboardingForInvite,
     onboardingForPlan,
     withTemplate,
+    withTried,
 } from "@/lib/plan-intent";
 import { safeDestination } from "@/lib/return-to";
 import { signInProviders } from "@/lib/sign-in-options";
@@ -42,6 +43,9 @@ export const metadata: Metadata = {
  * A template picked in the public gallery arrives as `?template=` (DEC-216)
  * and rides to onboarding beside either, or alone, where setup starts on
  * its trade. An invitation's `redirect` drops it: an invitee makes nothing.
+ *
+ * The website library's Try panel sends `?name=&trade=&colour=` (U12): the
+ * known ones ride to onboarding to fill its form in. Nothing is stored here.
  */
 export default async function SignupPage({
     searchParams,
@@ -49,13 +53,26 @@ export default async function SignupPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const params = await searchParams;
-    const { redirect, email, plan, cycle, invite, template } = params;
+    const {
+        redirect,
+        email,
+        plan,
+        cycle,
+        invite,
+        template,
+        name,
+        trade,
+        colour,
+    } = params;
     await recordSignupView(params);
     const returnTo =
         safeDestination(redirect) ??
-        withTemplate(
-            onboardingForInvite(invite) ?? onboardingForPlan(plan, cycle),
-            template,
+        withTried(
+            withTemplate(
+                onboardingForInvite(invite) ?? onboardingForPlan(plan, cycle),
+                template,
+            ),
+            { name, trade, colour },
         );
     const [providers, phone] = await Promise.all([
         signInProviders(),

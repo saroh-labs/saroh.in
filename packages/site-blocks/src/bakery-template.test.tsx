@@ -1,6 +1,6 @@
 import { toRendered } from "@saroh/block-contract";
 import type { TemplateContext } from "@saroh/templates";
-import { bakeryTemplate, instantiateTemplate } from "@saroh/templates";
+import { bakeryTemplateV1, instantiateTemplate } from "@saroh/templates";
 import { render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,7 +57,7 @@ function renderHome(
     context: TemplateContext,
     feeds: { products: ProductGridFeed; journal: JournalFeed },
 ) {
-    const home = instantiateTemplate(bakeryTemplate, context).pages[0];
+    const home = instantiateTemplate(bakeryTemplateV1, context).pages[0];
     const resolvePage = () => undefined;
     const sections = home.sections.map((s) => ({
         type: s.type,
