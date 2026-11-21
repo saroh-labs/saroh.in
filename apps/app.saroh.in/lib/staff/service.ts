@@ -130,7 +130,7 @@ export async function readOffered(
         // The public read is scoped to a site's own business (21 Nov security
         // review): ask through the business's site. One site per business for
         // now (DEC-230); none means no booking page to show.
-        const [site] = await listSites();
+        const site = (await listSites()).at(0);
         if (!site) return { ok: false, why: "off" };
         const query = staffId ? `?staffId=${encodeURIComponent(staffId)}` : "";
         const res = await apiFetch(
