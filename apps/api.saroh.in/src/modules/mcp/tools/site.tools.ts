@@ -60,6 +60,7 @@ import {
     tradeRead,
 } from "../../organizations/organization-trade";
 import { pageList } from "../../public-api/v1-support";
+import { changedKeys, stampDraftEditors } from "../../sites/draft-editors";
 import { lockSite } from "../../sites/live-pointer";
 import { MODULE_PAGE_DEFAULTS } from "../../sites/page-kinds";
 import { approvalApplies } from "../../sites/publish-approval";
@@ -1548,8 +1549,21 @@ export async function restoreSnapshot(
             await opts.before?.(tx);
             const current = await tx.page.findMany({
                 where: { siteId, organizationId },
-                select: { id: true, path: true, isHome: true },
+                select: {
+                    id: true,
+                    path: true,
+                    isHome: true,
+                    title: true,
+                    hidden: true,
+                    inMenu: true,
+                },
             });
+            // Who put each change back (KTD-4, R2 21 Nov 2026).
+            const at = new Date();
+            const edited = {
+                settingsEditedByUserId: ctx.userId,
+                settingsEditedAt: at,
+            };
             const keep = new Set(snap.pages.map((p) => p.pageId));
             const gone = current.filter((p) => !keep.has(p.id) && !p.isHome);
             await tx.page.deleteMany({
@@ -1576,10 +1590,16 @@ export async function restoreSnapshot(
                     hidden: p.hidden,
                     inMenu: p.inMenu,
                 };
-                if (present.has(p.pageId)) {
+                const was = present.get(p.pageId);
+                if (was) {
+                    const same =
+                        was.path === p.path &&
+                        was.title === p.title &&
+                        was.hidden === p.hidden &&
+                        was.inMenu === p.inMenu;
                     await tx.page.update({
                         where: { id: p.pageId },
-                        data: place,
+                        data: same ? place : { ...place, ...edited },
                         select: { id: true },
                     });
                     continue;
@@ -1592,6 +1612,7 @@ export async function restoreSnapshot(
                         isHome: p.isHome,
                         kind: p.kind as PageKind,
                         ...place,
+                        ...edited,
                     },
                     select: { id: true },
                 });
@@ -1613,7 +1634,30 @@ export async function restoreSnapshot(
                     pageId: p.pageId,
                     sections: p.sections,
                 })),
+                { siteId, userId: ctx.userId },
             );
+            const site = await tx.site.findUniqueOrThrow({
+                where: { id: siteId },
+                select: {
+                    style: true,
+                    navigation: true,
+                    footer: true,
+                    seoTitle: true,
+                    seoDescription: true,
+                },
+            });
+            await stampDraftEditors(tx, siteId, ctx.userId, [
+                ...gone.map((p) => `page:${p.id}`),
+                ...changedKeys({
+                    "site:style": [site.style, snap.style],
+                    "site:menu": [site.navigation, snap.navigation],
+                    "site:footer": [site.footer, snap.footer],
+                    "site:search": [
+                        [site.seoTitle, site.seoDescription],
+                        [snap.seoTitle, snap.seoDescription],
+                    ],
+                }),
+            ]);
             await tx.site.update({
                 where: { id: siteId },
                 data: {

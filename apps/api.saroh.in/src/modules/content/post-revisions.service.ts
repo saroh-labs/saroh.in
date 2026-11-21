@@ -8,6 +8,7 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
 import { assertSiteInOrg } from "../sites/site-access";
+import { postFingerprint } from "./post-approval";
 import { assertPostEditable } from "./post-paused";
 import {
     REVISION_FIELDS,
@@ -100,14 +101,6 @@ export class PostRevisionsService {
                 where: { id: postId },
                 select: REVISION_FIELDS,
             });
-            await writeRevision(tx, {
-                organizationId: ctx.organizationId,
-                postId,
-                state: revisionStateOf(current),
-                reason: "autosave",
-                savedByUserId: ctx.userId,
-                at: new Date(now - 1),
-            });
             const [slugTaken, category] = await Promise.all([
                 tx.post.findFirst({
                     where: { siteId, slug: revision.slug, id: { not: postId } },
@@ -125,6 +118,19 @@ export class PostRevisionsService {
                 slug: slugTaken ? current.slug : revision.slug,
                 categoryId: category ? revision.categoryId : null,
             };
+            // R3: restoring what the draft already says changes nothing, so
+            // it doesn't make the restorer the post's last editor.
+            if (postFingerprint(state) === postFingerprint(current)) {
+                return { id: postId };
+            }
+            await writeRevision(tx, {
+                organizationId: ctx.organizationId,
+                postId,
+                state: revisionStateOf(current),
+                reason: "autosave",
+                savedByUserId: ctx.userId,
+                at: new Date(now - 1),
+            });
             try {
                 await tx.post.update({ where: { id: postId }, data: state });
             } catch {

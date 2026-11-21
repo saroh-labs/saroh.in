@@ -18,20 +18,48 @@ export interface PostCheckFlag {
     message: string;
 }
 
+/** The most tags of one kind the checks read; a post has far fewer. */
+const MAX_TAGS = 2_000;
+
+/**
+ * Each `<name …>` opening tag's attributes, lower-cased names. Linear: a tag
+ * ends at the next `<` or `>`, and an unclosed quote runs to the tag's end
+ * instead of being retried, so 100k `<` or `"` can't go quadratic (W-ReDoS).
+ */
+function tagsOf(html: string, name: string): Map<string, string>[] {
+    const out: Map<string, string>[] = [];
+    for (const tag of html.matchAll(new RegExp(`<${name}\\b([^<>]*)`, "gi"))) {
+        if (out.length >= MAX_TAGS) break;
+        const attrs = new Map<string, string>();
+        for (const a of tag[1].matchAll(
+            /([^\s"'=]+)(?:\s*=\s*(?:"([^"]*)"?|'([^']*)'?|([^\s"']*)))?/g,
+        )) {
+            // A group that didn't take part is undefined at run time.
+            const [, name, dq, sq, bare] = a as unknown as (
+                string | undefined
+            )[];
+            const key = (name ?? "").toLowerCase();
+            if (!attrs.has(key)) attrs.set(key, dq ?? sq ?? bare ?? "");
+        }
+        out.push(attrs);
+    }
+    return out;
+}
+
 /** Every `href` in the writing, in order. */
 export function hrefsOf(html: string): string[] {
-    return [...html.matchAll(/<a\b[^>]*?\bhref\s*=\s*(["'])(.*?)\1/gi)].map(
-        (m) => m[2].trim(),
-    );
+    return tagsOf(html, "a").flatMap((a) => {
+        const href = a.get("href");
+        return href === undefined ? [] : [href.trim()];
+    });
 }
 
 /** The ids of the service cards in the writing. */
 function serviceCardsOf(html: string): string[] {
-    return [
-        ...html.matchAll(
-            /<div\b(?=[^>]*\bdata-embed\s*=\s*["']service["'])[^>]*\bdata-id\s*=\s*["']([^"']+)["']/gi,
-        ),
-    ].map((m) => m[1]);
+    return tagsOf(html, "div").flatMap((d) => {
+        const id = d.get("data-id");
+        return d.get("data-embed") === "service" && id ? [id] : [];
+    });
 }
 
 /** Pure: the flags on one post's writing. */

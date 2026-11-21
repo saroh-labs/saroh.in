@@ -7,6 +7,7 @@ import {
     AuditOutcome,
     auditMetadata,
 } from "../audit/audit.service";
+import { allows } from "../organizations/organization-policy";
 import type { ChangeUnit } from "./change-units";
 import { LEAVE_OUT_GONE_MESSAGE } from "./change-units";
 import { queueReviewAlert } from "./review-alert-queue";
@@ -28,11 +29,31 @@ import { queueReviewAlert } from "./review-alert-queue";
 
 export type ChangeVerdict = "APPROVED" | "CHANGES_REQUESTED";
 
+/** What a teammate with no name is called to someone who can't see the team. */
+export const UNNAMED_TEAMMATE = "A teammate";
+
+/**
+ * A teammate's name as `ctx` may see it (01 W1, 21 Nov 2026): their email
+ * when they have no name only to someone who may read the team
+ * (`member:read`); a reviewer, who may not, reads "A teammate".
+ */
+export function personName(
+    ctx: OrganizationContext,
+    user: { name: string | null; email: string },
+): string {
+    const name = user.name?.trim();
+    if (name) return name;
+    return allows(ctx, "member:read") ? user.email : UNNAMED_TEAMMATE;
+}
+
 /**
  * What a verdict binds to: a site's change unit, or a whole post
  * (`post:<postId>`, O7, KTD-E6), which publishes on its own.
  */
 export type ApprovalUnit = Pick<ChangeUnit, "key" | "fingerprint" | "editedBy">;
+
+export const APPROVAL_OFF_MESSAGE =
+    "Publishing needs approval isn't on for this site, so there's nothing to approve.";
 
 export const OWN_CHANGE_MESSAGE =
     "You can't approve a change you made. Someone else on the team can.";
@@ -215,7 +236,7 @@ export async function heldForApproval(
 export async function recordUnitVerdicts(
     tx: Pick<
         Prisma.TransactionClient,
-        "siteChangeApproval" | "job" | "siteReviewer"
+        "siteChangeApproval" | "job" | "siteReviewer" | "$executeRaw"
     >,
     ctx: OrganizationContext,
     input: {
@@ -243,8 +264,38 @@ export async function recordUnitVerdicts(
     }
     const reason =
         input.outcome === "CHANGES_REQUESTED" ? (input.reason ?? null) : null;
-    const rows = await Promise.all(
+    // One verdict at a time per site: the same verdict sent twice at once
+    // (a double click, a retry) is written once (05 L2, 21 Nov 2026).
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`site-verdict:${input.siteId}`}))`;
+    const newest = await Promise.all(
         units.map((u) =>
+            tx.siteChangeApproval.findFirst({
+                where: {
+                    organizationId: ctx.organizationId,
+                    siteId: input.siteId,
+                    unitKey: u.key,
+                },
+                orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                select: {
+                    unitFingerprint: true,
+                    byUserId: true,
+                    outcome: true,
+                    reason: true,
+                },
+            }),
+        ),
+    );
+    const fresh = units.filter((u, i) => {
+        const r = newest[i];
+        return !(
+            r?.unitFingerprint === u.fingerprint &&
+            r.byUserId === ctx.userId &&
+            r.outcome === input.outcome &&
+            r.reason === reason
+        );
+    });
+    const rows = await Promise.all(
+        fresh.map((u) =>
             tx.siteChangeApproval.create({
                 data: {
                     organizationId: ctx.organizationId,
@@ -262,7 +313,7 @@ export async function recordUnitVerdicts(
     if (input.outcome === "CHANGES_REQUESTED") {
         // One alert per person whose changes were asked about (UX-043).
         const told = new Set<string>();
-        for (const [i, u] of units.entries()) {
+        for (const [i, u] of fresh.entries()) {
             if (!u.editedBy || told.has(u.editedBy)) continue;
             told.add(u.editedBy);
             await queueReviewAlert(tx, ctx.organizationId, {
@@ -273,5 +324,6 @@ export async function recordUnitVerdicts(
             });
         }
     }
-    return { recorded: rows.length };
+    // A repeat is already recorded: the same answer as the first.
+    return { recorded: units.length };
 }

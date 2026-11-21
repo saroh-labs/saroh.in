@@ -3,7 +3,7 @@ import type { Job, Prisma } from "@saroh/database";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { schedulerStanding } from "../sites/go-live.handler";
-import { isLead, postHeldForApproval } from "./post-approval";
+import { isLead, postFingerprint, postHeldForApproval } from "./post-approval";
 import { assertPostEditable } from "./post-paused";
 import { publishPostInTx } from "./post-publish";
 import {
@@ -107,7 +107,12 @@ export async function runScheduledPost(
             id: payload.postId,
             site: { organizationId, deletedAt: null },
         },
-        select: { siteId: true, scheduledAt: true, scheduledByUserId: true },
+        select: {
+            ...REVISION_FIELDS,
+            siteId: true,
+            scheduledAt: true,
+            scheduledByUserId: true,
+        },
     });
     if (
         !post?.scheduledByUserId ||
@@ -135,13 +140,20 @@ export async function runScheduledPost(
             `${scheduler.name}, who scheduled it, can no longer publish posts. ${AGAIN}`,
         );
     }
+    // K2: an owner's or admin's schedule covers the post as they scheduled
+    // it. Edited since, it goes live only if its last editor needs no
+    // approval or it was approved as it is now.
+    const unchanged =
+        payload.fingerprint === postFingerprint(revisionStateOf(post));
     if (
         await postHeldForApproval(tx, {
             organizationId,
             siteId: post.siteId,
             postId: payload.postId,
             userId: post.scheduledByUserId,
-            lead: await isLead(tx, organizationId, post.scheduledByUserId),
+            lead:
+                unchanged &&
+                (await isLead(tx, organizationId, post.scheduledByUserId)),
         })
     ) {
         return no(NOT_APPROVED);
@@ -207,8 +219,9 @@ function messageOf(err: HttpException): string {
 
 function payloadOf(raw: unknown): PostGoLivePayload | null {
     if (raw === null || typeof raw !== "object") return null;
-    const { postId, at } = raw as Record<string, unknown>;
-    return typeof postId === "string" && typeof at === "string"
-        ? { postId, at }
-        : null;
+    const { postId, at, fingerprint } = raw as Record<string, unknown>;
+    if (typeof postId !== "string" || typeof at !== "string") return null;
+    return typeof fingerprint === "string"
+        ? { postId, at, fingerprint }
+        : { postId, at };
 }

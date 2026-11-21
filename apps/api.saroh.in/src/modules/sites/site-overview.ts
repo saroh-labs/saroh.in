@@ -13,6 +13,7 @@ import { periodWindows } from "../analytics/period";
 import { AuditAction } from "../audit/audit.service";
 import { businessTimezone } from "../bookings/staff-availability";
 import { allows, authorize } from "../organizations/organization-policy";
+import { personName } from "./change-approvals";
 import { modulePageState } from "./module-pages";
 import type { PageHealth } from "./page-health";
 import { pageHealth } from "./page-health";
@@ -158,6 +159,7 @@ export function newestFirst(
 }
 
 async function userNames(
+    ctx: OrganizationContext,
     ids: readonly (string | null | undefined)[],
 ): Promise<Map<string, string>> {
     const unique = [...new Set(ids.filter((id): id is string => !!id))];
@@ -166,7 +168,7 @@ async function userNames(
         where: { id: { in: unique } },
         select: { id: true, name: true, email: true },
     });
-    return new Map(users.map((u) => [u.id, u.name ?? u.email]));
+    return new Map(users.map((u) => [u.id, personName(ctx, u)]));
 }
 
 async function readResults(
@@ -287,7 +289,7 @@ export class SiteOverviewService {
             }),
         ]);
 
-        const names = await userNames([
+        const names = await userNames(ctx, [
             site.currentPublication?.publishedByUserId,
             ...publications.map((p) => p.publishedByUserId),
             ...audits.map((a) => a.actorUserId),
@@ -448,7 +450,7 @@ export async function siteCardExtras(
             },
         }),
     ]);
-    const names = await userNames([
+    const names = await userNames(ctx, [
         ...sites.map((s) => s.currentPublication?.publishedByUserId),
         ...settings.map((p) => p.settingsEditedByUserId),
     ]);

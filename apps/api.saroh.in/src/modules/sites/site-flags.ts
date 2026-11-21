@@ -223,12 +223,24 @@ function visitorText(value: unknown): string[] {
     return stringsOf(value);
 }
 
+/**
+ * "a@b.c": one `@`, no spaces, a dot inside the domain. Not one regex: the
+ * old `[^\s@]+\.[^\s@]+$` backtracked over every dot (W-ReDoS).
+ */
+export function looksLikeEmail(value: string): boolean {
+    const domain = /^[^\s@]+@([^\s@]+)$/.exec(value)?.[1];
+    return domain?.slice(1, -1).includes(".") === true;
+}
+
 /** Strip tags so a rich-text check reads the words, not the markup. */
 function textOf(html: string): string {
-    return html
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
+    return (
+        html
+            // `[^<>]`, not `[^>]`: linear on a run of unclosed `<` (W-ReDoS).
+            .replace(/<[^<>]*>/g, " ")
+            .replace(/\s+/g, " ")
+            .trim()
+    );
 }
 
 function str(v: unknown): string {
@@ -729,7 +741,7 @@ function checkCtaTarget(
             return;
         }
         case "email": {
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str(action.address))) {
+            if (!looksLikeEmail(str(action.address))) {
                 at(
                     "emptyRequiredField",
                     `${subject} has no email address to write to.`,

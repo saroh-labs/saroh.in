@@ -4,7 +4,8 @@ jest.mock("@saroh/database", () => ({
     ...jest.requireActual("@saroh/database"),
     prisma: {
         site: { findFirst: jest.fn() },
-        page: { findMany: jest.fn() },
+        page: { findMany: jest.fn(), updateMany: jest.fn() },
+        $transaction: jest.fn((writes: unknown[]) => Promise.all(writes)),
         siteRedirect: {
             findMany: jest.fn(),
             findFirst: jest.fn(),
@@ -35,6 +36,7 @@ const pageFindMany = prisma.page.findMany as jest.Mock;
 const redirectFindFirst = prisma.siteRedirect.findFirst as jest.Mock;
 const redirectCreate = prisma.siteRedirect.create as jest.Mock;
 const redirectUpdate = prisma.siteRedirect.update as jest.Mock;
+const pageUpdateMany = prisma.page.updateMany as jest.Mock;
 
 describe("planPageMove", () => {
     it("forwards a live page's old link to its new one", () => {
@@ -264,12 +266,21 @@ describe("SiteRedirectsService", () => {
     });
 
     it("stops forwarding the merchant's own old link from the next publish", async () => {
-        redirectFindFirst.mockResolvedValue({ id: "r1", source: "OWN" });
+        redirectFindFirst.mockResolvedValue({
+            id: "r1",
+            source: "OWN",
+            toPath: "/menu",
+        });
         await expect(service.remove(ctx(), "site_1", "r1")).resolves.toEqual({
             removed: true,
         });
         expect(redirectUpdate.mock.calls[0][0].data.removedAt).toBeInstanceOf(
             Date,
         );
+        // Its page's unit names the remover (R4).
+        expect(pageUpdateMany.mock.calls[0][0]).toMatchObject({
+            where: { siteId: "site_1", path: "/menu" },
+            data: { settingsEditedByUserId: ctx().userId },
+        });
     });
 });

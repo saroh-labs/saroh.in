@@ -14,10 +14,15 @@ import { prisma, runInOrgContext } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { env } from "../../env";
 import { planMeter } from "../billing/metering.service";
+import { wordReview } from "../notifications/review-alerts";
 import { TEAM_ALERT_TYPE } from "../notifications/team-alerts";
 import type { OrgAction } from "../organizations/organization-actions";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
+import { postFingerprint } from "./post-approval";
 import { PostApprovalService } from "./post-approval.service";
 import { NOT_APPROVED, runScheduledPost } from "./post-go-live.handler";
+import { REVISION_FIELDS, revisionStateOf } from "./post-revisions";
+import { PostRevisionsService } from "./post-revisions.service";
 import { POST_GO_LIVE_TYPE } from "./post-schedule";
 import { PostsService } from "./posts.service";
 
@@ -97,6 +102,15 @@ const edit = (title: string) => ({
     slug: "bridal-makeup-trial",
     content: `<p>${title}</p>`,
 });
+
+/** What an approver reads before approving. */
+async function fingerprintOf(b: { site: { id: string }; postId: string }) {
+    const post = await prisma.post.findUniqueOrThrow({
+        where: { id: b.postId },
+        select: REVISION_FIELDS,
+    });
+    return postFingerprint(revisionStateOf(post));
+}
 
 async function isLive(postId: string): Promise<boolean> {
     const p = await prisma.post.findUniqueOrThrow({
@@ -203,8 +217,10 @@ describe("post approval (O7)", () => {
             }),
         );
         // Approved for the writer's day: nothing goes live yet.
-        const res = await b.inOrg(() =>
-            approval.approve(b.reviewer, b.site.id, b.postId, {}),
+        const res = await b.inOrg(async () =>
+            approval.approve(b.reviewer, b.site.id, b.postId, {
+                fingerprint: await fingerprintOf(b),
+            }),
         );
         expect(res.published).toBe(false);
         expect(await isLive(b.postId)).toBe(false);
@@ -219,15 +235,26 @@ describe("post approval (O7)", () => {
 
     it("an approver can't approve what they edited last; a stale read is refused", async () => {
         const b = await business();
+        await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
         await expect(
-            b.inOrg(() => approval.approve(b.writer, b.site.id, b.postId, {})),
-        ).rejects.toThrow();
+            b.inOrg(async () =>
+                approval.approve(b.writer, b.site.id, b.postId, {
+                    fingerprint: await fingerprintOf(b),
+                }),
+            ),
+        ).rejects.toBeInstanceOf(ForbiddenException);
         // The owner edits it last: the owner can't approve, the reviewer can.
         await b.inOrg(() =>
             posts.update(b.owner, b.site.id, b.postId, edit("Owner's words")),
         );
         await expect(
-            b.inOrg(() => approval.approve(b.owner, b.site.id, b.postId, {})),
+            b.inOrg(async () =>
+                approval.approve(b.owner, b.site.id, b.postId, {
+                    fingerprint: await fingerprintOf(b),
+                }),
+            ),
         ).rejects.toBeInstanceOf(ForbiddenException);
         await expect(
             b.inOrg(() =>
@@ -241,8 +268,12 @@ describe("post approval (O7)", () => {
     it("ask for changes is recorded with its reason and tells the writer", async () => {
         const b = await business();
         await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
+        await b.inOrg(async () =>
             approval.askForChanges(b.reviewer, b.site.id, b.postId, {
                 reason: "Say the trial comes off the package.",
+                fingerprint: await fingerprintOf(b),
             }),
         );
         const view = await b.inOrg(() =>
@@ -297,8 +328,10 @@ describe("post approval (O7)", () => {
                 at: at.toISOString(),
             }),
         );
-        await b.inOrg(() =>
-            approval.approve(b.reviewer, b.site.id, b.postId, {}),
+        await b.inOrg(async () =>
+            approval.approve(b.reviewer, b.site.id, b.postId, {
+                fingerprint: await fingerprintOf(b),
+            }),
         );
         const again = await b.inOrg(() =>
             prisma.$transaction((tx) =>
@@ -313,12 +346,9 @@ describe("post approval (O7)", () => {
         const other = await business();
         await expect(
             other.inOrg(() =>
-                approval.approve(
-                    { ...other.reviewer },
-                    b.site.id,
-                    b.postId,
-                    {},
-                ),
+                approval.approve({ ...other.reviewer }, b.site.id, b.postId, {
+                    fingerprint: "any",
+                }),
             ),
         ).rejects.toThrow();
         await expect(
@@ -326,5 +356,266 @@ describe("post approval (O7)", () => {
                 approval.request(other.writer, b.site.id, b.postId, {}),
             ),
         ).rejects.toThrow();
+    });
+
+    // R1 (security review 21 Nov 2026): a Reviewer published drafts nobody sent.
+    it("refuses a verdict with approval off, on a plan without it, or with nothing sent", async () => {
+        const off = await business({ approval: false });
+        await off.inOrg(() =>
+            approval.request(off.writer, off.site.id, off.postId, {}),
+        );
+        await expect(
+            off.inOrg(async () =>
+                approval.approve(off.reviewer, off.site.id, off.postId, {
+                    fingerprint: await fingerprintOf(off),
+                }),
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(await isLive(off.postId)).toBe(false);
+
+        const b = await business();
+        // Nothing sent: neither verdict is taken, and nobody is told.
+        const fingerprint = await fingerprintOf(b);
+        await expect(
+            b.inOrg(() =>
+                approval.approve(b.reviewer, b.site.id, b.postId, {
+                    fingerprint,
+                }),
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        await expect(
+            b.inOrg(() =>
+                approval.askForChanges(b.reviewer, b.site.id, b.postId, {
+                    reason: "Change it.",
+                    fingerprint,
+                }),
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(await isLive(b.postId)).toBe(false);
+        const asks = await prisma.siteChangeApproval.count({
+            where: { organizationId: b.org.id },
+        });
+        expect(asks).toBe(0);
+        const view = await b.inOrg(() =>
+            posts.get(b.reviewer, b.site.id, b.postId),
+        );
+        expect(view.approval.canApprove).toBe(false);
+
+        // Sent, but the plan doesn't include approval (DEC-103).
+        await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(false);
+        await expect(
+            b.inOrg(() =>
+                approval.approve(b.reviewer, b.site.id, b.postId, {
+                    fingerprint,
+                }),
+            ),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(await isLive(b.postId)).toBe(false);
+    });
+
+    it("five approves at once: one publishes, the rest are a clean 409", async () => {
+        const b = await business();
+        await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
+        const fingerprint = await fingerprintOf(b);
+        const runs = await Promise.allSettled(
+            Array.from({ length: 5 }, () =>
+                b.inOrg(() =>
+                    approval.approve(b.reviewer, b.site.id, b.postId, {
+                        fingerprint,
+                    }),
+                ),
+            ),
+        );
+        expect(runs.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+        for (const r of runs) {
+            if (r.status === "rejected") {
+                expect(r.reason).toBeInstanceOf(ConflictException);
+            }
+        }
+        const live = await prisma.publication.count({
+            where: { postId: b.postId },
+        });
+        expect(live).toBe(1);
+    });
+
+    // K1: a publish by the teammate hid their next edit from approval.
+    it("after a teammate publishes a lead's post, their next edit waits for approval", async () => {
+        const b = await business();
+        const { id: postId } = await b.inOrg(() =>
+            posts.create(b.owner, b.site.id, {
+                title: "Owner's post",
+                slug: "owners-post",
+                content: "<p>Owner's words</p>",
+            }),
+        );
+        // The owner's words need nobody's approval: the teammate may publish.
+        await b.inOrg(() => posts.publish(b.writer, b.site.id, postId));
+        await b.inOrg(() =>
+            posts.update(b.writer, b.site.id, postId, {
+                title: "Owner's post",
+                slug: "owners-post",
+                content: "<p>The teammate's unapproved words</p>",
+            }),
+        );
+        await expect(
+            b.inOrg(() => posts.publish(b.writer, b.site.id, postId)),
+        ).rejects.toBeInstanceOf(ConflictException);
+        const view = await b.inOrg(() => posts.get(b.owner, b.site.id, postId));
+        expect(view.approval.lastEditorId).toBe(b.writer.userId);
+    });
+
+    // K2: an owner's schedule carried a teammate's later edit live.
+    it("an owner's schedule doesn't carry a teammate's later edit live unapproved", async () => {
+        const b = await business();
+        const make = (slug: string) =>
+            b.inOrg(() =>
+                posts.create(b.owner, b.site.id, {
+                    title: "Owner's post",
+                    slug,
+                    content: "<p>Owner's words</p>",
+                }),
+            );
+        const at = new Date(Date.now() + 60 * 60 * 1000);
+        const scheduled = async (postId: string) => {
+            await b.inOrg(() =>
+                posts.schedule(b.owner, b.site.id, postId, {
+                    at: at.toISOString(),
+                }),
+            );
+            const job = await prisma.job.findFirstOrThrow({
+                where: {
+                    type: POST_GO_LIVE_TYPE,
+                    organizationId: b.org.id,
+                    payload: { path: ["postId"], equals: postId },
+                },
+                select: { payload: true },
+            });
+            return job.payload as { postId: string; at: string };
+        };
+        const run = (payload: { postId: string; at: string }) =>
+            b.inOrg(() =>
+                prisma.$transaction((tx) =>
+                    runScheduledPost(tx, b.org.id, payload),
+                ),
+            );
+
+        const edited = await make("edited-after");
+        const payload = await scheduled(edited.id);
+        await b.inOrg(() =>
+            posts.update(b.writer, b.site.id, edited.id, {
+                title: "Owner's post",
+                slug: "edited-after",
+                content: "<p>The teammate's words after the schedule</p>",
+            }),
+        );
+        expect(await run(payload)).toEqual({
+            outcome: "NOT_LIVE",
+            reason: NOT_APPROVED,
+        });
+        expect(await isLive(edited.id)).toBe(false);
+
+        // Untouched since the owner scheduled it: it goes live.
+        const kept = await make("kept-as-is");
+        expect((await run(await scheduled(kept.id))).outcome).toBe("LIVE");
+    });
+
+    // R3: sending a colleague's post unchanged isn't writing it.
+    it("sending or restoring a colleague's post unchanged leaves them its last editor", async () => {
+        const b = await business();
+        const arjunId = await person(b.org.id, "Arjun", "MEMBER", [
+            "section:write",
+        ]);
+        const arjun: OrganizationContext = {
+            ...b.writer,
+            userId: arjunId,
+        };
+        await b.inOrg(() => approval.request(arjun, b.site.id, b.postId, {}));
+        const first = await prisma.postRevision.findFirstOrThrow({
+            where: { postId: b.postId, reason: "autosave" },
+            select: { id: true },
+        });
+        await b.inOrg(() =>
+            new PostRevisionsService().restore(
+                arjun,
+                b.site.id,
+                b.postId,
+                first.id,
+            ),
+        );
+        // A save that changes nothing doesn't either.
+        await b.inOrg(() =>
+            posts.update(arjun, b.site.id, b.postId, {
+                title: "Bridal makeup trial",
+                slug: "bridal-makeup-trial",
+                content: "<p>What a trial covers.</p>",
+            }),
+        );
+        const view = await b.inOrg(() =>
+            posts.get(b.owner, b.site.id, b.postId),
+        );
+        expect(view.approval.lastEditorId).toBe(b.writer.userId);
+    });
+
+    // W2/W3: repeats on the unchanged post tell nobody again; a sender's day has a limit.
+    it("tells approvers once per unchanged post, the writer once per ask, and limits sends", async () => {
+        const b = await business();
+        await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
+        await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
+        const fingerprint = await fingerprintOf(b);
+        // Asked again, in other words, on the unchanged post.
+        for (const reason of [
+            "Say the trial comes off the package.",
+            "And the price.",
+        ]) {
+            await b.inOrg(() =>
+                approval.askForChanges(b.reviewer, b.site.id, b.postId, {
+                    reason,
+                    fingerprint,
+                }),
+            );
+        }
+        const jobs = await prisma.job.findMany({
+            where: { organizationId: b.org.id, type: TEAM_ALERT_TYPE },
+            orderBy: { createdAt: "asc" },
+            select: { payload: true },
+        });
+        const keys = await b.inOrg(() =>
+            prisma.$transaction(async (tx) =>
+                Promise.all(
+                    jobs.map(async (j) => {
+                        const worded = await wordReview(
+                            tx,
+                            b.org.id,
+                            j.payload as never,
+                        );
+                        return worded?.eventKey;
+                    }),
+                ),
+            ),
+        );
+        expect(keys).toHaveLength(4);
+        expect(new Set(keys).size).toBe(2);
+
+        approval.sends = new SharedRateLimiter(
+            "post-sends-spec",
+            1,
+            60_000,
+            null,
+        );
+        await b.inOrg(() =>
+            approval.request(b.writer, b.site.id, b.postId, {}),
+        );
+        await expect(
+            b.inOrg(() => approval.request(b.writer, b.site.id, b.postId, {})),
+        ).rejects.toMatchObject({ status: 429 });
     });
 });

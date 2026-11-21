@@ -253,12 +253,11 @@ export class PostApprovalRequestDto {
     at?: string;
 }
 
-/** Approve a post (O7): the fingerprint the approver read, when sent. */
+/** Approve a post (O7): the fingerprint the approver read (R1: required). */
 export class ApprovePostDto {
-    @IsOptional()
-    @IsString()
+    @IsString({ message: "Read the post again, then approve it." })
     @MaxLength(128)
-    fingerprint?: string;
+    fingerprint!: string;
 }
 
 /** Ask for changes on a post, saying what (UX-043). */

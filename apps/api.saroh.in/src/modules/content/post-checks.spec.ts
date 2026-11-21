@@ -45,3 +45,36 @@ describe("checkPost", () => {
         ).toEqual(["/a", "/b"]);
     });
 });
+
+describe("checkPost on adversarial writing (W-ReDoS)", () => {
+    const fast = (content: string) => {
+        const started = performance.now();
+        checkPost({ content, services: SERVICES, paths: PATHS });
+        return performance.now() - started;
+    };
+
+    it.each([
+        ["100k unclosed <", "<".repeat(100_000)],
+        ["100k unclosed <a", "<a ".repeat(33_000)],
+        ["100k unclosed <div data-embed", "<div data-embed=x ".repeat(5_500)],
+        ["an unclosed href quote, many times", `<a ${'href="'.repeat(16_000)}`],
+        [
+            "100k $1 next to a service name",
+            `Bridal trial ${"$1 ".repeat(33_000)}`,
+        ],
+        [
+            "100k free next to a service name",
+            `Bridal trial ${"free ".repeat(20_000)}`,
+        ],
+    ])("reads %s in well under a second", (_, content) => {
+        expect(fast(content)).toBeLessThan(250);
+    });
+
+    it("still reads attributes in any order and quoting", () => {
+        expect(
+            hrefsOf(
+                `<a title="a b" href=/x>x</a><A HREF='/y' >y</a><a data-href="/z">`,
+            ),
+        ).toEqual(["/x", "/y"]);
+    });
+});

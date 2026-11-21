@@ -1,6 +1,11 @@
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { UnitVerdictRow } from "./change-approvals";
-import { recordUnitVerdicts, unitApprovals } from "./change-approvals";
+import {
+    personName,
+    recordUnitVerdicts,
+    unitApprovals,
+    UNNAMED_TEAMMATE,
+} from "./change-approvals";
 import type { ChangeUnit } from "./change-units";
 
 // Per-change approval (DEC-226, website area U9): the pure rule, and the
@@ -104,7 +109,9 @@ describe("recordUnitVerdicts", () => {
         role: "REVIEWER",
     });
     const tx = () => ({
+        $executeRaw: jest.fn().mockResolvedValue(1),
         siteChangeApproval: {
+            findFirst: jest.fn().mockResolvedValue(null),
             create: jest
                 .fn()
                 .mockImplementation(({ data }: { data: { unitKey: string } }) =>
@@ -177,5 +184,47 @@ describe("recordUnitVerdicts", () => {
         });
         expect(t.siteChangeApproval.create).toHaveBeenCalledTimes(3);
         expect(t.job.create).toHaveBeenCalledTimes(2);
+    });
+
+    it("writes the same verdict sent twice once, answering both alike (05 L2)", async () => {
+        const t = tx();
+        t.siteChangeApproval.findFirst.mockResolvedValue({
+            unitFingerprint: "f1",
+            byUserId: "kavya",
+            outcome: "APPROVED",
+            reason: null,
+        });
+        const out = await recordUnitVerdicts(t as never, ctx("kavya"), {
+            siteId: "s1",
+            units,
+            keys: ["k1"],
+            outcome: "APPROVED",
+        });
+        expect(out).toEqual({ recorded: 1 });
+        expect(t.$executeRaw).toHaveBeenCalled();
+        expect(t.siteChangeApproval.create).not.toHaveBeenCalled();
+    });
+});
+
+describe("personName (01 W1)", () => {
+    const as = (role: OrganizationContext["role"]): OrganizationContext => ({
+        organizationId: "org_1",
+        userId: "u1",
+        role,
+    });
+    const nameless = { name: null, email: "ritika@example.com" };
+
+    it("never shows a reviewer a nameless teammate's email", () => {
+        expect(personName(as("REVIEWER"), nameless)).toBe(UNNAMED_TEAMMATE);
+        expect(personName(as("REVIEWER"), { ...nameless, name: "  " })).toBe(
+            UNNAMED_TEAMMATE,
+        );
+        expect(
+            personName(as("REVIEWER"), { ...nameless, name: "Ritika" }),
+        ).toBe("Ritika");
+    });
+
+    it("shows it to someone who may read the team", () => {
+        expect(personName(as("OWNER"), nameless)).toBe("ritika@example.com");
     });
 });

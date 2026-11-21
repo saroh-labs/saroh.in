@@ -4,6 +4,8 @@ import {
     Delete,
     Get,
     HttpCode,
+    HttpException,
+    HttpStatus,
     Param,
     Post,
     Put,
@@ -16,6 +18,7 @@ import { OrganizationGuard } from "../../common/guards/organization.guard";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard";
 import { RequireModule } from "../capabilities/require-module.decorator";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import { WebsiteAreaSwitchGuard } from "../sites/website-area-switch";
 import {
     ApprovePostDto,
@@ -29,6 +32,14 @@ import {
 import { PostApprovalService } from "./post-approval.service";
 import { PostRevisionsService } from "./post-revisions.service";
 import { PostsService } from "./posts.service";
+
+/** Publish post's checks a minute, per person (W-ReDoS). */
+export const POST_CHECKS_PER_MINUTE = 30;
+const postChecksLimit = new SharedRateLimiter(
+    "post-checks",
+    POST_CHECKS_PER_MINUTE,
+    60_000,
+);
 
 /**
  * A site's posts (ADR-004, #209). These used to hang off a store
@@ -180,12 +191,19 @@ export class PostsController {
      */
     @Post(":postId/checks")
     @HttpCode(200)
-    checks(
+    async checks(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
         @Param("postId") postId: string,
         @Body() dto: PostChecksDto,
     ) {
+        // Reads up to 100 KB of writing per call: limited per person (W-ReDoS).
+        if (!(await postChecksLimit.take(ctx.userId))) {
+            throw new HttpException(
+                "Too many checks. Wait a moment, then try again.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
         return this.posts.checks(ctx, siteId, postId, dto);
     }
 

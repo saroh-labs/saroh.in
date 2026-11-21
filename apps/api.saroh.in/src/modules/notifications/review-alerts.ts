@@ -1,6 +1,7 @@
 import type { Prisma } from "@saroh/database";
 
-import { approverIdsOf } from "../content/post-approval";
+import { approverIdsOf, postFingerprint } from "../content/post-approval";
+import { revisionStateOf } from "../content/post-revisions";
 import { resolveCapabilities } from "../organizations/organization-policy";
 import { cleanBusinessName } from "../site-accounts/sender-name";
 import { noticeOf } from "./notice-target";
@@ -334,12 +335,25 @@ async function wordChangeAsk(
             id: true,
             siteId: true,
             unitKey: true,
+            unitFingerprint: true,
             byUserId: true,
             reason: true,
             site: { select: { name: true } },
         },
     });
     if (!a) return null;
+    // W3: the editor's own "off" for the Website email holds; with no
+    // choice made they still hear of it, as their role may have no row.
+    const off = await tx.notificationPreference.findFirst({
+        where: {
+            organizationId,
+            userId: p.editorUserId,
+            event: "site",
+            channel: "email",
+            enabled: false,
+        },
+        select: { id: true },
+    });
     // A post's verdict (O7) opens the post; a site change, its pages.
     const postId = a.unitKey.startsWith("post:") ? a.unitKey.slice(5) : null;
     const by = await tx.user.findUnique({
@@ -354,7 +368,8 @@ async function wordChangeAsk(
             : line;
     return {
         event: "site",
-        eventKey: `team:review-change:${a.id}`,
+        // W3: asked again on the unchanged change, by the same person: told once.
+        eventKey: `team:review-change:${a.unitKey}:${a.unitFingerprint}:${a.byUserId}`,
         notificationId: null,
         ...noticeOf(SITE_REVIEW_CHANGES_NOTIFICATION_TYPE, {
             siteId: a.siteId,
@@ -370,7 +385,7 @@ async function wordChangeAsk(
             : `/sites/${a.siteId}/pages`,
         skipUserId: a.byUserId,
         forUserId: p.editorUserId,
-        alwaysUserId: p.editorUserId,
+        alwaysUserId: off ? null : p.editorUserId,
     };
 }
 
@@ -391,6 +406,17 @@ async function wordPostAsk(
             postId: true,
             createdAt: true,
             savedByUserId: true,
+            title: true,
+            content: true,
+            excerpt: true,
+            image: true,
+            imageAlt: true,
+            seoTitle: true,
+            seoDescription: true,
+            shareImageUrl: true,
+            slug: true,
+            categoryId: true,
+            authorId: true,
             post: {
                 select: {
                     title: true,
@@ -418,7 +444,8 @@ async function wordPostAsk(
     const body = "Read it, then approve it or ask for changes.";
     return {
         event: "site",
-        eventKey: `team:review-post:${revisionId}`,
+        // W2: sent again unchanged, the approvers aren't told again.
+        eventKey: `team:review-post:${r.postId}:${postFingerprint(revisionStateOf(r))}`,
         notificationId: null,
         type: "site.review.requested",
         title: `${who} asked you to approve ${r.post.title}`,

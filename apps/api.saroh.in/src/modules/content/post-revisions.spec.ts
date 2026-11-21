@@ -2,6 +2,7 @@ import type { RevisionState } from "./post-revisions";
 import {
     AUTOSAVE_REVISION_EVERY_MS,
     autosaveDue,
+    EDIT_REASONS,
     revisionAfterSave,
 } from "./post-revisions";
 
@@ -69,6 +70,18 @@ describe("revisions after a save (U17a)", () => {
                 savedByUserId: "user-1",
             }),
         });
+    });
+
+    it("skips only after the saver's own edit revision, not a publish or a send (K1, R3)", async () => {
+        const tx = fakeTx(new Date("2026-11-20T09:30:00Z"));
+        await save(tx);
+        expect(tx.postRevision.findFirst).toHaveBeenCalledWith(
+            expect.objectContaining({
+                where: { postId: "post-1", reason: { in: EDIT_REASONS } },
+            }),
+        );
+        expect(EDIT_REASONS).not.toContain("published");
+        expect(EDIT_REASONS).not.toContain("sent");
     });
 
     it("always keeps an Ask AI save, named", async () => {

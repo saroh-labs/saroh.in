@@ -227,7 +227,7 @@ export class TestReleasesService {
             }),
             businessTimezone(prisma, ctx.organizationId),
         ]);
-        const names = await namesFor(peopleIn(rows, verdicts));
+        const names = await namesFor(ctx, peopleIn(rows, verdicts));
         const now = new Date();
         return {
             testHosts: testHosts(site.subdomain),
@@ -389,6 +389,7 @@ export class TestReleasesService {
         const [release, names] = await Promise.all([
             this.readOne(ctx, siteId, releaseId),
             namesFor(
+                ctx,
                 outcome.replaced?.publishedByUserId
                     ? [outcome.replaced.publishedByUserId]
                     : [],
@@ -553,7 +554,7 @@ export class TestReleasesService {
             data: { revokedAt: existing.revokedAt ?? new Date() },
             select: linkSelect,
         });
-        const names = await namesFor([link.createdByUserId]);
+        const names = await namesFor(ctx, [link.createdByUserId]);
         return toLinkView(link, existing.testRelease, names, new Date());
     }
 
@@ -672,7 +673,7 @@ export class TestReleasesService {
                 `Test release "${releaseId}" not found`,
             );
         }
-        const names = await namesFor(peopleIn([row], verdicts));
+        const names = await namesFor(ctx, peopleIn([row], verdicts));
         return toReleaseView(
             row,
             ctx,
@@ -715,7 +716,7 @@ export class TestReleasesService {
             },
             select: linkSelect,
         });
-        const names = await namesFor([link.createdByUserId]);
+        const names = await namesFor(ctx, [link.createdByUserId]);
         return withToken(
             toLinkView(link, release, names, now),
             token,

@@ -19,6 +19,7 @@ import {
     checkSite,
     FLAGS_AWAITING_NAVIGATION,
     hasOwnerNote,
+    looksLikeEmail,
     OWNER_NOTE_MESSAGE,
     type FlagPageInput,
     type FlagSiteInput,
@@ -1605,5 +1606,29 @@ describe("a showcase template's sample words (DEC-182)", () => {
             ["/"],
         );
         expect(sampleFlags(own)).toEqual([]);
+    });
+});
+
+describe("linear on adversarial content (W-ReDoS)", () => {
+    it("reads 100k unclosed < in a text block fast", () => {
+        const started = performance.now();
+        checkPage(
+            page([
+                { type: "richText", content: { value: "<".repeat(100_000) } },
+            ]),
+            ["/"],
+        );
+        expect(performance.now() - started).toBeLessThan(250);
+    });
+
+    it("checks an email address of 100k dots fast, with the old answers", () => {
+        const started = performance.now();
+        expect(looksLikeEmail(`a@${".".repeat(100_000)} `)).toBe(false);
+        expect(performance.now() - started).toBeLessThan(50);
+        expect(looksLikeEmail("hello@rye.in")).toBe(true);
+        expect(looksLikeEmail("hello@rye.")).toBe(false);
+        expect(looksLikeEmail("hello@.in")).toBe(false);
+        expect(looksLikeEmail("a b@rye.in")).toBe(false);
+        expect(looksLikeEmail("a@b@rye.in")).toBe(false);
     });
 });

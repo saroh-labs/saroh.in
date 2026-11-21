@@ -144,3 +144,28 @@ describe("PageResultsService.read", () => {
         });
     });
 });
+
+// The DTO lives beside its controller; its guards would load Better Auth.
+jest.mock("../../common/guards/better-auth.guard", () => ({
+    BetterAuthGuard: class {},
+}));
+
+describe("PageResultsQueryDto", () => {
+    const errorsFor = async (path: string) => {
+        const { validate } = await import("class-validator");
+        const { plainToInstance } = await import("class-transformer");
+        const { PageResultsQueryDto } =
+            await import("./page-results.controller");
+        return validate(plainToInstance(PageResultsQueryDto, { path }));
+    };
+
+    it("refuses a NUL or other control character (was a 500 from Postgres)", async () => {
+        expect(await errorsFor("/x\u0000")).not.toHaveLength(0);
+        expect(await errorsFor("/x\ny")).not.toHaveLength(0);
+    });
+
+    it("takes a page's link", async () => {
+        expect(await errorsFor("/bridal?x=1")).toHaveLength(0);
+        expect(await errorsFor("/")).toHaveLength(0);
+    });
+});

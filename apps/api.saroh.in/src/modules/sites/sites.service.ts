@@ -38,8 +38,10 @@ import {
 } from "../organizations/organization-policy";
 import type { ChangeVerdict, UnitApproval } from "./change-approvals";
 import {
+    APPROVAL_OFF_MESSAGE,
     editorsOf,
     heldForApproval,
+    personName,
     readUnitVerdicts,
     recordUnitVerdicts,
     unitApprovals,
@@ -1307,9 +1309,10 @@ export class SitesService {
      * business's admins and owners.
      */
     private async approversOf(
-        organizationId: string,
+        ctx: OrganizationContext,
         siteId: string,
     ): Promise<ChangeApprover[]> {
+        const { organizationId } = ctx;
         const [reviewers, leads] = await Promise.all([
             prisma.siteReviewer.findMany({
                 where: { organizationId, siteId },
@@ -1331,14 +1334,14 @@ export class SitesService {
         for (const r of reviewers) {
             out.set(r.user.id, {
                 id: r.user.id,
-                name: r.user.name ?? r.user.email,
+                name: personName(ctx, r.user),
                 role: "REVIEWER",
             });
         }
         for (const m of leads) {
             out.set(m.user.id, {
                 id: m.user.id,
-                name: m.user.name ?? m.user.email,
+                name: personName(ctx, m.user),
                 role: m.role as "OWNER" | "ADMIN",
             });
         }
@@ -1373,6 +1376,22 @@ export class SitesService {
     ): Promise<{ recorded: number }> {
         authorize(ctx, "site:approve");
         const units = await this.waitingUnits(ctx, siteId);
+        // R5: a verdict only where approval applies, as a post's (409).
+        const site = await prisma.site.findFirstOrThrow({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { publishNeedsApproval: true },
+        });
+        if (
+            !(await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            ))
+        ) {
+            throw new ConflictException({
+                message: APPROVAL_OFF_MESSAGE,
+                details: { reason: "approvalOff" },
+            });
+        }
         return prisma.$transaction((tx) =>
             recordUnitVerdicts(tx, ctx, {
                 siteId,
@@ -1450,7 +1469,7 @@ export class SitesService {
                     select: { id: true, title: true, updatedAt: true },
                 }),
                 approvalApplies(ctx.organizationId, site.publishNeedsApproval),
-                this.approversOf(ctx.organizationId, siteId),
+                this.approversOf(ctx, siteId),
             ],
         );
         const units = pending.get(siteId)?.units ?? null;
@@ -1473,7 +1492,7 @@ export class SitesService {
                       select: { id: true, name: true, email: true },
                   })
                 : [];
-        const names = new Map(users.map((u) => [u.id, u.name ?? u.email]));
+        const names = new Map(users.map((u) => [u.id, personName(ctx, u)]));
         return {
             siteId,
             livePublishedAt: site.currentPublication?.publishedAt ?? null,
@@ -1988,6 +2007,7 @@ export class SitesService {
         // Names, not ids (#283). "Who put this live" is a question the list
         // exists to answer, and a Publication records only the user id.
         const publishers = await this.userNames(
+            ctx,
             publications.map((p) => p.publishedByUserId),
         );
 
@@ -1997,7 +2017,7 @@ export class SitesService {
         ) => {
             const row = approvals.find((a) => a.outcome === outcome);
             return row
-                ? { at: row.createdAt, by: row.by.name ?? row.by.email }
+                ? { at: row.createdAt, by: personName(ctx, row.by) }
                 : null;
         };
 
@@ -2052,7 +2072,7 @@ export class SitesService {
             );
         }
         const { wentLiveFor, sourcePublication, ...row } = publication;
-        const publishers = await this.userNames([
+        const publishers = await this.userNames(ctx, [
             publication.publishedByUserId,
         ]);
         return {
@@ -2070,6 +2090,7 @@ export class SitesService {
      * One query for every distinct id, however many versions share a publisher.
      */
     private async userNames(
+        ctx: OrganizationContext,
         ids: (string | null)[],
     ): Promise<Map<string, string>> {
         const unique = [
@@ -2080,7 +2101,7 @@ export class SitesService {
             where: { id: { in: unique } },
             select: { id: true, name: true, email: true },
         });
-        return new Map(users.map((u) => [u.id, u.name ?? u.email]));
+        return new Map(users.map((u) => [u.id, personName(ctx, u)]));
     }
 
     /**
@@ -3273,8 +3294,7 @@ export class SitesService {
             createdAt: c.createdAt,
             author: {
                 id: c.author.id,
-                // A name is nicer, but an email always exists.
-                name: c.author.name ?? c.author.email,
+                name: personName(ctx, c.author),
             },
             // A note whose page (or post) is gone is orphaned by definition.
             orphaned:
@@ -3928,7 +3948,7 @@ export class SitesService {
                     : {
                           outcome: latest.outcome,
                           at: latest.createdAt,
-                          by: latest.by.name ?? latest.by.email,
+                          by: personName(ctx, latest.by),
                           reason: latest.reason ?? null,
                       },
         };

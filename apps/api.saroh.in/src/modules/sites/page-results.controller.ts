@@ -13,7 +13,11 @@ import { PageResultsService } from "./page-results";
 export class PageResultsQueryDto {
     /** The page's link on the site, `/` or `/bridal`; a query is cut off. */
     @IsString()
-    @Matches(/^\//, { message: "path must start with /" })
+    // No control characters: Postgres refuses a NUL in text, which was a 500.
+    // eslint-disable-next-line no-control-regex
+    @Matches(/^\/[^\u0000-\u001f\u007f]*$/, {
+        message: "path must start with / and be a page's link",
+    })
     @MaxLength(2048)
     path!: string;
 }

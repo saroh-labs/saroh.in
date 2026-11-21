@@ -1,6 +1,8 @@
 import {
     BadRequestException,
     ConflictException,
+    HttpException,
+    HttpStatus,
     Injectable,
     NotFoundException,
 } from "@nestjs/common";
@@ -9,6 +11,8 @@ import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
 import { authorize } from "../organizations/organization-policy";
+import type { WindowLimiter } from "../rate-limits/shared-window";
+import { SharedRateLimiter } from "../rate-limits/shared-window";
 import type { ChangeVerdict } from "../sites/change-approvals";
 import { recordUnitVerdicts } from "../sites/change-approvals";
 import { queueReviewAlert } from "../sites/review-alert-queue";
@@ -19,7 +23,11 @@ import type {
     AskPostChangesDto,
     PostApprovalRequestDto,
 } from "./dto";
-import { postApprovalUnit } from "./post-approval";
+import {
+    postApprovalOn,
+    postApprovalUnit,
+    postRequestOpen,
+} from "./post-approval";
 import { assertPostEditable } from "./post-paused";
 import { publishPostInTx } from "./post-publish";
 import {
@@ -32,6 +40,14 @@ import { clearPostScheduleInTx, schedulePostInTx } from "./post-schedule";
 export const POST_CHANGED_MESSAGE =
     "The post changed since you opened it. Read it again, then approve it.";
 
+/** R1: approve or ask with approval off, or nothing sent to answer. */
+export const NOTHING_TO_APPROVE_MESSAGE =
+    "This post isn't waiting for approval. Its writer sends it when it's ready.";
+
+/** W2: one person's Send for approval, a day. */
+const SENDS_PER_DAY = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Send for approval, Approve and Ask for changes on a post (O7,
  * `post-approval.ts`). Sending is the writer's (`section:write`); a verdict
@@ -41,6 +57,13 @@ export const POST_CHANGED_MESSAGE =
  */
 @Injectable()
 export class PostApprovalService {
+    /** Sends per sender a day (W2); a spec swaps in its own. */
+    sends: WindowLimiter = new SharedRateLimiter(
+        "post-approval-sends",
+        SENDS_PER_DAY,
+        DAY_MS,
+    );
+
     async request(
         ctx: OrganizationContext,
         siteId: string,
@@ -59,6 +82,21 @@ export class PostApprovalService {
             });
         }
         await assertPostEditable(ctx.organizationId, postId);
+        if (!(await this.sends.take(ctx.userId))) {
+            throw new HttpException(
+                {
+                    message:
+                        "You've sent enough posts for approval today. Try again tomorrow.",
+                    details: {
+                        reason: "limit",
+                        retryAfter: await this.sends.retryAfterSeconds(
+                            ctx.userId,
+                        ),
+                    },
+                },
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
         return prisma.$transaction(async (tx) => {
             const post = await this.postIn(tx, siteId, postId);
             const sent = await writeRevision(tx, {
@@ -148,14 +186,27 @@ export class PostApprovalService {
         input: {
             outcome: ChangeVerdict;
             reason?: string;
-            fingerprint?: string;
+            fingerprint: string;
             at?: Date;
         },
     ) {
+        // One verdict at a time: a parallel one waits, then finds the
+        // request answered (409, not a 500).
+        await tx.$queryRaw`SELECT id FROM "Post" WHERE id = ${postId} FOR UPDATE`;
         const post = await this.postIn(tx, siteId, postId);
+        // R1: only a request, sent with approval on, is answered.
+        if (
+            !(await postApprovalOn(tx, ctx.organizationId, siteId)) ||
+            !(await postRequestOpen(tx, postId))
+        ) {
+            throw new ConflictException({
+                message: NOTHING_TO_APPROVE_MESSAGE,
+                details: { reason: "notWaiting" },
+            });
+        }
         const state = revisionStateOf(post);
         const unit = await postApprovalUnit(tx, postId, state);
-        if (input.fingerprint && input.fingerprint !== unit.fingerprint) {
+        if (input.fingerprint !== unit.fingerprint) {
             throw new ConflictException({
                 message: POST_CHANGED_MESSAGE,
                 details: { reason: "postChanged" },

@@ -11,7 +11,12 @@ import { prisma } from "@saroh/database";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
+import type { RestoreSnapshot } from "../mcp/restore-point.service";
+import { RestorePointService } from "../mcp/restore-point.service";
+import { restoreSnapshot } from "../mcp/tools/site.tools";
 import type { OrgAction } from "../organizations/organization-actions";
+import { UNNAMED_TEAMMATE } from "./change-approvals";
+import { SiteRedirectsService } from "./site-redirects.service";
 import { SitesService } from "./sites.service";
 
 const sites = new SitesService({
@@ -345,5 +350,176 @@ describe("per-change approval (U9)", () => {
             "approved",
             "approved",
         ]);
+    });
+});
+
+/** The draft as an AI connection's restore point keeps it. */
+async function restorePoint(b: { org: { id: string }; site: { id: string } }) {
+    const points = new RestorePointService() as unknown as {
+        snapshotOf(org: string, site: string): Promise<RestoreSnapshot>;
+    };
+    return points.snapshotOf(b.org.id, b.site.id);
+}
+
+describe("every writer says who changed the draft (KTD-4, R2/R4 21 Nov 2026)", () => {
+    beforeEach(() => {
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(true);
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("an AI restore puts a teammate's change back as theirs, waiting, never as the owner's", async () => {
+        const b = await business();
+        // Ritika's changes, kept by her connection's restore point.
+        await sites.updatePage(b.ritika, b.site.id, b.bridal.id, {
+            title: "Ritika's page",
+        });
+        await sites.updateSettings(b.ritika, b.site.id, {
+            seoTitle: "Ritika's search line",
+        });
+        await sites.replaceDraftSections(b.ritika, b.site.id, b.bridal.id, {
+            sections: [hero("k1", "Ritika's intro"), hero("k2", "Packages")],
+        });
+        const point = await restorePoint(b);
+        // The owner changes each one after her.
+        await sites.updatePage(b.owner, b.site.id, b.bridal.id, {
+            title: "Owner's page",
+        });
+        await sites.updateSettings(b.owner, b.site.id, {
+            seoTitle: "Owner's search line",
+        });
+        await sites.replaceDraftSections(b.owner, b.site.id, b.bridal.id, {
+            sections: [hero("k1", "Owner's intro"), hero("k2", "Packages")],
+        });
+
+        await restoreSnapshot(b.ritika, b.site.id, point);
+
+        const changes = await sites.getChanges(b.owner, b.site.id);
+        const byKey = new Map(changes.units.map((u) => [u.key, u]));
+        for (const key of [`page:${b.bridal.id}`, "site:search", b.k1]) {
+            expect(byKey.get(key)).toMatchObject({
+                editedBy: b.ritika.userId,
+                approval: { state: "waiting" },
+            });
+        }
+        // Every change waits, so nothing goes out without an approval.
+        await expect(
+            sites.publishSite(b.owner, b.site.id),
+        ).rejects.toMatchObject({ status: 409 });
+        expect(await liveHeadings(b.site.id)).toEqual(["Intro", "Packages"]);
+    });
+
+    it("removing an old link that forwards names the remover (R4)", async () => {
+        const b = await business();
+        const redirects = new SiteRedirectsService();
+        const link = await redirects.create(b.owner, b.site.id, {
+            fromPath: "/old-bridal",
+            toPath: "/",
+        });
+        await sites.publishSite(b.owner, b.site.id);
+        await redirects.remove(b.ritika, b.site.id, link.id);
+        const page = await prisma.page.findUniqueOrThrow({
+            where: { id: b.bridal.id },
+            select: { settingsEditedByUserId: true },
+        });
+        expect(page.settingsEditedByUserId).toBe(b.ritika.userId);
+        const unit = (await sites.getChanges(b.owner, b.site.id)).units.find(
+            (u) => u.key === `page:${b.bridal.id}`,
+        );
+        expect(unit).toMatchObject({
+            editedBy: b.ritika.userId,
+            approval: { state: "waiting" },
+        });
+    });
+});
+
+describe("site verdicts (05 L2, R5, 01 W1)", () => {
+    beforeEach(() => {
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(true);
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("five approvals of one change at once write one row, and each answers", async () => {
+        const b = await business();
+        await sites.replaceDraftSections(b.ritika, b.site.id, b.bridal.id, {
+            sections: [hero("k1", "Intro, new"), hero("k2", "Packages")],
+        });
+        const results = await Promise.all(
+            Array.from({ length: 5 }, () =>
+                sites.recordChangeVerdict(b.reviewer, b.site.id, {
+                    units: [b.k1],
+                    outcome: "APPROVED",
+                }),
+            ),
+        );
+        expect(results).toEqual(Array(5).fill({ recorded: 1 }));
+        expect(
+            await prisma.siteChangeApproval.count({
+                where: { siteId: b.site.id, unitKey: b.k1 },
+            }),
+        ).toBe(1);
+    });
+
+    it("refuses a verdict where approval is off, or the plan has none (409)", async () => {
+        const off = await business({ approval: false });
+        await sites.replaceDraftSections(
+            off.ritika,
+            off.site.id,
+            off.bridal.id,
+            {
+                sections: [hero("k1", "Intro, new"), hero("k2", "Packages")],
+            },
+        );
+        await expect(
+            sites.recordChangeVerdict(off.reviewer, off.site.id, {
+                units: [off.k1],
+                outcome: "CHANGES_REQUESTED",
+                reason: "Old prices",
+            }),
+        ).rejects.toMatchObject({ status: 409 });
+
+        const on = await business();
+        await sites.replaceDraftSections(on.ritika, on.site.id, on.bridal.id, {
+            sections: [hero("k1", "Intro, new"), hero("k2", "Packages")],
+        });
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(false);
+        await expect(
+            sites.recordChangeVerdict(on.reviewer, on.site.id, {
+                units: [on.k1],
+                outcome: "APPROVED",
+            }),
+        ).rejects.toMatchObject({ status: 409 });
+        expect(
+            await prisma.siteChangeApproval.count({
+                where: { siteId: { in: [off.site.id, on.site.id] } },
+            }),
+        ).toBe(0);
+    });
+
+    it('a reviewer reads a nameless teammate as "A teammate", never their email', async () => {
+        const b = await business();
+        await prisma.user.update({
+            where: { id: b.ritika.userId },
+            data: { name: null },
+        });
+        await prisma.user.update({
+            where: { id: b.owner.userId },
+            data: { name: "" },
+        });
+        await sites.replaceDraftSections(b.ritika, b.site.id, b.bridal.id, {
+            sections: [hero("k1", "Intro, new"), hero("k2", "Packages")],
+        });
+        const seen = await sites.getChanges(b.reviewer, b.site.id);
+        const text = JSON.stringify(seen);
+        expect(text).not.toContain("@example.com");
+        expect(seen.groups[0]).toMatchObject({ name: UNNAMED_TEAMMATE });
+        expect(
+            seen.units[0].approval.approvers.find(
+                (a) => a.id === b.owner.userId,
+            )?.name,
+        ).toBe(UNNAMED_TEAMMATE);
+        // The owner, who may read the team, still sees the email.
+        expect(
+            JSON.stringify(await sites.getChanges(b.owner, b.site.id)),
+        ).toContain("@example.com");
     });
 });

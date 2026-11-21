@@ -242,7 +242,7 @@ export class SiteRedirectsService {
                 organizationId: ctx.organizationId,
                 removedAt: null,
             },
-            select: { id: true, source: true },
+            select: { id: true, source: true, toPath: true },
         });
         if (!row) throw new NotFoundException("That old link isn't here");
         if (row.source === "AUTO") {
@@ -252,10 +252,26 @@ export class SiteRedirectsService {
                 details: { reason: "auto" },
             });
         }
-        await prisma.siteRedirect.update({
-            where: { id: row.id },
-            data: { removedAt: new Date() },
-        });
+        const at = new Date();
+        await prisma.$transaction([
+            prisma.siteRedirect.update({
+                where: { id: row.id },
+                data: { removedAt: at },
+            }),
+            // A removal has no row of its own: its page's unit names the
+            // remover (KTD-4, R4 21 Nov 2026).
+            prisma.page.updateMany({
+                where: {
+                    siteId,
+                    organizationId: ctx.organizationId,
+                    path: row.toPath,
+                },
+                data: {
+                    settingsEditedByUserId: ctx.userId,
+                    settingsEditedAt: at,
+                },
+            }),
+        ]);
         return { removed: true };
     }
 }

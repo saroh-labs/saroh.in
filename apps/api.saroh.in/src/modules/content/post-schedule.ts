@@ -1,5 +1,8 @@
 import type { Prisma } from "@saroh/database";
 
+import { postFingerprint } from "./post-approval";
+import { REVISION_FIELDS, revisionStateOf } from "./post-revisions";
+
 /**
  * Publish post › Later (editor redesign U17a). `Post.scheduledAt` and one
  * PENDING `post.go_live` job, written together; the job publishes the draft
@@ -14,6 +17,11 @@ export interface PostGoLivePayload {
     postId: string;
     /** ISO instant. A post rescheduled since holds a different one. */
     at: string;
+    /**
+     * The post's fingerprint when it was scheduled (K2): an owner's or
+     * admin's schedule covers the post as it was then, not a later edit.
+     */
+    fingerprint?: string;
 }
 
 type Tx = Pick<Prisma.TransactionClient, "job" | "post">;
@@ -40,9 +48,14 @@ export async function schedulePostInTx(
     },
 ): Promise<void> {
     await dropPostGoLiveJob(tx, input.postId);
+    const post = await tx.post.findUniqueOrThrow({
+        where: { id: input.postId },
+        select: REVISION_FIELDS,
+    });
     const payload: PostGoLivePayload = {
         postId: input.postId,
         at: input.at.toISOString(),
+        fingerprint: postFingerprint(revisionStateOf(post)),
     };
     await tx.job.create({
         data: {

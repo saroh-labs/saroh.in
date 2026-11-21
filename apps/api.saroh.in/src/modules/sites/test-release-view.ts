@@ -2,6 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { personName } from "./change-approvals";
 import type { Renderability } from "./publication-renderability";
 import { ReviewRoute } from "./review-route";
 import type {
@@ -292,13 +293,16 @@ export function peopleIn(rows: ReleaseRow[], verdicts: VerdictRow[]): string[] {
  * columns (a person leaving Saroh never takes the record with them), so a
  * missing user reads as no name.
  */
-export async function namesFor(ids: string[]): Promise<Names> {
+export async function namesFor(
+    ctx: OrganizationContext,
+    ids: string[],
+): Promise<Names> {
     if (ids.length === 0) return new Map();
     const users = await prisma.user.findMany({
         where: { id: { in: ids } },
         select: { id: true, name: true, email: true },
     });
-    return new Map(users.map((u) => [u.id, u.name ?? u.email]));
+    return new Map(users.map((u) => [u.id, personName(ctx, u)]));
 }
 
 /** The hosts a site's releases are served on (see `platformTestHost`). */

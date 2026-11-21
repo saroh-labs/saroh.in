@@ -120,8 +120,26 @@ function spans(toks: Token[], name: string[]): [number, number][] {
     return out;
 }
 
-function distance(at: number, [from, to]: [number, number]): number {
-    return at < from ? from - at : at > to ? at - to : 0;
+/**
+ * Which token positions sit within `radius` of a span: one pass over the
+ * spans, so "is this price near the name" is a lookup, not a rescan of
+ * every span per price (W-ReDoS).
+ */
+function nearMask(
+    length: number,
+    found: [number, number][],
+    radius: number,
+): Uint8Array {
+    const near = new Uint8Array(length);
+    let filled = -1;
+    for (const [from, to] of found) {
+        const end = Math.min(length - 1, to + radius);
+        for (let i = Math.max(filled + 1, from - radius); i <= end; i++) {
+            near[i] = 1;
+        }
+        filled = Math.max(filled, end);
+    }
+    return near;
 }
 
 /** The ways a sentence can name a service: its name, and its head word. */
@@ -135,9 +153,12 @@ function aliasesOf(name: string): string[][] {
     return out.filter((a) => a.join(" ").length >= 3);
 }
 
-/** Strip tags so a rich-text field reads as its words. */
+/**
+ * Strip tags so a rich-text field reads as its words. `[^<>]` keeps it
+ * linear: `[^>]` rescanned to the end from every unclosed `<` (W-ReDoS).
+ */
 function textOf(value: string): string {
-    return value.includes("<") ? value.replace(/<[^>]*>/g, " ") : value;
+    return value.includes("<") ? value.replace(/<[^<>]*>/g, " ") : value;
 }
 
 /** Sentences, without splitting "Rs. 2,500". */
@@ -245,14 +266,17 @@ export function checkSectionPrices(
                 const hits = linked
                     ? [{ service: linked, near: amounts }]
                     : named
-                          .map((n) => ({
-                              service: n.service,
-                              near: amounts.filter((a) =>
-                                  spans(toks, n.full).some(
-                                      (span) => distance(a.at, span) <= NEAR,
-                                  ),
-                              ),
-                          }))
+                          .map((n) => {
+                              const near = nearMask(
+                                  toks.length,
+                                  spans(toks, n.full),
+                                  NEAR,
+                              );
+                              return {
+                                  service: n.service,
+                                  near: amounts.filter((a) => near[a.at]),
+                              };
+                          })
                           .filter((h) => h.near.length > 0);
                 // shortcut: two services in one sentence can't say whose
                 // price is whose, so it is left alone; a parser of "A ₹x, B ₹y"
@@ -283,11 +307,14 @@ export function checkSectionPrices(
             if (frees.length === 0) continue;
             const meant = named
                 .filter((n) =>
-                    n.aliases.some((alias) =>
-                        spans(toks, alias).some((span) =>
-                            frees.some((f) => distance(f, span) <= FREE_NEAR),
-                        ),
-                    ),
+                    n.aliases.some((alias) => {
+                        const near = nearMask(
+                            toks.length,
+                            spans(toks, alias),
+                            FREE_NEAR,
+                        );
+                        return frees.some((f) => near[f]);
+                    }),
                 )
                 .map((n) => n.service);
             if (meant.length > 0 && meant.every(priced)) {

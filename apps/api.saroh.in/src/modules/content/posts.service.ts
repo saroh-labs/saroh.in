@@ -22,6 +22,7 @@ import type {
 import {
     assertPostApproved,
     isLeadRole,
+    postFingerprint,
     readPostApproval,
 } from "./post-approval";
 import type { PostCheckFlag } from "./post-checks";
@@ -233,6 +234,10 @@ export class PostsService {
 
         try {
             await prisma.$transaction(async (tx) => {
+                const before = await tx.post.findUniqueOrThrow({
+                    where: { id: postId },
+                    select: REVISION_FIELDS,
+                });
                 const saved = await tx.post.update({
                     where: { id: postId },
                     data: {
@@ -258,10 +263,14 @@ export class PostsService {
                     },
                     select: REVISION_FIELDS,
                 });
+                // R3: a save that changes nothing doesn't make its saver the
+                // post's last editor.
+                const state = revisionStateOf(saved);
+                if (postFingerprint(state) === postFingerprint(before)) return;
                 await revisionAfterSave(tx, {
                     organizationId: ctx.organizationId,
                     postId,
-                    state: revisionStateOf(saved),
+                    state,
                     savedByUserId: ctx.userId,
                     event: dto.event,
                 });

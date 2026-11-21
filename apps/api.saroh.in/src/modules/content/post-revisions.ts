@@ -10,9 +10,9 @@ import type { Prisma } from "@saroh/database";
  * `SiteChangeApproval` on unit `post:<postId>`, and "publish on a date" is
  * `Post.scheduledAt`, so it needs no table of its own.
  *
- * An autosave by someone other than whoever saved the last revision always
- * writes one: the newest edit revision names the post's last editor, whom
- * approval binds to (nobody approves their own writing).
+ * An autosave by someone other than whoever saved the last edit revision
+ * always writes one: the newest edit revision names the post's last editor,
+ * whom approval binds to (nobody approves their own writing).
  */
 export const REVISION_REASONS = [
     "autosave",
@@ -24,6 +24,16 @@ export const REVISION_REASONS = [
     "approved",
 ] as const;
 export type RevisionReason = (typeof REVISION_REASONS)[number];
+
+/**
+ * Revisions someone's writing made: the newest names the post's last editor.
+ * Not `sent` (R3): sending a colleague's post unchanged isn't writing it.
+ */
+export const EDIT_REASONS: RevisionReason[] = [
+    "autosave",
+    "ask_ai",
+    "restored",
+];
 
 /** Autosaves closer together than this share one revision. */
 export const AUTOSAVE_REVISION_EVERY_MS = 60 * 60 * 1000;
@@ -103,7 +113,9 @@ export async function writeRevision(
 
 /**
  * After a save: an `ask_ai` revision always, an autosave one only when the
- * last revision is an hour old (or there is none).
+ * last edit revision is someone else's or an hour old (or there is none).
+ * Only edit revisions count (K1): a `published` or `sent` one by the saver
+ * must not hide that they changed a colleague's words.
  */
 export async function revisionAfterSave(
     tx: Tx,
@@ -118,7 +130,7 @@ export async function revisionAfterSave(
 ): Promise<void> {
     if (!input.event) {
         const last = await tx.postRevision.findFirst({
-            where: { postId: input.postId },
+            where: { postId: input.postId, reason: { in: EDIT_REASONS } },
             orderBy: { createdAt: "desc" },
             select: { createdAt: true, savedByUserId: true },
         });

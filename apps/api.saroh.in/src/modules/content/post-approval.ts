@@ -10,6 +10,7 @@ import type {
 } from "../sites/change-approvals";
 import {
     heldForApproval,
+    personName,
     readUnitVerdicts,
     unitApprovals,
 } from "../sites/change-approvals";
@@ -19,7 +20,11 @@ import {
 } from "../sites/publish-approval";
 import { websiteAreaOn } from "../sites/website-area-switch";
 import type { RevisionState } from "./post-revisions";
-import { REVISION_FIELDS, revisionStateOf } from "./post-revisions";
+import {
+    EDIT_REASONS,
+    REVISION_FIELDS,
+    revisionStateOf,
+} from "./post-revisions";
 
 /**
  * A post's approval (O7, owner 20 Nov 2026; KTD-E6). With "Publishing needs
@@ -38,17 +43,7 @@ export function postUnitKey(postId: string): string {
     return `post:${postId}`;
 }
 
-/** Revisions someone's writing made: the newest names the last editor. */
-const EDIT_REASONS = ["autosave", "ask_ai", "restored", "sent"];
-
 const LEAD_ROLES = ["OWNER", "ADMIN"];
-
-/** A person's name, or their email when the name is empty. */
-function nameOf(u: { name: string | null; email: string }): string {
-    // `||`: an empty name falls through to the email.
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    return u.name?.trim() || u.email;
-}
 
 /** Changes when anything that goes live with the post changes. */
 export function postFingerprint(s: RevisionState): string {
@@ -88,6 +83,23 @@ export async function postApprovalUnit(
         // A post older than its revisions: whoever wrote it.
         editedBy: last?.savedByUserId ?? state.authorId,
     };
+}
+
+/**
+ * Whether the post has an open request (R1): a `sent` revision newer than
+ * its last `approved` or `published` one. Approve and Ask for changes
+ * answer a request; without one there is nothing to answer.
+ */
+export async function postRequestOpen(
+    tx: Pick<Tx, "postRevision">,
+    postId: string,
+): Promise<boolean> {
+    const last = await tx.postRevision.findFirst({
+        where: { postId, reason: { in: ["sent", "approved", "published"] } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        select: { reason: true },
+    });
+    return last?.reason === "sent";
 }
 
 /** The caller is an owner or an admin: their posts need no approval. */
@@ -179,9 +191,10 @@ type ApproverTx = Pick<Tx, "siteReviewer" | "membership">;
 /** Who may approve a post on the site: its reviewers, the admins, the owner. */
 export async function approversOf(
     tx: ApproverTx,
-    organizationId: string,
+    ctx: OrganizationContext,
     siteId: string,
 ): Promise<PostApprover[]> {
+    const { organizationId } = ctx;
     const [reviewers, leads] = await Promise.all([
         tx.siteReviewer.findMany({
             where: { organizationId, siteId },
@@ -201,14 +214,14 @@ export async function approversOf(
     for (const { user } of reviewers) {
         out.set(user.id, {
             id: user.id,
-            name: nameOf(user),
+            name: personName(ctx, user),
             role: "REVIEWER",
         });
     }
     for (const { user, role } of leads) {
         out.set(user.id, {
             id: user.id,
-            name: nameOf(user),
+            name: personName(ctx, user),
             role: role as "OWNER" | "ADMIN",
         });
     }
@@ -220,7 +233,13 @@ export async function approverIdsOf(
     organizationId: string,
     siteId: string,
 ): Promise<string[]> {
-    return (await approversOf(tx, organizationId, siteId)).map((a) => a.id);
+    // Ids only: no name is read, so the caller's view doesn't matter.
+    const ctx: OrganizationContext = {
+        organizationId,
+        userId: "",
+        role: "MEMBER",
+    };
+    return (await approversOf(tx, ctx, siteId)).map((a) => a.id);
 }
 
 /** What the post editor draws for approval (the band, the sheet's foot). */
@@ -269,29 +288,32 @@ export async function readPostApproval(
 ): Promise<PostApprovalView> {
     const { organizationId } = ctx;
     const unit = await postApprovalUnit(tx, input.postId, input.state);
-    const [on, verdicts, approvers, sent, published] = await Promise.all([
-        postApprovalOn(tx, organizationId, input.siteId),
-        readUnitVerdicts(tx, {
-            organizationId,
-            siteId: input.siteId,
-            editors: unit.editedBy ? [unit.editedBy] : [],
-        }),
-        approversOf(tx, organizationId, input.siteId),
-        tx.postRevision.findFirst({
-            where: { postId: input.postId, reason: "sent" },
-            orderBy: { createdAt: "desc" },
-            select: {
-                note: true,
-                createdAt: true,
-                savedBy: { select: { id: true, name: true, email: true } },
-            },
-        }),
-        tx.postRevision.findFirst({
-            where: { postId: input.postId, reason: "published" },
-            orderBy: { createdAt: "desc" },
-            select: { createdAt: true },
-        }),
-    ]);
+    const [on, verdicts, approvers, sent, published, asked] = await Promise.all(
+        [
+            postApprovalOn(tx, organizationId, input.siteId),
+            readUnitVerdicts(tx, {
+                organizationId,
+                siteId: input.siteId,
+                editors: unit.editedBy ? [unit.editedBy] : [],
+            }),
+            approversOf(tx, ctx, input.siteId),
+            tx.postRevision.findFirst({
+                where: { postId: input.postId, reason: "sent" },
+                orderBy: { createdAt: "desc" },
+                select: {
+                    note: true,
+                    createdAt: true,
+                    savedBy: { select: { id: true, name: true, email: true } },
+                },
+            }),
+            tx.postRevision.findFirst({
+                where: { postId: input.postId, reason: "published" },
+                orderBy: { createdAt: "desc" },
+                select: { createdAt: true },
+            }),
+            postRequestOpen(tx, input.postId),
+        ],
+    );
     const approval = unitApprovals([unit], verdicts.rows, verdicts.leads).get(
         unit.key,
     );
@@ -306,7 +328,7 @@ export async function readPostApproval(
     const open = sent && (!published || published.createdAt < sent.createdAt);
     const person = (u: { id: string; name: string | null; email: string }) => ({
         id: u.id,
-        name: nameOf(u),
+        name: personName(ctx, u),
     });
     return {
         on,
@@ -316,7 +338,10 @@ export async function readPostApproval(
             state !== "not-needed" &&
             state !== "approved",
         canApprove:
-            on && allows(ctx, "site:approve") && ctx.userId !== unit.editedBy,
+            on &&
+            asked &&
+            allows(ctx, "site:approve") &&
+            ctx.userId !== unit.editedBy,
         state,
         fingerprint: unit.fingerprint,
         lastEditorId: unit.editedBy,

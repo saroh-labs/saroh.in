@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import type { Prisma } from "@saroh/database";
 
 /**
@@ -21,4 +23,17 @@ export async function stampDraftEditors(
         UPDATE "Site"
         SET "draftEditors" = COALESCE("draftEditors", '{}'::jsonb) || ${JSON.stringify(patch)}::jsonb
         WHERE id = ${siteId}`;
+}
+
+/**
+ * The unit keys among `pairs` whose value a write changed (`[before,
+ * after]`), for {@link stampDraftEditors}: a write that leaves a setting as
+ * it was must not take over its stamp (R2, 21 Nov 2026).
+ */
+export function changedKeys(
+    pairs: Record<string, readonly [unknown, unknown]>,
+): string[] {
+    return Object.entries(pairs)
+        .filter(([, [a, b]]) => !isDeepStrictEqual(a ?? null, b ?? null))
+        .map(([key]) => key);
 }
