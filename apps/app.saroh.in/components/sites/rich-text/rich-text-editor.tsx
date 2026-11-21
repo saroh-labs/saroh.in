@@ -644,9 +644,10 @@ function EditorSurface({
                     // through the schema, so a stray tag is normalised the
                     // way a paste would be.
                     if (!on && !editor.isDestroyed)
-                        editor.commands.setContent(value, {
-                            emitUpdate: false,
-                        });
+                        editor
+                            .chain()
+                            .setContent(value, { emitUpdate: false })
+                            .run();
                     setSource(on);
                 }}
                 aria-label="Edit as HTML"
