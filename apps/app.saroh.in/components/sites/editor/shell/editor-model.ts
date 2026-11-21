@@ -9,6 +9,7 @@ import type { ModulePageKind, SitePage } from "@/lib/sites/service";
 import type { SiteStateTone } from "@/lib/sites/site-state";
 import type { SiteStyleOptions } from "@/lib/sites/style";
 
+import type { AskAiOn } from "../use-editor-ask-ai";
 import type { EditorDraft } from "../use-editor-draft";
 import type { EditorLayout, EditorSheets } from "../use-editor-layout";
 import type { EditorReview } from "../use-editor-review";
@@ -87,4 +88,6 @@ export interface EditorModel {
     reloadDraft?: (pageId?: string) => void;
     /** The business's phone, for the link picker's Call and WhatsApp (U47d). */
     businessPhone: string | null;
+    /** Open Ask AI about the page (the top bar) or the chosen section (its own button). */
+    openAskAi: (on: AskAiOn) => void;
 }

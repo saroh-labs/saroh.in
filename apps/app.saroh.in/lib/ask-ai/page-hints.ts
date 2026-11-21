@@ -280,3 +280,104 @@ export function customerPage(
         suggestions,
     };
 }
+
+/**
+ * A page of the website open in the editor (owner, 21 Nov): Ask AI reads
+ * its words with `get_page`, so the id carries the site's too.
+ */
+export function sitePagePage(site: {
+    siteId: string;
+    pageId: string;
+    /** The page's own title, "Home". */
+    title: string;
+}): AskAiPage {
+    return {
+        about: {
+            kind: "site_page",
+            id: `${site.siteId}:${site.pageId}`,
+            label: clip(`${site.title} page`),
+        },
+        intro: `Looking at your ${site.title} page in the editor.`,
+        placeholder: "Ask about this page, or say what to change",
+        suggestions: [
+            {
+                label: "What could make this page clearer?",
+                question: "What could make this page clearer?",
+            },
+            {
+                label: "Anything missing for a first-time visitor?",
+                question: "Is anything missing for a first-time visitor?",
+            },
+        ],
+    };
+}
+
+/**
+ * One section of that page, or its header or footer ("On every page"):
+ * `name` is the section's kind in the editor's words, "Top of the page".
+ */
+export function siteSectionPage(site: {
+    siteId: string;
+    pageId: string;
+    title: string;
+    sectionKey: string;
+    name: string;
+    /** The header or footer: the same on every page. */
+    everywhere?: boolean;
+}): AskAiPage {
+    const where = site.everywhere ? "On every page" : site.title;
+    return {
+        about: {
+            kind: "site_section",
+            id: `${site.siteId}:${site.pageId}:${site.sectionKey}`,
+            label: clip(`${where} · ${site.name}`),
+        },
+        intro: site.everywhere
+            ? `Looking at the ${site.name}, on every page.`
+            : `Looking at the ${site.name} section on ${site.title}.`,
+        placeholder: "Ask about this section, or say what to change",
+        suggestions: [
+            {
+                label: "How could its words be clearer?",
+                question: "How could this section's words be clearer?",
+            },
+            {
+                label: "Is its main button clear?",
+                question: "Is this section's main button clear?",
+            },
+        ],
+    };
+}
+
+/** A blog post in its editor: its title names it. */
+export function postPage(post: {
+    siteId: string;
+    /** Null before a new post's first save. */
+    postId: string | null;
+    title: string;
+}): AskAiPage {
+    const title = post.title.trim() || "Untitled post";
+    return {
+        about: {
+            kind: "post",
+            id: `${post.siteId}:${post.postId ?? "new"}`,
+            label: clip(title),
+        },
+        intro: `Looking at your post, “${title}”.`,
+        placeholder: "Ask about this post",
+        suggestions: [
+            {
+                label: "A better title",
+                question: "Suggest a better title for this post",
+            },
+            {
+                label: "A few headings",
+                question: "Suggest a few headings for this post",
+            },
+        ],
+    };
+}
+
+/** The contract's label is 80 characters at most. */
+const clip = (words: string) =>
+    words.length > 80 ? `${words.slice(0, 79)}…` : words;

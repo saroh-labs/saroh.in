@@ -39,6 +39,10 @@ describe("outcome table (spec §3.3)", () => {
             true,
         );
         expect(countsFor("FAILED", "Anything")).toBe(false);
+        // The website editors' common questions don't count either.
+        expect(
+            countsFor("ANSWERED", "How could this section's words be clearer?"),
+        ).toBe(false);
     });
 });
 

@@ -15,7 +15,6 @@ import {
 import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { openAskAi } from "@/components/ask-ai/open";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 
@@ -85,7 +84,7 @@ export function PhonePageBar({
                     label="Ask AI"
                     icon={<Sparkles />}
                     tooltip={false}
-                    onClick={openAskAi}
+                    onClick={() => model.openAskAi("page")}
                     className={cn(
                         ICON,
                         "bg-info-subtle text-info-subtle-foreground hover:bg-info-subtle hover:text-info-subtle-foreground hover:brightness-95",

@@ -25,9 +25,6 @@ vi.mock("./find-settings-sheet", () => ({
     },
 }));
 const openAskAi = vi.fn();
-vi.mock("@/components/ask-ai/open", () => ({
-    openAskAi: () => openAskAi() as unknown,
-}));
 
 /**
  * Find (U46c, `fix/WXECommand`): ⌘K's one search, its groups, Enter and
@@ -66,6 +63,7 @@ function model(readOnly = false): EditorModel {
         readOnly,
         canUpdateSite: !readOnly,
         askAi: true,
+        openAskAi,
         unsaved: false,
         draft: {
             sections: [
@@ -197,7 +195,7 @@ describe("Find (⌘K) in the editor", () => {
         open();
         type("add a map");
         press("Tab");
-        expect(openAskAi).toHaveBeenCalled();
+        expect(openAskAi).toHaveBeenCalledWith("page");
         expect(input()).toBeNull();
     });
 

@@ -20,7 +20,6 @@ import {
 import type { FocusEvent, MouseEvent, ReactNode } from "react";
 import { useRef, useState } from "react";
 
-import { openAskAi } from "@/components/ask-ai/open";
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { FixedBlockInspector } from "@/components/sites/blocks/fixed-block-inspector";
 import { useServicesForPicker } from "@/components/sites/blocks/use-services-for-picker";
@@ -237,7 +236,7 @@ export function SectionSheet({
                         icon={Sparkles}
                         label="Ask AI"
                         info
-                        onClick={openAskAi}
+                        onClick={() => model.openAskAi("section")}
                     />
                 ) : null}
             </div>

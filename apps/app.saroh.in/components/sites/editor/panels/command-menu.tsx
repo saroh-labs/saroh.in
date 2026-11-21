@@ -24,7 +24,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { openAskAi } from "@/components/ask-ai/open";
 import { SECTION_ICONS } from "@/components/sites/blocks/block-icons";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 
@@ -124,7 +123,7 @@ export function CommandMenu({ model, open, onOpenChange }: CommandMenuProps) {
 
     function ask() {
         close();
-        openAskAi();
+        model.openAskAi("page");
     }
 
     const here: FindRow[] =

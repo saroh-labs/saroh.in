@@ -5,12 +5,14 @@ import { FileText, History, MessageSquare, Plus, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import { openAskAi } from "@/components/ask-ai/open";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import type { TrailTab } from "@/components/sites/editor/shell/editor-trail";
 import { EditorTrail } from "@/components/sites/editor/shell/editor-trail";
 import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { AddList } from "@/components/sites/rich-text/writing-menus";
+import { postPage } from "@/lib/ask-ai/page-hints";
 import type { PostDetail } from "@/lib/content/service";
 import { formatDateTime } from "@/lib/format/datetime";
 import { postChanges, postStatusLabel } from "@/lib/sites/post-diff";
@@ -205,9 +207,22 @@ export function PostShell({
               }
             : undefined;
 
+    // Every Ask AI here is about this post (owner, 21 Nov).
+    const askAiHere =
+        data.askAi && !data.readOnly ? (
+            <AskAiPageIs
+                page={postPage({
+                    siteId,
+                    postId: draft.postId ?? null,
+                    title: draft.fields.title,
+                })}
+            />
+        ) : null;
+
     if (phone) {
         return (
             <>
+                {askAiHere}
                 <PhonePostEditor
                     model={model}
                     onPublish={publish.open}
@@ -239,6 +254,7 @@ export function PostShell({
 
     return (
         <div className="flex h-dvh flex-col bg-background">
+            {askAiHere}
             <PostTopBar
                 model={model}
                 editor={editor}

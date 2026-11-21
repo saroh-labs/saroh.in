@@ -3128,3 +3128,15 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Older events keep counting** in the site's totals and Insights; they just don't count for a page. A page's part says "since <date>" from the first day it counted by page, never a 0 it didn't measure. No back-fill.
 - Consequences: `sitePagePathOf` in `packages/block-contract/src/private-paths.ts` is the one rule, used by the site (`visit-source.ts`, `blocks/enquiry.tsx`, `lib/site-view.ts`) and again by the API contract (`analytics/event-contract.ts`), which drops a path it may not keep and still counts the event. The public enquiry endpoint takes an optional `pagePath`. The daily rollups already break `site.started` and `enquiry.submitted` down by path (U47a). Saroh's privacy policy says in one line that a site counts which page a booking was started or a question sent from: a minimal factual addition for the owner to review, as earlier ones were.
 - Rules: `docs/patterns/saroh-product.md` → "what visit tracking collects".
+
+## DEC-236 Ask AI in the editors knows the page, section or post it was opened on, and can read the site (read only until batch 8)
+
+**Status: Accepted — 2026-11-21** · owner ("the ask AI should be context aware about the sections it is clicked on")
+
+- Context: in the site and post editors Ask AI fell back to the whole business ("November vs October"), whichever button opened it, and had no tool to read the site, so it couldn't talk about the words on the page.
+- Decision:
+    - **Three more kinds of `about`:** `site_page` (id `<siteId>:<pageId>`, label "Home page"), `site_section` (`<siteId>:<pageId>:<sectionKey>`, "Home · Top of the page"; the header and footer are "On every page · Header") and `post` (`<siteId>:<postId>`, the post's title). The site's id travels because `get_page` needs it. The label stays only a name, never an instruction.
+    - **Where it was opened decides:** the top bar, Find and the phone page menu ask about the page; a section's toolbar or sheet about that section, and choosing a section moves the panel to it; everything in the post editor about the post. One editor-level state (`useEditorAskAi`) renders `<AskAiPageIs>`; the buttons only say "page" or "section". Clearing the label still asks about the whole business (AF 7).
+    - **Ask AI reads the site:** `get_site` and `get_page` join its tools as reads, through the same tool bridge and checks as the MCP tools (`site:read`, the Website module, the person's live role). It suggests words to copy and never adds a price, offer, time, phone number or claim the person didn't give. There is no post read tool, so for a post it works from the title and what it is told.
+    - **Six more common questions** (two per screen) are asked as written and don't count.
+- Consequences: no site write tools yet; Ask AI changing the site with Now/New cards and a server-side Check this is the next step (batch 8, U42/U43).

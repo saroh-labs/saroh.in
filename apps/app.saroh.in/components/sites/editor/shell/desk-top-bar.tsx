@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { openAskAi } from "@/components/ask-ai/open";
 import { PagesPanel } from "@/components/sites/pages/pages-panel";
 import { unfinishedPhrase } from "@/components/sites/publish/held-back-copy";
 
@@ -142,7 +141,7 @@ export function DeskTopBar({
                         type="button"
                         variant="outline"
                         className="h-10 shrink-0 rounded-[9px]"
-                        onClick={openAskAi}
+                        onClick={() => model.openAskAi("page")}
                     >
                         <Sparkles aria-hidden className="size-4" />
                         Ask AI

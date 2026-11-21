@@ -1,6 +1,6 @@
 "use client";
 
-import { openAskAi } from "@/components/ask-ai/open";
+import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
@@ -67,6 +67,7 @@ import { SaveFailedNotice } from "./save-failed";
 import type { EditorModel, TrailKey } from "./shell/editor-model";
 import { EditorShell } from "./shell/editor-shell";
 import type { SiteEditorProps } from "./site-editor-props";
+import { useEditorAskAi } from "./use-editor-ask-ai";
 import { useEditorDraft } from "./use-editor-draft";
 import { takePendingNote, useEditorJumps } from "./use-editor-jumps";
 import { useEditorLayout, useEditorSheets } from "./use-editor-layout";
@@ -464,6 +465,13 @@ export function SiteEditor({
         setTrailExtra(null);
         selectRailTab(tab === "pages" ? "page" : tab, setRail, add.setAdding);
     };
+    const askAiHere = useEditorAskAi({
+        siteId,
+        pageId,
+        pageTitle: pages.find((p) => p.id === pageId)?.title ?? "this page",
+        active,
+        chrome: selection.selectedChrome,
+    });
     const model: EditorModel = {
         ...{ siteId, pageId, pages, address: address ?? null, layout },
         page: pages.find((p) => p.id === pageId),
@@ -490,6 +498,7 @@ export function SiteEditor({
         scrollToSection: scrollToBlock,
         reloadDraft: reloadDraft ? (page) => reloadDraft(page) : undefined,
         businessPhone: readOnly ? null : businessPhone,
+        openAskAi: askAiHere.open,
     };
 
     // The selected section's toolbar on the desk canvas (U47), each with Undo.
@@ -512,7 +521,11 @@ export function SiteEditor({
                           onDuplicate={() => act.duplicate(index)}
                           onHideOnPhone={(hide) => act.hideOnPhone(index, hide)}
                           onDelete={() => edits.removeAt(index)}
-                          onAskAi={model.askAi ? openAskAi : undefined}
+                          onAskAi={
+                              model.askAi
+                                  ? () => model.openAskAi("section")
+                                  : undefined
+                          }
                       />
                   );
               }
@@ -794,6 +807,7 @@ export function SiteEditor({
         <EditorReadOnly.Provider value={readOnly}>
             <EditorReviewCan.Provider value={reviewCan}>
                 <div className="flex h-dvh flex-col bg-background text-foreground">
+                    {model.askAi ? <AskAiPageIs page={askAiHere.page} /> : null}
                     {desk ? (
                         <EditorShell
                             model={model}

@@ -45,6 +45,7 @@ const ASKS: readonly [OrgAction, string][] = [
     ["lead:read", "enquiries"],
     ["invoice:read", "unpaid bills"],
     ["payment:read", "money that came in"],
+    ["site:read", "your website's pages"],
 ];
 
 const DRAFTS: readonly [OrgAction, string][] = [
