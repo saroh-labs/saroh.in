@@ -69,7 +69,9 @@ export function PostInspector({
                     tabs={tabs}
                     value={tab}
                     onValueChange={onTab}
-                    listClassName="px-3"
+                    // The board's tighter tabs (`blogdesk/WXWWrite`): all three
+                    // fit a 340px inspector, Feedback included.
+                    listClassName="px-2 [&>button]:px-2 [&>button]:text-[13px]"
                 />
             }
         >

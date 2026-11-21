@@ -250,6 +250,10 @@ export function usePostDraft({
 
     function set<K extends keyof PostFields>(key: K) {
         return (value: PostFields[K]) => {
+            // The same value again (an editor re-reporting what it holds)
+            // is not an edit: it must not autosave a post nobody touched.
+            if (latest.current[key] === value) return;
+            latest.current = { ...latest.current, [key]: value };
             setFields((f) => ({ ...f, [key]: value }));
             setDirty(true);
             setSaveFailed(false);

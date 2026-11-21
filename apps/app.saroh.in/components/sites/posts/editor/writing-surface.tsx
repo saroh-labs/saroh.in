@@ -119,12 +119,12 @@ export function WritingSurface({
                         size="inline"
                         aria-pressed={toolbar}
                         onClick={() => onToolbar(!toolbar)}
-                        className="font-sans text-xs font-normal text-muted-foreground hover:text-foreground"
+                        className="shrink-0 whitespace-nowrap font-sans text-xs font-normal text-muted-foreground hover:text-foreground"
                     >
                         {toolbar ? "Hide formatting" : "More formatting"}
                     </Button>
                 ) : null}
-                <span>
+                <span className="shrink-0 whitespace-nowrap">
                     {formatNumber(reading.words)} words · {reading.minutes} min
                     read
                 </span>

@@ -86,7 +86,7 @@ export function PostsLeftPanel({ model }: { model: PostEditorModel }) {
                         onRetry={draft.refresh}
                     />
                 ) : null}
-                <ul className="grid gap-px">
+                <ul className="grid grid-cols-1 gap-px">
                     {shown.map((p) => {
                         const current = p.id === draft.postId;
                         return (
@@ -137,7 +137,10 @@ export function PostsLeftPanel({ model }: { model: PostEditorModel }) {
                 <h3 className="mx-2.5 mb-1 mt-4 text-xs font-semibold text-muted-foreground">
                     In this post
                 </h3>
-                <ul aria-label="Outline of this post" className="grid gap-px">
+                <ul
+                    aria-label="Outline of this post"
+                    className="grid grid-cols-1 gap-px"
+                >
                     <li>
                         <button
                             type="button"

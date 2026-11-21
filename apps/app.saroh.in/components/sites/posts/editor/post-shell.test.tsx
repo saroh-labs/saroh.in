@@ -17,25 +17,31 @@ vi.mock("next/navigation", () => ({
     usePathname: () => "/sites/s1/write/new",
 }));
 
-// The rich text editor is browser-heavy; a textarea stands in for it.
-vi.mock("next/dynamic", () => ({
-    default: () =>
-        function Stand({
-            value,
-            onChange,
-        }: {
-            value: string;
-            onChange: (v: string) => void;
-        }) {
-            return (
-                <textarea
-                    aria-label="Post body"
-                    value={value}
-                    onChange={(e) => onChange(e.target.value)}
-                />
-            );
-        },
-}));
+// The rich text editor is browser-heavy; a textarea stands in for it. Like
+// Tiptap (setEditable emits an update), it re-reports its value on mount.
+vi.mock("next/dynamic", async () => {
+    const { useEffect } = await import("react");
+    return {
+        default: () =>
+            function Stand({
+                value,
+                onChange,
+            }: {
+                value: string;
+                onChange: (v: string) => void;
+            }) {
+                // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount
+                useEffect(() => onChange(value), []);
+                return (
+                    <textarea
+                        aria-label="Post body"
+                        value={value}
+                        onChange={(e) => onChange(e.target.value)}
+                    />
+                );
+            },
+    };
+});
 
 const createPost = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 const updatePost = vi.fn<(...a: unknown[]) => Promise<unknown>>();
@@ -236,6 +242,13 @@ describe("the desk post editor (U15)", () => {
         // Nor does autosave go without one.
         await settle(() => vi.advanceTimersByTime(3000));
         expect(createPost).not.toHaveBeenCalled();
+    });
+
+    it("opening a post is not an edit: nothing unsaved, nothing autosaved", async () => {
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        await settle(() => vi.advanceTimersByTime(3000));
+        expect(updatePost).not.toHaveBeenCalled();
+        expect(container.textContent).not.toContain("Unsaved changes");
     });
 
     it("counts the changes waiting against the live copy (RULES §2)", () => {

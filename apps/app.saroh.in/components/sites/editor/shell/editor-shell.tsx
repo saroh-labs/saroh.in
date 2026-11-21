@@ -26,6 +26,16 @@ import { ReviewerStrip } from "./reviewer-strip";
 /** The boards' widths (`fix/WXKRest`) until someone drags a divider. */
 const LEFT_PANEL = 280;
 const INSPECTOR = 360;
+/**
+ * The narrowest each left panel is drawn (`fix/WXBBrand`, `fix/WXBAdd`,
+ * `fix/WXEHistory`). A width the old editor saved (230) is not honoured
+ * below it: the panels' rows were drawn for these widths.
+ */
+export function leftPanelMin(trail: string): number {
+    if (trail === "brand" || trail === "add") return 380;
+    if (trail === "history") return 360;
+    return LEFT_PANEL;
+}
 
 export interface EditorShellProps {
     model: EditorModel;
@@ -104,6 +114,11 @@ export function EditorShell({
         );
 
     const page = model.page;
+    const railMin = leftPanelMin(model.trail);
+    const railShown = Math.max(
+        viewport.railWidth === RAIL_DEFAULT ? LEFT_PANEL : viewport.railWidth,
+        railMin,
+    );
     return (
         <>
             <DeskTopBar
@@ -121,10 +136,12 @@ export function EditorShell({
                 viewport={{
                     ...viewport,
                     // The boards' widths stand in for the old defaults.
-                    railWidth:
-                        viewport.railWidth === RAIL_DEFAULT
-                            ? LEFT_PANEL
-                            : viewport.railWidth,
+                    railWidth: railShown,
+                    // Dragging and the keys start from the width drawn.
+                    setRailWidth: (px) =>
+                        viewport.setRailWidth(Math.max(px, railMin)),
+                    nudgeRail: (d) =>
+                        viewport.setRailWidth(Math.max(railShown + d, railMin)),
                     panelWidth:
                         viewport.panelWidth === PANEL_DEFAULT
                             ? INSPECTOR

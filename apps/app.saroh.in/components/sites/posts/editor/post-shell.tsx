@@ -123,9 +123,11 @@ export function PostShell({
     const [previewing, setPreviewing] = useState(false);
     const [titleError, setTitleError] = useState(false);
 
-    // Preview reads the post as it will show: nothing on it edits.
+    // Preview reads the post as it will show: nothing on it edits. No
+    // update emitted: Tiptap's default made opening a post count as an edit.
     useEffect(() => {
-        if (editor && !editor.isDestroyed) editor.setEditable(!previewing);
+        if (editor && !editor.isDestroyed)
+            editor.setEditable(!previewing, false);
     }, [editor, previewing]);
     // The title asked for is given: the error goes.
     const showTitleError = titleError && !draft.fields.title.trim();
