@@ -92,13 +92,16 @@ describe("yearlyOffTooMuch: a year never costs less than a month (F11)", () => {
             percentOff: null,
             months,
         });
-        expect(yearlyOffTooMuch(amount(9), 1_000, 10)).toBe(false);
-        expect(yearlyOffTooMuch(amount(10), 1_000, 10)).toBe(true);
+        expect(yearlyOffTooMuch(amount(9), 1_000, 10_000)).toBe(false);
+        expect(yearlyOffTooMuch(amount(10), 1_000, 10_000)).toBe(true);
         const percent = { discountPaise: 0, percentOff: 90, months: 12 };
-        expect(yearlyOffTooMuch(percent, 1_000, 10)).toBe(true);
-        expect(yearlyOffTooMuch({ ...percent, months: 10 }, 1_000, 10)).toBe(
-            false,
-        );
+        expect(yearlyOffTooMuch(percent, 1_000, 10_000)).toBe(true);
+        expect(
+            yearlyOffTooMuch({ ...percent, months: 10 }, 1_000, 10_000),
+        ).toBe(false);
+        // A yearly offer (DEC-231) is the year it's measured against.
+        expect(yearlyOffTooMuch(amount(7), 1_000, 7_000)).toBe(true);
+        expect(yearlyOffTooMuch(amount(6), 1_000, 7_000)).toBe(false);
     });
 });
 

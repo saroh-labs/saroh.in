@@ -144,6 +144,13 @@ export const planSchema = z.object({
     /** Retired plans keep their businesses; no new business can choose them. */
     retired: z.boolean().default(false),
     trial: trialSchema.optional(),
+    /**
+     * What a yearly buyer is charged before GST, when the plan has a yearly
+     * offer (DEC-231): below the regular yearly price ("pay for N months,
+     * get 12"), which the pricing page strikes through beside it. Absent:
+     * no offer, the regular yearly price is charged.
+     */
+    yearlyOfferPaise: paise.positive().optional(),
 });
 
 export const groupSchema = z.object({ id, name: z.string().min(1) });
@@ -353,6 +360,15 @@ export const catalogSchema = catalogShape.superRefine((c, ctx) => {
                 "trial",
                 "firstPaise",
             ]);
+        }
+        if (
+            p.yearlyOfferPaise !== undefined &&
+            p.yearlyOfferPaise >= p.pricePaise * c.yearly.paid
+        ) {
+            issue(
+                `${p.name}'s yearly offer must cost less than its regular yearly price`,
+                ["plans", i, "yearlyOfferPaise"],
+            );
         }
     });
 

@@ -36,6 +36,7 @@ import { autopayTakes, planTaxOf } from "./autopay-currency";
 import { assertBillingMayStart, renewsAtProvider } from "./business-closing";
 import { billedByProvider, periodEnd, periodStart } from "./checkout-quote";
 import { CheckoutService } from "./checkout.service";
+import { withLaunchOff, yearlyExtrasLaunch } from "./extras-launch";
 import type { AddonChargeLine } from "./offers";
 import {
     addonInvoiceName,
@@ -383,7 +384,7 @@ export class AddonsService {
                 sub.providerSubscriptionId
             ) {
                 const cycle = sub.billingCycle === "year" ? "year" : "month";
-                const line = addonProratedLine({
+                const prorated = addonProratedLine({
                     addon,
                     added: quantity - held,
                     cycle,
@@ -391,6 +392,22 @@ export class AddonsService {
                     periodEnd: end,
                     now,
                 });
+                // A year at its yearly offer: the launch percent on what
+                // falls in its first months (DEC-231).
+                const line =
+                    prorated &&
+                    withLaunchOff(
+                        prorated,
+                        await yearlyExtrasLaunch(tx, {
+                            organizationId: ctx.organizationId,
+                            edition: ctx.edition ?? "INDIA",
+                            planRowId: sub.plan.id,
+                            planId,
+                            cycle,
+                            catalog,
+                            now,
+                        }),
+                    );
                 if (line) {
                     await queueAddonChargesInTx(tx, {
                         organizationId: ctx.organizationId,

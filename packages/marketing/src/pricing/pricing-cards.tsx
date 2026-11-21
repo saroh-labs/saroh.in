@@ -48,7 +48,7 @@ export function PricingCards({
                     {model.yearly ? (
                         <BillingToggle
                             yearly={yearly}
-                            freeMonths={model.yearly.freeMonths}
+                            label={model.yearly.label}
                             onChange={(v) => {
                                 if (v === yearly) return;
                                 setYearly(v);

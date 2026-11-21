@@ -306,6 +306,26 @@ describe("the catalogue schema", () => {
         expect(errorsOf(input)).toEqual([]);
     });
 
+    it("keeps a yearly offer above nothing and below the regular year (DEC-231)", () => {
+        const input = fixtureInput();
+        // Plan B: 111 a month, the fixture's year pays for 9 months.
+        const regular = input.plans[1].pricePaise * input.yearly.paid;
+        input.plans[1].yearlyOfferPaise = regular;
+        expect(errorsOf(input).join()).toMatch(
+            /yearly offer must cost less than its regular yearly price/,
+        );
+        input.plans[1].yearlyOfferPaise = 0;
+        expect(errorsOf(input).length).toBeGreaterThan(0);
+        // Free has no regular year to go under.
+        input.plans[1].yearlyOfferPaise = regular - 1;
+        input.plans[0].yearlyOfferPaise = 1;
+        expect(errorsOf(input).join()).toMatch(/Plan A's yearly offer/);
+        delete input.plans[0].yearlyOfferPaise;
+        expect(errorsOf(input)).toEqual([]);
+        // A snapshot from before it reads unchanged, with no offer.
+        expect(fixture().plans[1].yearlyOfferPaise).toBeUndefined();
+    });
+
     it("reads a plan's first-month charge only while its offer is on", () => {
         expect(
             trialFirstPaise({ trial: { on: true, days: 30, firstPaise: 7 } }),

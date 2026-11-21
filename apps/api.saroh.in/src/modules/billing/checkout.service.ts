@@ -98,6 +98,7 @@ import {
     COUPON_KINDS,
     periodEnd,
     quoteChange,
+    yearlyOfferRegular,
 } from "./checkout-quote";
 import {
     couponCheckoutExpiresAt,
@@ -241,6 +242,11 @@ export interface ChangePlanQuoteView {
     addonsNowPaise: number;
     /** What setting up autopay takes now, named honestly (DEC-093). */
     mandateCheck: MandateCheck;
+    /**
+     * The regular yearly price before tax, struck beside `pricePaise` when
+     * the year is charged at its plan's yearly offer (DEC-231); else null.
+     */
+    regularPricePaise: number | null;
     /**
      * The add-ons held today that end with this change (DEC-157), by the
      * rule the change itself ends them by (`addons-ending.ts`). Empty when
@@ -1124,10 +1130,14 @@ export class CheckoutService {
                         )
                     ).priceCents
                   : catalog?.plans.find((p) => p.id === planId)?.pricePaise;
+        // A year at its plan's yearly offer: the offer is yearly's launch
+        // price, so the automatic coupon never stacks on it (DEC-231).
+        const regularPaise = yearlyOfferRegular(catalog, planId, target);
         const asked = {
             subscription,
             target,
             now,
+            regularPaise,
             tax: catalogMoney(catalog).tax,
             trialDays,
             trialFirstPaise,
@@ -1155,8 +1165,16 @@ export class CheckoutService {
                 });
             }
             coupon = await findUsableCoupon({ ...couponAsk, code });
+            if (coupon.automatic && regularPaise !== null) {
+                throw new BadRequestException({
+                    message:
+                        "This offer is for paying monthly. Yearly already has its own offer price.",
+                    details: { field: "coupon" },
+                });
+            }
         } else if (
             automatic &&
+            regularPaise === null &&
             target.priceCents > 0 &&
             COUPON_KINDS.includes(quoteChange(asked).kind)
         ) {
@@ -1334,6 +1352,7 @@ export class CheckoutService {
             payment: quote.payment,
             termCharges: quote.termCharges,
             payNowTotalPaise: quote.payNowTotalPaise,
+            regularPricePaise: quote.regularPricePaise ?? null,
             addonsNowPaise: monthAddons.reduce(
                 (t, l) => t + l.quantity * l.unitPaise,
                 0,

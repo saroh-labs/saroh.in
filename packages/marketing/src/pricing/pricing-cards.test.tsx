@@ -48,7 +48,7 @@ const model = (
     tax = { toggle: true, initial: false },
 ): PricingPageModel => ({
     placeholder: false,
-    yearly: { freeMonths: 2 },
+    yearly: { freeMonths: 2, label: "Yearly · 2 months free" },
     tax,
     views: {
         "month-excl": view(ids, "-me"),

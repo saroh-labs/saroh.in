@@ -87,6 +87,21 @@ describe("diff", () => {
         ]);
     });
 
+    it("words a plan's yearly offer set, changed and taken off (DEC-231)", () => {
+        const a = edit(
+            fixture(),
+            (c) => (c.plans[1].yearlyOfferPaise = 77_700),
+        );
+        const b = edit(a, (c) => (c.plans[1].yearlyOfferPaise = 66_600));
+        expect(diff(fixture(), a)).toEqual([
+            `Plan B: yearly offer ${R}777 a year`,
+        ]);
+        expect(diff(a, b)).toEqual([
+            `Plan B: yearly offer ${R}777 → ${R}666 a year`,
+        ]);
+        expect(diff(b, fixture())).toEqual(["Plan B: yearly offer off"]);
+    });
+
     it("words a change to how many charges one autopay covers", () => {
         const b = edit(fixture(), (c) => {
             c.autopay = { charges: 60 };
