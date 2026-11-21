@@ -36,7 +36,7 @@ vi.mock("next/link", () => ({
     }) => <a href={href}>{children}</a>,
 }));
 
-import { DraftCard } from "./draft-card";
+import { DraftCard, forgetSettledDrafts } from "./draft-card";
 
 const EDIT: AskAiDraftCard = {
     draftId: "d1",
@@ -115,6 +115,7 @@ beforeEach(() => {
     vi.clearAllMocks();
 });
 afterEach(() => {
+    forgetSettledDrafts();
     act(() => root.unmount());
     document.body.innerHTML = "";
 });
@@ -455,5 +456,83 @@ describe("several orders at once (AF 8)", () => {
         expect(text()).toContain("Change 3 orders");
         expect(text()).toContain("OrdersORD-118, ORD-121, ORD-124");
         expect(button("Mark 3 ready")).toBeDefined();
+    });
+});
+
+describe("a section's words (owner, 21 Nov)", () => {
+    const SECTION: AskAiDraftCard = {
+        ...EDIT,
+        draftId: "d9",
+        tool: "edit_section",
+        kind: "section",
+        targetId: "s1:p1:k1",
+        targetName: "Home · Top of the page",
+        fields: [
+            {
+                field: "heading",
+                label: "Heading",
+                old: "Packaging, storage and safety supplies",
+                new: "Packaging, storage that arrives whole, now 20% off",
+            },
+        ],
+        note: "Applies to your website's draft. Visitors see it when you publish.",
+        checks: [
+            {
+                id: "heading:percent:20",
+                field: "heading",
+                words: "20% off",
+                why: "An offer that isn't in your Discounts or on this page",
+            },
+        ],
+        basedOn: "This section's words now, your Services, Discounts and hours",
+    };
+
+    it("shows Now and New with the changed words marked, Check this, and what it is based on", () => {
+        render(SECTION);
+        expect(text()).toContain("Home · Top of the page");
+        expect(text()).toContain("Now");
+        expect(text()).toContain("New");
+        const removed = Array.from(host.querySelectorAll("del")).map(
+            (d) => d.textContent,
+        );
+        const added = Array.from(host.querySelectorAll("ins")).map(
+            (d) => d.textContent,
+        );
+        expect(removed).toEqual(["and", "safety", "supplies"]);
+        expect(added).toEqual(
+            expect.arrayContaining(["that", "arrives", "whole,", "20%"]),
+        );
+        expect(added).not.toContain("storage");
+        expect(text()).toContain("Check this");
+        expect(text()).toContain("Based on: This section's words now");
+        expect(button("Not now")).toBeTruthy();
+    });
+
+    it("keeps Apply off until the fact is confirmed, then sends only its id", async () => {
+        render(SECTION);
+        expect(button("Apply")?.disabled).toBe(true);
+        const tick = host.querySelector<HTMLElement>(
+            "[data-check-this] button[role=checkbox]",
+        );
+        act(() => tick?.click());
+        expect(button("Apply")?.disabled).toBe(false);
+        actions.confirmDraft.mockResolvedValueOnce(
+            result(
+                { ...SECTION, status: "confirmed" },
+                { words: "Saved · goes live when you publish" },
+            ),
+        );
+        const heard = vi.fn();
+        window.addEventListener("saroh:site-draft-changed", heard);
+        act(() => button("Apply")?.click());
+        await settle();
+        window.removeEventListener("saroh:site-draft-changed", heard);
+        expect(actions.confirmDraft).toHaveBeenCalledWith("d9", undefined, [
+            "heading:percent:20",
+        ]);
+        expect(text()).toContain("Saved · goes live when you publish");
+        expect(button("Undo")).toBeTruthy();
+        // The open editor is told to read its draft again.
+        expect(heard).toHaveBeenCalledTimes(1);
     });
 });

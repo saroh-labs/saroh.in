@@ -112,7 +112,7 @@ describe("what Ask AI is told (eval run 14 Nov)", () => {
             "refunds",
             "cancelling",
             "deleting",
-            "website pages and sections",
+            "adding, moving or removing website sections",
             "social posts",
         ]) {
             expect(told).toContain(thing);
@@ -287,13 +287,11 @@ describe("the page a question is asked from", () => {
         expect(aboutTail(undefined)).toBe("");
     });
 
-    it("reads the site, never writes it", () => {
-        expect(ASK_AI_TOOLS).toEqual(
-            expect.arrayContaining(["get_site", "get_page"]),
-        );
-        expect(ASK_AI_AGENT.draftTools).not.toContain("get_page");
+    it("reads the site, and only drafts a section's words for the person to apply", () => {
         expect(ASK_AI_TOOLS.filter((t) => /page|site|section/.test(t))).toEqual(
-            ["get_site", "get_page"],
+            ["edit_section", "get_site", "get_page"],
         );
+        expect(ASK_AI_AGENT.draftTools).toContain("edit_section");
+        expect(ASK_AI_AGENT.draftTools).not.toContain("get_page");
     });
 });

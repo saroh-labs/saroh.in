@@ -1,6 +1,7 @@
 "use client";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
+import { SITE_DRAFT_CHANGED } from "@/components/ask-ai/open";
 import { AddSectionDialog } from "@/components/sites/blocks/add-section-dialog";
 import { useAddBlock } from "@/components/sites/blocks/use-add-block";
 import { queryCanvas } from "@/components/sites/canvas/device-frame";
@@ -465,6 +466,21 @@ export function SiteEditor({
         setTrailExtra(null);
         selectRailTab(tab === "pages" ? "page" : tab, setRail, add.setAdding);
     };
+    // Ask AI applied or undid new words in this site's draft (owner, 21
+    // Nov): read the draft again, unless the editor has work of its own
+    // not saved yet, which its save then meets as a conflict.
+    const unsavedNow = useRef(unsaved);
+    useEffect(() => {
+        unsavedNow.current = unsaved;
+    });
+    useEffect(() => {
+        const onChanged = (e: Event) => {
+            if ((e as CustomEvent<string>).detail !== siteId) return;
+            if (!unsavedNow.current) reloadDraft?.(pageId);
+        };
+        window.addEventListener(SITE_DRAFT_CHANGED, onChanged);
+        return () => window.removeEventListener(SITE_DRAFT_CHANGED, onChanged);
+    }, [siteId, pageId, reloadDraft]);
     const askAiHere = useEditorAskAi({
         siteId,
         pageId,

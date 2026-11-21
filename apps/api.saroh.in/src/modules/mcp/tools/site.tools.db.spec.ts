@@ -105,7 +105,7 @@ const data = <T = Record<string, unknown>>(r: Result) =>
     r.structuredContent as T;
 
 /** A business with a site made from the starter, connected as `role`. */
-async function connect(role: "OWNER" | "MEMBER" = "OWNER") {
+async function connect(role: "OWNER" | "MEMBER" | "REVIEWER" = "OWNER") {
     const org = await prisma.organization.create({
         data: { name: uniq("Rye Bakery"), slug: uniq("rye") },
     });
@@ -295,6 +295,60 @@ describe("MCP website tools (U11)", () => {
         });
         expect(bad.isError).toBe(true);
         expect(textOf(bad)).toContain("Next: Call get_page");
+    });
+
+    it("edit_section changes only a section's words, in the draft, never live (Ask AI's Apply)", async () => {
+        const { siteId, homeId, as } = await connect();
+        const live = await liveOf(siteId);
+        const before = await sectionsOf(homeId);
+        const hero = before.find((s) => s.type === "hero");
+        if (!hero?.key) throw new Error("The starter has no hero");
+        const r = await call(as, "edit_section", {
+            site_id: siteId,
+            page_id: homeId,
+            section_key: hero.key,
+            heading: "Bread from the wood oven",
+            button_label: "See today's loaves",
+        });
+        expect(r.isError).toBeFalsy();
+        const after = (await sectionsOf(homeId)).find(
+            (s) => s.key === hero.key,
+        );
+        const was = hero.content as Record<string, unknown>;
+        const now = after?.content as Record<string, unknown>;
+        expect(now.heading).toBe("Bread from the wood oven");
+        expect((now.cta as { label: string }).label).toBe("See today's loaves");
+        // Everything else as it was: the line under it, the button's link.
+        expect(now.subheading).toEqual(was.subheading);
+        expect((now.cta as { action: unknown }).action).toEqual(
+            (was.cta as { action: unknown }).action,
+        );
+        // The live site is untouched.
+        expect(await liveOf(siteId)).toBe(live);
+
+        const none = await call(as, "edit_section", {
+            site_id: siteId,
+            page_id: homeId,
+            section_key: "nope",
+            heading: "x",
+        });
+        expect(none.isError).toBe(true);
+    });
+
+    it("edit_section is refused to a Reviewer, as editing in the editor is", async () => {
+        const { siteId, homeId, as } = await connect("REVIEWER");
+        const hero = (await sectionsOf(homeId)).find((s) => s.type === "hero");
+        const r = await call(as, "edit_section", {
+            site_id: siteId,
+            page_id: homeId,
+            section_key: hero?.key ?? "x",
+            heading: "Not mine to change",
+        });
+        expect(r.isError).toBe(true);
+        expect(
+            (await sectionsOf(homeId)).find((s) => s.key === hero?.key)
+                ?.content,
+        ).toEqual(hero?.content);
     });
 
     it("prepares a publish without publishing: what goes live, preview, a link into Saroh, the token kept only as a digest", async () => {

@@ -98,8 +98,10 @@ export async function bookFromAnswer(body: AskAiBookBody) {
 export async function confirmDraft(
     draftId: string,
     fields?: Record<string, unknown>,
+    /** The card's Check this ids the person confirmed. */
+    confirmed?: string[],
 ) {
-    const parsed = askAiConfirmBody.safeParse({ fields });
+    const parsed = askAiConfirmBody.safeParse({ fields, confirmed });
     if (!parsed.success || !draftId) return INVALID;
     return confirmAskAiDraft(draftId, parsed.data);
 }

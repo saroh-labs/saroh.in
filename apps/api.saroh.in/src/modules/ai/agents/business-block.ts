@@ -55,6 +55,7 @@ const DRAFTS: readonly [OrgAction, string][] = [
     ["contact:write", "adding or changing a customer"],
     ["store:write", "adding or changing a product"],
     ["service:write", "adding or changing a service or its hours"],
+    ["section:write", "changing a section's words on your website"],
 ];
 
 /** The asks and drafts this person's live role allows, so a refusal can offer them instead. */
