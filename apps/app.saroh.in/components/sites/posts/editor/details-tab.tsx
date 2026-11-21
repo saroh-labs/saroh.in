@@ -1,5 +1,6 @@
 "use client";
 
+import { isSafeImageSrc } from "@saroh/block-contract";
 import { Button } from "@saroh/ui/button";
 import { Field } from "@saroh/ui/field";
 import { Input } from "@saroh/ui/input";
@@ -270,6 +271,10 @@ export function CoverEditor({
     const [found, setFound] = useState<
         { w: number; h: number } | "missing" | null
     >(null);
+    const address = src.trim();
+    // Only a photo a block would draw: a `javascript:` or other address
+    // is never put in an <img> nor kept as the cover.
+    const drawable = isSafeImageSrc(address);
     return (
         <div className="grid gap-3">
             <Segmented
@@ -304,23 +309,25 @@ export function CoverEditor({
                     aria-label="Image address"
                 />
             )}
-            {src.trim() ? (
+            {address ? (
                 <div className="flex items-center gap-3">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL */}
-                    <img
-                        src={src}
-                        alt=""
-                        onLoad={(e) =>
-                            setFound({
-                                w: e.currentTarget.naturalWidth,
-                                h: e.currentTarget.naturalHeight,
-                            })
-                        }
-                        onError={() => setFound("missing")}
-                        className="h-[68px] w-[120px] shrink-0 rounded-md border object-cover"
-                    />
+                    {drawable ? (
+                        // eslint-disable-next-line @next/next/no-img-element -- a merchant-supplied absolute URL
+                        <img
+                            src={address}
+                            alt=""
+                            onLoad={(e) =>
+                                setFound({
+                                    w: e.currentTarget.naturalWidth,
+                                    h: e.currentTarget.naturalHeight,
+                                })
+                            }
+                            onError={() => setFound("missing")}
+                            className="h-[68px] w-[120px] shrink-0 rounded-md border object-cover"
+                        />
+                    ) : null}
                     <span role="status" className="text-[0.8125rem]">
-                        {found === "missing"
+                        {!drawable || found === "missing"
                             ? "No photo found at that address."
                             : found
                               ? `Found it · ${found.w} × ${found.h}`
@@ -367,10 +374,11 @@ export function CoverEditor({
                 <Button
                     type="button"
                     size="sm"
-                    disabled={found === "missing"}
+                    disabled={
+                        found === "missing" || (address !== "" && !drawable)
+                    }
                     onClick={() => {
-                        if (src.trim() !== fields.image)
-                            set("image")(src.trim());
+                        if (address !== fields.image) set("image")(address);
                         if (alt !== fields.imageAlt) set("imageAlt")(alt);
                         onDone();
                     }}

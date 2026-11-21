@@ -56,4 +56,23 @@ describe("Describe it (U10)", () => {
         expect(photoAt(sections, 1, "images.0")).toBe("/a.jpg");
         expect(photoAt(sections, 0, "image")).toBeNull();
     });
+
+    it("walks own fields only, so `__proto__` never reaches Object.prototype", () => {
+        for (const path of [
+            "__proto__",
+            "constructor.prototype",
+            "images.__proto__",
+        ]) {
+            expect(withPhotoDescription(sections, 1, path, "x")).toBeNull();
+        }
+        expect(({} as { alt?: unknown }).alt).toBeUndefined();
+        // An inherited photo is not this section's photo.
+        const inherited = [
+            {
+                ...sections[0],
+                content: Object.create({ src: "/x.jpg" }) as object,
+            },
+        ] as unknown as DraftSection[];
+        expect(photoAt(inherited, 0, "__proto__")).toBeNull();
+    });
 });

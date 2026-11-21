@@ -22,7 +22,8 @@ export function phoneVersion(
     phone: string | null | undefined,
     desk: string,
 ): string | null {
-    if (!phone || phone.replace(/<[^>]*>/g, " ").trim() === "") return null;
+    // `[^<>]`, not `[^>]`: a run of `<` with no `>` is then linear, not quadratic.
+    if (!phone || phone.replace(/<[^<>]*>/g, " ").trim() === "") return null;
     return phone.trim() === desk.trim() ? null : phone;
 }
 

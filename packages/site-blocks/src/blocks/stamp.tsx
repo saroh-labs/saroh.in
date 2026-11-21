@@ -113,6 +113,17 @@ export function ringWords(name: string, town: string): string {
 }
 
 /**
+ * `part` less its trailing run of digits, spaces and dashes when that run
+ * has a digit (a pin code). A backward scan, not a `$`-anchored regex, which
+ * is quadratic on a long run of spaces or digits in a merchant's address.
+ */
+function withoutPin(part: string): string {
+    let start = part.length;
+    while (start > 0 && /[\d\s-]/.test(part.charAt(start - 1))) start--;
+    return /\d/.test(part.slice(start)) ? part.slice(0, start) : part;
+}
+
+/**
  * The town in a one-line or several-line address: its last part that is
  * not a pin code, without a trailing pin ("Bandra West, Mumbai 400050" →
  * "Mumbai"). Null when there is none.
@@ -121,7 +132,7 @@ export function townOf(address: string | null | undefined): string | null {
     if (!address) return null;
     const parts = address
         .split(/[\n,]/)
-        .map((p) => p.replace(/[\s-]*\d[\d\s-]*$/, "").trim())
+        .map((p) => withoutPin(p).trim())
         .filter((p) => p !== "");
     return parts.length > 1 ? parts[parts.length - 1] : null;
 }

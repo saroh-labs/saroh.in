@@ -123,6 +123,19 @@ describe("Stamp", () => {
         expect(townOf("12 Qila Road\nRohtak 124001")).toBe("Rohtak");
         expect(townOf("Rohtak")).toBeNull();
         expect(ringWords("Rye", "MUMBAI").length).toBeGreaterThanOrEqual(36);
+        expect(townOf("Shop 4, Sector 12 - 124 001 ")).toBe("Sector");
+        expect(townOf("Shop 4, Rohtak - -")).toBe("Rohtak - -");
+    });
+
+    it("reads a long run of spaces or digits in linear time", () => {
+        // The old `$`-anchored pin regex takes seconds on these (quadratic);
+        // the bound leaves room for a busy machine.
+        const started = performance.now();
+        expect(townOf(`Shop 4, ${"\t".repeat(100_000)}x`)).toBe("x");
+        expect(townOf(`Shop 4, Rohtak ${"0".repeat(100_000)}x`)).toBe(
+            `Rohtak ${"0".repeat(100_000)}x`,
+        );
+        expect(performance.now() - started).toBeLessThan(500);
     });
 });
 

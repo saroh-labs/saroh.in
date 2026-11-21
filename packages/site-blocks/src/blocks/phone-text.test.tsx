@@ -29,6 +29,15 @@ describe("phoneVersion", () => {
         expect(phoneVersion("Book a chair ", "Book a chair")).toBeNull();
         expect(phoneVersion("Book", "Book a chair")).toBe("Book");
     });
+
+    it("reads a long run of `<` in linear time", () => {
+        const hostile = `${"<".repeat(100_000)}x`;
+        // The old `<[^>]*>` takes seconds here (quadratic); the bound leaves
+        // room for a busy machine.
+        const started = performance.now();
+        expect(phoneVersion(hostile, "Book")).toBe(hostile);
+        expect(performance.now() - started).toBeLessThan(500);
+    });
 });
 
 describe("a button with a phone label", () => {

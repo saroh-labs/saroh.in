@@ -10,6 +10,8 @@ function photoIn(content: unknown, path: string): Photo | null {
     let at: unknown = content;
     for (const key of path.split(".")) {
         if (typeof at !== "object" || at === null) return null;
+        // Own fields only: `__proto__` would reach Object.prototype.
+        if (key === "__proto__" || !Object.hasOwn(at, key)) return null;
         at = (at as Record<string, unknown>)[key];
     }
     return typeof at === "object" &&
