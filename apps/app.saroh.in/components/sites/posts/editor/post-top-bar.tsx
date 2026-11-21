@@ -89,14 +89,18 @@ export function PostTopBar({
                     <IconButton
                         label="Undo"
                         icon={<Undo2 className="size-[18px]" />}
-                        disabled={!editor?.can().undo()}
+                        disabled={
+                            !(editor?.isInitialized && editor.can().undo())
+                        }
                         onClick={() => editor?.chain().focus().undo().run()}
                         className="size-11"
                     />
                     <IconButton
                         label="Redo"
                         icon={<Redo2 className="size-[18px]" />}
-                        disabled={!editor?.can().redo()}
+                        disabled={
+                            !(editor?.isInitialized && editor.can().redo())
+                        }
                         onClick={() => editor?.chain().focus().redo().run()}
                         className="size-11"
                     />

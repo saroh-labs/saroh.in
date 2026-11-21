@@ -52,8 +52,8 @@ export function WritingToolbar({
     const can = useEditorState({
         editor,
         selector: ({ editor: e }) => ({
-            undo: e?.can().undo() ?? false,
-            redo: e?.can().redo() ?? false,
+            undo: (e?.isInitialized && e.can().undo()) ?? false,
+            redo: (e?.isInitialized && e.can().redo()) ?? false,
         }),
     });
     return (
@@ -71,11 +71,11 @@ export function WritingToolbar({
                 onClick={() => {
                     if (panel === "format") {
                         onPanel(null);
-                        editor?.commands.focus();
+                        editor?.chain().focus().run();
                         return;
                     }
                     // The keys go down; the panel takes their place.
-                    editor?.commands.blur();
+                    editor?.chain().blur().run();
                     onPanel("format");
                 }}
                 className={TOOL}
@@ -129,7 +129,7 @@ export function WritingToolbar({
                 aria-label="Hide keyboard"
                 disabled={!keyboardUp && panel === null}
                 onClick={() => {
-                    editor?.commands.blur();
+                    editor?.chain().blur().run();
                     (document.activeElement as HTMLElement | null)?.blur();
                     onPanel(null);
                 }}
