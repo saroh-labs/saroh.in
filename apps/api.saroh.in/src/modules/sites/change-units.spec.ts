@@ -694,19 +694,21 @@ describe("a section's frame is content (KTD-E5)", () => {
 });
 
 // Measured 21 Nov 2026: about 80 ms grouped, 650 ms filtered per page.
-const TIME_LIMIT_MS = 300;
+// Sized so the old per-page filter (about 6 s here) and the grouped read
+// (about 0.25 s) sit far apart, so a busy gate run can't flip it.
+const TIME_LIMIT_MS = 2000;
 
 describe("changeUnits with many old links (W4, 21 Nov 2026)", () => {
     it("groups the forwards once: pages × forwards doesn't grow as a square", () => {
-        const pages: Page[] = Array.from({ length: 1000 }, (_, i) => ({
+        const pages: Page[] = Array.from({ length: 3000 }, (_, i) => ({
             id: `p${i}`,
             path: `/p${i}`,
             title: `Page ${i}`,
             sections: [],
         }));
-        const redirects = Array.from({ length: 100_000 }, (_, i) => ({
+        const redirects = Array.from({ length: 300_000 }, (_, i) => ({
             from: `/old${i}`,
-            to: `/p${i % 1000}`,
+            to: `/p${i % 3000}`,
         }));
         const started = performance.now();
         const units = changeUnits(
@@ -715,7 +717,7 @@ describe("changeUnits with many old links (W4, 21 Nov 2026)", () => {
             stamps(),
         );
         const ms = performance.now() - started;
-        expect(units).toHaveLength(1000);
+        expect(units).toHaveLength(3000);
         // A filter of every forward per page took seconds here.
         expect(ms).toBeLessThan(TIME_LIMIT_MS);
     });
