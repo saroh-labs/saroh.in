@@ -33,6 +33,8 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 vi.mock("next/link", () => ({
+    // A tab or segment marks itself while it loads (`LinkPending`).
+    useLinkStatus: () => ({ pending: false }),
     default: ({
         href,
         children,

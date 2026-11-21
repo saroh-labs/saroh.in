@@ -78,6 +78,8 @@ vi.mock("@saroh/ui/scroll-x", () => ({
     ScrollX: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("next/link", () => ({
+    // A tab or segment marks itself while it loads (`LinkPending`).
+    useLinkStatus: () => ({ pending: false }),
     default: ({
         href,
         children,
