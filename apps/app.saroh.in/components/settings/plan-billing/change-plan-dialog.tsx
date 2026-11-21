@@ -473,7 +473,10 @@ export function ChangePlanDialog({
                                 <dd className="m-0 text-right font-medium tabular-nums">
                                     {l.was ? (
                                         <s className="mr-1.5 font-normal text-muted-foreground">
-                                            <span className="sr-only">
+                                            <span
+                                                data-ph-unmask=""
+                                                className="sr-only"
+                                            >
                                                 Regular price{" "}
                                             </span>
                                             {l.was}

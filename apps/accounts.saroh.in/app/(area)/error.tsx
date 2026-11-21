@@ -2,10 +2,8 @@
 
 import { FailedState } from "@saroh/ui/data-state";
 
-import {
-    type BoundaryErrorProps,
-    useReportedError,
-} from "@/lib/boundary-error";
+import type { BoundaryErrorProps } from "@/lib/boundary-error";
+import { useReportedError } from "@/lib/boundary-error";
 
 /**
  * A page of the account area that failed, inside the frame: the bar and the
