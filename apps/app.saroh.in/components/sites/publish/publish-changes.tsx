@@ -46,7 +46,7 @@ export function PublishChanges({
                     if (units.length === 0) return null;
                     const name = group.you
                         ? "You"
-                        : (group.name ?? "Changed before names were kept");
+                        : (group.name ?? "Changed earlier");
                     return (
                         <li key={group.userId ?? "earlier"}>
                             <h3 className="flex items-center gap-2 pb-1.5 text-sm font-semibold">
@@ -111,7 +111,7 @@ export function PublishChanges({
                                         {post.title}
                                     </span>
                                     <span className="block text-xs text-muted-foreground">
-                                        Draft · edited{" "}
+                                        Not live yet · edited{" "}
                                         {formatDate(post.updatedAt, zone)}
                                     </span>
                                 </span>

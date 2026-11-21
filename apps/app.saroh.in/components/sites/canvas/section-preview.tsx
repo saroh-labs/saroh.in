@@ -96,6 +96,7 @@ export function DraftPreview({
     selectedChrome,
     onSelectChrome,
     notesByKey,
+    changedByKey,
     onOpenNotes,
     siteAddress,
     siteId,
@@ -158,6 +159,8 @@ export function DraftPreview({
     onSelectChrome?: (part: "header" | "footer") => void;
     /** Open notes per section key, for the pins. */
     notesByKey?: ReadonlyMap<string, number>;
+    /** Changed since live, per section key: a reader's marks (`fix/WXMReviewer`). */
+    changedByKey?: ReadonlyMap<string, string>;
     /** A pin was pressed: select that block and show its feedback. */
     onOpenNotes?: (index: number) => void;
     /** The merchant's site address, which the page's links open on. */
@@ -277,6 +280,11 @@ export function DraftPreview({
                                 : (notesByKey?.get(section.key) ?? 0)
                         }
                         onOpenNotes={() => onOpenNotes?.(index)}
+                        changed={
+                            section.key === undefined
+                                ? undefined
+                                : changedByKey?.get(section.key)
+                        }
                         tools={
                             selectedIndex === index
                                 ? blockTools?.(index)
@@ -439,11 +447,14 @@ function CanvasBlock({
     selected,
     locked = false,
     notes = 0,
+    changed,
     onSelect,
     onOpenNotes,
     tools,
     children,
 }: {
+    /** "changed", "added", "moved" or "hidden" since live, for a reader. */
+    changed?: string;
     /** Drawn on the block while it is selected: a phone's toolbar. */
     tools?: ReactNode;
     /** Position in the page's block list, so the editor can scroll to it. */
@@ -468,14 +479,28 @@ function CanvasBlock({
              * `outline` and `outline-2` as the same property and drops the
              * first, which leaves an outline with no style — invisible.
              */
+            /*
+             * The selection is Ink with a Paper line inside it, in light and
+             * dark alike: the merchant's page keeps its own ground, so a
+             * theme colour could vanish on it (editor audit, 21 Nov).
+             */
             className={`group/block relative cursor-pointer outline outline-offset-[-2px] transition-[outline-color] duration-fast ${
                 selected
-                    ? "outline-2 outline-border-strong"
+                    ? "outline-2 outline-brand-surface after:pointer-events-none after:absolute after:inset-[2px] after:z-10 after:shadow-[inset_0_0_0_1px_hsl(var(--brand-surface-foreground)/0.9)] after:content-['']"
                     : "outline-1 outline-transparent hover:outline-border-strong"
             }`}
         >
             {children}
             {tools}
+            {changed && !selected ? (
+                // Under the label chip, which covers it on hover and selection.
+                <span
+                    data-changed-mark={changed}
+                    className="pointer-events-none absolute left-0 top-0 z-10 flex h-6 items-center rounded-br-md bg-warning-subtle px-2 font-sans text-xs font-semibold text-warning-subtle-foreground transition-opacity duration-fast group-hover/block:opacity-0"
+                >
+                    {`${changed[0].toUpperCase()}${changed.slice(1)} since live`}
+                </span>
+            ) : null}
             <button
                 type="button"
                 aria-label={selected ? `${name}, selected` : name}
@@ -485,7 +510,7 @@ function CanvasBlock({
                     onSelect();
                 }}
                 className={cn(
-                    "label absolute left-0 top-0 z-10 flex items-center gap-1 rounded-br-md bg-foreground px-2 py-0.5 font-sans text-background transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    "absolute left-0 top-0 z-10 flex h-6 items-center gap-1 rounded-br-md bg-brand-surface px-2 font-sans text-xs font-semibold text-brand-surface-foreground transition-opacity duration-fast focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     selected
                         ? "opacity-100"
                         : "opacity-0 group-hover/block:opacity-100",

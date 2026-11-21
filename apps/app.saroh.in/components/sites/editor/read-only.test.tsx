@@ -372,7 +372,7 @@ const ALLOWED: RegExp[] = [
     /^Feedback, \d+ open notes?$/,
     /^(See the notes|Show all|Try again)$/,
     // Test releases: the list, and each one's own review page (a link).
-    /^Test releases( · )?\d*$/,
+    /^Test links( · )?\d*$/,
     /^Show (all \d+|fewer)$/,
     // The new desk shell (U46): the rail, the Pages tree, More and its
     // looking-only items.
@@ -656,7 +656,7 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
             "Add",
             "Publish",
             "Share",
-            "Test release",
+            "Test link",
             "Remove",
             "Move block up",
             "Move block down",
@@ -729,12 +729,12 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         );
     });
 
-    it("test releases: each one's review, nothing to make, share or put live", () => {
+    it("test links: each one's review, nothing to make, share or put live", () => {
         render();
-        click(button("Test releases · 1"));
-        expectReadOnly("desk, test releases");
+        click(button("Test links · 1"));
+        expectReadOnly("desk, test links");
         for (const gone of [
-            "Make a test release",
+            "Make a test link",
             "Open",
             "Go live…",
             "Schedule…",
@@ -1130,7 +1130,7 @@ describe("the same editor, editable (owner regression)", () => {
             "Add",
             "Publish",
             "In review",
-            "Test release",
+            "Test link",
             "Remove",
         ]) {
             expect(has(kept), kept).toBe(true);
@@ -1175,9 +1175,9 @@ describe("the top bar's status for a Reviewer (U6)", () => {
         expect(status()).not.toMatch(/look at|Not published ·|change/i);
     });
 
-    it("says Not published yet for a site never published", () => {
+    it("says Not live yet for a site never published", () => {
         render({ neverPublished: true, publishedAt: null });
-        expect(status()).toContain("Not published yet");
+        expect(status()).toContain("Not live yet");
     });
 
     it("leaves the owner's readout alone", () => {
@@ -1381,7 +1381,7 @@ describe("the desk shell for an owner (U46)", () => {
             "Live · 2 changes waiting",
         );
         // None of the old bar's controls sit on it any more.
-        for (const gone of ["Share", "In review", "Test release", "Zoom"]) {
+        for (const gone of ["Share", "In review", "Test link", "Zoom"]) {
             expect(has(gone), gone).toBe(false);
         }
     });
@@ -1483,7 +1483,7 @@ describe("the desk shell for an owner (U46)", () => {
         const panel = $("[data-history-panel]");
         // No recorded editor: a neutral row, no made-up person (no avatar).
         expect(panel?.textContent).toContain("Changed Top of the page");
-        expect(panel?.textContent).toContain("before names were kept");
+        expect(panel?.textContent).toContain("changed earlier");
         expect(panel?.textContent).not.toContain("Earlier changes");
         expect(has("Undo")).toBe(true);
         expect(panel?.textContent).toContain("Live now");
@@ -1513,7 +1513,7 @@ describe("the desk shell for an owner (U46)", () => {
         area.on = false;
         render(owner);
         expect($("[data-editor-trail]")).toBeNull();
-        expect(has("Test release")).toBe(true);
+        expect(has("Test link")).toBe(true);
         expect(has("In review")).toBe(true);
         expect($("[data-status-chip]")).toBeNull();
     });
@@ -1753,9 +1753,11 @@ describe("the one phone editor (U49)", () => {
         for (const tab of ["Content", "Style", "Visibility", /^Feedback/]) {
             expect(has(tab), String(tab)).toBe(true);
         }
+        // Before Save, never "Saved" (editor audit, 21 Nov).
         expect($("[data-save-footer]")?.textContent).toContain(
-            "Saved · goes live when you publish",
+            "Goes live when you publish",
         );
+        expect($("[data-save-footer]")?.textContent).not.toContain("Saved");
         expect(has("Cancel")).toBe(true);
         click(button("Visibility"));
         expect(sheet?.textContent).toContain("Hidden when published");
@@ -1865,7 +1867,7 @@ describe("the one phone editor (U49)", () => {
             // REVIEW is pending: Withdraw stands where Ask would.
             /^Withdraw the review request/,
             /^Share a preview link/,
-            /^Make a test release/,
+            /^Make a test link/,
             /^Preview/,
             /^Feedback/,
             /^(Light|Dark)/,

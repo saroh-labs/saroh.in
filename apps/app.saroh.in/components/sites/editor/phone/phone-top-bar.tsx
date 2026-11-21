@@ -83,8 +83,8 @@ export function PhoneTopBar({
                     type="button"
                     aria-label={
                         openNotes > 0
-                            ? `More: preview, feedback (${openNotes} open), share and test releases`
-                            : "More: preview, feedback, share and test releases"
+                            ? `More: preview, feedback (${openNotes} open), share and test links`
+                            : "More: preview, feedback, share and test links"
                     }
                     onClick={() => setSheet?.("more")}
                     className="relative grid size-11 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

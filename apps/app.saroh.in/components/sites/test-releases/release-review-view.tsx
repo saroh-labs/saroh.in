@@ -80,7 +80,7 @@ export function ReleaseReviewView({
             <div className="min-w-0 space-y-4">
                 {pages.length > 1 ? (
                     <nav
-                        aria-label="Pages in this test release"
+                        aria-label="Pages in this test link"
                         className="flex flex-wrap gap-2"
                     >
                         {pages.map((p) => (
@@ -120,7 +120,7 @@ export function ReleaseReviewView({
 
                 {activePath === null ? (
                     <p className="text-sm text-muted-foreground">
-                        This test release holds no pages.
+                        This test link holds no pages.
                     </p>
                 ) : (
                     <SectionReview
@@ -159,7 +159,7 @@ export function ReleaseReviewView({
             </div>
 
             <aside
-                aria-label="Review this test release"
+                aria-label="Review this test link"
                 className="flex min-w-0 flex-col overflow-hidden rounded-xl border bg-card lg:sticky lg:top-4"
             >
                 <ReviewPanel

@@ -172,7 +172,7 @@ export function PostEditor({
                         Live
                     </Badge>
                 ) : (
-                    <Badge variant="outline">Draft</Badge>
+                    <Badge variant="outline">Not live yet</Badge>
                 )}
                 {live && dirty ? (
                     <span className="text-xs text-warning">
@@ -378,7 +378,7 @@ export function PostEditor({
                         </div>
 
                         {post?.author ? (
-                            <Field label="Byline">
+                            <Field label="Written by">
                                 {/* Said where it comes from (UX-091): the
                                     writer's own account name, shown on the
                                     public post, and changed there. */}

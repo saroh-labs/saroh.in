@@ -338,6 +338,27 @@ export async function unschedulePost(siteId: string, postId: string) {
     return mutate(`${base}/posts/${postId}/schedule`, "DELETE");
 }
 
+/** One of Publish post's checks the API makes (U18). Advice only. */
+export interface PostCheckFlag {
+    type: "priceMismatch" | "freeClaim" | "brokenLink" | "serviceGone";
+    message: string;
+}
+
+/** Publish post's checks on the writing as it is on screen (U18). */
+export async function checkPostWriting(
+    siteId: string,
+    postId: string,
+    content: string,
+): Promise<Result<{ flags: PostCheckFlag[] }>> {
+    const base = await siteBase(siteId);
+    if (!base) return noOrg();
+    return mutate<{ flags: PostCheckFlag[] }>(
+        `${base}/posts/${postId}/checks`,
+        "POST",
+        { content },
+    );
+}
+
 /** A post's History, newest first (U17a). Empty when it can't be read. */
 export async function listPostRevisions(
     siteId: string,

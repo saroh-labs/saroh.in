@@ -1,6 +1,6 @@
 jest.mock("@saroh/database", () => ({ prisma: {} }));
 
-import { checksFor, factsIn, unconfirmed } from "./fact-checks";
+import { basedOnFor, checksFor, factsIn, unconfirmed } from "./fact-checks";
 
 /**
  * Check this (RULES §5, U43): the facts in a section's new words, which of
@@ -64,5 +64,28 @@ describe("Check this", () => {
         ).toEqual([]);
         // An id the card never had confirms nothing.
         expect(unconfirmed(checks, ["heading:percent:99"])).toHaveLength(2);
+    });
+});
+
+/** "Based on" names only what the new words used (editor audit, 21 Nov). */
+describe("basedOnFor", () => {
+    const given = {
+        keys: new Set(["money:180", "time:600"]),
+        from: new Map([["money:180", "your Services"]]),
+    };
+
+    it("names no Services for words typed out", () => {
+        expect(
+            basedOnFor(
+                [{ field: "heading", new: "Packaging made easy" }],
+                given,
+            ),
+        ).toBe("What you asked and this section's words now");
+    });
+
+    it("names Services when a price came from them", () => {
+        expect(
+            basedOnFor([{ field: "heading", new: "Fitting from ₹180" }], given),
+        ).toBe("What you asked, this section's words now and your Services");
     });
 });

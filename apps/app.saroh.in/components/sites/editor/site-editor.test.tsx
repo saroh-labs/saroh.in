@@ -448,7 +448,7 @@ describe("SiteEditor shell", () => {
         expect(
             button(/^Page: Home\. Choose another page to edit$/),
         ).toBeTruthy();
-        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=status]")?.textContent).toBe("Live");
         expect($("[role=group][aria-label='Preview width']")).not.toBeNull();
         for (const d of ["desktop", "tablet", "phone"]) {
             expect(button(`Show at ${d} width`)).toBeTruthy();
@@ -515,9 +515,9 @@ describe("SiteEditor shell", () => {
         expect(button("Publish").getAttribute("aria-description")).toBe(
             "Put this site live",
         );
-        expect($("[role=status]")?.textContent).toBe("Not published yet");
+        expect($("[role=status]")?.textContent).toBe("Not live yet");
         expect(host.textContent).toContain("Nothing’s live yet");
-        expect(host.textContent).toContain("Not published yet");
+        expect(host.textContent).toContain("Not live yet");
         expect(host.textContent).not.toContain("⌘-click");
     });
 
@@ -527,14 +527,14 @@ describe("SiteEditor shell", () => {
             initialPendingSiteChanges: ["footer"],
         });
         expect($("[role=status]")?.textContent).toBe(
-            "Not published · 2 blocks, footer",
+            "Live · 3 changes waiting",
         );
         // The pill says it, so the line beside it does not say it twice.
         expect(
             $("nav[aria-label=Breadcrumb] span[title]:not([role=status])"),
         ).toBeNull();
         expect(button("Publish").getAttribute("aria-description")).toBe(
-            "Put live: 2 blocks, footer",
+            "Publish: 3 changes waiting",
         );
     });
 
@@ -565,7 +565,7 @@ describe("SiteEditor shell", () => {
         render();
         click(button(/Visible$/));
         await wait(1500);
-        expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
         click(button(/Hidden$/));
         await wait(1500);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
@@ -974,8 +974,10 @@ describe("SiteEditor shell", () => {
         });
         act(() => undoFrom(0));
         await wait(1500);
-        expect(toast.showError).toHaveBeenCalledWith(
-            "Saroh couldn't save that.",
+        // Said once, on the page, not in a toast as well (editor audit F3).
+        expect(toast.showError).not.toHaveBeenCalled();
+        expect($("[data-save-failed]")?.textContent).toContain(
+            "Couldn't save.",
         );
         expect(host.textContent).toContain("Not saved");
     });
@@ -1031,7 +1033,7 @@ describe("SiteEditor shell", () => {
         click(button(/Visible$/));
         expect(button(/Hidden$/)).toBeTruthy();
         expect(button("Publish").disabled).toBe(true);
-        expect($("[role=status]")?.textContent).not.toBe("Published");
+        expect($("[role=status]")?.textContent).not.toBe("Live");
 
         await wait(1500);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
@@ -1044,7 +1046,7 @@ describe("SiteEditor shell", () => {
         expect(toast.showSuccess).not.toHaveBeenCalled();
         expect(button("Publish").disabled).toBe(false);
         // G2: the pill carries what the save counted.
-        expect($("[role=status]")?.textContent).toBe("Not published · 1 block");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
     });
 
     it("keeps a hidden section in the block list, marked Hidden (G16)", () => {
@@ -1074,7 +1076,8 @@ describe("SiteEditor shell", () => {
         render();
         click(button(/Visible$/));
         await wait(1500);
-        expect(toast.showError).toHaveBeenCalledWith("Someone else saved.");
+        // The notice says it; not a toast as well (editor audit F4).
+        expect(toast.showError).not.toHaveBeenCalled();
         // C12: who changed it, never live presence.
         expect($("[role=alert]")?.textContent).toContain(
             "Ritika Sharma changed Home since you opened it.",
@@ -1085,6 +1088,39 @@ describe("SiteEditor shell", () => {
         click(button(/Hidden$/));
         await wait(5000);
         expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+    });
+
+    it("says it was you, in another tab, when the newer save was yours (editor audit F4)", async () => {
+        actions.saveDraftSections.mockResolvedValue({
+            ok: false,
+            conflict: true,
+            by: null,
+            you: true,
+            error: "You saved this page in another tab.",
+        });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        const notice = $("[data-save-conflict]")?.textContent ?? "";
+        expect(notice).toContain("You changed Home in another tab or window.");
+        expect(notice).not.toContain("Someone else");
+    });
+
+    it("couldn't save tries again by itself when the connection is back", async () => {
+        actions.saveDraftSections.mockResolvedValueOnce({
+            ok: false,
+            error: "Couldn't reach Saroh.",
+        });
+        render();
+        click(button(/Visible$/));
+        await wait(1500);
+        expect($("[data-save-failed]")).toBeTruthy();
+        act(() => {
+            window.dispatchEvent(new Event("online"));
+        });
+        await wait(0);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        expect($("[data-save-failed]")).toBeNull();
     });
 
     it("couldn't save keeps the words, and Try again sends the save now (RULES §4)", async () => {
@@ -1148,7 +1184,7 @@ describe("SiteEditor shell", () => {
             initialPendingSiteChanges: ["footer"],
         });
         expect($("[role=status]")?.textContent).toBe(
-            "Not published · 1 block, footer",
+            "Live · 2 changes waiting",
         );
         await press(button("Publish"));
         // Two areas: one row each (DEC-185).
@@ -1160,7 +1196,7 @@ describe("SiteEditor shell", () => {
         await press(go[go.length - 1]);
         await wait(0);
         expect(actions.publishSite).toHaveBeenCalledTimes(1);
-        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=status]")?.textContent).toBe("Live");
     });
 
     it("publishes while a page is out for review, and records the bypass", async () => {
@@ -1361,9 +1397,7 @@ describe("SiteEditor header and footer text (G6)", () => {
             name: "Rye & Co.",
         });
         expect(button("Publish").disabled).toBe(false);
-        expect($("[role=status]")?.textContent).toBe(
-            "Not published · site name",
-        );
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
 
         // And the live message names the site as it is now.
         await press(button("Publish"));
@@ -1410,7 +1444,7 @@ describe("SiteEditor header and footer text (G6)", () => {
             format: "html",
             value: "<p>Hill Road, Bandra</p>",
         });
-        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
     });
 
     it("saves an emptied footer as none, and the canvas falls back to the name", async () => {
@@ -1505,7 +1539,7 @@ describe("SiteEditor header and footer text (G6)", () => {
         await wait(0);
         expect(actions.updateSiteFooter).toHaveBeenCalledTimes(3);
         expect(button("Publish").disabled).toBe(false);
-        expect($("[role=status]")?.textContent).toBe("Not published · footer");
+        expect($("[role=status]")?.textContent).toBe("Live · 1 change waiting");
     });
 
     /** A page whose one block is a hero with a button to /about. */
@@ -1755,7 +1789,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button(/^Page: Home/)).toBeTruthy();
         expect($(`a[aria-label='Back to Website']`)).not.toBeNull();
         expect(button("Publish").disabled).toBe(false);
-        expect($("[role=status]")?.textContent).toBe("Published");
+        expect($("[role=status]")?.textContent).toBe("Live");
         expect($("[role=group][aria-label='Preview width']")).toBeNull();
         // No bottom tabs: one pill over the page.
         expect($("nav[aria-label='Edit this page']")).toBeNull();

@@ -253,8 +253,8 @@ export function EditorPanels({
                     onClose={releases.onClose}
                     container={body}
                     side={phone ? "bottom" : "right"}
-                    title="Test releases"
-                    closeLabel="Close test releases"
+                    title="Test links"
+                    closeLabel="Close test links"
                     // Wider than the inspector: a release carries its links
                     // and five actions.
                     className={phone ? undefined : "w-[400px] max-w-[92%]"}

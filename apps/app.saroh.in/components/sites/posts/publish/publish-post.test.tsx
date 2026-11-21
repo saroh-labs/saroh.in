@@ -56,9 +56,13 @@ vi.mock("@/lib/content/actions", () => ({
 }));
 const readPostRevisions = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 const readPostRevision = vi.fn<(...a: unknown[]) => Promise<unknown>>();
+const readPostChecks = vi.fn<(...a: unknown[]) => Promise<unknown>>(() =>
+    Promise.resolve([]),
+);
 vi.mock("@/lib/sites/post-revisions-read", () => ({
     readPostRevisions: (...a: unknown[]) => readPostRevisions(...a),
     readPostRevision: (...a: unknown[]) => readPostRevision(...a),
+    readPostChecks: (...a: unknown[]) => readPostChecks(...a),
 }));
 vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: () => null,
@@ -85,7 +89,7 @@ vi.mock("@saroh/ui/toast", () => ({
 import type { PostEditorData } from "../editor/post-model";
 import { PostShell } from "../editor/post-shell";
 import { selectedQuote } from "../post-feedback";
-import { postChecks } from "./publish-post";
+import { lastChangedBy, postChecks, serverChecks } from "./publish-post";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -240,6 +244,89 @@ describe("Publish post (U18)", () => {
             document.querySelector('[role="dialog"] [role="alert"]')
                 ?.textContent,
         ).toBe("Pick a time at least 5 minutes from now.");
+    });
+
+    it("adds the API's price and link checks, and who changed what", async () => {
+        readPostChecks.mockResolvedValueOnce([
+            {
+                type: "brokenLink",
+                message: "The link to /prices opens no page on this site.",
+            },
+        ]);
+        readPostRevisions.mockResolvedValueOnce({
+            ok: true,
+            rows: [
+                {
+                    id: "r1",
+                    reason: "autosave",
+                    note: null,
+                    title: post.title,
+                    slug: post.slug,
+                    createdAt: "2026-11-20T03:30:00.000Z",
+                    savedBy: { id: "u2", name: "Meera" },
+                },
+            ],
+        });
+        readPostRevision.mockResolvedValueOnce({
+            ...post.liveCopy,
+            id: "r1",
+            reason: "autosave",
+            note: null,
+            content: post.content,
+            categoryId: "c1",
+            authorId: null,
+            createdAt: "2026-11-20T03:30:00.000Z",
+            savedBy: { id: "u2", name: "Meera" },
+        });
+        act(() => root.render(<PostShell data={data()} post={post} />));
+        await settle(() => named("Publish post")?.click());
+        await settle(() => undefined);
+        const sheet = document.querySelector('[role="dialog"]');
+        expect(readPostChecks).toHaveBeenCalledWith("s1", "p1", post.content);
+        expect(sheet?.textContent).toContain("Prices match Services");
+        expect(sheet?.textContent).toContain(
+            "The link to /prices opens no page on this site.",
+        );
+        expect(
+            sheet?.querySelector("[data-post-changes] li")?.textContent,
+        ).toBe("The writingMeera");
+    });
+
+    it("says when the API's checks couldn't run, never passes them", () => {
+        expect(serverChecks(null)).toEqual([
+            {
+                ok: false,
+                text: "Couldn't check prices and links. Publishing still works.",
+            },
+        ]);
+        expect(serverChecks([]).map((c) => c.ok)).toEqual([true, true]);
+    });
+
+    it("names whoever last changed each part since it went live", () => {
+        const live = post.liveCopy!;
+        const view = {
+            title: live.title,
+            content: live.content,
+            excerpt: live.excerpt ?? "",
+            image: "",
+            imageAlt: "",
+            slug: live.slug,
+            category: "Bridal",
+            seoTitle: "",
+            seoDescription: "",
+        };
+        const byMeera = { ...view, content: "<p>New.</p>" };
+        const byRavi = { ...byMeera, title: "New title" };
+        expect(
+            lastChangedBy(
+                live,
+                [
+                    { view: byMeera, by: "Meera" },
+                    { view: byRavi, by: "Ravi" },
+                ],
+                { ...byRavi, category: "" },
+            ),
+        ).toEqual({ words: "Meera", title: "Ravi", category: "Ravi" });
     });
 
     it("checks the photos are described", () => {

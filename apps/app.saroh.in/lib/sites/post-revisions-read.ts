@@ -1,7 +1,15 @@
 "use server";
 
-import type { PostRevision, PostRevisionRow } from "@/lib/content/service";
-import { getPostRevision, listPostRevisions } from "@/lib/content/service";
+import type {
+    PostCheckFlag,
+    PostRevision,
+    PostRevisionRow,
+} from "@/lib/content/service";
+import {
+    checkPostWriting,
+    getPostRevision,
+    listPostRevisions,
+} from "@/lib/content/service";
 
 /**
  * A post's History for the editor's client pieces (plan U17, KTD-E4):
@@ -27,6 +35,20 @@ export async function readPostRevision(
 ): Promise<PostRevision | null> {
     try {
         return await getPostRevision(siteId, postId, revisionId);
+    } catch {
+        return null;
+    }
+}
+
+/** Publish post's price and link checks; null when they couldn't run. */
+export async function readPostChecks(
+    siteId: string,
+    postId: string,
+    content: string,
+): Promise<PostCheckFlag[] | null> {
+    try {
+        const res = await checkPostWriting(siteId, postId, content);
+        return res.ok ? res.data.flags : null;
     } catch {
         return null;
     }

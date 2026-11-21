@@ -32,7 +32,8 @@ function postPill(post: Post): {
         return { label: "Archived", variant: "neutral" };
     }
     if (post.live) return { label: "Live", variant: "success" };
-    if (post.status === "DRAFT") return { label: "Draft", variant: "draft" };
+    if (post.status === "DRAFT")
+        return { label: "Not live yet", variant: "draft" };
     return { label: "Not live", variant: "warning" };
 }
 

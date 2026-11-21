@@ -98,21 +98,21 @@ afterEach(() => {
 describe("the hero's byline", () => {
     it("a name makes one, a role joins it, and it saves", () => {
         mount(hero());
-        const name = field("Byline");
+        const name = field("Written by");
         expect(name).not.toBeNull();
         expect(field("Their role")).toBeNull();
-        if (name) type(name, "Dr Meera Rao");
+        if (name) type(name, "Asha Verma");
         const role = field("Their role");
-        if (role) type(role, "Dentist");
+        if (role) type(role, "Founder");
         expect(draft.content).toMatchObject({
-            byline: { name: "Dr Meera Rao", role: "Dentist" },
+            byline: { name: "Asha Verma", role: "Founder" },
         });
         expect(saves(draft)).toBe(true);
     });
 
     it("clearing the name removes it", () => {
         mount(hero());
-        const name = field("Byline");
+        const name = field("Written by");
         if (name) type(name, "Meera");
         if (name) type(name, "");
         expect((draft.content as { byline?: unknown }).byline).toBeUndefined();

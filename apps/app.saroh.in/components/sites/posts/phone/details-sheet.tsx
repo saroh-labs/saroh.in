@@ -67,9 +67,7 @@ export function DetailsSheet({
                 description={fields.title.trim() || "New post"}
                 dirty={dirty}
                 doneOnly={!writer}
-                footNote={
-                    writer ? "Saved · goes live when you publish" : undefined
-                }
+                footNote={writer ? "Goes live when you publish" : undefined}
                 fieldsClassName="gap-3"
                 onSubmit={
                     writer

@@ -443,7 +443,7 @@ export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
         note: "Applies to your website's draft. Visitors see it when you publish.",
         doneWords: "Saved · goes live when you publish",
         undoNote: "Put back in your draft.",
-        basedOn: "This section's words now, your Services, Discounts and hours",
+        basedOn: "What you asked and this section's words now",
         async pageText(r, input) {
             const page = await pageSections(r, {
                 site_id: String(input.site_id),

@@ -64,7 +64,7 @@ describe("pageState", () => {
     it("does not call a page live before the site has been published", () => {
         expect(
             pageState({ hidden: false }, { currentPublicationId: null }).label,
-        ).toBe("Not published yet");
+        ).toBe("Not live yet");
     });
 
     it("calls a visible page on a published site live", () => {
@@ -95,9 +95,9 @@ describe("siteState for a reader (U6)", () => {
         ).toEqual({ label: "Live · published 17 Oct", tone: "live" });
     });
 
-    it("says Not published yet for a site never published", () => {
+    it("says Not live yet for a site never published", () => {
         expect(siteState(base, { reader })).toEqual({
-            label: "Not published yet",
+            label: "Not live yet",
             tone: "draft",
         });
     });

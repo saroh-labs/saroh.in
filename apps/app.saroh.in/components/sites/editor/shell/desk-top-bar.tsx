@@ -191,6 +191,9 @@ export function DeskTopBar({
                 ) : (
                     <PublishButton
                         {...actions}
+                        // The board's plain Publish: things worth a look
+                        // are dots in the Pages tree and listed in Publish.
+                        flagCount={0}
                         className="h-10 shrink-0 rounded-[9px] px-3.5 text-sm"
                     />
                 )}

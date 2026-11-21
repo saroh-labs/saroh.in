@@ -43,7 +43,7 @@ import { SaveFailedNotice } from "../save-failed";
 import { PriceSheet } from "../sheets/price-sheet";
 import type { EditorModel } from "../shell/editor-model";
 import type { TextField } from "./text-sheet";
-import { richEditorOf, TextSheet } from "./text-sheet";
+import { longField, richEditorOf, TextSheet } from "./text-sheet";
 
 /**
  * A tapped section on a phone (U49, `fix/WXEEditorPhone`, `fix/WXNSection`):
@@ -138,25 +138,26 @@ export function SectionSheet({
         onClose();
     };
 
-    /** A longer field (a textarea) opens full screen to be written in. */
+    /** A longer field (`longField`) opens full screen to be written in. */
     const openText = (e: FocusEvent | MouseEvent, sectionName: string) => {
         if (readOnly || !(e.target instanceof HTMLElement)) return;
-        // A textarea, or a rich text editor's page (U47d: Bold and Link).
+        // A long field, or a rich text editor's page (U47d: Bold and Link).
         const rich = richEditorOf(e.target)
             ? e.target.closest<HTMLElement>(".ProseMirror")
             : null;
         const el = rich ?? e.target;
-        if (!rich && (!(el instanceof HTMLTextAreaElement) || el.disabled)) {
-            return;
-        }
+        if (!rich && !(longField(el) && !el.disabled)) return;
         if (e.type === "focus" && returned.current === el) {
             returned.current = null;
             return;
         }
         const label =
             [
-                el instanceof HTMLTextAreaElement
-                    ? Array.from(el.labels).at(0)?.textContent.trim()
+                el instanceof HTMLTextAreaElement ||
+                el instanceof HTMLInputElement
+                    ? Array.from(el.labels ?? [])
+                          .at(0)
+                          ?.textContent.trim()
                     : el
                           .closest("[data-slot=field]")
                           ?.querySelector("label")
@@ -375,17 +376,27 @@ export function SectionSheet({
                     className="flex min-h-0 flex-1 flex-col"
                     style={lift > 0 ? { marginBottom: lift } : undefined}
                 >
-                    {actions}
-                    {tabs}
-                    <FormSheetBody
-                        className={cn(
-                            "mx-0 block gap-0 p-0",
-                            active || selection.selectedChrome
-                                ? "px-4 py-3.5"
-                                : "",
-                        )}
-                    >
-                        {body}
+                    {/*
+                     * The actions scroll away with the fields and the tabs
+                     * stay at the top, so at 320 the form gets the sheet
+                     * (editor audit, 21 Nov).
+                     */}
+                    <FormSheetBody className="mx-0 block gap-0 p-0">
+                        {actions}
+                        {tabs ? (
+                            <div className="sticky top-0 z-10 bg-background">
+                                {tabs}
+                            </div>
+                        ) : null}
+                        <div
+                            className={
+                                active || selection.selectedChrome
+                                    ? "px-4 py-3.5"
+                                    : undefined
+                            }
+                        >
+                            {body}
+                        </div>
                     </FormSheetBody>
                     {footer ? (
                         <SaveFooter className="shrink-0 border-t px-4 pb-3 pt-2 [&>p]:basis-full [&>p]:text-xs">
@@ -446,7 +457,7 @@ function SheetHead({
     onClose: () => void;
 }) {
     return (
-        <div className="flex shrink-0 items-center gap-2.5 pb-1.5 pl-4 pr-1">
+        <div className="flex shrink-0 items-center gap-2.5 pb-1.5 pl-4 pr-2">
             {icon ? (
                 <span
                     aria-hidden

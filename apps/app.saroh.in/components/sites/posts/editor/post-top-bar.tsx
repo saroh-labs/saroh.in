@@ -24,6 +24,7 @@ import { useEffect, useState } from "react";
 import { formatRelative } from "@/lib/format/datetime";
 
 import type { PostEditorModel } from "./post-model";
+import { useCanUndo } from "./use-can-undo";
 
 /**
  * The post editor's top bar at desk (`blogdesk/WXWWrite`, RULES §3):
@@ -55,6 +56,8 @@ export function PostTopBar({
     const slug = draft.fields.slug.trim();
     const path = slug ? `/${postsPrefix}/${slug}` : `/${postsPrefix}/`;
     const live = model.status.startsWith("Live");
+    // Lit after an edit, never on open (editor audit, 21 Nov).
+    const can = useCanUndo(editor);
     return (
         <header
             data-post-bar=""
@@ -89,18 +92,14 @@ export function PostTopBar({
                     <IconButton
                         label="Undo"
                         icon={<Undo2 className="size-[18px]" />}
-                        disabled={
-                            !(editor?.isInitialized && editor.can().undo())
-                        }
+                        disabled={!can.undo}
                         onClick={() => editor?.chain().focus().undo().run()}
                         className="size-11"
                     />
                     <IconButton
                         label="Redo"
                         icon={<Redo2 className="size-[18px]" />}
-                        disabled={
-                            !(editor?.isInitialized && editor.can().redo())
-                        }
+                        disabled={!can.redo}
                         onClick={() => editor?.chain().focus().redo().run()}
                         className="size-11"
                     />

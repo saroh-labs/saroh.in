@@ -158,7 +158,7 @@ test.describe("the Look row", { tag: "@serial" }, () => {
             );
             await expect(
                 page.getByText(
-                    "Not published yet. Your site is Quiet until you publish.",
+                    "Not live yet. Your site stays Quiet until you publish.",
                 ),
             ).toBeVisible();
             await expect.poll(() => canvasLook(page)).toBeNull();

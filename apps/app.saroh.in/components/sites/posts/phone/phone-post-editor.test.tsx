@@ -66,6 +66,7 @@ vi.mock("@/lib/sites/actions", () => ({
 vi.mock("@/lib/sites/post-revisions-read", () => ({
     readPostRevisions: vi.fn(() => Promise.resolve({ ok: true, rows: [] })),
     readPostRevision: vi.fn(),
+    readPostChecks: vi.fn(() => Promise.resolve([])),
 }));
 vi.mock("@/components/billing/plan-refusal", () => ({
     showPlanRefusal: vi.fn(),
@@ -261,7 +262,8 @@ describe("the phone post editor (U16)", () => {
         updatePost.mockResolvedValue({ ok: true, data: { id: "p1" } });
         act(() => root.render(<PostShell data={data()} post={post} />));
         await settle(() => named("Details")?.click());
-        expect(text()).toContain("Saved · goes live when you publish");
+        // Before Save, never "Saved" (editor audit, 21 Nov).
+        expect(text()).toContain("Goes live when you publish");
         expect(text()).toContain("Search and sharing");
         expect(text()).toContain("Written by");
         act(() =>

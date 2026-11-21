@@ -98,7 +98,7 @@ export function BrandColourSheet({
             description="One colour in, and the page’s colours are made from it, each one clear to read."
             onClose={onClose}
             saveLabel="Use these colours"
-            footNote="Every page changes. Saved · goes live when you publish."
+            footNote="Every page changes. Goes live when you publish."
             onSubmit={(e) => {
                 e.preventDefault();
                 if (!hex || !palette) return;
@@ -113,7 +113,7 @@ export function BrandColourSheet({
                     <Input
                         type="color"
                         aria-label="Pick your brand colour"
-                        value={(hex ?? "#E0609A").toLowerCase()}
+                        value={(hex ?? "#000000").toLowerCase()}
                         onChange={(e) => setTyped(e.target.value)}
                         className="size-10 shrink-0 cursor-pointer rounded-md p-0.5"
                     />
@@ -121,7 +121,7 @@ export function BrandColourSheet({
                         id={`${id}-hex`}
                         value={typed}
                         onChange={(e) => setTyped(e.target.value)}
-                        placeholder="#E0609A"
+                        placeholder="#2B6CB0"
                         autoComplete="off"
                         spellCheck={false}
                         aria-invalid={typed !== "" && !hex}
@@ -132,7 +132,7 @@ export function BrandColourSheet({
                 </div>
                 <p id={`${id}-hint`} className="text-xs text-muted-foreground">
                     {typed !== "" && !hex
-                        ? "Write it as six letters and numbers, like #E0609A."
+                        ? "Write it as six letters and numbers, like #2B6CB0."
                         : "The colour your sign, your cards or your logo are in."}
                 </p>
             </div>

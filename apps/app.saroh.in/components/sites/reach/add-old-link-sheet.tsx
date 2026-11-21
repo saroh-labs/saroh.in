@@ -80,7 +80,7 @@ export function AddOldLinkSheet({
             pending={busy}
             saveLabel="Add old link"
             savingLabel="Adding…"
-            footNote={SAVE_LINES["waits-for-publish"]}
+            footNote={SAVE_LINES["on-publish"]}
             onClose={close}
             onSubmit={(e) => {
                 e.preventDefault();

@@ -302,3 +302,10 @@ export class UpdatePostCategoryDto {
     @Matches(SLUG_RE, { message: SLUG_MSG })
     slug!: string;
 }
+
+/** Publish post's checks (U18): the writing as it is on screen. */
+export class PostChecksDto {
+    @IsString()
+    @MaxLength(1_000_000)
+    content!: string;
+}

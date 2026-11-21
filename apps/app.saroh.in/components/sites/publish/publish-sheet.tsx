@@ -251,8 +251,8 @@ export function PublishSheet({
                             {siteWide ? (
                                 <Notice tone="error" role="note">
                                     {canOverride
-                                        ? `This site goes live only from an approved test release. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
-                                        : "This site goes live only from an approved test release. Make a test release and ask for a review."}
+                                        ? `This site goes live only from an approved test link. As an owner you can publish without approval. ${OVERRIDE_RECORD}`
+                                        : "This site goes live only from an approved test link. Make a test link and ask for a review."}
                                 </Notice>
                             ) : null}
                             {overriding ? (

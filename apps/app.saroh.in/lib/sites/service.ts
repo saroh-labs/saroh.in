@@ -952,6 +952,8 @@ export type SitesResult<T> =
           conflict?: boolean;
           /** With `conflict`: who saved the draft since (C12), if known. */
           by?: string | null;
+          /** With `conflict`: the newer save was this person's own. */
+          you?: boolean;
           /**
            * An address to offer instead of one the API refused (G14's
            * `details.suggestion`): taken, or one of the site's own routes.
@@ -976,6 +978,13 @@ export type SitesResult<T> =
 async function sitesBase(): Promise<string | null> {
     const orgId = await getActiveOrgId();
     return orgId ? `/organizations/${orgId}/sites` : null;
+}
+
+/** A 409's `error.details`: who saved the draft since (C12). */
+function conflictDetails(data: unknown): { by?: string | null; you?: boolean } {
+    const error = (data as { error?: { details?: unknown } } | null)?.error;
+    const details = typeof error === "object" ? error.details : undefined;
+    return typeof details === "object" && details !== null ? details : {};
 }
 
 /** Extract a human message (+ optional index) from a JSON error body. */
@@ -1378,6 +1387,7 @@ export async function saveDraftSections(
         code?: string;
         index?: number;
         by?: string | null;
+        you?: boolean;
     } | null;
     if (res.status === 409) {
         /*
@@ -1388,11 +1398,14 @@ export async function saveDraftSections(
         return {
             ok: false,
             conflict: true,
-            // Who saved it since (C12); null when the API can't say.
-            by: data?.by ?? null,
+            // Who saved it since (C12); null when the API can't say. The
+            // error filter carries it in `error.details`.
+            by: conflictDetails(data).by ?? data?.by ?? null,
+            // The newest save was this person's own, in another tab.
+            you: (conflictDetails(data).you ?? data?.you) === true,
             ...readError(
                 data,
-                "Someone else saved this page while you were editing.",
+                "This page was saved somewhere else while you were editing.",
             ),
         };
     }

@@ -10,7 +10,9 @@ import {
     requestReview,
     withdrawReview,
 } from "@/lib/sites/actions";
+import { readSiteChanges } from "@/lib/sites/changes-read";
 import type {
+    ChangeUnit,
     ReviewerVerdict,
     ReviewState,
     SiteCommentView,
@@ -45,6 +47,24 @@ export function useEditorReview({
      */
     const [loadFailed, setLoadFailed] = useState(false);
     const openNotes = review.openNotes;
+    /**
+     * What waits for Publish, for a Reviewer to read (`fix/WXMReviewer`):
+     * the same change units Publish counts. Null until read, or when the
+     * read failed: a reader is then told nothing rather than "no changes".
+     */
+    const [changes, setChanges] = useState<ChangeUnit[] | null>(null);
+    useEffect(() => {
+        if (!readOnly) return;
+        let live = true;
+        readSiteChanges(siteId)
+            .then((res) => {
+                if (live) setChanges(res?.units ?? null);
+            })
+            .catch(() => undefined);
+        return () => {
+            live = false;
+        };
+    }, [readOnly, siteId]);
 
     /*
      * One counter per re-read. It fires from several places — publishing, a
@@ -127,7 +147,7 @@ export function useEditorReview({
                 return;
             }
             showSuccess(
-                "Asked for a review. Reviewers can comment on any block and cannot change the page.",
+                "Asked for a review. Reviewers can comment on any section and cannot change the page.",
             );
             // Still disabled until the refreshed state reads In review, so a
             // second click cannot send a second request in between.
@@ -188,6 +208,8 @@ export function useEditorReview({
     return {
         comments,
         review,
+        changes,
+        changedByKey: changedOnPage(changes, pageId),
         openNotes,
         asking,
         recording,
@@ -202,3 +224,44 @@ export function useEditorReview({
 }
 
 export type EditorReview = ReturnType<typeof useEditorReview>;
+
+/** A section unit's key on its page: `section:<pageId>:<sectionKey>`. */
+export function unitSectionKey(unit: ChangeUnit): string | null {
+    if (unit.kind !== "section" || unit.pageId === null) return null;
+    const prefix = `section:${unit.pageId}:`;
+    return unit.key.startsWith(prefix) ? unit.key.slice(prefix.length) : null;
+}
+
+/** "Changed", "Added", … per section key on this page, for the canvas marks. */
+export function changedOnPage(
+    units: readonly ChangeUnit[] | null,
+    pageId: string,
+): Map<string, ChangeUnit["change"]> {
+    const marks = new Map<string, ChangeUnit["change"]>();
+    for (const unit of units ?? []) {
+        const key = unit.pageId === pageId ? unitSectionKey(unit) : null;
+        if (key !== null && unit.change !== "removed")
+            marks.set(key, unit.change);
+    }
+    return marks;
+}
+
+/**
+ * The change Next change opens after the selected section: the next section
+ * unit that is still on a page, wrapping round. Null when there is none.
+ */
+export function nextChange(
+    units: readonly ChangeUnit[],
+    at: { pageId: string; sectionKey: string | null },
+): ChangeUnit | null {
+    const jumpable = units.filter(
+        (u) => unitSectionKey(u) !== null && u.change !== "removed",
+    );
+    if (jumpable.length === 0) return null;
+    const here = jumpable.findIndex(
+        (u) => u.pageId === at.pageId && unitSectionKey(u) === at.sectionKey,
+    );
+    if (here !== -1) return jumpable[(here + 1) % jumpable.length];
+    // Nothing of it selected: this page's first change, else the first.
+    return jumpable.find((u) => u.pageId === at.pageId) ?? jumpable[0];
+}

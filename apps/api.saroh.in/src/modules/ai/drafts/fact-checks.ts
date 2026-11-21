@@ -119,6 +119,8 @@ export function factsIn(text: string): Omit<Fact, "id" | "field">[] {
 /** What the business already says, as fact keys, and where each came from. */
 export interface Given {
     keys: Set<string>;
+    /** A key the page doesn't say, by where Saroh has it: "your Services". */
+    from?: Map<string, string>;
 }
 
 /**
@@ -144,24 +146,34 @@ export async function givenFacts(
         }),
     ]);
     const keys = new Set(factsIn(pageText).map((f) => f.key));
+    const from = new Map<string, string>();
+    const add = (key: string, source: string) => {
+        if (!keys.has(key)) from.set(key, source);
+        keys.add(key);
+    };
     for (const s of services) {
-        if (s.priceCents !== null) keys.add(`money:${s.priceCents / 100}`);
+        if (s.priceCents !== null) {
+            add(`money:${s.priceCents / 100}`, "your Services");
+        }
     }
     for (const d of discounts) {
-        if (d.percentBps !== null) keys.add(`percent:${d.percentBps / 100}`);
-        if (d.amount !== null) keys.add(`money:${Number(d.amount)}`);
+        if (d.percentBps !== null) {
+            add(`percent:${d.percentBps / 100}`, "your Discounts");
+        }
+        if (d.amount !== null)
+            add(`money:${Number(d.amount)}`, "your Discounts");
     }
     // A business with any Discount has an offer to speak of.
     if (discounts.length) {
         for (const w of ["discount", "offer", "sale", "deal", "coupon"]) {
-            keys.add(`offer:${w}`);
+            add(`offer:${w}`, "your Discounts");
         }
     }
     for (const h of hours) {
-        keys.add(`time:${h.startMinute}`);
-        keys.add(`time:${h.endMinute}`);
+        add(`time:${h.startMinute}`, "your hours");
+        add(`time:${h.endMinute}`, "your hours");
     }
-    return { keys };
+    return { keys, from };
 }
 
 /** The new words' facts the business never gave, by field: the card's Check this. */
@@ -180,6 +192,27 @@ export function checksFor(
                   }))
             : [],
     );
+}
+
+/**
+ * What the card says the new words are based on (RULES §5): what was asked
+ * and the section's words, then only the parts of Saroh a fact in the new
+ * words was taken from. A heading typed out word for word names no Services.
+ */
+export function basedOnFor(
+    fields: { field: string; new: unknown }[],
+    given: Given,
+): string {
+    const used = new Set<string>();
+    for (const { new: value } of fields) {
+        if (typeof value !== "string") continue;
+        for (const f of factsIn(value)) {
+            const source = given.from?.get(f.key);
+            if (source) used.add(source);
+        }
+    }
+    const parts = ["What you asked", "this section's words now", ...used];
+    return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 /**

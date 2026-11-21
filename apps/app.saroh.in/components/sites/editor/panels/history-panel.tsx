@@ -348,9 +348,7 @@ function Waiting({
                                     )}
                                     <span className="mt-0.5 block text-xs">
                                         {unit.where}
-                                        {group.name
-                                            ? ""
-                                            : " · before names were kept"}
+                                        {group.name ? "" : " · changed earlier"}
                                         {unit.editedAt
                                             ? ` · ${formatRelative(unit.editedAt)}`
                                             : ""}

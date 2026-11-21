@@ -7,7 +7,7 @@ import { cn } from "@saroh/ui/lib/utils";
 import { useEffect, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import type { PostRevisionRow } from "@/lib/content/service";
+import type { PostRevision, PostRevisionRow } from "@/lib/content/service";
 import { formatDateTime, formatTime } from "@/lib/format/datetime";
 import { initials } from "@/lib/names";
 import { readPostRevisions } from "@/lib/sites/post-revisions-read";
@@ -21,6 +21,27 @@ import { groupVersions, revisionWhy } from "./version-words";
  * draws it). The rail shows the tab once this is true.
  */
 export const POST_HISTORY_READY = true as boolean;
+
+/** The id of the stand-in row for the live copy; never a revision's. */
+export const LIVE_COPY_ID = "live-copy";
+
+/** The live copy as a version, or null when there isn't one. */
+export function liveVersion(model: PostEditorModel): PostRevision | null {
+    const { liveCopy, data } = model;
+    if (!liveCopy) return null;
+    return {
+        ...liveCopy,
+        id: LIVE_COPY_ID,
+        reason: "published",
+        note: null,
+        createdAt: liveCopy.publishedAt ?? new Date(0).toISOString(),
+        savedBy: null,
+        categoryId:
+            data.categories.find((c) => c.name === liveCopy.category)?.id ??
+            null,
+        authorId: null,
+    };
+}
 
 /**
  * A post's versions (`blogdesk/WXWHistory`): "Versions n", Today and
@@ -57,11 +78,23 @@ export function PostHistoryPanel({ model }: { model: PostEditorModel }) {
         setAttempt((n) => n + 1);
     };
 
-    const rows = Array.isArray(read) ? read : [];
+    const read_ = Array.isArray(read) ? read : [];
     // The copy visitors read now: the newest one published, while it's live.
-    const liveId = model.draft.live
-        ? rows.find((r) => r.reason === "published")?.id
+    // A post published before versions were kept has none: the live copy
+    // the editor read stands in, so there is always something to compare.
+    const published = model.draft.live
+        ? read_.find((r) => r.reason === "published")
         : undefined;
+    const liveCopy =
+        model.draft.live && !published && Array.isArray(read)
+            ? liveVersion(model)
+            : null;
+    const rows = liveCopy
+        ? [liveCopy, ...read_].sort((a, b) =>
+              b.createdAt.localeCompare(a.createdAt),
+          )
+        : read_;
+    const liveId = published?.id ?? liveCopy?.id;
 
     return (
         <section
@@ -131,13 +164,18 @@ export function PostHistoryPanel({ model }: { model: PostEditorModel }) {
                                                 className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[0.6875rem] font-semibold"
                                             >
                                                 {initials(
-                                                    r.savedBy?.name ?? "?",
+                                                    r.id === LIVE_COPY_ID
+                                                        ? model.data.siteName
+                                                        : (r.savedBy?.name ??
+                                                              "?"),
                                                 )}
                                             </span>
                                             <span className="min-w-0 flex-1 text-[0.8125rem]">
                                                 <b className="block truncate font-semibold">
-                                                    {r.savedBy?.name ??
-                                                        "Someone"}
+                                                    {r.id === LIVE_COPY_ID
+                                                        ? "On the site now"
+                                                        : (r.savedBy?.name ??
+                                                          "Someone")}
                                                 </b>
                                                 <small className="block text-xs text-muted-foreground">
                                                     {g.day === "Today"
@@ -174,6 +212,7 @@ export function PostHistoryPanel({ model }: { model: PostEditorModel }) {
                     model={model}
                     row={open}
                     live={open.id === liveId}
+                    copy={open.id === liveCopy?.id ? liveCopy : undefined}
                     onClose={() => setOpen(null)}
                 />
             ) : null}

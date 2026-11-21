@@ -1,7 +1,7 @@
 "use client";
 
 import { TabStrip } from "@saroh/ui/tabs";
-import { Check, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 
 import { InspectorFrame } from "@/components/sites/editor/shell/inspector-frame";
 
@@ -79,7 +79,8 @@ export function PostInspector({
                 <div
                     role="tabpanel"
                     aria-labelledby={`post-inspector-${tab}`}
-                    className="min-h-0 flex-1 overflow-y-auto p-4"
+                    // Relative: an sr-only input stays clipped here.
+                    className="relative min-h-0 flex-1 overflow-y-auto p-4"
                 >
                     {tab === "feedback" && feedback && draft.postId ? (
                         <PostFeedback
@@ -107,17 +108,8 @@ export function PostInspector({
                 </div>
                 {data.readOnly ? null : (
                     <p className="flex shrink-0 items-center gap-1.5 border-t px-4 py-3 text-[0.8125rem] text-foreground/75">
-                        {draft.dirty || draft.saveFailed ? (
-                            "Goes live when you publish"
-                        ) : (
-                            <>
-                                <Check
-                                    aria-hidden
-                                    className="size-3.5 text-success"
-                                />
-                                Saved · goes live when you publish
-                            </>
-                        )}
+                        {/* "Saved" is said once, in the top bar. */}
+                        Goes live when you publish
                     </p>
                 )}
             </div>

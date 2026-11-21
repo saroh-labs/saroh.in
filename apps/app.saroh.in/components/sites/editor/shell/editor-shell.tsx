@@ -3,7 +3,6 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import { useEditorAskAiDock } from "@/components/ask-ai/editor-ask-ai-context";
 import { RAIL_DEFAULT } from "@/lib/sites/editor-prefs";
 import type { Flag } from "@/lib/sites/service";
 
@@ -82,8 +81,7 @@ export function EditorShell({
     // The tree's Add a page opens Add's own sheet (U46e, `fix/WXBAddPage`).
     const [addingPage, setAddingPage] = useState(false);
     const { viewport } = model;
-    const dock = useEditorAskAiDock();
-    const right = useRightWidth(model.askAi ? (dock?.tab ?? "edit") : "edit");
+    const right = useRightWidth();
 
     // ⌘K opens Find once it is built (U46c).
     useEffect(() => {
@@ -131,9 +129,7 @@ export function EditorShell({
                 pickerOpen={pickerOpen}
                 setPickerOpen={setPickerOpen}
             />
-            {model.readOnly ? (
-                <ReviewerStrip review={model.review.review} />
-            ) : null}
+            {model.readOnly ? <ReviewerStrip model={model} /> : null}
             <EditorPanels
                 {...panels}
                 viewport={{

@@ -89,6 +89,11 @@ export function useEditorDraft({
     const [conflict, setConflict] = useState(false);
     // Who saved the page since this editor opened it (C12), if the API said.
     const [conflictBy, setConflictBy] = useState<string | null>(null);
+    // The newest save was this person's own, from another tab or window.
+    const [conflictYou, setConflictYou] = useState(false);
+    // Set while a save writes form ids into the blocks: Undo's history
+    // folds that into the step before, as it isn't the merchant's.
+    const stamping = useRef(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const sectionsJson = JSON.stringify(sections);
@@ -258,6 +263,7 @@ export function useEditorDraft({
             setSaveError(true);
             setErrorIndex(synced.index);
             setErrorMessage(synced.error);
+            // The section may not be the one open: the toast names it.
             showError(synced.error);
             // Recorded like any other failed save, so the autosave does not
             // send the same draft again every 1.5s with a fresh toast.
@@ -267,6 +273,7 @@ export function useEditorDraft({
         // Stamp ONLY the new formIds onto what is on screen now (#281).
         const found = newFormIds(sections, synced.sections);
         if (found.length > 0) {
+            stamping.current = true;
             setSections((current) =>
                 stampFormIds(current, found, sections.length),
             );
@@ -309,7 +316,7 @@ export function useEditorDraft({
             revision,
         ).catch(() => ({
             ok: false as const,
-            error: "Couldn't reach Saroh. Your work is still here. It will save again with your next edit.",
+            error: "Couldn't reach Saroh.",
         }));
         setSaving(false);
         if (res.ok) {
@@ -346,16 +353,33 @@ export function useEditorDraft({
             // one side's work. The banner offers the reload instead.
             setConflict(true);
             setConflictBy(res.by ?? null);
+            setConflictYou(res.you === true);
         }
         if ("index" in res && typeof res.index === "number") {
             // The server counts positions in what was SENT; the editor's list
             // may have held-back sections in between.
             setErrorIndex(plan.sentFrom[res.index] ?? res.index);
             setErrorMessage(res.error);
+            // The section may not be the one open: the toast names it.
+            showError(res.error);
         }
-        showError(res.error);
+        /*
+         * One message, where the merchant is working (editor audit F3):
+         * the conflict notice, or Couldn't save with Try again. Never a
+         * toast as well, which went off-screen and
+         * promised a retry that didn't come.
+         */
         return false;
     }
+
+    // Back online after a save failed: try it again, without being asked.
+    useEffect(() => {
+        if (readOnly || !saveError || conflict) return;
+        const again = () => void onSave(true);
+        window.addEventListener("online", again);
+        return () => window.removeEventListener("online", again);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `onSave` is new each render
+    }, [readOnly, saveError, conflict, sections]);
 
     /*
      * Autosave, debounced.
@@ -414,6 +438,8 @@ export function useEditorDraft({
         lastSavedAt,
         conflict,
         conflictBy,
+        conflictYou,
+        stamping,
         errorIndex,
         errorMessage,
         /**

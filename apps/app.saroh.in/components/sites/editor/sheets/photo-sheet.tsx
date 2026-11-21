@@ -416,7 +416,7 @@ function PhotoDraft({
                                 .join(" · ")}
                         </span>
                     ) : (
-                        SAVE_LINES["waits-for-publish"]
+                        SAVE_LINES["on-publish"]
                     )
                 }
                 onSubmit={(e) => {

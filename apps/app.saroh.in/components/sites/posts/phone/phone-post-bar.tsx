@@ -51,7 +51,9 @@ export function PhonePostBar({
     return (
         <header
             data-post-bar=""
-            className="flex h-14 shrink-0 items-center gap-0.5 border-b bg-background pl-0.5 pr-2.5"
+            // At 320 the status and Saved take a row of their own under the
+            // buttons, whole, instead of being cut to "L…" and "Save".
+            className="flex h-14 shrink-0 items-center gap-0.5 border-b bg-background pl-0.5 pr-2.5 max-[360px]:h-auto max-[360px]:flex-wrap max-[360px]:pt-1.5"
         >
             <Link
                 href={`/sites/${data.siteId}/overview`}
@@ -60,7 +62,8 @@ export function PhonePostBar({
             >
                 <ChevronLeft aria-hidden className="size-5" />
             </Link>
-            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 pl-0.5 leading-tight">
+            <span aria-hidden className="hidden flex-1 max-[360px]:block" />
+            <div className="flex min-w-0 flex-1 flex-col items-start gap-0.5 pl-0.5 leading-tight max-[360px]:order-last max-[360px]:basis-full max-[360px]:flex-row max-[360px]:items-center max-[360px]:gap-2 max-[360px]:px-2.5 max-[360px]:pb-2">
                 <span
                     data-status-chip=""
                     className={cn(

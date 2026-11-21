@@ -85,7 +85,7 @@ export function PostReviewBody({ model }: { model: PostEditorModel }) {
                 paragraphs={marks}
                 label={(n, total) => `Change ${n} of ${total}`}
             />
-            <p className="text-[12.5px] text-muted-foreground">
+            <p className="text-[12.5px] text-site-muted">
                 Shown as plain text. Its formatting and pictures show on the
                 site once it is published.
             </p>

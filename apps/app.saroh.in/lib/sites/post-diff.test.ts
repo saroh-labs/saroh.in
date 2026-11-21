@@ -57,6 +57,15 @@ describe("postChanges", () => {
         ).toEqual(["title", "coverDescription", "pageLink"]);
     });
 
+    it("doesn't count an empty line as a change to the writing", () => {
+        expect(
+            postChanges(
+                { ...draft, content: `${live.content}<p></p><p><br></p>` },
+                live,
+            ),
+        ).toEqual([]);
+    });
+
     it("isn't waiting on anything for a post that isn't live", () => {
         expect(postChanges({ ...draft, title: "New" }, null)).toEqual([]);
     });
@@ -109,6 +118,13 @@ describe("wordDiff", () => {
         ).toBe("photos to show your family.");
     });
 
+    it("matches a paragraph's last word with the same word mid-line", () => {
+        expect(wordDiff("Strong enough.", "Strong enough. More.")).toEqual([
+            { kind: "same", text: "Strong enough. " },
+            { kind: "added", text: "More." },
+        ]);
+    });
+
     it("is one same run for the same line", () => {
         expect(wordDiff("A trial.", "A trial.")).toEqual([
             { kind: "same", text: "A trial." },
@@ -134,6 +150,16 @@ describe("paragraphDiff", () => {
             "added",
         ]);
         expect(diffCounts(out)).toEqual({ added: 2, removed: 1 });
+    });
+
+    it("shows two paragraphs joined as one change, not two that contradict", () => {
+        const out = paragraphDiff(
+            ["Strong enough.", "Seeded content for the demo."],
+            ["Strong enough. Seeded content for the demo."],
+        );
+        expect(out).toHaveLength(1);
+        expect(out[0].kind).toBe("changed");
+        expect(diffCounts(out)).toEqual({ added: 0, removed: 0 });
     });
 
     it("says a paragraph taken out", () => {

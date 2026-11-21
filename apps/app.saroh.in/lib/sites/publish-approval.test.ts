@@ -4,7 +4,7 @@ import { publishApprovalLine, publishApprovalOf } from "./publish-approval";
 
 /** When the settings show "Publishing needs approval" (DEC-071, T13). */
 describe("publishApprovalOf", () => {
-    it("hides the setting while test releases are off and it is off", () => {
+    it("hides the setting while test links are off and it is off", () => {
         expect(publishApprovalOf({ publishNeedsApproval: false }, false)).toBe(
             null,
         );

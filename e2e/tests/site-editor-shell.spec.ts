@@ -75,7 +75,7 @@ for (const size of SIZES) {
                 bar.getByRole("button", { name: /^(Publish|Needs approval)$/ }),
             ).toBeVisible();
             // The old bar's controls are gone from it.
-            for (const gone of [/^Share$/, /^Test release$/, /^Zoom$/]) {
+            for (const gone of [/^Share$/, /^Test link$/, /^Zoom$/]) {
                 await expect(
                     bar.getByRole("button", { name: gone }),
                 ).toHaveCount(0);

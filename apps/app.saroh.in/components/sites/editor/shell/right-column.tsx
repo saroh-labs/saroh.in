@@ -77,31 +77,26 @@ export function RightColumn({
 
 /*
  * The right column's width (owner, 21 Nov): dragged from its left edge,
- * 320 to half the window, remembered per person in this browser under its
- * own key (the old `saroh.editor.chrome` held bad widths), each tab its own.
- * Until dragged, Ask AI is a little wider than Edit, as the boards draw it.
+ * 320 to half the window, remembered per person in this browser. One width
+ * for both tabs, so switching Edit and Ask AI never moves the canvas.
  */
-const WIDTH_KEY = "saroh.editor.right-width.v1";
+const WIDTH_KEY = "saroh.editor.right-width.v2";
 export const RIGHT_MIN = 320;
-export const RIGHT_DEFAULT: Record<RightTab, number> = { edit: 360, ask: 400 };
+export const RIGHT_DEFAULT = 360;
 
 const listeners = new Set<() => void>();
-type Widths = Partial<Record<RightTab, number>>;
-let saved: Widths | undefined;
+let saved: number | null | undefined;
 
-function readSaved(): Widths {
-    if (saved) return saved;
-    saved = {};
+function readSaved(): number | null {
+    if (saved !== undefined) return saved;
+    saved = null;
     try {
-        const raw = JSON.parse(
-            window.localStorage.getItem(WIDTH_KEY) ?? "{}",
-        ) as Record<string, unknown> | null;
-        for (const tab of ["edit", "ask"] as const) {
-            const n = raw?.[tab];
-            if (typeof n === "number" && n >= RIGHT_MIN) saved[tab] = n;
-        }
+        const n: unknown = JSON.parse(
+            window.localStorage.getItem(WIDTH_KEY) ?? "null",
+        );
+        if (typeof n === "number" && n >= RIGHT_MIN) saved = n;
     } catch {
-        // Unreadable or blocked: the boards' widths.
+        // Unreadable or blocked: the boards' width.
     }
     return saved;
 }
@@ -110,9 +105,8 @@ function readSaved(): Widths {
 export const rightMax = () =>
     Math.max(RIGHT_MIN, Math.floor(window.innerWidth / 2));
 
-function save(tab: RightTab, px: number) {
-    const width = Math.round(Math.min(Math.max(px, RIGHT_MIN), rightMax()));
-    saved = { ...readSaved(), [tab]: width };
+function save(px: number) {
+    saved = Math.round(Math.min(Math.max(px, RIGHT_MIN), rightMax()));
     try {
         window.localStorage.setItem(WIDTH_KEY, JSON.stringify(saved));
     } catch {
@@ -130,20 +124,16 @@ function subscribe(onChange: () => void) {
     };
 }
 
-/** The right column's width for the open tab, and how to change it. */
-export function useRightWidth(tab: RightTab) {
-    const stored = useSyncExternalStore(
-        subscribe,
-        () => readSaved()[tab] ?? null,
-        () => null,
-    );
+/** The right column's width, the same on either tab, and how to change it. */
+export function useRightWidth() {
+    const stored = useSyncExternalStore(subscribe, readSaved, () => null);
     const max = useSyncExternalStore(subscribe, rightMax, () => 960);
-    const width = Math.min(stored ?? RIGHT_DEFAULT[tab], max);
+    const width = Math.min(stored ?? RIGHT_DEFAULT, max);
     return {
         width,
         max,
-        setWidth: (px: number) => save(tab, px),
-        nudge: (d: number) => save(tab, width + d),
-        reset: RIGHT_DEFAULT[tab],
+        setWidth: save,
+        nudge: (d: number) => save(width + d),
+        reset: RIGHT_DEFAULT,
     };
 }

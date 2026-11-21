@@ -133,7 +133,7 @@ export function PhoneShell({ model, topBar, children }: PhoneShellProps) {
                 bar={bar}
                 onPicker={() => setSheet("pages")}
             />
-            {readOnly ? <ReviewerStrip review={model.review.review} /> : null}
+            {readOnly ? <ReviewerStrip model={model} /> : null}
             <div
                 ref={setBody}
                 data-layout="phone"
@@ -228,8 +228,8 @@ export function PhoneShell({ model, topBar, children }: PhoneShellProps) {
                     onClose={releases.onClose}
                     container={body}
                     side="bottom"
-                    title="Test releases"
-                    closeLabel="Close test releases"
+                    title="Test links"
+                    closeLabel="Close test links"
                 >
                     {releases.content}
                 </EditorSheet>

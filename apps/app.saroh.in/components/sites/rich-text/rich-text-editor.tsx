@@ -287,6 +287,14 @@ function EditorSurface({
     onToolbarChange?: (open: boolean) => void;
 }) {
     const [source, setSource] = useState(false);
+    /*
+     * On a phone the bar is the board's short set (`fix/WXNText`): text
+     * style, Bold, Link and a list. The rest waits under More, so the
+     * field keeps the room (editor audit, 21 Nov).
+     */
+    const [more, setMore] = useState(false);
+    // A post's full toolbar (`document`) is already the "more" one.
+    const extra = cn("contents", !more && !asDocument && PHONE_HIDDEN);
 
     /*
      * Keep the editor in step with the field it edits. Switching sections
@@ -375,27 +383,29 @@ function EditorSurface({
 
     const bar = (
         <div className="flex flex-wrap items-center gap-0.5 border-b p-1">
-            <Tool
-                label="Undo"
-                onClick={() => chain().undo().run()}
-                disabled={!state.canUndo}
-            >
-                <Undo2 />
-            </Tool>
-            <Tool
-                label="Redo"
-                onClick={() => chain().redo().run()}
-                disabled={!state.canRedo}
-            >
-                <Redo2 />
-            </Tool>
-            <Tool
-                label="Clear formatting"
-                onClick={() => chain().unsetAllMarks().clearNodes().run()}
-            >
-                <Eraser />
-            </Tool>
-            <Gap />
+            <span className={extra}>
+                <Tool
+                    label="Undo"
+                    onClick={() => chain().undo().run()}
+                    disabled={!state.canUndo}
+                >
+                    <Undo2 />
+                </Tool>
+                <Tool
+                    label="Redo"
+                    onClick={() => chain().redo().run()}
+                    disabled={!state.canRedo}
+                >
+                    <Redo2 />
+                </Tool>
+                <Tool
+                    label="Clear formatting"
+                    onClick={() => chain().unsetAllMarks().clearNodes().run()}
+                >
+                    <Eraser />
+                </Tool>
+                <Gap />
+            </span>
 
             <Select
                 value={String(state.heading)}
@@ -424,44 +434,52 @@ function EditorSurface({
                     <SelectItem value="4">Heading 4</SelectItem>
                 </SelectContent>
             </Select>
-            <Select
-                value={state.font ?? "__site"}
-                onValueChange={(v) =>
-                    v === "__site"
-                        ? chain().unsetFontFamily().run()
-                        : chain().setFontFamily(v).run()
-                }
-            >
-                <SelectTrigger className="h-7 w-24" aria-label="Font">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {FONTS.map((f) => (
-                        <SelectItem key={f.label} value={f.value ?? "__site"}>
-                            {f.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            <Select
-                value={state.size ?? "__normal"}
-                onValueChange={(v) =>
-                    v === "__normal"
-                        ? chain().unsetFontSize().run()
-                        : chain().setFontSize(v).run()
-                }
-            >
-                <SelectTrigger className="h-7 w-24" aria-label="Size">
-                    <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                    {SIZES.map((s) => (
-                        <SelectItem key={s.label} value={s.value ?? "__normal"}>
-                            {s.label}
-                        </SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+            <span className={extra}>
+                <Select
+                    value={state.font ?? "__site"}
+                    onValueChange={(v) =>
+                        v === "__site"
+                            ? chain().unsetFontFamily().run()
+                            : chain().setFontFamily(v).run()
+                    }
+                >
+                    <SelectTrigger className="h-7 w-24" aria-label="Font">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {FONTS.map((f) => (
+                            <SelectItem
+                                key={f.label}
+                                value={f.value ?? "__site"}
+                            >
+                                {f.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                <Select
+                    value={state.size ?? "__normal"}
+                    onValueChange={(v) =>
+                        v === "__normal"
+                            ? chain().unsetFontSize().run()
+                            : chain().setFontSize(v).run()
+                    }
+                >
+                    <SelectTrigger className="h-7 w-24" aria-label="Size">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {SIZES.map((s) => (
+                            <SelectItem
+                                key={s.label}
+                                value={s.value ?? "__normal"}
+                            >
+                                {s.label}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </span>
             <Gap />
 
             <Mark
@@ -471,87 +489,91 @@ function EditorSurface({
             >
                 <Bold />
             </Mark>
-            <Mark
-                label="Italic"
-                pressed={state.italic}
-                onPressedChange={() => chain().toggleItalic().run()}
-            >
-                <Italic />
-            </Mark>
-            <Mark
-                label="Underline"
-                pressed={state.underline}
-                onPressedChange={() => chain().toggleUnderline().run()}
-            >
-                <UnderlineIcon />
-            </Mark>
-            <Mark
-                label="Strikethrough"
-                pressed={state.strike}
-                onPressedChange={() => chain().toggleStrike().run()}
-            >
-                <Strikethrough />
-            </Mark>
-            <Mark
-                label="Subscript"
-                pressed={state.sub}
-                onPressedChange={() => chain().toggleSubscript().run()}
-            >
-                <SubscriptIcon />
-            </Mark>
-            <Mark
-                label="Superscript"
-                pressed={state.sup}
-                onPressedChange={() => chain().toggleSuperscript().run()}
-            >
-                <SuperscriptIcon />
-            </Mark>
-            <Gap />
+            <span className={extra}>
+                <Mark
+                    label="Italic"
+                    pressed={state.italic}
+                    onPressedChange={() => chain().toggleItalic().run()}
+                >
+                    <Italic />
+                </Mark>
+                <Mark
+                    label="Underline"
+                    pressed={state.underline}
+                    onPressedChange={() => chain().toggleUnderline().run()}
+                >
+                    <UnderlineIcon />
+                </Mark>
+                <Mark
+                    label="Strikethrough"
+                    pressed={state.strike}
+                    onPressedChange={() => chain().toggleStrike().run()}
+                >
+                    <Strikethrough />
+                </Mark>
+                <Mark
+                    label="Subscript"
+                    pressed={state.sub}
+                    onPressedChange={() => chain().toggleSubscript().run()}
+                >
+                    <SubscriptIcon />
+                </Mark>
+                <Mark
+                    label="Superscript"
+                    pressed={state.sup}
+                    onPressedChange={() => chain().toggleSuperscript().run()}
+                >
+                    <SuperscriptIcon />
+                </Mark>
+                <Gap />
 
-            <Swatches
-                label="Text colour"
-                icon={<Baseline />}
-                colours={COLOURS}
-                current={state.colour}
-                onPick={(c) =>
-                    c ? chain().setColor(c).run() : chain().unsetColor().run()
-                }
-            />
-            <Swatches
-                label="Highlight"
-                icon={<Highlighter />}
-                colours={HIGHLIGHTS}
-                current={null}
-                onPick={(c) =>
-                    c
-                        ? chain().setHighlight({ color: c }).run()
-                        : chain().unsetHighlight().run()
-                }
-            />
-            <Gap />
+                <Swatches
+                    label="Text colour"
+                    icon={<Baseline />}
+                    colours={COLOURS}
+                    current={state.colour}
+                    onPick={(c) =>
+                        c
+                            ? chain().setColor(c).run()
+                            : chain().unsetColor().run()
+                    }
+                />
+                <Swatches
+                    label="Highlight"
+                    icon={<Highlighter />}
+                    colours={HIGHLIGHTS}
+                    current={null}
+                    onPick={(c) =>
+                        c
+                            ? chain().setHighlight({ color: c }).run()
+                            : chain().unsetHighlight().run()
+                    }
+                />
+                <Gap />
 
-            <Mark
-                label="Align left"
-                pressed={state.align === "left"}
-                onPressedChange={() => chain().setTextAlign("left").run()}
-            >
-                <AlignLeft />
-            </Mark>
-            <Mark
-                label="Align centre"
-                pressed={state.align === "center"}
-                onPressedChange={() => chain().setTextAlign("center").run()}
-            >
-                <AlignCenter />
-            </Mark>
-            <Mark
-                label="Align right"
-                pressed={state.align === "right"}
-                onPressedChange={() => chain().setTextAlign("right").run()}
-            >
-                <AlignRight />
-            </Mark>
-            <Gap />
+                <Mark
+                    label="Align left"
+                    pressed={state.align === "left"}
+                    onPressedChange={() => chain().setTextAlign("left").run()}
+                >
+                    <AlignLeft />
+                </Mark>
+                <Mark
+                    label="Align centre"
+                    pressed={state.align === "center"}
+                    onPressedChange={() => chain().setTextAlign("center").run()}
+                >
+                    <AlignCenter />
+                </Mark>
+                <Mark
+                    label="Align right"
+                    pressed={state.align === "right"}
+                    onPressedChange={() => chain().setTextAlign("right").run()}
+                >
+                    <AlignRight />
+                </Mark>
+                <Gap />
+            </span>
 
             <Mark
                 label="Bulleted list"
@@ -560,34 +582,36 @@ function EditorSurface({
             >
                 <List />
             </Mark>
-            <Mark
-                label="Numbered list"
-                pressed={state.ordered}
-                onPressedChange={() => chain().toggleOrderedList().run()}
-            >
-                <ListOrdered />
-            </Mark>
-            <Mark
-                label="Quote"
-                pressed={state.quote}
-                onPressedChange={() => chain().toggleBlockquote().run()}
-            >
-                <Quote />
-            </Mark>
-            <Mark
-                label="Code block"
-                pressed={state.code}
-                onPressedChange={() => chain().toggleCodeBlock().run()}
-            >
-                <Code2 />
-            </Mark>
-            <Tool
-                label="Horizontal rule"
-                onClick={() => chain().setHorizontalRule().run()}
-            >
-                <Minus />
-            </Tool>
-            <Gap />
+            <span className={extra}>
+                <Mark
+                    label="Numbered list"
+                    pressed={state.ordered}
+                    onPressedChange={() => chain().toggleOrderedList().run()}
+                >
+                    <ListOrdered />
+                </Mark>
+                <Mark
+                    label="Quote"
+                    pressed={state.quote}
+                    onPressedChange={() => chain().toggleBlockquote().run()}
+                >
+                    <Quote />
+                </Mark>
+                <Mark
+                    label="Code block"
+                    pressed={state.code}
+                    onPressedChange={() => chain().toggleCodeBlock().run()}
+                >
+                    <Code2 />
+                </Mark>
+                <Tool
+                    label="Horizontal rule"
+                    onClick={() => chain().setHorizontalRule().run()}
+                >
+                    <Minus />
+                </Tool>
+                <Gap />
+            </span>
 
             <LinkTool
                 active={state.link}
@@ -604,56 +628,69 @@ function EditorSurface({
                         : chain().extendMarkRange("link").unsetLink().run()
                 }
             />
-            <Popover>
-                <PopoverTrigger asChild>
-                    <IconButton
-                        label="Insert image"
-                        icon={<ImagePlus className="size-4" />}
-                        size="xs"
-                    />
-                </PopoverTrigger>
-                <PopoverContent align="start" className="w-80">
-                    <MediaPicker
-                        label="Choose a photo"
-                        onPick={(img) => insertImage(editor, img)}
-                    />
-                </PopoverContent>
-            </Popover>
-            <Tool
-                label="Insert table"
-                onClick={() =>
-                    chain()
-                        .insertTable({
-                            rows: 3,
-                            cols: 3,
-                            withHeaderRow: true,
-                        })
-                        .run()
-                }
-            >
-                <Table2 />
-            </Tool>
-            <Gap />
+            <span className={extra}>
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <IconButton
+                            label="Insert image"
+                            icon={<ImagePlus className="size-4" />}
+                            size="xs"
+                        />
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-80">
+                        <MediaPicker
+                            label="Choose a photo"
+                            onPick={(img) => insertImage(editor, img)}
+                        />
+                    </PopoverContent>
+                </Popover>
+                <Tool
+                    label="Insert table"
+                    onClick={() =>
+                        chain()
+                            .insertTable({
+                                rows: 3,
+                                cols: 3,
+                                withHeaderRow: true,
+                            })
+                            .run()
+                    }
+                >
+                    <Table2 />
+                </Tool>
+                <Gap />
 
-            <Toggle
-                size="sm"
-                className="h-7 px-2 text-xs"
-                pressed={source}
-                onPressedChange={(on) => {
-                    // Leaving source view pushes whatever was typed back
-                    // through the schema, so a stray tag is normalised the
-                    // way a paste would be.
-                    if (!on && !editor.isDestroyed)
-                        editor
-                            .chain()
-                            .setContent(value, { emitUpdate: false })
-                            .run();
-                    setSource(on);
-                }}
-                aria-label="Edit as HTML"
-            >
-                HTML
-            </Toggle>
+                <Toggle
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    pressed={source}
+                    onPressedChange={(on) => {
+                        // Leaving source view pushes whatever was typed back
+                        // through the schema, so a stray tag is normalised the
+                        // way a paste would be.
+                        if (!on && !editor.isDestroyed)
+                            editor
+                                .chain()
+                                .setContent(value, { emitUpdate: false })
+                                .run();
+                        setSource(on);
+                    }}
+                    aria-label="Edit as HTML"
+                >
+                    HTML
+                </Toggle>
+            </span>
+            {asDocument ? null : (
+                <Toggle
+                    size="sm"
+                    className="h-7 px-2 text-xs min-[760px]:hidden"
+                    pressed={more}
+                    onPressedChange={setMore}
+                    aria-label="More formatting"
+                >
+                    More
+                </Toggle>
+            )}
         </div>
     );
 
@@ -733,6 +770,9 @@ function EditorSurface({
         </div>
     );
 }
+
+/** The editor's phone width (`PHONE_QUERY`): the short bar's tools only. */
+const PHONE_HIDDEN = "max-[759.98px]:hidden";
 
 function Gap() {
     return <Separator orientation="vertical" className="mx-1 h-5" />;

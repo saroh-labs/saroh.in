@@ -74,7 +74,7 @@ test(
             await expect(
                 page
                     .getByText(
-                        "Only an approved test release can go live. You can still go live without approval, and it's recorded.",
+                        "Pages and posts go live once a reviewer, an admin or the owner approves them. You can still go live without approval, and it's recorded.",
                     )
                     .filter({ visible: true }),
             ).toHaveCount(1);

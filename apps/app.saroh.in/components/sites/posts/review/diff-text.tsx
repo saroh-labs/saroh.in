@@ -58,7 +58,8 @@ export function DiffParagraphs({
                                 {label(n, of)}
                             </span>
                         ) : null}
-                        <p>
+                        {/* A joined or split paragraph keeps its line breaks. */}
+                        <p className="whitespace-pre-line">
                             {p.kind === "changed" ? (
                                 <DiffRuns runs={p.runs} />
                             ) : (

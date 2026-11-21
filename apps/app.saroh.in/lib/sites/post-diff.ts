@@ -29,6 +29,11 @@ export interface PostDraftView {
 const same = (a: string | null | undefined, b: string | null | undefined) =>
     (a ?? "").trim() === (b ?? "").trim();
 
+/** The writing without empty lines, which show nothing on the page. */
+const EMPTY_LINE = /<p\b[^>]*>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/gi;
+export const sameWriting = (a: string, b: string) =>
+    a.replace(EMPTY_LINE, "").trim() === b.replace(EMPTY_LINE, "").trim();
+
 /**
  * What differs between the draft and the live copy (U15; U17's review and
  * U18's Publish post list the same parts): one entry per changed part, so
@@ -42,7 +47,7 @@ export function postChanges(
     if (!live) return [];
     const parts: [PostPart, boolean][] = [
         ["title", same(draft.title, live.title)],
-        ["words", draft.content === live.content],
+        ["words", sameWriting(draft.content, live.content)],
         ["shortDescription", same(draft.excerpt, live.excerpt)],
         ["cover", same(draft.image, live.image)],
         ["coverDescription", same(draft.imageAlt, live.imageAlt)],
@@ -130,6 +135,8 @@ function common<T>(a: T[], b: T[]): [number, number][] {
 export function wordDiff(older: string, newer: string): DiffRun[] {
     const a = older.match(/\S+\s*/g) ?? [];
     const b = newer.match(/\S+\s*/g) ?? [];
+    // Compared without their spaces: a paragraph's last word has none.
+    const key = (w: string) => w.trimEnd();
     const runs: DiffRun[] = [];
     const push = (kind: DiffRun["kind"], words: string[]) => {
         if (words.length === 0) return;
@@ -139,10 +146,13 @@ export function wordDiff(older: string, newer: string): DiffRun[] {
     };
     let i = 0;
     let j = 0;
-    for (const [ci, cj] of [...common(a, b), [a.length, b.length]]) {
+    for (const [ci, cj] of [
+        ...common(a.map(key), b.map(key)),
+        [a.length, b.length],
+    ]) {
         push("removed", a.slice(i, ci));
         push("added", b.slice(j, cj));
-        if (ci < a.length) push("same", [a[ci]]);
+        if (cj < b.length) push("same", [b[cj]]);
         i = ci + 1;
         j = cj + 1;
     }
@@ -172,13 +182,21 @@ export function paragraphDiff(
     ]) {
         const gone = older.slice(i, ci);
         const put = newer.slice(j, cj);
-        const paired = Math.min(gone.length, put.length);
-        for (let k = 0; k < paired; k++) {
-            out.push({ kind: "changed", runs: wordDiff(gone[k], put[k]) });
+        if (gone.length === put.length) {
+            gone.forEach((text, k) =>
+                out.push({ kind: "changed", runs: wordDiff(text, put[k]) }),
+            );
+        } else if (gone.length > 0 && put.length > 0) {
+            // Paragraphs joined or split: one change, word by word, not a
+            // rewrite and a removal that contradict each other.
+            out.push({
+                kind: "changed",
+                runs: wordDiff(gone.join("\n"), put.join("\n")),
+            });
+        } else {
+            for (const text of gone) out.push({ kind: "removed", text });
+            for (const text of put) out.push({ kind: "added", text });
         }
-        for (const text of gone.slice(paired))
-            out.push({ kind: "removed", text });
-        for (const text of put.slice(paired)) out.push({ kind: "added", text });
         if (ci < older.length) out.push({ kind: "same", text: older[ci] });
         i = ci + 1;
         j = cj + 1;

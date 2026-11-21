@@ -253,7 +253,7 @@ describe("the line under the row", () => {
     it("says a chosen look isn't live yet", () => {
         renderPicker(inLook(classic, "folio"), { liveLook: null });
         expect(host.textContent).toContain(
-            "Not published yet. Your site is Classic until you publish.",
+            "Not live yet. Your site stays Classic until you publish.",
         );
     });
 
@@ -287,7 +287,7 @@ describe("the line under the row", () => {
         expect(alert?.textContent).toBe(
             "Couldn't reach Saroh. The look stays Classic.",
         );
-        expect(host.textContent).not.toContain("Not published yet");
+        expect(host.textContent).not.toContain("Not live yet");
     });
 });
 

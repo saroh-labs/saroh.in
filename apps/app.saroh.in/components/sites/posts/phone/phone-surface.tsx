@@ -16,7 +16,7 @@ import { resolveStyleVariables } from "@/lib/sites/style";
 
 import type { PostEditorModel } from "../editor/post-model";
 import { EMPTY_POST_HINT, TITLE_NEEDED } from "../editor/writing-surface";
-import { ReadOnlyBody } from "../post-editor";
+import { PostReviewBody } from "../review/review-body";
 
 /* On demand and browser-only: the editor is heavy and made in the browser. */
 const RichTextEditor = dynamic(
@@ -129,7 +129,7 @@ export function PhoneSurface({
                     aria-describedby={
                         titleError ? "post-title-error" : undefined
                     }
-                    className="mt-[18px] block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-[1.75rem] font-normal leading-[1.18] text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive"
+                    className="mt-[18px] block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-[1.75rem] font-normal leading-[1.18] text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive [&[readonly]]:text-site-fg"
                 />
                 {titleError ? (
                     <p
@@ -158,7 +158,8 @@ export function PhoneSurface({
                         />
                     </div>
                 ) : (
-                    <ReadOnlyBody content={fields.content} />
+                    // A reviewer gets the desk's change marks and Next change.
+                    <PostReviewBody model={model} />
                 )}
                 {fresh && editing ? (
                     <div className="mt-[18px] grid gap-2 font-sans">

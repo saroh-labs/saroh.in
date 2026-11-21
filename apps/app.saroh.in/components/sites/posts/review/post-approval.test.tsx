@@ -66,6 +66,7 @@ const readPostRevision = vi.fn<(...a: unknown[]) => Promise<unknown>>();
 vi.mock("@/lib/sites/post-revisions-read", () => ({
     readPostRevisions: (...a: unknown[]) => readPostRevisions(...a),
     readPostRevision: (...a: unknown[]) => readPostRevision(...a),
+    readPostChecks: () => Promise.resolve([]),
 }));
 vi.mock("@/components/shared/fields/media-picker", () => ({
     MediaPicker: () => null,

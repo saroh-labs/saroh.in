@@ -43,25 +43,29 @@ export function PostVersionSheet({
     model,
     row,
     live,
+    copy,
     onClose,
 }: {
     model: PostEditorModel;
     row: PostRevisionRow;
     /** The copy visitors read now. */
     live: boolean;
+    /** The version in full when it is already at hand (the live copy). */
+    copy?: PostRevision;
     onClose: () => void;
 }) {
     const zone = useBusinessZone();
     const { data, draft } = model;
     const postId = draft.postId ?? "";
     const [read, setRead] = useState<PostRevision | "loading" | "failed">(
-        "loading",
+        copy ?? "loading",
     );
     const [busy, setBusy] = useState(false);
     const when = formatDateTime(row.createdAt, zone);
 
     const [attempt, setAttempt] = useState(0);
     useEffect(() => {
+        if (copy) return;
         let gone = false;
         void readPostRevision(data.siteId, postId, row.id)
             .catch(() => null)
@@ -71,7 +75,7 @@ export function PostVersionSheet({
         return () => {
             gone = true;
         };
-    }, [data.siteId, postId, row.id, attempt]);
+    }, [data.siteId, postId, row.id, attempt, copy]);
 
     async function restore() {
         // What is on screen now is kept: saved first, so the API keeps it
@@ -132,8 +136,14 @@ export function PostVersionSheet({
             pending={busy}
             saveLabel="Restore this version"
             savingLabel="Restoring…"
-            saveOff={!version}
-            footNote="Restore brings this copy back: red returns, green goes. It becomes the draft. What is written now stays here as a version, and the site doesn't change until you publish."
+            // The stand-in for a live copy kept before versions were has no
+            // version to restore; it is here to compare against.
+            saveOff={!version || copy !== undefined}
+            footNote={
+                copy
+                    ? "This is the copy on your site now, to compare with. It was published before versions were kept, so it can't be restored from here."
+                    : "Restore brings this copy back: red returns, green goes. It becomes the draft. What is written now stays here as a version, and the site doesn't change until you publish."
+            }
             onClose={onClose}
             onSubmit={restore}
         >
@@ -178,7 +188,13 @@ export function PostVersionSheet({
                             {changed.length === 0
                                 ? "Nothing: this is what is written now."
                                 : `${changed.length} since: ${changed
-                                      .map((p) => POST_PART_WORDS[p])
+                                      .map((p) =>
+                                          // No word differs: only its look did.
+                                          p === "words" &&
+                                          counts.added + counts.removed === 0
+                                              ? "The writing's formatting"
+                                              : POST_PART_WORDS[p],
+                                      )
                                       .join(", ")}`}
                         </dd>
                     </dl>

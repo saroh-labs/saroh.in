@@ -19,7 +19,7 @@ import { LinkPicker } from "../link-picker";
  * text editor's page (Tiptap's, which carries its `editor`).
  */
 export interface TextField {
-    el: HTMLTextAreaElement | HTMLElement;
+    el: HTMLTextAreaElement | HTMLInputElement | HTMLElement;
     /** "Intro", from the field's label. */
     label: string;
     /** "Bridal packages", the section it is in. */
@@ -52,6 +52,21 @@ export function richEditorOf(el: Element | null): RichEditor | null {
     return page?.isContentEditable && page.editor ? page.editor : null;
 }
 
+/**
+ * A field written better full screen: a textarea, or a one-line text field
+ * whose words no longer fit it (Subheading, cut at 320).
+ */
+export function longField(
+    el: Element,
+): el is HTMLTextAreaElement | HTMLInputElement {
+    if (el instanceof HTMLTextAreaElement) return true;
+    return (
+        el instanceof HTMLInputElement &&
+        el.type === "text" &&
+        el.scrollWidth > el.clientWidth
+    );
+}
+
 /** Words in a piece of text, for the count under it. */
 export function wordCount(text: string): number {
     return text.split(/\s+/).filter(Boolean).length;
@@ -61,10 +76,15 @@ export function wordCount(text: string): number {
  * Put text into a form's own field as if typed, so the form's change
  * handler (React's, which listens for `input`) sees it.
  */
-export function typeInto(el: HTMLTextAreaElement, value: string) {
+export function typeInto(
+    el: HTMLTextAreaElement | HTMLInputElement,
+    value: string,
+) {
     // The prototype's setter: React tracks the element's own one.
     Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
+        el instanceof HTMLInputElement
+            ? HTMLInputElement.prototype
+            : HTMLTextAreaElement.prototype,
         "value",
     )?.set?.call(el, value);
     el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -104,7 +124,8 @@ export function TextSheet({
         >
             {field ? (
                 // Keyed on the field: each opening starts from its words.
-                field.el instanceof HTMLTextAreaElement ? (
+                field.el instanceof HTMLTextAreaElement ||
+                field.el instanceof HTMLInputElement ? (
                     <TextBody
                         key={field.el.id || field.label}
                         field={{ ...field, el: field.el }}
@@ -127,7 +148,7 @@ function TextBody({
     field,
     onClose,
 }: {
-    field: TextField & { el: HTMLTextAreaElement };
+    field: TextField & { el: HTMLTextAreaElement | HTMLInputElement };
     onClose: () => void;
 }) {
     const [value, setValue] = useState(field.el.value);
@@ -151,7 +172,13 @@ function TextBody({
                     type="button"
                     className="h-11"
                     onClick={() => {
-                        typeInto(field.el, value);
+                        // A one-line field keeps to one line.
+                        typeInto(
+                            field.el,
+                            field.el instanceof HTMLInputElement
+                                ? value.replace(/\s*\n+\s*/g, " ")
+                                : value,
+                        );
                         onClose();
                     }}
                 >

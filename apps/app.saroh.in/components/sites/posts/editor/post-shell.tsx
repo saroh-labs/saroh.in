@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
-import { useEditorAskAiDock } from "@/components/ask-ai/editor-ask-ai-context";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { PanelDivider } from "@/components/sites/editor/editor-chrome";
 import type { TrailTab } from "@/components/sites/editor/shell/editor-trail";
@@ -175,10 +174,7 @@ export function PostShell({
         },
     };
     const publish = usePublishPost(model);
-    const dock = useEditorAskAiDock();
-    const right = useRightWidth(
-        data.askAi && !data.readOnly ? (dock?.tab ?? "edit") : "edit",
-    );
+    const right = useRightWidth();
 
     const feedback = data.feedback;
     const openNotes =

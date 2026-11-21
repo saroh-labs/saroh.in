@@ -546,3 +546,18 @@ describe("no primitive fades a disabled control", () => {
         expect(src.match(/disabled:opacity-\d+/g) ?? []).toEqual([]);
     });
 });
+
+describe("a disabled ghost button (editor audit, 21 Nov)", () => {
+    it("stays flat: no fill or edge, only a quieter label", () => {
+        render(
+            <Button variant="ghost" disabled>
+                Undo
+            </Button>,
+        );
+        const cls = screen.getByRole("button", { name: "Undo" }).className;
+        expect(cls).toContain("disabled:bg-transparent");
+        expect(cls).not.toContain("disabled:bg-disabled");
+        expect(cls).toContain("disabled:shadow-none");
+        expect(cls).toContain("disabled:text-disabled-foreground");
+    });
+});

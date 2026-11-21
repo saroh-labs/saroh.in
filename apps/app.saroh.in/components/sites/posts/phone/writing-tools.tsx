@@ -22,6 +22,8 @@ import {
 import type { ReactNode } from "react";
 import { useState } from "react";
 
+import { useCanUndo } from "../editor/use-can-undo";
+
 /** What sits under the writing: the keyboard, or the format panel. */
 export type ToolPanel = "format" | null;
 
@@ -49,13 +51,7 @@ export function WritingToolbar({
     keyboardUp: boolean;
 }) {
     // Undo and Redo follow the editor's history as it changes.
-    const can = useEditorState({
-        editor,
-        selector: ({ editor: e }) => ({
-            undo: (e?.isInitialized && e.can().undo()) ?? false,
-            redo: (e?.isInitialized && e.can().redo()) ?? false,
-        }),
-    });
+    const can = useCanUndo(editor);
     return (
         <div
             role="toolbar"
@@ -108,7 +104,7 @@ export function WritingToolbar({
             <button
                 type="button"
                 aria-label="Undo"
-                disabled={!can?.undo}
+                disabled={!can.undo}
                 onClick={() => editor?.chain().undo().run()}
                 className={TOOL}
             >
@@ -117,7 +113,7 @@ export function WritingToolbar({
             <button
                 type="button"
                 aria-label="Redo"
-                disabled={!can?.redo}
+                disabled={!can.redo}
                 onClick={() => editor?.chain().redo().run()}
                 className={TOOL}
             >

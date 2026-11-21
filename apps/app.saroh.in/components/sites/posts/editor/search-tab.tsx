@@ -139,7 +139,7 @@ export function SearchSheet({
                 slug !== fields.slug
             }
             className="max-w-[1000px]"
-            footNote="Saved · goes live when you publish"
+            footNote="Goes live when you publish"
             onSubmit={() => {
                 if (seoTitle !== fields.seoTitle) set("seoTitle")(seoTitle);
                 if (seoText !== fields.seoDescription)

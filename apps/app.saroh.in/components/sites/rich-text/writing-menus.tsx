@@ -280,12 +280,14 @@ export function SlashMenu({ editor }: { editor: Editor }) {
             setAt({ top: c.bottom, left: c.left });
         };
         const attach = () => {
-            if (dom || editor.isDestroyed || !editor.isInitialized) return;
+            if (dom || editor.isDestroyed) return;
             dom = editor.view.dom;
             dom.addEventListener("keydown", onKey);
         };
-        attach();
-        editor.on("create", attach);
+        // Tiptap emits "create" a tick after mount and only then sets
+        // isInitialized, so the create handler must not wait on that flag.
+        if (editor.isInitialized) attach();
+        else editor.on("create", attach);
         return () => {
             editor.off("create", attach);
             dom?.removeEventListener("keydown", onKey);

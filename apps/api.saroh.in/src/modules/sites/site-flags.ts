@@ -581,7 +581,7 @@ function checkSection(
                 if (link !== "" && isBrokenInternalLink(link, pagePaths)) {
                     at(
                         "brokenLink",
-                        `The link for ${which} points at ${link}, which is not a page on this site.`,
+                        `The link for ${which} points at a page that doesn't exist.`,
                         "items",
                     );
                 }
@@ -690,7 +690,7 @@ function checkCtaTarget(
         } else if (isBrokenInternalLink(href, pagePaths)) {
             at(
                 "brokenLink",
-                `${subject} points at ${href}, which is not a page on this site.`,
+                `${subject} points at a page that doesn't exist.`,
                 field,
             );
         }
@@ -716,7 +716,7 @@ function checkCtaTarget(
             } else if (isBrokenInternalLink(href, pagePaths)) {
                 at(
                     "brokenLink",
-                    `${subject} points at ${href}, which is not a page on this site.`,
+                    `${subject} points at a page that doesn't exist.`,
                     field,
                 );
             } else if (!/^(https?:\/\/|\/|mailto:|tel:)/i.test(href)) {

@@ -38,14 +38,14 @@ async function openPhoneMenu(page: Page, inside: string | RegExp) {
 
 /** "Make a test release": the split's main half, or the phone's menu. */
 async function openMake(page: Page) {
-    const sheet = page.getByRole("dialog", { name: "Make a test release" });
+    const sheet = page.getByRole("dialog", { name: "Make a test link" });
     await expect(async () => {
         if (onPhone(page)) {
-            await (await openPhoneMenu(page, "Make a test release")).click();
+            await (await openPhoneMenu(page, "Make a test link")).click();
         } else {
             await page
-                .getByRole("group", { name: "Test release" })
-                .getByRole("button", { name: "Test release", exact: true })
+                .getByRole("group", { name: "Test link" })
+                .getByRole("button", { name: "Test link", exact: true })
                 .click();
         }
         await expect(sheet).toBeVisible({ timeout: 2_000 });
@@ -55,15 +55,15 @@ async function openMake(page: Page) {
 
 /** The Test releases panel, opened from the split's menu or the phone's. */
 async function openPanel(page: Page) {
-    const panel = page.getByRole("dialog", { name: "Test releases" });
+    const panel = page.getByRole("dialog", { name: "Test links" });
     if (await panel.isVisible()) return panel;
     if (onPhone(page)) {
-        await (await openPhoneMenu(page, /^Test releases/)).click();
+        await (await openPhoneMenu(page, /^Test links/)).click();
     } else {
         await page
-            .getByRole("button", { name: "More test release actions" })
+            .getByRole("button", { name: "More test link actions" })
             .click();
-        await page.getByRole("menuitem", { name: /^Test releases/ }).click();
+        await page.getByRole("menuitem", { name: /^Test links/ }).click();
     }
     await expect(panel).toBeVisible();
     return panel;
@@ -99,7 +99,7 @@ async function pickTomorrow(page: Page, sheet: Locator, zone: string) {
     await expect(calendar).toBeHidden();
 }
 
-test.describe("test releases in the editor (T11)", { tag: "@serial" }, () => {
+test.describe("test links in the editor (T11)", { tag: "@serial" }, () => {
     test("make, schedule, cancel and go live; the live site shows it", async ({
         page,
     }, testInfo) => {
@@ -153,9 +153,7 @@ test.describe("test releases in the editor (T11)", { tag: "@serial" }, () => {
             // Make it, with a name; the link shows once.
             const make = await openMake(page);
             await make.getByLabel("Name").fill(name);
-            await make
-                .getByRole("button", { name: "Make test release" })
-                .click();
+            await make.getByRole("button", { name: "Make test link" }).click();
             const made = page.getByRole("dialog", { name: `${name} is ready` });
             await expect(made).toBeVisible({ timeout: 30_000 });
             await expect(made.locator("[data-release-link]")).toContainText(
@@ -164,7 +162,7 @@ test.describe("test releases in the editor (T11)", { tag: "@serial" }, () => {
             await made.getByRole("button", { name: "Done" }).click();
 
             // Closing shows it in the panel, ready.
-            const panel = page.getByRole("dialog", { name: "Test releases" });
+            const panel = page.getByRole("dialog", { name: "Test links" });
             await expect(panel).toBeVisible();
             const row = panel.getByRole("listitem", { name });
             await expect(row).toContainText("Ready");

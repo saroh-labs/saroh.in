@@ -460,7 +460,7 @@ test.describe("a shared preview link", () => {
  * and puts it back. The release is the test's own, stamped, and discarded
  * at the end.
  */
-test.describe("a reviewer and a test release", () => {
+test.describe("a reviewer and a test link", () => {
     test(
         "approves the release, and the editor's row reads Approved",
         { tag: "@serial" },
@@ -583,7 +583,7 @@ test.describe("a reviewer and a test release", () => {
                     .click();
                 await expect(
                     page.locator("[data-release-verdict]"),
-                ).toContainText("approved this test release.");
+                ).toContainText("approved this test link.");
                 // The draft's own review is as it was.
                 const after = await draftReview();
                 expect(after.latestApproval).toEqual(before.latestApproval);
@@ -599,17 +599,17 @@ test.describe("a reviewer and a test release", () => {
                 // The editor redraws its top bar while it settles, so the
                 // menu is opened until the panel shows, as T11's spec does.
                 const releasesPanel = owner.getByRole("dialog", {
-                    name: "Test releases",
+                    name: "Test links",
                 });
                 await expect(async () => {
                     if (!(await releasesPanel.isVisible())) {
                         await owner
                             .getByRole("button", {
-                                name: "More test release actions",
+                                name: "More test link actions",
                             })
                             .click({ timeout: 2_000 });
                         await owner
-                            .getByRole("menuitem", { name: /^Test releases/ })
+                            .getByRole("menuitem", { name: /^Test links/ })
                             .click({ timeout: 2_000 });
                     }
                     await expect(releasesPanel).toBeVisible({

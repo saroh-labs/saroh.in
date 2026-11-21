@@ -572,7 +572,9 @@ export function siteTools(d: SiteToolDeps): McpTool[] {
                 };
             });
             const text = [
-                `Page ${quoteUntrusted("title", page.title)} at ${page.path} (page_id ${page_id}): ${views.length} sections, top to bottom.`,
+                // Said which copy it is (editor audit, 21 Nov): the draft the
+                // person is editing, never the live page.
+                `Page ${quoteUntrusted("title", page.title)} at ${page.path} (page_id ${page_id}), its draft as saved now (the version being edited, which may differ from the live site): ${views.length} sections, top to bottom.`,
                 ...views.map(
                     (v) =>
                         `- section_key ${v.section_key}: ${v.type}${v.hidden ? " (hidden)" : ""}. ${v.content ? quoteUntrusted("content", v.content.text) : "Content cut for size: call get_page with this section_key."}`,

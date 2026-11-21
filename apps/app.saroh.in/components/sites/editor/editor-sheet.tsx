@@ -123,6 +123,15 @@ export function EditorSheet({
                             event.preventDefault();
                         }
                     }}
+                    onOpenAutoFocus={(event) => {
+                        // A sheet with no scrim opens on a tap: focus goes
+                        // to the sheet, not a ring on its Close (audit).
+                        if (modal) return;
+                        event.preventDefault();
+                        (event.currentTarget as HTMLElement | null)?.focus({
+                            preventScroll: true,
+                        });
+                    }}
                     onCloseAutoFocus={(event) => {
                         const target = returnFocus?.() ?? null;
                         if (target === null) return;

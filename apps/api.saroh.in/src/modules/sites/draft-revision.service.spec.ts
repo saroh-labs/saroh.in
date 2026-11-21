@@ -145,11 +145,30 @@ describe("saving a draft against the revision it was read at (#285)", () => {
             })
             .catch((e: ConflictException) => e.getResponse());
 
-        expect(error).toMatchObject({ by: "Ritika Sharma" });
+        expect(error).toMatchObject({ by: "Ritika Sharma", you: false });
         expect(db.section.findMany.mock.calls[0][0].where).toEqual({
             pageVersionId: "ver_1",
-            lastEditedByUserId: { not: "user_1" },
+            lastEditedByUserId: { not: null },
         });
+    });
+
+    it("says it was you, in another tab, when your own save is newest (editor audit)", async () => {
+        db.section.findMany.mockResolvedValueOnce([
+            { lastEditedByUserId: "user_1" },
+        ]);
+        db.user.findMany.mockClear();
+        const error = await service
+            .replaceDraftSections(ctx, "site_1", "page_1", {
+                sections: [HERO],
+                revision: 1,
+            })
+            .catch((e: ConflictException) => e.getResponse());
+
+        expect(error).toMatchObject({ by: null, you: true });
+        expect((error as { message: string }).message).toContain(
+            "another tab or window",
+        );
+        expect(db.user.findMany).not.toHaveBeenCalled();
     });
 
     it("trusts a caller that sends no revision at all", async () => {

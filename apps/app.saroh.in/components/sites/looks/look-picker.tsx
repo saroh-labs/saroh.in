@@ -83,7 +83,7 @@ export function lookStatus({
     if (published && draftLook !== liveLook) {
         return {
             tone: "note",
-            text: `Not published yet. Your site is ${lookName(liveLook)} until you publish.`,
+            text: `Not live yet. Your site stays ${lookName(liveLook)} until you publish.`,
         };
     }
     if (draftLook) {

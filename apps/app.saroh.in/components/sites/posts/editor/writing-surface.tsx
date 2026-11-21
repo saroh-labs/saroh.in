@@ -165,7 +165,7 @@ export function WritingSurface({
                             aria-describedby={
                                 titleError ? "post-title-error" : undefined
                             }
-                            className="mt-2 block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-4xl font-normal leading-tight text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive"
+                            className="mt-2 block min-h-0 w-full resize-none overflow-hidden rounded-md border-0 bg-transparent p-0 font-site-heading text-4xl font-normal leading-tight text-site-fg outline-none [field-sizing:content] placeholder:text-site-muted focus-visible:ring-0 focus-visible:ring-offset-0 aria-[invalid]:ring-2 aria-[invalid]:ring-destructive [&[readonly]]:text-site-fg"
                         />
                         {titleError ? (
                             <p

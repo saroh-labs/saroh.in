@@ -2395,13 +2395,15 @@ export class SitesService {
                 dto.revision !== version.revision
             ) {
                 /*
-                 * Who saved it since (C12): the last other person to edit
-                 * a section of this draft. Said by name, never as presence.
+                 * Who saved it since (C12): whoever last edited a section
+                 * of this draft. Said by name, never as presence; when it
+                 * was this person, from another tab or window, `you`
+                 * says so (editor audit, 21 Nov), never "someone else".
                  */
                 const edits = await tx.section.findMany({
                     where: {
                         pageVersionId: version.id,
-                        lastEditedByUserId: { not: ctx.userId },
+                        lastEditedByUserId: { not: null },
                     },
                     orderBy: { lastEditedAt: "desc" },
                     take: 1,
@@ -2409,21 +2411,28 @@ export class SitesService {
                 });
                 const byId =
                     edits.length > 0 ? edits[0].lastEditedByUserId : null;
-                const users = byId
-                    ? await prisma.user.findMany({
-                          where: { id: byId },
-                          select: { name: true, email: true },
-                      })
-                    : [];
+                const you = byId === ctx.userId;
+                const users =
+                    byId && !you
+                        ? await prisma.user.findMany({
+                              where: { id: byId },
+                              select: { name: true, email: true },
+                          })
+                        : [];
                 const by =
                     users.length > 0 ? (users[0].name ?? users[0].email) : null;
                 throw new ConflictException({
-                    message:
-                        "Someone else saved this page while you were editing. Reload to see their version.",
+                    message: you
+                        ? "You saved this page in another tab or window while editing here. Reload to see that version."
+                        : "Someone else saved this page while you were editing. Reload to see their version.",
                     code: "DRAFT_REVISION_MISMATCH",
                     yours: dto.revision,
                     current: version.revision,
                     by,
+                    you,
+                    // Only `details` reaches the client past the error
+                    // filter: who it was travels there.
+                    details: { by, you },
                 });
             }
 

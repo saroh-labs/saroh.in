@@ -277,7 +277,7 @@ describe("a project's photo and link (K11)", () => {
         expect(flags.map((f) => [f.type, f.field])).toEqual([
             ["brokenLink", "items"],
         ]);
-        expect(flags[0].message).toMatch(/\/work\/menus/);
+        expect(flags[0].message).toMatch(/a page that doesn.t exist/);
     });
 
     it("says nothing about a hidden block", () => {

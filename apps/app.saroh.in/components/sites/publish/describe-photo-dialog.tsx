@@ -69,7 +69,7 @@ export function DescribePhotoDialog({
             description="Google and people using a screen reader read this instead of seeing the photo."
             pending={busy}
             savingLabel="Saving…"
-            footNote={SAVE_LINES["waits-for-publish"]}
+            footNote={SAVE_LINES["on-publish"]}
             onClose={close}
             onSubmit={(e) => {
                 e.preventDefault();

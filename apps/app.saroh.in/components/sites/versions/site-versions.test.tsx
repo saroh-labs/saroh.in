@@ -100,9 +100,9 @@ describe("version history (T12)", () => {
         );
     });
 
-    it("links a go-live to the test release it came from", () => {
+    it("links a go-live to the test link it came from", () => {
         const html = render();
-        expect(text(html)).toContain("From test release 2 · Diwali menu");
+        expect(text(html)).toContain("From test link 2 · Diwali menu");
         expect(html).toContain('href="/sites/site_1/releases/rel_2"');
         expect(text(html)).toContain("Went live by Asha");
     });
@@ -151,7 +151,7 @@ describe("version history (T12)", () => {
                 zone: "Asia/Kolkata",
             },
         });
-        expect(text(html)).toContain("Test release 3 · Weekend menu");
+        expect(text(html)).toContain("Test link 3 · Weekend menu");
         expect(text(html)).toContain("Scheduled");
         expect(text(html)).toMatch(/Goes live .* by Asha/);
         expect(html).toContain('href="/sites/site_1/releases/rel_3"');
@@ -188,12 +188,12 @@ describe("the review panel says what it reviews (T12)", () => {
         expect(text(panel({}))).toContain("Reviewing Draft");
     });
 
-    it("names the test release, and leaves the draft's preview links out", () => {
+    it("names the test link, and leaves the draft's preview links out", () => {
         const html = panel({
             release: { id: "rel_2", number: 2, name: "Diwali menu" },
         });
-        expect(text(html)).toContain("Reviewing Test release 2 · Diwali menu");
-        expect(text(html)).toContain("No notes on this test release yet.");
+        expect(text(html)).toContain("Reviewing Test link 2 · Diwali menu");
+        expect(text(html)).toContain("No notes on this test link yet.");
         expect(text(html)).not.toContain("preview");
     });
 

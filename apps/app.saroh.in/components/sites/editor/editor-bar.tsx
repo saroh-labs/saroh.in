@@ -22,8 +22,10 @@ import {
     statusReadout,
 } from "@/components/sites/publish/status-readout";
 import type { DraftReadiness } from "@/components/sites/publish/use-publish";
+import { count } from "@/lib/format/plural";
 import type { EditorStatus } from "@/lib/sites/editor-status";
 import { unseenBecause } from "@/lib/sites/page-menu";
+import { pendingChangeCount } from "@/lib/sites/pending";
 import type {
     ModulePageKind,
     ReviewState,
@@ -75,6 +77,13 @@ export interface EditorTopBarProps {
     pendingSummary: string | null;
     pendingShort: string | null;
     pendingKnown: boolean;
+    /**
+     * The server's change units (KTD-E3), and the two counts it falls back
+     * to: the pill counts what Publish counts, never its own words.
+     */
+    pendingUnits?: number | null;
+    pendingChanges?: number | null;
+    pendingSiteChanges?: readonly string[] | null;
     publishing: boolean;
     siteFlags: SiteFlags;
     openCheck: (draft: DraftReadiness) => Promise<void>;
@@ -142,8 +151,11 @@ export function useEditorBar({
     neverPublished,
     publishedAt = null,
     pendingSummary,
-    pendingShort,
+    pendingShort: pendingWords,
     pendingKnown,
+    pendingUnits = null,
+    pendingChanges = null,
+    pendingSiteChanges = null,
     publishing,
     siteFlags,
     openCheck,
@@ -198,6 +210,17 @@ export function useEditorBar({
     );
 
     const activePage = pages.find((page) => page.id === pageId);
+    // "7 changes waiting", the Publish badge's number (RULES §1, §2).
+    const waiting = pendingChangeCount(
+        pendingChanges,
+        pendingSiteChanges,
+        pendingUnits,
+    );
+    const pendingShort = pendingWords
+        ? waiting > 0
+            ? `${count(waiting, "change")} waiting`
+            : "changes waiting"
+        : null;
     const ownerReadout = statusReadout({
         saving,
         styleSaving,
@@ -291,7 +314,7 @@ export function useEditorBar({
 }
 
 /**
- * "Published", "Not published · 2 blocks, footer" or "Not published yet" (G2),
+ * "Live", "Live · 7 changes waiting" or "Not live yet" (G2, RULES §1),
  * worked out from the server's count so it is the same after a reload, then
  * what the pill leaves out: the reviewer's verdict, how many notes are open,
  * and what publishing would change when a review outranks it in the pill.

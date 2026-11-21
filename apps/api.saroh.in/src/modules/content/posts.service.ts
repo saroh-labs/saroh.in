@@ -14,6 +14,7 @@ import { SCHEDULE_MIN_AHEAD_MS } from "../sites/test-release-schedule";
 import { slugify } from "../stores/slug";
 import type {
     CreatePostDto,
+    PostChecksDto,
     PostStatus,
     SchedulePostDto,
     UpdatePostDto,
@@ -23,6 +24,8 @@ import {
     isLeadRole,
     readPostApproval,
 } from "./post-approval";
+import type { PostCheckFlag } from "./post-checks";
+import { postCheckFlags } from "./post-checks";
 import { assertPostEditable } from "./post-paused";
 import { publishPostInTx } from "./post-publish";
 import {
@@ -453,6 +456,29 @@ export class PostsService {
      * The shared helper, not a copy: it is where the reviewer scope lives
      * (#276), and a second implementation is a site a reviewer can still read.
      */
+    /** Publish post's checks on the writing sent (U18). Reads only. */
+    async checks(
+        ctx: OrganizationContext,
+        siteId: string,
+        postId: string,
+        dto: PostChecksDto,
+    ): Promise<{ flags: PostCheckFlag[] }> {
+        authorize(ctx, "site:read");
+        await this.assertSiteInOrg(ctx, siteId);
+        const post = await prisma.post.findFirst({
+            where: { id: postId, siteId },
+            select: { id: true },
+        });
+        if (!post) throw new NotFoundException("Post not found");
+        return {
+            flags: await postCheckFlags(
+                ctx.organizationId,
+                siteId,
+                dto.content,
+            ),
+        };
+    }
+
     private async assertSiteInOrg(
         ctx: OrganizationContext,
         siteId: string,

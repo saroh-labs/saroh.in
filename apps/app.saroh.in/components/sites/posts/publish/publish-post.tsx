@@ -12,7 +12,7 @@ import { TimeSelect } from "@saroh/ui/time-select";
 import { showError, showSuccess } from "@saroh/ui/toast";
 import { AlertCircle, Check, MessageCircle, Share2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
 import { ShareItemButton } from "@/components/shared/share-item/share-item-sheet";
@@ -22,11 +22,22 @@ import {
     schedulePost,
     unschedulePost,
 } from "@/lib/content/actions";
+import type {
+    PostCheckFlag,
+    PostLiveCopy,
+    PostRevision,
+} from "@/lib/content/service";
 import { wallClockToIso } from "@/lib/courses/sessions";
 import { formatDateTime } from "@/lib/format/datetime";
 import { count } from "@/lib/format/plural";
 import { whatsappHref } from "@/lib/share-item/share";
+import type { PostDraftView, PostPart } from "@/lib/sites/post-diff";
 import { POST_PART_WORDS, postChanges } from "@/lib/sites/post-diff";
+import {
+    readPostChecks,
+    readPostRevision,
+    readPostRevisions,
+} from "@/lib/sites/post-revisions-read";
 import { whatsappMessage } from "@/lib/sites/share-words";
 import { nextSlot, whenIn, zoneName } from "@/lib/sites/zone-time";
 
@@ -57,8 +68,8 @@ function bodyPhotos(html: string): { all: number; bare: number } {
  * What Publish post checks before it goes (RULES §6, the part the editor
  * can see for itself): every photo described, and a short description for
  * the blog and share cards. Prices beside services and links that don't
- * open need the API's checks (`publish-checks.ts`), not yet asked for a
- * post. Each is a warning: none stops the post.
+ * open are the API's (`serverChecks`). Each is a warning: none stops the
+ * post.
  */
 export function postChecks(fields: PostFields): PostCheck[] {
     const checks: PostCheck[] = [];
@@ -85,6 +96,144 @@ export function postChecks(fields: PostFields): PostCheck[] {
               },
     );
     return checks;
+}
+
+/**
+ * The API's checks as Checked lines (U18): each flag as it is, else that
+ * prices agree with Services and every link opens. `null` is a check that
+ * couldn't run, said so rather than passed.
+ */
+export function serverChecks(flags: PostCheckFlag[] | null): PostCheck[] {
+    if (flags === null) {
+        return [
+            {
+                ok: false,
+                text: "Couldn't check prices and links. Publishing still works.",
+            },
+        ];
+    }
+    const prices = flags.filter(
+        (f) => f.type === "priceMismatch" || f.type === "freeClaim",
+    );
+    const links = flags.filter((f) => f.type === "brokenLink");
+    const rest = flags.filter((f) => !prices.includes(f) && !links.includes(f));
+    return [
+        ...(prices.length === 0
+            ? [{ ok: true, text: "Prices match Services" }]
+            : prices.map((f) => ({ ok: false, text: f.message }))),
+        ...(links.length === 0
+            ? [{ ok: true, text: "Every link opens" }]
+            : links.map((f) => ({ ok: false, text: f.message }))),
+        ...rest.map((f) => ({ ok: false, text: f.message })),
+    ];
+}
+
+/** A copy of the post as `postChanges` compares against it. */
+function asLive(view: PostDraftView): PostLiveCopy {
+    return { ...view, shareImageUrl: null, path: null, publishedAt: null };
+}
+
+/**
+ * Who last changed each part since the live copy (U18 "who made them"),
+ * from the versions kept since, oldest first. What is on screen after the
+ * newest version is its writer's: anyone else's save keeps a version.
+ */
+export function lastChangedBy(
+    live: PostLiveCopy,
+    versions: { view: PostDraftView; by: string | null }[],
+    draft: PostDraftView,
+): Partial<Record<PostPart, string>> {
+    const out: Partial<Record<PostPart, string>> = {};
+    let before = live;
+    for (const step of [
+        ...versions,
+        { view: draft, by: versions.at(-1)?.by ?? null },
+    ]) {
+        for (const part of postChanges(step.view, before)) {
+            if (step.by) out[part] = step.by;
+        }
+        before = asLive(step.view);
+    }
+    return out;
+}
+
+/** How many versions since the live copy are read to say who changed what. */
+const VERSIONS_READ = 10;
+
+/** The API's checks and who changed what, read once the sheet opens. */
+function usePublishReads(
+    model: PostEditorModel,
+    category: string,
+): {
+    flags: PostCheckFlag[] | null | "loading";
+    by: Partial<Record<PostPart, string>>;
+} {
+    const { data, draft, liveCopy } = model;
+    const postId = draft.postId;
+    const [flags, setFlags] = useState<PostCheckFlag[] | null | "loading">(
+        postId ? "loading" : [],
+    );
+    const [by, setBy] = useState<Partial<Record<PostPart, string>>>({});
+    // Read once per opening (the sheet is mounted per opening), from what
+    // was on screen when it opened.
+    const [start] = useState(() => ({ ...draft.fields, category }));
+    const { content } = start;
+    useEffect(() => {
+        if (!postId) return;
+        let gone = false;
+        void readPostChecks(data.siteId, postId, content).then((f) => {
+            if (!gone) setFlags(f);
+        });
+        return () => {
+            gone = true;
+        };
+    }, [data.siteId, postId, content]);
+
+    const since = draft.live ? liveCopy?.publishedAt : null;
+    useEffect(() => {
+        if (!postId || !liveCopy || !since) return;
+        const run = { gone: false };
+        const nameOf = (id: string | null) =>
+            data.categories.find((c) => c.id === id)?.name ?? "";
+        const viewOf = (r: PostRevision): PostDraftView => ({
+            title: r.title,
+            content: r.content,
+            excerpt: r.excerpt ?? "",
+            image: r.image ?? "",
+            imageAlt: r.imageAlt ?? "",
+            slug: r.slug,
+            category: nameOf(r.categoryId),
+            seoTitle: r.seoTitle ?? "",
+            seoDescription: r.seoDescription ?? "",
+        });
+        void (async () => {
+            // Names are a nicety: any read that fails leaves them out.
+            const list = await readPostRevisions(data.siteId, postId);
+            if (!list.ok) return;
+            const newer = list.rows
+                .filter((r) => r.createdAt >= since)
+                .slice(0, VERSIONS_READ)
+                .reverse();
+            const full = await Promise.all(
+                newer.map((r) => readPostRevision(data.siteId, postId, r.id)),
+            );
+            if (run.gone || full.some((r) => r === null)) return;
+            setBy(
+                lastChangedBy(
+                    liveCopy,
+                    (full as PostRevision[]).map((r) => ({
+                        view: viewOf(r),
+                        by: r.savedBy?.name ?? null,
+                    })),
+                    start,
+                ),
+            );
+        })().catch(() => undefined);
+        return () => {
+            run.gone = true;
+        };
+    }, [data.siteId, data.categories, postId, since, liveCopy, start]);
+    return { flags, by };
 }
 
 /** The post's public link: the page read's, else built from the address. */
@@ -170,6 +319,7 @@ export function PublishPostSheet({
     const changes = draft.live
         ? postChanges({ ...fields, category }, liveCopy)
         : [];
+    const reads = usePublishReads(model, category);
 
     if (live) {
         return (
@@ -281,7 +431,10 @@ export function PublishPostSheet({
         draft.refresh();
     }
 
-    const checks = postChecks(fields);
+    const checks = [
+        ...postChecks(fields),
+        ...(reads.flags === "loading" ? [] : serverChecks(reads.flags)),
+    ];
 
     return (
         <FormSheet
@@ -327,7 +480,9 @@ export function PublishPostSheet({
                       ? publishNow
                       : publishLater
             }
-            fieldsClassName="gap-5"
+            // One column that may shrink: a long link or title truncates
+            // instead of pushing the sheet sideways.
+            fieldsClassName="grid-cols-[minmax(0,1fr)] gap-5"
         >
             {asking ? (
                 <section data-approvers="" className="grid gap-3">
@@ -430,8 +585,16 @@ export function PublishPostSheet({
                     {changes.length > 0 ? (
                         <ul className="divide-y rounded-xl border bg-card text-sm">
                             {changes.map((p) => (
-                                <li key={p} className="px-3.5 py-2.5">
+                                <li
+                                    key={p}
+                                    className="flex items-baseline gap-2 px-3.5 py-2.5"
+                                >
                                     {POST_PART_WORDS[p]}
+                                    {reads.by[p] ? (
+                                        <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground">
+                                            {reads.by[p]}
+                                        </span>
+                                    ) : null}
                                 </li>
                             ))}
                         </ul>
@@ -441,6 +604,11 @@ export function PublishPostSheet({
 
             <section className="grid gap-2">
                 <h3 className={H3}>Checked</h3>
+                {reads.flags === "loading" ? (
+                    <p className="text-[0.8125rem] text-muted-foreground">
+                        Checking prices and links…
+                    </p>
+                ) : null}
                 <ul className="grid gap-1.5 text-[0.8125rem]">
                     {checks.map((c) => (
                         <li

@@ -71,6 +71,7 @@ vi.mock("@/lib/sites/actions", () => ({
 vi.mock("@/lib/sites/post-revisions-read", () => ({
     readPostRevisions: vi.fn(() => Promise.resolve({ ok: true, rows: [] })),
     readPostRevision: vi.fn(),
+    readPostChecks: vi.fn(() => Promise.resolve([])),
 }));
 vi.mock("@/components/billing/plan-refusal", () => ({
     showPlanRefusal: vi.fn(),
@@ -210,6 +211,17 @@ describe("the desk post editor (U15)", () => {
         );
     });
 
+    it("a new post says Saved only once it is saved (editor audit #2)", async () => {
+        createPost.mockResolvedValue({ ok: true, data: { id: "p9" } });
+        act(() => root.render(<PostShell data={data()} />));
+        expect(container.textContent).not.toContain("Saved");
+        expect(container.textContent).toContain("Goes live when you publish");
+        act(() => type(field("Post title"), "Monsoon hair care"));
+        await settle(() => vi.advanceTimersByTime(2600));
+        // Said once, in the top bar, not again under the inspector.
+        expect(container.textContent.match(/Saved/g)).toHaveLength(1);
+    });
+
     it("saves on ⌘S", async () => {
         updatePost.mockResolvedValue({ ok: true, data: { id: "p1" } });
         act(() => root.render(<PostShell data={data()} post={post} />));
@@ -284,9 +296,7 @@ describe("the desk post editor (U15)", () => {
         expect(container.textContent).toContain(
             "The page link is in Search and sharing.",
         );
-        expect(container.textContent).toContain(
-            "Saved · goes live when you publish",
-        );
+        expect(container.textContent).toContain("Goes live when you publish");
     });
 
     it("a changed page link says the old one forwards on publish", () => {

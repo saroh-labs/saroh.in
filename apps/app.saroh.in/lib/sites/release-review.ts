@@ -17,7 +17,7 @@ import type {
  * kept its default name, which would otherwise be said twice.
  */
 export function releaseTitle(release: { number: number; name: string }) {
-    const number = `Test release ${release.number}`;
+    const number = `Test link ${release.number}`;
     return release.name.trim() === number
         ? number
         : `${number} · ${release.name}`;
@@ -39,11 +39,11 @@ export function reviewSubject(
 export function releaseVerdictLine(
     latest: { outcome: string; by: string | null } | null | undefined,
 ): string {
-    if (!latest) return "Nobody has reviewed this test release yet.";
+    if (!latest) return "Nobody has reviewed this test link yet.";
     const who = latest.by ?? "Someone";
     switch (latest.outcome) {
         case "APPROVED":
-            return `${who} approved this test release.`;
+            return `${who} approved this test link.`;
         case "CHANGES_REQUESTED":
             return `${who} asked for changes.`;
         case "REQUESTED":
@@ -53,7 +53,7 @@ export function releaseVerdictLine(
         case "OVERRIDDEN":
             return `${who} went live without approval.`;
         default:
-            return "Nobody has reviewed this test release yet.";
+            return "Nobody has reviewed this test link yet.";
     }
 }
 
@@ -200,7 +200,7 @@ export type RestoreGate =
     { kind: "go" } | { kind: "override" } | { kind: "blocked"; why: string };
 
 export const RESTORE_NEEDS_OWNER =
-    "Publishing needs approval, so only an approved test release can go live. Only an owner can restore a version without approval.";
+    "Publishing needs approval, so only an approved test link can go live. Only an owner can restore a version without approval.";
 
 /** What an owner's restore past the setting leaves behind, said first. */
 export const RESTORE_OVERRIDE_LINE =

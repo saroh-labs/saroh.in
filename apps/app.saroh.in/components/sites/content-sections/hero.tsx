@@ -199,7 +199,7 @@ export function HeroFields({
                             ),
                         })
                     }
-                    placeholder="See the timetable"
+                    placeholder="See more"
                 />
             </Field>
             {c.secondaryCta ? (
@@ -215,7 +215,7 @@ export function HeroFields({
                                 ),
                             })
                         }
-                        placeholder="/#timetable"
+                        placeholder="/#contact"
                     />
                 </Field>
             ) : null}
@@ -427,14 +427,14 @@ function BylineFields({
         <>
             <Field
                 optional
-                label="Byline"
+                label="Written by"
                 hint="Who is behind the business, shown under the line."
             >
                 <Input
                     value={byline?.name ?? ""}
                     onChange={(e) => set({ name: e.target.value })}
                     maxLength={120}
-                    placeholder="Dr Meera Rao"
+                    placeholder="Your name"
                 />
             </Field>
             {byline?.name.trim() ? (
@@ -446,7 +446,7 @@ function BylineFields({
                                 set({ role: e.target.value || undefined })
                             }
                             maxLength={160}
-                            placeholder="Dentist"
+                            placeholder="Founder"
                         />
                     </Field>
                     <Field optional label="Their photo">

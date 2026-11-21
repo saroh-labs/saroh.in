@@ -99,6 +99,29 @@ const CTA_KINDS: { value: CtaKind; label: string }[] = [
     { value: "email", label: "Send an email" },
 ];
 
+/** The site's page a typed "/about" or "/about#hours" goes to, if any. */
+function pageAt(href: string, pages: SitePage[]): SitePage | undefined {
+    if (!href.startsWith("/")) return undefined;
+    const path = href.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+    return pages.find((p) => p.path === path);
+}
+
+/** A v1 or typed link to one of the site's own pages reads as that page. */
+export function shownAction(action: CtaAction, pages: SitePage[]): CtaAction {
+    if (action.kind !== "url" || action.href.includes("#")) return action;
+    const page = pageAt(action.href.trim(), pages);
+    return page ? { kind: "page", pageId: page.id } : action;
+}
+
+/** A link inside the site to a page it doesn't have. */
+export function isMissingPage(
+    action: Extract<CtaAction, { kind: "url" }>,
+    pages: SitePage[],
+): boolean {
+    const href = action.href.trim();
+    return href.startsWith("/") && !pageAt(href, pages);
+}
+
 /** A blank action of the given kind, for when the merchant switches kinds. */
 export function blankAction(
     kind: CtaKind,
@@ -128,7 +151,7 @@ export function blankAction(
  * normalises it.
  */
 export function CtaActionFields({
-    action,
+    action: saved,
     pages,
     onChange,
 }: {
@@ -137,6 +160,10 @@ export function CtaActionFields({
     onChange: (next: CtaAction) => void;
 }) {
     const home = pages.find((p) => p.isHome)?.id;
+    // A typed "/products" is shown as its page, never as a raw path; it is
+    // saved as a page only when the merchant changes it.
+    const action = shownAction(saved, pages);
+    const missingPage = action.kind === "url" && isMissingPage(action, pages);
     return (
         <>
             <Field label="When pressed">
@@ -185,7 +212,14 @@ export function CtaActionFields({
                 </Field>
             ) : null}
             {action.kind === "url" ? (
-                <Field label="Address">
+                <Field
+                    label="Address"
+                    hint={
+                        missingPage
+                            ? "This goes to a page that doesn't exist. Pick a page under When pressed."
+                            : undefined
+                    }
+                >
                     <Input
                         value={action.href}
                         onChange={(e) =>

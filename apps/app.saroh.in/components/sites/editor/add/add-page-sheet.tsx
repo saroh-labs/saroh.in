@@ -188,7 +188,8 @@ export function AddPageSheet({
                                     }
                                     disabled={start !== "blank"}
                                     onChange={(e) => setPath(e.target.value)}
-                                    placeholder="/trials"
+                                    aria-label="Page link"
+                                    placeholder="/our-team"
                                 />
                             </div>
                         </Field>

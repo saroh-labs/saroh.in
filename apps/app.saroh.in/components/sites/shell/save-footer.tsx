@@ -7,6 +7,9 @@ import type { ReactNode } from "react";
  * on its own button, never words a sheet makes up.
  */
 export const SAVE_LINES = {
+    // Before anything is saved (a sheet's Cancel and Save, a page at rest):
+    // "Saved" only ever follows a real save (editor audit, 21 Nov).
+    "on-publish": "Goes live when you publish",
     "waits-for-publish": "Saved · goes live when you publish",
     // An open sheet whose thing already has changes waiting (Page settings).
     "changed-waits": "Changed · goes live when you publish",
@@ -19,9 +22,12 @@ export const SAVE_LINES = {
 
 export type SaveLine = keyof typeof SAVE_LINES;
 
-/** A sheet's foot: its one line, then its buttons (Cancel, Save). */
+/**
+ * A sheet's foot: its one line, then its buttons (Cancel, Save). The line
+ * says when a save goes live; "Saved · …" only once a save has happened.
+ */
 export function SaveFooter({
-    line = "waits-for-publish",
+    line = "on-publish",
     children,
     className,
 }: {

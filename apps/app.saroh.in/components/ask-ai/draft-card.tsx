@@ -293,7 +293,7 @@ export function DraftCard({
             className="overflow-hidden rounded-xl border-[1.5px] border-foreground bg-card"
         >
             <div className="flex items-center gap-2 border-b border-muted bg-neutral-50 px-3.5 py-2.5 dark:bg-muted">
-                <span className="label inline-flex h-5 items-center rounded-md bg-foreground px-[7px] text-background">
+                <span className="inline-flex h-5 items-center rounded-md bg-foreground px-[7px] text-[11px] font-semibold text-background">
                     {words.tag}
                 </span>
                 <span className="ml-auto text-[12.5px] text-muted-foreground">
@@ -531,13 +531,19 @@ function SectionWords({
                             {f.label}
                         </span>
                         <p className="m-0 text-[13.5px] text-muted-foreground [overflow-wrap:anywhere]">
-                            <span className="mr-1.5 text-[12px] font-semibold uppercase tracking-wide">
+                            <span
+                                data-ph-unmask=""
+                                className="mr-1.5 text-[12px] font-semibold"
+                            >
                                 Now
                             </span>
                             <Words words={diff.now} mark="del" />
                         </p>
                         <p className="m-0 text-[13.5px] font-medium [overflow-wrap:anywhere]">
-                            <span className="mr-1.5 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <span
+                                data-ph-unmask=""
+                                className="mr-1.5 text-[12px] font-semibold text-muted-foreground"
+                            >
                                 New
                             </span>
                             <Words words={diff.next} mark="ins" />
@@ -589,7 +595,7 @@ function Words({
     words: { word: string; changed: boolean }[];
     mark: "del" | "ins";
 }) {
-    if (!words.length) return <span>(none)</span>;
+    if (!words.length) return <span data-ph-unmask="">(none)</span>;
     return (
         <>
             {words.map((w, i) => (

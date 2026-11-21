@@ -22,6 +22,7 @@ import {
     AskPostChangesDto,
     CreatePostDto,
     PostApprovalRequestDto,
+    PostChecksDto,
     SchedulePostDto,
     UpdatePostDto,
 } from "./dto";
@@ -171,6 +172,21 @@ export class PostsController {
         @Body() dto: AskPostChangesDto,
     ) {
         return this.approval.askForChanges(ctx, siteId, postId, dto);
+    }
+
+    /**
+     * Publish post's checks (U18): prices against Services, links against
+     * the site's pages and live posts. `site:read`; changes nothing.
+     */
+    @Post(":postId/checks")
+    @HttpCode(200)
+    checks(
+        @OrgContext() ctx: OrganizationContext,
+        @Param("siteId") siteId: string,
+        @Param("postId") postId: string,
+        @Body() dto: PostChecksDto,
+    ) {
+        return this.posts.checks(ctx, siteId, postId, dto);
     }
 
     /** History (U17a): newest first, who and why, no bodies. */

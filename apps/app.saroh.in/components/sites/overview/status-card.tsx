@@ -122,7 +122,7 @@ export function StatusCard({
     const by = firstName(lastPublished?.by ?? null);
     const published = lastPublished
         ? `Last published ${formatDate(lastPublished.at, timeZone, { now })}${by ? ` by ${by}` : ""}`
-        : "Not published yet. Publish to put it live.";
+        : "Not live yet. Publish to put it live.";
     const offerPublish =
         canPublish && (status.waiting > 0 || lastPublished === null);
     return (

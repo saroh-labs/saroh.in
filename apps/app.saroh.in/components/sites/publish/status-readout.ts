@@ -62,7 +62,7 @@ export const APPROVAL_BADGE: Record<
  * the refusal (`APPROVAL_REQUIRED`), said before it is pressed.
  */
 export const NEEDS_APPROVAL_HINT =
-    "This site goes live only from an approved test release.";
+    "This site goes live only from an approved test link.";
 
 /** The status pill's colour, by what it means (#335). */
 export const STATUS_BADGE: Record<
@@ -109,7 +109,7 @@ export function statusReadout({
     review: ReviewState;
     neverPublished: boolean;
     pendingSummary: string | null;
-    /** The same, in the pill's words: "2 blocks, footer". */
+    /** The same as a count of change units: "7 changes waiting". */
     pendingShort: string | null;
     /** Whether the server's count of what's changed arrived (G2). */
     pendingKnown: boolean;
@@ -147,8 +147,7 @@ export function statusReadout({
      * in a hover title (00-universal §15).
      */
     const pillSaysPending =
-        pendingShort !== null &&
-        status.label === `Not published · ${pendingShort}`;
+        pendingShort !== null && status.label === `Live · ${pendingShort}`;
     /*
      * What the pill leaves out, for anyone who hovers it: when it last saved,
      * what publishing would change, and the reviewer's verdict in full.
@@ -238,10 +237,10 @@ export function publishTitle({
     if (needsApproval) {
         return canOverride
             ? `${NEEDS_APPROVAL_HINT} As an owner you can still publish without approval, and it's recorded.`
-            : `${NEEDS_APPROVAL_HINT} Make a test release and ask for a review.`;
+            : `${NEEDS_APPROVAL_HINT} Make a test link and ask for a review.`;
     }
     if (neverPublished) return "Put this site live";
     if (!pendingKnown) return "Put this site live as it is now";
-    if (pendingShort) return `Put live: ${pendingShort}`;
+    if (pendingShort) return `Publish: ${pendingShort}`;
     return "Nothing has changed since the last publish";
 }

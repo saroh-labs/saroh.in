@@ -64,9 +64,12 @@ describe("styleChoiceRules", () => {
         expect(rules.refuses("colourway", "kesar")).toBe(false);
     });
 
-    it("opens every paid one on a plan with themes, still marked", () => {
+    // Editor audit 21 Nov: a "paid plans" mark on a plan that has them was
+    // a wrong label for that business.
+    it("opens every paid one on a plan with themes, and marks none paid", () => {
         const rules = styleChoiceRules(access(true), saved, options);
-        expect(rules.isPaid("fontPair", "paid")).toBe(true);
+        expect(rules.isPaid("fontPair", "paid")).toBe(false);
+        expect(rules.isPaid("look", "folio")).toBe(false);
         expect(rules.refuses("fontPair", "paid")).toBe(false);
         expect(rules.refuses("colourway", "mauve")).toBe(false);
         expect(rules.refuses("look", "quiet")).toBe(false);

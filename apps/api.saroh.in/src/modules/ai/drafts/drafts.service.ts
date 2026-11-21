@@ -54,7 +54,7 @@ import type { AiToolRun, AiTurnRef } from "../tools/toolbox.port";
 import type { DraftSpec, ReadContext, TargetState } from "./draft-targets";
 import { DRAFT_SPECS, labelOf } from "./draft-targets";
 import type { Fact } from "./fact-checks";
-import { checksFor, givenFacts, unconfirmed } from "./fact-checks";
+import { basedOnFor, checksFor, givenFacts, unconfirmed } from "./fact-checks";
 
 /** A create's request_id while it is only drafted (rolled back, so never kept). */
 const DRAFTING = "ask-ai-draft";
@@ -277,7 +277,9 @@ export class DraftsService {
                 output: `Nothing would change: ${spec.kind} ${targetId} is already like that. Tell the person.`,
             };
         }
-        draft.checks = await this.checksOf(asker, spec, parsed, draft.fields);
+        const checked = await this.checksOf(asker, spec, parsed, draft.fields);
+        draft.checks = checked.checks;
+        draft.basedOn = checked.basedOn;
         return this.keep(draft);
     }
 
@@ -365,7 +367,7 @@ export class DraftsService {
         // Check this (RULES §5): every fact the business never gave is
         // confirmed by the person, decided here, never by the browser.
         if (spec.pageText) {
-            const checks = await this.checksOf(
+            const { checks } = await this.checksOf(
                 asker,
                 spec,
                 input,
@@ -827,14 +829,17 @@ export class DraftsService {
         spec: DraftSpec,
         input: Record<string, unknown>,
         fields: AskAiDraftField[],
-    ): Promise<Fact[]> {
+    ): Promise<{ checks: Fact[]; basedOn: string | null }> {
         const pageText = spec.pageText;
-        if (!pageText) return [];
+        if (!pageText) return { checks: [], basedOn: null };
         const org = asker.ctx.organizationId;
         const given = await asBusiness(org, async () =>
             givenFacts(org, await pageText(this.reader(asker), input)),
         );
-        return checksFor(fields, given);
+        return {
+            checks: checksFor(fields, given),
+            basedOn: basedOnFor(fields, given),
+        };
     }
 
     private reader(asker: McpCall): ReadContext {
@@ -883,7 +888,7 @@ export class DraftsService {
             ...(d.spec.pageText
                 ? {
                       checks: (d.checks ?? []).map(({ key: _, ...c }) => c),
-                      basedOn: d.spec.basedOn ?? null,
+                      basedOn: d.basedOn ?? d.spec.basedOn ?? null,
                   }
                 : {}),
         };
@@ -1054,6 +1059,8 @@ interface NewDraft {
     refusal?: Refusal;
     /** Check this: new facts the business never gave. */
     checks?: Fact[];
+    /** What the card says it is based on, from the facts it used. */
+    basedOn?: string | null;
 }
 
 const CHANGED =

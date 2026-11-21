@@ -245,6 +245,8 @@ export function SiteEditor({
         ...siteStyle,
         setSelectedIndex,
         readOnly,
+        // Ask AI's applied words start the editor afresh: its history stays.
+        carryKey: `${siteId}:${pageId}`,
     });
     /*
      * Anything not saved yet: the page, the look, the name or the footer.
@@ -476,11 +478,14 @@ export function SiteEditor({
     useEffect(() => {
         const onChanged = (e: Event) => {
             if ((e as CustomEvent<string>).detail !== siteId) return;
-            if (!unsavedNow.current) reloadDraft?.(pageId);
+            if (unsavedNow.current || !reloadDraft) return;
+            // Undo in the top bar takes Ask AI's words back too.
+            edits.carry();
+            reloadDraft(pageId);
         };
         window.addEventListener(SITE_DRAFT_CHANGED, onChanged);
         return () => window.removeEventListener(SITE_DRAFT_CHANGED, onChanged);
-    }, [siteId, pageId, reloadDraft]);
+    }, [siteId, pageId, reloadDraft, edits]);
     const askAiHere = useEditorAskAi({
         siteId,
         pageId,
@@ -672,10 +677,15 @@ export function SiteEditor({
             neverPublished={publish.neverPublished}
             canvasChrome={canvasChrome}
             notesByKey={review.notesByKey}
+            changedByKey={review.changedByKey}
+            // The boards draw no window round the page (editor audit).
+            windowBar={!areaOn}
             saveFailed={
                 <SaveFailedNotice
                     draft={draft}
-                    className="mx-auto mb-4 max-w-xl"
+                    // Pinned to the top of the canvas, so it is seen
+                    // wherever the page is scrolled (editor audit F3).
+                    className="sticky top-3 z-20 mx-auto mb-4 max-w-xl shadow-md"
                 />
             }
         />

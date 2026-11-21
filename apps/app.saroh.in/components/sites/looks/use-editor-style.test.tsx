@@ -147,20 +147,20 @@ describe("choosing a look", () => {
             "site-1",
             expect.objectContaining({ look: "folio" }),
         );
-        expect(host.textContent).toContain("Not published yet");
+        expect(host.textContent).toContain("Not live yet");
         expect(seen.current?.savedLook).toBe("folio");
     });
 
     it("goes back to Classic by leaving the look out", async () => {
         updateSiteStyle.mockResolvedValue({ ok: true, data: { id: "site-1" } });
         render({ ...classic, look: "quiet" }, "quiet");
-        expect(host.textContent).not.toContain("Not published yet");
+        expect(host.textContent).not.toContain("Not live yet");
         pick("classic");
         await settle();
         const sent = updateSiteStyle.mock.calls[0][1] as SiteStyle;
         expect(sent).not.toHaveProperty("look");
         expect(host.textContent).toContain(
-            "Not published yet. Your site is Quiet until you publish.",
+            "Not live yet. Your site stays Quiet until you publish.",
         );
     });
 

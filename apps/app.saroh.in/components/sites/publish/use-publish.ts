@@ -128,6 +128,12 @@ export function usePublish({
         const read = await readSiteChanges(siteId).catch(() => null);
         if (request !== unitsRequest.current) return;
         setPendingUnits(read ? read.units.length : null);
+        // A setting changed back to its live value stops waiting: Brand's
+        // Undo used to leave "brand" in Publish's line (editor audit F12).
+        if (read && read.count !== null) {
+            const keys = read.units.map((u) => u.key);
+            setPendingSiteChanges((prev) => siteKindsFromUnits(prev, keys));
+        }
     }, [siteId]);
     const [checking, setChecking] = useState(false);
     /*
@@ -295,8 +301,8 @@ export function usePublish({
                 setPublishError({
                     message: res.error,
                     detail: canOverride
-                        ? "Make a test release and get it approved, or publish without approval."
-                        : "Make a test release and get it approved, then go live with it.",
+                        ? "Make a test link and get it approved, or publish without approval."
+                        : "Make a test link and get it approved, then go live with it.",
                 });
                 return;
             }
@@ -421,3 +427,29 @@ export function usePublish({
 }
 
 export type EditorPublish = ReturnType<typeof usePublish>;
+
+/**
+ * The site settings still waiting, as the change units have them: a
+ * `site:<kind>` unit is a kind waiting. Pages and old links are counted
+ * per page there, so they stay as the last save said.
+ */
+export function siteKindsFromUnits(
+    prev: SiteChangeKind[] | null,
+    unitKeys: readonly string[],
+): SiteChangeKind[] | null {
+    if (prev === null) return prev;
+    const site = new Set(
+        unitKeys
+            .filter((k) => k.startsWith("site:"))
+            .map((k) => k.slice("site:".length) as SiteChangeKind),
+    );
+    const kept = prev.filter(
+        (k) => k === "pages" || k === "redirects" || site.has(k),
+    );
+    site.forEach((k) => {
+        if (!kept.includes(k)) kept.push(k);
+    });
+    return kept.length === prev.length && kept.every((k, i) => k === prev[i])
+        ? prev
+        : kept;
+}

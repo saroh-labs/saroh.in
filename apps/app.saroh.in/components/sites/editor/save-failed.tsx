@@ -11,8 +11,17 @@ export const COULDNT_SAVE = "Couldn't save.";
 export const WORDS_KEPT =
     "Your words are kept here. Check your connection, then try again.";
 
-/** C12: the revision 409 said with who and what, never as live presence. */
-export function changedSinceLine(by: string | null, page: string): string {
+/**
+ * C12: the revision 409 said with who and what, never as live presence.
+ * The owner's own save from another tab is theirs, never "someone else's"
+ * (editor audit, 21 Nov).
+ */
+export function changedSinceLine(
+    by: string | null,
+    page: string,
+    you = false,
+): string {
+    if (you) return `You changed ${page} in another tab or window.`;
     return `${by ?? "Someone else"} changed ${page} since you opened it.`;
 }
 

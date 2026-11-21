@@ -12,7 +12,10 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EditorUndo } from "@/components/sites/editor/use-undo";
-import { useUndo } from "@/components/sites/editor/use-undo";
+import {
+    forgetCarriedHistory,
+    useUndo,
+} from "@/components/sites/editor/use-undo";
 import type { Section } from "@/lib/sites/service";
 import type { SiteStyle } from "@/lib/sites/style";
 
@@ -53,8 +56,18 @@ let root: Root;
 let host: HTMLDivElement;
 let h: Harness;
 
-function Probe({ report }: { report: (next: Harness) => void }) {
-    const [sections, setSections] = useState<Section[]>([A, B]);
+function Probe({
+    report,
+    initial = [A, B],
+    carryKey,
+    stamping,
+}: {
+    report: (next: Harness) => void;
+    initial?: Section[];
+    carryKey?: string;
+    stamping?: { current: boolean };
+}) {
+    const [sections, setSections] = useState<Section[]>(initial);
     const [style, setStyle] = useState<SiteStyle>(LOOK);
     const [selected, setSelected] = useState<number | null>(0);
     const undo = useUndo({
@@ -76,6 +89,8 @@ function Probe({ report }: { report: (next: Harness) => void }) {
         setStyle,
         resetStyle: () => setStyle(PLAIN),
         setSelectedIndex: setSelected,
+        carryKey,
+        stamping,
     });
     report({ undo, sections, style, setSections, setStyle, selected });
     return null;
@@ -163,13 +178,13 @@ describe("useUndo", () => {
     it("hides and shows with the words for each", () => {
         act(() => h.undo.toggleHidden(1));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "FAQ is hidden on this page",
+            "Questions and answers is hidden on this page",
             expect.any(Function),
             { duration: 10_000 },
         );
         act(() => h.undo.toggleHidden(1));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "FAQ is back on this page",
+            "Questions and answers is back on this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -189,14 +204,13 @@ describe("useUndo", () => {
         expect(h.style).toEqual(LOOK);
     });
 
-    it("closes the window when the look changes again, and leaves the blocks' Undo alone", () => {
+    it("takes the toast away when anything changes again: its Undo would skip that change", () => {
         act(() => h.undo.resetStyle());
         act(() => h.setSections([B, A]));
-        expect(toast.dismissToast).not.toHaveBeenCalled();
-        act(() => h.setStyle({ colours: { accent: "sea" }, scalars: {} }));
         expect(toast.dismissToast).toHaveBeenCalledWith(lastId());
         pressUndo();
-        expect(h.style.colours.accent).toBe("sea");
+        expect(h.sections).toEqual([B, A]);
+        expect(h.style).toEqual(PLAIN);
     });
 
     it("ends after ten seconds: the toast goes, and Undo does nothing", () => {
@@ -218,8 +232,7 @@ describe("useUndo", () => {
 });
 
 describe("the top bar's Undo and More › Redo (U46)", () => {
-    it("Undo is pressable only while the window is open, and does what the toast does", () => {
-        expect(h.undo.canUndo).toBe(false);
+    it("Undo does what the toast does", () => {
         act(() => h.undo.removeAt(0));
         expect(h.undo.canUndo).toBe(true);
         act(() => h.undo.undo());
@@ -228,12 +241,14 @@ describe("the top bar's Undo and More › Redo (U46)", () => {
         expect(toast.dismissToast).toHaveBeenCalledWith(lastId());
     });
 
-    it("closes with the window after ten seconds", () => {
+    it("stays pressable after the toast's ten seconds: the history is the editor's", () => {
         act(() => h.undo.removeAt(0));
         act(() => {
             vi.advanceTimersByTime(10_000);
         });
-        expect(h.undo.canUndo).toBe(false);
+        expect(h.undo.canUndo).toBe(true);
+        act(() => h.undo.undo());
+        expect(h.sections).toEqual([A, B]);
     });
 
     it("Redo puts the removal back, once", () => {
@@ -261,5 +276,167 @@ describe("the top bar's Undo and More › Redo (U46)", () => {
         expect(h.style).toBe(LOOK);
         act(() => h.undo.redo());
         expect(h.style).toBe(PLAIN);
+    });
+});
+
+/** A field edit, as the inspector or typing on the page makes one. */
+function typeHeading(text: string) {
+    act(() =>
+        h.setSections([
+            { ...h.sections[0], content: { heading: text } } as Section,
+            ...h.sections.slice(1),
+        ]),
+    );
+}
+
+describe("one history for the whole editor (editor audit F2)", () => {
+    it("is never lit on open", () => {
+        expect(h.undo.canUndo).toBe(false);
+        expect(h.undo.canRedo).toBe(false);
+    });
+
+    it("lights up after a field edit, and Undo puts the words back", () => {
+        typeHeading("Ab");
+        expect(h.undo.canUndo).toBe(true);
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "A" });
+        expect(h.undo.canUndo).toBe(false);
+        expect(h.undo.canRedo).toBe(true);
+        act(() => h.undo.redo());
+        expect(h.sections[0].content).toEqual({ heading: "Ab" });
+    });
+
+    it("takes a burst of typing back as one step, and a pause as two", () => {
+        typeHeading("Ab");
+        act(() => {
+            vi.advanceTimersByTime(300);
+        });
+        typeHeading("Abc");
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        typeHeading("Abcd");
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "Abc" });
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "A" });
+    });
+
+    it("goes back through Brand, moves and typing in the order they were made", () => {
+        typeHeading("Ab");
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        act(() => h.setStyle({ colours: { accent: "sea" }, scalars: {} }));
+        act(() => h.undo.move(0, 1));
+        act(() => h.undo.undo());
+        expect(h.sections.map((x) => x.key)).toEqual(["a", "b"]);
+        expect(h.style.colours.accent).toBe("sea");
+        act(() => h.undo.undo());
+        expect(h.style).toEqual(LOOK);
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "A" });
+        expect(h.undo.canUndo).toBe(false);
+        // And forward again, in the same order.
+        act(() => h.undo.redo());
+        act(() => h.undo.redo());
+        act(() => h.undo.redo());
+        expect(h.sections.map((x) => x.key)).toEqual(["b", "a"]);
+        expect(h.style.colours.accent).toBe("sea");
+    });
+
+    it("an Undo or Redo is not itself a step", () => {
+        typeHeading("Ab");
+        act(() => h.undo.undo());
+        act(() => h.undo.redo());
+        act(() => h.undo.undo());
+        expect(h.undo.canUndo).toBe(false);
+        expect(h.undo.canRedo).toBe(true);
+    });
+});
+
+describe("Ask AI's words, applied in the draft (editor audit F2)", () => {
+    function mount(props: {
+        initial?: Section[];
+        stamping?: { current: boolean };
+    }) {
+        act(() =>
+            root.render(
+                createElement(Probe, {
+                    ...props,
+                    carryKey: "s1:p1",
+                    report: (next) => {
+                        h = next;
+                    },
+                }),
+            ),
+        );
+    }
+
+    afterEach(() => forgetCarriedHistory());
+
+    it("are one more step after the editor starts afresh on them, and Undo takes them back", () => {
+        act(() => root.unmount());
+        root = createRoot(host);
+        mount({});
+        typeHeading("Ab");
+        act(() => h.undo.carry());
+        act(() => root.unmount());
+        root = createRoot(host);
+        // The draft read again, with Ask AI's heading in it.
+        const applied = { ...A, content: { heading: "Ask AI's" } } as Section;
+        mount({ initial: [applied, B] });
+        expect(h.undo.canUndo).toBe(true);
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "Ab" });
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "A" });
+    });
+
+    it("is not handed to an editor opened later on its own", () => {
+        act(() => root.unmount());
+        root = createRoot(host);
+        mount({});
+        typeHeading("Ab");
+        act(() => h.undo.carry());
+        act(() => {
+            vi.advanceTimersByTime(60_000);
+        });
+        act(() => root.unmount());
+        root = createRoot(host);
+        mount({});
+        expect(h.undo.canUndo).toBe(false);
+    });
+});
+
+describe("a save's form ids are not a step", () => {
+    it("folds them into the step before, so Undo stays one press", () => {
+        const stamping = { current: false };
+        act(() => root.unmount());
+        root = createRoot(host);
+        act(() =>
+            root.render(
+                createElement(Probe, {
+                    stamping,
+                    report: (next) => {
+                        h = next;
+                    },
+                }),
+            ),
+        );
+        typeHeading("Ab");
+        act(() => {
+            vi.advanceTimersByTime(2000);
+        });
+        stamping.current = true;
+        act(() =>
+            h.setSections([
+                h.sections[0],
+                { ...h.sections[1], formId: "f1" } as unknown as Section,
+            ]),
+        );
+        act(() => h.undo.undo());
+        expect(h.sections[0].content).toEqual({ heading: "A" });
+        expect(h.undo.canUndo).toBe(false);
     });
 });

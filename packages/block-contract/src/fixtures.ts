@@ -687,7 +687,9 @@ export const BLOCK_META = {
      * later, not a new block.
      */
     faq: {
-        label: "FAQ",
+        // RULES §1: the merchant's words; the old name still finds it.
+        label: "Questions and answers",
+        aliases: ["FAQ"],
         description:
             "Questions a visitor would otherwise call to ask, each answer one tap away.",
         variants: soleVariant(
@@ -715,7 +717,8 @@ export const BLOCK_META = {
         },
     },
     testimonials: {
-        label: "Testimonials",
+        label: "What customers say",
+        aliases: ["Testimonials", "Reviews"],
         description:
             "What customers said, in their words and under their names.",
         variants: soleVariant(

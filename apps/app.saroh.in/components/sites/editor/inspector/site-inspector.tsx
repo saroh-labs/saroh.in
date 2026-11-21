@@ -241,7 +241,11 @@ export function SiteInspector({
         >
             {header}
             {tabs}
-            <div className="min-h-0 flex-1 overflow-y-auto p-4">{body}</div>
+            {/* Relative, so a field's sr-only file input is clipped here
+                and never makes the whole editor scroll (editor audit). */}
+            <div className="relative min-h-0 flex-1 overflow-y-auto p-4">
+                {body}
+            </div>
             <PhotoSheet
                 model={model}
                 target={photoFor}
