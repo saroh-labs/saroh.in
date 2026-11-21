@@ -7,7 +7,9 @@ import {
     Optional,
 } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import { editionProfile } from "@saroh/edition";
 
+import { editionOf } from "../../common/app-url";
 import { structuredLogger } from "../../common/logging/structured-logger";
 import type { ModuleKey } from "../capabilities/module-registry";
 import { MODULE_BY_KEY } from "../capabilities/module-registry";
@@ -121,10 +123,13 @@ export class AccountHomeService {
                         gstin: true,
                     },
                 },
-                organization: { select: { name: true } },
+                organization: { select: { name: true, edition: true } },
             },
         });
         if (!account) throw new NotFoundException();
+        // No GST, no GSTIN card (E3): the field is left out, as an older API did.
+        const gst =
+            editionProfile(account.organization.edition).taxSystem === "gst";
         const [offers, unreadMessages, site] = await Promise.all([
             this.offers(ctx),
             // The tab's dot (A13); a failed count never hides the account.
@@ -144,7 +149,9 @@ export class AccountHomeService {
         ]);
         return accountView({
             account,
-            contact: account.contact,
+            contact: gst
+                ? account.contact
+                : { ...account.contact, gstin: undefined },
             businessName: account.organization.name,
             tabs: accountTabs(offers),
             offers,
@@ -174,7 +181,14 @@ export class AccountHomeService {
         if (dto.gstin !== undefined) {
             // Only invoices made from now on print it (R16): issued ones keep theirs.
             const gstin = dto.gstin.toUpperCase();
-            const problem = gstin === "" ? null : gstinProblem(gstin);
+            // A business without GST (Global, E3) keeps none: removing one still works.
+            const problem =
+                gstin === ""
+                    ? null
+                    : editionProfile(await editionOf(ctx.organizationId))
+                            .taxSystem !== "gst"
+                      ? "A GSTIN is only for businesses in India."
+                      : gstinProblem(gstin);
             if (problem) {
                 throw new BadRequestException({
                     message: problem,

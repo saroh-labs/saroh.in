@@ -400,7 +400,14 @@ export class AddonsService {
                         prorated,
                         await yearlyExtrasLaunch(tx, {
                             organizationId: ctx.organizationId,
-                            edition: ctx.edition ?? "INDIA",
+                            // Read, never assumed (R7): Saroh's own grants
+                            // (addBySaroh) build a context with no edition.
+                            edition: (
+                                await tx.organization.findUniqueOrThrow({
+                                    where: { id: ctx.organizationId },
+                                    select: { edition: true },
+                                })
+                            ).edition,
                             planRowId: sub.plan.id,
                             planId,
                             cycle,

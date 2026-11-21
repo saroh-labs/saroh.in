@@ -1,5 +1,6 @@
 import "@saroh/ui/globals.css";
 import type { Metadata } from "next";
+import { connection } from "next/server";
 
 /*
  * The fallback for a page that names none, which here is only the root 404
@@ -11,11 +12,15 @@ export const metadata: Metadata = {
     title: "Page not found",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    // Every page renders per request, so Next can stamp the request's
+    // script nonce on its own scripts (`lib/csp.ts`); a page drawn at build
+    // time would carry none and be blocked.
+    await connection();
     return (
         // `data-skin="mono"` pins the pre-brand register. This app renders
         // merchants' sites, which carry their own `--site-*` themes; the few

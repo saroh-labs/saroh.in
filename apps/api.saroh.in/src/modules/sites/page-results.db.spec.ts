@@ -50,6 +50,10 @@ describe("a page's results, counted by page (DEC-235, DB)", () => {
                 data: { organizationId, name: "Rye", slug: `pr-${tag}` },
             })
         ).id;
+        // The site's own page: the only path its results are kept for (02 W7).
+        await prisma.page.create({
+            data: { organizationId, siteId, path: "/bridal", title: "Bridal" },
+        });
         const enquiry = (n: number, pagePath?: string) =>
             prisma.analyticsEvent.create({
                 data: enquirySubmittedEvent({
@@ -68,6 +72,7 @@ describe("a page's results, counted by page (DEC-235, DB)", () => {
         await enquiry(4, "/account/messages"); // private: never kept
         await started("/bridal");
         await started(); // landed on the booking page: totals only
+        await started("/made-up"); // no such page: totals only (02 W7)
         await new AnalyticsAggregateHandler().handle({
             payload: { organizationId, date: at.toISOString().slice(0, 10) },
         } as unknown as Job);
@@ -103,7 +108,7 @@ describe("a page's results, counted by page (DEC-235, DB)", () => {
             )?.count;
         expect(row("enquiry.submitted", "", "")).toBe(4);
         expect(row("enquiry.submitted", "path", "/bridal")).toBe(2);
-        expect(row("site.started", "", "")).toBe(2);
+        expect(row("site.started", "", "")).toBe(3);
         expect(row("site.started", "path", "/bridal")).toBe(1);
         expect(
             rows.filter(

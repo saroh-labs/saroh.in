@@ -159,10 +159,8 @@
         "NEXT_PUBLIC_CLAIM_SITE_TEST_RELEASES",
         "NEXT_PUBLIC_CLAIM_SHARE_INSIGHTS",
         "NEXT_PUBLIC_API_AREA",
-        // The redesigned Website area (plan 2026-11-18-001): the app's
-        // switch, read at build.
-        "NEXT_PUBLIC_WEBSITE_AREA",
-        // The api's half (owner, 20 Nov 2026): post approval only while on.
+        // The redesigned Website area (plan 2026-11-18-001): the api's
+        // switch, the only one; the app asks the api (DEC-240).
         "WEBSITE_AREA",
         // Share as a post and Create post (DEC-217): the app's switch, read at
         // build, and the api's, which answers 404 while it is off.

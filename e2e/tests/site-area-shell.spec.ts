@@ -9,7 +9,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * The Website area's shell (plan 2026-11-18-001 U3), behind
- * `NEXT_PUBLIC_WEBSITE_AREA` (on in CI and `pnpm prepush --e2e`): All sites
+ * the api's `WEBSITE_AREA` (on in CI and `pnpm prepush --e2e`): All sites
  * at `/sites` with one card (DEC-230: one web address per business), a
  * site's Overview with the header and the four groups (the desk's list; the
  * phone's site home), and old addresses that still land.
@@ -43,7 +43,7 @@ test.describe("the Website area's shell", () => {
         await page.goto("/sites");
         test.skip(
             !page.url().endsWith("/sites"),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: /sites still forwards",
+            "The Website area is off: /sites still forwards",
         );
         await expect(
             page.getByRole("heading", { name: "Sites", level: 1 }),
@@ -95,7 +95,7 @@ test.describe("the Website area's shell", () => {
         await page.goto(`/sites/${siteId}/posts`);
         test.skip(
             !page.url().includes("/writing"),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: Posts is still a tab",
+            "The Website area is off: Posts is still a tab",
         );
         await expect(
             page.getByRole("heading", {

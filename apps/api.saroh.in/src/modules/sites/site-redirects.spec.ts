@@ -8,6 +8,7 @@ jest.mock("@saroh/database", () => ({
         $transaction: jest.fn((writes: unknown[]) => Promise.all(writes)),
         siteRedirect: {
             findMany: jest.fn(),
+            count: jest.fn().mockResolvedValue(0),
             findFirst: jest.fn(),
             create: jest.fn(),
             update: jest.fn(),

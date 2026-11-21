@@ -417,6 +417,41 @@ describe("a GSTIN for invoices (R16)", () => {
         expect(contact.gstin).toBeNull();
     });
 
+    it("refuses a GSTIN on a business without GST (Global, E3); removing still works", async () => {
+        const biz = await business("Kavi Dental", ["APPOINTMENTS"]);
+        await prisma.organization.update({
+            where: { id: biz.organizationId },
+            data: { edition: "GLOBAL" },
+        });
+        const { token, account } = await signIn(biz.host);
+        // No GSTIN field, so the site draws no card.
+        expect(
+            (await call("GET", ME, { host: biz.host, token })).body,
+        ).not.toHaveProperty("gstin");
+        const refused = await call("PATCH", ME, {
+            host: biz.host,
+            token,
+            body: { gstin: GSTIN },
+        });
+        expect(refused.status).toBe(400);
+        expect(refused.body.error).toMatchObject({
+            details: { field: "gstin" },
+        });
+        const removed = await call("PATCH", ME, {
+            host: biz.host,
+            token,
+            body: { gstin: "" },
+        });
+        expect(removed.status).toBe(200);
+        expect(
+            (
+                await prisma.contact.findUniqueOrThrow({
+                    where: { id: account.contactId },
+                })
+            ).gstin,
+        ).toBeNull();
+    });
+
     it("another business's account can't read or write it", async () => {
         const one = await business("Kavi Dental", ["APPOINTMENTS"]);
         const two = await business("Pulse Fitness", ["APPOINTMENTS"]);

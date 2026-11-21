@@ -3,6 +3,15 @@ jest.mock("@saroh/database", () => ({
     prisma: {
         analyticsEvent: { findMany: jest.fn() },
         analyticsDailyAggregate: { upsert: jest.fn(), findUnique: jest.fn() },
+        // The business's pages: the only paths a day keeps (02 W7).
+        page: {
+            findMany: jest.fn().mockResolvedValue(
+                ["/", "/a", "/b", "/bridal"].map((path) => ({
+                    siteId: "site_1",
+                    path,
+                })),
+            ),
+        },
     },
 }));
 
@@ -12,6 +21,7 @@ import { prisma } from "@saroh/database";
 import { planMeter } from "../billing/metering.service";
 import { JobHandlerRegistry } from "../jobs/job-handler.registry";
 import {
+    AGGREGATE_READ_PAGE,
     ANALYTICS_AGGREGATE_TYPE,
     AnalyticsAggregateHandler,
     pastRetention,
@@ -406,6 +416,51 @@ describe("AnalyticsAggregateHandler — where visits came from (U15)", () => {
                     (r) => r.type === "site.paid" && r.dimension === "path",
                 ),
         ).toEqual([]);
+    });
+
+    it("keeps a path only when it is one of the site's pages (02 W7)", async () => {
+        eventFindMany.mockResolvedValue([
+            step("site.started", { source: "direct", path: "/bridal" }),
+            // Made up: counted in the totals, never as a page.
+            step("site.started", { source: "direct", path: "/made-up-1" }),
+            step("site.view", { path: "/made-up-2" }),
+            // Another site's page is not this one's.
+            step("site.view", { path: "/bridal" }, "site_2"),
+        ]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        const paths = aggregateUpsert.mock.calls
+            .map((c) => c[0].create)
+            .filter((r) => r.dimension === "path")
+            .map((r) => `${r.type} ${r.siteId} ${r.dimensionValue}`);
+        expect(paths.sort()).toEqual([
+            "site.started  /bridal",
+            "site.started site_1 /bridal",
+        ]);
+        expect(rowOf("site.started", "site_1", "", "")).toMatchObject({
+            count: 2,
+        });
+    });
+
+    it("reads a busy day a page at a time (04 W6)", async () => {
+        const page = Array.from({ length: AGGREGATE_READ_PAGE }, () =>
+            step("site.view", { path: "/a" }),
+        ).map((e, i) => ({ ...e, id: `ev_${String(i).padStart(6, "0")}` }));
+        eventFindMany
+            .mockResolvedValueOnce(page)
+            .mockResolvedValueOnce([step("site.view", { path: "/a" })]);
+
+        await new AnalyticsAggregateHandler().handle(jobFor("org_1"));
+
+        expect(eventFindMany).toHaveBeenCalledTimes(2);
+        expect(eventFindMany.mock.calls[0][0].take).toBe(AGGREGATE_READ_PAGE);
+        expect(eventFindMany.mock.calls[1][0].where.id).toEqual({
+            gt: page[page.length - 1].id,
+        });
+        expect(rowOf("site.view", "site_1", "", "")).toMatchObject({
+            count: AGGREGATE_READ_PAGE + 1,
+        });
     });
 
     it("leaves site.view's own rollups as they were: no source dimension", async () => {

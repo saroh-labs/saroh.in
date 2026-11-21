@@ -15,12 +15,13 @@
  * the three is missing, isn't wired in, or says something different.
  *
  * Every page also switches off the browser features no app uses
- * (Permissions-Policy), and every app but the merchant sites reports a
- * Content-Security-Policy (pentest, 29 Oct 2026; @saroh/auth/security-headers).
- * The merchant sites have none yet: each business's trackers would need listing.
- * Every page says Referrer-Policy: strict-origin-when-cross-origin, and all
- * but saroh.in enforce ENFORCED_CSP, which blocks inline event handlers
- * (security review, 21 Nov 2026).
+ * (Permissions-Policy) and says Referrer-Policy:
+ * strict-origin-when-cross-origin. saroh.in reports a Content-Security-Policy
+ * (pentest, 29 Oct 2026; @saroh/auth/security-headers). The other four
+ * ENFORCE one from their middleware, with a fresh script nonce per answer
+ * (21 Nov 2026): their next.config must NOT send a Content-Security-Policy,
+ * because on Workers OpenNext lets a next.config header replace the
+ * middleware's of the same name, and the nonce would be lost.
  *
  * Run from the repo root.
  */
@@ -30,7 +31,7 @@ import { pathToFileURL } from "node:url";
 
 import securityHeaders from "../packages/auth/src/security-headers.cjs";
 
-const { ENFORCED_CSP } = securityHeaders;
+const { ENFORCED_CSP, contentSecurityPolicy } = securityHeaders;
 
 const CONFIGS = [
     "apps/saroh.in/next.config.js",
@@ -42,25 +43,36 @@ const CONFIGS = [
 const REQUIRED = {
     "strict-transport-security": /^max-age=31536000\b/u,
     "x-frame-options": /^SAMEORIGIN$/u,
-    "content-security-policy": /frame-ancestors 'self'/u,
     "x-content-type-options": /^nosniff$/u,
     "permissions-policy": /camera=\(\), microphone=\(\), geolocation=\(\)/u,
     "referrer-policy": /^strict-origin-when-cross-origin$/u,
 };
 /**
- * The apps that enforce more than frame-ancestors: no inline event handler,
- * plugin or moved base (security review, 21 Nov 2026). saroh.in isn't one yet.
+ * The apps whose middleware enforces the CSP with a nonce, and how its
+ * default export must start. saroh.in isn't one yet.
  */
-const ENFORCES_CSP = new Set([
-    "apps/app.saroh.in/next.config.js",
-    "apps/accounts.saroh.in/next.config.mjs",
-    "apps/admin.saroh.in/next.config.mjs",
-    "apps/saroh.app/next.config.js",
-]);
-/** The apps whose pages report a full CSP; saroh.app isn't one yet. */
+const NONCE_CSP = {
+    "apps/app.saroh.in/next.config.js": /export default withPrivateApp\(/u,
+    "apps/accounts.saroh.in/next.config.mjs":
+        /export default withPrivateApp\(/u,
+    "apps/admin.saroh.in/next.config.mjs": /export default withPrivateApp\(/u,
+    "apps/saroh.app/next.config.js": /export default withSitePolicy\(/u,
+};
+const MIDDLEWARE = {
+    "apps/saroh.app/next.config.js": "apps/saroh.app/middleware.ts",
+};
+/** saroh.in: a full CSP, report-only, and frame-ancestors enforced. */
 const REPORTED_CSP =
     /^default-src 'self';.*object-src 'none'; base-uri 'self'$/u;
-const NO_CSP_YET = new Set(["apps/saroh.app/next.config.js"]);
+
+/** One directive's sources, or null. */
+function directive(policy, name) {
+    const found = policy
+        .split(";")
+        .map((part) => part.trim().split(/\s+/u))
+        .find(([key]) => key === name);
+    return found ? found.slice(1) : null;
+}
 
 /** The signed-in apps, and the file whose default export is their middleware. */
 const PRIVATE_APPS = {
@@ -129,22 +141,43 @@ for (const file of CONFIGS) {
     for (const [key, shape] of Object.entries(REQUIRED))
         if (!shape.test(sent.get(key) ?? ""))
             problems.push(`${file}: every page must send ${key}`);
-    if (
-        ENFORCES_CSP.has(file) &&
-        sent.get("content-security-policy") !== ENFORCED_CSP
-    )
-        problems.push(
-            `${file}: every page must enforce ENFORCED_CSP (@saroh/auth/security-headers)`,
-        );
-    if (
-        !NO_CSP_YET.has(file) &&
-        !REPORTED_CSP.test(
-            sent.get("content-security-policy-report-only") ?? "",
+    const nonced = NONCE_CSP[file];
+    if (nonced) {
+        if (sent.has("content-security-policy"))
+            problems.push(
+                `${file}: must not send Content-Security-Policy; the middleware's, with its nonce, would be replaced on Workers`,
+            );
+        const middleware = PRIVATE_APPS[file] ?? MIDDLEWARE[file];
+        const source = readFileSync(join(process.cwd(), middleware), "utf8");
+        if (!nonced.test(source))
+            problems.push(
+                `${middleware}: the default export must enforce the CSP with a nonce (${nonced.source})`,
+            );
+        if (
+            PRIVATE_APPS[file] &&
+            !/contentSecurityPolicy\(\{[^}]*\bnonce\b/u.test(source)
         )
-    )
-        problems.push(
-            `${file}: every page must report a CSP (pageSecurityHeaders, @saroh/auth/security-headers)`,
-        );
+            problems.push(
+                `${middleware}: withPrivateApp's policy must be contentSecurityPolicy({ …, nonce })`,
+            );
+    } else {
+        if (
+            !/frame-ancestors 'self'/u.test(
+                sent.get("content-security-policy") ?? "",
+            )
+        )
+            problems.push(
+                `${file}: every page must send content-security-policy`,
+            );
+        if (
+            !REPORTED_CSP.test(
+                sent.get("content-security-policy-report-only") ?? "",
+            )
+        )
+            problems.push(
+                `${file}: every page must report a CSP (pageSecurityHeaders, @saroh/auth/security-headers)`,
+            );
+    }
 
     const middleware = PRIVATE_APPS[file];
     if (!middleware) continue;
@@ -161,7 +194,39 @@ for (const file of CONFIGS) {
     const assetsFile = join(dirname(file), "public/_headers");
     const assets = assetHeaders(join(process.cwd(), assetsFile));
     if (!assets) problems.push(`${assetsFile}: missing`);
+    // The policy the middleware enforces: ENFORCED_CSP's every directive,
+    // and scripts by nonce only.
+    const sources = (
+        await import(
+            pathToFileURL(join(process.cwd(), dirname(file), "csp-sources.cjs"))
+                .href
+        )
+    ).default;
+    const policy = contentSecurityPolicy({ ...sources, nonce: "n0nce" });
+    for (const part of ENFORCED_CSP.split("; "))
+        if (!policy.includes(part))
+            problems.push(`${file}: the enforced CSP lacks "${part}"`);
+    const scripts = directive(policy, "script-src") ?? [];
+    if (
+        !scripts.includes("'nonce-n0nce'") ||
+        scripts.includes("'unsafe-inline'") ||
+        // Chrome runs any DOM-added script under it, injected inline ones too.
+        scripts.includes("'strict-dynamic'") ||
+        (process.env.NODE_ENV !== "development" &&
+            scripts.includes("'unsafe-eval'"))
+    )
+        problems.push(
+            `${file}: the enforced script-src must be by nonce, without 'unsafe-inline' or (outside next dev) 'unsafe-eval'`,
+        );
     for (const [key, value] of wrapper) {
+        // The middleware sends the page's CSP itself (above).
+        if (key === "content-security-policy") {
+            if (assets && assets.get(key) !== value)
+                problems.push(
+                    `${assetsFile}: ${key} differs from PRIVATE_APP_HEADERS (${WRAPPER})`,
+                );
+            continue;
+        }
         if (sent.get(key) !== value)
             problems.push(
                 `${file}: ${key} differs from PRIVATE_APP_HEADERS (${WRAPPER})`,

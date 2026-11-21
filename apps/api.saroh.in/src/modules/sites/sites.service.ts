@@ -41,6 +41,7 @@ import {
     APPROVAL_OFF_MESSAGE,
     editorsOf,
     heldForApproval,
+    namesOf,
     personName,
     readUnitVerdicts,
     recordUnitVerdicts,
@@ -195,6 +196,10 @@ import {
     templateFooterLine,
     templateFormerFooterLines,
 } from "./site-template-record";
+import { websiteAreaOn } from "./website-area-switch";
+
+/** A site's live posts a public read lists, newest first (02 W6). */
+export const PUBLIC_POSTS_LISTED = 1000;
 
 /**
  * Take the key a section claims, unless something earlier in the list already
@@ -1479,6 +1484,7 @@ export class SitesService {
             organizationId: ctx.organizationId,
             siteId,
             editors: editorsOf(units ?? []),
+            unitKeys: (units ?? []).map((u) => u.key),
         });
         const approvals = unitApprovals(units ?? [], rows, leads);
         const people = [
@@ -1492,7 +1498,7 @@ export class SitesService {
                       select: { id: true, name: true, email: true },
                   })
                 : [];
-        const names = new Map(users.map((u) => [u.id, personName(ctx, u)]));
+        const names = namesOf(ctx, users);
         return {
             siteId,
             livePublishedAt: site.currentPublication?.publishedAt ?? null,
@@ -2101,7 +2107,7 @@ export class SitesService {
             where: { id: { in: unique } },
             select: { id: true, name: true, email: true },
         });
-        return new Map(users.map((u) => [u.id, personName(ctx, u)]));
+        return namesOf(ctx, users);
     }
 
     /**
@@ -2826,7 +2832,13 @@ export class SitesService {
         const draftSnapshot = this.buildSnapshot(site, publishedAt, {
             invalid,
         });
-        const asked = options.leaveOut ?? [];
+        /*
+         * Leave out and per-change approval (DEC-226) belong to the Website
+         * area: with it off, a publish takes the whole draft and "Publishing
+         * needs approval" refuses it whole, as before (DEC-071, owner 21 Nov).
+         */
+        const area = websiteAreaOn();
+        const asked = area ? (options.leaveOut ?? []) : [];
 
         const published = await prisma.$transaction(async (tx) => {
             await lockSite(tx, site.id);
@@ -2852,6 +2864,7 @@ export class SitesService {
              * first publish has no changes to name, and goes as before.
              */
             const gated =
+                area &&
                 liveSnapshot !== null &&
                 options.override !== true &&
                 (await approvalApplies(
@@ -3060,6 +3073,8 @@ export class SitesService {
                 AND: [kept],
             },
             orderBy: { publishedAt: "desc" },
+            // Bounded (02 W6): every public posts read pays for the list.
+            take: PUBLIC_POSTS_LISTED,
             select: { currentPublication: { select: { snapshot: true } } },
         });
         return {
@@ -3752,14 +3767,17 @@ export class SitesService {
             where: { id: siteId, organizationId: ctx.organizationId },
             select: { publishNeedsApproval: true },
         });
-        const units = (await approvalApplies(
-            ctx.organizationId,
-            site.publishNeedsApproval,
-        ))
-            ? (await this.waitingUnits(ctx, siteId)).filter(
-                  (u) => u.editedBy !== ctx.userId,
-              )
-            : [];
+        // With the Website area off, as before DEC-226: no per-change rows.
+        const units =
+            websiteAreaOn() &&
+            (await approvalApplies(
+                ctx.organizationId,
+                site.publishNeedsApproval,
+            ))
+                ? (await this.waitingUnits(ctx, siteId)).filter(
+                      (u) => u.editedBy !== ctx.userId,
+                  )
+                : [];
         return this.approvalWithAlert(
             ctx,
             {

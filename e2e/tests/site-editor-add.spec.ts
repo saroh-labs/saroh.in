@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * Rail › Add (plan 2026-11-20-002 U46e, `fix/WXBAdd`, `fix/WXBAddPage`),
- * behind `NEXT_PUBLIC_WEBSITE_AREA`: pages first, then a section below the
+ * behind the api's `WEBSITE_AREA`: pages first, then a section below the
  * selected one, today's library under Browse all, A service asking which
  * services, and Add a page as its own sheet.
  *
@@ -42,7 +42,7 @@ test.describe("Rail › Add at 1920", () => {
     test("pages, sections, the library and Add a page", async ({ page }) => {
         test.skip(
             !(await openEditor(page)),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: today's chrome",
+            "The Website area is off: today's chrome",
         );
         await page
             .locator("[data-editor-trail]")

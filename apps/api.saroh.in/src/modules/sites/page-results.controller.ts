@@ -9,6 +9,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { PageResults } from "./page-results";
 import { PageResultsService } from "./page-results";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 export class PageResultsQueryDto {
     /** The page's link on the site, `/` or `/bridal`; a query is cut off. */
@@ -27,7 +28,13 @@ export class PageResultsQueryDto {
  * `site:read`, reviewer-scoped; results null without `analytics:read`.
  */
 @Controller("organizations/:organizationId/sites/:siteId/results")
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Only with the Website area on (DEC-240): off, a 404.
+@UseGuards(
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+    WebsiteAreaSwitchGuard,
+)
 @RequireModule("WEBSITE")
 export class PageResultsController {
     constructor(private readonly results: PageResultsService) {}

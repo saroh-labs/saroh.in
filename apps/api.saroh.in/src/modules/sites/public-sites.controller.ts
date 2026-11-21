@@ -59,6 +59,12 @@ export class PublicSitesController {
         60_000,
     );
 
+    /**
+     * The post reads, per visitor as relayed (02 W6, 21 Nov 2026): a post
+     * page is two of them, so as generous as the test-host lookup.
+     */
+    readonly postReadLimiter = new FixedWindowRateLimiter(300, 60_000);
+
     constructor(
         private readonly sites: SitesService,
         private readonly previewLinks: SitePreviewLinksService,
@@ -178,7 +184,12 @@ export class PublicSitesController {
      * a site once, then asks here by id.
      */
     @Get(":siteId/posts")
-    posts(@Param("siteId") siteId: string) {
+    posts(
+        @Param("siteId") siteId: string,
+        @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ) {
+        this.takePostRead(siteId, ip, relay);
         return this.sites.getPublicPosts(siteId);
     }
 
@@ -187,14 +198,41 @@ export class PublicSitesController {
      * slug, or 404. The renderer asks only after a post read missed.
      */
     @Get(":siteId/posts/:slug/moved")
-    postMoved(@Param("siteId") siteId: string, @Param("slug") slug: string) {
+    postMoved(
+        @Param("siteId") siteId: string,
+        @Param("slug") slug: string,
+        @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ) {
+        this.takePostRead(siteId, ip, relay);
         return postMovedTo(siteId, slug);
     }
 
     /** One live post by slug (#232). 404 when it is not live. */
     @Get(":siteId/posts/:slug")
-    post(@Param("siteId") siteId: string, @Param("slug") slug: string) {
+    post(
+        @Param("siteId") siteId: string,
+        @Param("slug") slug: string,
+        @ClientAddress() ip: string,
+        @Headers(SITE_RELAY_HEADER) relay: string | undefined,
+    ) {
+        this.takePostRead(siteId, ip, relay);
         return this.sites.getPublicPost(siteId, slug);
+    }
+
+    /** 429 past the post reads' limit; a caller with no address shares the site's. */
+    private takePostRead(
+        siteId: string,
+        ip: string,
+        relay: string | undefined,
+    ): void {
+        const key = visitorKey(ip, relay) ?? `posts:${siteId}`;
+        if (!this.postReadLimiter.take(key)) {
+            throw new HttpException(
+                "Too many requests. Try again shortly.",
+                HttpStatus.TOO_MANY_REQUESTS,
+            );
+        }
     }
 
     /**

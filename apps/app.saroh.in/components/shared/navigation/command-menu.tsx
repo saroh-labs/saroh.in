@@ -43,6 +43,7 @@ import { searchSettings, settingsPageLabel } from "@/lib/settings/search";
 import { mayNavigate } from "@saroh/ui/lib/leave-request";
 import { noMatchLine } from "@saroh/ui/lib/state-copy";
 
+import { useWebsiteArea } from "@/components/sites/website-area";
 import type { NavRole } from "./nav-items";
 import {
     navCan,
@@ -237,6 +238,8 @@ export function CommandMenu({
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
+    // The sites' Overview rows follow the api's switch (DEC-240).
+    const websiteArea = useWebsiteArea();
     const [hits, setHits] = useState<SearchHit[]>([]);
     const [searching, setSearching] = useState(false);
     // The query the search couldn't be read for, and how often it was
@@ -253,6 +256,7 @@ export function CommandMenu({
         sites,
         storefronts: storefronts?.used ?? null,
         stockTracked,
+        websiteArea,
     });
 
     const actions = quickActionsFor({

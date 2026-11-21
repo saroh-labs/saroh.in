@@ -9,7 +9,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 /**
  * The editor's inspector (plan 2026-11-20-002 U47, `fix/WXKRest`,
  * `fix/WXKSelected`, `fix/WXKStyle`, `fix/WXMGlobal`), behind
- * `NEXT_PUBLIC_WEBSITE_AREA`: the page at rest, a section with its four
+ * the api's `WEBSITE_AREA`: the page at rest, a section with its four
  * tabs and its canvas toolbar, and the header on every page.
  *
  * Read-only: it selects, switches tabs and closes. Nothing is pressed that
@@ -50,7 +50,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's inspector",
+                "The Website area is off: today's inspector",
             );
             const inspector = page.getByRole("complementary", {
                 name: "Inspector",

@@ -8,10 +8,17 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { SiteOverview } from "./site-overview";
 import { SiteOverviewService } from "./site-overview";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 /** A site's Overview (plan 2026-11-18-001 U4). `site:read`. */
 @Controller("organizations/:organizationId/sites/:siteId/overview")
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Only with the Website area on (DEC-240): off, a 404.
+@UseGuards(
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+    WebsiteAreaSwitchGuard,
+)
 @RequireModule("WEBSITE")
 export class SiteOverviewController {
     constructor(private readonly overview: SiteOverviewService) {}

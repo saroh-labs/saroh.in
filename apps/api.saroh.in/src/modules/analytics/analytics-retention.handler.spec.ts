@@ -6,6 +6,11 @@ jest.mock("@saroh/database", () => ({
         // Businesses on legal hold (DEC-122): none unless a test says so.
         organization: { findMany: jest.fn() },
         job: { create: jest.fn(), count: jest.fn() },
+        postRevision: {
+            groupBy: jest.fn(),
+            findFirst: jest.fn(),
+            deleteMany: jest.fn(),
+        },
     },
 }));
 
@@ -62,6 +67,7 @@ describe("AnalyticsRetentionHandler", () => {
         jest.useFakeTimers({ now: NOW, advanceTimers: true });
         jobCreate.mockResolvedValue({});
         held.mockResolvedValue([]);
+        (prisma.postRevision.groupBy as jest.Mock).mockResolvedValue([]);
         log = jest.spyOn(Logger.prototype, "log").mockImplementation();
         error = jest.spyOn(Logger.prototype, "error").mockImplementation();
     });
@@ -151,10 +157,15 @@ describe("AnalyticsRetentionHandler", () => {
 
         await new AnalyticsRetentionHandler().handle(run());
 
-        expect(held).toHaveBeenCalledTimes(2);
+        // Once a batch, then once for the post revisions' prune (W5).
+        expect(held).toHaveBeenCalledTimes(3);
         expect(deleteMany.mock.calls[1][0].where.organizationId).toEqual({
             notIn: ["org_held"],
         });
+        expect(
+            (prisma.postRevision.groupBy as jest.Mock).mock.calls[0][0].where
+                .organizationId,
+        ).toEqual({ notIn: ["org_held"] });
     });
 
     it("says nothing when nothing is due, and comes back in a day", async () => {

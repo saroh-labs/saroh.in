@@ -4,7 +4,7 @@ jest.mock("@saroh/database", () => ({
     ...jest.requireActual("@saroh/database"),
     prisma: {
         site: { findFirst: jest.fn() },
-        analyticsDailyAggregate: { findMany: jest.fn(), groupBy: jest.fn() },
+        analyticsDailyAggregate: { findMany: jest.fn(), findFirst: jest.fn() },
     },
 }));
 jest.mock("../bookings/staff-availability", () => ({
@@ -21,7 +21,7 @@ import { foldPageResults, PageResultsService } from "./page-results";
 
 const siteFindFirst = prisma.site.findFirst as jest.Mock;
 const aggFindMany = prisma.analyticsDailyAggregate.findMany as jest.Mock;
-const aggGroupBy = prisma.analyticsDailyAggregate.groupBy as jest.Mock;
+const aggFirst = prisma.analyticsDailyAggregate.findFirst as jest.Mock;
 const moduleState = modulePageState as jest.Mock;
 
 const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
@@ -95,9 +95,13 @@ describe("PageResultsService.read", () => {
         jest.clearAllMocks();
         siteFindFirst.mockResolvedValue({ id: "site_1" });
         aggFindMany.mockResolvedValue([{ type: "site.view", count: 4 }]);
-        aggGroupBy.mockResolvedValue([
-            { type: "site.view", _min: { date: day("2026-01-01") } },
-        ]);
+        aggFirst.mockImplementation(({ where }: { where: { type: string } }) =>
+            Promise.resolve(
+                where.type === "site.view"
+                    ? { type: "site.view", date: day("2026-01-01") }
+                    : null,
+            ),
+        );
         moduleState.mockResolvedValue({ state: "on" });
     });
 
@@ -115,6 +119,13 @@ describe("PageResultsService.read", () => {
             siteId: "site_1",
             dimension: "path",
             dimensionValue: "/bridal",
+        });
+        // "Since" is one indexed probe per kind (04 W6): the business-wide
+        // row's first day, never a group of every path row.
+        expect(aggFirst).toHaveBeenCalledTimes(4);
+        expect(aggFirst.mock.calls[0][0]).toMatchObject({
+            where: { organizationId: "org_1", siteId: "", dimension: "path" },
+            orderBy: { date: "asc" },
         });
     });
 

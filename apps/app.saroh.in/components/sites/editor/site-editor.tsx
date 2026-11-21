@@ -36,6 +36,7 @@ import {
 } from "@/components/sites/test-releases/test-release-sheets";
 import { TestReleasesPanel } from "@/components/sites/test-releases/test-releases-panel";
 import { useTestReleases } from "@/components/sites/test-releases/use-test-releases";
+import { useWebsiteArea } from "@/components/sites/website-area";
 import { flagsByScreenPosition } from "@/lib/sites/editor-positions";
 import type { Section } from "@/lib/sites/service";
 import { siteStatus } from "@/lib/sites/site-status";
@@ -43,7 +44,6 @@ import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import { resolveStyleVariables } from "@/lib/sites/style";
 import { styleChoiceRules } from "@/lib/sites/style-access";
 import { publishOverScheduleWarning } from "@/lib/sites/test-releases";
-import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import type { LookId } from "@saroh/block-contract";
 import type { EditableTextHost } from "@saroh/site-blocks";
 import type { ReactElement } from "react";
@@ -180,6 +180,12 @@ export function SiteEditor({
             void releaseState.readLive();
         },
     });
+    /*
+     * The Website area's shell (U46, KTD-E1): on a desk the new frame, on a
+     * phone today's until U49; off, today's chrome. All three run on the
+     * hooks below. The api's switch, through the layout (DEC-240).
+     */
+    const areaOn = useWebsiteArea();
     // The changes by person, read as the Publish sheet opens (U11).
     const publishChanges = usePublishChanges(siteId);
     const releases = {
@@ -245,7 +251,7 @@ export function SiteEditor({
         styleOptions,
         onSaved: publish.markStylePending,
         // Off, today's Brand panel and its Reset style (owner, 20 Nov).
-        legacyBrand: !websiteAreaOn(),
+        legacyBrand: !areaOn,
     });
     const { style } = siteStyle;
     useEffect(() => {
@@ -445,12 +451,6 @@ export function SiteEditor({
               }
             : null;
 
-    /*
-     * The Website area's shell (U46, KTD-E1): on a desk the new frame, on a
-     * phone today's until U49; off, today's chrome. All three run on the
-     * hooks above.
-     */
-    const areaOn = websiteAreaOn();
     // The page settings sheet (batch 1), opened from the picker or More.
     const [settingsPage, setSettingsPage] = useState<string | null>(null);
     const openCheck = (ready: DraftReadiness) => {

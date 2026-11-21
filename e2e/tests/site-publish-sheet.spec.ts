@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * The Publish sheet outside the editor (plan 2026-11-18-001 U11,
- * WXMPublish), behind `NEXT_PUBLIC_WEBSITE_AREA`: the site header's status
+ * WXMPublish), behind the api's `WEBSITE_AREA`: the site header's status
  * chip opens it with the checks on top and the changes by person, each
  * with Leave out; leaving one out says "Publish N of M changes now", and
  * Include puts it back. Never presses Publish: what goes live on
@@ -38,7 +38,7 @@ test.describe("Publish sheet", () => {
         const chip = page.locator("[data-status-chip]");
         test.skip(
             (await chip.count()) === 0,
-            "NEXT_PUBLIC_WEBSITE_AREA is off: today's header",
+            "The Website area is off: today's header",
         );
         await chip.click();
 

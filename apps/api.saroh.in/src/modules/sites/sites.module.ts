@@ -48,6 +48,7 @@ import { TestReleasesController } from "./test-releases.controller";
 import { TestReleasesService } from "./test-releases.service";
 import { VersionRestoreService } from "./version-restore";
 import { VersionRestoreController } from "./version-restore.controller";
+import { WebsiteAreaController } from "./website-area.controller";
 
 /**
  * Org-owned publishing sites (S2-003). Imports {@link OrganizationsModule} for
@@ -89,6 +90,8 @@ import { VersionRestoreController } from "./version-restore.controller";
         ServiceUsesController,
         ChangeRevertController,
         VersionRestoreController,
+        // The Website area switch the app asks for (DEC-240).
+        WebsiteAreaController,
         PublicSitesController,
         PublicQrController,
         // "Your booking page" in Bookings (DEC-175).

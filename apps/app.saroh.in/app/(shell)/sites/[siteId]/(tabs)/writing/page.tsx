@@ -19,7 +19,7 @@ export default async function SiteWritingPage({
     searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
     const { siteId } = await params;
-    if (!websiteAreaOn()) {
+    if (!(await websiteAreaOn())) {
         redirect(withQuery(`/sites/${siteId}/posts`, await searchParams));
     }
     return <SitePostsList siteId={siteId} />;

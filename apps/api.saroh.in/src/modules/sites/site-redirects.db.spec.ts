@@ -6,13 +6,18 @@
  *
  * Runs in the integration project (TEST_DATABASE_URL).
  */
-import { NotFoundException } from "@nestjs/common";
+import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma, runInOrgContext } from "@saroh/database";
 
 import { isRlsTestMode } from "../../../test/rls-mode";
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { EntitlementService } from "../billing/entitlement.service";
-import { SiteRedirectsService } from "./site-redirects.service";
+import {
+    OWN_REDIRECTS_PER_SITE,
+    REDIRECTS_FULL_MESSAGE,
+    REDIRECTS_LISTED,
+    SiteRedirectsService,
+} from "./site-redirects.service";
 import { SitesService } from "./sites.service";
 
 const sites = new SitesService({
@@ -166,6 +171,50 @@ describe("old page links that forward (KTD-3)", () => {
         await expect(
             redirects.list(other.ctx, a.site.id),
         ).rejects.toBeInstanceOf(NotFoundException);
+    });
+});
+
+describe("a site's own old links are bounded (W4, 21 Nov 2026)", () => {
+    it("refuses one past the cap in words, and pages the list", async () => {
+        const b = await business();
+        await prisma.siteRedirect.createMany({
+            data: Array.from({ length: OWN_REDIRECTS_PER_SITE }, (_, i) => ({
+                organizationId: b.org.id,
+                siteId: b.site.id,
+                fromPath: `/old-${String(i).padStart(4, "0")}`,
+                toPath: "/",
+                source: "OWN" as const,
+                createdByUserId: b.owner.id,
+            })),
+        });
+        const err = await redirects
+            .create(b.ctx, b.site.id, { fromPath: "/one-more", toPath: "/" })
+            .catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(BadRequestException);
+        expect((err as BadRequestException).getResponse()).toMatchObject({
+            message: REDIRECTS_FULL_MESSAGE,
+            details: { reason: "full" },
+        });
+        // A page's own forward (AUTO) isn't the merchant's to count.
+        await prisma.siteRedirect.createMany({
+            data: Array.from({ length: REDIRECTS_LISTED }, (_, i) => ({
+                organizationId: b.org.id,
+                siteId: b.site.id,
+                fromPath: `/zz-${String(i).padStart(4, "0")}`,
+                toPath: "/",
+                source: "AUTO" as const,
+                createdByUserId: b.owner.id,
+            })),
+        });
+        const first = await redirects.list(b.ctx, b.site.id);
+        expect(first).toHaveLength(REDIRECTS_LISTED);
+        const next = await redirects.list(
+            b.ctx,
+            b.site.id,
+            first[first.length - 1].fromPath,
+        );
+        expect(next).toHaveLength(OWN_REDIRECTS_PER_SITE);
+        expect(next[0].fromPath > first[first.length - 1].fromPath).toBe(true);
     });
 });
 

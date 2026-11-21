@@ -23,6 +23,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { RestoreAsDraftResult } from "./version-restore";
 import { VersionRestoreService } from "./version-restore";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 export class RestoreAsDraftDto {
     /** The page the editor has open, whose revision it holds. */
@@ -46,7 +47,13 @@ export class RestoreAsDraftDto {
 @Controller(
     "organizations/:organizationId/sites/:siteId/publications/:publicationId/restore-draft",
 )
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Only with the Website area on (DEC-240): off, a 404.
+@UseGuards(
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+    WebsiteAreaSwitchGuard,
+)
 @RequireModule("WEBSITE")
 export class VersionRestoreController {
     constructor(private readonly versions: VersionRestoreService) {}

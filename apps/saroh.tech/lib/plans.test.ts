@@ -385,6 +385,27 @@ describe("Global's paid plans, at their prices (owner, 15 Nov 2026: shown before
         expect(planWords(false).paidCard).toBe("Coming soon");
     });
 
+    it("draws a yearly offer only once paid plans are on sale (DEC-211, E4)", () => {
+        const input = {
+            ...fakeInput(),
+            currency: "USD",
+            tax: "none",
+            yearly: { on: true, paid: 10 },
+        } as CatalogInput;
+        for (const p of input.plans) {
+            if (p.pricePaise > 0) p.yearlyOfferPaise = p.pricePaise * 8;
+        }
+        const catalog = parseCatalog(input);
+        const struck = (on: boolean) =>
+            pricingModel(catalog, on).views["year-excl"].plans.some(
+                (p) => p.was !== undefined,
+            );
+        expect(struck(false)).toBe(false);
+        expect(pricingModel(catalog, false).yearly?.label).not.toMatch(/save/);
+        expect(struck(true)).toBe(true);
+        expect(pricingModel(catalog, true).yearly?.label).toMatch(/save up to/);
+    });
+
     it("never draws an India catalogue's prices", () => {
         const view = pricingModel(parseCatalog(fakeInput())).views[
             "month-excl"

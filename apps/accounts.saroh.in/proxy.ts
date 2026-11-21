@@ -2,6 +2,7 @@ import { sessionCookiePrefix } from "@saroh/auth/constants";
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { getServerSession } from "@saroh/auth/next";
 import { withPrivateApp } from "@saroh/auth/private-app";
+import { contentSecurityPolicy } from "@saroh/auth/security-headers";
 import { getSessionCookie } from "better-auth/cookies";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
@@ -11,6 +12,8 @@ import {
     SIGNED_OUT_PAGES,
     signedInDestination,
 } from "@/lib/return-to";
+
+import cspSources from "./csp-sources.cjs";
 
 const protectedRoutes = new Set(["/businesses", "/apps", "/account", "/"]);
 
@@ -63,7 +66,11 @@ async function proxy(req: NextRequest) {
 // says "noindex, nofollow" and carries the security headers. Nothing on this
 // host is for a search engine: the sign-in page's share card is for a pasted
 // link, which reads the page's tags and not this header.
-export default withPrivateApp(withDevAccess(proxy));
+export default withPrivateApp(
+    withDevAccess(proxy),
+    // This answer's CSP, scripts by nonce only (@saroh/auth/security-headers).
+    (nonce) => contentSecurityPolicy({ ...cspSources, nonce }),
+);
 
 export const config = {
     matcher: [

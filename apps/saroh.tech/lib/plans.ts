@@ -247,9 +247,22 @@ export function freeUsage(
  * prices, coming soon, before Saroh sells them). The paid plans' cards keep
  * Coming soon and Tell me when until billing is on (`components/pricing`).
  * Never an India catalogue, which is in rupees; with no catalogue, Free's
- * general lines and paid plans with no price.
+ * general lines and paid plans with no price. A yearly offer (struck price,
+ * "save up to X%") shows only once paid plans are on sale (`on`, DEC-211).
  */
-export function pricingModel(catalog: Catalog | null = null): PricingPageModel {
+export function pricingModel(
+    whole: Catalog | null = null,
+    on = false,
+): PricingPageModel {
+    const catalog =
+        whole && !on
+            ? {
+                  ...whole,
+                  plans: whole.plans.map(
+                      ({ yearlyOfferPaise: _offer, ...plan }) => plan,
+                  ),
+              }
+            : whole;
     const money = catalog ? catalogMoney(catalog) : null;
     if (
         catalog &&

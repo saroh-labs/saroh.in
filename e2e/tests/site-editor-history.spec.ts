@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * Rail › History (plan 2026-11-20-002 U46b, `fix/WXEHistory`) and Preview
- * at three sizes (U46f, `fix/WXMPreview`), behind `NEXT_PUBLIC_WEBSITE_AREA`.
+ * at three sizes (U46f, `fix/WXMPreview`), behind the api's `WEBSITE_AREA`.
  *
  * The first two only look: History's lists and Compare (closed without
  * restoring), and the three frames. The last makes one change on
@@ -66,7 +66,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's chrome",
+                "The Website area is off: today's chrome",
             );
             const panel = await openHistory(page);
             await expect(panel).toContainText("Waiting to publish");
@@ -101,7 +101,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's chrome",
+                "The Website area is off: today's chrome",
             );
             await page
                 .locator("[data-editor-bar]")
@@ -139,7 +139,7 @@ test.describe("History's Undo", { tag: "@serial" }, () => {
         test.skip(testInfo.project.name.startsWith("phone"), "A desk board.");
         test.skip(
             !(await openEditor(page)),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: today's chrome",
+            "The Website area is off: today's chrome",
         );
         // Hide the first section on phone: one change waiting on this page.
         await page

@@ -6,13 +6,15 @@ jest.mock("@saroh/database", () => ({
         post: { findFirst: jest.fn() },
         site: { findUnique: jest.fn() },
     },
+    onTransaction: jest.fn((_tx: unknown, fn: () => unknown) => fn()),
 }));
 jest.mock("../billing/over-limit.service", () => ({
     overLimit: { pausedNow: jest.fn() },
 }));
 
 import { ConflictException } from "@nestjs/common";
-import { prisma } from "@saroh/database";
+import type { Prisma } from "@saroh/database";
+import { onTransaction, prisma } from "@saroh/database";
 
 import { overLimit } from "../billing/over-limit.service";
 import { assertPostEditable, keptPostsOnSite } from "./post-paused";
@@ -30,6 +32,24 @@ beforeEach(() => {
 });
 
 describe("assertPostEditable (#800)", () => {
+    it("reads on the caller's transaction when given one, never a second connection (04 W5)", async () => {
+        pausedNow.mockResolvedValue({ posts: CUT });
+        const txFind = jest.fn().mockResolvedValue({
+            id: "post_old",
+            createdAt: new Date("2026-01-01T00:00:00Z"),
+            currentPublicationId: "pub_1",
+        });
+        const tx = {
+            post: { findFirst: txFind },
+        } as unknown as Prisma.TransactionClient;
+        await expect(
+            assertPostEditable("org_1", "post_old", tx),
+        ).rejects.toBeInstanceOf(ConflictException);
+        expect(onTransaction).toHaveBeenCalledWith(tx, expect.any(Function));
+        expect(txFind).toHaveBeenCalledTimes(1);
+        expect(post).not.toHaveBeenCalled();
+    });
+
     it("refuses editing or republishing a live post older than the cut", async () => {
         pausedNow.mockResolvedValue({ posts: CUT });
         post.mockResolvedValue({

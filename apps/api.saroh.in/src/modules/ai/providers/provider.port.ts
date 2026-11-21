@@ -93,6 +93,8 @@ export type AiFinishReason =
  * key. `unauthorized`: the key was refused. `rate-limited`, `overloaded`,
  * `server-error`, `network`: try again later. `invalid-request`: Saroh sent
  * something the provider refused (a bug, or a prompt over its limit).
+ * `provider-billing`: Saroh's account with the provider is out of credit or
+ * its billing failed: staff top it up; not a bug, and not the business's doing.
  */
 export type AiFailureReason =
     | "not-configured"
@@ -100,6 +102,7 @@ export type AiFailureReason =
     | "rate-limited"
     | "overloaded"
     | "invalid-request"
+    | "provider-billing"
     | "server-error"
     | "network"
     | "unknown";

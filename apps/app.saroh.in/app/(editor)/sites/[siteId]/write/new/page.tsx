@@ -30,7 +30,7 @@ export default async function WriteNewPostPage({
 }) {
     const { siteId } = await params;
     // Off, today's post editor, as every link into it is (owner, 20 Nov).
-    if (!websiteAreaOn()) {
+    if (!(await websiteAreaOn())) {
         redirect(
             withQuery(`/sites/${siteId}/posts/new`, (await searchParams) ?? {}),
         );

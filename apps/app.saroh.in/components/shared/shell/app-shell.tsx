@@ -26,6 +26,7 @@ import {
 } from "@/components/shared/navigation/nav-locks";
 import { PageContainer } from "@/components/shared/page/page-container";
 import { BusinessTradeProvider } from "@/components/sites/templates/business-trade";
+import { WebsiteAreaProvider } from "@/components/sites/website-area";
 import { accountsUrl } from "@/lib/accounts";
 import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { getAskAiState } from "@/lib/ask-ai/service";
@@ -45,6 +46,7 @@ import { tradeOf } from "@/lib/organizations/trade";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull, pausedOrNull } from "@/lib/saroh-billing/service";
 import { listSites } from "@/lib/sites/service";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { getStockTracking } from "@/lib/stock/service";
 import { getStorefrontAllowance } from "@/lib/stores/storefronts";
 import { usageSharingOrNull } from "@/lib/usage-sharing/service";
@@ -152,6 +154,7 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         usageSharing,
         accountManager,
         askAiState,
+        websiteArea,
     ] = await Promise.all([
         unreadNotificationCount(),
         listModules().catch(() => null),
@@ -209,6 +212,9 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
         // Ask AI (U10): what the button and panel open on. A Reviewer has
         // no Ask AI at all; null when unread, and the panel says so.
         askAiShown ? getAskAiState().catch(() => null) : null,
+        // The Website area switch, as the api holds it (DEC-240): off
+        // when unread. One read per request, shared with the page.
+        websiteAreaOn(),
     ]);
     // Available modules, plus those shut only by the plan: locked, not off,
     // so they stay in the rail with a lock and a way up (U14). None while
@@ -261,7 +267,10 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     const roleKey = activeOrg?.roleKey ?? null;
 
     return (
-        <ShellFrame canChangePlan={mayChangePlan(activeOrg)}>
+        <ShellFrame
+            canChangePlan={mayChangePlan(activeOrg)}
+            websiteArea={websiteArea}
+        >
             {/*
              * Without this, reaching the page content by keyboard means tabbing
              * through the wordmark, search, every nav item, the org switcher,
@@ -463,14 +472,18 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
  */
 function ShellFrame({
     canChangePlan,
+    websiteArea = false,
     children,
 }: {
     canChangePlan: boolean;
+    websiteArea?: boolean;
     children: React.ReactNode;
 }) {
     return (
         <PlanAccessProvider canChangePlan={canChangePlan}>
-            <div className="flex min-h-screen flex-col">{children}</div>
+            <WebsiteAreaProvider on={websiteArea}>
+                <div className="flex min-h-screen flex-col">{children}</div>
+            </WebsiteAreaProvider>
         </PlanAccessProvider>
     );
 }

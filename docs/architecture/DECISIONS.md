@@ -3076,6 +3076,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context (owner, 20 Nov 2026): "Google Calendar should be with the other integrations, and also should be able to connect from the Bookings page." With a calendar in it, "Providers" read wrong; saroh.in already calls these integrations (`/integrations`).
 - Decision: **the Settings section is "Integrations" at `/settings/integrations`**, holding the business's payment, email and WhatsApp providers, its domains and, in its own group, the person's own Google Calendar (Connect, or Manage at `/settings/integrations/google-calendar`). The tab opens for anyone the calendar is switched on for, who then sees only their calendar. Bookings offers Connect in one dismissible line to someone who could connect and hasn't, and a lapsed account with Manage; nothing about the plan's lock.
 - Consequences: `/settings/providers/*` and `/settings/google-calendar` redirect (permanent, query kept), so Google's callback (`RETURN_PATH`), old links and stored notifications still land. Code names (`providers`, `comms-providers`) stay. The admin console's own Providers page is unchanged.
+
 ## DEC-237 Merchant sites get component styles: free on every plan, set per kind of component, kept when the look changes
 
 **Status: Accepted — 2026-11-17, to design then build** · owner · extends DEC-172 (looks) and DEC-177 (which styles are paid)
@@ -3140,7 +3141,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: Restore in the editor's History and on Version history put an old version live at once, as a new publish.
 - Decision: **Restore <date> as the draft** copies the version's pages and sections into the current draft. Nothing goes live until Publish, which asks for approval like any publish. Each section it changes is stamped with the person restoring, so the Publish sheet lists every change as theirs. It needs the editor's own write (`section:write`), not `site:publish`; a reader can't restore. The confirm says "This replaces your draft with this version. It goes live only when you publish." A page removed since is skipped; a page added since stays; page settings, the menu and the look are not part of it.
 - Consequences: `POST …/sites/:siteId/publications/:publicationId/restore-draft` (revision checked for the open page, 409 when stale; audited as `site.version.restored_as_draft`). The editor reloads on History after a restore. The old make-it-live endpoint (`…/publications/:id/restore`) stays in the API, where the live pointer's `restore` source and its specs use it; the app no longer calls it.
-- Behind the Website area switch (owner, 20 Nov 2026): with `NEXT_PUBLIC_WEBSITE_AREA` off, Version history and a past version keep today's restore, which puts the version live again (`components/sites/versions/legacy/`, chosen by `restoresAsDraft()`).
+- Behind the Website area switch (owner, 20 Nov 2026; one api-held switch since DEC-240): with it off, Version history and a past version keep today's restore, which puts the version live again (`components/sites/versions/legacy/`, chosen by `restoresAsDraft()`).
 
 ## DEC-238 A post's approval is a change unit; Publish post becomes Send for approval when the switch is on
 
@@ -3149,7 +3150,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context: posts went live past "Publishing needs approval": a post publishes on its own, outside the site's Publish, so a teammate's post never waited for anyone.
 - Decision: with "Publishing needs approval" on, a teammate who is not the owner or an admin presses **Send for approval** instead of Publish post, with an optional note and "As soon as it is approved" or "After approval, on a day I pick". **Any reviewer, admin or owner other than the post's last editor** can approve, and approving publishes the post now, or on the day the writer picked. Ask for changes needs a reason (UX-043). Owner and admin posts need no approval (DEC-103).
 - Consequences: the post is one change unit, `post:<postId>`, in the same approval records as a site's changes (DEC-226): the approval binds to the post's fingerprint, so a later edit voids it, and nobody approves their own writing. The API refuses a teammate's unapproved publish or schedule with the site's approval words (409), and the scheduled go-live checks approval again. Sending is a `sent` revision in the post's History, approving an `approved` one. No new table.
-- Behind the Website area switch (owner, 20 Nov 2026): the api's `WEBSITE_AREA` (on with the app's `NEXT_PUBLIC_WEBSITE_AREA`); off, posts publish and schedule as before and the three approval routes are a 404.
+- Behind the Website area switch (owner, 20 Nov 2026): the api's `WEBSITE_AREA`, the one switch since DEC-240; off, posts publish and schedule as before and the three approval routes are a 404.
 
 ## DEC-235 A started booking or checkout and an enquiry keep the site page they came from
 
@@ -3177,6 +3178,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Now and New (a narrow first cut of U42/U43):** one draft tool, `edit_section`, changes a section's heading, the line under it or its main button's words, through the MCP tool of the same name and the editor's own draft save (`section:write`; never a Reviewer, never live). The card names the section, shows Now and New with the changed words marked and what it is based on, then Apply and Not now; Apply says "Saved · goes live when you publish" and Undo puts the old words back. The open editor reads its draft again.
     - **Check this is the server's:** facts in the new words the business never gave (a price not in Services, an offer or percentage not in Discounts, a time not in its hours, "free", a phone number, a number with a claim such as "20 years", none of them on the page now) are marked on the card; Apply stays off until each is ticked, and Confirm refuses while any is unconfirmed. The person's own question doesn't count as giving a fact: they confirm it on the card.
 - Consequences: other section fields, pictures, adding, moving or removing sections, pages and settings stay out of Ask AI; a post can't be read by Ask AI (no post read tool). Editing a flagged fact on the card, rather than confirming it, is left for the full U43.
+
 ## DEC-239 A yearly offer price per plan; the launch coupon doesn't stack on it
 
 **Status: Accepted — 2026-11-20** · owner
@@ -3191,3 +3193,46 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **The Monthly/Yearly switch** says "Yearly · save up to X%" while any plan has a yearly offer: X is the largest saving across the paid plans of the charged yearly price against 12 months at the regular monthly price, rounded down to a whole percent, worked out from the catalogue. Without a yearly offer it keeps "Yearly · N months free".
     - **Pricing and checkout say, near the yearly price:** "We don't refund payments, including a yearly plan cancelled early. If you're ever charged twice, the extra charge is refunded on its own." The Terms already say the same and are unchanged.
 - Consequences: the real offer prices go into the catalogue, never the repo. One helper pair (`regularYearlyPaise`, `chargedYearlyPaise`) is the only place a yearly price is worked out; the version diff and the publish comparison name the offer.
+
+## DEC-240 The Website area switch is one API-held switch; with it off, site publishing and every new route behave as before
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review of website-editor-redesign, E1 and E2) · narrows DEC-226 and DEC-238 to the switch · keeps DEC-047, DEC-071 and DEC-103
+
+- Context: the redesign had two switches set apart, the api's `WEBSITE_AREA` and the app's `NEXT_PUBLIC_WEBSITE_AREA`. When they disagreed a teammate's post could be held for approval with no Send for approval to free it, or Send for approval could 404. And per-change site approval (DEC-226) applied whatever the switch said, so shipping the branch would have changed Publish in production with the area off.
+- Decision:
+    - **One switch, held by the api** (`WEBSITE_AREA`; unset is on only under `NODE_ENV=development`). The app keeps none: it asks `GET /website-area` once per request on the server and hands the answer to client components through `WebsiteAreaProvider`. An answer it can't read is off. `NEXT_PUBLIC_WEBSITE_AREA` is gone, and `pnpm check:website-area-switch` (prepush and CI) refuses it coming back. Development and CI set `WEBSITE_AREA=on`, so the browser specs still walk the area.
+    - **Off, site publishing is what it was before the area:** a publish takes the whole draft (`leaveOut` is ignored), "Publishing needs approval" refuses a direct publish whole with `APPROVAL_REQUIRED` unless an owner overrides (DEC-071), and a whole-draft review verdict stays advisory and writes no per-change verdicts (DEC-047). Posts publish as before (DEC-238).
+    - **Off, every route the area added answers 404** (`WebsiteAreaSwitchGuard`): a site's changes and their approve and ask, Undo one change, restore as the draft, page results, service uses, Overview, the merchant's redirects, Duplicate page, and a post's schedule, checks, revisions and approval routes. Today's routes and the public reads saroh.app needs are untouched.
+    - **On, nothing changes** from DEC-226 and DEC-238. A whole-draft Approve or Ask for changes on a plan without review stays advisory, as before: it records the verdict and tells the team, and answers no change (R5).
+- Consequences: the switch is turned on by setting one variable on the api and redeploying it; the app follows on its next request. The app's legacy editor calls none of the 404 routes with the area off (its Publish sheet lists what goes live as before).
+
+## DEC-241 The Brand panel's "Colours from my brand colour" relaxes DEC-090
+
+**Status: Accepted — 2026-11-21** · owner-approved Brand panel design (20–21 Nov 2026) · relaxes [DEC-090](#dec-090-a-template-carries-its-own-exact-palette-and-type-scale) · keeps DEC-177
+
+- Context: DEC-090 let a site carry an exact palette only as one of its template's colourways or the one it already holds; merchants chose only from curated choices. The redesigned Brand panel offers "Colours from my brand colour".
+- Decision: **a merchant may set one brand colour (`#RRGGBB`) and get a whole palette from it.** The palette is generated on the server from that one hex (`brandPalette`), never sent by the app, and every text pairing in it passes the same 4.5:1 contrast check, so it can't produce an unreadable site. It is the merchant's own colour, so it is free on every plan (DEC-177). There is still no free colour picker per role, and the type scale still has no control of its own.
+- Consequences: `Site.style.brandColour` is stored with the palette made from it; anything else that isn't a template colourway or the one already held is still refused, as DEC-090 says.
+
+## DEC-242 No GSTIN on Global, and no yearly offer on saroh.tech before paid plans are on sale
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review, E3 and E4) · follows DEC-211
+
+- A Global business's customers can't save a GSTIN and Global invoices never carry one (E3).
+- saroh.tech shows no yearly offer until paid plans are on sale (E4, follows DEC-211).
+
+## DEC-243 Post history and page analytics are bounded
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review, 02 W5/W7 and 04 W6)
+
+- Post history keeps the newest 200 autosave, Ask AI and restore versions per post, plus every sent, approved and published one, pruned in the daily analytics retention run.
+- Page-level analytics rows exist only for a site's real pages.
+
+## DEC-244 Content-Security-Policy is enforced with a per-request nonce
+
+**Status: Accepted — 2026-11-21** · owner (21 Nov 2026 security review, 06 L2 / 07 B-I3 / 08 #1)
+
+- Content-Security-Policy is enforced with a per-request nonce on app, admin, accounts and merchant sites.
+- Policy: no `'strict-dynamic'` (a nonce-less injected script must stay blocked), no `'unsafe-inline'` scripts, `'unsafe-eval'` only in development, and `style-src` keeps `'unsafe-inline'` (React style props, Radix and next/font).
+- Third-party scripts only from named hosts; on merchant sites, those are the supported trackers' hosts and the payment and Turnstile hosts.
+- next.config sends no CSP (on Workers it would replace the middleware's nonce header); `check:security-headers` guards this.

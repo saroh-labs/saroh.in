@@ -9,6 +9,7 @@
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { planMeter } from "../billing/metering.service";
 import type { RestoreSnapshot } from "../mcp/restore-point.service";
@@ -20,6 +21,15 @@ import { stampDraftEditors, SYSTEM_EDITOR } from "./draft-editors";
 import { SiteRedirectsService } from "./site-redirects.service";
 import { SitesService } from "./sites.service";
 import { addToMenu } from "./template-sync";
+
+// Leave out and per-change approval belong to the Website area (DEC-240).
+const areaBefore = env.WEBSITE_AREA;
+beforeAll(() => {
+    env.WEBSITE_AREA = "on";
+});
+afterAll(() => {
+    env.WEBSITE_AREA = areaBefore;
+});
 
 const sites = new SitesService({
     check: jest.fn().mockResolvedValue(true),
@@ -172,6 +182,46 @@ describe("per-change approval (U9)", () => {
         const after = await sites.getChanges(b.owner, b.site.id);
         expect(after.units.map((u) => u.key)).toEqual([b.k2]);
         expect(after.units[0].approval.state).toBe("waiting");
+    });
+
+    it("with the Website area off, refuses the whole draft as before (DEC-240, DEC-071)", async () => {
+        const b = await business();
+        await sites.replaceDraftSections(b.ritika, b.site.id, b.bridal.id, {
+            sections: [hero("k1", "Intro, new"), hero("k2", "Packages, new")],
+        });
+        await sites.recordChangeVerdict(b.reviewer, b.site.id, {
+            units: [b.k1],
+            outcome: "APPROVED",
+        });
+        env.WEBSITE_AREA = "off";
+        try {
+            // No partial publish of the approved change: refused whole.
+            await expect(
+                sites.publishSite(b.owner, b.site.id, { leaveOut: [b.k2] }),
+            ).rejects.toMatchObject({
+                response: {
+                    details: {
+                        code: "APPROVAL_REQUIRED",
+                        reason: "approvalRequired",
+                    },
+                },
+            });
+            expect(await liveHeadings(b.site.id)).toEqual([
+                "Intro",
+                "Packages",
+            ]);
+            // An owner's override takes everything, as before.
+            const result = await sites.publishSite(b.owner, b.site.id, {
+                override: true,
+            });
+            expect(result.overridden).toBe(true);
+            expect(await liveHeadings(b.site.id)).toEqual([
+                "Intro, new",
+                "Packages, new",
+            ]);
+        } finally {
+            env.WEBSITE_AREA = "on";
+        }
     });
 
     it("a later edit voids the approval, recorded once by the publish", async () => {

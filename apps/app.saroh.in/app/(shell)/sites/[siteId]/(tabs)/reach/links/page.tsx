@@ -26,7 +26,7 @@ export default async function SiteLinksPage({
     params: Promise<{ siteId: string }>;
 }) {
     const { siteId } = await params;
-    if (!websiteAreaOn()) {
+    if (!(await websiteAreaOn())) {
         redirect(`/sites/${siteId}/settings?section=search-and-sharing`);
     }
     await requireSession();

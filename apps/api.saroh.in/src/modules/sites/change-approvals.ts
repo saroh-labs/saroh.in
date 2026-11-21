@@ -10,6 +10,7 @@ import {
 import { allows } from "../organizations/organization-policy";
 import type { ChangeUnit } from "./change-units";
 import { LEAVE_OUT_GONE_MESSAGE } from "./change-units";
+import { SYSTEM_EDITOR } from "./draft-editors";
 import { queueReviewAlert } from "./review-alert-queue";
 
 /**
@@ -44,6 +45,23 @@ export function personName(
     const name = user.name?.trim();
     if (name) return name;
     return allows(ctx, "member:read") ? user.email : UNNAMED_TEAMMATE;
+}
+
+/** What Saroh's own writes ({@link SYSTEM_EDITOR}: a template upgrade, a menu entry) are signed. */
+export const SAROH_EDITOR_NAME = "Saroh";
+
+/**
+ * Display names for user ids, each by {@link personName}, with Saroh's own
+ * writes named "Saroh" rather than none (History, Publish, Changes).
+ */
+export function namesOf(
+    ctx: OrganizationContext,
+    users: readonly { id: string; name: string | null; email: string }[],
+): Map<string, string> {
+    return new Map([
+        [SYSTEM_EDITOR, SAROH_EDITOR_NAME],
+        ...users.map((u): [string, string] => [u.id, personName(ctx, u)]),
+    ]);
 }
 
 /**
@@ -92,8 +110,11 @@ export function unitApprovals(
     leads: ReadonlySet<string>,
 ): Map<string, UnitApproval> {
     const out = new Map<string, UnitApproval>();
+    // Newest first: the first row for a key is its verdict.
+    const newest = new Map<string, UnitVerdictRow>();
+    for (const r of rows) if (!newest.has(r.unitKey)) newest.set(r.unitKey, r);
     for (const u of units) {
-        const row = rows.find((r) => r.unitKey === u.key);
+        const row = newest.get(u.key);
         const covers =
             row?.unitFingerprint === u.fingerprint &&
             row.byUserId !== u.editedBy;
@@ -128,27 +149,40 @@ type ReadTx = Pick<
     "siteChangeApproval" | "membership"
 >;
 
-/** The site's verdicts, newest first, and its owners' and admins' ids. */
+/**
+ * The newest verdict on each of `unitKeys` (04 W3, 21 Nov 2026: never the
+ * site's whole history, which grows for good), and the editors who are
+ * owners or admins.
+ */
 export async function readUnitVerdicts(
     client: ReadTx,
-    input: { organizationId: string; siteId: string; editors: string[] },
+    input: {
+        organizationId: string;
+        siteId: string;
+        editors: string[];
+        unitKeys: readonly string[];
+    },
 ): Promise<{ rows: UnitVerdictRow[]; leads: Set<string> }> {
     const [rows, members] = await Promise.all([
-        client.siteChangeApproval.findMany({
-            where: {
-                organizationId: input.organizationId,
-                siteId: input.siteId,
-            },
-            orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-            select: {
-                unitKey: true,
-                unitFingerprint: true,
-                byUserId: true,
-                outcome: true,
-                reason: true,
-                createdAt: true,
-            },
-        }),
+        input.unitKeys.length === 0
+            ? Promise.resolve([])
+            : client.siteChangeApproval.findMany({
+                  where: {
+                      organizationId: input.organizationId,
+                      siteId: input.siteId,
+                      unitKey: { in: [...new Set(input.unitKeys)] },
+                  },
+                  orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+                  distinct: ["unitKey"],
+                  select: {
+                      unitKey: true,
+                      unitFingerprint: true,
+                      byUserId: true,
+                      outcome: true,
+                      reason: true,
+                      createdAt: true,
+                  },
+              }),
         input.editors.length > 0
             ? client.membership.findMany({
                   where: {
@@ -188,10 +222,13 @@ export async function heldForApproval(
     const { rows, leads } = await readUnitVerdicts(tx, {
         ...input,
         editors: editorsOf(input.units),
+        unitKeys: input.units.map((u) => u.key),
     });
     const states = unitApprovals(input.units, rows, leads);
+    // One row per key (`distinct`): its newest.
+    const newestOf = new Map(rows.map((r) => [r.unitKey, r]));
     const voided = input.units.filter((u) => {
-        const newest = rows.find((r) => r.unitKey === u.key);
+        const newest = newestOf.get(u.key);
         return newest?.outcome === "APPROVED" && states.get(u.key)?.voided;
     });
     if (voided.length > 0) {

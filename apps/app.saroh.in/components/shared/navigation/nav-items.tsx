@@ -32,7 +32,6 @@ import { freeNoteShown } from "@/lib/saroh-billing/global-free";
 import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { apiAreaOn } from "@/lib/settings/api-area-switch";
 import { sharePostsOn } from "@/lib/share-item/share-posts-switch";
-import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 /** Grow › Social: Your posts and Create post, while Share is switched on (DEC-217). */
 export const SOCIAL_HREF = "/social";
@@ -766,6 +765,8 @@ export function navGroupsWithSites(
      * is not offered a row that ends in a refusal.
      */
     actions: readonly string[] | null = null,
+    /** The Website area switch, as the api said (DEC-240). */
+    websiteArea = false,
 ): NavGroup[] {
     const actor = { role, actions };
     /*
@@ -781,7 +782,7 @@ export function navGroupsWithSites(
     const mayAuthor = navCan(actor, "section:write");
     // The Website area's Overview first while it is on (plan 2026-11-18-001).
     const overview = (siteId: string): NavChild[] =>
-        websiteAreaOn()
+        websiteArea
             ? [
                   {
                       href: `${WEBSITE_HREF}/${siteId}/overview`,
@@ -1013,6 +1014,7 @@ export function navFor({
     storefronts,
     stockTracked,
     kind,
+    websiteArea,
 }: {
     /** `null` when it could not be resolved; the nav then fails open. */
     role: NavRole | null;
@@ -1051,11 +1053,19 @@ export function navFor({
      * kind). Absent: every row, as for a business.
      */
     kind?: unknown;
+    /** The Website area switch (DEC-240): its sites' Overview row. */
+    websiteArea?: boolean;
 }): NavGroup[] {
     const tracked = filterNavGroupsByRole(
         filterNavGroups(
             sites
-                ? navGroupsWithSites(NAV_GROUPS, sites, role, actions)
+                ? navGroupsWithSites(
+                      NAV_GROUPS,
+                      sites,
+                      role,
+                      actions,
+                      websiteArea,
+                  )
                 : NAV_GROUPS,
             moduleKeys,
         ),

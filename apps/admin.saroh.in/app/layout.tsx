@@ -3,6 +3,7 @@ import { Toaster } from "@saroh/ui/sonner";
 import { ThemeProvider } from "@saroh/ui/theme-provider";
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { headers } from "next/headers";
 
 import { AdminShell } from "@/components/admin-shell";
 import type { StaffIdentity } from "@/lib/control-plane";
@@ -64,6 +65,9 @@ export default async function RootLayout({
     const staff = await getStaffIdentity().catch(
         (): StaffIdentity | null => null,
     );
+    // This request's script nonce (the middleware's CSP, `withPrivateApp`),
+    // for the theme's script.
+    const nonce = (await headers()).get("x-nonce") ?? undefined;
     return (
         // `suppressHydrationWarning`: next-themes writes the class on <html>
         // before React hydrates, which is the point of it.
@@ -82,6 +86,7 @@ export default async function RootLayout({
                     defaultTheme="dark"
                     enableSystem={false}
                     disableTransitionOnChange
+                    nonce={nonce}
                 >
                     {staff ? (
                         <AdminShell staff={staff}>{children}</AdminShell>

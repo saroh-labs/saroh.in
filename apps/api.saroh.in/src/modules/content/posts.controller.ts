@@ -121,6 +121,7 @@ export class PostsController {
 
     /** Publish post › Later (U17a): `{ at }`, an ISO instant. Moves an earlier one. */
     @Put(":postId/schedule")
+    @UseGuards(WebsiteAreaSwitchGuard)
     schedule(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
@@ -132,6 +133,7 @@ export class PostsController {
 
     /** Don't publish it later after all. */
     @Delete(":postId/schedule")
+    @UseGuards(WebsiteAreaSwitchGuard)
     unschedule(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
@@ -190,6 +192,7 @@ export class PostsController {
      * the site's pages and live posts. `site:read`; changes nothing.
      */
     @Post(":postId/checks")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     async checks(
         @OrgContext() ctx: OrganizationContext,
@@ -209,6 +212,7 @@ export class PostsController {
 
     /** History (U17a): newest first, who and why, no bodies. */
     @Get(":postId/revisions")
+    @UseGuards(WebsiteAreaSwitchGuard)
     listRevisions(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
@@ -219,6 +223,7 @@ export class PostsController {
 
     /** One revision in full, for Compare. */
     @Get(":postId/revisions/:revisionId")
+    @UseGuards(WebsiteAreaSwitchGuard)
     getRevision(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
@@ -230,6 +235,7 @@ export class PostsController {
 
     /** Make a revision the draft (the draft as it was is kept first). */
     @Post(":postId/revisions/:revisionId/restore")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     restoreRevision(
         @OrgContext() ctx: OrganizationContext,

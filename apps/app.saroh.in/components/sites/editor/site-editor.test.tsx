@@ -30,9 +30,8 @@ import { leaveLost } from "./use-editor-leave";
 // `vi.mock` is hoisted above the imports, so the editor gets these.
 // The Website area's switch (KTD-E1): off, today's editor and Brand panel.
 const area = vi.hoisted(() => ({ on: false }));
-vi.mock("@/lib/sites/website-area-switch", () => ({
-    websiteAreaOn: () => area.on,
-    websiteAreaOnFor: () => area.on,
+vi.mock("@/components/sites/website-area", () => ({
+    useWebsiteArea: () => area.on,
 }));
 const push = vi.fn();
 vi.mock("next/navigation", () => ({

@@ -36,6 +36,18 @@ export interface SiteRedirectView {
     createdAt: Date;
 }
 
+/**
+ * A site's own old links (OWN) it may keep (W4, 21 Nov 2026): each one rides
+ * in every publication snapshot. Never shown as a number.
+ */
+export const OWN_REDIRECTS_PER_SITE = 500;
+
+/** One page of the list; `after` (the last `fromPath` seen) reads the next. */
+export const REDIRECTS_LISTED = 1000;
+
+export const REDIRECTS_FULL_MESSAGE =
+    "Your site has as many old links as it can keep. Remove one you no longer need, then add this one.";
+
 const REDIRECT_SELECT = {
     id: true,
     fromPath: true,
@@ -128,6 +140,7 @@ export class SiteRedirectsService {
     async list(
         ctx: OrganizationContext,
         siteId: string,
+        after?: string,
     ): Promise<SiteRedirectView[]> {
         authorize(ctx, "site:read");
         await assertSiteInOrg(ctx, siteId);
@@ -137,8 +150,12 @@ export class SiteRedirectsService {
                     siteId,
                     organizationId: ctx.organizationId,
                     removedAt: null,
+                    ...(typeof after === "string" && after
+                        ? { fromPath: { gt: after } }
+                        : {}),
                 },
                 orderBy: { fromPath: "asc" },
+                take: REDIRECTS_LISTED,
                 select: REDIRECT_SELECT,
             }),
             prisma.page.findMany({
@@ -196,6 +213,16 @@ export class SiteRedirectsService {
             select: { toPath: true },
         });
         if (existing) throw alreadyForwards(dto.fromPath, existing.toPath);
+        // shortcut: two adds at once may pass one over the cap; harmless, it only bounds size.
+        const own = await prisma.siteRedirect.count({
+            where: { siteId, source: "OWN", removedAt: null },
+        });
+        if (own >= OWN_REDIRECTS_PER_SITE) {
+            throw new BadRequestException({
+                message: REDIRECTS_FULL_MESSAGE,
+                details: { field: "fromPath", reason: "full" },
+            });
+        }
         try {
             const row = await prisma.siteRedirect.create({
                 data: {

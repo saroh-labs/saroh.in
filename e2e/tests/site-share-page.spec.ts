@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * Share this page (plan 2026-11-18-001 U12, WXSShare), behind
- * `NEXT_PUBLIC_WEBSITE_AREA`. Opens from Home's row on Pages (Home is live
+ * the api's `WEBSITE_AREA`. Opens from Home's row on Pages (Home is live
  * on Northwind's published site), reads the page link and the messages
  * written from the page's own words, and checks no email row is drawn.
  * Never publishes, never makes a QR code (Download QR would): read-only.
@@ -36,7 +36,7 @@ test.describe("Share this page", () => {
         await page.goto(`/sites/${siteId}/pages`);
         test.skip(
             (await page.getByPlaceholder("Find a page").count()) === 0,
-            "NEXT_PUBLIC_WEBSITE_AREA is off: today's Pages list",
+            "The Website area is off: today's Pages list",
         );
         // Home is first, and live on Northwind's published site.
         await page

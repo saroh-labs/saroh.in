@@ -42,7 +42,7 @@ export default async function WritePostPage({
 }) {
     const { siteId, postId } = await params;
     // Off, today's post editor, as every link into it is (owner, 20 Nov).
-    if (!websiteAreaOn()) redirect(`/sites/${siteId}/posts/${postId}`);
+    if (!(await websiteAreaOn())) redirect(`/sites/${siteId}/posts/${postId}`);
     await requireSession();
     const site = await getSite(siteId);
     if (!site) notFound();

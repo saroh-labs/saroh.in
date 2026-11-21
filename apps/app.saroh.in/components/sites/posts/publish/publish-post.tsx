@@ -46,7 +46,7 @@ import type { PostFields } from "../editor/use-post-draft";
 import {
     approversLine,
     approversNote,
-    firstName,
+    sentForApprovalWords,
 } from "../review/approval-words";
 
 /** One line of "Checked": done, or what to do about it. */
@@ -406,12 +406,7 @@ export function PublishPostSheet({
             else showError(res.error);
             return;
         }
-        const names = approvers.map((a) => firstName(a.name));
-        showSuccess(
-            names.length > 0
-                ? `Sent for approval. ${names.join(" and ")} ${names.length === 1 ? "hears" : "hear"} about it now.`
-                : "Sent for approval.",
-        );
+        showSuccess(sentForApprovalWords(approvers));
         draft.refresh();
         onClose();
     }

@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * The desk editor's shell (plan 2026-11-20-002 U46, `fix/WXKRest` at 1920,
- * `fix/WXEEditor` at 1440), behind `NEXT_PUBLIC_WEBSITE_AREA`: the trimmed
+ * `fix/WXEEditor` at 1440), behind the api's `WEBSITE_AREA`: the trimmed
  * bar, everything else in More, the rail of five tabs, the Pages tree and
  * the canvas bar; the status chip opens Publish.
  *
@@ -56,7 +56,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's chrome",
+                "The Website area is off: today's chrome",
             );
             const bar = page.locator("[data-editor-bar]");
             await expect(

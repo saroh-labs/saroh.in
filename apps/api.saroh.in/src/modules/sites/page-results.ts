@@ -140,24 +140,27 @@ export class PageResultsService {
                 select: { type: true, count: true },
             }),
             // When each kind began counting by page, business-wide: the
-            // business-wide row (siteId "") is written for every one.
-            prisma.analyticsDailyAggregate.groupBy({
-                by: ["type"],
-                where: {
-                    organizationId,
-                    siteId: "",
-                    type: { in: PART_TYPES },
-                    dimension: "path",
-                },
-                _min: { date: true },
-            }),
+            // business-wide row (siteId "") is written for every one. One
+            // index probe per kind (04 W6), never a scan of every path row.
+            Promise.all(
+                PART_TYPES.map((type) =>
+                    prisma.analyticsDailyAggregate.findFirst({
+                        where: {
+                            organizationId,
+                            siteId: "",
+                            type,
+                            dimension: "path",
+                        },
+                        orderBy: { date: "asc" },
+                        select: { type: true, date: true },
+                    }),
+                ),
+            ),
             modulePageState("BOOK", organizationId),
             modulePageState("SHOP", organizationId),
         ]);
         const firstDays = new Map<string, Date>();
-        for (const f of firsts) {
-            if (f._min.date) firstDays.set(f.type, f._min.date);
-        }
+        for (const f of firsts) if (f) firstDays.set(f.type, f.date);
         return {
             results: foldPageResults(path, rows, firstDays, w, {
                 bookings: book.state === "on",

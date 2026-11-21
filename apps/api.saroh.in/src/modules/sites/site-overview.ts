@@ -13,7 +13,7 @@ import { periodWindows } from "../analytics/period";
 import { AuditAction } from "../audit/audit.service";
 import { businessTimezone } from "../bookings/staff-availability";
 import { allows, authorize } from "../organizations/organization-policy";
-import { personName } from "./change-approvals";
+import { namesOf } from "./change-approvals";
 import { modulePageState } from "./module-pages";
 import type { PageHealth } from "./page-health";
 import { pageHealth } from "./page-health";
@@ -168,7 +168,7 @@ async function userNames(
         where: { id: { in: unique } },
         select: { id: true, name: true, email: true },
     });
-    return new Map(users.map((u) => [u.id, personName(ctx, u)]));
+    return namesOf(ctx, users);
 }
 
 async function readResults(

@@ -1,7 +1,4 @@
-const {
-    ENFORCED_CSP,
-    pageSecurityHeaders,
-} = require("@saroh/auth/security-headers");
+const { pageSecurityHeaders } = require("@saroh/auth/security-headers");
 
 // A production deployment that falls back to built-in addresses talks to
 // whatever the code assumed; one missing variable once dropped every waitlist
@@ -55,22 +52,19 @@ const SECURITY_HEADERS = [
         value: "max-age=31536000; includeSubDomains",
     },
     { key: "X-Frame-Options", value: "SAMEORIGIN" },
-    { key: "Content-Security-Policy", value: ENFORCED_CSP },
     { key: "X-Content-Type-Options", value: "nosniff" },
 ];
 
-// The page policies (pentest, 29 Oct 2026): a report-only CSP naming what
-// this app's pages load, and the browser features they never use switched
-// off (@saroh/auth/security-headers). A rule of their own: a policy governs
-// a page, not the files and redirects SECURITY_HEADERS also reaches.
+// The page policies (pentest, 29 Oct 2026): the browser features this app's
+// pages never use switched off, and the Referrer-Policy
+// (@saroh/auth/security-headers). The Content-Security-Policy is the
+// middleware's (`withPrivateApp`), with a fresh script nonce per request: a
+// next.config header of that name would replace it on Workers, so none is
+// sent here (`enforced`). A rule of their own: a policy governs a page, not
+// the files and redirects SECURITY_HEADERS also reaches.
 const PAGE_POLICIES = pageSecurityHeaders({
-    origins: [
-        process.env.NEXT_PUBLIC_API_URL,
-        process.env.NEXT_PUBLIC_BETTER_AUTH_URL,
-    ],
-    uses: ["razorpay", "uploads", "unsplash"],
-    posthogHost: process.env.NEXT_PUBLIC_POSTHOG_HOST,
-    dev: process.env.NODE_ENV === "development",
+    ...require("./csp-sources.cjs"),
+    enforced: true,
 });
 
 /** @type {import('next').NextConfig} */

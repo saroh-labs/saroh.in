@@ -8,6 +8,7 @@ import { pausedOriginOf, pausedTestOrigin } from "@/lib/domain-paused";
 import { journalFeed } from "@/lib/journal-feed";
 import { modulePageStatesOf } from "@/lib/module-pages";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
+import { withRelay } from "@/lib/relay-headers";
 import { safeRequestPath } from "@/lib/request-path";
 import type { SiteHostKind } from "@/lib/site-host-mode";
 import { classifySiteHost, normaliseSiteHost } from "@/lib/site-host-mode";
@@ -716,7 +717,8 @@ export const readPublishedPosts = cache(async function readPublishedPosts(
     try {
         res = await fetch(`${API_URL}/public/sites/${siteId}/posts`, {
             cache: "no-store",
-            headers: { accept: "application/json" },
+            // The API limits each visitor (02 W6): name them, not this server.
+            headers: await withRelay({ accept: "application/json" }),
             signal: serverReadSignal(),
         });
     } catch {
@@ -797,7 +799,7 @@ export const getPublishedPost = cache(async function getPublishedPost(
             `${API_URL}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}`,
             {
                 cache: "no-store",
-                headers: { accept: "application/json" },
+                headers: await withRelay({ accept: "application/json" }),
                 signal: serverReadSignal(),
             },
         );

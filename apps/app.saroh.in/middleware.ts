@@ -1,9 +1,12 @@
 import { withDevAccess } from "@saroh/auth/dev-access";
 import { createAuthMiddleware } from "@saroh/auth/middleware";
 import { withPrivateApp } from "@saroh/auth/private-app";
+import { contentSecurityPolicy } from "@saroh/auth/security-headers";
 
 import { accountsLoginUrl, inviteLandingFor } from "@/lib/accounts";
 import { isPublicPath } from "@/lib/public-paths";
+
+import cspSources from "./csp-sources.cjs";
 
 // Auth-only gate: every app route requires an accounts session. (The old
 // host-based tenant rewriting is gone — the public renderer is saroh.app.)
@@ -19,6 +22,8 @@ export default withPrivateApp(
             signedOutUrl: inviteLandingFor,
         }),
     ),
+    // This answer's CSP, scripts by nonce only (@saroh/auth/security-headers).
+    (nonce) => contentSecurityPolicy({ ...cspSources, nonce }),
 );
 
 export const config = {

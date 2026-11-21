@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolvePostEmbeds } from "@/lib/post-embeds";
 import { postMovedTo } from "@/lib/post-moved";
 import type * as Publication from "@/lib/publication";
-import { getPublishedPost } from "@/lib/publication";
+import { getPublishedPost, readPublishedPosts } from "@/lib/publication";
 
 import PostPage, { generateMetadata } from "./page";
 
@@ -97,8 +97,9 @@ describe("old post links (U17a)", () => {
         );
     });
 
-    it("is a 404 when no post was ever live there", async () => {
+    it("is a 404 when no post was ever live there, with no list read (02 W6)", async () => {
         await expect(at("never-was")).rejects.toThrow("NOT_FOUND");
+        expect(readPublishedPosts).not.toHaveBeenCalled();
     });
 
     it("serves a live post at the link without asking where it moved", async () => {

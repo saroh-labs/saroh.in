@@ -136,7 +136,7 @@ export default async function PastVersionPage({
                 </PartialNotice>
             )}
 
-            {!restoresAsDraft() ? (
+            {!(await restoresAsDraft()) ? (
                 // Off, today's restore: the version goes live again.
                 site.can.publish ? (
                     <LegacyRestoreVersion

@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * Reach › Links and sharing (plan 2026-11-18-001 U6), behind
- * `NEXT_PUBLIC_WEBSITE_AREA`: the page links Northwind shares and the old
+ * the api's `WEBSITE_AREA`: the page links Northwind shares and the old
  * links that forward to them. Adds one old link of its own (a name no other
  * test uses), sees it wait for Publish, and removes it. Never publishes.
  */
@@ -40,7 +40,7 @@ test.describe("Links and sharing", () => {
         await page.goto(`/sites/${siteId}/reach/links`);
         test.skip(
             !page.url().includes("/reach/links"),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: sharing is still in Settings",
+            "The Website area is off: sharing is still in Settings",
         );
         await expect(
             page.getByRole("heading", { name: "Links and sharing", level: 1 }),
@@ -94,7 +94,7 @@ test.describe("Links and sharing", () => {
         await page.goto(`/sites/${siteId}/reach/links`);
         test.skip(
             !page.url().includes("/reach/links"),
-            "NEXT_PUBLIC_WEBSITE_AREA is off",
+            "The Website area is off",
         );
         await page.getByRole("button", { name: "Add an old link" }).click();
         const sheet = page.getByRole("dialog", { name: "Add an old link" });

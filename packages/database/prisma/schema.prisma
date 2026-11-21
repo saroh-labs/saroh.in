@@ -5000,6 +5000,8 @@ model SiteChangeApproval {
   createdAt       DateTime @default(now())
 
   @@index([organizationId, siteId, createdAt])
+  // The newest verdict per unit, read for the units at hand (04 W3).
+  @@index([organizationId, siteId, unitKey, createdAt])
 }
 
 model SiteLink {
@@ -7032,6 +7034,8 @@ model AnalyticsDailyAggregate {
 
   @@unique([organizationId, siteId, date, type, dimension, dimensionValue])
   @@index([organizationId, type, date])
+  // When a kind first counted by page: one probe, not every path row (04 W6).
+  @@index([organizationId, siteId, type, dimension, date])
 }
 
 /// Insights' "Not now" on a suggestion (DEC-171, #1087): one person put off

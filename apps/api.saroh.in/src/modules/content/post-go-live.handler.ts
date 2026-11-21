@@ -161,7 +161,7 @@ export async function runScheduledPost(
 
     try {
         // A live post the plan paused is read-only (#800).
-        await assertPostEditable(organizationId, payload.postId);
+        await assertPostEditable(organizationId, payload.postId, tx);
         const live = await publishPostInTx(tx, {
             organizationId,
             siteId: post.siteId,

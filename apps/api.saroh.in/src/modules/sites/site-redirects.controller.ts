@@ -5,6 +5,7 @@ import {
     Get,
     Param,
     Post,
+    Query,
     UseGuards,
 } from "@nestjs/common";
 
@@ -17,24 +18,36 @@ import { RequireModule } from "../capabilities/require-module.decorator";
 import { CreateSiteRedirectDto } from "./dto";
 import type { SiteRedirectView } from "./site-redirects.service";
 import { SiteRedirectsService } from "./site-redirects.service";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 /**
  * A site's old page links that forward to a page (KTD-3), for Links and
  * sharing. Every change reaches the site with the next publish.
  */
 @Controller("organizations/:organizationId/sites/:siteId/redirects")
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Only with the Website area on (DEC-240): off, a 404.
+@UseGuards(
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+    WebsiteAreaSwitchGuard,
+)
 @RequireModule("WEBSITE")
 export class SiteRedirectsController {
     constructor(private readonly redirects: SiteRedirectsService) {}
 
-    /** Every old link that forwards, with the page it opens. `site:read`. */
+    /**
+     * The old links that forward, with the page each opens, a page at a
+     * time in `fromPath` order; `?after=` the last one seen reads the next.
+     * `site:read`.
+     */
     @Get()
     list(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
+        @Query("after") after?: string,
     ): Promise<SiteRedirectView[]> {
-        return this.redirects.list(ctx, siteId);
+        return this.redirects.list(ctx, siteId, after);
     }
 
     /** Forward one of the merchant's old links. `site:update`. */

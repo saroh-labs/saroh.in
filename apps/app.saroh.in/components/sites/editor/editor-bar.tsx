@@ -22,6 +22,7 @@ import {
     statusReadout,
 } from "@/components/sites/publish/status-readout";
 import type { DraftReadiness } from "@/components/sites/publish/use-publish";
+import { useWebsiteArea } from "@/components/sites/website-area";
 import { count } from "@/lib/format/plural";
 import type { EditorStatus } from "@/lib/sites/editor-status";
 import { unseenBecause } from "@/lib/sites/page-menu";
@@ -33,7 +34,6 @@ import type {
     SitePage,
 } from "@/lib/sites/service";
 import { readerSiteState } from "@/lib/sites/site-state";
-import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import type { Device, Zoom } from "./editor-constants";
 import { useEditorReadOnly } from "./read-only";
 
@@ -185,7 +185,8 @@ export function useEditorBar({
     const [ownSettingsFor, setOwnSettingsFor] = useState<string | null>(null);
     const settingsFor = pageSettings ? pageSettings.id : ownSettingsFor;
     const setSettingsFor = pageSettings ? pageSettings.set : setOwnSettingsFor;
-    const onPageSettings = websiteAreaOn()
+    const areaOn = useWebsiteArea();
+    const onPageSettings = areaOn
         ? (page: SitePage) => setSettingsFor(page.id)
         : undefined;
     const pageSheet = (

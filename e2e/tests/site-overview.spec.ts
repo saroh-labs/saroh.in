@@ -9,7 +9,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * A site's Overview (plan 2026-11-18-001 U4), behind
- * `NEXT_PUBLIC_WEBSITE_AREA`: the web address and status, what the site
+ * the api's `WEBSITE_AREA`: the web address and status, what the site
  * brought in over the last 7 days, what needs doing and activity, for the
  * owner; the same screen without fix buttons or Review and publish for a
  * reviewer (DEC-200).
@@ -38,7 +38,7 @@ test.describe("a site's Overview", () => {
         await page.goto(`/sites/${site?.id ?? ""}/overview`);
         test.skip(
             !page.url().endsWith("/overview"),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: Overview forwards to Pages",
+            "The Website area is off: Overview forwards to Pages",
         );
         const o = overview(page);
         await expect(
@@ -75,7 +75,7 @@ test.describe("a site's Overview", () => {
         await page.goto("/sites");
         test.skip(
             new URL(page.url()).pathname !== "/sites",
-            "NEXT_PUBLIC_WEBSITE_AREA is off: /sites forwards to the editor",
+            "The Website area is off: /sites forwards to the editor",
         );
         await page
             .getByRole("list", { name: "Your sites" })

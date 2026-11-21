@@ -92,7 +92,12 @@ vi.mock("@saroh/ui/toast", () => ({
 
 import type { PostEditorData } from "../editor/post-model";
 import { PostShell } from "../editor/post-shell";
-import { approvalStatus, approversLine, approversNote } from "./approval-words";
+import {
+    approvalStatus,
+    approversLine,
+    approversNote,
+    sentForApprovalWords,
+} from "./approval-words";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -220,9 +225,15 @@ describe("the words (O7)", () => {
         expect(approversLine(approvers)).toBe(
             "Kavya (reviewer) or Mohit (owner)",
         );
-        expect(approversNote(2)).toBe(
-            "Either can approve. Both hear about it now.",
+        expect(approversNote(2)).toBe("Either can approve. Both get an email.");
+        // The ask goes by email only (P1): the toast says so, nothing more.
+        expect(sentForApprovalWords(approvers)).toBe(
+            "Sent for approval. Kavya and Mohit get an email.",
         );
+        expect(sentForApprovalWords(approvers.slice(0, 1))).toBe(
+            "Sent for approval. Kavya gets an email.",
+        );
+        expect(sentForApprovalWords([])).toBe("Sent for approval.");
         expect(approvalStatus(approval({ request }))).toBe(
             "Waiting for Kavya's or Mohit's approval",
         );

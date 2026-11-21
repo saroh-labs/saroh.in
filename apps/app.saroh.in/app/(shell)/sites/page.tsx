@@ -56,7 +56,7 @@ export default async function SitesPage() {
         listSites(),
         resolveActiveOrganization(),
     ]);
-    const area = websiteAreaOn();
+    const area = await websiteAreaOn();
     const first = sites.at(0);
     if (first && !area) redirect(`/sites/${first.id}/pages`);
 

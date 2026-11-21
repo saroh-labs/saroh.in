@@ -96,7 +96,7 @@ test(
             await page.goto(`/sites/${site.id}/posts/${made.id}`);
             test.skip(
                 !page.url().includes(`/write/${made.id}`),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's post editor",
+                "The Website area is off: today's post editor",
             );
 
             // A direct publish is refused in the site's words.

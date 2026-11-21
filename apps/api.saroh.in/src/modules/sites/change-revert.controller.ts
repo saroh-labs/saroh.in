@@ -23,6 +23,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { RevertResult } from "./change-revert";
 import { ChangeRevertService } from "./change-revert";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 export class RevertChangeDto {
     /** The change unit's key, as `GET …/changes` names it. */
@@ -43,7 +44,13 @@ export class RevertChangeDto {
  * plan U47a). The permission of the write the change was made with.
  */
 @Controller("organizations/:organizationId/sites/:siteId/changes/revert")
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Only with the Website area on (DEC-240): off, a 404.
+@UseGuards(
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+    WebsiteAreaSwitchGuard,
+)
 @RequireModule("WEBSITE")
 export class ChangeRevertController {
     constructor(private readonly changes: ChangeRevertService) {}

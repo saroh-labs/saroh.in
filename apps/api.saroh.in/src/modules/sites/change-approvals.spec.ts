@@ -1,6 +1,7 @@
 import type { OrganizationContext } from "../../common/types/organization-context";
 import type { UnitVerdictRow } from "./change-approvals";
 import {
+    namesOf,
     personName,
     recordUnitVerdicts,
     unitApprovals,
@@ -226,5 +227,13 @@ describe("personName (01 W1)", () => {
 
     it("shows it to someone who may read the team", () => {
         expect(personName(as("OWNER"), nameless)).toBe("ritika@example.com");
+    });
+
+    it("names Saroh's own writes (the system editor) Saroh, never none", () => {
+        const names = namesOf(as("REVIEWER"), [
+            { id: "u2", name: "Ritika", email: "ritika@example.com" },
+        ]);
+        expect(names.get("system")).toBe("Saroh");
+        expect(names.get("u2")).toBe("Ritika");
     });
 });

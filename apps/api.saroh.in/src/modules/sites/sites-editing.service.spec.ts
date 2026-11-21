@@ -69,6 +69,7 @@ import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 import { starterTemplate } from "@saroh/templates";
 
+import { env } from "../../env";
 import { draftFingerprint } from "./review-route";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
@@ -1265,6 +1266,15 @@ describe("SitesService.publishSite", () => {
             keys: { "/": { id: "p1", sections: ["a"] } },
         };
 
+        // Leave out belongs to the Website area (DEC-240).
+        const area = env.WEBSITE_AREA;
+        beforeEach(() => {
+            env.WEBSITE_AREA = "on";
+        });
+        afterEach(() => {
+            env.WEBSITE_AREA = area;
+        });
+
         it("doesn't block a publish that leaves it out", async () => {
             siteFindFirst.mockResolvedValue(draft());
             (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
@@ -1278,6 +1288,23 @@ describe("SitesService.publishSite", () => {
 
             const written = publicationCreate.mock.calls[0][0].data.snapshot;
             expect(written.pages[0].sections).toHaveLength(1);
+        });
+
+        it("with the Website area off, takes the whole draft as before (DEC-240)", async () => {
+            env.WEBSITE_AREA = "off";
+            siteFindFirst.mockResolvedValue(draft());
+            (prisma.site.findUniqueOrThrow as jest.Mock).mockResolvedValueOnce({
+                publishNeedsApproval: false,
+                currentPublication: { snapshot: live },
+            });
+
+            // The leave-out is ignored, so the broken section still refuses.
+            await expect(
+                service.publishSite(ctx(), "site_1", {
+                    leaveOut: ["section:p1:b"],
+                }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(publicationCreate).not.toHaveBeenCalled();
         });
 
         it("still refuses it when it would go live", async () => {

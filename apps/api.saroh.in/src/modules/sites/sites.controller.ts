@@ -40,6 +40,7 @@ import { SitePreviewLinksService } from "./site-preview-links.service";
 import { SitesService } from "./sites.service";
 import type { CatalogueTemplate } from "./template-catalogue";
 import { templateCatalogue } from "./template-catalogue";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 /**
  * Site endpoints for an Organization (S2-003), scoped to
@@ -109,6 +110,7 @@ export class SitesController {
      * (change units, U7). `site:read`, reviewer-scoped in the service.
      */
     @Get(":siteId/changes")
+    @UseGuards(WebsiteAreaSwitchGuard)
     changes(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,
@@ -123,6 +125,7 @@ export class SitesController {
      * this site, an admin or the owner; 403 on a change the caller made.
      */
     @Post(":siteId/changes/approve")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     approveChanges(
         @OrgContext() ctx: OrganizationContext,
@@ -140,6 +143,7 @@ export class SitesController {
      * whoever made them. Same rules as approving.
      */
     @Post(":siteId/changes/ask")
+    @UseGuards(WebsiteAreaSwitchGuard)
     @HttpCode(200)
     askForChanges(
         @OrgContext() ctx: OrganizationContext,
@@ -349,6 +353,7 @@ export class SitesController {
      * (website area U5). Requires `site:update`.
      */
     @Post(":siteId/pages/:pageId/duplicate")
+    @UseGuards(WebsiteAreaSwitchGuard)
     duplicatePage(
         @OrgContext() ctx: OrganizationContext,
         @Param("siteId") siteId: string,

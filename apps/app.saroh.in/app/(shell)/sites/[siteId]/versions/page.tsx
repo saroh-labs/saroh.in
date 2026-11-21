@@ -29,7 +29,7 @@ export default async function SiteVersionsPage({
     const { siteId } = await params;
     await requireSession();
 
-    const asDraft = restoresAsDraft();
+    const asDraft = await restoresAsDraft();
     const [site, publications, releases, review] = await Promise.all([
         getSite(siteId),
         listPublications(siteId),

@@ -34,7 +34,7 @@ export default async function SiteOverviewPage({
     params: Promise<{ siteId: string }>;
 }) {
     const { siteId } = await params;
-    if (!websiteAreaOn()) redirect(`/sites/${siteId}/pages`);
+    if (!(await websiteAreaOn())) redirect(`/sites/${siteId}/pages`);
     await requireSession();
     const [site, organization, posts, webAddress, overview] = await Promise.all(
         [

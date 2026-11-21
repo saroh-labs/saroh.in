@@ -60,7 +60,7 @@ export default async function SitePagesPage({
 }) {
     const { siteId } = await params;
     const session = await requireSession();
-    if (websiteAreaOn())
+    if (await websiteAreaOn())
         return <WebsitePages siteId={siteId} userId={session.user.id} />;
     const site = await getSite(siteId);
     if (!site) notFound();

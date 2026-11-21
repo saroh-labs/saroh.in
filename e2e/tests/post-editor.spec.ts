@@ -71,7 +71,7 @@ test("a new post keeps its editor through the first save", async ({
 
 /**
  * The desk post editor (plan 2026-11-20-002 U15, `blogdesk/WXWWrite`,
- * `WXWSearch`, `WXWStates`), behind `NEXT_PUBLIC_WEBSITE_AREA`: today's
+ * `WXWSearch`, `WXWStates`), behind the api's `WEBSITE_AREA`: today's
  * New post forwards to `/write/new`; a post needs a title before it saves
  * or publishes; it autosaves and says so; its page link lives in Search
  * and sharing. Owns its post: a stamped title, deleted at the end.
@@ -100,7 +100,7 @@ for (const size of [
             await page.goto(`/sites/${site.id}/posts/new`);
             test.skip(
                 !page.url().includes("/write/new"),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's post editor",
+                "The Website area is off: today's post editor",
             );
             const bar = page.locator("[data-post-bar]");
             await expect(

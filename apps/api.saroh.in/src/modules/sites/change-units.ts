@@ -263,10 +263,15 @@ function matchPages(
         return pairs;
     }
     const livePaths = new Set(livePages.map((p) => p.path));
+    // The first forward from each link, as `find` took it (W4: not pages × forwards).
+    const forwardOf = new Map<string, string>();
+    for (const r of draftRedirects) {
+        if (!forwardOf.has(r.from)) forwardOf.set(r.from, r.to);
+    }
     for (const l of livePages) {
         let d = draftPages.find((p) => p.path === l.path);
         if (!d) {
-            const to = draftRedirects.find((r) => r.from === l.path)?.to;
+            const to = forwardOf.get(l.path);
             // Only a draft page with no live page of its own at its link.
             d = draftPages.find((p) => p.path === to && !livePaths.has(p.path));
         }
@@ -315,11 +320,23 @@ export function changeUnits(
         });
     };
 
-    const redirectsTo = (list: SnapshotRedirect[], path: string) =>
-        list
-            .filter((r) => r.to === path)
-            .map((r) => r.from)
-            .sort();
+    // The old links that forward to each page, grouped once (W4, 21 Nov
+    // 2026): a filter of every forward per page grew as pages × forwards.
+    const byTarget = (list: readonly SnapshotRedirect[]) => {
+        const out = new Map<string, string[]>();
+        for (const r of list) {
+            const froms = out.get(r.to);
+            if (froms) froms.push(r.from);
+            else out.set(r.to, [r.from]);
+        }
+        for (const froms of out.values()) froms.sort();
+        return out;
+    };
+    const draftByTarget = byTarget(draftRedirects);
+    const liveByTarget = byTarget(liveRedirects);
+    const redirectsTo = (grouped: Map<string, string[]>, path: string) => [
+        ...(grouped.get(path) ?? []),
+    ];
 
     for (const d of draftPages) {
         // Built by `buildSnapshot`, a draft page always has its id.
@@ -345,7 +362,7 @@ export function changeUnits(
                 stamp: pageStamp?.stamp,
                 value: {
                     page: pageSettings(d.entry),
-                    redirects: redirectsTo(draftRedirects, d.path),
+                    redirects: redirectsTo(draftByTarget, d.path),
                 },
             });
             d.sections.forEach((section, i) => {
@@ -370,13 +387,14 @@ export function changeUnits(
         // leaves out the forward it made.
         const draftSettings = pageSettings(d.entry);
         const liveSettings = pageSettings(l.entry);
-        const draftLinks = redirectsTo(draftRedirects, d.path);
-        const liveLinks = redirectsTo(liveRedirects, l.path);
+        const draftLinks = redirectsTo(draftByTarget, d.path);
+        const liveLinks = redirectsTo(liveByTarget, l.path);
         const settingsChanged =
             canonical(draftSettings) !== canonical(liveSettings);
         const linksChanged = canonical(draftLinks) !== canonical(liveLinks);
         if (settingsChanged || linksChanged) {
-            const newLinks = draftLinks.filter((f) => !liveLinks.includes(f));
+            const liveSet = new Set(liveLinks);
+            const newLinks = draftLinks.filter((f) => !liveSet.has(f));
             unit({
                 key: pageKey,
                 kind: "page",

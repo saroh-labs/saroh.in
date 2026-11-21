@@ -10,7 +10,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 /**
  * The one phone editor (plan 2026-11-20-002 U49, `fix/WXNHome`,
  * `fix/WXEEditorPhone`, `fix/WXNSection`, `fix/WXNReorder`), behind
- * `NEXT_PUBLIC_WEBSITE_AREA`: the top bar ← Website · page · Ask AI ·
+ * the api's `WEBSITE_AREA`: the top bar ← Website · page · Ask AI ·
  * Preview, one bar Sections · Add · Brand · Publish with the chip's count,
  * a tapped section's sheet and the Sections sheet. At 390 and at 320,
  * where no board exists (the four-scenes rules).
@@ -58,7 +58,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's phone editor",
+                "The Website area is off: today's phone editor",
             );
             const top = page.locator("[data-editor-bar]");
             await expect(
@@ -99,7 +99,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's phone editor",
+                "The Website area is off: today's phone editor",
             );
             const first = page
                 .locator("[data-block-index] > button[aria-pressed]")
@@ -134,7 +134,7 @@ for (const size of SIZES) {
         }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's phone editor",
+                "The Website area is off: today's phone editor",
             );
             await page
                 .locator("[data-phone-bar]")
@@ -158,7 +158,7 @@ for (const size of SIZES) {
         test("Publish opens the Publish sheet", async ({ page }) => {
             test.skip(
                 !(await openEditor(page)),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's phone editor",
+                "The Website area is off: today's phone editor",
             );
             await page
                 .locator("[data-phone-bar]")

@@ -30,11 +30,18 @@ export function approversLine(approvers: PostApprover[]): string {
     );
 }
 
-/** "Either can approve. Both hear about it now." */
+/** The toast once a post is sent for approval: "Sent for approval. Kavya and Mohit get an email." */
+export function sentForApprovalWords(approvers: PostApprover[]): string {
+    const names = approvers.map((a) => firstName(a.name));
+    if (names.length === 0) return "Sent for approval.";
+    return `Sent for approval. ${names.join(" and ")} ${names.length === 1 ? "gets" : "get"} an email.`;
+}
+
+/** "Either can approve. Both get an email." The ask goes by email only (P1). */
 export function approversNote(n: number): string {
-    if (n <= 1) return "They can approve it. They hear about it now.";
-    if (n === 2) return "Either can approve. Both hear about it now.";
-    return "Any one of them can approve. They all hear about it now.";
+    if (n <= 1) return "They can approve it. They get an email.";
+    if (n === 2) return "Either can approve. Both get an email.";
+    return "Any one of them can approve. They all get an email.";
 }
 
 /**

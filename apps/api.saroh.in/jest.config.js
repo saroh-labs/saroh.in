@@ -354,6 +354,7 @@ module.exports = {
         // service with a jest-mocked Prisma. Never touch a DB. (The numbering
         // races in invoices.db.spec.ts need Postgres and run in integration.)
         "<rootDir>/src/modules/invoices/totals.spec.ts",
+        "<rootDir>/src/modules/invoices/contact-gstin.spec.ts",
         "<rootDir>/src/modules/invoices/numbering.spec.ts",
         "<rootDir>/src/modules/invoices/invoice-state.spec.ts",
         // DEC-173: the ledger's settle rules, pure.

@@ -37,9 +37,8 @@ import { useEditorDraft } from "./use-editor-draft";
 
 // The Website area's switch (KTD-E1): off unless a test turns it on.
 const area = vi.hoisted(() => ({ on: false }));
-vi.mock("@/lib/sites/website-area-switch", () => ({
-    websiteAreaOn: () => area.on,
-    websiteAreaOnFor: () => area.on,
+vi.mock("@/components/sites/website-area", () => ({
+    useWebsiteArea: () => area.on,
 }));
 
 vi.mock("next/navigation", () => ({

@@ -230,6 +230,10 @@ jobs:
       - name: mktemp templates
         run: pnpm run check:mktemp
 
+      # The Website area has one switch, the api's (DEC-240).
+      - name: Website area switch
+        run: pnpm run check:website-area-switch
+
       # No new hard-coded addresses in shared code (DEC-204)
       - name: Hard-coded domains
         run: pnpm run check:domains
@@ -751,9 +755,8 @@ jobs:
       # production, hides it until the area ships (#1357).
       NEXT_PUBLIC_API_AREA: "on"
       # The redesigned Website area (plan 2026-11-18-001), which the site
-      # specs walk. Unset, as production, keeps today's tabs.
-      NEXT_PUBLIC_WEBSITE_AREA: "on"
-      # Its api half: post approval (O7) applies only while it is on.
+      # specs walk: the api's switch, which the app asks (DEC-240). Unset,
+      # as production, keeps today's tabs and publishing.
       WEBSITE_AREA: "on"
       # Share as a post and Create post (DEC-217), in the app and the API.
       # Unset, as production, hides the screens and the API answers 404.

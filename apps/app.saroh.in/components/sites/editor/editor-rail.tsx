@@ -21,10 +21,10 @@ import { StylePanel as LegacyStylePanel } from "@/components/sites/looks/legacy/
 import type { LookChanges } from "@/components/sites/looks/look-changes";
 import type { LookChoices } from "@/components/sites/looks/look-picker";
 import { StylePanel } from "@/components/sites/looks/style-panel";
+import { useWebsiteArea } from "@/components/sites/website-area";
 import type { Flag, Section, SectionType } from "@/lib/sites/service";
 import type { SiteStyle, SiteStyleOptions } from "@/lib/sites/style";
 import type { StyleChoiceRules } from "@/lib/sites/style-access";
-import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 import { Tip } from "@saroh/ui/tooltip";
 import { BrandReadOnly } from "./brand-read-only";
 import { EditorTabs, railRowState } from "./editor-chrome";
@@ -152,6 +152,7 @@ export function EditorRail({
     /** Class packs is rolled out and on: its block is offered (DEC-057). */
     packsOpen?: boolean;
 }) {
+    const areaOn = useWebsiteArea();
     /*
      * Drag state. `dragIndex` is the row being carried, `dropIndex` the row it
      * would land on — kept apart so the source can dim while the target draws
@@ -184,7 +185,7 @@ export function EditorRail({
                 />
             )}
             {/* Off, today's Brand panel exactly as it was (owner, 20 Nov). */}
-            {tab === "brand" && !websiteAreaOn() ? (
+            {tab === "brand" && !areaOn ? (
                 readOnly ? (
                     <LegacyBrandReadOnly
                         style={style}

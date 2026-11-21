@@ -101,12 +101,7 @@ export default async function PostPage({
         notFound();
     }
 
-    const [post, posts] = await Promise.all([
-        getPublishedPost(resolved.siteId, postSlug),
-        // Older and Newer (U8). A failed list read draws neither, and the
-        // read keeps the page out of the cache.
-        readPublishedPosts(resolved.siteId),
-    ]);
+    const post = await getPublishedPost(resolved.siteId, postSlug);
     if (!post) {
         // A link the post was live at before its link changed (U17a).
         const to = await postMovedTo(resolved.siteId, postSlug);
@@ -117,6 +112,11 @@ export default async function PostPage({
         }
         notFound();
     }
+
+    // Older and Newer (U8), read only once the post is there: a random
+    // link costs no list read (02 W6). A failed list read draws neither,
+    // and the read keeps the page out of the cache.
+    const posts = await readPublishedPosts(resolved.siteId);
 
     // Its cards from the business, filled from Services and Products now
     // (U15b): never the price the post was written with.

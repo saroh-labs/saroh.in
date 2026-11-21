@@ -22,7 +22,7 @@ export const onPhone = (page: Page): boolean =>
  */
 export async function openReviewedSite(page: Page): Promise<string> {
     await page.goto(`${urls.APP_URL}/sites`);
-    // The Website area (NEXT_PUBLIC_WEBSITE_AREA, on in CI) lists the site
+    // The Website area (the api's WEBSITE_AREA, on in CI) lists the site
     // at /sites: its card opens the Overview, whose Open editor opens it
     // read-only. Off, /sites forwards straight to the editor.
     if (new URL(page.url()).pathname === "/sites") {

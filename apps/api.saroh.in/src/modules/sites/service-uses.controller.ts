@@ -8,6 +8,7 @@ import { ModuleEnforcementGuard } from "../capabilities/module-enforcement.guard
 import { RequireModule } from "../capabilities/require-module.decorator";
 import type { ServiceUses } from "./service-uses";
 import { ServiceUsesService } from "./service-uses";
+import { WebsiteAreaSwitchGuard } from "./website-area-switch";
 
 /**
  * Where a service shows on a site, for the price sheet (website editor plan
@@ -16,7 +17,13 @@ import { ServiceUsesService } from "./service-uses";
 @Controller(
     "organizations/:organizationId/sites/:siteId/services/:serviceId/uses",
 )
-@UseGuards(BetterAuthGuard, OrganizationGuard, ModuleEnforcementGuard)
+// Only with the Website area on (DEC-240): off, a 404.
+@UseGuards(
+    BetterAuthGuard,
+    OrganizationGuard,
+    ModuleEnforcementGuard,
+    WebsiteAreaSwitchGuard,
+)
 @RequireModule("WEBSITE")
 export class ServiceUsesController {
     constructor(private readonly uses: ServiceUsesService) {}

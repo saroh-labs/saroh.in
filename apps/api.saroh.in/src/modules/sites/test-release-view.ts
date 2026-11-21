@@ -2,7 +2,7 @@ import type { Prisma } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { personName } from "./change-approvals";
+import { namesOf } from "./change-approvals";
 import type { Renderability } from "./publication-renderability";
 import { ReviewRoute } from "./review-route";
 import type {
@@ -302,7 +302,7 @@ export async function namesFor(
         where: { id: { in: ids } },
         select: { id: true, name: true, email: true },
     });
-    return new Map(users.map((u) => [u.id, personName(ctx, u)]));
+    return namesOf(ctx, users);
 }
 
 /** The hosts a site's releases are served on (see `platformTestHost`). */

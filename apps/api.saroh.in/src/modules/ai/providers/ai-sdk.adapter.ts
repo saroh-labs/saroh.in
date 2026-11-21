@@ -10,6 +10,7 @@ import type {
 } from "ai";
 import { APICallError, jsonSchema, streamText } from "ai";
 
+import { structuredLogger } from "../../../common/logging/structured-logger";
 import { env } from "../../../env";
 import type {
     AiEvent,
@@ -231,6 +232,12 @@ export function usageOf(usage: LanguageModelUsage): AiUsage {
     };
 }
 
+/** An error chunk's type and words, as far as {@link failureOf} reads them. */
+interface ErrorSaid {
+    type?: unknown;
+    message?: unknown;
+}
+
 /** Anthropic's error types, as a stream's error chunk names them. */
 const BY_TYPE: Record<string, AiFailureReason> = {
     authentication_error: "unauthorized",
@@ -245,9 +252,21 @@ const BY_TYPE: Record<string, AiFailureReason> = {
 
 /**
  * A reason and a status from whatever the SDK threw or streamed, reading
- * only those two things. The error itself goes no further.
+ * only those two things (and the provider's "credit balance" words, P3).
+ * The error itself goes no further.
  */
 export function failureOf(error: unknown): AiEvent {
+    const event = sortFailure(error);
+    if (event.type === "failed" && event.reason === "provider-billing") {
+        // An error line staff are alerted on (P3): Saroh's provider account needs topping up.
+        structuredLogger.error("ai_provider_out_of_credit", {
+            hint: "Saroh's AI provider account is out of credit or its billing failed; top it up. Not a bug.",
+        });
+    }
+    return event;
+}
+
+function sortFailure(error: unknown): AiEvent {
     // After its retries the SDK wraps the last call's error.
     const last =
         error && typeof error === "object" && "lastError" in error
@@ -255,19 +274,39 @@ export function failureOf(error: unknown): AiEvent {
             : error;
     if (APICallError.isInstance(last)) {
         const status = last.statusCode;
-        return status === undefined
-            ? { type: "failed", reason: "network" }
-            : { type: "failed", reason: reasonOfStatus(status), status };
+        if (status === undefined) return { type: "failed", reason: "network" };
+        const reason =
+            status === 402 ||
+            (status === 400 && outOfCredit(last.message, last.responseBody))
+                ? "provider-billing"
+                : reasonOfStatus(status);
+        return { type: "failed", reason, status };
     }
-    const kind =
+    const inner: ErrorSaid | undefined =
         last && typeof last === "object"
-            ? ((last as { type?: unknown; error?: { type?: unknown } }).error
-                  ?.type ?? (last as { type?: unknown }).type)
+            ? ((last as { error?: ErrorSaid }).error ?? last)
             : undefined;
-    const reason = typeof kind === "string" ? BY_TYPE[kind] : undefined;
+    const kind = inner?.type;
+    const reason =
+        kind === "invalid_request_error" && outOfCredit(inner?.message)
+            ? "provider-billing"
+            : typeof kind === "string"
+              ? BY_TYPE[kind]
+              : undefined;
     if (reason) return { type: "failed", reason };
     if (last instanceof TypeError) return { type: "failed", reason: "network" };
     return { type: "failed", reason: "unknown" };
+}
+
+/**
+ * Anthropic answers an empty credit balance with a 400 `invalid_request_error`
+ * (P3). Its fixed words are read only to sort it from a Saroh bug; they go no
+ * further.
+ */
+function outOfCredit(...texts: unknown[]): boolean {
+    return texts.some(
+        (t) => typeof t === "string" && /credit balance/i.test(t),
+    );
 }
 
 function reasonOfStatus(status: number): AiFailureReason {

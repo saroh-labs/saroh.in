@@ -295,6 +295,7 @@ export async function readPostApproval(
                 organizationId,
                 siteId: input.siteId,
                 editors: unit.editedBy ? [unit.editedBy] : [],
+                unitKeys: [unit.key],
             }),
             approversOf(tx, ctx, input.siteId),
             tx.postRevision.findFirst({

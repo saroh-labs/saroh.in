@@ -5,6 +5,7 @@ import { EditorAskAiProvider } from "@/components/ask-ai/editor-ask-ai";
 import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { SiteFacesProvider } from "@/components/sites/looks/site-faces";
+import { WebsiteAreaProvider } from "@/components/sites/website-area";
 import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
 import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
@@ -12,6 +13,7 @@ import { businessZone } from "@/lib/format/business-zone";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { activeBusinessTitle } from "@/lib/organizations/tab-title";
 import { SITE_FACES } from "@/lib/sites/site-fonts";
+import { websiteAreaOn } from "@/lib/sites/website-area-switch";
 
 /** The editor's tab names the business too, as the shell's does. */
 export function generateMetadata(): Promise<Metadata> {
@@ -42,7 +44,11 @@ export default async function EditorLayout({
     // to another plan only to someone who may and says who can to anyone
     // else (`PlanWay`). A business that couldn't be read says nothing, and
     // the page a link opens decides.
-    const organization = await activeOrganizationOnce().catch(() => undefined);
+    const [organization, websiteArea] = await Promise.all([
+        activeOrganizationOnce().catch(() => undefined),
+        // The Website area switch, as the api holds it (DEC-240).
+        websiteAreaOn(),
+    ]);
     // Ask AI, as the shell mounts it (`app-shell.tsx`): the editors' Ask AI
     // buttons open it by event, and without a host here nothing opened.
     const askAiShown =
@@ -52,7 +58,9 @@ export default async function EditorLayout({
         : null;
     // The merchant faces, so the preview shows the site's chosen typeface.
     const faces = (
-        <SiteFacesProvider faces={SITE_FACES}>{children}</SiteFacesProvider>
+        <WebsiteAreaProvider on={websiteArea}>
+            <SiteFacesProvider faces={SITE_FACES}>{children}</SiteFacesProvider>
+        </WebsiteAreaProvider>
     );
     // Ask AI, docked in the editors' right column at the desk and the
     // shared sheet on a phone (owner, 21 Nov); never for a Reviewer.

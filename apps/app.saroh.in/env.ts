@@ -70,14 +70,6 @@ export const env = createEnv({
          */
         NEXT_PUBLIC_API_AREA: z.enum(["on", "off"]).optional(),
         /**
-         * The redesigned Website area (plan 2026-11-18-001, KTD-10): `on`
-         * shows All sites, the site header, Overview and the four groups;
-         * anything else, unset included, keeps today's tabs
-         * (`lib/sites/website-area-switch.ts`). Off in production until the
-         * owner turns it on.
-         */
-        NEXT_PUBLIC_WEBSITE_AREA: z.enum(["on", "off"]).optional(),
-        /**
          * Share as a post and Create post (DEC-217): `on` shows the Share
          * buttons, the Social rail row and its page; anything else, unset
          * included, hides them (`lib/share-item/share-posts-switch.ts`).
@@ -130,7 +122,6 @@ export const env = createEnv({
         NEXT_PUBLIC_VERCEL_ENV: process.env.NEXT_PUBLIC_VERCEL_ENV,
         NEXT_PUBLIC_TEMPLATES: process.env.NEXT_PUBLIC_TEMPLATES,
         NEXT_PUBLIC_API_AREA: process.env.NEXT_PUBLIC_API_AREA,
-        NEXT_PUBLIC_WEBSITE_AREA: process.env.NEXT_PUBLIC_WEBSITE_AREA,
         NEXT_PUBLIC_SHARE_POSTS: process.env.NEXT_PUBLIC_SHARE_POSTS,
         NEXT_PUBLIC_ASK_AI: process.env.NEXT_PUBLIC_ASK_AI,
         NEXT_PUBLIC_POSTHOG_KEY: process.env.NEXT_PUBLIC_POSTHOG_KEY,

@@ -9,8 +9,18 @@ import { BadRequestException } from "@nestjs/common";
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
+import { env } from "../../env";
 import type { EntitlementService } from "../billing/entitlement.service";
 import { SitesService } from "./sites.service";
+
+// Leave out and per-change approval belong to the Website area (DEC-240).
+const areaBefore = env.WEBSITE_AREA;
+beforeAll(() => {
+    env.WEBSITE_AREA = "on";
+});
+afterAll(() => {
+    env.WEBSITE_AREA = areaBefore;
+});
 
 const sites = new SitesService({
     check: jest.fn().mockResolvedValue(true),

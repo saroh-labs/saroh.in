@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 /**
  * Publish post and the post's History (plan 2026-11-20-002 U17, U18;
  * `blogdesk/WXWPublish`, `WXWHistory`, `blogphone/WXYPublish`), behind
- * `NEXT_PUBLIC_WEBSITE_AREA`. A post goes live on its own from its sheet,
+ * the api's `WEBSITE_AREA`. A post goes live on its own from its sheet,
  * then the sheet is Tell people; a change after that is listed against the
  * live copy and can go live later instead; History lists the published copy
  * tagged Live. Owns its post: a stamped title, deleted at the end.
@@ -38,7 +38,7 @@ test("Publish post: now, Tell people, then later; History shows the live copy", 
         await page.goto(`/sites/${site.id}/posts/${made.id}`);
         test.skip(
             !page.url().includes(`/write/${made.id}`),
-            "NEXT_PUBLIC_WEBSITE_AREA is off: today's post editor",
+            "The Website area is off: today's post editor",
         );
         const phone = testInfo.project.name.startsWith("phone");
         test.skip(phone, "The phone post editor mounts these sheets (U16).");

@@ -1,5 +1,6 @@
 import { serverApiUrl, serverReadSignal } from "@/lib/api-url";
 import { dontCachePage } from "@/lib/page-cache/site-rules";
+import { withRelay } from "@/lib/relay-headers";
 
 /**
  * Where an old post link forwards (U17a): the post's live slug, or null.
@@ -16,7 +17,7 @@ export async function postMovedTo(
             `${serverApiUrl()}/public/sites/${siteId}/posts/${encodeURIComponent(slug)}/moved`,
             {
                 cache: "no-store",
-                headers: { accept: "application/json" },
+                headers: await withRelay({ accept: "application/json" }),
                 signal: serverReadSignal(),
             },
         );

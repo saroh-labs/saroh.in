@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * Website › Pages and the page settings sheet (plan 2026-11-18-001 U5),
- * behind `NEXT_PUBLIC_WEBSITE_AREA`. Each test makes its own hidden page
+ * behind the api's `WEBSITE_AREA`. Each test makes its own hidden page
  * on Northwind (a link no other test uses), changes it through the sheet
  * and the row menu, and deletes what it made. Never publishes.
  */
@@ -66,7 +66,7 @@ test.describe("Pages", () => {
             const search = page.getByPlaceholder("Find a page");
             test.skip(
                 (await search.count()) === 0,
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's Pages list",
+                "The Website area is off: today's Pages list",
             );
             const sheet = page.getByRole("dialog", { name: "Page settings" });
             await expect(sheet).toBeVisible();
@@ -109,10 +109,7 @@ test.describe("Pages", () => {
         try {
             await page.goto(`/sites/${siteId}/pages`);
             const search = page.getByPlaceholder("Find a page");
-            test.skip(
-                (await search.count()) === 0,
-                "NEXT_PUBLIC_WEBSITE_AREA is off",
-            );
+            test.skip((await search.count()) === 0, "The Website area is off");
             await search.fill(own.base);
             const row = page.locator(`[data-page-row="${own.base}"]`);
             await row
@@ -138,7 +135,7 @@ test.describe("Pages", () => {
         await page.goto(`/sites/${siteId}/pages`);
         test.skip(
             (await page.getByPlaceholder("Find a page").count()) === 0,
-            "NEXT_PUBLIC_WEBSITE_AREA is off",
+            "The Website area is off",
         );
         const fix = page.getByRole("button", { name: /Needs fixing/ });
         await fix.click();

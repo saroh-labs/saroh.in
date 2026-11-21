@@ -91,6 +91,32 @@ describe("contentSecurityPolicy", () => {
     });
 });
 
+describe("contentSecurityPolicy with a nonce (enforced, 21 Nov 2026)", () => {
+    const policy = contentSecurityPolicy({ nonce: "abc123==" });
+
+    it("runs scripts by nonce only, never inline or eval", () => {
+        const scripts = directive(policy, "script-src");
+        expect(scripts).toContain("'nonce-abc123=='");
+        // Chrome runs any DOM-added script under 'strict-dynamic', an
+        // injected inline one too.
+        expect(scripts).not.toContain("'strict-dynamic'");
+        expect(scripts).not.toContain("'unsafe-inline'");
+        expect(scripts).not.toContain("'unsafe-eval'");
+        // `next dev` alone gets eval.
+        expect(
+            directive(
+                contentSecurityPolicy({ nonce: "n", dev: true }),
+                "script-src",
+            ),
+        ).toContain("'unsafe-eval'");
+    });
+
+    it("contains every directive of ENFORCED_CSP", () => {
+        for (const part of ENFORCED_CSP.split("; "))
+            expect(policy).toContain(part);
+    });
+});
+
 describe("permissionsPolicy", () => {
     it("switches off camera, microphone, location and USB", () => {
         const policy = permissionsPolicy();
@@ -122,6 +148,13 @@ describe("pageSecurityHeaders", () => {
         ]);
         expect(headers[2]?.value).toBe("strict-origin-when-cross-origin");
         expect(headers[1]?.value).toContain("api.razorpay.com");
+    });
+});
+
+describe("pageSecurityHeaders for an app whose middleware enforces the CSP", () => {
+    it("sends no CSP of its own, which would replace the middleware's on Workers", () => {
+        const keys = pageSecurityHeaders({ enforced: true }).map((h) => h.key);
+        expect(keys).toEqual(["Permissions-Policy", "Referrer-Policy"]);
     });
 });
 

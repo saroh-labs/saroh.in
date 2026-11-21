@@ -1,30 +1,36 @@
-import { env } from "@/env";
+import { cache } from "react";
+
+import { apiFetch } from "@/lib/api/http";
 
 /**
- * Whether the redesigned Website area is shown (plan 2026-11-18-001, KTD-10):
- * All sites at `/sites`, and inside a site the site header, Overview and the
- * four groups. Only when `NEXT_PUBLIC_WEBSITE_AREA` is `on`; unset or
- * anything else is off, so a production build that leaves it out keeps
- * today's tabs exactly. Unset counts as on only under `next dev`; `off`
- * there checks today's screens. It hides; it protects nothing.
+ * Whether the redesigned Website area is shown (plan 2026-11-18-001,
+ * KTD-10): All sites at `/sites`, and inside a site the site header,
+ * Overview, the four groups, the new editor and post editor.
  *
- * Readers: `/sites`, the site layout (`[siteId]/(tabs)/layout.tsx`), the
- * Overview and Writing routes, the Posts tab's forward, Version history's
- * restore (`restoresAsDraft`), and the command
- * menu's site rows. Removed with today's `WebsiteHeader` once the area has
+ * The api holds the one switch (`WEBSITE_AREA`, DEC-240) and this asks it,
+ * once per request, so the app and the api can never disagree (a post held
+ * for approval with no Send for approval to free it). An answer that can't
+ * be read is off: today's screens, which the api also serves.
+ *
+ * Server-only (it reads through the API client). Server components await
+ * it; client components read it from `useWebsiteArea()`
+ * (`components/sites/website-area.tsx`), which the shell and the editor
+ * layout fill from here. Removed with today's screens once the area has
  * been on in production for a release (00-universal §15).
  */
-export function websiteAreaOnFor(
-    flag: string | undefined,
-    nodeEnv: string | undefined,
-): boolean {
-    if (flag) return flag === "on";
-    return nodeEnv === "development";
-}
+export const websiteAreaOn = cache(async (): Promise<boolean> => {
+    try {
+        const res = await apiFetch("/website-area");
+        if (!res.ok) return false;
+        return websiteAreaFrom(await res.json());
+    } catch {
+        return false;
+    }
+});
 
-/** {@link websiteAreaOnFor} for this build. Client-safe: both are public. */
-export function websiteAreaOn(): boolean {
-    return websiteAreaOnFor(env.NEXT_PUBLIC_WEBSITE_AREA, env.NODE_ENV);
+/** The api's answer: on only when it says so. */
+export function websiteAreaFrom(body: unknown): boolean {
+    return (body as { on?: unknown } | null)?.on === true;
 }
 
 /**
@@ -32,6 +38,6 @@ export function websiteAreaOn(): boolean {
  * version is restored as the draft (`restore-version.tsx`); off, it goes
  * live again as it always did (`versions/legacy/`).
  */
-export function restoresAsDraft(): boolean {
+export function restoresAsDraft(): Promise<boolean> {
     return websiteAreaOn();
 }

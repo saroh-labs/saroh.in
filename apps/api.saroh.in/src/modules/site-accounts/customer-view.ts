@@ -54,8 +54,8 @@ export interface AccountView {
     phone: string | null;
     /** The verified phone they sign in with by WhatsApp (DEC-196), or null. */
     signInPhone: string | null;
-    /** Their GSTIN for their invoices (R16), or null. */
-    gstin: string | null;
+    /** Their GSTIN for their invoices (R16), or null. Absent on a business without GST (E3). */
+    gstin?: string | null;
     businessName: string;
     tabs: AccountTab[];
     /** What the business offers, for which Home cards to draw. */
@@ -416,7 +416,9 @@ export function accountView(input: {
         email: input.account.email,
         phone: blankToNull(input.contact.phone),
         signInPhone: input.account.phoneE164 ?? null,
-        gstin: input.contact.gstin ?? null,
+        ...(input.contact.gstin !== undefined && {
+            gstin: input.contact.gstin,
+        }),
         businessName: input.businessName,
         tabs: input.tabs.map((t) => ({ key: t.key, label: t.label })),
         offers: {

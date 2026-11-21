@@ -445,6 +445,15 @@ the Privacy Policy states both.
   that starts before the 400-day cutoff (`pastRetention`), since what is
   left of it would shrink its rollup. It logs counts only. A business
   on legal hold keeps its events until the hold is lifted (DEC-122).
+  The same run prunes blog posts' revisions
+  (`content/post-revision-retention.ts`, 21 Nov 2026): each post keeps its
+  newest 200 autosave, Ask AI and restore revisions and every `sent`,
+  `approved` and `published` one, at most 500 posts a run, counted and
+  caught on its own; a held business keeps them all.
+- **`analytics.aggregate`** reads a day in pages of 5,000 events, and keeps
+  a `path` breakdown only for a path that is one of the event's site's
+  pages (21 Nov 2026), so the rows a day writes are bounded by the pages,
+  not by what visitors send.
 
 ## Custom-domain re-check — **Current** (#860)
 

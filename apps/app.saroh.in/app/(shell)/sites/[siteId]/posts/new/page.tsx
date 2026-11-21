@@ -29,7 +29,7 @@ export default async function NewPostPage({
     const query = (await searchParams) ?? {};
     // With the Website area on, a new post opens in the desk editor (U15,
     // KTD-E7), keeping `?from=`.
-    if (websiteAreaOn()) {
+    if (await websiteAreaOn()) {
         redirect(withQuery(`/sites/${siteId}/write/new`, query));
     }
     const { from } = query;

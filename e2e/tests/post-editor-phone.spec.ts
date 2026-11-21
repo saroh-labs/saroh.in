@@ -8,7 +8,7 @@ import { NORTHWIND_ORG } from "../playwright.config";
 
 /**
  * The post editor on a phone (plan 2026-11-20-002 U16, `blogphone/WXYWrite`,
- * `WXYDetails`, `WXYMore`, `WXYStates`), behind `NEXT_PUBLIC_WEBSITE_AREA`:
+ * `WXYDetails`, `WXYMore`, `WXYStates`), behind the api's `WEBSITE_AREA`:
  * at 390 and the 320 floor the bar and the writing tools fit with 44px
  * targets and nothing scrolls sideways; a post needs a title; Details'
  * Save writes its fields in one save; Delete asks in today's words.
@@ -66,7 +66,7 @@ for (const size of SIZES) {
             await page.goto(`/sites/${site.id}/posts/new`);
             test.skip(
                 !page.url().includes("/write/new"),
-                "NEXT_PUBLIC_WEBSITE_AREA is off: today's post editor",
+                "The Website area is off: today's post editor",
             );
             const editor = page.locator("[data-phone-post-editor]");
             const bar = editor.locator("[data-post-bar]");

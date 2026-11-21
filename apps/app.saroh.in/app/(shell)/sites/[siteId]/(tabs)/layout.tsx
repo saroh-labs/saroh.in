@@ -42,7 +42,7 @@ import { websiteAreaOn } from "@/lib/sites/website-area-switch";
  * places a tab leads to — so they live outside this group and keep their own
  * screens.
  *
- * With `NEXT_PUBLIC_WEBSITE_AREA` on, the same reads draw the redesigned
+ * With the Website area on (the api's switch, DEC-240), the same reads draw the redesigned
  * area instead (plan 2026-11-18-001 U3): the site header over Overview and
  * the four groups. Off, today's header and tabs, unchanged.
  */
@@ -118,7 +118,7 @@ export default async function WebsiteTabsLayout({
     };
     const mayCreate = navCan(actor, "site:create");
 
-    if (websiteAreaOn()) {
+    if (await websiteAreaOn()) {
         const reader = !site.can.edit;
         // One web address per business (DEC-230): the header shows the
         // business's default, and the switcher this one site until adding
