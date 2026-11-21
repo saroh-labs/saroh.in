@@ -556,7 +556,7 @@ describe("one business on Free per person (DEC-227, M-4)", () => {
         expect(await freeLimitPaused(theirs.orgId)).toBe(true);
     });
 
-    it("reads the owner's other businesses on the transaction's own connection, with the scope put back (04 S2)", async () => {
+    it("sees the owner's other businesses from inside a scoped transaction, and leaves its scope alone", async () => {
         const newOwner = await person();
         await business(HARD, { ownerId: newOwner.id });
         const theirs = await business(HARD);
