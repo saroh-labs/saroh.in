@@ -1,82 +1,33 @@
 "use client";
 
 import type { Editor } from "@tiptap/react";
-import { FileText, History, MessageSquare, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useState,
+} from "react";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
-import { PanelDivider } from "@/components/sites/editor/editor-chrome";
-import type { TrailTab } from "@/components/sites/editor/shell/editor-trail";
-import { EditorTrail } from "@/components/sites/editor/shell/editor-trail";
-import {
-    RIGHT_MIN,
-    RightColumn,
-    useRightWidth,
-} from "@/components/sites/editor/shell/right-column";
 import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
-import { AddList } from "@/components/sites/rich-text/writing-menus";
 import { postPage } from "@/lib/ask-ai/page-hints";
 import type { PostDetail } from "@/lib/content/service";
 import { formatDateTime } from "@/lib/format/datetime";
 import { postChanges, postStatusLabel } from "@/lib/sites/post-diff";
 
-import {
-    POST_HISTORY_READY,
-    PostHistoryPanel,
-} from "../history/post-history-panel";
 import { PhonePostEditor } from "../phone/phone-post-editor";
 import { usePublishPost } from "../publish/publish-post";
-import { ApprovalBand } from "../review/approval-band";
 import { approvalStatus } from "../review/approval-words";
-import type { DetailsRow } from "./details-tab";
-import type { InspectorTab } from "./post-inspector";
-import { PostInspector } from "./post-inspector";
+import { PostFrame, usePostFrame } from "./post-frame";
 import type { PostEditorData, PostEditorModel } from "./post-model";
-import { PostMoreMenu } from "./post-more-menu";
-import { PostBanner } from "./post-states";
-import { PostTopBar } from "./post-top-bar";
-import { PostsLeftPanel } from "./posts-left-panel";
 import { usePostDraft } from "./use-post-draft";
 import { WritingSurface } from "./writing-surface";
 
-export type PostTrailKey = "posts" | "add" | "history" | "feedback";
-
-/**
- * The post editor's rail (`blogdesk/WXWWrite`, C3): Posts · Add · History ·
- * Feedback; a reader's Posts · Feedback. History once U17 builds it. Ask AI
- * left the rail for the right column's tab (owner, 21 Nov).
- */
-export function postTrailTabs({
-    readOnly,
-    history,
-    openNotes,
-    feedback,
-}: {
-    readOnly: boolean;
-    history: boolean;
-    openNotes: number;
-    feedback: boolean;
-}): TrailTab<PostTrailKey>[] {
-    const tabs: (TrailTab<PostTrailKey> | false)[] = [
-        { key: "posts", label: "Posts", icon: FileText },
-        !readOnly && { key: "add", label: "Add", icon: Plus },
-        !readOnly &&
-            history && {
-                key: "history",
-                label: "History",
-                icon: History,
-            },
-        feedback && {
-            key: "feedback",
-            label: "Feedback",
-            icon: MessageSquare,
-            count: openNotes,
-        },
-    ];
-    return tabs.filter((t): t is TrailTab<PostTrailKey> => t !== false);
-}
+export { postTrailTabs } from "./post-trail";
+export type { PostTrailKey } from "./post-trail";
 
 /**
  * The post editor at desk (U15; `blogdesk/WXWWrite`, `WXWInsert`,
@@ -87,16 +38,33 @@ export function postTrailTabs({
  *
  * Every write is today's (`usePostDraft`): autosave, ⌘S, Publish, Take off
  * the site, Delete. Publish post is `usePublishPost` (U18 fills its sheet)
- * and History is `PostHistoryPanel` (U17).
+ * and History is `PostHistoryPanel` (U17). The bar, rail, list and right
+ * column are `PostFrame`'s, which stays mounted from post to post.
  */
-export function PostShell({
-    data,
-    post,
-}: {
+export function PostShell(props: {
     data: PostEditorData;
     /** Absent when writing a new post. */
     post?: PostDetail;
 }) {
+    // In `write/layout.tsx` the frame is already drawn and stays; alone (a
+    // test, a page without the layout) the post draws its own.
+    return usePostFrame() ? (
+        <PostBody {...props} />
+    ) : (
+        <PostFrame>
+            <PostBody {...props} />
+        </PostFrame>
+    );
+}
+
+/**
+ * One post: its draft and the writing surface. Everything else the frame
+ * draws from what this hands it (`PostLive`), after every render.
+ */
+function PostBody({ data, post }: { data: PostEditorData; post?: PostDetail }) {
+    const frame = usePostFrame();
+    if (!frame) throw new Error("PostBody is drawn inside PostFrame");
+    const { previewing, toolbar, setToolbar, openCover, show } = frame;
     const router = useRouter();
     const zone = useBusinessZone();
     // Below 760px the phone post editor (U16), on this same model and draft.
@@ -116,15 +84,6 @@ export function PostShell({
         listHref: `/sites/${siteId}/writing`,
     });
     const [editor, setEditor] = useState<Editor | null>(null);
-    const [trail, setTrail] = useState<PostTrailKey>(
-        data.readOnly && data.feedback ? "feedback" : "posts",
-    );
-    const [tab, setTab] = useState<InspectorTab>(
-        data.readOnly && data.feedback && post ? "feedback" : "details",
-    );
-    const [editing, setEditing] = useState<DetailsRow>(null);
-    const [toolbar, setToolbar] = useState(false);
-    const [previewing, setPreviewing] = useState(false);
     const [titleError, setTitleError] = useState(false);
 
     // Preview reads the post as it will show: nothing on it edits. No
@@ -174,27 +133,6 @@ export function PostShell({
         },
     };
     const publish = usePublishPost(model);
-    const right = useRightWidth();
-
-    const feedback = data.feedback;
-    const openNotes =
-        feedback?.comments.filter((c) => c.resolvedAt === null).length ?? 0;
-    const tabs = postTrailTabs({
-        readOnly: data.readOnly || data.paused,
-        history: POST_HISTORY_READY,
-        openNotes,
-        feedback: Boolean(feedback && draft.postId),
-    });
-
-    function onTrail(key: PostTrailKey) {
-        if (key === "feedback") setTab("feedback");
-        setTrail(key);
-    }
-
-    const openCover = () => {
-        setTab("details");
-        setEditing("cover");
-    };
 
     const onDiscard =
         data.fromAskAi !== undefined && !draft.postId
@@ -203,6 +141,14 @@ export function PostShell({
                   router.push(`/sites/${siteId}/writing`);
               }
             : undefined;
+
+    // The frame's bar, list and inspector read this post after each render;
+    // gone, they show their skeletons until the next post is here.
+    const key = post?.id ?? "new";
+    useLayoutEffect(() => {
+        show({ key, model, editor, onPublish: publish.open, onDiscard });
+    });
+    useLayoutEffect(() => () => show(null), [show]);
 
     // Every Ask AI here is about this post (owner, 21 Nov).
     const askAiHere =
@@ -216,125 +162,29 @@ export function PostShell({
             />
         ) : null;
 
-    if (phone) {
-        return (
-            <>
-                {askAiHere}
+    return (
+        <>
+            {askAiHere}
+            {phone ? (
                 <PhonePostEditor
                     model={model}
                     onPublish={publish.open}
                     titleError={showTitleError}
                     onDiscard={onDiscard}
                 />
-                {publish.node}
-                {draft.guard.dialog}
-            </>
-        );
-    }
-
-    const left =
-        trail === "add" ? (
-            <section aria-label="Add" className="flex min-h-0 flex-1 flex-col">
-                <h2 className="flex h-12 shrink-0 items-center px-4 text-[0.9375rem] font-semibold">
-                    Add to the post
-                </h2>
-                <p className="px-4 pb-1 text-[0.8125rem] text-muted-foreground">
-                    Adds where the cursor is. Or type / on an empty line.
-                </p>
-                <AddList editor={editor} />
-            </section>
-        ) : trail === "history" && POST_HISTORY_READY ? (
-            <PostHistoryPanel model={model} />
-        ) : (
-            <PostsLeftPanel model={model} />
-        );
-
-    return (
-        <div className="flex h-dvh flex-col bg-background">
-            {askAiHere}
-            <PostTopBar
-                model={model}
-                editor={editor}
-                previewing={previewing}
-                onPreview={setPreviewing}
-                onPublish={publish.open}
-                more={
-                    <PostMoreMenu
-                        model={model}
-                        onMoreFormatting={() => setToolbar(true)}
-                    />
-                }
-                onDiscard={onDiscard}
-            />
-            <PostBanner model={model} />
-            <ApprovalBand model={model} />
-            <div className="flex min-h-0 flex-1">
-                {previewing ? null : (
-                    <>
-                        <EditorTrail
-                            tabs={tabs}
-                            value={trail}
-                            onSelect={onTrail}
-                        />
-                        <div
-                            data-left-panel={trail}
-                            className="flex w-[292px] shrink-0 flex-col border-r bg-card max-[1200px]:hidden min-[1600px]:w-[280px]"
-                        >
-                            {left}
-                        </div>
-                    </>
-                )}
-                <main aria-label="Post" className="grid min-h-0 min-w-0 flex-1">
-                    <WritingSurface
-                        model={model}
-                        previewing={previewing}
-                        titleError={showTitleError}
-                        toolbar={toolbar}
-                        onToolbar={setToolbar}
-                        onEditor={setEditor}
-                        onCover={openCover}
-                    />
-                </main>
-                {previewing ? null : (
-                    <>
-                        <div className="flex w-px shrink-0 [&>*]:flex-1">
-                            <PanelDivider
-                                label="Resize the right column"
-                                width={right.width}
-                                min={RIGHT_MIN}
-                                max={right.max}
-                                reset={right.reset}
-                                onResize={right.setWidth}
-                                onNudge={right.nudge}
-                                panelSide="right"
-                            />
-                        </div>
-                        <div
-                            className="flex max-w-[calc(100vw-20rem)] shrink-0 [&>*]:flex-1"
-                            style={{ width: right.width }}
-                        >
-                            <RightColumn askAi={data.askAi && !data.readOnly}>
-                                <PostInspector
-                                    model={model}
-                                    tab={tab}
-                                    onTab={(t) => {
-                                        setTab(t);
-                                        if (
-                                            t !== "feedback" &&
-                                            trail === "feedback"
-                                        )
-                                            setTrail("posts");
-                                    }}
-                                    editing={editing}
-                                    onEditing={setEditing}
-                                />
-                            </RightColumn>
-                        </div>
-                    </>
-                )}
-            </div>
+            ) : (
+                <WritingSurface
+                    model={model}
+                    previewing={previewing}
+                    titleError={showTitleError}
+                    toolbar={toolbar}
+                    onToolbar={setToolbar}
+                    onEditor={setEditor}
+                    onCover={openCover}
+                />
+            )}
             {publish.node}
             {draft.guard.dialog}
-        </div>
+        </>
     );
 }

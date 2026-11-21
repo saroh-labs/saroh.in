@@ -5,11 +5,14 @@ import { FailedState } from "@saroh/ui/data-state";
 import { IconButton } from "@saroh/ui/icon-button";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { cn } from "@saroh/ui/lib/utils";
+import { Skeleton } from "@saroh/ui/skeleton";
 import { ChevronRight, FileText, Heading, Plus, Settings2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { PostCategoriesSheet } from "../post-categories-sheet";
-import type { PostEditorModel } from "./post-model";
+import type { PostEditorData, PostEditorModel } from "./post-model";
 
 /** How many posts the panel lists before "n more" (`WXWWrite`). */
 const SHOWN = 5;
@@ -51,12 +54,26 @@ function scrollToHeading(index: number | null) {
  * settings and categories", today's categories sheet. The kind is the
  * site's one blog until kinds of writing come (batch 3 U13).
  */
-export function PostsLeftPanel({ model }: { model: PostEditorModel }) {
-    const { data, draft } = model;
+export function PostsLeftPanel({
+    data,
+    model,
+    busy = true,
+}: {
+    /** The site's side: its posts and categories. */
+    data: PostEditorData;
+    /** The open post; null while the next one loads (`PostFrame`). */
+    model: PostEditorModel | null;
+    /** Without a model: its outline is on its way, or it failed to open. */
+    busy?: boolean;
+}) {
+    const router = useRouter();
     const { siteId, posts, readOnly, categories } = data;
+    // The post asked for, marked at once while it loads.
+    const [opening, setOpening] = useState<string | null>(null);
+    const currentId = model ? model.draft.postId : opening;
     const all = posts ?? [];
     const shown = all.slice(0, SHOWN);
-    const outline = headingsOf(draft.fields.content);
+    const outline = model ? headingsOf(model.draft.fields.content) : null;
     return (
         <aside
             aria-label="Posts in Blog"
@@ -83,17 +100,18 @@ export function PostsLeftPanel({ model }: { model: PostEditorModel }) {
                     <FailedState
                         size="inline"
                         title={couldntLoad("your posts")}
-                        onRetry={draft.refresh}
+                        onRetry={() => router.refresh()}
                     />
                 ) : null}
                 <ul className="grid grid-cols-1 gap-px">
                     {shown.map((p) => {
-                        const current = p.id === draft.postId;
+                        const current = p.id === currentId;
                         return (
                             <li key={p.id}>
                                 <Link
                                     href={`/sites/${siteId}/write/${p.id}`}
                                     aria-current={current ? "page" : undefined}
+                                    onClick={() => setOpening(p.id)}
                                     className={cn(
                                         "flex h-9 min-w-0 items-center gap-2 rounded-lg px-2.5 text-sm text-foreground/80 hover:bg-secondary",
                                         current &&
@@ -108,7 +126,7 @@ export function PostsLeftPanel({ model }: { model: PostEditorModel }) {
                                         {p.title}
                                     </span>
                                     <span className="shrink-0 text-xs font-normal text-muted-foreground">
-                                        {current
+                                        {current && model
                                             ? model.status.split(" · ")[0]
                                             : p.live
                                               ? "Live"
@@ -154,7 +172,14 @@ export function PostsLeftPanel({ model }: { model: PostEditorModel }) {
                             Title and cover
                         </button>
                     </li>
-                    {outline.map((h, i) => (
+                    {outline === null && busy ? (
+                        <li aria-busy="true" className="grid gap-2 px-2.5 py-2">
+                            <span className="sr-only">Loading the outline</span>
+                            <Skeleton aria-hidden className="h-3 w-3/4" />
+                            <Skeleton aria-hidden className="ml-4 h-3 w-1/2" />
+                        </li>
+                    ) : null}
+                    {(outline ?? []).map((h, i) => (
                         <li key={`${i}-${h.text}`}>
                             <button
                                 type="button"

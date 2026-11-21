@@ -83,6 +83,9 @@ vi.mock("@saroh/ui/toast", () => ({
     showInfo: vi.fn(),
 }));
 
+import { PageLoading } from "@/components/shared/page/page-loading";
+
+import { PostFrame } from "./post-frame";
 import type { PostEditorData } from "./post-model";
 import { PostShell, postTrailTabs } from "./post-shell";
 
@@ -481,5 +484,67 @@ describe("the post capability table, row by row (U51)", () => {
         openMore();
         expect(menuItems()).not.toContain("Save now");
         expect(menuItems()).toContain("Delete this post…");
+    });
+});
+
+describe("the frame stays from post to post (write/layout.tsx)", () => {
+    const other: PostDetail = { ...post, id: "p2", title: "Monsoon hair" };
+    const listed = data({
+        posts: [
+            { ...post, id: "p1" },
+            { ...post, id: "p2", title: "Monsoon hair" },
+        ] as unknown as PostEditorData["posts"],
+    });
+    // The layout's frame with the segment under it: a post, or its loader.
+    const draw = (page: React.ReactNode) =>
+        act(() => root.render(<PostFrame>{page}</PostFrame>));
+    // The right column's box (its Ask AI tabs need the editor's provider).
+    const column = () => el("[data-inspector-frame]").parentElement;
+    const loader = (
+        <PageLoading
+            shape="writing"
+            width="full"
+            bare
+            label="Opening the post"
+        />
+    );
+
+    it("keeps the bar, rail, list and right column mounted; greys only the post's regions", () => {
+        draw(<PostShell key="p1" data={listed} post={post} />);
+        const bar = el("[data-post-bar]");
+        const rail = el('nav[aria-label="Editor panels"]');
+        const list = el("[data-left-panel]");
+        const right = column();
+        expect(bar.textContent).toContain("Bridal trial");
+
+        // Another post asked for: the segment's loader stands in its place.
+        draw(loader);
+        expect(el("[data-post-bar]")).toBe(bar);
+        expect(bar.getAttribute("aria-busy")).toBe("true");
+        expect(el('nav[aria-label="Editor panels"]')).toBe(rail);
+        expect(el("[data-left-panel]")).toBe(list);
+        expect(column()).toBe(right);
+        expect(list.textContent).toContain("Monsoon hair");
+        const shapes = Array.from(
+            document.querySelectorAll<HTMLElement>("[data-slot=page-loading]"),
+        ).map((n) => n.dataset.shape);
+        expect(shapes).toEqual(["writing", "inspector"]);
+
+        draw(<PostShell key="p2" data={listed} post={other} />);
+        expect(el("[data-post-bar]")).toBe(bar);
+        expect(el("[data-left-panel]")).toBe(list);
+        expect(column()).toBe(right);
+        expect(bar.getAttribute("aria-busy")).toBeNull();
+        expect(bar.textContent).toContain("Monsoon hair");
+        expect(document.querySelector("[data-slot=page-loading]")).toBeNull();
+    });
+
+    it("keeps the rail's tab across posts", () => {
+        draw(<PostShell key="p1" data={listed} post={post} />);
+        act(() => named("Add")?.click());
+        expect(el("[data-left-panel]").dataset.leftPanel).toBe("add");
+        draw(loader);
+        draw(<PostShell key="p2" data={listed} post={other} />);
+        expect(el("[data-left-panel]").dataset.leftPanel).toBe("add");
     });
 });

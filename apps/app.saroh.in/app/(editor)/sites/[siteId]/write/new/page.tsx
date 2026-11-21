@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 
+import { PostFrameAway } from "@/components/sites/posts/editor/post-frame";
 import { PostShell } from "@/components/sites/posts/editor/post-shell";
 import { deniedFor } from "@/lib/access/require-can";
 import { readAskAiDraftContent } from "@/lib/ask-ai/service";
@@ -39,10 +40,19 @@ export default async function WriteNewPostPage({
     const site = await getSite(siteId);
     if (!site) notFound();
     if (!site.can.edit) {
-        return deniedFor(await resolveActiveOrganization(), {
-            thing: "New post",
-            back: { href: `/sites/${siteId}/writing`, label: "Back to Blog" },
-        });
+        // The refusal has the screen: no editor frame around it.
+        return (
+            <>
+                <PostFrameAway off />
+                {deniedFor(await resolveActiveOrganization(), {
+                    thing: "New post",
+                    back: {
+                        href: `/sites/${siteId}/writing`,
+                        label: "Back to Blog",
+                    },
+                })}
+            </>
+        );
     }
     const draftId = typeof from === "string" && from ? from : null;
     const draft = draftId ? await readAskAiDraftContent(draftId) : null;

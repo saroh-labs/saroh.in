@@ -1,5 +1,6 @@
 import { AccessDenied } from "@/components/shared/states/access-denied";
 import { whoCanChange } from "@/components/shared/states/who-can-change";
+import { PostFrameAway } from "@/components/sites/posts/editor/post-frame";
 
 /**
  * `blogdesk/WXWStates`, `blogphone/WXYStates` "No access": a teammate whose
@@ -7,11 +8,15 @@ import { whoCanChange } from "@/components/shared/states/who-can-change";
  * the menu's place, and the way back is Website.
  */
 export default function Forbidden() {
+    // The refusal has the screen: no editor frame around it.
     return (
-        <AccessDenied
-            {...whoCanChange({ thing: "Blog and other writing" })}
-            backHref="/sites"
-            backLabel="Back to Website"
-        />
+        <>
+            <PostFrameAway off />
+            <AccessDenied
+                {...whoCanChange({ thing: "Blog and other writing" })}
+                backHref="/sites"
+                backLabel="Back to Website"
+            />
+        </>
     );
 }

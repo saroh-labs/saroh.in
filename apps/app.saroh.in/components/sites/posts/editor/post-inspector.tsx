@@ -50,18 +50,7 @@ export function PostInspector({
     ];
     return (
         <InspectorFrame
-            header={
-                <div className="flex h-14 shrink-0 items-center gap-2.5 border-b px-4">
-                    <FileText
-                        aria-hidden
-                        className="size-4 text-muted-foreground"
-                    />
-                    <h2 className="text-[0.9375rem] font-semibold">Post</h2>
-                    <span className="truncate text-[0.8125rem] text-muted-foreground">
-                        Shows in Blog
-                    </span>
-                </div>
-            }
+            header={<PostInspectorHeader />}
             tabs={
                 <TabStrip
                     label="Post"
@@ -114,5 +103,18 @@ export function PostInspector({
                 )}
             </div>
         </InspectorFrame>
+    );
+}
+
+/** "Post · Shows in Blog": the same while a post loads as when it is open. */
+export function PostInspectorHeader() {
+    return (
+        <div className="flex h-14 shrink-0 items-center gap-2.5 border-b px-4">
+            <FileText aria-hidden className="size-4 text-muted-foreground" />
+            <h2 className="text-[0.9375rem] font-semibold">Post</h2>
+            <span className="truncate text-[0.8125rem] text-muted-foreground">
+                Shows in Blog
+            </span>
+        </div>
     );
 }

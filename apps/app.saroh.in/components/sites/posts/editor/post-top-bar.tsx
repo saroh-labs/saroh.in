@@ -4,6 +4,7 @@ import { Button } from "@saroh/ui/button";
 import { IconButton } from "@saroh/ui/icon-button";
 import { cn } from "@saroh/ui/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@saroh/ui/popover";
+import { Skeleton } from "@saroh/ui/skeleton";
 import type { Editor } from "@tiptap/react";
 import {
     Check,
@@ -33,7 +34,9 @@ import { useCanUndo } from "./use-can-undo";
  * Publish post, the one black button. Ask AI is in the rail here (C3).
  */
 export function PostTopBar({
+    siteId,
     model,
+    busy = true,
     editor,
     previewing,
     onPreview,
@@ -41,7 +44,12 @@ export function PostTopBar({
     more,
     onDiscard,
 }: {
-    model: PostEditorModel;
+    /** Null only before the first post of a visit has loaded. */
+    siteId: string | null;
+    /** Null while another post loads: its parts are grey, the bar stays. */
+    model: PostEditorModel | null;
+    /** Without a model: a post is on its way (grey), or none is coming. */
+    busy?: boolean;
     editor: Editor | null;
     previewing: boolean;
     onPreview: (on: boolean) => void;
@@ -50,27 +58,61 @@ export function PostTopBar({
     /** Started from Ask AI and not yet saved: Discard and Save draft. */
     onDiscard?: () => void;
 }) {
+    // Lit after an edit, never on open (editor audit, 21 Nov).
+    const can = useCanUndo(editor);
+    const back = siteId ? (
+        <Link
+            href={`/sites/${siteId}/overview`}
+            aria-label="Back to Website"
+            className="flex h-10 shrink-0 items-center gap-1.5 rounded-[9px] pl-1.5 pr-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+            <ChevronLeft aria-hidden className="size-[18px]" />
+            <span className="hidden min-[1600px]:inline">Website</span>
+        </Link>
+    ) : (
+        <Skeleton aria-hidden className="ml-1.5 h-10 w-9 rounded-[9px]" />
+    );
+    if (!model) {
+        // Another post on its way: the same bar, its post parts grey.
+        if (!busy) {
+            return (
+                <header data-post-bar="" className={BAR}>
+                    {back}
+                </header>
+            );
+        }
+        return (
+            <header data-post-bar="" aria-busy="true" className={BAR}>
+                {back}
+                <Divider />
+                <span
+                    aria-hidden
+                    className="flex h-11 w-[300px] shrink items-center gap-2.5 rounded-[10px] border bg-card px-2.5"
+                >
+                    <Skeleton className="h-5 w-12" />
+                    <span className="grid flex-1 gap-1.5">
+                        <Skeleton className="h-3.5 w-4/5" />
+                        <Skeleton className="h-3 w-1/2" />
+                    </span>
+                </span>
+                <span className="flex-1" />
+                <Skeleton aria-hidden className="h-9 w-40 rounded-full" />
+                <Skeleton
+                    aria-hidden
+                    className="ml-2 h-10 w-28 rounded-[9px]"
+                />
+            </header>
+        );
+    }
     const { data, draft } = model;
-    const { siteId, readOnly, paused, postsPrefix } = data;
+    const { readOnly, paused, postsPrefix } = data;
     const title = draft.fields.title.trim() || "New post";
     const slug = draft.fields.slug.trim();
     const path = slug ? `/${postsPrefix}/${slug}` : `/${postsPrefix}/`;
     const live = model.status.startsWith("Live");
-    // Lit after an edit, never on open (editor audit, 21 Nov).
-    const can = useCanUndo(editor);
     return (
-        <header
-            data-post-bar=""
-            className="flex h-[60px] shrink-0 items-center gap-1 overflow-hidden whitespace-nowrap border-b bg-background pl-2 pr-3"
-        >
-            <Link
-                href={`/sites/${siteId}/overview`}
-                aria-label="Back to Website"
-                className="flex h-10 shrink-0 items-center gap-1.5 rounded-[9px] pl-1.5 pr-2.5 text-sm font-semibold transition-colors duration-fast hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-                <ChevronLeft aria-hidden className="size-[18px]" />
-                <span className="hidden min-[1600px]:inline">Website</span>
-            </Link>
+        <header data-post-bar="" className={BAR}>
+            {back}
             <Divider />
             <PostPicker model={model} title={title} path={path} />
             {readOnly || paused ? (
@@ -172,6 +214,9 @@ export function PostTopBar({
         </header>
     );
 }
+
+const BAR =
+    "flex h-[60px] shrink-0 items-center gap-1 overflow-hidden whitespace-nowrap border-b bg-background pl-2 pr-3";
 
 function Divider() {
     return <span aria-hidden className="mx-1 h-6 w-px shrink-0 bg-border" />;
