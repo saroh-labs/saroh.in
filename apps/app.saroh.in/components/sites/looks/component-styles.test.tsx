@@ -10,7 +10,7 @@ import { changedComponents, resolveStyleVariables } from "@/lib/sites/style";
 import { ComponentStyleList, componentsLine } from "./component-styles";
 
 /**
- * Brand › Buttons and shapes (DEC-227, plan U2, board SBCustomise): each
+ * Brand › Buttons and shapes (DEC-237, plan U2, board SBCustomise): each
  * component's options, the look's default chosen until the owner picks; a
  * pick is kept even when it equals the look's own (KD1); Undo per row and
  * "Reset to <look>" take choices away.

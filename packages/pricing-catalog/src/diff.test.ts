@@ -87,7 +87,7 @@ describe("diff", () => {
         ]);
     });
 
-    it("words a plan's yearly offer set, changed and taken off (DEC-231)", () => {
+    it("words a plan's yearly offer set, changed and taken off (DEC-239)", () => {
         const a = edit(
             fixture(),
             (c) => (c.plans[1].yearlyOfferPaise = 77_700),

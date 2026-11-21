@@ -192,7 +192,7 @@ describe("pricingPageModel with an automatic discount", () => {
     });
 });
 
-describe("a plan's yearly offer price (DEC-231)", () => {
+describe("a plan's yearly offer price (DEC-239)", () => {
     const offered = () => {
         const c = catalog();
         c.plans[1].yearlyOfferPaise = 77_700;

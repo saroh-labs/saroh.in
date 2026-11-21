@@ -839,7 +839,7 @@ describe("how it's paid (DEC-093)", () => {
     });
 });
 
-describe("a yearly offer price (DEC-231)", () => {
+describe("a yearly offer price (DEC-239)", () => {
     // Made up: a plan at 222 a month, its year paying for 10 months, and a
     // yearly offer of 1,777 the plan row was written at.
     const catalog = (offer?: number) =>

@@ -133,7 +133,7 @@ export interface ChangeQuote {
     mandateCheck: "PAID" | "REFUNDED" | "NONE";
     /**
      * The regular yearly price before tax, struck beside `pricePaise`, when
-     * the year is charged at its plan's yearly offer (DEC-231). Absent from
+     * the year is charged at its plan's yearly offer (DEC-239). Absent from
      * an API before it, or null: no offer.
      */
     regularPricePaise?: number | null;
@@ -277,7 +277,7 @@ export function priceWords(pricePaise: number, cycle: Cycle): string {
 
 /**
  * Whether the picker offers yearly, how many months it gives free, and the
- * switch's words ("save up to X%" while a plan has a yearly offer, DEC-231).
+ * switch's words ("save up to X%" while a plan has a yearly offer, DEC-239).
  */
 export function yearlyOffer(
     catalog: Catalog | null,

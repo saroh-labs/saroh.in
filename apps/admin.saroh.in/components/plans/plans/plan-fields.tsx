@@ -14,7 +14,7 @@ import { FIELD, Field, NumberField } from "./fields";
  * Plans tab's "Plan by plan" before it): Name, the monthly price before
  * GST and when a new one reaches businesses, the line under the name, the
  * button, Highlight, and what it comes to a year when yearly billing is
- * on, with its yearly offer price (DEC-231). Retire is the sheet's own
+ * on, with its yearly offer price (DEC-239). Retire is the sheet's own
  * block.
  */
 

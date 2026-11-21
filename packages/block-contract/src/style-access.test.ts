@@ -76,7 +76,7 @@ describe("the shared style rule", () => {
         expect(colourwayOfPalette(undefined, colourways)).toBe(null);
     });
 
-    it("never charges a component style (DEC-227, KD4: free on every plan)", () => {
+    it("never charges a component style (DEC-237, KD4: free on every plan)", () => {
         const withComponents = {
             ...stored,
             components: { buttons: "square", cards: "raised" },

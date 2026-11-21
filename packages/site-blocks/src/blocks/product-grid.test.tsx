@@ -527,7 +527,7 @@ describe("products across on a phone, the owner's choice (24 Oct)", () => {
     });
 });
 
-describe("Product grid: Add in place and Pre-order words (DEC-227/228, U5)", () => {
+describe("Product grid: Add in place and Pre-order words (DEC-237/228, U5)", () => {
     afterEach(() => {
         window.localStorage.clear();
     });

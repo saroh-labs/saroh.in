@@ -116,7 +116,7 @@ export function BrandReadOnly({
                 ))}
             <section aria-label="Buttons and shapes">
                 <h3 className="label pb-1">Buttons and shapes</h3>
-                {/* The owner's choices, drawn off (DEC-200, DEC-227). */}
+                {/* The owner's choices, drawn off (DEC-200, DEC-237). */}
                 <ComponentStyleList
                     style={style}
                     onChange={noChange}

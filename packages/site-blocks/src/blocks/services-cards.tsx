@@ -72,7 +72,7 @@ export function NoTimesYet({
 }
 
 /**
- * The `cards` look (DEC-227), which is also the older "Show as: Cards"
+ * The `cards` look (DEC-237), which is also the older "Show as: Cards"
  * (G16): the services side by side, as the Customer Site design draws a
  * Book page — how long, the name, a line about it, the price and a button
  * that opens the booking page on that service. Content that chose cards

@@ -176,7 +176,7 @@ export function offerTermsChanged(
 export function yearlyOffTooMuch(
     f: Pick<CouponFields, "discountPaise" | "percentOff" | "months">,
     monthlyPaise: number,
-    /** What the year is charged: its yearly offer when set (DEC-231). */
+    /** What the year is charged: its yearly offer when set (DEC-239). */
     yearPaise: number,
 ): boolean {
     const month = couponMonthPaise(f, monthlyPaise);

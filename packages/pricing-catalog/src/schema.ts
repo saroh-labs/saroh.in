@@ -146,7 +146,7 @@ export const planSchema = z.object({
     trial: trialSchema.optional(),
     /**
      * What a yearly buyer is charged before GST, when the plan has a yearly
-     * offer (DEC-231): below the regular yearly price ("pay for N months,
+     * offer (DEC-239): below the regular yearly price ("pay for N months,
      * get 12"), which the pricing page strikes through beside it. Absent:
      * no offer, the regular yearly price is charged.
      */

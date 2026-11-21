@@ -365,7 +365,7 @@ describe("the preview's colours under a look", () => {
     });
 });
 
-describe("switching look after customising components (DEC-227)", () => {
+describe("switching look after customising components (DEC-237)", () => {
     const customised: SiteStyle = {
         ...inLook(classic, "folio"),
         components: { buttons: "rounded", cards: "raised" },

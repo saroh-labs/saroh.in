@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * Phone text in the inspector (U7, KD9, DEC-227): a button, the hero's line
+ * Phone text in the inspector (U7, KD9, DEC-237): a button, the hero's line
  * and a Text block's body each choose "Same on phone" or "Shorter on phone";
  * shorter opens an empty phone field, body text says search engines read
  * it, and the hero's heading has no phone field, only "Shorten it for both".

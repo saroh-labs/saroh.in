@@ -1056,7 +1056,7 @@ export const BLOCK_META = {
                 showAvailability: true,
                 note: "Baked this morning. What is gone usually goes before ten.",
             },
-            // Add in place, a Pre-order tag and the cut-off line (DEC-227).
+            // Add in place, a Pre-order tag and the cut-off line (DEC-237).
             preorder: {
                 variant: "default",
                 title: "Cakes for the weekend",

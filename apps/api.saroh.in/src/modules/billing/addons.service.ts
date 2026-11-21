@@ -393,7 +393,7 @@ export class AddonsService {
                     now,
                 });
                 // A year at its yearly offer: the launch percent on what
-                // falls in its first months (DEC-231).
+                // falls in its first months (DEC-239).
                 const line =
                     prorated &&
                     withLaunchOff(

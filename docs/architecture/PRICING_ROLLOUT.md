@@ -412,7 +412,7 @@ Code: `checkout-quote.ts` (the rule), `checkout.service.ts`, `offers.ts`,
       month's end (`cancelAtPeriodEnd`); the move-down notice tells it.
 - **Yearly** is the plan's yearly row ("pay for N months, get 12", priced
   at publish) on its yearly provider plan, sold only while yearly is on.
-  A plan's `yearlyOfferPaise` (DEC-231) is what that row is priced at
+  A plan's `yearlyOfferPaise` (DEC-239) is what that row is priced at
   instead (`chargedYearlyPaise`; the regular price is
   `regularYearlyPaise`); the quote carries the regular price as
   `regularPricePaise` to strike, and the automatic coupon is skipped on it

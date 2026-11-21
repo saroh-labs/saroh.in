@@ -83,7 +83,7 @@ export interface ProductGridFeed {
     /** The read failed: not "none", so the section says so (`FeedFailed`). */
     failed?: boolean;
     /**
-     * The site whose bag the cards' Add fills (`addInPlace`, DEC-227), set
+     * The site whose bag the cards' Add fills (`addInPlace`, DEC-237), set
      * only where the site takes orders online. Absent: no Add on a live
      * page; the card opens the product as before.
      */
@@ -437,7 +437,7 @@ function ProductCards({
         !list && (content.phoneColumns === 1 || content.phoneColumns === 2)
             ? content.phoneColumns
             : undefined;
-    // Add to bag from the card (DEC-227): the even grid, bare cards and the
+    // Add to bag from the card (DEC-237): the even grid, bare cards and the
     // list. Plates are for browsing, and the lead piece opens its page.
     const order =
         content.addInPlace === true

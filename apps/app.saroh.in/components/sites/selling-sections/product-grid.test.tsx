@@ -265,7 +265,7 @@ describe("the Product grid's fields (G12)", () => {
     it("never offers a product's name, price or photo as a field", () => {
         render({});
         // The title, the button's words (G16), the owner's own cut-off
-        // line (U11) and Pre-order tag (DEC-227): never a product's own.
+        // line (U11) and Pre-order tag (DEC-237): never a product's own.
         expect(host.querySelectorAll("input")).toHaveLength(4);
         expect(host.textContent).toContain(
             "Each card uses that product's own photo",

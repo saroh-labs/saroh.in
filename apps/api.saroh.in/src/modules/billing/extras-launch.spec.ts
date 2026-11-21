@@ -1,5 +1,5 @@
 /**
- * Extras on a yearly offer plan (DEC-231): the launch percent only on what
+ * Extras on a yearly offer plan (DEC-239): the launch percent only on what
  * falls in the subscription's first months. Made-up figures (an add-on at
  * 1,000 a year, a 10% offer for 3 months), never a real price or offer.
  */
@@ -25,7 +25,7 @@ const line = (start: string, end: string, unitPaise: number) =>
         periodEnd: day(end),
     }) satisfies AddonChargeLine;
 
-describe("withLaunchOff (DEC-231)", () => {
+describe("withLaunchOff (DEC-239)", () => {
     it("takes the percent off only the part inside the first months", () => {
         // Bought on 1 Feb: 334 days to the year's end, 59 of them in the
         // window. 10% of 59/334 of 91,507 is 1,616.44… → 1,616 a unit.

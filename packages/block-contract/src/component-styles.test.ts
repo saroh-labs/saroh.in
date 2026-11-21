@@ -18,7 +18,7 @@ import {
     siteStyleVariables,
 } from "./site-style";
 
-describe("component styles (DEC-227)", () => {
+describe("component styles (DEC-237)", () => {
     it("labels every component and option for the editor", () => {
         for (const kind of COMPONENT_KINDS) {
             expect(COMPONENT_LABELS[kind]).toBeTruthy();

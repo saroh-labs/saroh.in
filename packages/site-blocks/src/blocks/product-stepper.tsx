@@ -14,7 +14,7 @@ const outline =
     "border-site-rule text-site-fg inline-flex min-h-11 w-full items-center justify-center rounded-[var(--site-radius)] border px-3.5 text-[14px] font-semibold";
 
 /**
- * A Product grid card's order control (DEC-227, "Add to bag from the card"):
+ * A Product grid card's order control (DEC-237, "Add to bag from the card"):
  * Add, which turns into the − / + stepper after the first tap — one control,
  * never both — so a customer fills the bag without leaving the page. It is
  * the shop's own bag (`bag-store.ts`) and stepper (`BagStepper`): the count

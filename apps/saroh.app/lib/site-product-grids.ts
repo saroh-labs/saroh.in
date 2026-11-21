@@ -73,7 +73,7 @@ export async function getProductGridFeeds(
     return bagSite ? feeds?.map((f) => f && { ...f, bagSite }) : feeds;
 }
 
-/** A grid whose cards add to the bag in place (DEC-227). */
+/** A grid whose cards add to the bag in place (DEC-237). */
 function addsInPlace(section: { type: string; content: unknown }): boolean {
     return (
         section.type === "productGrid" &&

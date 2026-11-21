@@ -189,7 +189,7 @@ export function parseSiteStyle(input: unknown): SiteStyle {
 }
 
 /**
- * Component styles (DEC-227, KD1): refused, not coerced, like a look. A
+ * Component styles (DEC-237, KD1): refused, not coerced, like a look. A
  * key equal to the look's default is KEPT (the choice survives a look
  * switch); an empty object or null is "no choices", stored as absent.
  */

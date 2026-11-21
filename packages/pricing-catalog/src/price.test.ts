@@ -57,7 +57,7 @@ describe("catalogue money", () => {
         ).toBe(11_100);
     });
 
-    it("charges a year at the plan's yearly offer when it has one (DEC-231)", () => {
+    it("charges a year at the plan's yearly offer when it has one (DEC-239)", () => {
         const yearly = { yearly: { on: true, paid: 9 } };
         const plain = { pricePaise: 11_100 };
         const offered = { pricePaise: 11_100, yearlyOfferPaise: 77_700 };
@@ -69,7 +69,7 @@ describe("catalogue money", () => {
         expect(planPricePaise(yearly, offered, "month")).toBe(11_100);
     });
 
-    it("says the best yearly saving, rounded down, only with an offer (DEC-231)", () => {
+    it("says the best yearly saving, rounded down, only with an offer (DEC-239)", () => {
         const c = (offerB?: number, offerC?: number) => ({
             yearly: { on: true, paid: 10 },
             plans: [

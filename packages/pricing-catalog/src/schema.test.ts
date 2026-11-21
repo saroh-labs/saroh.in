@@ -306,7 +306,7 @@ describe("the catalogue schema", () => {
         expect(errorsOf(input)).toEqual([]);
     });
 
-    it("keeps a yearly offer above nothing and below the regular year (DEC-231)", () => {
+    it("keeps a yearly offer above nothing and below the regular year (DEC-239)", () => {
         const input = fixtureInput();
         // Plan B: 111 a month, the fixture's year pays for 9 months.
         const regular = input.plans[1].pricePaise * input.yearly.paid;

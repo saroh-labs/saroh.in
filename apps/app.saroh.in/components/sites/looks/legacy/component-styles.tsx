@@ -26,7 +26,7 @@ export function componentsLine(style: SiteStyle): string {
 }
 
 /**
- * The Brand tab's "Customise components" (DEC-227, plan U2): a row that
+ * The Brand tab's "Customise components" (DEC-237, plan U2): a row that
  * opens the list beside the rail on a desk; in a phone's Brand sheet the
  * list itself (`BrandPicker`). Free on every plan, so nothing here asks
  * the plan.

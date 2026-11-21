@@ -22,7 +22,7 @@ import type { LookId } from "@saroh/block-contract";
  *
  * Colours and faces are the business's (`--site-*` only, gate G2).
  *
- * COMPONENT STYLES (DEC-227, DEC-229): the merchant's button and card
+ * COMPONENT STYLES (DEC-237, DEC-229): the merchant's button and card
  * choices reach these same parts: `component-theme.ts` finds them by
  * `ACCOUNT_PARTS`, and its button rule reaches past the look's account
  * rules here. One set of parts for every look: this list only grows, and

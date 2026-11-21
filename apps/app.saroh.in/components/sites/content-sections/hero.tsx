@@ -92,7 +92,7 @@ export function HeroFields({
                     placeholder="Welcome"
                 />
             </Field>
-            {/* One h1, the same on every width (DEC-227): no phone version. */}
+            {/* One h1, the same on every width (DEC-237): no phone version. */}
             <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
                 Same on phone and desktop. Search engines read the phone page,
                 and a page has one main heading. Too long for a phone?{" "}

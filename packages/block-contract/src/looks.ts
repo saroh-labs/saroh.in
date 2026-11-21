@@ -93,7 +93,7 @@ export interface SiteLook {
     short: string;
     tokens: LookTokens;
     /**
-     * Its component styles (DEC-227, KD3; BRIEF Wave 2): what each option
+     * Its component styles (DEC-237, KD3; BRIEF Wave 2): what each option
      * row in Customise starts on. Each is how the look draws today, so a
      * site that changed nothing renders as it always has.
      */

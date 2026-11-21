@@ -360,7 +360,7 @@ const renderedServicesList = z.object({
     followUpLine: z.string().optional(),
     includesLabel: z.string().optional(),
     includes: z.array(z.string()).optional(),
-    /** The menu look's headings, each over its services (DEC-227). */
+    /** The menu look's headings, each over its services (DEC-237). */
     groups: z
         .array(z.object({ name: z.string(), serviceIds: z.array(z.string()) }))
         .optional(),
@@ -461,7 +461,7 @@ const renderedProductGrid = z.object({
     columns: z.number().int().optional(),
     // Across on a phone; a count this build does not know keeps the look's.
     phoneColumns: z.number().int().optional(),
-    /** A − / + stepper on each card (DEC-227); absent, off. */
+    /** A − / + stepper on each card (DEC-237); absent, off. */
     addInPlace: z.boolean().optional(),
     /** The owner's Pre-order tag words; absent, no tag. */
     preorderWords: z.string().optional(),

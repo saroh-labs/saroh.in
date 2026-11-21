@@ -262,7 +262,7 @@ export interface ServicesListContent {
     followUpLine?: string;
     includesLabel?: string;
     includes?: string[];
-    /** The menu look's headings, each over its services (DEC-227). */
+    /** The menu look's headings, each over its services (DEC-237). */
     groups?: { name: string; serviceIds: string[] }[];
 }
 
@@ -362,7 +362,7 @@ export interface ProductGridContent {
     columns?: 3 | 4 | 5;
     /** Across on a phone, the owner's choice; absent, the look's own. */
     phoneColumns?: 1 | 2;
-    /** A − / + stepper on each card (DEC-227). */
+    /** A − / + stepper on each card (DEC-237). */
     addInPlace?: boolean;
     /** The owner's Pre-order tag words. */
     preorderWords?: string;

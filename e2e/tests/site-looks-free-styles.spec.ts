@@ -25,7 +25,7 @@ import { NORTHWIND_ORG, urls } from "../playwright.config";
  * - a typeface the catalogue doesn't make free is refused the same way;
  * - with `themes` granted to Northwind (a module override, as staff give
  *   it on its admin page, ended after), Quiet is taken and saved;
- * - component styles (DEC-227) are free on every plan: Cards → Flat saves
+ * - component styles (DEC-237) are free on every plan: Cards → Flat saves
  *   on a plan without `themes`, with no refusal.
  *
  * Which styles are free is the live catalogue's (`freeStyles`), and
@@ -279,7 +279,7 @@ test.describe("free and paid styles", { tag: "@serial" }, () => {
         }
     });
 
-    test("saves a component style on any plan (DEC-227)", async ({
+    test("saves a component style on any plan (DEC-237)", async ({
         browser,
         page,
     }, testInfo) => {

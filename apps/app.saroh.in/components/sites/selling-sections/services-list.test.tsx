@@ -175,7 +175,7 @@ describe("the services list's display options (G16)", () => {
     });
 });
 
-describe("the menu look's headings (DEC-227)", () => {
+describe("the menu look's headings (DEC-237)", () => {
     it("adds a heading and puts a service under it", () => {
         const onChange = render({
             variant: "menu",

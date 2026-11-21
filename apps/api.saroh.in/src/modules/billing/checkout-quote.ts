@@ -185,7 +185,7 @@ export interface ChangeQuote {
     /**
      * The regular yearly price before tax, struck beside `pricePaise`, when
      * the target is a yearly row charged at its plan's yearly offer
-     * (DEC-231); null or absent otherwise.
+     * (DEC-239); null or absent otherwise.
      */
     regularPricePaise?: number | null;
 }
@@ -194,7 +194,7 @@ const YEAR_MONTHS = 12;
 
 /**
  * The regular yearly price a yearly row's offer is struck against
- * (DEC-231): set only when the row is yearly, its plan has a yearly offer
+ * (DEC-239): set only when the row is yearly, its plan has a yearly offer
  * on that version, and the row is charged below the regular price.
  * Null otherwise. While it is set, the automatic launch coupon is skipped.
  */

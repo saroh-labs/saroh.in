@@ -269,7 +269,7 @@ describe("StylePanel on a phone", () => {
     });
 });
 
-describe("Customise components (DEC-227)", () => {
+describe("Customise components (DEC-237)", () => {
     it("opens the list from its row on a desk and saves a pick", () => {
         const onChange = renderPanel({ ...GREEN.style, look: "folio" });
         const open = host.querySelector<HTMLElement>("[data-components-open]");

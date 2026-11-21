@@ -244,7 +244,7 @@ export function ServicesListFields({
 
             <DisplayOptions
                 /*
-                 * Cards is a look now (DEC-227), picked above. Show as stays
+                 * Cards is a look now (DEC-237), picked above. Show as stays
                  * only under the list look, where an older section may still
                  * say cards: choosing cards moves it to the Cards look.
                  */
@@ -434,7 +434,7 @@ const MAX_GROUPS = 8;
 type Groups = NonNullable<ServicesListContent["groups"]>;
 
 /**
- * The menu's headings (DEC-227): each a name over the services ticked
+ * The menu's headings (DEC-237): each a name over the services ticked
  * under it, from the services this section shows. A service in no heading
  * goes under "More" on the site, so nothing listed is ever lost.
  */

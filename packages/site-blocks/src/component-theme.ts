@@ -16,7 +16,7 @@ import { ACCOUNT_PARTS } from "./account/look-account-rules";
 import { LOOK_DESK_FROM } from "./look-theme";
 
 /**
- * Component styles as CSS (DEC-227, plan U1 KD2), written by `SiteTheme`
+ * Component styles as CSS (DEC-237, plan U1 KD2), written by `SiteTheme`
  * LAST, after the look's rules, so a merchant's choice beats the look.
  *
  * Only a choice that differs from the look's default writes anything: a

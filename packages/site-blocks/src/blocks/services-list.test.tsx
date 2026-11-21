@@ -296,7 +296,7 @@ describe("a free service under a look (DEC-172, VD01, VA01)", () => {
     });
 });
 
-describe("servicesList cards and menu (DEC-227, U5)", () => {
+describe("servicesList cards and menu (DEC-237, U5)", () => {
     const colour: PublicService = {
         id: "fixture-colour",
         name: "Full colour",

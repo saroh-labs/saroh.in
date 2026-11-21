@@ -10,7 +10,7 @@ type Tx = Prisma.TransactionClient;
 
 /**
  * The launch offer on extras of a yearly plan at its yearly offer price
- * (DEC-231, owner 20 Nov 2026). The plan's year skips the automatic coupon,
+ * (DEC-239, owner 20 Nov 2026). The plan's year skips the automatic coupon,
  * but its extras (packs, seats) get the coupon's percent for what falls in
  * the subscription's first `months` months, counted from the day the yearly
  * plan started, never from the extra's own start. From then on every extra

@@ -92,7 +92,7 @@ export interface SiteStyle {
      */
     look?: LookId;
     /**
-     * Component styles (DEC-227, KD1): only the components the owner
+     * Component styles (DEC-237, KD1): only the components the owner
      * changed. Absent until they change one; a key equal to the look's
      * default is kept, and only "Reset to <look>" removes the object.
      */
@@ -112,7 +112,7 @@ export function inLook(style: SiteStyle, look: LookId | null): SiteStyle {
 }
 
 /**
- * The components whose choice differs from the look's own (DEC-227): what
+ * The components whose choice differs from the look's own (DEC-237): what
  * "N changed" counts. A key equal to the look's default is kept (KD1) but
  * is not a change.
  */
@@ -305,7 +305,7 @@ export function resolveStyleVariables(
     // one rule, as the API's resolver applies them.
     if (style.palette) Object.assign(vars, paletteVariables(style.palette));
     Object.assign(vars, typeScaleVariables(style.type));
-    // Component choices, by word (DEC-227), as the API's resolver emits them.
+    // Component choices, by word (DEC-237), as the API's resolver emits them.
     Object.assign(vars, componentStyleVariables(style.components));
     // A look draws in safe colours, by the contract's one rule, as
     // publishing does (DEC-172, KD4). Classic's variables are unchanged.

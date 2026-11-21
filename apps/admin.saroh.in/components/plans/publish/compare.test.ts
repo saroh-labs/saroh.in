@@ -21,7 +21,7 @@ describe("comparePlans", () => {
         expect(plan?.same).toBe("No changes");
     });
 
-    it("names a plan's yearly offer beside its regular year (DEC-231)", () => {
+    it("names a plan's yearly offer beside its regular year (DEC-239)", () => {
         const live = tabCatalog();
         live.yearly = { on: true, paid: 10 };
         const draft = structuredClone(live);

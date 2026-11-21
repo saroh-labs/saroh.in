@@ -9,7 +9,7 @@ import { nextIndex } from "../roving";
 
 /**
  * The Pricing design's Monthly / "Yearly · N months free" (or "save up
- * to X%" with a yearly offer, DEC-231) switch: a
+ * to X%" with a yearly offer, DEC-239) switch: a
  * radiogroup on white, the chosen side in Ink. Shown only when the
  * catalogue offers yearly billing. One tab stop; the arrow keys move
  * between the two and choose as they go (WAI-ARIA radio group).

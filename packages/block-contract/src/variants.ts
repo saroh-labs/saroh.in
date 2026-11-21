@@ -91,7 +91,7 @@ const galleryLegacy: LegacyResolver = (content) => {
 };
 
 /**
- * Services' "Show as: Cards" (G16) predates the `cards` look (DEC-227) and
+ * Services' "Show as: Cards" (G16) predates the `cards` look (DEC-237) and
  * draws the same cards, so content that names no variant but chose cards
  * resolves to that look: the editor shows Cards picked, and nothing on a
  * live page moves. A named variant always wins over `layout`.

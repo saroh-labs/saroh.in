@@ -244,7 +244,7 @@ export interface ChangePlanQuoteView {
     mandateCheck: MandateCheck;
     /**
      * The regular yearly price before tax, struck beside `pricePaise` when
-     * the year is charged at its plan's yearly offer (DEC-231); else null.
+     * the year is charged at its plan's yearly offer (DEC-239); else null.
      */
     regularPricePaise: number | null;
     /**
@@ -1131,7 +1131,7 @@ export class CheckoutService {
                     ).priceCents
                   : catalog?.plans.find((p) => p.id === planId)?.pricePaise;
         // A year at its plan's yearly offer: the offer is yearly's launch
-        // price, so the automatic coupon never stacks on it (DEC-231).
+        // price, so the automatic coupon never stacks on it (DEC-239).
         const regularPaise = yearlyOfferRegular(catalog, planId, target);
         const asked = {
             subscription,

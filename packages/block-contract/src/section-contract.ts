@@ -176,7 +176,7 @@ const linkHref = z
     );
 
 /**
- * A button's shorter words for a phone (KD9, DEC-227): both are in the page
+ * A button's shorter words for a phone (KD9, DEC-237): both are in the page
  * and CSS shows one per width, so nothing loads on tap. ABSENT or empty, the
  * phone shows the button's own label.
  */
@@ -515,7 +515,7 @@ const richTextV1 = z.object({
      */
     factsStyle: z.enum(TEXT_FACTS_STYLES).optional(),
     /**
-     * A shorter body for a phone (KD9, DEC-227), in `format` like `value`
+     * A shorter body for a phone (KD9, DEC-237), in `format` like `value`
      * and sanitized like it. Both are in the page and CSS shows one, so
      * search engines read the phone version too. ABSENT or empty, the
      * phone shows `value`.
@@ -861,7 +861,7 @@ const servicesListV1 = z.object({
     includesLabel: z.string().trim().max(60).optional(),
     includes: z.array(z.string().trim().min(1).max(200)).max(12).optional(),
     /**
-     * The `menu` look's headings (DEC-227): each group's name over the
+     * The `menu` look's headings (DEC-237): each group's name over the
      * services named in it, in its order. A listed service in no group
      * goes under "More". ABSENT, one list. The other looks ignore it.
      */
@@ -1219,7 +1219,7 @@ const productGridV1 = z.object({
     phoneColumns: z.union([z.literal(1), z.literal(2)]).optional(),
     /**
      * A − / + stepper on each card that adds to the bag where it stands,
-     * in place of opening the product (DEC-227). ABSENT, off.
+     * in place of opening the product (DEC-237). ABSENT, off.
      */
     addInPlace: z.boolean().optional(),
     /**

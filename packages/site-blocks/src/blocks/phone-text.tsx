@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 /**
- * Different words on a phone (KD9, DEC-227): a button's label, the hero's
+ * Different words on a phone (KD9, DEC-237): a button's label, the hero's
  * line and a Text block's body may carry a shorter phone version. Both are
  * in the page and CSS shows one per width, so nothing loads on tap and
  * search engines read both. The hidden one is `display: none`, so a

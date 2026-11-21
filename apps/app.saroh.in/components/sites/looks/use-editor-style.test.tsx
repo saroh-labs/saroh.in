@@ -226,7 +226,7 @@ describe("choosing a look", () => {
     });
 });
 
-describe("component styles and the look (DEC-227)", () => {
+describe("component styles and the look (DEC-237)", () => {
     const customised: SiteStyle = {
         ...classic,
         look: "folio",

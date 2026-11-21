@@ -109,7 +109,7 @@ export interface LookChoices {
     error: string | null;
     /**
      * `keepComponents` false: the new look's own component styles, the
-     * owner's choices dropped ("Use <look>'s styles", DEC-227). Absent or
+     * owner's choices dropped ("Use <look>'s styles", DEC-237). Absent or
      * true keeps them.
      */
     onChoose: (look: LookId | null, keepComponents?: boolean) => void;
@@ -170,7 +170,7 @@ export function LookPicker({
     // The Preview button that opened it, for the keyboard on the way back.
     const opener = useRef<HTMLElement | null>(null);
     const changeRef = useRef<HTMLDivElement | null>(null);
-    // A look asked about first: the owner changed components (DEC-227).
+    // A look asked about first: the owner changed components (DEC-237).
     const [switching, setSwitching] = useState<LookChoice | null>(null);
     const [keep, setKeep] = useState<"keep" | "use">("keep");
     const draftLook = style.look ?? null;

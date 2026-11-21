@@ -25,7 +25,7 @@ describe("planRows", () => {
         expect(new Set(rows.map((r) => r.currency))).toEqual(new Set(["INR"]));
     });
 
-    it("writes the yearly offer as the yearly row's price (DEC-231)", () => {
+    it("writes the yearly offer as the yearly row's price (DEC-239)", () => {
         const rows = planRows(
             edit(fixture(), (c) => (c.plans[1].yearlyOfferPaise = 77_700)),
             1,

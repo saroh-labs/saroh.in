@@ -11,7 +11,7 @@ import type { PublicService } from "./service-words";
 import { formatDuration, servicePriceWords } from "./service-words";
 import { focusRing, NoTimesYet, serviceHref } from "./services-cards";
 
-/** The heading over the services no group names (DEC-227). */
+/** The heading over the services no group names (DEC-237). */
 export const MENU_MORE = "More";
 
 export interface MenuGroup {
@@ -51,7 +51,7 @@ export function menuGroups(
 }
 
 /**
- * The `menu` look (DEC-227, SLServices "Menu"): services under the
+ * The `menu` look (DEC-237, SLServices "Menu"): services under the
  * merchant's headings, read like a salon's price list — the name, a dotted
  * leader, the price, how long under it, and Book on every line as a link
  * (44px under a finger). Two groups across at a desk, one on a phone, where

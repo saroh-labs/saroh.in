@@ -73,7 +73,7 @@ export function regularYearlyPaise(
 
 /**
  * What a yearly buyer is charged before GST: the plan's yearly offer when
- * it has one (DEC-231), else the regular yearly price.
+ * it has one (DEC-239), else the regular yearly price.
  */
 export function chargedYearlyPaise(
     catalog: Pick<Catalog, "yearly">,
@@ -83,7 +83,7 @@ export function chargedYearlyPaise(
 }
 
 /**
- * Said near the yearly price on the pricing page and at checkout (DEC-231),
+ * Said near the yearly price on the pricing page and at checkout (DEC-239),
  * in step with the Terms: Saroh refunds nothing but a double charge.
  */
 export const NO_REFUNDS_LINE =
@@ -92,7 +92,7 @@ export const NO_REFUNDS_LINE =
 /**
  * The most a yearly offer saves across the plans still offered, against 12
  * months at the regular monthly price, rounded down to a whole percent
- * (DEC-231). Null when no paid plan has a yearly offer.
+ * (DEC-239). Null when no paid plan has a yearly offer.
  */
 export function yearlySavePercent(
     catalog: Pick<Catalog, "yearly" | "plans">,
@@ -112,7 +112,7 @@ export function yearlySavePercent(
 
 /**
  * The Monthly/Yearly switch's yearly side: the best saving while a plan
- * has a yearly offer (DEC-231), else the months the regular rule gives free.
+ * has a yearly offer (DEC-239), else the months the regular rule gives free.
  */
 export function yearlySwitchLabel(
     catalog: Pick<Catalog, "yearly" | "plans">,

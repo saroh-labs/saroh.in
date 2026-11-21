@@ -28,7 +28,7 @@ export interface QuoteLine {
     label: string;
     value: string;
     iso?: string | null;
-    /** A regular price struck before `value`: a yearly offer's (DEC-231). */
+    /** A regular price struck before `value`: a yearly offer's (DEC-239). */
     was?: string;
 }
 

@@ -215,7 +215,7 @@ export interface SiteStyle {
      */
     look?: LookId;
     /**
-     * Component styles (DEC-227, KD1): only the components the owner
+     * Component styles (DEC-237, KD1): only the components the owner
      * changed, by option id (`component-styles.ts`). ABSENT until they
      * change one, for the reason `look` is; a key equal to the look's
      * default is kept, and only "Reset to <look>" removes the object.
@@ -392,7 +392,7 @@ export function siteStyleVariables(style: SiteStyle): Record<string, string> {
         ...(style.palette ? paletteVariables(style.palette) : {}),
         // Its type scale: nothing at all for a site without one.
         ...typeScaleVariables(style.type),
-        // Component choices, by word (DEC-227): none for a site with none.
+        // Component choices, by word (DEC-237): none for a site with none.
         ...componentStyleVariables(style.components),
     };
     // A look draws in safe colours (KD4); Classic keeps exactly these.

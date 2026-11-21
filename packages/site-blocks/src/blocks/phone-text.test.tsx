@@ -7,7 +7,7 @@ import { DESK_ONLY, PHONE_ONLY, phoneVersion } from "./phone-text";
 import RichTextSection from "./rich-text";
 
 /**
- * Phone text (U7, KD9, DEC-227): both versions in the page, one shown per
+ * Phone text (U7, KD9, DEC-237): both versions in the page, one shown per
  * width by a class that is `display: none` on the other, so a button's
  * accessible name is the label on screen. Empty phone text draws the desk's
  * words alone. The h1 never has a phone version.

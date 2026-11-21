@@ -23,7 +23,7 @@ const grid = (addInPlace?: boolean) => ({
     content: { source: "newest", ...(addInPlace ? { addInPlace } : {}) },
 });
 
-/** A card's Add fills the bag only where the site takes orders (DEC-227). */
+/** A card's Add fills the bag only where the site takes orders (DEC-237). */
 describe("getProductGridFeeds' bag", () => {
     beforeEach(() => vi.mocked(getCheckoutOptions).mockClear());
 

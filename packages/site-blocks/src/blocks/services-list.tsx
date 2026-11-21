@@ -148,7 +148,7 @@ export default function ServicesListSection({
 
     if (state.kind === "ready" && state.services.length === 0) return null;
     /*
-     * The `cards` look (DEC-227) is the older "Show as: Cards" (G16): with
+     * The `cards` look (DEC-237) is the older "Show as: Cards" (G16): with
      * no variant it resolves to `cards` (`variants.ts`), and the default
      * look still honours it, since both could be picked before. Every
      * other look wins over `layout`. Nothing on a live page moves.

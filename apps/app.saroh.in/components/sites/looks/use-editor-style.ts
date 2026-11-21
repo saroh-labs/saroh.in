@@ -24,7 +24,7 @@ export function useEditorStyle({
     /**
      * Today's Brand panel (`looks/legacy`), while the Website area is off:
      * its Reset style keeps the component choices, which have their own
-     * "Reset to <look>" there (DEC-227).
+     * "Reset to <look>" there (DEC-237).
      */
     legacyBrand?: boolean;
     siteId: string;
@@ -136,7 +136,7 @@ export function useEditorStyle({
     /**
      * Choose a look, or Classic for null (U16): a draft change. The
      * component choices go with it unless the owner asked for the new
-     * look's own ("Use <look>'s styles", DEC-227 KD3).
+     * look's own ("Use <look>'s styles", DEC-237 KD3).
      */
     function chooseLook(look: LookId | null, keepComponents = true) {
         setLookError(null);

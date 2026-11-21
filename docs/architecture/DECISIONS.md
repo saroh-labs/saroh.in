@@ -3076,7 +3076,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Context (owner, 20 Nov 2026): "Google Calendar should be with the other integrations, and also should be able to connect from the Bookings page." With a calendar in it, "Providers" read wrong; saroh.in already calls these integrations (`/integrations`).
 - Decision: **the Settings section is "Integrations" at `/settings/integrations`**, holding the business's payment, email and WhatsApp providers, its domains and, in its own group, the person's own Google Calendar (Connect, or Manage at `/settings/integrations/google-calendar`). The tab opens for anyone the calendar is switched on for, who then sees only their calendar. Bookings offers Connect in one dismissible line to someone who could connect and hasn't, and a lapsed account with Manage; nothing about the plan's lock.
 - Consequences: `/settings/providers/*` and `/settings/google-calendar` redirect (permanent, query kept), so Google's callback (`RETURN_PATH`), old links and stored notifications still land. Code names (`providers`, `comms-providers`) stay. The admin console's own Providers page is unchanged.
-## DEC-227 Merchant sites get component styles: free on every plan, set per kind of component, kept when the look changes
+## DEC-237 Merchant sites get component styles: free on every plan, set per kind of component, kept when the look changes
 
 **Status: Accepted — 2026-11-17, to design then build** · owner · extends DEC-172 (looks) and DEC-177 (which styles are paid)
 
@@ -3093,7 +3093,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 ## DEC-228 A public site library on saroh.in, built on a 17-block catalogue
 
-**Status: Accepted — 2026-11-17, to design then build** · owner · follows DEC-227 · block map `~/.saroh-design-drafts/templates/BLOCK-MAP.md` (private drafts)
+**Status: Accepted — 2026-11-17, to design then build** · owner · follows DEC-237 · block map `~/.saroh-design-drafts/templates/BLOCK-MAP.md` (private drafts)
 
 - Context: the owner wants a library where merchants try out what their website can be made of (looks, components, blocks, templates) and that brings visitors to Saroh. `ui.saroh.in` today shows Saroh's own app UI and a rough block index.
 - Decision:
@@ -3111,9 +3111,9 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 
 ## DEC-229 A customer's account on a merchant's site is one design that takes the site's theme
 
-**Status: Accepted — 2026-11-17** · owner · extends DEC-037, DEC-172 and DEC-227
+**Status: Accepted — 2026-11-17** · owner · extends DEC-037, DEC-172 and DEC-237
 
-- Decision: the signed-in account on a merchant's site (home, bookings, orders, plan, messages, details, receipts, sign-in) has **one layout for every business, trade, template and look**. It matches the site through tokens only: the site's colours or colourway, fonts, the look's corners, type and motion, and the merchant's component styles (DEC-227). No template or look gets its own account screens.
+- Decision: the signed-in account on a merchant's site (home, bookings, orders, plan, messages, details, receipts, sign-in) has **one layout for every business, trade, template and look**. It matches the site through tokens only: the site's colours or colourway, fonts, the look's corners, type and motion, and the merchant's component styles (DEC-237). No template or look gets its own account screens.
 - Consequences: keeps today's approach (`packages/site-blocks/src/account/look-account-rules.ts`: one set of parts restyled by the look, held by `looks-account.test.tsx`). New account features are drawn once.
 - Owner picks, 2026-11-18: a GST number can be saved on the customer's account (needs an API field). Book again and Order again are built with DEC-172's later phases, not now.
 
@@ -3142,7 +3142,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
 - Consequences: `POST …/sites/:siteId/publications/:publicationId/restore-draft` (revision checked for the open page, 409 when stale; audited as `site.version.restored_as_draft`). The editor reloads on History after a restore. The old make-it-live endpoint (`…/publications/:id/restore`) stays in the API, where the live pointer's `restore` source and its specs use it; the app no longer calls it.
 - Behind the Website area switch (owner, 20 Nov 2026): with `NEXT_PUBLIC_WEBSITE_AREA` off, Version history and a past version keep today's restore, which puts the version live again (`components/sites/versions/legacy/`, chosen by `restoresAsDraft()`).
 
-## DEC-233 A post's approval is a change unit; Publish post becomes Send for approval when the switch is on
+## DEC-238 A post's approval is a change unit; Publish post becomes Send for approval when the switch is on
 
 **Status: Accepted — 2026-11-20** · owner (O7 of the website editor redesign plan) · extends DEC-226 · keeps DEC-103
 
@@ -3177,7 +3177,7 @@ Also decided 9 Oct (#886): each admin console deploys only its own environment; 
     - **Now and New (a narrow first cut of U42/U43):** one draft tool, `edit_section`, changes a section's heading, the line under it or its main button's words, through the MCP tool of the same name and the editor's own draft save (`section:write`; never a Reviewer, never live). The card names the section, shows Now and New with the changed words marked and what it is based on, then Apply and Not now; Apply says "Saved · goes live when you publish" and Undo puts the old words back. The open editor reads its draft again.
     - **Check this is the server's:** facts in the new words the business never gave (a price not in Services, an offer or percentage not in Discounts, a time not in its hours, "free", a phone number, a number with a claim such as "20 years", none of them on the page now) are marked on the card; Apply stays off until each is ticked, and Confirm refuses while any is unconfirmed. The person's own question doesn't count as giving a fact: they confirm it on the card.
 - Consequences: other section fields, pictures, adding, moving or removing sections, pages and settings stay out of Ask AI; a post can't be read by Ask AI (no post read tool). Editing a flagged fact on the card, rather than confirming it, is left for the full U43.
-## DEC-231 A yearly offer price per plan; the launch coupon doesn't stack on it
+## DEC-239 A yearly offer price per plan; the launch coupon doesn't stack on it
 
 **Status: Accepted — 2026-11-20** · owner
 

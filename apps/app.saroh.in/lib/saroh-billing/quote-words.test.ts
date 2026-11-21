@@ -124,7 +124,7 @@ describe("quoteSummary (DEC-093)", () => {
         );
     });
 
-    it("a yearly offer: the regular year struck before what is charged (DEC-231)", () => {
+    it("a yearly offer: the regular year struck before what is charged (DEC-239)", () => {
         const year = {
             cycle: "year" as const,
             payment: "ONE_TIME" as const,

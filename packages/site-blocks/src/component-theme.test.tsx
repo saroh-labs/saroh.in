@@ -16,7 +16,7 @@ import { componentRules } from "./component-theme";
 import { SiteTheme } from "./site-theme";
 
 /**
- * Component styles (DEC-227, plan U1). A style with no `components` must
+ * Component styles (DEC-237, plan U1). A style with no `components` must
  * draw exactly the sheet it drew before component styles existed: the
  * look pin below was written BEFORE any component code landed (Classic's
  * is `classic-pin.test.tsx`), so a change to it is a change to every live

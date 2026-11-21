@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 
 import { ChoiceField } from "./choice-field";
 
-/** The board's two answers (DEC-227): absent is the same words. */
+/** The board's two answers (DEC-237): absent is the same words. */
 const PHONE_CHOICES = [
     [false, "Same on phone"],
     [true, "Shorter on phone"],
@@ -17,7 +17,7 @@ export const PHONE_SEARCH_HINT =
     "Search engines read this phone text. Keep the words people search for.";
 
 /**
- * A text's phone version (KD9, DEC-227): "Same on phone" stores nothing,
+ * A text's phone version (KD9, DEC-237): "Same on phone" stores nothing,
  * "Shorter on phone" opens an empty phone field. Empty, the site shows the
  * desk words on a phone too, which the field says. Body text carries the
  * search hint; buttons may differ freely. The h1 never uses this.

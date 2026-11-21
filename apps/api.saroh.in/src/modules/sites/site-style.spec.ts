@@ -371,7 +371,7 @@ describe("a look (DEC-172)", () => {
     });
 });
 
-describe("component styles (DEC-227, KD1)", () => {
+describe("component styles (DEC-237, KD1)", () => {
     function refusal(style: unknown): unknown {
         try {
             parseSiteStyle(style);

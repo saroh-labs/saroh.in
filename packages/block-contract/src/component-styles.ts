@@ -1,5 +1,5 @@
 /**
- * Component styles (DEC-227, plan U1 KD1–KD4): how each kind of component
+ * Component styles (DEC-237, plan U1 KD1–KD4): how each kind of component
  * on a merchant's site is drawn, chosen per site from a few curated
  * options, never free CSS. Free on every plan (`StyleKind` does not name
  * them; `style-access.test.ts` holds that).

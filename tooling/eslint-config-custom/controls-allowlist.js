@@ -227,7 +227,7 @@ export const RAW_ALLOWED = {
     "components/sites/editor/editor-rail.tsx": ["button"],
     // button: a Brand tab colour row, one line that opens its swatches (DEC-184)
     "components/sites/looks/colour-picker.tsx": ["button"],
-    // button: Brand's "Customise components" row, two lines that open the list (DEC-227)
+    // button: Brand's "Customise components" row, two lines that open the list (DEC-237)
     "components/sites/looks/component-styles.tsx": ["button"],
     // button, input: today's Brand panel, parked behind the Website area switch (owner, 20 Nov)
     "components/sites/looks/legacy/component-styles.tsx": ["button"],

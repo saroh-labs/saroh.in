@@ -50,7 +50,7 @@ function planViews(
         const charge = taxed(
             year ? chargedYearlyPaise(catalog, p) : p.pricePaise,
         );
-        // A yearly offer leads, the regular year struck beside it (DEC-231).
+        // A yearly offer leads, the regular year struck beside it (DEC-239).
         const yearOffer = year && p.yearlyOfferPaise !== undefined;
         let sub: string;
         if (!paid) sub = "Free for good";
@@ -62,7 +62,7 @@ function planViews(
         const trialOn = paid && !year && p.trial?.on === true;
         const first = trialOn ? trialFirstPaise(p) : 0;
         const cl = cardLines(catalog, p.id);
-        // The launch coupon doesn't stack on a yearly offer (DEC-231).
+        // The launch coupon doesn't stack on a yearly offer (DEC-239).
         const offer =
             paid && !yearOffer
                 ? offers.find((o) => o.planId === p.id && o.discountPaise > 0)
@@ -162,7 +162,7 @@ function footnote(
     site: PricingSite,
 ) {
     // With a yearly offer the struck price says the saving, so the rule
-    // behind the regular price isn't spelled out (DEC-231).
+    // behind the regular price isn't spelled out (DEC-239).
     const offerOn = offeredPlans(catalog).some(
         (p) => p.pricePaise > 0 && p.yearlyOfferPaise !== undefined,
     );

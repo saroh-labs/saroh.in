@@ -20,7 +20,7 @@ export interface PlanCardView {
     price: string;
     /**
      * The regular yearly price, struck through before `price`, when the
-     * plan's yearly offer is shown (DEC-231); else absent.
+     * plan's yearly offer is shown (DEC-239); else absent.
      */
     was?: string;
     /** "a month", "a year, paid once"; empty beside the placeholder. */
