@@ -165,7 +165,9 @@ describe("only with the Website area on (owner, 20 Nov 2026)", () => {
             [undefined, "production"],
             [undefined, "test"],
         ] as const) {
-            env.WEBSITE_AREA = area;
+            // Under SKIP_ENV_VALIDATION env is process.env, where assigning undefined stores "undefined".
+            if (area === undefined) delete env.WEBSITE_AREA;
+            else env.WEBSITE_AREA = area;
             env.NODE_ENV = node;
             const tx = site();
             expect(await postApprovalOn(tx as never, "o", "s")).toBe(false);
@@ -182,7 +184,9 @@ describe("only with the Website area on (owner, 20 Nov 2026)", () => {
             ["on", "production"],
             [undefined, "development"],
         ] as const) {
-            env.WEBSITE_AREA = area;
+            // Under SKIP_ENV_VALIDATION env is process.env, where assigning undefined stores "undefined".
+            if (area === undefined) delete env.WEBSITE_AREA;
+            else env.WEBSITE_AREA = area;
             env.NODE_ENV = node;
             expect(await postApprovalOn(site() as never, "o", "s")).toBe(true);
             expect(new WebsiteAreaSwitchGuard().canActivate()).toBe(true);
