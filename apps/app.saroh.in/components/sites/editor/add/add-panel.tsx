@@ -308,11 +308,10 @@ export function AddPanel({ model, phone = false }: AddPanelProps) {
             <div className="grid gap-3 px-3 pb-2 pt-3">
                 {phone ? null : <h2 className="text-sm font-semibold">Add</h2>}
                 <ListSearch
-                    placeholder={
-                        phone
-                            ? "Search pages, sections, your business"
-                            : "Search pages, sections and your business"
-                    }
+                    // ListSearch's rule: "Search {things}", the rest said
+                    // as its description, so nothing is clipped at 320px.
+                    placeholder="Search pages and sections"
+                    describe="Pages, sections and things from your business"
                     onSearch={setQuery}
                     shortcut={false}
                 />

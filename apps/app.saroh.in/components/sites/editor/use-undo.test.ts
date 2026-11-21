@@ -124,7 +124,7 @@ describe("useUndo", () => {
         expect(h.sections).toEqual([B]);
         expect(h.selected).toBeNull();
         expect(toast.showUndo).toHaveBeenCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -137,13 +137,13 @@ describe("useUndo", () => {
         act(() => h.undo.move(0, 1));
         expect(h.sections).toEqual([B, A]);
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             { duration: 10_000 },
         );
         act(() => h.undo.moveTo(1, 0));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved up",
+            "Top of the page moved up",
             expect.any(Function),
             { duration: 10_000 },
         );

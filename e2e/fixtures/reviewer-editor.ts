@@ -48,12 +48,14 @@ export async function openReviewedSite(page: Page): Promise<string> {
 }
 
 /**
- * The first block drawn on the canvas, by its "Hero block, 1 of 4" name.
+ * The first block drawn on the canvas, by its "Top of the page section, 1 of 4" name.
  * The editor opens with it chosen ("…, selected"): a desk shows its
  * Feedback at once, a phone opens the sheet only when it is tapped.
  */
 export const firstBlock = (page: Page): Locator =>
-    page.getByRole("button", { name: /block, 1 of \d+(, selected)?$/ }).first();
+    page
+        .getByRole("button", { name: /section, 1 of \d+(, selected)?$/ })
+        .first();
 
 /**
  * The note box for the first block on the canvas. A Reviewer's inspector

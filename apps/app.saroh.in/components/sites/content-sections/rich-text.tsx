@@ -60,7 +60,7 @@ export function RichTextFields({
         onChange({ ...section, content: { ...c, ...next } });
     return (
         <div className="grid gap-3">
-            <Field label="Format">
+            <Field label="Written as">
                 <Select
                     value={c.format}
                     onValueChange={(v) =>
@@ -73,8 +73,8 @@ export function RichTextFields({
                         <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="html">HTML</SelectItem>
-                        <SelectItem value="markdown">Markdown</SelectItem>
+                        <SelectItem value="html">Formatted text</SelectItem>
+                        <SelectItem value="markdown">Plain text</SelectItem>
                     </SelectContent>
                 </Select>
             </Field>

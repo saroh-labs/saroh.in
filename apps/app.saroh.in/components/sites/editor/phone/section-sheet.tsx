@@ -205,7 +205,7 @@ export function SectionSheet({
             <SheetHead
                 icon={<Icon aria-hidden className="size-[18px]" />}
                 title={title}
-                kicker={`${SECTION_LABELS[section.type]} section · ${index + 1} of ${draft.sections.length}`}
+                kicker={`${SECTION_LABELS[section.type]} · section ${index + 1} of ${draft.sections.length}`}
                 onClose={onClose}
             />
         );
@@ -258,7 +258,8 @@ export function SectionSheet({
                 ]}
                 value={tab}
                 onValueChange={openTab}
-                listClassName="px-2"
+                // All four fit at 320; narrower still, the strip scrolls.
+                listClassName="px-1 [&>button]:px-3"
             />
         );
         const onChange = (next: Section) => draft.replaceAt(index, next);
@@ -362,7 +363,11 @@ export function SectionSheet({
                 closeLabel="Close the section"
                 modal={false}
                 head={head}
-                className={keyboard ? "h-auto max-h-[70%]" : undefined}
+                // Tall enough that the fields scroll under the head, actions
+                // and tabs, even at 320 (`fix/WXNSection`).
+                className={
+                    keyboard ? "h-auto max-h-[70%]" : "min-h-[min(92%,30rem)]"
+                }
             >
                 <div
                     data-section-sheet={

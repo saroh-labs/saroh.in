@@ -65,12 +65,10 @@ test.describe("Rail › Add at 1920", () => {
 
         // A search finds a section by its words.
         await panel
-            .getByPlaceholder("Search pages, sections and your business")
+            .getByPlaceholder("Search pages and sections")
             .fill("questions");
         await expect(panel).toContainText(/Questions/);
-        await panel
-            .getByPlaceholder("Search pages, sections and your business")
-            .fill("");
+        await panel.getByPlaceholder("Search pages and sections").fill("");
 
         // Add a page is its own sheet; Cancel adds nothing.
         await panel.getByRole("button", { name: "Blank page" }).click();

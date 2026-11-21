@@ -161,16 +161,17 @@ export function PagesTree({
                                         aria-hidden
                                         className="size-4 shrink-0"
                                     />
+                                    {/* The title wins: the path gives way first. */}
                                     <span
                                         className={cn(
-                                            "min-w-0 flex-1 truncate",
+                                            "min-w-0 flex-auto truncate",
                                             page.hidden &&
                                                 "text-muted-foreground line-through",
                                         )}
                                     >
                                         {page.title}
                                     </span>
-                                    <span className="shrink-0 font-mono text-xs font-normal text-muted-foreground">
+                                    <span className="min-w-0 shrink-[999] truncate font-mono text-xs font-normal text-muted-foreground">
                                         {page.path}
                                     </span>
                                 </TreeRow>

@@ -346,9 +346,9 @@ const ALLOWED: RegExp[] = [
     /^Make the sheet (taller|shorter)$/,
     // Selecting a block, the header or the footer, in the list or on the page.
     /^(Header|Footer)(, on every page.*)?$/,
-    /^Hero block, \d+ of \d+(, selected)?$/,
+    /^Top of the page section, \d+ of \d+(, selected)?$/,
     /^(Welcome in|Our story)$/,
-    /^Hero(Welcome in|Our story)/,
+    /^Top of the page(Welcome in|Our story)/,
     /^(Header|Footer)On every page/,
     /open on this block\. Read the feedback$/,
     // Reading notes: go to one, show the settled ones.
@@ -389,7 +389,7 @@ const ALLOWED: RegExp[] = [
     // The one phone editor (U49): the page picker, the Sections sheet's
     // rows and pinned header and footer, and a reader's way to Brand.
     /^Page: .+\. Choose another page or change its settings$/,
-    /^(Welcome in|Our story)(Hero|Hidden when published)$/,
+    /^(Welcome in|Our story)(Top of the page|Hidden when published)$/,
     /^Open the (header|footer)$/,
     /^(Sections on this page|Done)$/,
     // Preview at three sizes (U46f): which sizes, and scrolling together.
@@ -725,7 +725,7 @@ describe("the read-only editor draws no write control (DEC-200)", () => {
         click(button("Blocks"));
         expectReadOnly("phone, Blocks sheet");
         expect($("[aria-label^='Move ']")).toBeNull();
-        click(button(/^HeroWelcome in/));
+        click(button(/^Top of the pageWelcome in/));
         expectReadOnly("phone, a block's sheet");
         click(button("Close the block panel"));
         // Brand is a tab in the Blocks sheet, not on the pill (U5).
@@ -808,7 +808,9 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         );
         // The composer names the block.
         expect(document.querySelector("label")?.textContent).toBeDefined();
-        expect(document.body.textContent).toContain("Add a note on Hero");
+        expect(document.body.textContent).toContain(
+            "Add a note on Top of the page",
+        );
     });
 
     it("a reader who may only read is offered no note box and no verdict", async () => {
@@ -816,7 +818,9 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         await flush();
         expect(has("Ask for changes")).toBe(false);
         expect(has("Approve")).toBe(false);
-        expect(document.body.textContent).not.toContain("Add a note on Hero");
+        expect(document.body.textContent).not.toContain(
+            "Add a note on Top of the page",
+        );
         // Reading stays: the tag and the Feedback tab are still there.
         expect($("[data-reviewing]")).not.toBeNull();
     });
@@ -833,7 +837,9 @@ describe("feedback and the verdict for a Reviewer (DEC-200, U4)", () => {
         render({ reviewCan: { comment: true, approve: false } });
         await flush();
         expect(has("Approve")).toBe(false);
-        expect(document.body.textContent).toContain("Add a note on Hero");
+        expect(document.body.textContent).toContain(
+            "Add a note on Top of the page",
+        );
     });
 
     it("the request line, from the review state", () => {
@@ -978,7 +984,9 @@ describe("a Reviewer on a phone (DEC-200, U5)", () => {
         click(onCanvas(0));
         expect(onCanvas(0).getAttribute("aria-pressed")).toBe("true");
         // The sheet names the block, on its Feedback (RVD1Phone).
-        expect(sheet("Hero")).toContain("Add a note on Hero");
+        expect(sheet("Top of the page")).toContain(
+            "Add a note on Top of the page",
+        );
         // Even after the Block tab was looked at.
         click(button("Block"));
         click(button("Close the block panel"));
@@ -992,7 +1000,7 @@ describe("a Reviewer on a phone (DEC-200, U5)", () => {
         expect(sheet("Blocks on Home")).not.toBeNull();
         const scrolled = vi.fn();
         Element.prototype.scrollTo = scrolled;
-        click(button(/^HeroWelcome in/));
+        click(button(/^Top of the pageWelcome in/));
         act(() => {
             vi.advanceTimersByTime(20);
         });
@@ -1425,9 +1433,10 @@ describe("the desk shell for an owner (U46)", () => {
             await Promise.resolve();
         });
         const panel = $("[data-history-panel]");
-        expect(panel?.textContent).toContain(
-            "Earlier changes changed Top of the page",
-        );
+        // No recorded editor: a neutral row, no made-up person (no avatar).
+        expect(panel?.textContent).toContain("Changed Top of the page");
+        expect(panel?.textContent).toContain("before names were kept");
+        expect(panel?.textContent).not.toContain("Earlier changes");
         expect(has("Undo")).toBe(true);
         expect(panel?.textContent).toContain("Live now");
         expect(panel?.querySelector("a[href$='/versions']")?.textContent).toBe(
@@ -1507,7 +1516,9 @@ describe("the inspector with the Website area on (U47)", () => {
         expect(inspector()?.querySelector("h2")?.textContent).toBe(
             "Welcome in",
         );
-        expect(inspector()?.textContent).toContain("Hero section · 1 of 2");
+        expect(inspector()?.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
         expect(button("Content").getAttribute("aria-selected")).toBe("true");
         // The canvas toolbar holds what the old inspector's foot did.
         for (const kept of ["Move", "Duplicate", "Hide on phone", "Delete"]) {
@@ -1535,7 +1546,9 @@ describe("the inspector with the Website area on (U47)", () => {
         click(button("Welcome in"));
         click(button("Duplicate"));
         expect(tree().match(/Welcome in/g)).toHaveLength(2);
-        expect(inspector()?.textContent).toContain("Hero section · 2 of 3");
+        expect(inspector()?.textContent).toContain(
+            "Top of the page · section 2 of 3",
+        );
         click(button("Undo"));
         expect(tree().match(/Welcome in/g)).toHaveLength(1);
     });
@@ -1679,7 +1692,9 @@ describe("the one phone editor (U49)", () => {
         tapSection(0);
         const sheet = sectionSheet();
         expect(sheet).not.toBeNull();
-        expect(document.body.textContent).toContain("Hero section · 1 of 2");
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
         expect(
             Array.from(
                 document.querySelectorAll(
@@ -1706,9 +1721,13 @@ describe("the one phone editor (U49)", () => {
         render(owner);
         tapSection(0);
         click(button("Duplicate"));
-        expect(document.body.textContent).toContain("Hero section · 2 of 3");
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 2 of 3",
+        );
         undoFromToast();
-        expect(document.body.textContent).toContain("Hero section · 1 of 2");
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
         click(button("Hide here"));
         expect(button("Show here").getAttribute("aria-pressed")).toBe("true");
         undoFromToast();
@@ -1734,11 +1753,13 @@ describe("the one phone editor (U49)", () => {
             list()?.textContent.indexOf("Welcome in") ?? -1,
         );
         expect(vi.mocked(showUndo).mock.calls.at(-1)?.[0]).toBe(
-            "Hero moved down",
+            "Top of the page moved down",
         );
         undoFromToast();
         // Undo selects the section again, so its sheet is what shows.
-        expect(document.body.textContent).toContain("Hero section · 1 of 2");
+        expect(document.body.textContent).toContain(
+            "Top of the page · section 1 of 2",
+        );
         click(button("Sections"));
         expect(list()?.textContent.indexOf("Welcome in")).toBeLessThan(
             list()?.textContent.indexOf("Our story") ?? -1,

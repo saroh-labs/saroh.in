@@ -364,7 +364,7 @@ function checkSection(
                 found.length > 60 ? `${found.slice(0, 57).trimEnd()}…` : found;
             at(
                 "placeholderText",
-                `This ${label} block still has the template's placeholder words in it ("${quoted}"). Replace them with your own before going live.`,
+                `This ${label} section still has the template's placeholder words in it ("${quoted}"). Replace them with your own before going live.`,
                 null,
             );
         }
@@ -397,7 +397,7 @@ function checkSection(
                 : sample.words;
         at(
             "placeholderText",
-            `This ${label} block still has sample words from the ${from} starter in it ("${quoted}"). Replace them with your own before going live.`,
+            `This ${label} section still has sample words from the ${from} starter in it ("${quoted}"). Replace them with your own before going live.`,
             null,
         );
     }
@@ -408,13 +408,13 @@ function checkSection(
             if (heading.trim() === "") {
                 at(
                     "emptyRequiredField",
-                    "This hero has no heading.",
+                    "The top of the page has no heading.",
                     "heading",
                 );
             } else if (looksLikePlaceholder(heading)) {
                 at(
                     "placeholderText",
-                    "The hero heading still has placeholder text in it.",
+                    "The top of the page's heading still has placeholder text in it.",
                     "heading",
                 );
             } else if (heading.length > HERO_HEADING_PHONE_LIMIT) {
@@ -438,7 +438,7 @@ function checkSection(
             } else if (sub !== "" && looksLikePlaceholder(sub)) {
                 at(
                     "placeholderText",
-                    "The hero subheading still has placeholder text in it.",
+                    "The top of the page's line under the heading still has placeholder text in it.",
                     "subheading",
                 );
             }
@@ -454,8 +454,8 @@ function checkSection(
                 at(
                     "missingImage",
                     brief
-                        ? `This hero has no image yet. It wants: ${brief}`
-                        : "This hero has no image.",
+                        ? `The top of the page has no photo yet. It wants: ${brief}`
+                        : "The top of the page has no photo.",
                     "image",
                 );
             }
@@ -465,7 +465,7 @@ function checkSection(
                 checkCtaTarget(
                     cta,
                     "cta",
-                    "The hero button",
+                    "The button at the top of the page",
                     at,
                     pagePaths,
                     pageIds,
@@ -596,7 +596,7 @@ function checkSection(
             if (str(photo.src).trim() !== "" && str(photo.alt).trim() === "") {
                 at(
                     "emptyRequiredField",
-                    "The photo in this person block has no description, so someone using a screen reader won't know what it shows.",
+                    "The photo in this person section has no description, so someone using a screen reader won't know what it shows.",
                     "image",
                 );
             }
@@ -605,7 +605,7 @@ function checkSection(
                 checkCtaTarget(
                     cta,
                     "cta",
-                    "The person block's button",
+                    "The person section's button",
                     at,
                     pagePaths,
                     pageIds,

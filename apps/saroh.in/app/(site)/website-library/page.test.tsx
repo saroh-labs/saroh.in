@@ -158,11 +158,11 @@ describe("/website-library", () => {
         );
         expect(screen.getByRole("radiogroup", { name: "Cards" })).toBeTruthy();
 
-        const hero = frameOf("Hero");
+        const hero = frameOf("Top of the page");
         expect(hero.getAttribute("src")).toBe(
             "/library-preview/hero?variant=centered",
         );
-        expect(hero.title).toBe("Hero, Centered layout, preview");
+        expect(hero.title).toBe("Top of the page, Centered layout, preview");
 
         fireEvent.click(within(looks).getByRole("radio", { name: "Live" }));
         fireEvent.click(
@@ -172,22 +172,26 @@ describe("/website-library", () => {
             ),
         );
         expect(window.location.search).toBe("?look=live&cards=flat");
-        expect(frameOf("Hero").getAttribute("src")).toBe(
+        expect(frameOf("Top of the page").getAttribute("src")).toBe(
             "/library-preview/hero?variant=centered&look=live&cards=flat",
         );
 
         // Phone lays the frame out at a phone's width; the address says so.
         fireEvent.click(screen.getByRole("radio", { name: "Phone" }));
-        expect(frameOf("Hero").getAttribute("width")).toBe("390");
+        expect(frameOf("Top of the page").getAttribute("width")).toBe("390");
         expect(window.location.search).toContain("view=phone");
 
         // A layout is picked on its card.
         fireEvent.click(
-            within(card("Hero")).getByRole("radio", { name: "Answer panel" }),
+            within(card("Top of the page")).getByRole("radio", {
+                name: "Answer panel",
+            }),
         );
-        expect(frameOf("Hero").getAttribute("src")).toContain("variant=answer");
-        expect(frameOf("Hero").title).toBe(
-            "Hero, Answer panel layout, preview",
+        expect(frameOf("Top of the page").getAttribute("src")).toContain(
+            "variant=answer",
+        );
+        expect(frameOf("Top of the page").title).toBe(
+            "Top of the page, Answer panel layout, preview",
         );
     });
 

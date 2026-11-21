@@ -615,6 +615,16 @@ export function SiteEditor({
         <EditorCanvas
             {...viewport}
             {...selection}
+            // A tapped section on a phone comes up to the top, above its
+            // sheet, rather than staying where the tap left the page.
+            setSelectedIndex={
+                layout === "phone"
+                    ? (index: number | null) => {
+                          setSelectedIndex(index);
+                          if (index !== null) scrollToBlock(index);
+                      }
+                    : setSelectedIndex
+            }
             {...draft}
             {...{
                 siteId,

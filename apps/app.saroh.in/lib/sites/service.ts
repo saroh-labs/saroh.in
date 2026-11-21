@@ -1155,7 +1155,7 @@ export interface ChangeUnit {
     where: string;
     pageId: string | null;
     fingerprint: string;
-    /** Null: "Earlier changes". */
+    /** Null: changed before names were kept. */
     editedBy: string | null;
     editedAt: string | null;
     /** Units that go out, or are left out, with this one. */
@@ -1192,7 +1192,7 @@ export interface SiteChanges {
     /** `units.length`; null before the first publish. */
     count: number | null;
     units: ChangeUnit[];
-    /** Newest first; `userId` null is "Earlier changes". */
+    /** Newest first; `userId` null: changed before names were kept. */
     groups: {
         userId: string | null;
         name: string | null;

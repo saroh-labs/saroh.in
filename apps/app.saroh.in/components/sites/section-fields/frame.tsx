@@ -126,8 +126,8 @@ export function SectionFrameFields({
                 />
             </Field>
             <p className="-mt-1.5 text-[12px] leading-relaxed text-muted-foreground">
-                On the home page, a block with a menu label is listed in your
-                site's menu, and the entry jumps to it.
+                On the home page, a section with a menu label is listed in your
+                site's menu, and tapping it there jumps here.
             </p>
             <Field label="Link name">
                 <Input
@@ -145,7 +145,7 @@ export function SectionFrameFields({
                 {problem ??
                     (anchor
                         ? `A button can link here with #${anchor}.`
-                        : "Give the block a link name to jump to it from a button or the menu.")}
+                        : "Give the section a link name to jump to it from a button or the menu.")}
             </p>
             {showBand ? (
                 <>

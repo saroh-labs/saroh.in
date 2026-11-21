@@ -59,7 +59,9 @@ async function openPublish(page: Page) {
 }
 
 const heroChip = (page: Page) =>
-    page.getByRole("button", { name: /^Hero block, \d+ of \d+/ }).first();
+    page
+        .getByRole("button", { name: /^Top of the page section, \d+ of \d+/ })
+        .first();
 
 test.describe("Publish is a sheet", { tag: "@serial" }, () => {
     test("says what goes live, then turns into the result", async ({
@@ -257,7 +259,9 @@ test.describe("the phone editor's changes", { tag: "@serial" }, () => {
         const down = tools.getByRole("button", { name: "Move down" });
         await expect(down).toBeEnabled();
         await down.click();
-        await expect(page.getByText("Hero moved down").first()).toBeVisible();
+        await expect(
+            page.getByText("Top of the page moved down").first(),
+        ).toBeVisible();
         await page.getByRole("button", { name: "Undo" }).last().click();
         await expect(heroChip(page)).toBeVisible();
     });

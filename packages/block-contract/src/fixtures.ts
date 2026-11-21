@@ -190,7 +190,9 @@ const PROJECT_ITEMS = [
  */
 export const BLOCK_META = {
     hero: {
-        label: "Hero",
+        // RULES §1: a merchant's words. Search still finds the old name.
+        label: "Top of the page",
+        aliases: ["Hero"],
         description:
             "The opening statement of a page — a headline, an optional line beneath it, an optional button and image.",
         variants: heroVariants,
@@ -372,7 +374,8 @@ export const BLOCK_META = {
         },
     },
     cta: {
-        label: "Call to action",
+        label: "Big button",
+        aliases: ["Call to action", "CTA"],
         description: "A band with one button, asking for the next step.",
         variants: soleVariant("A centred button on the call-to-action colour."),
         fixtures: {

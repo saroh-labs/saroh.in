@@ -24,6 +24,8 @@ const TOOL = "h-9 gap-1.5 px-2.5 text-[13px] coarse:h-11 [&_svg]:size-4";
  * its name, then Move · Duplicate · Hide on phone · Delete · Ask AI. Move is
  * a handle: ↑ and ↓ move it at once, a click opens Move up / Move down. Each
  * acts at once with Undo (G3). It stops the click reaching the section.
+ * It sits under the section's tag, right-aligned, so a wrapped toolbar on a
+ * narrow canvas never covers the tag.
  */
 export function SectionToolbar({
     label,
@@ -54,7 +56,7 @@ export function SectionToolbar({
             aria-label={`${label} actions`}
             data-section-toolbar=""
             onClick={(e) => e.stopPropagation()}
-            className="absolute left-2 top-2 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-0.5 rounded-xl border bg-card p-1 font-sans text-foreground shadow-[0_8px_20px_hsl(var(--shadow-color)/0.18)]"
+            className="absolute right-2 top-8 z-20 flex max-w-[calc(100%-1rem)] flex-wrap items-center gap-0.5 rounded-xl border bg-card p-1 font-sans text-foreground shadow-[0_8px_20px_hsl(var(--shadow-color)/0.18)]"
         >
             <span
                 data-ph-mask=""

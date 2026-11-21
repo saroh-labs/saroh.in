@@ -320,6 +320,32 @@ describe("missing images", () => {
         );
         expect(flags.filter((f) => f.type === "missingImage")).toHaveLength(2);
     });
+
+    it("says the merchant's words: no hero, no block (RULES §1)", () => {
+        const flags = checkPage(
+            page([
+                {
+                    type: "hero",
+                    content: {
+                        heading: "",
+                        subheading: "Lorem ipsum",
+                        cta: { label: "Go", href: "/nowhere" },
+                    },
+                },
+                {
+                    type: "hero",
+                    content: {
+                        heading: "Fresh bread, baked every morning",
+                    },
+                },
+            ]),
+            ["/"],
+        );
+        expect(flags.length).toBeGreaterThan(2);
+        for (const f of flags) {
+            expect(f.message).not.toMatch(/\b(hero|block)\b/i);
+        }
+    });
 });
 
 describe("broken links", () => {
@@ -1455,7 +1481,7 @@ describe("the first starters' stock sentences (DEC-141)", () => {
             ).filter(
                 (f) =>
                     f.type === "placeholderText" &&
-                    f.message.includes("text block still has") &&
+                    f.message.includes("text section still has") &&
                     f.message.includes("template's placeholder words"),
             );
             expect(texts.length).toBeGreaterThan(0);

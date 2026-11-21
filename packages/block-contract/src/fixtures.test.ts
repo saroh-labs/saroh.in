@@ -138,7 +138,18 @@ describe("block families", () => {
         expect(blockHeading("contact")).toBe("Visit us · Talk to us");
         expect(blockHeading("packs")).toBe("Plans · Class packs");
         expect(blockHeading("plans")).toBe("Plans");
-        expect(blockHeading("hero")).toBe("Hero");
+        expect(blockHeading("hero")).toBe("Top of the page");
+    });
+
+    it("names every section in a merchant's words (RULES §1)", () => {
+        // The editor's tag, inspector, History and Publish all read this.
+        const banned =
+            /\b(hero|call to action|cta|block|entry|entries|html)\b/i;
+        for (const type of SECTION_TYPES) {
+            expect(blockHeading(type), type).not.toMatch(banned);
+        }
+        expect(blockSearchText("hero")).toContain("hero");
+        expect(blockSearchText("cta")).toContain("call to action");
     });
 
     it("finds a family layout by its old name", () => {

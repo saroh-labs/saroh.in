@@ -32,7 +32,7 @@ test("every block is in the page's HTML, and Subscribe is Coming", async ({
 }) => {
     const html = await (await request.get(`${WEB}/website-library`)).text();
     for (const name of [
-        "Hero",
+        "Top of the page",
         "Services",
         "Timetable",
         "Visit us",
@@ -49,7 +49,7 @@ test("a toolbar choice moves the previews and the address, and a reload keeps it
     page,
 }) => {
     await page.goto(`${WEB}/website-library`);
-    const hero = page.getByTitle(/^Hero, /);
+    const hero = page.getByTitle(/^Top of the page, /);
     await expect(hero).toHaveAttribute("src", /variant=centered/);
     await page
         .getByRole("radiogroup", { name: "Look" })
@@ -58,13 +58,13 @@ test("a toolbar choice moves the previews and the address, and a reload keeps it
     await expect(hero).toHaveAttribute("src", /look=live/);
     await expect(page).toHaveURL(/look=live/);
     await page.reload();
-    await expect(page.getByTitle(/^Hero, /)).toHaveAttribute(
+    await expect(page.getByTitle(/^Top of the page, /)).toHaveAttribute(
         "src",
         /look=live/,
     );
     // The preview drew: its frame is measured, with no failure note.
-    await page.getByTitle(/^Hero, /).scrollIntoViewIfNeeded();
-    const frame = page.frameLocator('iframe[title^="Hero, "]');
+    await page.getByTitle(/^Top of the page, /).scrollIntoViewIfNeeded();
+    const frame = page.frameLocator('iframe[title^="Top of the page, "]');
     await expect(
         frame.locator("[data-library-preview] *").first(),
     ).toBeVisible();

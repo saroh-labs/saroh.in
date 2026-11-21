@@ -268,7 +268,7 @@ export function DraftPreview({
                         key={index}
                         index={index}
                         label={label}
-                        name={`${label} block, ${position + 1} of ${count}`}
+                        name={`${label} section, ${position + 1} of ${count}`}
                         selected={selectedIndex === index}
                         onSelect={() => onSelect(index)}
                         notes={

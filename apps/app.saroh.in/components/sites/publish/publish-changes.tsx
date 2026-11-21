@@ -46,7 +46,7 @@ export function PublishChanges({
                     if (units.length === 0) return null;
                     const name = group.you
                         ? "You"
-                        : (group.name ?? "Earlier changes");
+                        : (group.name ?? "Changed before names were kept");
                     return (
                         <li key={group.userId ?? "earlier"}>
                             <h3 className="flex items-center gap-2 pb-1.5 text-sm font-semibold">

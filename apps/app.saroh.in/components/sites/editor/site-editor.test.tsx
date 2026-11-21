@@ -745,7 +745,7 @@ describe("SiteEditor shell", () => {
         // The same canvas, with no block outlines or labels on it.
         expect($("[data-previewing]")).not.toBeNull();
         expect($$("[data-block-index]")).toHaveLength(0);
-        expect(() => button(/^Hero block, 1 of/)).toThrow();
+        expect(() => button(/^Top of the page section, 1 of/)).toThrow();
         expect(() => button("Header, on every page")).toThrow();
         expect(host.textContent).toContain("Welcome in");
         // The rail and inspector are away, kept mounted, and the bar stays.
@@ -918,7 +918,7 @@ describe("SiteEditor shell", () => {
         expect(host.textContent).toContain("3 blocks");
         expect(() => button("Welcome in")).toThrow();
         expect(toast.showUndo).toHaveBeenCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -984,7 +984,7 @@ describe("SiteEditor shell", () => {
         render();
         click(button("Move block down"));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -995,7 +995,7 @@ describe("SiteEditor shell", () => {
 
         click(button(/Visible$/));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero is hidden on this page",
+            "Top of the page is hidden on this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -1635,7 +1635,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("opens the inspector over the page when a block is chosen, and Close hands focus back to it", async () => {
         atWidth(1000);
         render();
-        click(button(/^Hero block, 2 of 2/));
+        click(button(/^Top of the page section, 2 of 2/));
 
         const open = sheet();
         expect(
@@ -1651,7 +1651,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()).toBeNull();
         // Still selected, and focus is on its label on the page.
         expect(button("Our story").getAttribute("aria-current")).toBe("true");
-        expect(focused()).toBe("Hero block, 2 of 2, selected");
+        expect(focused()).toBe("Top of the page section, 2 of 2, selected");
     });
 
     it("keeps Tab inside the sheet, and Escape closes it back to the block", async () => {
@@ -1678,7 +1678,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         escape();
         await wait(0);
         expect(sheet()).toBeNull();
-        expect(focused()).toBe("Hero block, 2 of 2, selected");
+        expect(focused()).toBe("Top of the page section, 2 of 2, selected");
     });
 
     it("edits a block in the sheet, and the page follows", () => {
@@ -1703,7 +1703,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()).toBeNull();
         expect(host.textContent).toContain("3 blocks");
         expect(toast.showUndo).toHaveBeenCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             { duration: 10_000 },
         );
@@ -1803,7 +1803,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(sheet()?.textContent).toContain("Blocks on Home");
         // Each block with its first line; the header and footer Fixed.
         expect(sheet()?.textContent).toContain("FooterOn every pageFixed");
-        click(button(/^HeroOur story/));
+        click(button(/^Top of the pageOur story/));
         // One sheet at a time: the list makes way for the block's fields.
         expect($$("[role=dialog]")).toHaveLength(1);
         expect(
@@ -1833,7 +1833,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         render();
         click(button("Blocks"));
         act(() => {
-            button(/^Move Hero/).dispatchEvent(
+            button(/^Move Top of the page/).dispatchEvent(
                 new KeyboardEvent("keydown", {
                     key: "ArrowDown",
                     bubbles: true,
@@ -1841,7 +1841,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
             );
         });
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             expect.anything(),
         );
@@ -1878,7 +1878,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("gives a tapped block a toolbar: move and remove at once, each with Undo", () => {
         atWidth(390);
         render();
-        click(button(/^Hero block, 1 of 2/));
+        click(button(/^Top of the page section, 1 of 2/));
         const tools = $("[role=toolbar][aria-label='Block actions']");
         expect(tools).not.toBeNull();
         // Its settings rise with no scrim, so the toolbar stays in reach.
@@ -1893,12 +1893,14 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(inTools("Move up").disabled).toBe(true);
         click(inTools("Move down"));
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero moved down",
+            "Top of the page moved down",
             expect.any(Function),
             expect.anything(),
         );
         // It moved, and stays selected in its new place.
-        expect(button(/^Hero block, 2 of 2, selected/)).toBeTruthy();
+        expect(
+            button(/^Top of the page section, 2 of 2, selected/),
+        ).toBeTruthy();
         const after = $("[role=toolbar][aria-label='Block actions']");
         const remove = after?.querySelector<HTMLButtonElement>(
             "button[aria-label='Remove']",
@@ -1907,7 +1909,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
         click(remove);
         expect($$("[data-block-index]")).toHaveLength(1);
         expect(toast.showUndo).toHaveBeenLastCalledWith(
-            "Hero taken off this page",
+            "Top of the page taken off this page",
             expect.any(Function),
             expect.anything(),
         );
@@ -1944,7 +1946,7 @@ describe("SiteEditor narrow and phone (G4)", () => {
     it("keeps the selection and the open fields when a phone turns on its side", () => {
         atWidth(390);
         render();
-        click(button(/^Hero block, 2 of 2/));
+        click(button(/^Top of the page section, 2 of 2/));
         expect(sheet()).not.toBeNull();
 
         resizeTo(844);

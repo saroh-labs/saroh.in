@@ -130,7 +130,7 @@ export function SiteInspector({
         header = (
             <InspectorHeader
                 title={sectionTitle(section)}
-                kicker={`${SECTION_LABELS[section.type]} section · ${index + 1} of ${draft.sections.length}`}
+                kicker={`${SECTION_LABELS[section.type]} · section ${index + 1} of ${draft.sections.length}`}
                 onClose={deselect}
             />
         );

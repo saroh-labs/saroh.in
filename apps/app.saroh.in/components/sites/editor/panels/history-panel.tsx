@@ -54,7 +54,7 @@ export function scopedGroups(
     changes: SiteChanges,
     scope: HistoryScope,
     pageId: string,
-): { key: string; name: string; units: ChangeUnit[] }[] {
+): { key: string; name: string | null; units: ChangeUnit[] }[] {
     const byKey = new Map(changes.units.map((u) => [u.key, u]));
     return changes.groups.flatMap((group) => {
         const units = group.units
@@ -65,7 +65,8 @@ export function scopedGroups(
                     (scope === "site" || u.pageId === pageId),
             );
         if (units.length === 0) return [];
-        const name = group.you ? "You" : (group.name ?? "Earlier changes");
+        // Null: changed before names were kept. No person is drawn for it.
+        const name = group.you ? "You" : group.name;
         return [{ key: group.userId ?? "earlier", name, units }];
     });
 }
@@ -202,7 +203,7 @@ export function HistoryPanel({ model }: HistoryPanelProps) {
             <Segmented<HistoryScope>
                 label="Show history for"
                 block
-                className="mx-4 mb-3"
+                className="mx-4 mb-3 w-auto"
                 value={scope}
                 onValueChange={setScope}
                 options={[
@@ -331,14 +332,25 @@ function Waiting({
                     {groups.flatMap((group) =>
                         group.units.map((unit) => (
                             <li key={unit.key} className={ROW}>
-                                <Who name={group.name} />
+                                {group.name ? <Who name={group.name} /> : null}
                                 <span className="min-w-0 flex-1 text-[0.8125rem] leading-snug text-muted-foreground">
-                                    <b className="font-semibold text-foreground">
-                                        {group.name}
-                                    </b>{" "}
-                                    {changeWords(unit.label)}
+                                    {group.name ? (
+                                        <>
+                                            <b className="font-semibold text-foreground">
+                                                {group.name}
+                                            </b>{" "}
+                                            {changeWords(unit.label)}
+                                        </>
+                                    ) : (
+                                        <span className="text-foreground">
+                                            {unit.label.replace(" · ", " ")}
+                                        </span>
+                                    )}
                                     <span className="mt-0.5 block text-xs">
                                         {unit.where}
+                                        {group.name
+                                            ? ""
+                                            : " · before names were kept"}
                                         {unit.editedAt
                                             ? ` · ${formatRelative(unit.editedAt)}`
                                             : ""}
