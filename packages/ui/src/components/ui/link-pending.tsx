@@ -10,11 +10,15 @@ import { useLinkStatus } from "next/link";
  */
 export function LinkPending() {
     const { pending } = useLinkStatus();
+    // Two spans: `.skeleton-sweep` sets `position: relative` (unlayered CSS
+    // beats the `absolute` utility), so the sweep sits inside a placed box.
     return pending ? (
         <span
             aria-hidden
             data-link-pending=""
-            className="skeleton-sweep pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full bg-muted-foreground/40"
-        />
+            className="pointer-events-none absolute inset-x-1 bottom-0 h-0.5"
+        >
+            <span className="skeleton-sweep block h-full w-full rounded-full bg-muted-foreground/40" />
+        </span>
     ) : null;
 }
