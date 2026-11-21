@@ -6843,3 +6843,9 @@ built, whatever the design says (`docs/patterns/saroh-product.md`).
 - **Symptom:** opening a live post showed "Unsaved changes", autosaved to "Saved · just now" and raised the post's "changes waiting" count, with no edit.
 - **Cause:** the desk post editor calls `editor.setEditable(!previewing)` on mount. Tiptap's `setEditable(editable, emitUpdate = true)` fires `onUpdate`, so the rich text handed back the HTML it already held and `usePostDraft` marked the post dirty.
 - **Fix:** `setEditable(x, false)` (`posts/editor/post-shell.tsx`, as `description-editor.tsx` already did), and `usePostDraft`'s `set` ignores a value equal to the one held. `post-shell.test.tsx` stands in an editor that re-reports its value on mount and checks nothing saves. Any Tiptap call that is not an edit (`setEditable`, `setContent`) passes `emitUpdate: false`.
+
+### The post editor crashed on `editor.commands` in a click handler (21 Nov 2026)
+
+- **Symptom:** opening a post showed "Couldn't load this post", or logged "Cannot read properties of null (reading 'commands')" from `SlashMenu`, even though `editor.commands` was only used inside a click handler.
+- **Cause:** the React Compiler memoises the handler on the property path `editor.commands` and reads it during render. Tiptap's `commands` is a getter that throws until the editor is mounted, and with `immediatelyRender: false` the first render has no mounted editor.
+- **Fix:** render the menus only once `editor` exists, and call `editor.chain().focus().run()` instead of reading `editor.commands` in render scope. A Tiptap getter (`commands`, `view`, `state`) never goes in a component body or a closure the compiler can lift; keep it inside an effect or a chain call.
