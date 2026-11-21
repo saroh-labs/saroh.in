@@ -1,6 +1,10 @@
+import { ForbiddenException, Logger } from "@nestjs/common";
 import { prisma } from "@saroh/database";
+import type { ModuleAccess } from "@saroh/pricing-catalog";
 
+import { CatalogueAccessService } from "../billing/catalogue-access.service";
 import { planMeter } from "../billing/metering.service";
+import { moduleLocked } from "../billing/plan-limit-errors";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { teamHolding } from "../organizations/team-powers";
 
@@ -36,10 +40,64 @@ export async function businessPause(
     if (!(await flags.isEnabled("GOOGLE_CALENDAR", organizationId))) {
         return "off";
     }
-    if (!(await planMeter.isIncluded(organizationId, "integrations"))) {
-        return "plan";
-    }
+    if (await calendarPlan.locked(organizationId)) return "plan";
     return null;
+}
+
+/** The catalogue row Google Calendar rides (`integrations`, Free locked). */
+export const PLAN_ROW = "integrations";
+
+const catalogue = new CatalogueAccessService();
+const logger = new Logger("CalendarPlan");
+
+/**
+ * Google Calendar's plan check (P3). Fails closed, as Social's and Ask
+ * AI's do: a business the catalogue doesn't reach, a version without the
+ * row or a plan that can't be read is locked, since every sync is Saroh's
+ * work on its one Google quota. Behind the `PLAN_ENFORCEMENT` kill switch
+ * nothing is locked, as for every other use of this row.
+ * An object, so a spec can stand in for it.
+ */
+export const calendarPlan = {
+    /** Null when on; else the row that locks it, or "unread". */
+    async locked(
+        organizationId: string,
+        now: Date = new Date(),
+    ): Promise<ModuleAccess | "unread" | null> {
+        try {
+            if (!(await planMeter.enforcing(organizationId))) return null;
+            const a = await catalogue.resolve(organizationId, now);
+            const row =
+                a.source === "catalogue"
+                    ? a.modules.find((m) => m.moduleId === PLAN_ROW)
+                    : undefined;
+            if (row?.state === "on") return null;
+            return row ?? "unread";
+        } catch (err) {
+            logger.warn(
+                `google_calendar_plan_unread org=${organizationId} error=${err instanceof Error ? err.name : "unknown"}`,
+            );
+            return "unread";
+        }
+    },
+};
+
+/** Refuse (403 `MODULE_LOCKED`) unless the plan has Google Calendar (P3). */
+export async function assertCalendarPlan(
+    organizationId: string,
+): Promise<void> {
+    const locked = await calendarPlan.locked(organizationId);
+    if (!locked) return;
+    if (locked !== "unread") throw moduleLocked(locked);
+    throw new ForbiddenException({
+        message: "Google Calendar isn't in your plan.",
+        details: {
+            code: "MODULE_LOCKED",
+            moduleId: PLAN_ROW,
+            plan: null,
+            upgradeTo: null,
+        },
+    });
 }
 
 /** The memberships here whose connections may sync: they hold the permission now. */
@@ -141,4 +199,30 @@ export async function googleBusyAllowed(
 ): Promise<Set<string> | null> {
     if (await businessPause(organizationId)) return null;
     return syncingMembers(organizationId);
+}
+
+/**
+ * The connections whose busy times may block slots here now, or null when
+ * none may (the flag or the plan off): of the people who may sync, every
+ * connected account but those past the plan's allowance, so an account
+ * paused by a downgrade stops blocking at once, not at its next busy
+ * read (P4).
+ */
+export async function googleBusyConnections(
+    organizationId: string,
+): Promise<Set<string> | null> {
+    const members = await googleBusyAllowed(organizationId);
+    if (!members) return null;
+    const [over, rows] = await Promise.all([
+        overAllowance(organizationId),
+        prisma.googleCalendarConnection.findMany({
+            where: {
+                organizationId,
+                status: "CONNECTED",
+                membershipId: { in: [...members] },
+            },
+            select: { id: true },
+        }),
+    ]);
+    return new Set(rows.map((r) => r.id).filter((id) => !over.has(id)));
 }

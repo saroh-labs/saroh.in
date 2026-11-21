@@ -19,7 +19,7 @@ import {
     loadPeople,
 } from "../bookings/staff-availability";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
-import { googleBusyAllowed } from "./calendar-allowed";
+import { googleBusyConnections } from "./calendar-allowed";
 import { CalendarBusyHandler } from "./calendar-busy.handler";
 import { CalendarConnectService } from "./calendar-connect.service";
 import { CALENDAR_BUSY_TYPE } from "./calendar-jobs";
@@ -52,7 +52,7 @@ beforeAll(async () => {
     mutableEnv.API_PUBLIC_URL = "https://api.example.com";
     // Slot reads ask whether Google busy times count (GC-02), as the
     // module registers at boot; the flag is on per business.
-    setGoogleBusyGate(googleBusyAllowed);
+    setGoogleBusyGate(googleBusyConnections);
     await prisma.featureFlag.upsert({
         where: { key: "GOOGLE_CALENDAR" },
         create: { key: "GOOGLE_CALENDAR", enabledByDefault: false },

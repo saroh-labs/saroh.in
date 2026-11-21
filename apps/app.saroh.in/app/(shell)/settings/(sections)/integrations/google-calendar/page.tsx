@@ -14,6 +14,7 @@ import { readGoogleCalendar } from "@/lib/google-calendar/service";
 import { GC_WORDS } from "@/lib/google-calendar/words";
 import { permits } from "@/lib/organizations/permits";
 import { resolveActiveOrganization } from "@/lib/organizations/service";
+import { plansShown } from "@/lib/saroh-billing/plans-shown";
 import { billingAccessOrNull } from "@/lib/saroh-billing/service";
 import { requireSession } from "@/lib/session";
 
@@ -70,6 +71,13 @@ export default async function GoogleCalendarSettingsPage({
     if (read.kind === "plan") {
         return (
             <SettingsPanel header={header}>
+                {/* No plans shown (Global, DEC-136): the card draws nothing, so say it (S11). */}
+                {!plansShown() ? (
+                    <Notice className="max-w-[760px]" title="Not on your plan">
+                        Google Calendar isn&apos;t on Saroh&apos;s plans here
+                        yet.
+                    </Notice>
+                ) : null}
                 <PlanLockedCard
                     className="max-w-[760px]"
                     name="Google Calendar"

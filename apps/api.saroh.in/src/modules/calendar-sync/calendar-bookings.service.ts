@@ -1,8 +1,6 @@
 import {
     BadRequestException,
     ForbiddenException,
-    HttpException,
-    HttpStatus,
     Injectable,
     Logger,
     NotFoundException,
@@ -11,14 +9,12 @@ import {
 import { prisma } from "@saroh/database";
 
 import type { OrganizationContext } from "../../common/types/organization-context";
-import { env } from "../../env";
-import { planMeter } from "../billing/metering.service";
 import { assertOwnBooking } from "../bookings/own-diary";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { allows, authorize } from "../organizations/organization-policy";
 import type { WindowLimiter } from "../rate-limits/shared-window";
-import { SharedRateLimiter } from "../rate-limits/shared-window";
 import {
+    assertCalendarPlan,
     businessPause,
     pausedBecause,
     syncingMembers,
@@ -31,6 +27,13 @@ import type {
     CalendarMemberView,
     MoveBookingsView,
 } from "./dto";
+import {
+    memberChanges,
+    moves,
+    takeBusinessChanges,
+    takeGoogleChange,
+    takeOrRefuse,
+} from "./google-changes";
 import type { MeetAccess } from "./google/google-calendar.port";
 import { isGoogleError } from "./google/google-calendar.port";
 import { isMeetAccess, meetAccessOf, resyncMeetAccess } from "./meet-access";
@@ -49,14 +52,12 @@ export class CalendarBookingsService {
     constructor(
         private readonly flags: FeatureFlagService,
         private readonly sync: CalendarSyncHandler,
-        // Each change queues Google work on the shared lane: a business
-        // can't flood it, or Saroh's one Google quota (M2).
+        // Each change queues Google work on the shared lane: a person
+        // can't flood it, or Saroh's one Google quota (M2, L9).
         @Optional()
-        private readonly changes: WindowLimiter = new SharedRateLimiter(
-            "google-calendar-changes",
-            Number(env.GOOGLE_CALENDAR_CHANGES_PER_HOUR) || 120,
-            60 * 60_000,
-        ),
+        private readonly changes: WindowLimiter = memberChanges,
+        @Optional()
+        private readonly moveLimit: WindowLimiter = moves,
     ) {}
 
     /**
@@ -70,7 +71,7 @@ export class CalendarBookingsService {
     async moveBookings(ctx: OrganizationContext): Promise<MoveBookingsView> {
         authorize(ctx, "calendar:connect-own");
         await this.gate(ctx.organizationId);
-        await this.takeChange(ctx.organizationId);
+        await this.takeChange(ctx);
         const staff = await prisma.staffMember.findFirst({
             where: {
                 organizationId: ctx.organizationId,
@@ -114,6 +115,16 @@ export class CalendarBookingsService {
             },
             select: { id: true },
         });
+        if (bookings.length > 0) {
+            // Each round invites every customer again (L1): a few a day,
+            // and the business's hour pays for every booking it queues.
+            await takeOrRefuse(
+                this.moveLimit,
+                ctx,
+                "You've moved your bookings a few times today. Try again tomorrow.",
+            );
+            await takeBusinessChanges(ctx.organizationId, bookings.length);
+        }
         const moving = await queueCalendarSyncs(
             prisma,
             ctx.organizationId,
@@ -136,7 +147,7 @@ export class CalendarBookingsService {
     ): Promise<{ meetAccess: MeetAccess; updating: number }> {
         authorize(ctx, "service:write");
         await this.gate(ctx.organizationId);
-        await this.takeChange(ctx.organizationId);
+        await this.takeChange(ctx);
         await prisma.businessProfile.upsert({
             where: { organizationId: ctx.organizationId },
             create: { organizationId: ctx.organizationId, meetAccess },
@@ -178,7 +189,7 @@ export class CalendarBookingsService {
         const google =
             dto.meetingLink === "GOOGLE_MEET" || dto.meetAccess !== undefined;
         if (google) await this.gate(ctx.organizationId);
-        await this.takeChange(ctx.organizationId);
+        await this.takeChange(ctx);
         if (dto.meetingLink === "GOOGLE_MEET") {
             if (booking.service.capacity > 1 || booking.courseEnrollmentId) {
                 throw new BadRequestException(
@@ -313,16 +324,12 @@ export class CalendarBookingsService {
         if (!(await this.flags.isEnabled("GOOGLE_CALENDAR", organizationId))) {
             throw new NotFoundException("Google Calendar isn't available yet.");
         }
-        await planMeter.assertIncluded(organizationId, "integrations");
+        await assertCalendarPlan(organizationId);
     }
 
-    /** One change to Google Calendar, counted against the business's hour (M2). */
-    private async takeChange(organizationId: string): Promise<void> {
-        if (await this.changes.take(organizationId)) return;
-        throw new HttpException(
-            "Too many Google Calendar changes this hour. Try again later.",
-            HttpStatus.TOO_MANY_REQUESTS,
-        );
+    /** One change to Google Calendar: the person's hour, then the business's (M2, L9). */
+    private takeChange(ctx: OrganizationContext): Promise<void> {
+        return takeGoogleChange(ctx, this.changes);
     }
 
     /**

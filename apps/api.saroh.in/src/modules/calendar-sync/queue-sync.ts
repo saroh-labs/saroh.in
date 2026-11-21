@@ -2,6 +2,14 @@ import type { Prisma } from "@saroh/database";
 
 import { CALENDAR_SYNC_ATTEMPTS, CALENDAR_SYNC_TYPE } from "./calendar-jobs";
 
+/**
+ * How far apart several bookings' jobs are queued (S1): the calendar lane
+ * is one queue by `runAt` for every business, so one business's hundreds
+ * of jobs are spread out and another's new booking, queued for now, goes
+ * ahead of the rest of them.
+ */
+export const BULK_SYNC_SPACING_MS = 2_000;
+
 type Tx = Pick<
     Prisma.TransactionClient,
     "googleCalendarEvent" | "googleCalendarConnection" | "job"
@@ -85,12 +93,14 @@ export async function queueCalendarSyncs(
     );
     const fresh = bookingIds.filter((id) => !queued.has(id));
     if (fresh.length > 0) {
+        const now = Date.now();
         await db.job.createMany({
-            data: fresh.map((bookingId) => ({
+            data: fresh.map((bookingId, i) => ({
                 organizationId,
                 type: CALENDAR_SYNC_TYPE,
                 payload: { bookingId, ...flags },
                 maxAttempts: CALENDAR_SYNC_ATTEMPTS,
+                runAt: new Date(now + i * BULK_SYNC_SPACING_MS),
             })),
         });
     }

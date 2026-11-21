@@ -14,14 +14,13 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
-import { planMeter } from "../billing/metering.service";
 import { setGoogleBusyGate } from "../bookings/google-busy-gate";
 import {
     GOOGLE_BUSY_FRESH_MS,
     loadPeople,
 } from "../bookings/staff-availability";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
-import { googleBusyAllowed } from "./calendar-allowed";
+import { calendarPlan, googleBusyConnections } from "./calendar-allowed";
 import { CalendarBusyHandler } from "./calendar-busy.handler";
 import { CALENDAR_BUSY_TYPE, scheduleBusy } from "./calendar-jobs";
 import { CalendarLapseService } from "./calendar-lapse.service";
@@ -46,7 +45,7 @@ beforeAll(async () => {
     mutableEnv.CALENDAR_ENC_KEY = randomBytes(32).toString("base64");
     // Slot reads ask whether Google busy times count (GC-02), as the
     // module registers at boot; the flag is on per business.
-    setGoogleBusyGate(googleBusyAllowed);
+    setGoogleBusyGate(googleBusyConnections);
     await prisma.featureFlag.upsert({
         where: { key: "GOOGLE_CALENDAR" },
         create: { key: "GOOGLE_CALENDAR", enabledByDefault: false },
@@ -319,8 +318,8 @@ describe("calendar.busy", () => {
         expect((await read())[0].timeOff).toHaveLength(1);
 
         const spy = jest
-            .spyOn(planMeter, "isIncluded")
-            .mockResolvedValue(false);
+            .spyOn(calendarPlan, "locked")
+            .mockResolvedValue("unread");
         try {
             // Slots stop counting it at once, before any job runs.
             expect((await read())[0].timeOff).toHaveLength(0);
@@ -353,6 +352,44 @@ describe("calendar.busy", () => {
         } finally {
             spy.mockRestore();
         }
+    });
+
+    it("leaves out an account past the plan's allowance at once, not at its next read (P4)", async () => {
+        const c = await connected();
+        const theirs = { startAt: hours(24), endAt: hours(25) };
+        google.busy.set("primary-cal", [theirs]);
+        await handler.handle(job(c.organizationId, c.connectionId));
+        // A second account, as before a downgrade to one a person, with
+        // its own fresh busy time still stored.
+        const extra = await prisma.googleCalendarConnection.create({
+            data: {
+                organizationId: c.organizationId,
+                membershipId: c.membershipId,
+                googleEmail: "kabir.work@example.com",
+                scopes: Object.values(SCOPES),
+                busyRefreshedAt: new Date(),
+            },
+        });
+        await prisma.googleCalendarBusy.create({
+            data: {
+                organizationId: c.organizationId,
+                connectionId: extra.id,
+                staffId: c.staffId,
+                startAt: hours(30),
+                endAt: hours(31),
+            },
+        });
+        await expect(googleBusyConnections(c.organizationId)).resolves.toEqual(
+            new Set([c.connectionId]),
+        );
+        const [p] = await loadPeople(
+            prisma,
+            c.organizationId,
+            [c.staffId],
+            hours(0),
+            hours(72),
+        );
+        expect(p.timeOff).toEqual([theirs]);
     });
 
     it("pauses for someone who lost the permission (GC-03)", async () => {

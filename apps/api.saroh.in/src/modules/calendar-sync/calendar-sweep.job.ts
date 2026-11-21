@@ -125,6 +125,24 @@ export class CalendarSweepJob {
                     },
                 },
             });
+            // Which of this page already have a busy read waiting: one read
+            // a page, not a count per connection (S5).
+            const waitingJobs = await prisma.job.findMany({
+                where: {
+                    type: CALENDAR_BUSY_TYPE,
+                    status: { in: ["PENDING", "PROCESSING"] },
+                    organizationId: {
+                        in: [...new Set(page.map((c) => c.organizationId))],
+                    },
+                },
+                select: { payload: true },
+            });
+            const waitingFor = new Set(
+                waitingJobs.map(
+                    (j) =>
+                        (j.payload as { connectionId?: string }).connectionId,
+                ),
+            );
             for (const c of page) {
                 try {
                     const may = await allowedIn(c.organizationId);
@@ -138,14 +156,7 @@ export class CalendarSweepJob {
                         continue;
                     }
                     if (c.calendars.length === 0) continue;
-                    const waiting = await prisma.job.count({
-                        where: {
-                            type: CALENDAR_BUSY_TYPE,
-                            status: { in: ["PENDING", "PROCESSING"] },
-                            payload: { path: ["connectionId"], equals: c.id },
-                        },
-                    });
-                    if (waiting === 0) {
+                    if (!waitingFor.has(c.id)) {
                         const at = new Date(
                             now.getTime() +
                                 Math.floor(Math.random() * BUSY_EVERY_MS),

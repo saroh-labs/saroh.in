@@ -15,8 +15,8 @@ import type { Job } from "@saroh/database";
 import { prisma } from "@saroh/database";
 
 import { env } from "../../env";
-import { planMeter } from "../billing/metering.service";
 import type { FeatureFlagService } from "../feature-flags/feature-flags.service";
+import { calendarPlan } from "./calendar-allowed";
 import { CALENDAR_SYNC_TYPE } from "./calendar-jobs";
 import {
     CALENDAR_SYNC_FAILED_NOTICE,
@@ -379,8 +379,8 @@ describe("calendar.sync", () => {
             data: { status: "CANCELLED", cancelledAt: new Date() },
         });
         const spy = jest
-            .spyOn(planMeter, "isIncluded")
-            .mockResolvedValue(false);
+            .spyOn(calendarPlan, "locked")
+            .mockResolvedValue("unread");
         try {
             google.calls.length = 0;
             await handler.handle(job(org, b.id));

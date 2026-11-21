@@ -33,16 +33,16 @@ interface Block {
     staffId: string;
     startAt: Date;
     endAt: Date;
-    /** Whose connection read it; Asha's unless said. */
-    membershipId?: string;
+    /** Which connection read it; Asha's unless said. */
+    connectionId?: string;
 }
 
 function db(google: Block[]) {
     const empty = () => jest.fn().mockResolvedValue([]);
     const googleBusy = jest.fn().mockResolvedValue(
-        google.map(({ membershipId, ...b }) => ({
+        google.map(({ connectionId, ...b }) => ({
             ...b,
-            connection: { membershipId: membershipId ?? "m_asha" },
+            connectionId: connectionId ?? "gc_asha",
         })),
     );
     return {
@@ -74,7 +74,7 @@ function db(google: Block[]) {
 
 beforeEach(() => {
     allowed.mockReset();
-    allowed.mockResolvedValue(new Set(["m_asha"]));
+    allowed.mockResolvedValue(new Set(["gc_asha"]));
 });
 
 describe("Google busy times in slots", () => {
@@ -119,11 +119,11 @@ describe("Google busy times in slots", () => {
         expect(since).toBeLessThanOrEqual(Date.now() - GOOGLE_BUSY_FRESH_MS);
     });
 
-    const block = (membershipId?: string): Block => ({
+    const block = (connectionId?: string): Block => ({
         staffId: "asha",
         startAt: iso("2026-07-20T08:00:00Z"),
         endAt: iso("2026-07-20T09:00:00Z"),
-        ...(membershipId ? { membershipId } : {}),
+        ...(connectionId ? { connectionId } : {}),
     });
 
     it("ignores them once the flag or the plan is off (GC-02)", async () => {
@@ -134,8 +134,14 @@ describe("Google busy times in slots", () => {
     });
 
     it("ignores them from someone who no longer holds the permission (GC-03)", async () => {
-        allowed.mockResolvedValue(new Set(["m_someone_else"]));
+        allowed.mockResolvedValue(new Set(["gc_someone_else"]));
         const { client } = db([block()]);
+        const people = await loadPeople(client, "org_a", ["asha"], from, to);
+        expect(people[0].timeOff).toHaveLength(0);
+    });
+
+    it("ignores an account the plan's allowance leaves out (P4)", async () => {
+        const { client } = db([block("gc_extra")]);
         const people = await loadPeople(client, "org_a", ["asha"], from, to);
         expect(people[0].timeOff).toHaveLength(0);
     });
