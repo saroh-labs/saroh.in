@@ -323,6 +323,23 @@ a skeleton only, not the full section."
   in the canvas instead of letting Next fall back to a full page load.
 - `post-shell.test.tsx` "the frame stays from post to post" checks the
   frame's nodes survive a post change; copy it for a new frame.
+- **The site editor stays one mounted editor across a `?page=` change**:
+  the frame (bar, rail, Pages tree, right column, Ask AI) keeps its nodes;
+  the draft, autosave, per-page Undo, sheets, canvas and inspector re-seed
+  for the new page (`site-editor.test.tsx`, `read-only.test.tsx`).
+- **A failed load while online** is caught in its region, not turned into
+  a full page load: `lib/navigation/caught-full-load.ts` (the Navigation
+  API stops Next's fallback; a second failure after Try again is let
+  through, so a new deploy or an expired session still reloads). It leans
+  on Next 16.4.5 internals: check it on every Next upgrade.
+- **Pieces to reuse:** `LinkPending` (`@saroh/ui`, inside a `Link` that
+  only changes a view; `TabStrip` and `SectionList` draw it), the app's
+  `ScreenPending` / `PendingRegion` (`components/shared/page/screen-pending.tsx`)
+  for a region greyed during a transition, admin's `TableSkeleton` (the
+  list's real column count) and `RegionError`. On merchant sites,
+  `SiteLink` (`packages/site-blocks`) makes a same-site link a soft
+  navigation while the server HTML keeps its `<a href>`, and a pending mark
+  uses the site's own tokens and never loops (DEC-172).
 
 ## If you think you need React Query
 
