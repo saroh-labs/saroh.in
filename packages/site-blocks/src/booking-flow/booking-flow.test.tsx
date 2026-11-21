@@ -242,7 +242,14 @@ async function chooseOneToOne() {
 describe("the booking page (U19)", () => {
     it("says a day is Full or Closed, and opens on the first free one", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         fireEvent.click(
             screen.getByRole("radio", { name: /Personal training/ }),
         );
@@ -264,14 +271,23 @@ describe("the booking page (U19)", () => {
                 name: "Edit the day, Sunday 20 September",
             }),
         ).toBeVisible();
-        expect(calls[0]?.url).toBe(`${API}/public/services/svc_pt/days`);
+        expect(calls[0]?.url).toBe(
+            `${API}/public/sites/site_1/services/svc_pt/days`,
+        );
     });
 
     it("books at the desk, and confirms without promising a message", async () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
         fireEvent.click(
@@ -314,7 +330,14 @@ describe("the booking page (U19)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
             target: { value: " +91 98450 12345 " },
@@ -335,7 +358,14 @@ describe("the booking page (U19)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.change(screen.getByLabelText("Phone (optional)"), {
             target: { value: "98450" },
@@ -381,7 +411,14 @@ describe("the booking page (U19)", () => {
             }
             return json({ state: holdState, holdExpiresAt: null });
         });
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -428,7 +465,14 @@ describe("the booking page (U19)", () => {
             if (url.endsWith("/payment-intent")) return json({}, 500);
             return json({ state: "RELEASED", holdExpiresAt: null });
         });
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -458,7 +502,14 @@ describe("the booking page (U19)", () => {
                       409,
                   ),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -492,7 +543,12 @@ describe("the booking page (U19)", () => {
                       ),
             );
             render(
-                <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+                <BookingFlow
+                    siteId="site_1"
+                    page={PAGE}
+                    apiUrl={API}
+                    account={account()}
+                />,
             );
             await chooseOneToOne();
             fireEvent.click(
@@ -543,7 +599,14 @@ describe("the booking page (U19)", () => {
             }
             return json({ state: "HELD", holdExpiresAt: null });
         });
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -623,7 +686,12 @@ describe("the booking page (U19)", () => {
             return json({ state: "HELD", holdExpiresAt: null });
         });
         const { rerender } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         await chooseOneToOne();
         fireEvent.click(
@@ -638,6 +706,7 @@ describe("the booking page (U19)", () => {
         const before = daysRead().length;
         rerender(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -709,7 +778,14 @@ describe("the booking page (U19)", () => {
 
     it("stays with the hold when letting it go fails, and books nothing at the desk (K-2)", async () => {
         heldThenDesk(() => json({}, 500));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -739,7 +815,14 @@ describe("the booking page (U19)", () => {
 
     it("a hold paid just before it was let go is booked and paid, not booked again (K-2)", async () => {
         heldThenDesk(() => json({ state: "CONFIRMED", holdExpiresAt: null }));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         fireEvent.click(
             screen.getByRole("button", { name: "Pay ₹1,200 and book" }),
@@ -785,7 +868,14 @@ describe("the booking page (U19)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(TWO_STARTS) : json({}, 502),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         const keys = () =>
             calls
@@ -832,7 +922,14 @@ describe("the booking page (U19)", () => {
 
     it("lists a class's sessions with places left, and a full one cannot be picked", async () => {
         serve(() => json(CLASS_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         fireEvent.click(screen.getByRole("radio", { name: /HIIT class/ }));
 
         const full = await screen.findByRole("radio", {
@@ -853,6 +950,7 @@ describe("the booking page (U19)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, payOnline: false }}
                 apiUrl={API}
                 account={account()}
@@ -874,6 +972,7 @@ describe("the booking page (U19)", () => {
         serve(() => json({}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, open: false }}
                 apiUrl={API}
                 account={account()}
@@ -890,6 +989,7 @@ describe("the booking page (U19)", () => {
         serve(() => json({}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, paused: true }}
                 apiUrl={API}
                 account={account()}
@@ -912,6 +1012,7 @@ describe("the booking page (U19)", () => {
         serve(() => json({}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, paused: true, demo: true }}
                 apiUrl={API}
                 account={account()}
@@ -997,7 +1098,14 @@ describe("Where and anything we should know (E7)", () => {
                       201,
                   ),
         );
-        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={KAVI}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseAt(/Video consultation/);
 
         const where = screen.getByRole("radiogroup", { name: "Where" });
@@ -1059,7 +1167,14 @@ describe("Where and anything we should know (E7)", () => {
                       201,
                   ),
         );
-        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={KAVI}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseAt(/Video consultation/);
 
         const clinic = screen.getByRole("radio", { name: "At Kavi Dental" });
@@ -1086,7 +1201,14 @@ describe("Where and anything we should know (E7)", () => {
                 ? json(KAVI_DAYS)
                 : json(booked({ serviceName: "Cleaning" }), 201),
         );
-        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={KAVI}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseAt(/Cleaning/);
 
         expect(
@@ -1115,7 +1237,14 @@ describe("Where and anything we should know (E7)", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         expect(
             screen.queryByRole("radiogroup", { name: "Where" }),
@@ -1132,7 +1261,14 @@ describe("Where and anything we should know (E7)", () => {
 
     it("caps the note at 1,000 characters", async () => {
         serve(() => json(KAVI_DAYS));
-        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={KAVI}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseAt(/Cleaning/);
         expect(
             screen.getByLabelText("Anything we should know?"),
@@ -1174,7 +1310,14 @@ describe("Where and anything we should know (E7)", () => {
                 },
             });
         });
-        render(<BookingFlow page={KAVI} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={KAVI}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseAt(/Video consultation/);
         fireEvent.click(screen.getByRole("radio", { name: "Video call" }));
         vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -1230,7 +1373,14 @@ describe("online checkout (E11)", () => {
     }
 
     async function payNow() {
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         vi.useFakeTimers({ shouldAdvanceTime: true });
         fireEvent.click(
@@ -1259,7 +1409,14 @@ describe("online checkout (E11)", () => {
         serve((url) =>
             url.includes("svc_hiit") ? json(CLASS_DAYS) : json(ONE_DAYS),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         expect(
             screen.getByRole("radio", {
@@ -1469,6 +1626,7 @@ describe("online checkout (E11)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, payOnline: false }}
                 apiUrl={API}
                 account={account()}
@@ -1512,6 +1670,7 @@ describe("opening on a time from On today (G18)", () => {
         serve(() => json(TWO_TIMES));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -1539,6 +1698,7 @@ describe("opening on a time from On today (G18)", () => {
         serve(() => json(TWO_TIMES));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -1565,6 +1725,7 @@ describe("opening on a time from On today (G18)", () => {
         serve(() => json(CLASS_DAYS));
         const { unmount } = render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -1585,6 +1746,7 @@ describe("opening on a time from On today (G18)", () => {
         serve(() => json(CLASS_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -1602,6 +1764,7 @@ describe("opening on a time from On today (G18)", () => {
         serve(() => json(TWO_TIMES));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -1707,6 +1870,7 @@ describe("sign-in at the last step (A9)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null })}
@@ -1759,6 +1923,7 @@ describe("sign-in at the last step (A9)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({
@@ -1826,6 +1991,7 @@ describe("sign-in at the last step (A9)", () => {
         const requestCode = vi.fn();
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({
@@ -1858,6 +2024,7 @@ describe("sign-in at the last step (A9)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({
@@ -1885,6 +2052,7 @@ describe("sign-in at the last step (A9)", () => {
         serve(() => json(ONE_DAYS));
         const { unmount } = render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null })}
@@ -1897,7 +2065,14 @@ describe("sign-in at the last step (A9)", () => {
         // Another visit: nothing chosen on the last one is kept for it.
         window.sessionStorage.clear();
 
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await pickSeven();
         expect(screen.queryByLabelText("Email")).toBeNull();
         expect(screen.getByLabelText("Phone (optional)")).not.toBeRequired();
@@ -1908,6 +2083,7 @@ describe("sign-in at the last step (A9)", () => {
         const signOut = vi.fn(() => Promise.resolve({ ok: true }));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ signOut })}
@@ -1940,7 +2116,14 @@ describe("sign-in at the last step (A9)", () => {
                       409,
                   ),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await pickSeven();
         fireEvent.click(
             screen.getByRole("button", { name: "Book and pay at the desk" }),
@@ -1985,6 +2168,7 @@ describe("sign-in at the last step (A9)", () => {
         });
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null })}
@@ -2015,6 +2199,7 @@ describe("sign-in at the last step (A9)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null, signIn: cannotSend() })}
@@ -2045,6 +2230,7 @@ describe("sign-in at the last step (A9)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({
@@ -2093,7 +2279,14 @@ describe("sign-in at the last step (A9)", () => {
                       401,
                   ),
         );
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await pickSeven();
         fireEvent.click(
             screen.getByRole("button", { name: "Book and pay at the desk" }),
@@ -2141,6 +2334,7 @@ describe("a deposit at booking (E8)", () => {
         serveDeposit(() => json({}, 500));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={DEPOSIT_PAGE}
                 apiUrl={API}
                 account={account()}
@@ -2185,6 +2379,7 @@ describe("a deposit at booking (E8)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={DEPOSIT_PAGE}
                 apiUrl={API}
                 account={account()}
@@ -2226,6 +2421,7 @@ describe("a deposit at booking (E8)", () => {
         serveDeposit(() => json({}, 500));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={DEPOSIT_PAGE}
                 apiUrl={API}
                 account={account()}
@@ -2249,6 +2445,7 @@ describe("a deposit at booking (E8)", () => {
         serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{
                     ...PAGE,
                     services: [{ ...PAGE.services[0], depositCents: 120_000 }],
@@ -2271,6 +2468,7 @@ describe("a deposit at booking (E8)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...DEPOSIT_PAGE, payOnline: false }}
                 apiUrl={API}
                 account={account()}
@@ -2327,6 +2525,7 @@ describe("how the business takes payment (DEC-088)", () => {
         serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={withWay("ONLINE")}
                 apiUrl={API}
                 account={account()}
@@ -2343,6 +2542,7 @@ describe("how the business takes payment (DEC-088)", () => {
         serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={withWay("DESK")}
                 apiUrl={API}
                 account={account()}
@@ -2361,6 +2561,7 @@ describe("how the business takes payment (DEC-088)", () => {
         serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={withWay("ONLINE", { payOnline: false })}
                 apiUrl={API}
                 account={account()}
@@ -2386,6 +2587,7 @@ describe("how the business takes payment (DEC-088)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={withWay("DESK", {
                     services: [{ ...PAGE.services[0], depositCents: 60_000 }],
                 })}
@@ -2419,6 +2621,7 @@ describe("how the business takes payment (DEC-088)", () => {
         serve((url) => json(url.endsWith("/days") ? ONE_DAYS : {}));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={withWay("ONLINE", {
                     payOnline: false,
                     services: [{ ...PAGE.services[0], depositCents: 60_000 }],
@@ -2476,6 +2679,7 @@ describe("the header's facts (E6)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={KAVI_PAGE}
                 visit={KAVI_VISIT}
                 apiUrl={API}
@@ -2503,6 +2707,7 @@ describe("the header's facts (E6)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 visit={KAVI_VISIT}
                 apiUrl={API}
@@ -2521,6 +2726,7 @@ describe("the header's facts (E6)", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={KAVI_PAGE}
                 visit={{ ...KAVI_VISIT, hours: null, phone: null }}
                 apiUrl={API}
@@ -2540,6 +2746,7 @@ describe("the header's facts (E6)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={KAVI_PAGE}
                 visit={null}
                 apiUrl={API}
@@ -2576,7 +2783,12 @@ describe("a treatment of several visits (E10)", () => {
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
         render(
-            <BookingFlow page={VISITS_PAGE} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={VISITS_PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         expect(
             screen.getByRole("radio", {
@@ -2612,7 +2824,12 @@ describe("a treatment of several visits (E10)", () => {
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
         render(
-            <BookingFlow page={VISITS_PAGE} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={VISITS_PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         await chooseOneToOne();
         fireEvent.click(screen.getByRole("radio", { name: /Pay at the desk/ }));
@@ -2632,6 +2849,7 @@ describe("a treatment of several visits (E10)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{
                     ...PAGE,
                     services: [
@@ -2656,7 +2874,14 @@ describe("a treatment of several visits (E10)", () => {
 
     it("a service of one visit reads as before", async () => {
         serve(() => json(ONE_DAYS));
-        render(<BookingFlow page={PAGE} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         expect(
             screen.getByRole("heading", { name: "When?" }),
@@ -2679,7 +2904,12 @@ describe("the booking page on a test release (DEC-071, T6)", () => {
         });
         render(
             <TestReleaseProvider release={{ name: "Diwali menu" }}>
-                <BookingFlow page={PAGE} apiUrl={API} account={signedOut} />
+                <BookingFlow
+                    siteId="site_1"
+                    page={PAGE}
+                    apiUrl={API}
+                    account={signedOut}
+                />
             </TestReleaseProvider>,
         );
         await chooseOneToOne();
@@ -2719,6 +2949,7 @@ describe("the booking page on a test release (DEC-071, T6)", () => {
         );
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ book })}
@@ -2777,7 +3008,14 @@ describe("GST on the booking page", () => {
         serve((url) =>
             url.endsWith("/days") ? json(ONE_DAYS) : json(booked(), 201),
         );
-        render(<BookingFlow page={ADDED} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={ADDED}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         // Browsing: the price the business typed, and that GST comes on top.
         expect(
             screen.getByRole("radio", { name: /Personal training/ }),
@@ -2816,7 +3054,12 @@ describe("GST on the booking page", () => {
     it("includes GST: the typed price is what is paid, with the GST in it said", async () => {
         serve(() => json(ONE_DAYS));
         render(
-            <BookingFlow page={INCLUDED} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={INCLUDED}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         expect(
             screen.getByRole("radio", { name: /Personal training/ }),
@@ -2840,7 +3083,14 @@ describe("GST on the booking page", () => {
                 ADDED.services[1],
             ],
         };
-        render(<BookingFlow page={page} apiUrl={API} account={account()} />);
+        render(
+            <BookingFlow
+                siteId="site_1"
+                page={page}
+                apiUrl={API}
+                account={account()}
+            />,
+        );
         await chooseOneToOne();
         const deposit = screen.getByRole("radio", {
             name: /Pay ₹295 deposit now/,
@@ -2858,6 +3108,7 @@ describe("GST on the booking page", () => {
         serve(() => json(ONE_DAYS));
         render(
             <BookingFlow
+                siteId="site_1"
                 page={pageWith({ payCents: 100_000, gst: null })}
                 apiUrl={API}
                 account={account()}
@@ -2911,6 +3162,7 @@ describe("signing in while booking, when the server draws the page again", () =>
         });
         const { rerender } = render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null })}
@@ -2941,6 +3193,7 @@ describe("signing in while booking, when the server draws the page again", () =>
         // choices, none of them the later weeks, and who is signed in.
         rerender(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}
@@ -2989,6 +3242,7 @@ describe("signing in while booking, when the server draws the page again", () =>
         serve((url) => json(url.includes("svc_hiit") ? CLASS_DAYS : ONE_DAYS));
         const { rerender } = render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account({ customer: null })}
@@ -2997,6 +3251,7 @@ describe("signing in while booking, when the server draws the page again", () =>
         await chooseOneToOne();
         rerender(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}

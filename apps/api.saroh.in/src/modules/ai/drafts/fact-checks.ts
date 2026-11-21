@@ -6,8 +6,9 @@ import { prisma } from "@saroh/database";
  * section are read for facts (prices, percentages and offers, times,
  * "free", phone numbers, numbers with a claim such as "20 years"), and each
  * one is given only when the business already says it: a price in its
- * Services, an offer in its Discounts, a time in its hours, or anything on
- * the page's current words. The rest are marked on the card, and the
+ * Services, an offer in its Discounts, a time in its hours, or anything in
+ * the edited section's current words (never another section's: review 07
+ * B-L1). The rest are marked on the card, and the
  * server won't save until each is confirmed. Decided here, never in the
  * browser.
  */
@@ -25,13 +26,13 @@ export interface Fact {
 }
 
 const WHY = {
-    money: "A price that isn't in your Services or on this page",
-    percent: "An offer that isn't in your Discounts or on this page",
-    offer: "An offer that isn't in your Discounts or on this page",
-    free: "Says free, which this page doesn't say",
-    time: "A time that isn't in your hours or on this page",
-    phone: "A phone number that isn't on this page",
-    claim: "A number or claim that isn't on this page",
+    money: "A price that isn't in your Services or in this section",
+    percent: "An offer that isn't in your Discounts or in this section",
+    offer: "An offer that isn't in your Discounts or in this section",
+    free: "Says free, which this section doesn't say",
+    time: "A time that isn't in your hours or in this section",
+    phone: "A phone number that isn't in this section",
+    claim: "A number or claim that isn't in this section",
 } as const;
 
 const num = (s: string) => Number(s.replace(/,/g, ""));
@@ -125,11 +126,11 @@ export interface Given {
 
 /**
  * The facts the business gave: its Services' prices, its Discounts, its
- * team's hours, and every word on the page now (`pageText`).
+ * team's hours, and every word in the edited section now (`pageText`).
  */
 export async function givenFacts(
     organizationId: string,
-    pageText: string,
+    sectionText: string,
 ): Promise<Given> {
     const [services, discounts, hours] = await Promise.all([
         prisma.service.findMany({
@@ -145,7 +146,7 @@ export async function givenFacts(
             select: { startMinute: true, endMinute: true },
         }),
     ]);
-    const keys = new Set(factsIn(pageText).map((f) => f.key));
+    const keys = new Set(factsIn(sectionText).map((f) => f.key));
     const from = new Map<string, string>();
     const add = (key: string, source: string) => {
         if (!keys.has(key)) from.set(key, source);

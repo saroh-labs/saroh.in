@@ -201,6 +201,7 @@ function draw(
     const q = new URLSearchParams(opened ?? "");
     return render(
         <BookingFlow
+            siteId="site_1"
             page={PAGE}
             apiUrl={API}
             account={account(over)}
@@ -370,7 +371,12 @@ describe("signed in", () => {
 describe("Classic", () => {
     it("keeps today's page: no frame, the numbered steps", () => {
         const { container } = render(
-            <BookingFlow page={PAGE} apiUrl={API} account={account()} />,
+            <BookingFlow
+                siteId="site_1"
+                page={PAGE}
+                apiUrl={API}
+                account={account()}
+            />,
         );
         expect(container.querySelector("[data-booking-frame]")).toBeNull();
         expect(
@@ -385,6 +391,7 @@ describe("a demo business, in a look (DEC-188)", () => {
         (look) => {
             render(
                 <BookingFlow
+                    siteId="site_1"
                     page={{ ...PAGE, paused: true, demo: true }}
                     apiUrl={API}
                     account={account()}
@@ -408,6 +415,7 @@ describe("booking paused, in a look (DEC-172, U15)", () => {
         (look) => {
             render(
                 <BookingFlow
+                    siteId="site_1"
                     page={{ ...PAGE, paused: true }}
                     apiUrl={API}
                     account={account()}
@@ -442,6 +450,7 @@ describe("booking paused, in a look (DEC-172, U15)", () => {
     it("messages by email when the business has no WhatsApp", () => {
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, paused: true }}
                 apiUrl={API}
                 account={account()}
@@ -464,6 +473,7 @@ describe("booking paused, in a look (DEC-172, U15)", () => {
     it("with no way to reach the business, says to get in touch and offers nothing dead", () => {
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, paused: true }}
                 apiUrl={API}
                 account={account()}
@@ -478,6 +488,7 @@ describe("booking paused, in a look (DEC-172, U15)", () => {
     it("not open at all says that, in the look", () => {
         render(
             <BookingFlow
+                siteId="site_1"
                 page={{ ...PAGE, open: false }}
                 apiUrl={API}
                 account={account()}

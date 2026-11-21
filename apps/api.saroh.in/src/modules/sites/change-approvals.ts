@@ -245,6 +245,8 @@ export async function recordUnitVerdicts(
         keys: readonly string[];
         outcome: ChangeVerdict;
         reason?: string | null;
+        /** No per-change alert: the whole review's verdict tells the team. */
+        quiet?: boolean;
     },
 ): Promise<{ recorded: number }> {
     const byKey = new Map(input.units.map((u) => [u.key, u]));
@@ -310,7 +312,7 @@ export async function recordUnitVerdicts(
             }),
         ),
     );
-    if (input.outcome === "CHANGES_REQUESTED") {
+    if (input.outcome === "CHANGES_REQUESTED" && !input.quiet) {
         // One alert per person whose changes were asked about (UX-043).
         const told = new Set<string>();
         for (const [i, u] of fresh.entries()) {

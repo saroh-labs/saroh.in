@@ -153,7 +153,7 @@ function siteTail(about: {
             .map(([k, v]) => `${k} ${JSON.stringify(v)}`)
             .join(", ");
     const read =
-        "Read its current words with get_page before answering, again each time: it gives the draft they are editing, and an earlier read in this conversation may be out of date. To change a section's words, draft them with edit_section; never add a price, offer, time, phone number or claim they didn't give.";
+        "Read its current words with get_page before answering, again each time: it gives the draft they are editing, and an earlier read in this conversation may be out of date. If get_page refuses, say you couldn't read this page; never answer about another page instead. To change a section's words, draft them with edit_section; never add a price, offer, time, phone number or claim they didn't give.";
     if (about.kind === "site_page") {
         return `they are editing a page of their website in the editor, labelled ${label} (${ids(
             [

@@ -32,7 +32,9 @@ import { ctaClasses } from "./cta";
  * time chosen. Given `content.serviceId` it reads the very days the booking
  * page draws its times from, so a time shown here is one that page offers:
  *
- *   GET  ${NEXT_PUBLIC_API_URL}/public/services/${serviceId}/days
+ *   GET  ${NEXT_PUBLIC_API_URL}/public/sites/${siteId}/services/${serviceId}/days
+ *
+ * through the site, so only its own business's services answer (07 B-L2).
  *
  * It books nothing itself. Sign-in is always on (A9, ADR-011): a customer
  * books on the booking page (`/book?service=&date=&start=`), where they
@@ -119,6 +121,7 @@ const NOT_LOADED =
 export default function BookingSection({
     content,
     apiUrl = DEFAULT_API_URL,
+    siteId,
     slots: givenSlots,
     bookHref,
     reach = null,
@@ -133,6 +136,8 @@ export default function BookingSection({
     content: RenderedBooking;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /** The site, whose own service's days are read; absent, none are. */
+    siteId?: string | null;
     /**
      * The site's booking page (U19), on a live site only — a preview has no
      * `/book`, so the link is drawn but goes nowhere there.
@@ -165,13 +170,15 @@ export default function BookingSection({
     // state itself, so it's safe to call from an effect (state is only ever set
     // in the resolving `.then`, never synchronously in the effect body).
     const fetchSlots = useCallback(async (): Promise<SlotsState> => {
-        if (!serviceId) return { kind: "ready", slots: [], zone: null };
+        if (!serviceId || typeof siteId !== "string") {
+            return { kind: "ready", slots: [], zone: null };
+        }
         const couldNotLoad: SlotsState = {
             kind: "error",
             message: NOT_LOADED,
         };
         try {
-            const res = await fetch(daysUrl(apiUrl, serviceId), {
+            const res = await fetch(daysUrl(apiUrl, siteId, serviceId), {
                 headers: { accept: "application/json" },
             });
             if (!res.ok) {
@@ -217,7 +224,7 @@ export default function BookingSection({
                     "We couldn't reach the server. Please check your connection and try again.",
             };
         }
-    }, [serviceId, apiUrl]);
+    }, [serviceId, siteId, apiUrl]);
 
     // Reload with a visible spinner, for Try again. Only ever called from an
     // event handler, so the synchronous "loading" set is fine here.

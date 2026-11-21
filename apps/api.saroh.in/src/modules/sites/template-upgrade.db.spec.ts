@@ -27,6 +27,7 @@ import { ModuleReadinessRegistry } from "../capabilities/readiness/module-readin
 import { ModuleSetupService } from "../capabilities/setup/module-setup.service";
 import { FeatureFlagService } from "../feature-flags/feature-flags.service";
 import { FLAG_KEYS } from "../feature-flags/flags";
+import { SYSTEM_EDITOR } from "./draft-editors";
 import { OWNER_NOTE_MESSAGE } from "./site-flags";
 import { SitesService } from "./sites.service";
 import {
@@ -251,6 +252,22 @@ describe("a starter site nobody touched", () => {
             },
         });
 
+        // No person did it: the look and the hidden page are stamped as
+        // Saroh's, so they wait for approval where it applies (21 Nov).
+        const stamped = await prisma.site.findUniqueOrThrow({
+            where: { id: siteId },
+            select: { draftEditors: true },
+        });
+        expect(stamped.draftEditors).toMatchObject({
+            "site:style": { userId: SYSTEM_EDITOR },
+            "site:footer": { userId: SYSTEM_EDITOR },
+        });
+        const hiddenAbout = await prisma.page.findFirstOrThrow({
+            where: { siteId, path: "/about" },
+            select: { settingsEditedByUserId: true },
+        });
+        expect(hiddenAbout.settingsEditedByUserId).toBe(SYSTEM_EDITOR);
+
         // It can now go live: the note is gone.
         await expect(sites.publishSite(ctx, siteId)).resolves.toMatchObject({
             bypassed: false,
@@ -381,7 +398,7 @@ describe("a starter site its owner has worked on", () => {
         const read = await sites.getSite(ctx, siteId);
         expect(read.template).toEqual({
             id: "starter",
-            version: 4,
+            version: 5,
             styleId: null,
         });
     });

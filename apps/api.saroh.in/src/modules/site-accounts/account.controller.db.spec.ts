@@ -238,6 +238,8 @@ describe("Me", () => {
             email: atClinic.email,
             phone: null,
             signInPhone: null,
+            // Their own GSTIN, for invoices (DEC-229); none saved yet.
+            gstin: null,
             businessName: "Kavi Dental",
             // Home and Me (A5), Appointments (A6) and Messages (A13).
             tabs: [

@@ -167,9 +167,13 @@ export interface DaysAsk {
     staffId?: string | null;
 }
 
-/** The address of a service's days read, with what was asked. */
+/**
+ * The address of a service's days read, with what was asked. Read through
+ * the site, so only its own business's services answer (07 B-L2).
+ */
 export function daysUrl(
     apiUrl: string,
+    siteId: string,
     serviceId: string,
     ask: DaysAsk = {},
 ): string {
@@ -177,16 +181,17 @@ export function daysUrl(
     if (ask.skip && ask.skip > 0) params.set("skip", String(ask.skip));
     if (ask.staffId) params.set("staffId", ask.staffId);
     const query = params.toString();
-    return `${apiUrl}/public/services/${encodeURIComponent(serviceId)}/days${query ? `?${query}` : ""}`;
+    return `${apiUrl}/public/sites/${encodeURIComponent(siteId)}/services/${encodeURIComponent(serviceId)}/days${query ? `?${query}` : ""}`;
 }
 
 export function fetchDays(
     apiUrl: string,
+    siteId: string,
     serviceId: string,
     ask: DaysAsk = {},
 ): Promise<Result<BookingDays>> {
     return read(
-        daysUrl(apiUrl, serviceId, ask),
+        daysUrl(apiUrl, siteId, serviceId, ask),
         { cache: "no-store" },
         isBookingDays,
     );

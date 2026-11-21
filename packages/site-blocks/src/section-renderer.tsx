@@ -323,6 +323,7 @@ export default function SectionRenderer({
                     {...site}
                     content={content as RenderedServicesList}
                     apiUrl={apiUrl}
+                    siteId={siteId}
                     bookHref={bookHref}
                     services={fixtures?.services}
                     feed={serviceList}
@@ -432,6 +433,7 @@ export default function SectionRenderer({
                     {...site}
                     content={content as RenderedBooking}
                     apiUrl={apiUrl}
+                    siteId={siteId}
                     bookHref={bookHref}
                     reach={reach}
                     askHref={askHref}

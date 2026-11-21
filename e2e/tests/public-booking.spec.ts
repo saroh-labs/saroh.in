@@ -66,7 +66,7 @@ async function signIn(page: Page) {
 async function pickTime(
     page: Page,
     slot: number,
-): Promise<{ label: string; serviceId: string }> {
+): Promise<{ label: string; serviceId: string; daysUrl: string }> {
     const phone = test.info().project.name.startsWith("phone");
     const fromEnd = 1 + slot + (phone ? 4 : 0);
     await page.goto(`${SITE}/book`);
@@ -74,11 +74,13 @@ async function pickTime(
         page.getByRole("heading", { name: "Make a booking" }),
     ).toBeVisible();
     const daysRead = page.waitForRequest((r) =>
-        /\/public\/services\/[^/]+\/days$/.test(new URL(r.url()).pathname),
+        /\/public\/sites\/[^/]+\/services\/[^/]+\/days$/.test(
+            new URL(r.url()).pathname,
+        ),
     );
     await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
-    const serviceId =
-        new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
+    const daysUrl = (await daysRead).url();
+    const serviceId = new URL(daysUrl).pathname.split("/")[5] ?? "";
     const openDays = page.getByRole("radio", { name: /times? free/ });
     await expect(openDays.first()).toBeVisible({ timeout: 15_000 });
     const count = await openDays.count();
@@ -95,7 +97,7 @@ async function pickTime(
     await expect(
         page.getByRole("button", { name: `Edit the time, ${label}` }),
     ).toBeVisible();
-    return { label, serviceId };
+    return { label, serviceId, daysUrl };
 }
 
 /**
@@ -208,11 +210,13 @@ test.describe("the booking page", () => {
         // The service's id, as the page itself reads its days.
         await page.goto(`${SITE}/book`);
         const daysRead = page.waitForRequest((r) =>
-            /\/public\/services\/[^/]+\/days$/.test(new URL(r.url()).pathname),
+            /\/public\/sites\/[^/]+\/services\/[^/]+\/days$/.test(
+                new URL(r.url()).pathname,
+            ),
         );
         await page.getByRole("radio", { name: new RegExp(SERVICE) }).click();
         const serviceId =
-            new URL((await daysRead).url()).pathname.split("/")[3] ?? "";
+            new URL((await daysRead).url()).pathname.split("/")[5] ?? "";
 
         // A services list's Book (or "Choose a time") links here. The
         // middleware once dropped the query on its way to the page, and
@@ -319,7 +323,7 @@ test.describe("the booking page", () => {
     }, testInfo) => {
         test.setTimeout(120_000);
         const email = `now-${testInfo.project.name}-${Date.now()}@example.in`;
-        const { label, serviceId } = await pickTime(page, 1);
+        const { label, daysUrl } = await pickTime(page, 1);
         await details(page);
         await expect(
             page.getByRole("radio", { name: /^Pay ₹\S+ now Online/ }),
@@ -354,9 +358,7 @@ test.describe("the booking page", () => {
 
         // Everyone else, meanwhile, is no longer offered that time.
         const other = await browser.newContext({ ignoreHTTPSErrors });
-        const days = await other.request.get(
-            `${urls.API_URL}/public/services/${serviceId}/days`,
-        );
+        const days = await other.request.get(daysUrl);
         const offered = (
             (await days.json()) as {
                 days: { starts: { startAt: string }[] }[];
@@ -386,9 +388,7 @@ test.describe("the booking page", () => {
         // time is offered again.
         expect(after.status()).toBe(404);
         expect(label).toMatch(/^\d{1,2}:\d{2} [ap]m$/);
-        const again = await page.request.get(
-            `${urls.API_URL}/public/services/${serviceId}/days`,
-        );
+        const again = await page.request.get(daysUrl);
         expect(
             (
                 (await again.json()) as {

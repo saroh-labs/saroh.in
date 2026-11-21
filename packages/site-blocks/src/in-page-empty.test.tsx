@@ -254,7 +254,7 @@ describe("the header hides a jump to a section that shows nothing (the browser's
         render(
             <>
                 <SiteHeader name="Rye & Co." navigation={NAV} />
-                <PageSections sections={[services, visit]} />
+                <PageSections siteId="site_1" sections={[services, visit]} />
             </>,
         );
         await act(async () => {

@@ -100,6 +100,7 @@ async function stampOf(siteId: string, key: string) {
 }
 
 describe("change units with attribution (U7)", () => {
+    // A hero is always "Top of the page" (RULES §1), whatever its heading.
     it("lists each change by who made it, and every count agrees", async () => {
         const b = await business();
         const [, k2, k3] = b.sections;
@@ -124,12 +125,12 @@ describe("change units with attribution (U7)", () => {
         expect(changes.units.map((u) => [u.key, u.label, u.editedBy])).toEqual([
             [
                 `section:${b.bridal.id}:k1`,
-                "Changed · Intro, rewritten",
+                "Changed · Top of the page",
                 b.ritika.user.id,
             ],
             [
                 `section:${b.bridal.id}:k9`,
-                "Added · Two photos",
+                "Added · Top of the page",
                 b.arjun.user.id,
             ],
             ["site:footer", "Changed · Footer", b.mohit.user.id],
@@ -185,7 +186,7 @@ describe("change units with attribution (U7)", () => {
         expect(changes.units).toEqual([
             expect.objectContaining({
                 key: `section:${b.bridal.id}:k3`,
-                label: "Removed · From our brides",
+                label: "Removed · Top of the page",
                 editedBy: b.ritika.user.id,
             }),
         ]);

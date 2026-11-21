@@ -731,17 +731,16 @@ describe("PublicBookingsService.publicServices — the website's services list (
 
     it("returns services in the merchant's order and drops unknown ids", async () => {
         serviceFindMany.mockResolvedValue([row("b"), row("a")]);
-        const result = await new PublicBookingsService().publicServices([
-            "a",
-            "gone",
-            "b",
-        ]);
+        const result = await new PublicBookingsService().publicServices(
+            "site_1",
+            ["a", "gone", "b"],
+        );
         expect(result.map((s) => s.id)).toEqual(["a", "b"]);
     });
 
     it("asks only for active, undeleted services whose Appointments is not disabled", async () => {
         serviceFindMany.mockResolvedValue([]);
-        await new PublicBookingsService().publicServices(["a"]);
+        await new PublicBookingsService().publicServices("site_1", ["a"]);
         const { where, select } = serviceFindMany.mock.calls[0][0];
         expect(where).toMatchObject({
             id: { in: ["a"] },
@@ -756,6 +755,8 @@ describe("PublicBookingsService.publicServices — the website's services list (
                         status: { not: "ENABLED" },
                     },
                 },
+                // Only the asking site's own business (07 B-L2).
+                sites: { some: { id: "site_1", deletedAt: null } },
             },
         });
         // No site, capacity or buffers are read. The business, the rate and
@@ -775,9 +776,9 @@ describe("PublicBookingsService.publicServices — the website's services list (
     });
 
     it("does not query for an empty list", async () => {
-        expect(await new PublicBookingsService().publicServices([])).toEqual(
-            [],
-        );
+        expect(
+            await new PublicBookingsService().publicServices("site_1", []),
+        ).toEqual([]);
         expect(serviceFindMany).not.toHaveBeenCalled();
     });
 });

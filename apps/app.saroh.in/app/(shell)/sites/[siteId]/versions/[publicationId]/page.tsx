@@ -189,6 +189,7 @@ export default async function PastVersionPage({
             {page ? (
                 <PastVersionPreview
                     sections={sections}
+                    siteId={siteId}
                     variables={publication.snapshot.site?.styleVariables}
                     look={publication.snapshot.site?.look}
                 />

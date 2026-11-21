@@ -65,7 +65,7 @@ const bookable: TemplateContext = {
 function stubApi({ hours = true }: { hours?: boolean } = {}) {
     const fetchMock = vi.fn((input: string) => {
         const url = input;
-        if (url.startsWith(`${API}/public/services`)) {
+        if (url.startsWith(`${API}/public/sites/site_dietician/services?`)) {
             return Promise.resolve(
                 new Response(JSON.stringify([CONSULTATION]), { status: 200 }),
             );

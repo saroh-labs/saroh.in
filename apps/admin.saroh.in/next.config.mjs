@@ -1,4 +1,7 @@
-import { pageSecurityHeaders } from "@saroh/auth/security-headers";
+import {
+    ENFORCED_CSP,
+    pageSecurityHeaders,
+} from "@saroh/auth/security-headers";
 
 // A production deployment that falls back to built-in addresses talks to
 // whatever the code assumed; one missing variable once dropped every waitlist
@@ -52,7 +55,7 @@ const SECURITY_HEADERS = [
         value: "max-age=31536000; includeSubDomains",
     },
     { key: "X-Frame-Options", value: "SAMEORIGIN" },
-    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    { key: "Content-Security-Policy", value: ENFORCED_CSP },
     { key: "X-Content-Type-Options", value: "nosniff" },
 ];
 

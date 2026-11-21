@@ -65,6 +65,8 @@ export interface BookingFlowProps {
     account: BookingAccount;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /** The site the page is on: its services' days are read through it. */
+    siteId: string;
     /**
      * The business's place, hours and phone for the header (E6). Null or
      * absent when it could not be read: the header names the business only.

@@ -3,6 +3,13 @@ import { isDeepStrictEqual } from "node:util";
 import type { Prisma } from "@saroh/database";
 
 /**
+ * The editor stamped for Saroh's own writes with no person behind them (a
+ * template upgrade, a module switch's menu entry). Never an owner or admin,
+ * so its changes wait for approval where approval applies (fail-safe).
+ */
+export const SYSTEM_EDITOR = "system";
+
+/**
  * Stamp who changed parts of a draft that have no row of their own
  * (`Site.draftEditors`, change units U7): site settings (`site:footer`),
  * removed sections, deleted pages. One merge in the database, so two

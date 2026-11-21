@@ -290,3 +290,15 @@ describe("toPublishableSection — a v2 button's action becomes an href (#207)",
         ).toBeUndefined();
     });
 });
+
+describe("toPublishableSection drops a stored unsafe photo (06 L1)", () => {
+    it("publishes the person without the javascript: photo instead of failing", () => {
+        const result = toPublishableSection({
+            type: "person",
+            contractVersion: 1,
+            content: { name: "Anika", image: { src: "javascript:x" } },
+        } as Parameters<typeof toPublishableSection>[0]);
+        expect(result.ok).toBe(true);
+        expect(JSON.stringify(result)).not.toContain("javascript:");
+    });
+});

@@ -61,6 +61,10 @@ export function cardShown(card: NonNullable<AiToolRun["card"]>): string {
         : CARD_SHOWN;
 }
 
+/** Said after any refused `get_page` (review 07 B-I2). */
+export const PAGE_UNREAD =
+    "That page couldn't be read. Next: if it is the page the person asked about, tell them in one line you couldn't read it; never answer about another page in its place.";
+
 @Injectable()
 export class ToolBridge implements AiToolbox {
     private readonly allowed: ReadonlySet<string>;
@@ -134,6 +138,11 @@ export class ToolBridge implements AiToolbox {
             asker,
         );
         const run = textOf(result);
+        // Review 07 B-I2: a page it can't read is said, never swapped for
+        // another page (the business's Home) without a word.
+        if (run.isError && tool.name === "get_page") {
+            return { ...run, output: `${run.output}\n${PAGE_UNREAD}` };
+        }
         if (run.isError || !("structuredContent" in result)) return run;
         const card = await this.cardOf(
             live,

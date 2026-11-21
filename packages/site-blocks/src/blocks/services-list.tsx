@@ -33,10 +33,11 @@ export type { PublicService, ServicesFeed } from "./service-words";
  * The section stores only which services, in what order. Names, durations and
  * prices come from the public endpoint when the page is viewed:
  *
- *   GET ${NEXT_PUBLIC_API_URL}/public/services?ids=a,b,c
+ *   GET ${NEXT_PUBLIC_API_URL}/public/sites/:siteId/services?ids=a,b,c
  *
- * which returns only services that may still be offered (active, not deleted,
- * Appointments not switched off), in the order asked for. So:
+ * which returns only the site's own business's services that may still be
+ * offered (active, not deleted, Appointments not switched off), in the order
+ * asked for (07 B-L2). With no site to ask through, it lists none. So:
  * - a service deleted or archived after publish is simply absent;
  * - none left: the block renders NOTHING — a heading over an empty list, or a
  *   "Book now" for services that no longer exist, would promise what the
@@ -75,6 +76,7 @@ function isPublicService(value: unknown): value is PublicService {
 export default function ServicesListSection({
     content,
     apiUrl = DEFAULT_API_URL,
+    siteId,
     services,
     feed,
     bookHref,
@@ -83,6 +85,8 @@ export default function ServicesListSection({
     content: RenderedServicesList;
     /** Base URL of the public API. See {@link DEFAULT_API_URL}. */
     apiUrl?: string;
+    /** The site, whose own services are read; absent, none are. */
+    siteId?: string | null;
     /** Sample services to draw instead of fetching (catalog, tests). */
     services?: PublicService[];
     /** What the page that serves the site read for it (a Book page). */
@@ -108,10 +112,12 @@ export default function ServicesListSection({
     }, [ids]);
 
     const load = useCallback(async (): Promise<LoadState> => {
-        if (!ids) return { kind: "ready", services: [] };
+        if (!ids || typeof siteId !== "string") {
+            return { kind: "ready", services: [] };
+        }
         try {
             const res = await fetch(
-                `${apiUrl}/public/services?ids=${encodeURIComponent(ids)}`,
+                `${apiUrl}/public/sites/${encodeURIComponent(siteId)}/services?ids=${encodeURIComponent(ids)}`,
                 { headers: { accept: "application/json" } },
             );
             if (!res.ok) return { kind: "error" };
@@ -125,7 +131,7 @@ export default function ServicesListSection({
         } catch {
             return { kind: "error" };
         }
-    }, [apiUrl, ids]);
+    }, [apiUrl, siteId, ids]);
 
     useEffect(() => {
         if (given) return;

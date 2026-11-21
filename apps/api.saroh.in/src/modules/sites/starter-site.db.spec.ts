@@ -201,7 +201,7 @@ describe("Turning Website on drafts starter@5", () => {
     it("a business with nothing else on: a headline, a way to get in touch, and a Contact page", async () => {
         expect(starterTemplate).toMatchObject({
             id: STARTER_TEMPLATE_ID,
-            version: 4,
+            version: 5,
         });
         const ctx = await business("Asha Rao");
         const siteId = await website(ctx, "Asha Rao");

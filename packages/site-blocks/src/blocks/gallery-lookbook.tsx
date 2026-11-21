@@ -77,17 +77,19 @@ function useLinked(
     useEffect(() => {
         if (given || (!serviceIds && !productIds)) return;
         let active = true;
-        const services = serviceIds
-            ? fetch(
-                  `${apiUrl}/public/services?ids=${encodeURIComponent(serviceIds)}`,
-                  { headers: { accept: "application/json" } },
-              )
-                  .then((r) => (r.ok ? r.json() : []))
-                  .then((body: unknown) =>
-                      Array.isArray(body) ? body.filter(isService) : [],
+        // Read through the site: only its own business's services (07 B-L2).
+        const services =
+            serviceIds && typeof siteId === "string"
+                ? fetch(
+                      `${apiUrl}/public/sites/${encodeURIComponent(siteId)}/services?ids=${encodeURIComponent(serviceIds)}`,
+                      { headers: { accept: "application/json" } },
                   )
-                  .catch(() => [] as PublicService[])
-            : Promise.resolve([] as PublicService[]);
+                      .then((r) => (r.ok ? r.json() : []))
+                      .then((body: unknown) =>
+                          Array.isArray(body) ? body.filter(isService) : [],
+                      )
+                      .catch(() => [] as PublicService[])
+                : Promise.resolve([] as PublicService[]);
         // shortcut: one read per product, because a shop card carries no
         // product id to match a batch by; fine for a lookbook's few looks,
         // a batch read by id when the shop API offers one.
@@ -146,7 +148,10 @@ export default function GalleryLookbook({
     content: RenderedGallery;
     look?: LookId;
     apiUrl?: string;
-    /** The site, for its products' reads. Absent: products show typed words. */
+    /**
+     * The site, for its services' and products' reads. Absent: they show
+     * the typed words.
+     */
     siteId?: string | null;
     /** The booking page; absent (a preview), Book is drawn, not followed. */
     bookHref?: string;

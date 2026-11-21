@@ -295,8 +295,64 @@ export const imageFocusSchema = z.object({
 
 export type ImageFocus = z.infer<typeof imageFocusSchema>;
 
+/**
+ * Whether an image `src` is safe to store (06 L1). Every block draws it as an
+ * `<img>` today, which runs no script, but the day one draws it as a link a
+ * `javascript:` src becomes stored XSS. So a photo is a web address, a path on
+ * the site (not `//host`, which is another site), or an inline raster image.
+ * SVG data URIs stay for the catalogue's placeholder rectangles, but not with
+ * script or event handlers in them.
+ */
+export function isSafeImageSrc(src: string): boolean {
+    if (/^https?:\/\/[^\s]/i.test(src)) return true;
+    if (/^\/(?![/\\])/.test(src)) return true;
+    if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i.test(src)) {
+        return true;
+    }
+    // Not base64: its markup could not be checked.
+    if (/^data:image\/svg\+xml(;utf-?8|;charset=[a-z0-9-]+)?,/i.test(src)) {
+        let body: string;
+        try {
+            body = decodeURIComponent(src);
+        } catch {
+            return false;
+        }
+        return !/<script|\bon[a-z]+\s*=|javascript:|<foreignobject/i.test(body);
+    }
+    return false;
+}
+
+/**
+ * A copy of stored content with every image whose `src` is unsafe removed
+ * (06 L1). Saving refuses such an image; this is for content stored before
+ * that rule, so publishing it drops the photo instead of failing the section.
+ * Only image objects carry `src` in section content.
+ */
+export function dropUnsafeImages(value: unknown): unknown {
+    const unsafe = (v: unknown) =>
+        v !== null &&
+        typeof v === "object" &&
+        typeof (v as { src?: unknown }).src === "string" &&
+        !isSafeImageSrc((v as { src: string }).src);
+    if (Array.isArray(value)) {
+        return value.filter((v) => !unsafe(v)).map(dropUnsafeImages);
+    }
+    if (value === null || typeof value !== "object") return value;
+    return Object.fromEntries(
+        Object.entries(value)
+            .filter(([, v]) => !unsafe(v))
+            .map(([k, v]) => [k, dropUnsafeImages(v)]),
+    );
+}
+
 const imageSchema = z.object({
-    src: z.string().min(1),
+    src: z
+        .string()
+        .min(1)
+        .refine(
+            isSafeImageSrc,
+            "A photo must be a web address or a path on this site",
+        ),
     alt: z.string().default(""),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),

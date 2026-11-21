@@ -18,12 +18,19 @@
  * (Permissions-Policy), and every app but the merchant sites reports a
  * Content-Security-Policy (pentest, 29 Oct 2026; @saroh/auth/security-headers).
  * The merchant sites have none yet: each business's trackers would need listing.
+ * Every page says Referrer-Policy: strict-origin-when-cross-origin, and all
+ * but saroh.in enforce ENFORCED_CSP, which blocks inline event handlers
+ * (security review, 21 Nov 2026).
  *
  * Run from the repo root.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
+
+import securityHeaders from "../packages/auth/src/security-headers.cjs";
+
+const { ENFORCED_CSP } = securityHeaders;
 
 const CONFIGS = [
     "apps/saroh.in/next.config.js",
@@ -38,7 +45,18 @@ const REQUIRED = {
     "content-security-policy": /frame-ancestors 'self'/u,
     "x-content-type-options": /^nosniff$/u,
     "permissions-policy": /camera=\(\), microphone=\(\), geolocation=\(\)/u,
+    "referrer-policy": /^strict-origin-when-cross-origin$/u,
 };
+/**
+ * The apps that enforce more than frame-ancestors: no inline event handler,
+ * plugin or moved base (security review, 21 Nov 2026). saroh.in isn't one yet.
+ */
+const ENFORCES_CSP = new Set([
+    "apps/app.saroh.in/next.config.js",
+    "apps/accounts.saroh.in/next.config.mjs",
+    "apps/admin.saroh.in/next.config.mjs",
+    "apps/saroh.app/next.config.js",
+]);
 /** The apps whose pages report a full CSP; saroh.app isn't one yet. */
 const REPORTED_CSP =
     /^default-src 'self';.*object-src 'none'; base-uri 'self'$/u;
@@ -111,6 +129,13 @@ for (const file of CONFIGS) {
     for (const [key, shape] of Object.entries(REQUIRED))
         if (!shape.test(sent.get(key) ?? ""))
             problems.push(`${file}: every page must send ${key}`);
+    if (
+        ENFORCES_CSP.has(file) &&
+        sent.get("content-security-policy") !== ENFORCED_CSP
+    )
+        problems.push(
+            `${file}: every page must enforce ENFORCED_CSP (@saroh/auth/security-headers)`,
+        );
     if (
         !NO_CSP_YET.has(file) &&
         !REPORTED_CSP.test(

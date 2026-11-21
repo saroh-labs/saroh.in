@@ -47,6 +47,7 @@ describe("booking days response", () => {
         globalThis.fetch = vi.fn(() => Promise.resolve(response));
         render(
             <BookingSection
+                siteId="site_1"
                 content={BLOCK_META.booking.fixtures.default as RenderedBooking}
             />,
         );
@@ -153,7 +154,13 @@ describe("booking block — availability failures", () => {
                     "This business isn't taking online bookings right now",
                 ),
             );
-            render(<BookingSection content={CONTENT} apiUrl="https://api" />);
+            render(
+                <BookingSection
+                    siteId="site_1"
+                    content={CONTENT}
+                    apiUrl="https://api"
+                />,
+            );
 
             expect(
                 await screen.findByText(/Online booking isn't open right now/),
@@ -170,7 +177,13 @@ describe("booking block — availability failures", () => {
 
     it("a 500 shows the error and offers Try again", async () => {
         stubFetch(apiError(500, "Internal server error"));
-        render(<BookingSection content={CONTENT} apiUrl="https://api" />);
+        render(
+            <BookingSection
+                siteId="site_1"
+                content={CONTENT}
+                apiUrl="https://api"
+            />,
+        );
 
         expect(await screen.findByRole("alert")).toHaveTextContent(
             "We couldn't load available times right now",
@@ -189,6 +202,7 @@ describe("booking block — sign-in is always on (A9)", () => {
         stubFetch(json(days([{ startAt, endAt }]), 200));
         render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -208,6 +222,7 @@ describe("booking block — sign-in is always on (A9)", () => {
         const fetchMock = stubFetch(json(days([{ startAt, endAt }]), 200));
         const { container } = render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -221,13 +236,19 @@ describe("booking block — sign-in is always on (A9)", () => {
         expect(fetchMock).toHaveBeenCalledTimes(1);
         // The very read the booking page draws its times from.
         expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
-            "https://api/public/services/svc_1/days",
+            "https://api/public/sites/site_1/services/svc_1/days",
         );
     });
 
     it("in a preview, with no booking page, the button goes nowhere", async () => {
         stubFetch(json(days([{ startAt, endAt }]), 200));
-        render(<BookingSection content={CONTENT} apiUrl="https://api" />);
+        render(
+            <BookingSection
+                siteId="site_1"
+                content={CONTENT}
+                apiUrl="https://api"
+            />,
+        );
 
         const link = await screen.findByText("Book a time");
         expect(link).not.toHaveAttribute("href");
@@ -252,6 +273,7 @@ describe("booking block — each free time is a way in", () => {
         stubFetch(json(days([morning, afternoon]), 200));
         render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -293,6 +315,7 @@ describe("booking block — each free time is a way in", () => {
         );
         render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -308,6 +331,7 @@ describe("booking block — each free time is a way in", () => {
         stubFetch(json(days([]), 200));
         render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -332,6 +356,7 @@ describe("booking block — each free time is a way in", () => {
         stubFetch(json(days([]), 200));
         render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -346,6 +371,7 @@ describe("booking block — each free time is a way in", () => {
         stubFetch(apiError(404, "Not found"));
         render(
             <BookingSection
+                siteId="site_1"
                 content={CONTENT}
                 apiUrl="https://api"
                 reach={{ phone: "+918040992210", whatsapp: null }}
@@ -399,6 +425,7 @@ describe("booking block — Next open (U6)", () => {
         stubFetch(json(fortnight([1, 2, 4, 6], [0, 5])));
         render(
             <BookingSection
+                siteId="site_1"
                 content={NEXT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -437,6 +464,7 @@ describe("booking block — Next open (U6)", () => {
         stubFetch(json(fortnight([])));
         render(
             <BookingSection
+                siteId="site_1"
                 content={NEXT}
                 apiUrl="https://api"
                 bookHref="/book"
@@ -457,6 +485,7 @@ describe("booking block — Next open (U6)", () => {
         stubFetch(json({}, 500));
         render(
             <BookingSection
+                siteId="site_1"
                 content={NEXT}
                 apiUrl="https://api"
                 bookHref="/book"

@@ -492,6 +492,23 @@ describe("SitesService.replaceDraftSections sanitizes on the way in (#280)", () 
         ).rejects.toBeInstanceOf(BadRequestException);
         expect(sectionCreateMany).not.toHaveBeenCalled();
     });
+
+    it("refuses a photo whose src would run script (06 L1)", async () => {
+        await expect(
+            service.replaceDraftSections(ctx(), "site_1", "page_1", {
+                sections: [
+                    {
+                        type: "gallery",
+                        contractVersion: 1,
+                        content: {
+                            images: [{ src: "javascript:window.__pwn=9" }],
+                        },
+                    },
+                ],
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(sectionCreateMany).not.toHaveBeenCalled();
+    });
 });
 
 describe("SitesService.replaceDraftSections takes the phase 2 block fields (U15)", () => {

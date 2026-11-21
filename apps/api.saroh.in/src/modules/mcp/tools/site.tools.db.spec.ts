@@ -319,9 +319,12 @@ describe("MCP website tools (U11)", () => {
         expect(now.heading).toBe("Bread from the wood oven");
         expect((now.cta as { label: string }).label).toBe("See today's loaves");
         // Everything else as it was: the line under it, the button's link.
+        // A v1 starter hero's `href` is lifted to v2's `action` on touch
+        // (liftToLatest), pointing at the same place.
         expect(now.subheading).toEqual(was.subheading);
+        const wasCta = was.cta as { href?: string; action?: unknown };
         expect((now.cta as { action: unknown }).action).toEqual(
-            (was.cta as { action: unknown }).action,
+            wasCta.action ?? { kind: "url", href: wasCta.href },
         );
         // The live site is untouched.
         expect(await liveOf(siteId)).toBe(live);

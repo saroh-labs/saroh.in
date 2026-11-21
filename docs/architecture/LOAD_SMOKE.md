@@ -20,7 +20,7 @@ query, a lock, or an error that only appears under concurrency. It found one
    per-visitor `X-Forwarded-For`, as production reads Cloudflare's.
    Otherwise every request is one visitor, and the rate limits answer 429
    almost at once.
-3. `node scripts/load-smoke.mjs --seconds 20 --concurrency 10`. Options:
+3. `node scripts/load-smoke.mjs --site <Pulse site id> --seconds 20 --concurrency 10`. Options:
    `--only enquiry,slots,book,checkout`, `--service <id>`, `--form <id>`,
    `--order <id>`, `--one-visitor`.
 

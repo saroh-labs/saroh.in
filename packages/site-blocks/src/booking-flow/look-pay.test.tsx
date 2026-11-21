@@ -190,6 +190,7 @@ describe("paying now, in a look", () => {
     it("puts the price on the button, holds the time and says only what is known", async () => {
         render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account()}

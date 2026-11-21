@@ -20,6 +20,21 @@
 /** Where business media is served from (R2's public buckets, prod and dev). */
 const MEDIA = ["https://media.saroh.in", "https://media.saroh.io"];
 
+/**
+ * The policy the signed-in apps and the merchant sites ENFORCE on every
+ * answer, beside the report-only one below (security review, 21 Nov 2026):
+ * no framing by another site, no inline event handler (`<img onerror=…>`, the
+ * usual injected payload), no plugins, no moved base. It names no script
+ * host, so a merchant's trackers (added as `<script>` elements) still load.
+ * `withPrivateApp` and each `public/_headers` repeat it as text;
+ * `check:security-headers` keeps them the same.
+ */
+const ENFORCED_CSP =
+    "frame-ancestors 'self'; script-src-attr 'none'; object-src 'none'; base-uri 'self'";
+
+/** Sent with every page: a link to another site carries the origin only. */
+const REFERRER_POLICY = "strict-origin-when-cross-origin";
+
 /** PostHog's EU host, the default when NEXT_PUBLIC_POSTHOG_HOST isn't set. */
 const POSTHOG_DEFAULT = "https://eu.i.posthog.com";
 
@@ -171,7 +186,7 @@ function permissionsPolicy(uses = []) {
 }
 
 /**
- * Both, as next.config `headers()` entries.
+ * Both, and the Referrer-Policy, as next.config `headers()` entries.
  * @param {PageHeaderOptions} options
  */
 function pageSecurityHeaders(options = {}) {
@@ -184,11 +199,14 @@ function pageSecurityHeaders(options = {}) {
             key: "Permissions-Policy",
             value: permissionsPolicy(options.uses),
         },
+        { key: "Referrer-Policy", value: REFERRER_POLICY },
     ];
 }
 
 module.exports = {
+    ENFORCED_CSP,
     MEDIA,
+    REFERRER_POLICY,
     contentSecurityPolicy,
     permissionsPolicy,
     pageSecurityHeaders,

@@ -186,6 +186,7 @@ export function HistoryCompare({
                                 </h3>
                                 <VersionPage
                                     detail={loaded.detail}
+                                    siteId={siteId}
                                     path={model.page?.path ?? "/"}
                                     scale={scale}
                                 />
@@ -273,10 +274,12 @@ function Differences({ units }: { units: ChangeUnit[] }) {
 /** The open page as it was in that version, matched by its link. */
 function VersionPage({
     detail,
+    siteId,
     path,
     scale,
 }: {
     detail: SitePublicationDetail;
+    siteId: string;
     path: string;
     scale: number;
 }) {
@@ -304,6 +307,7 @@ function VersionPage({
         >
             <PastVersionPreview
                 sections={sections}
+                siteId={siteId}
                 variables={detail.snapshot.site?.styleVariables}
                 look={detail.snapshot.site?.look}
             />

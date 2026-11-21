@@ -150,6 +150,7 @@ describe.each(["quiet", "live"] as const)("the header under %s", (look) => {
                     loadOptions={vi.fn().mockResolvedValue(null)}
                 />
                 <BookingFlow
+                    siteId="site_1"
                     page={PAGE}
                     apiUrl={API}
                     account={flow}
@@ -217,6 +218,7 @@ describe.each(["folio", "quiet", "live"] as const)("under %s", (look) => {
     it("stays on Your details with the later time, what was typed and no new read", async () => {
         const { rerender } = render(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account(null)}
@@ -253,6 +255,7 @@ describe.each(["folio", "quiet", "live"] as const)("under %s", (look) => {
 
         rerender(
             <BookingFlow
+                siteId="site_1"
                 page={PAGE}
                 apiUrl={API}
                 account={account(ASHA)}

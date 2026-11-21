@@ -16,8 +16,10 @@ import { RestorePointService } from "../mcp/restore-point.service";
 import { restoreSnapshot } from "../mcp/tools/site.tools";
 import type { OrgAction } from "../organizations/organization-actions";
 import { UNNAMED_TEAMMATE } from "./change-approvals";
+import { stampDraftEditors, SYSTEM_EDITOR } from "./draft-editors";
 import { SiteRedirectsService } from "./site-redirects.service";
 import { SitesService } from "./sites.service";
+import { addToMenu } from "./template-sync";
 
 const sites = new SitesService({
     check: jest.fn().mockResolvedValue(true),
@@ -432,6 +434,68 @@ describe("every writer says who changed the draft (KTD-4, R2/R4 21 Nov 2026)", (
     });
 });
 
+describe("Saroh's own writes wait for approval (21 Nov)", () => {
+    beforeEach(() => {
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(true);
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it("a page a module switch adds to the menu is Saroh's change, never the owner's older one", async () => {
+        const b = await business({ approval: false });
+        await prisma.site.update({
+            where: { id: b.site.id },
+            data: { navigation: { items: [{ pageId: b.bridal.id }] } },
+        });
+        await sites.publishSite(b.owner, b.site.id);
+        await prisma.site.update({
+            where: { id: b.site.id },
+            data: { publishNeedsApproval: true },
+        });
+        // The owner changed the menu once, and that stamp is still there.
+        await stampDraftEditors(prisma, b.site.id, b.owner.userId, [
+            "site:menu",
+        ]);
+        const about = await prisma.page.create({
+            data: {
+                siteId: b.site.id,
+                organizationId: b.org.id,
+                path: "/about",
+                title: "About",
+            },
+        });
+        await prisma.$transaction((tx) =>
+            addToMenu(tx, b.site.id, [about.id], null),
+        );
+        const unit = (await sites.getChanges(b.owner, b.site.id)).units.find(
+            (u) => u.key === "site:menu",
+        );
+        expect(unit).toMatchObject({
+            editedBy: SYSTEM_EDITOR,
+            approval: { state: "waiting" },
+        });
+
+        // A person's addition is theirs.
+        const team = await prisma.page.create({
+            data: {
+                siteId: b.site.id,
+                organizationId: b.org.id,
+                path: "/team",
+                title: "Team",
+            },
+        });
+        await prisma.$transaction((tx) =>
+            addToMenu(tx, b.site.id, [team.id], b.ritika.userId),
+        );
+        const site = await prisma.site.findUniqueOrThrow({
+            where: { id: b.site.id },
+            select: { draftEditors: true },
+        });
+        expect(site.draftEditors).toMatchObject({
+            "site:menu": { userId: b.ritika.userId },
+        });
+    });
+});
+
 describe("site verdicts (05 L2, R5, 01 W1)", () => {
     beforeEach(() => {
         jest.spyOn(planMeter, "isIncluded").mockResolvedValue(true);
@@ -493,6 +557,67 @@ describe("site verdicts (05 L2, R5, 01 W1)", () => {
                 where: { siteId: { in: [off.site.id, on.site.id] } },
             }),
         ).toBe(0);
+    });
+
+    it("the review's own Approve, sent three times at once, writes each change's row once (21 Nov)", async () => {
+        const b = await business();
+        await sites.replaceDraftSections(b.ritika, b.site.id, b.bridal.id, {
+            sections: [hero("k1", "Intro, new"), hero("k2", "Packages, new")],
+        });
+        await Promise.all(
+            Array.from({ length: 3 }, () =>
+                sites.createApproval(b.reviewer, b.site.id, {
+                    outcome: "APPROVED",
+                }),
+            ),
+        );
+        // A one-change verdict after it, the same, isn't written again.
+        await sites.recordChangeVerdict(b.reviewer, b.site.id, {
+            units: [b.k1],
+            outcome: "APPROVED",
+        });
+        const rows = await prisma.siteChangeApproval.groupBy({
+            by: ["unitKey"],
+            where: { siteId: b.site.id },
+            _count: true,
+        });
+        expect(
+            Object.fromEntries(rows.map((r) => [r.unitKey, r._count])),
+        ).toEqual({ [b.k1]: 1, [b.k2]: 1 });
+    });
+
+    it("the review's own Approve answers no change where approval is off, or the plan has none", async () => {
+        const off = await business({ approval: false });
+        const on = await business();
+        for (const b of [off, on]) {
+            await sites.replaceDraftSections(b.ritika, b.site.id, b.bridal.id, {
+                sections: [hero("k1", "Intro, new"), hero("k2", "Packages")],
+            });
+        }
+        await sites.createApproval(off.reviewer, off.site.id, {
+            outcome: "APPROVED",
+        });
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(false);
+        await sites.createApproval(on.reviewer, on.site.id, {
+            outcome: "APPROVED",
+        });
+        // The review itself is kept (advisory, DEC-047); no change is.
+        expect(
+            await prisma.siteApproval.count({
+                where: { siteId: { in: [off.site.id, on.site.id] } },
+            }),
+        ).toBe(2);
+        expect(
+            await prisma.siteChangeApproval.count({
+                where: { siteId: { in: [off.site.id, on.site.id] } },
+            }),
+        ).toBe(0);
+        // Back on a plan with approval, Ritika's change still waits.
+        jest.spyOn(planMeter, "isIncluded").mockResolvedValue(true);
+        const unit = (await sites.getChanges(on.owner, on.site.id)).units.find(
+            (u) => u.key === on.k1,
+        );
+        expect(unit?.approval.state).toBe("waiting");
     });
 
     it('a reviewer reads a nameless teammate as "A teammate", never their email', async () => {

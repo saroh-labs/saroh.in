@@ -47,12 +47,17 @@ const TEST_HOST_PATTERNS = ["test--.+", "test\\..+\\..+"];
 const SECURITY_HEADERS = [
     { key: "Strict-Transport-Security", value: "max-age=31536000" },
     { key: "X-Frame-Options", value: "SAMEORIGIN" },
-    { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
+    // ENFORCED_CSP (@saroh/auth/security-headers): no inline event handler,
+    // plugin or moved base. No script-src: each business's trackers (#889),
+    // checkout and media hosts would need listing.
+    {
+        key: "Content-Security-Policy",
+        value: "frame-ancestors 'self'; script-src-attr 'none'; object-src 'none'; base-uri 'self'",
+    },
     { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     // Camera, microphone, location and USB off (pentest, 29 Oct 2026); the
-    // checkout's payment keeps the browser's default. No CSP beyond
-    // frame-ancestors yet: each business's trackers (#889), checkout and
-    // media hosts would need listing.
+    // checkout's payment keeps the browser's default.
     {
         key: "Permissions-Policy",
         value: "camera=(), microphone=(), geolocation=(), usb=()",

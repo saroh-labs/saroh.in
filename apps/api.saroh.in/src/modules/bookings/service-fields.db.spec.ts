@@ -152,7 +152,9 @@ describe("service fields (E1, real database)", () => {
         expect(JSON.stringify(shown)).not.toMatch(
             /depositMode|showOnBookingPage/i,
         );
-        const [listItem] = await publicBookings.publicServices([made.id]);
+        const [listItem] = await publicBookings.publicServices(siteId, [
+            made.id,
+        ]);
         expect(listItem).toBeDefined();
         expect(JSON.stringify(listItem)).not.toMatch(
             /visits|deposit|showOnBookingPage/i,
@@ -170,7 +172,7 @@ describe("service fields (E1, real database)", () => {
         const page = await publicBookings.publicBookingPage(siteId);
         expect(page.services.map((s) => s.id)).not.toContain(hidden.id);
         await expect(
-            publicBookings.publicServices([hidden.id, existing]),
+            publicBookings.publicServices(siteId, [hidden.id, existing]),
         ).resolves.toEqual([expect.objectContaining({ id: existing })]);
         await expect(publicBookings.publicDays(hidden.id)).rejects.toThrow(
             "This service isn't booked online",
@@ -204,7 +206,7 @@ describe("service fields (E1, real database)", () => {
         const page = await publicBookings.publicBookingPage(siteId);
         expect(page.services.map((s) => s.id)).toContain(online.id);
         await expect(
-            publicBookings.publicServices([online.id]),
+            publicBookings.publicServices(siteId, [online.id]),
         ).resolves.toEqual([expect.objectContaining({ id: online.id })]);
         await expect(
             publicBookings.publicDays(online.id),
@@ -221,6 +223,63 @@ describe("service fields (E1, real database)", () => {
         await expect(
             prisma.service.findUniqueOrThrow({ where: { id: existing } }),
         ).resolves.toMatchObject({ visits: 1, showOnBookingPage: true });
+    });
+
+    // 07 B-L2: a site's section naming another business's public service
+    // must not draw that business's name and price as its own.
+    it("gives a site nothing of another business's services", async () => {
+        const theirs = await prisma.service.create({
+            data: {
+                organizationId: other.organizationId,
+                name: "Annual health check",
+                durationMinutes: 30,
+                priceCents: 350_000,
+                currency: "INR",
+                timezone: "Asia/Kolkata",
+                availabilityRules: {
+                    create: {
+                        organizationId: other.organizationId,
+                        dayOfWeek: 1,
+                        startMinute: 9 * 60,
+                        endMinute: 13 * 60,
+                    },
+                },
+            },
+        });
+        const theirSite = await prisma.site.create({
+            data: {
+                organizationId: other.organizationId,
+                name: "Another clinic",
+                slug: `e1-other-${process.pid}`,
+            },
+        });
+        await expect(
+            publicBookings.publicServices(siteId, [theirs.id, existing]),
+        ).resolves.toEqual([expect.objectContaining({ id: existing })]);
+        await expect(
+            publicBookings.siteServiceDays(siteId, theirs.id),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        const from = new Date().toISOString();
+        const to = new Date(Date.now() + 7 * 86_400_000).toISOString();
+        await expect(
+            publicBookings.siteAvailability(siteId, theirs.id, from, to),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        await expect(
+            publicBookings.siteServiceStaff(siteId, theirs.id),
+        ).rejects.toBeInstanceOf(NotFoundException);
+        // Their own site still reads it.
+        await expect(
+            publicBookings.siteAvailability(theirSite.id, theirs.id, from, to),
+        ).resolves.toEqual(expect.any(Array));
+        await expect(
+            publicBookings.siteServiceStaff(theirSite.id, theirs.id),
+        ).resolves.toEqual(expect.any(Array));
+        await expect(
+            publicBookings.publicServices(theirSite.id, [theirs.id]),
+        ).resolves.toEqual([expect.objectContaining({ id: theirs.id })]);
+        await expect(
+            publicBookings.siteServiceDays(theirSite.id, theirs.id),
+        ).resolves.toBeTruthy();
     });
 
     it("adds a booking's own place, empty on every booking made before it", async () => {

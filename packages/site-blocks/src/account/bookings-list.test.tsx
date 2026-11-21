@@ -748,6 +748,7 @@ describe("moving a class on the booking page (A6)", () => {
         const move = vi.fn().mockResolvedValue({ ok: true, booking: YOGA });
         render(
             <MoveClass
+                siteId="site_1"
                 row={YOGA}
                 apiUrl="https://api.example"
                 businessName="Pulse"
@@ -775,6 +776,7 @@ describe("moving a class on the booking page (A6)", () => {
     it("a booking that isn't a class to move here says why", () => {
         render(
             <MoveClass
+                siteId="site_1"
                 row={LATE}
                 apiUrl="https://api.example"
                 businessName="Pulse"

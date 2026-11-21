@@ -33,7 +33,7 @@ describe("a read of the times that hangs", () => {
         const seen = vi.fn(hanging);
         vi.stubGlobal("fetch", seen);
         const done = vi.fn();
-        void fetchDays("https://api.test", "svc").then(done);
+        void fetchDays("https://api.test", "site_1", "svc").then(done);
 
         await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS - 1);
         expect(seen).toHaveBeenCalledTimes(1);
@@ -52,7 +52,7 @@ describe("a read of the times that hangs", () => {
             "fetch",
             vi.fn(() => answer(DAYS)).mockImplementationOnce(hanging as never),
         );
-        const late = fetchDays("https://api.test", "svc");
+        const late = fetchDays("https://api.test", "site_1", "svc");
         await vi.advanceTimersByTimeAsync(READ_TIMEOUT_MS);
         await expect(late).resolves.toMatchObject({ ok: true });
     });
@@ -61,7 +61,7 @@ describe("a read of the times that hangs", () => {
         const seen = vi.fn(() => answer({}, 503));
         vi.stubGlobal("fetch", seen);
         await expect(
-            fetchDays("https://api.test", "svc"),
+            fetchDays("https://api.test", "site_1", "svc"),
         ).resolves.toMatchObject({ ok: false, status: 503 });
         expect(seen).toHaveBeenCalledTimes(2);
     });
@@ -70,7 +70,7 @@ describe("a read of the times that hangs", () => {
         const seen = vi.fn(() => answer({ error: { message: "Gone" } }, 404));
         vi.stubGlobal("fetch", seen);
         await expect(
-            fetchDays("https://api.test", "svc"),
+            fetchDays("https://api.test", "site_1", "svc"),
         ).resolves.toMatchObject({ ok: false, status: 404 });
         expect(seen).toHaveBeenCalledTimes(1);
     });

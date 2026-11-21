@@ -1,4 +1,5 @@
 import {
+    dropUnsafeImages,
     pagePathResolver,
     parseSectionContent,
     toRendered,
@@ -93,7 +94,8 @@ export function toPublishableSection(
     const parsed = parseSectionContent(
         section.type,
         section.contractVersion,
-        section.content,
+        // A photo stored before unsafe srcs were refused is dropped, not fatal.
+        dropUnsafeImages(section.content),
     );
     if (!parsed.success) {
         return { ok: false, error: parsed.error.message };

@@ -3744,10 +3744,22 @@ export class SitesService {
         }
 
         // The verdict covers each change waiting now that the caller didn't
-        // make (DEC-226, U9): what Approve in the review approves.
-        const units = (await this.waitingUnits(ctx, siteId)).filter(
-            (u) => u.editedBy !== ctx.userId,
-        );
+        // make (DEC-226, U9): what Approve in the review approves. Only
+        // where approval applies, as a verdict on one change (R5): off, or
+        // on a plan without review, the whole review stays advisory and
+        // answers no change (21 Nov review).
+        const site = await prisma.site.findFirstOrThrow({
+            where: { id: siteId, organizationId: ctx.organizationId },
+            select: { publishNeedsApproval: true },
+        });
+        const units = (await approvalApplies(
+            ctx.organizationId,
+            site.publishNeedsApproval,
+        ))
+            ? (await this.waitingUnits(ctx, siteId)).filter(
+                  (u) => u.editedBy !== ctx.userId,
+              )
+            : [];
         return this.approvalWithAlert(
             ctx,
             {
@@ -3789,17 +3801,16 @@ export class SitesService {
                 (data.outcome === "APPROVED" ||
                     data.outcome === "CHANGES_REQUESTED")
             ) {
+                // The same rules as one change's verdict: the site's lock,
+                // and a repeat of the newest verdict isn't written again.
                 // The draft's own alert already tells the team.
-                await tx.siteChangeApproval.createMany({
-                    data: units.map((u) => ({
-                        organizationId: ctx.organizationId,
-                        siteId: data.siteId,
-                        unitKey: u.key,
-                        unitFingerprint: u.fingerprint,
-                        byUserId: ctx.userId,
-                        outcome: data.outcome,
-                        reason: data.reason ?? null,
-                    })),
+                await recordUnitVerdicts(tx, ctx, {
+                    siteId: data.siteId,
+                    units,
+                    keys: units.map((u) => u.key),
+                    outcome: data.outcome,
+                    reason: data.reason,
+                    quiet: true,
                 });
             }
             await queueReviewAlert(

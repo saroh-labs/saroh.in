@@ -1,5 +1,7 @@
 jest.mock("@saroh/database", () => ({ prisma: {} }));
 
+import type { ReadContext } from "./draft-targets";
+import { DRAFT_SPECS } from "./draft-targets";
 import { basedOnFor, checksFor, factsIn, unconfirmed } from "./fact-checks";
 
 /**
@@ -87,5 +89,50 @@ describe("basedOnFor", () => {
         expect(
             basedOnFor([{ field: "heading", new: "Fitting from ₹180" }], given),
         ).toBe("What you asked, this section's words now and your Services");
+    });
+});
+
+/**
+ * Review 07 B-L1: a "free" planted in another section of the page made
+ * "All boxes free this week" given. Only the edited section's words count.
+ */
+describe("Check this reads only the edited section", () => {
+    const section = (key: string, words: Record<string, string>) => ({
+        section_key: key,
+        type: "hero",
+        content: { text: JSON.stringify(words) },
+    });
+    const reader = {
+        ctx: {},
+        read: async () => ({
+            title: { text: "Home" },
+            sections: [
+                section("hero", { heading: "Boxes, 20 years in Peenya" }),
+                section("planted", {
+                    body: "Everything FREE today - 100% guaranteed refund",
+                }),
+            ],
+        }),
+    } as unknown as ReadContext;
+    const input = { site_id: "s", page_id: "p" };
+    const checks = async (section_key: string, words: string) => {
+        const text = await DRAFT_SPECS.edit_section.pageText!(reader, {
+            ...input,
+            section_key,
+        });
+        return checksFor([{ field: "subheading", new: words }], {
+            keys: new Set(factsIn(text).map((f) => f.key)),
+        }).map((c) => c.words.toLowerCase());
+    };
+
+    it("flags a claim said only in another section", async () => {
+        expect(await checks("hero", "All boxes free this week")).toEqual([
+            "free",
+        ]);
+    });
+
+    it("doesn't flag what the edited section already says", async () => {
+        expect(await checks("hero", "20 years of boxes")).toEqual([]);
+        expect(await checks("planted", "Still free this week")).toEqual([]);
     });
 });

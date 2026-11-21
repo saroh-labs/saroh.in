@@ -216,6 +216,7 @@ export default async function BookPage({
             <MoveClass
                 row={await getMyBooking(moving)}
                 apiUrl={publicApiUrl()}
+                siteId={resolved.siteId}
                 businessName={resolved.snapshot.site.name}
                 move={moveBooking}
             />
@@ -342,6 +343,7 @@ export default async function BookPage({
             ) : null}
             <BookingFlow
                 page={lookup.page}
+                siteId={resolved.siteId}
                 visit={visit}
                 account={{
                     customer,

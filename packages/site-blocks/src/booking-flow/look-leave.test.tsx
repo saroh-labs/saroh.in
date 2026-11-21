@@ -204,6 +204,7 @@ const bookKeys = () =>
 async function toPayStep() {
     render(
         <BookingFlow
+            siteId="site_1"
             page={PAGE}
             apiUrl={API}
             account={account()}

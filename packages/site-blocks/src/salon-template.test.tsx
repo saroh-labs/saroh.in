@@ -74,7 +74,7 @@ const bookable: TemplateContext = {
 
 function stubApi() {
     const fetchMock = vi.fn((url: string) => {
-        if (url.startsWith(`${API}/public/services`)) {
+        if (url.startsWith(`${API}/public/sites/${SITE}/services?`)) {
             return Promise.resolve(
                 new Response(JSON.stringify(SERVICES), { status: 200 }),
             );

@@ -16,6 +16,7 @@ import {
     templateModulePageKinds,
 } from "@saroh/templates";
 
+import { stampDraftEditors, SYSTEM_EDITOR } from "./draft-editors";
 import type { PageActor } from "./module-page-create";
 import { addModulePageIfMissing } from "./module-page-create";
 import { MODULE_PAGE_DEFAULTS } from "./page-kinds";
@@ -365,7 +366,12 @@ export async function applySitePages(
         if (page.action === "hide") {
             await tx.page.update({
                 where: { id: page.pageId },
-                data: { hidden: true },
+                // Stamped, so the hide waits for approval like any change.
+                data: {
+                    hidden: true,
+                    settingsEditedByUserId: actor.userId ?? SYSTEM_EDITOR,
+                    settingsEditedAt: new Date(),
+                },
             });
             counts.pagesHidden++;
             continue;
@@ -397,7 +403,7 @@ export async function applySitePages(
     }
 
     if (menuAdditions.length > 0) {
-        await addToMenu(tx, site.id, menuAdditions);
+        await addToMenu(tx, site.id, menuAdditions, actor.userId);
     }
     return counts;
 }
@@ -412,6 +418,8 @@ export async function addToMenu(
     tx: Tx,
     siteId: string,
     pageIds: readonly string[],
+    /** Who added them; null is Saroh's own write ({@link SYSTEM_EDITOR}). */
+    userId: string | null,
 ): Promise<void> {
     const site = await tx.site.findUnique({
         where: { id: siteId },
@@ -438,6 +446,8 @@ export async function addToMenu(
             navigation: { items },
         },
     });
+    // Stamped, so a stale owner's stamp never lets the change skip approval.
+    await stampDraftEditors(tx, siteId, userId ?? SYSTEM_EDITOR, ["site:menu"]);
 }
 
 /**

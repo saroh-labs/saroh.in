@@ -3,6 +3,11 @@ jest.mock("@saroh/database", () => {
         store: { findFirst: jest.fn() },
         site: {
             findFirst: jest.fn().mockResolvedValue({ id: "site_1" }),
+            // A verdict reads whether approval applies (21 Nov review): off.
+            findFirstOrThrow: jest.fn().mockResolvedValue({
+                id: "site_1",
+                publishNeedsApproval: false,
+            }),
             findMany: jest.fn().mockResolvedValue([]),
         },
         page: {

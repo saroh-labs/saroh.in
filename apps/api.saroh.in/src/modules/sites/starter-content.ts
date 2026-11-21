@@ -466,7 +466,7 @@ export async function copyStarterContent(
             if (page?.inMenu ?? true) menuAdditions.push(row.id);
         }
         if (menuAdditions.length > 0) {
-            await addToMenu(tx, siteId, menuAdditions);
+            await addToMenu(tx, siteId, menuAdditions, ctx.userId);
         }
 
         const updated = await tx.site.update({

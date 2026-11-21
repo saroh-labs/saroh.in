@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    ENFORCED_CSP,
     contentSecurityPolicy,
     pageSecurityHeaders,
     permissionsPolicy,
@@ -117,7 +118,21 @@ describe("pageSecurityHeaders", () => {
         expect(headers.map((h) => h.key)).toEqual([
             "Content-Security-Policy-Report-Only",
             "Permissions-Policy",
+            "Referrer-Policy",
         ]);
+        expect(headers[2]?.value).toBe("strict-origin-when-cross-origin");
         expect(headers[1]?.value).toContain("api.razorpay.com");
+    });
+});
+
+describe("ENFORCED_CSP", () => {
+    it("blocks inline event handlers, plugins and a moved base, and names no script host", () => {
+        expect(directive(ENFORCED_CSP, "frame-ancestors")).toEqual(["'self'"]);
+        expect(directive(ENFORCED_CSP, "script-src-attr")).toEqual(["'none'"]);
+        expect(directive(ENFORCED_CSP, "object-src")).toEqual(["'none'"]);
+        expect(directive(ENFORCED_CSP, "base-uri")).toEqual(["'self'"]);
+        // A merchant's trackers load as <script> elements: never restricted here.
+        expect(directive(ENFORCED_CSP, "script-src")).toBeNull();
+        expect(directive(ENFORCED_CSP, "default-src")).toBeNull();
     });
 });

@@ -18,7 +18,9 @@ export const PRIVATE_APP_HEADERS = {
     "X-Robots-Tag": "noindex, nofollow",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "X-Frame-Options": "SAMEORIGIN",
-    "Content-Security-Policy": "frame-ancestors 'self'",
+    // ENFORCED_CSP (@saroh/auth/security-headers).
+    "Content-Security-Policy":
+        "frame-ancestors 'self'; script-src-attr 'none'; object-src 'none'; base-uri 'self'",
     "X-Content-Type-Options": "nosniff",
 } as const;
 

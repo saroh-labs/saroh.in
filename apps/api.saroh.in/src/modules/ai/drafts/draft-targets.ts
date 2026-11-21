@@ -77,7 +77,8 @@ export interface DraftSpec {
     doneWords?: string;
     /**
      * Check this (RULES §5): the words the business already says where the
-     * change lands (a page's), read to tell given facts from new ones.
+     * change lands (the edited section's own), read to tell given facts
+     * from new ones.
      */
     pageText?: (
         r: ReadContext,
@@ -444,12 +445,17 @@ export const DRAFT_SPECS: Readonly<Record<string, DraftSpec>> = {
         doneWords: "Saved · goes live when you publish",
         undoNote: "Put back in your draft.",
         basedOn: "What you asked and this section's words now",
+        // Only the edited section's own words: a word planted in another
+        // section never makes a claim given here (review 07 B-L1).
         async pageText(r, input) {
             const page = await pageSections(r, {
                 site_id: String(input.site_id),
                 page_id: String(input.page_id),
             });
-            return page?.sections.map((s) => s.text).join("\n") ?? "";
+            return (
+                page?.sections.find((s) => s.key === String(input.section_key))
+                    ?.text ?? ""
+            );
         },
     },
     create_product: {
