@@ -266,7 +266,9 @@ export function SlashMenu({ editor }: { editor: Editor }) {
     const box = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        const dom = editor.view.dom;
+        // The view mounts after the first render (immediatelyRender off), and
+        // reading editor.view before then throws: listen once it exists.
+        let dom: HTMLElement | null = null;
         const onKey = (e: KeyboardEvent) => {
             if (e.key !== "/" || e.metaKey || e.ctrlKey || e.altKey) return;
             if (!onEmptyLine(editor)) return;
@@ -277,8 +279,17 @@ export function SlashMenu({ editor }: { editor: Editor }) {
             setPicking(null);
             setAt({ top: c.bottom, left: c.left });
         };
-        dom.addEventListener("keydown", onKey);
-        return () => dom.removeEventListener("keydown", onKey);
+        const attach = () => {
+            if (dom || editor.isDestroyed || !editor.isInitialized) return;
+            dom = editor.view.dom;
+            dom.addEventListener("keydown", onKey);
+        };
+        attach();
+        editor.on("create", attach);
+        return () => {
+            editor.off("create", attach);
+            dom?.removeEventListener("keydown", onKey);
+        };
     }, [editor]);
 
     const items = filterAddItems(query);
