@@ -1212,12 +1212,22 @@ describe("add-ons are always paid for (review 19 Nov 2026, H-1 and M-1; 21 Nov P
         const carried = await prisma.subscriptionAddonCharge.findMany({
             where: { providerSubscriptionId: `fake_order_${r.checkout.id}` },
         });
-        expect(carried).toEqual([
+        // The order also settles the part of this month since it was
+        // bought; the year's line is the one that runs a whole year.
+        const year = carried.filter(
+            (c) => c.periodEnd.getTime() - c.periodStart.getTime() > 360 * DAY,
+        );
+        expect(year).toEqual([
             expect.objectContaining({ addonId: "things-pack", quantity: 1 }),
         ]);
         expect(
-            carried[0]!.periodEnd.getTime() - carried[0]!.periodStart.getTime(),
-        ).toBeGreaterThan(360 * DAY);
+            carried
+                .filter((c) => !year.includes(c))
+                .every(
+                    (c) =>
+                        c.periodEnd.getTime() <= year[0]!.periodStart.getTime(),
+                ),
+        ).toBe(true);
         // More now would ride the year unpaid.
         await expect(addons.set(ctx, "things-pack", 2)).rejects.toMatchObject({
             status: 409,
