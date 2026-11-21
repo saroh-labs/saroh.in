@@ -726,7 +726,9 @@ describe("Classic folds each answer to a row with Edit (owner, 4 Nov)", () => {
     }
     async function toSeven() {
         fireEvent.click(radio(/Personal training/));
-        fireEvent.click(await screen.findByRole("radio", { name: SUN }));
+        fireEvent.click(
+            await screen.findByRole("radio", { name: SUN }, { timeout: 5_000 }),
+        );
         fireEvent.click(radio(SEVEN));
     }
 
@@ -739,7 +741,8 @@ describe("Classic folds each answer to a row with Edit (owner, 4 Nov)", () => {
         expect(document.activeElement).toBe(rowOf(edit));
         expect(screen.queryByRole("radio", { name: /HIIT class/ })).toBeNull();
 
-        await screen.findByRole("radio", { name: SUN });
+        // The days load after the fold; a busy gate run can take past 1 s.
+        await screen.findByRole("radio", { name: SUN }, { timeout: 5_000 });
         fireEvent.click(radio(SUN));
         fireEvent.click(radio(SEVEN));
         expect(

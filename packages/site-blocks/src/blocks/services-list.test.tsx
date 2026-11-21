@@ -55,7 +55,7 @@ describe("servicesList (#255)", () => {
     // 07 B-L2: services are read only through the site, never by bare id.
     it("reads nothing with no site to read through", async () => {
         const fetchMock = vi.fn();
-        globalThis.fetch = fetchMock as unknown as typeof fetch;
+        globalThis.fetch = fetchMock;
         const { container } = render(<ServicesListSection content={content} />);
         await act(async () => {
             await Promise.resolve();
