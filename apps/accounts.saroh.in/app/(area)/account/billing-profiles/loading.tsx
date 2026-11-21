@@ -1,12 +1,9 @@
-import { ListHead } from "@/components/billing-profiles/profile-list";
-import { LoadingProfiles } from "@/components/billing-profiles/states";
+import { AreaLoading } from "@/components/account-area/area-loading";
 
-/** The list's frame and title while it is read (F7). */
+/**
+ * Below the list: opening a profile changes this segment, so this boundary
+ * shows for it too; the path draws the list or the profile's shape (F7).
+ */
 export default function Loading() {
-    return (
-        <div className="flex max-w-[760px] flex-col gap-6">
-            <ListHead />
-            <LoadingProfiles />
-        </div>
-    );
+    return <AreaLoading />;
 }
