@@ -297,14 +297,18 @@ describe("All modules", () => {
 
     it("offers the Variants row to a catalogue without it, and adds it under its id (DEC-158)", async () => {
         open();
+        expect(screen.getByText(/No Variants row: The sizes/)).toBeTruthy();
+        // A feature row says it goes in off, so adding it grants nothing.
         expect(
-            screen.getByText(/This catalogue has no Variants row/),
+            screen.getByText(
+                /No Saroh Social row: .*Added off on every plan\./,
+            ),
         ).toBeTruthy();
         fireEvent.click(
             screen.getByRole("button", { name: "Add Variants row" }),
         );
         // Offered once: the line goes when the row is there.
-        expect(screen.queryByText(/has no Variants row/)).toBeNull();
+        expect(screen.queryByText(/No Variants row/)).toBeNull();
         expect(
             screen.getByRole("region", { name: "Module details: Variants" }),
         ).toBeTruthy();

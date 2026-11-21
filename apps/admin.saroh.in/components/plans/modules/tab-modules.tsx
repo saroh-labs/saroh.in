@@ -212,8 +212,10 @@ export function TabModules() {
                         className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[12.5px] text-muted-foreground"
                     >
                         <span>
-                            This catalogue has no {row.name} row, so no plan
-                            limits how many a product can have.
+                            No {row.name} row: {row.what}{" "}
+                            {row.off
+                                ? "Added off on every plan."
+                                : "Added with no limit on every plan."}
                         </span>
                         <AddButton onClick={() => addKnown(row.id)}>
                             Add {row.name} row

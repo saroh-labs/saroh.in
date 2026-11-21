@@ -1,4 +1,5 @@
-import { validateCatalog } from "@saroh/pricing-catalog";
+import { MODULE_MAP, validateCatalog } from "@saroh/pricing-catalog";
+import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -50,12 +51,46 @@ describe("rows the product knows by id (DEC-158)", () => {
         }
     });
 
-    it("offers it to a catalogue made before it, and to no other", () => {
-        expect(knownRowsMissing(blankCatalog())).toEqual([
-            { id: "variants", name: "Variants" },
-            // A cap on each person (DEC-233).
-            { id: "google-accounts", name: "Google accounts a person" },
-        ]);
+    it("offers every row the product enforces by id that's missing, and nothing present", () => {
+        const offered = knownRowsMissing(blankCatalog());
+        const ids = offered.map((r) => r.id);
+        for (const id of ["variants", "google-accounts", "ask-ai", "social"]) {
+            expect(ids).toContain(id);
+        }
+        // Only rows the product reads by id.
+        for (const id of ids) expect(Object.hasOwn(MODULE_MAP, id)).toBe(true);
+        expect(offered.find((r) => r.id === "social")).toMatchObject({
+            name: "Saroh Social",
+            off: true,
+        });
+        expect(offered.find((r) => r.id === "social")?.what).toBeTruthy();
+        expect(offered.find((r) => r.id === "variants")?.off).toBe(false);
+        const c = starterCatalog();
+        c.modules = c.modules.filter((m) => m.id !== "social");
+        expect(knownRowsMissing(c).map((r) => r.id)).toEqual(["social"]);
+    });
+
+    it("adds a feature row off on every plan, so Free gets nothing by accident", () => {
+        const c = starterCatalog();
+        c.modules = c.modules.filter(
+            (m) => !["social", "ask-ai", "google-accounts"].includes(m.id),
+        );
+        for (const id of ["social", "ask-ai", "google-accounts"]) {
+            expect(addKnownRow(c, id)).toBe(id);
+            const row = c.modules.find((m) => m.id === id);
+            expect(row?.pricing).toBe("hidden");
+            expect(Object.keys(row?.cells ?? {}).sort()).toEqual(
+                c.plans.map((p) => p.id).sort(),
+            );
+            for (const cell of Object.values(row?.cells ?? {})) {
+                expect(cell).toEqual({ inc: false, off: "locked" });
+            }
+        }
+        expect(c.modules.find((m) => m.id === "social")?.group).toBe(
+            SEED_CATALOG.modules.find((m) => m.id === "social")?.group,
+        );
+        expect(validateCatalog(c).ok).toBe(true);
+        expect(knownRowsMissing(c)).toEqual([]);
     });
 
     it("adds it under its own id, beside Products, capping nothing yet", () => {
@@ -96,7 +131,7 @@ describe("rows the product knows by id (DEC-158)", () => {
     it("adds nothing twice, nothing it doesn't know, and nothing with no group", () => {
         const c = starterCatalog();
         expect(addKnownRow(c, "variants")).toBeNull();
-        expect(addKnownRow(blankCatalog(), "products")).toBeNull();
+        expect(addKnownRow(blankCatalog(), "made-up")).toBeNull();
         const bare = blankCatalog();
         bare.groups = [];
         expect(addKnownRow(bare, "variants")).toBeNull();

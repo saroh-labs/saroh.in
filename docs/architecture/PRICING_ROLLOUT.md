@@ -236,6 +236,11 @@ and the admin's usage lines and impact (`ImpactService`).
   `variants`; "Add module" makes an id of its own, which governs nothing):
   it arrives with no limit on any plan and hidden from the pricing page,
   so adding it changes nothing until a number is set and published.
+  Every other row the product reads by id (`MODULE_MAP`: `social`,
+  `ask-ai`, `google-accounts`, …) is offered the same way when missing,
+  but arrives off on every plan, so adding it never grants anything:
+  Social and Ask AI stay locked and Google accounts a person stays at one
+  until a plan is turned on and published.
 
 ## A business's own domain (DEC-139)
 
