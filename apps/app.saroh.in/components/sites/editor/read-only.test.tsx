@@ -30,6 +30,7 @@ import type { SiteStyleOptions } from "@/lib/sites/style";
 import type { TestRelease } from "@/lib/sites/test-releases";
 import { showUndo } from "@saroh/ui/toast";
 
+import { EditorAskAiProvider } from "@/components/ask-ai/editor-ask-ai";
 import { typeInto } from "./phone/text-sheet";
 import { SiteEditor } from "./site-editor";
 import { useEditorDraft } from "./use-editor-draft";
@@ -376,7 +377,9 @@ const ALLOWED: RegExp[] = [
     // The new desk shell (U46): the rail, the Pages tree, More and its
     // looking-only items.
     /^Pages$/,
-    /^More: desk, tablet or phone width/,
+    /^More: find \(Command K\)/,
+    // The canvas bar's width and zoom (owner, 21 Nov): looking is allowed.
+    /^(Zoom out|Zoom in|Zoom: (\d+%|Fit)\. Choose a zoom)$/,
     /^(Home\/|About\/about)$/,
     /^Our storyHidden$/,
     /^(Desk|Tablet|Phone|Fit|\d+%)$/,
@@ -468,7 +471,11 @@ let host: HTMLDivElement;
 let site = 0;
 type Props = Parameters<typeof SiteEditor>[0];
 
-function render(overrides: Partial<Props> = {}) {
+function render(
+    overrides: Partial<Props> = {},
+    /** Ask AI's editor provider around it, as the editor layout mounts it. */
+    withAskAi = false,
+) {
     site += 1;
     const props: Props = {
         siteId: `site-${site}`,
@@ -504,7 +511,36 @@ function render(overrides: Partial<Props> = {}) {
         reloadDraft: vi.fn(),
         ...overrides,
     };
-    act(() => root.render(<SiteEditor {...props} />));
+    const editor = <SiteEditor {...props} />;
+    act(() =>
+        root.render(
+            withAskAi ? (
+                <EditorAskAiProvider
+                    state={{
+                        available: true,
+                        reason: null,
+                        upgradeTo: null,
+                        usage: {
+                            used: 1,
+                            limit: 100,
+                            resetsAt: "2026-12-14T00:00:00.000Z",
+                        },
+                        requestMore: true,
+                        ownerName: null,
+                        businessOn: true,
+                        canSwitch: false,
+                        language: "MATCH",
+                    }}
+                    businessName="Flour & Ferment"
+                    zone="Asia/Kolkata"
+                >
+                    {editor}
+                </EditorAskAiProvider>
+            ) : (
+                editor
+            ),
+        ),
+    );
     return props;
 }
 
@@ -1250,13 +1286,15 @@ describe("the desk shell with the Website area on (U46)", () => {
         ).toBe(true);
     });
 
-    it("a reader's More: how the page is shown and test links, nothing that writes", () => {
+    it("a reader's More and canvas bar: how the page is shown and test links, nothing that writes", () => {
         render();
-        openMenu(button(/^More: desk/));
+        // Width and zoom are on the canvas bar; looking is allowed.
+        click(button("Tablet"));
+        click(button("Zoom out"));
+        expect(button(/^Zoom: 75%/)).toBeTruthy();
+        openMenu(button(/^More: find/));
         const items = menuItems();
-        expect(items).toEqual(
-            expect.arrayContaining(["Desk", "Tablet", "Phone", "Fit"]),
-        );
+        expect(items).toEqual(expect.arrayContaining(["Page settings"]));
         for (const gone of [
             "Redo",
             "Share a test link",
@@ -1323,7 +1361,7 @@ describe("the desk shell for an owner (U46)", () => {
         initialPendingSiteChanges: [],
     };
 
-    it("the bar is Website, page, Undo, Ask AI, the chip, Preview, More, Publish", () => {
+    it("the bar is Website, page, Undo, Redo, the chip, Preview, More, Publish", () => {
         render(owner);
         const bar = $("[data-editor-bar]");
         const names = Array.from(
@@ -1333,10 +1371,10 @@ describe("the desk shell for an owner (U46)", () => {
             "Back to Website",
             "Page: Home. Choose another page to edit",
             "Undo",
-            "Ask AI",
+            "Redo",
             "chip",
             "Preview",
-            expect.stringMatching(/^More: desk/),
+            expect.stringMatching(/^More: find/),
             "Publish",
         ]);
         expect($("[data-status-chip]")?.textContent).toBe(
@@ -1348,19 +1386,19 @@ describe("the desk shell for an owner (U46)", () => {
         }
     });
 
-    it("everything that left the bar is in More (00-universal §15)", () => {
+    it("everything that left the bar is in More, the canvas bar or beside Undo (00-universal §15)", () => {
         render(owner);
-        openMenu(button(/^More: desk/));
+        const canvasBar = $("[data-canvas-bar]");
+        for (const name of ["Desk", "Tablet", "Phone", "Zoom out", "Zoom in"]) {
+            expect(
+                canvasBar?.querySelector(`[aria-label="${name}"]`),
+                name,
+            ).not.toBeNull();
+        }
+        expect(button("Redo")).toBeTruthy();
+        openMenu(button(/^More: find/));
         expect(menuItems()).toEqual(
             expect.arrayContaining([
-                "Desk",
-                "Tablet",
-                "Phone",
-                "50%",
-                "75%",
-                "100%",
-                "Fit",
-                "Redo",
                 "Page settings",
                 "Share a test link",
                 "Test links1",
@@ -1374,17 +1412,27 @@ describe("the desk shell for an owner (U46)", () => {
         );
     });
 
-    it("More › Width changes the canvas bar's word", () => {
+    it("the canvas bar's width switch and zoom change the page shown", () => {
         render(owner);
-        expect($("[data-canvas-bar]")?.textContent).toContain("Desk view");
-        openMenu(button(/^More: desk/));
-        click(menuItem("Tablet"));
-        expect($("[data-canvas-bar]")?.textContent).toContain("Tablet view");
+        const on = () =>
+            $(
+                "[data-canvas-bar] [role=radio][aria-checked=true]",
+            )?.getAttribute("aria-label");
+        expect(on()).toBe("Desk");
+        click(button("Tablet"));
+        expect(on()).toBe("Tablet");
+        click(button("Zoom out"));
+        click(button("Zoom out"));
+        expect(button(/^Zoom: 50%/)).toBeTruthy();
+        expect(button("Zoom out").hasAttribute("disabled")).toBe(true);
+        openMenu(button(/^Zoom: 50%/));
+        click(menuItem("Fit"));
+        expect(button(/^Zoom: Fit/)).toBeTruthy();
     });
 
     it("More › Share a preview link opens the rail's Feedback", () => {
         render(owner);
-        openMenu(button(/^More: desk/));
+        openMenu(button(/^More: find/));
         click(menuItem("Share a preview link"));
         expect($("[data-left-panel=feedback]")).not.toBeNull();
     });
@@ -1951,6 +1999,66 @@ describe("the capability table, row by row (U51)", () => {
             expect(
                 $("[data-inspector-frame] [data-brand-aside]"),
             ).not.toBeNull();
+        });
+
+        it("the right column is Edit · Ask AI; every Ask AI entry opens its tab (owner, 21 Nov)", () => {
+            render(owner, true);
+            const tab = () =>
+                $("[data-right-column]")?.getAttribute("data-right-column");
+            const about = () =>
+                $("#right-ask")?.textContent.match(/About: [^L]*/)?.[0];
+            const tabEl = (id: string) => {
+                const el = $(id);
+                if (!el) throw new Error(`No ${id}`);
+                return el;
+            };
+            const editTab = () => tabEl("#right-column-edit");
+            const askTab = () => tabEl("#right-column-ask");
+            expect(editTab().textContent).toBe("Edit");
+            expect(askTab().textContent).toBe("Ask AI");
+            expect(tab()).toBe("edit");
+            // No Ask AI on the top bar at the desk any more.
+            expect($("[data-editor-bar]")?.textContent.includes("Ask AI")).toBe(
+                false,
+            );
+            // The tab with nothing chosen: the page.
+            const close = document.querySelector<HTMLElement>(
+                "[aria-label='Close, nothing selected']",
+            );
+            if (close) click(close);
+            click(askTab());
+            expect(tab()).toBe("ask");
+            expect($("#right-ask")?.textContent).toContain(
+                "Looking at your Home page in the editor.",
+            );
+            // ⌘J goes back and forth.
+            key("j", { metaKey: true });
+            expect(tab()).toBe("edit");
+            key("j", { metaKey: true });
+            expect(tab()).toBe("ask");
+            // Choosing a section keeps Ask AI open, about that section.
+            const block = $("[data-block-index='0'] > button[aria-pressed]");
+            if (!block) throw new Error("No section 0 on the canvas");
+            click(block);
+            expect(tab()).toBe("ask");
+            expect(about()).toContain("Home · Top of the page");
+            // Edit goes back; the section toolbar's Ask AI comes again.
+            click(editTab());
+            expect(tab()).toBe("edit");
+            const toolbar = $("[aria-label$=' actions']");
+            const ask = Array.from(
+                toolbar?.querySelectorAll<HTMLElement>("button") ?? [],
+            ).find((b) => nameOf(b) === "Ask AI");
+            if (!ask) throw new Error("No Ask AI on the section toolbar");
+            click(ask);
+            expect(tab()).toBe("ask");
+            expect(about()).toContain("Home · Top of the page");
+        });
+
+        it("a reader has no Ask AI tab", () => {
+            render({}, true);
+            expect($("[data-right-column]")).toBeNull();
+            expect(has("Ask AI")).toBe(false);
         });
 
         it("the dividers still resize both panels", () => {

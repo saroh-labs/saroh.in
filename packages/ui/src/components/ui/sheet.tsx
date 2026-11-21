@@ -58,11 +58,6 @@ interface SheetContentProps
      * quick look puts it beside the status, where the design has it.
      */
     closeButton?: boolean;
-    /**
-     * False for a sheet that stays open beside the work (`modal={false}` on
-     * the `Sheet`): no dimmed overlay, so the page behind stays usable.
-     */
-    overlay?: boolean;
 }
 
 const SheetContent = React.forwardRef<
@@ -75,14 +70,13 @@ const SheetContent = React.forwardRef<
             className,
             children,
             closeButton = true,
-            overlay = true,
             onInteractOutside,
             ...props
         },
         ref,
     ) => (
         <SheetPortal>
-            {overlay ? <SheetOverlay /> : null}
+            <SheetOverlay />
             <SheetPrimitive.Content
                 ref={ref}
                 className={cn(sheetVariants({ side }), className)}

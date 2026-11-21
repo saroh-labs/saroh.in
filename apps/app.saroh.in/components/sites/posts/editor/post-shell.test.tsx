@@ -370,22 +370,20 @@ describe("the desk post editor for a reader (DEC-200 U8)", () => {
 });
 
 describe("postTrailTabs", () => {
-    it("is Posts · Add · Ask AI · History · Feedback, a reader's Posts · Feedback", () => {
+    it("is Posts · Add · History · Feedback (Ask AI is the right column's tab), a reader's Posts · Feedback", () => {
         const keys = (o: Parameters<typeof postTrailTabs>[0]) =>
             postTrailTabs(o).map((t) => t.label);
         expect(
             keys({
                 readOnly: false,
-                askAi: true,
                 history: true,
                 openNotes: 2,
                 feedback: true,
             }),
-        ).toEqual(["Posts", "Add", "Ask AI", "History", "Feedback"]);
+        ).toEqual(["Posts", "Add", "History", "Feedback"]);
         expect(
             keys({
                 readOnly: true,
-                askAi: true,
                 history: true,
                 openNotes: 0,
                 feedback: true,

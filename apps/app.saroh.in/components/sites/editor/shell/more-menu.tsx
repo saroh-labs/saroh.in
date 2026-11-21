@@ -4,9 +4,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuRadioGroup,
-    DropdownMenuRadioItem,
     DropdownMenuSeparator,
     DropdownMenuShortcut,
     DropdownMenuTrigger,
@@ -19,7 +16,6 @@ import {
     MessageSquare,
     Moon,
     MoreHorizontal,
-    Redo2,
     Search,
     Settings2,
     Share2,
@@ -29,24 +25,15 @@ import {
 } from "lucide-react";
 import { useTheme } from "next-themes";
 
-import type { Device, Zoom } from "../editor-constants";
-import { DEVICES, ZOOMS } from "../editor-constants";
 import { COMMAND_MENU_READY } from "../panels/command-menu";
 import type { TopBarActionProps } from "../top-bar-actions";
 import type { EditorModel } from "./editor-model";
 
-/** The desk's words for the three widths (RULES §1). */
-const WIDTH_WORD: Record<Device, string> = {
-    desktop: "Desk",
-    tablet: "Tablet",
-    phone: "Phone",
-};
-
 /**
- * ⋯ More on the desk bar (`fix/WXKRest`, RULES §3): everything the old bar
- * carried that is not the page, the status, Preview or Publish. Width,
- * zoom, Redo, Find, Page settings, test links, review and preview link,
- * History, Feedback (the 1440 board's; the rail has it wider), and Theme.
+ * ⋯ More on the desk bar (`fix/WXKRest`, RULES §3): the rarer actions.
+ * Find, Page settings, test links, review and preview link, History,
+ * Feedback (the 1440 board's; the rail has it wider), and Theme. Width and
+ * zoom moved to the canvas bar and Redo beside Undo (owner, 21 Nov).
  * Each item does exactly what its old control did (00-universal §15).
  */
 export function MoreMenu({
@@ -62,7 +49,7 @@ export function MoreMenu({
     /** Find (⌘K); shown once the command menu is built (U46c). */
     onFind?: () => void;
 }) {
-    const { readOnly, edits } = model;
+    const { readOnly } = model;
     const release = actions.testRelease;
     const { resolvedTheme, setTheme } = useTheme();
     const dark = resolvedTheme === "dark";
@@ -70,50 +57,13 @@ export function MoreMenu({
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <IconButton
-                    label="More: desk, tablet or phone width, zoom, redo, find (Command K), page settings, share a test link, history, theme"
+                    label="More: find (Command K), page settings, test links, review, preview link, history, theme"
                     icon={<MoreHorizontal className="size-5" />}
                     tooltip={false}
                     className="size-11"
                 />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-72">
-                <DropdownMenuLabel>Width</DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                    value={actions.device}
-                    onValueChange={(v) => actions.setDevice(v as Device)}
-                >
-                    {DEVICES.map((d) => (
-                        <DropdownMenuRadioItem key={d.key} value={d.key}>
-                            {WIDTH_WORD[d.key]}
-                        </DropdownMenuRadioItem>
-                    ))}
-                </DropdownMenuRadioGroup>
-                <DropdownMenuLabel>Zoom</DropdownMenuLabel>
-                <DropdownMenuRadioGroup
-                    value={String(actions.zoom)}
-                    onValueChange={(v) =>
-                        actions.setZoom(
-                            v === "fit" ? "fit" : (Number(v) as Zoom),
-                        )
-                    }
-                >
-                    {ZOOMS.map((z) => (
-                        <DropdownMenuRadioItem key={z} value={String(z)}>
-                            {z === "fit" ? "Fit" : `${z}%`}
-                        </DropdownMenuRadioItem>
-                    ))}
-                </DropdownMenuRadioGroup>
-                <DropdownMenuSeparator />
-
-                {readOnly ? null : (
-                    <DropdownMenuItem
-                        disabled={!edits.canRedo}
-                        onSelect={() => edits.redo()}
-                    >
-                        <Redo2 aria-hidden />
-                        Redo
-                    </DropdownMenuItem>
-                )}
                 {COMMAND_MENU_READY && onFind ? (
                     <DropdownMenuItem onSelect={onFind}>
                         <Search aria-hidden />

@@ -9,7 +9,7 @@ import {
     ChevronLeft,
     Eye,
     Lock,
-    Sparkles,
+    Redo2,
     Undo2,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,7 +25,7 @@ import { MoreMenu } from "./more-menu";
 
 /**
  * The desk's top bar with the Website area on (`fix/WXKRest`, RULES §3):
- * ← Website · the page picker (page over site) · Undo · Ask AI · the
+ * ← Website · the page picker (page over site) · Undo · Redo · the
  * status chip (opens Publish) · Preview · ⋯ More · Publish, the one black
  * button. Everything else the old bar carried is in More (`more-menu.tsx`)
  * or the rail. A reader (`fix/WXMReviewer`): Read only, Preview, More and
@@ -128,25 +128,23 @@ export function DeskTopBar({
                 <span className="flex-1" />
 
                 {readOnly ? null : (
-                    <IconButton
-                        label="Undo"
-                        icon={<Undo2 className="size-[18px]" />}
-                        disabled={!model.edits.canUndo}
-                        onClick={() => model.edits.undo()}
-                        className="size-11"
-                    />
+                    <>
+                        <IconButton
+                            label="Undo"
+                            icon={<Undo2 className="size-[18px]" />}
+                            disabled={!model.edits.canUndo}
+                            onClick={() => model.edits.undo()}
+                            className="size-11"
+                        />
+                        <IconButton
+                            label="Redo"
+                            icon={<Redo2 className="size-[18px]" />}
+                            disabled={!model.edits.canRedo}
+                            onClick={() => model.edits.redo()}
+                            className="size-11"
+                        />
+                    </>
                 )}
-                {model.askAi && !readOnly ? (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        className="h-10 shrink-0 rounded-[9px]"
-                        onClick={() => model.openAskAi("page")}
-                    >
-                        <Sparkles aria-hidden className="size-4" />
-                        Ask AI
-                    </Button>
-                ) : null}
                 {readOnly ? null : (
                     <>
                         <Divider />

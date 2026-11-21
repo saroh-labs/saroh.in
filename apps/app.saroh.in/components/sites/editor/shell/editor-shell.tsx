@@ -3,7 +3,8 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 
-import { PANEL_DEFAULT, RAIL_DEFAULT } from "@/lib/sites/editor-prefs";
+import { useEditorAskAiDock } from "@/components/ask-ai/editor-ask-ai-context";
+import { RAIL_DEFAULT } from "@/lib/sites/editor-prefs";
 import type { Flag } from "@/lib/sites/service";
 
 import { AddPageFor, AddPanel } from "../add/add-panel";
@@ -22,10 +23,10 @@ import { EditorTrail, siteTrailTabs } from "./editor-trail";
 import { InspectorFrame } from "./inspector-frame";
 import { PagesTree } from "./pages-tree";
 import { ReviewerStrip } from "./reviewer-strip";
+import { RIGHT_MIN, RightColumn, useRightWidth } from "./right-column";
 
 /** The boards' widths (`fix/WXKRest`) until someone drags a divider. */
 const LEFT_PANEL = 280;
-const INSPECTOR = 360;
 /**
  * The narrowest each left panel is drawn (`fix/WXBBrand`, `fix/WXBAdd`,
  * `fix/WXEHistory`). A width the old editor saved (230) is not honoured
@@ -81,6 +82,8 @@ export function EditorShell({
     // The tree's Add a page opens Add's own sheet (U46e, `fix/WXBAddPage`).
     const [addingPage, setAddingPage] = useState(false);
     const { viewport } = model;
+    const dock = useEditorAskAiDock();
+    const right = useRightWidth(model.askAi ? (dock?.tab ?? "edit") : "edit");
 
     // ⌘K opens Find once it is built (U46c).
     useEffect(() => {
@@ -142,10 +145,15 @@ export function EditorShell({
                         viewport.setRailWidth(Math.max(px, railMin)),
                     nudgeRail: (d) =>
                         viewport.setRailWidth(Math.max(railShown + d, railMin)),
-                    panelWidth:
-                        viewport.panelWidth === PANEL_DEFAULT
-                            ? INSPECTOR
-                            : viewport.panelWidth,
+                    // The right column's own width (Edit · Ask AI).
+                    panelWidth: right.width,
+                    setPanelWidth: right.setWidth,
+                    nudgePanel: right.nudge,
+                }}
+                panelBounds={{
+                    min: RIGHT_MIN,
+                    max: right.max,
+                    reset: right.reset,
                 }}
                 trail={
                     <EditorTrail
@@ -181,6 +189,8 @@ export function EditorShell({
                                 path={page?.path ?? "/"}
                                 device={viewport.device}
                                 zoom={viewport.zoom}
+                                onDevice={viewport.setDevice}
+                                onZoom={viewport.setZoom}
                             />
                         )}
                         {viewport.previewing && PREVIEW_FRAMES_READY ? (
@@ -193,7 +203,11 @@ export function EditorShell({
                         )}
                     </main>
                 }
-                inspector={<InspectorFrame>{inspector}</InspectorFrame>}
+                inspector={
+                    <RightColumn askAi={model.askAi}>
+                        <InspectorFrame>{inspector}</InspectorFrame>
+                    </RightColumn>
+                }
             />
             <CommandMenu
                 model={model}

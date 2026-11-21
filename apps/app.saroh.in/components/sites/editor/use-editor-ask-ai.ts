@@ -14,10 +14,10 @@ export type AskAiOn = "page" | "section";
 
 /**
  * What Ask AI is about in the site editor (owner, 21 Nov): the one state
- * every Ask AI button sets, rendered once as `<AskAiPageIs>`. The top bar
- * asks about the page; a section's toolbar or sheet, or choosing a section
- * while the panel is open, about that section. With nothing chosen it is
- * the page again.
+ * every Ask AI entry sets, rendered once as `<AskAiPageIs>`. The section
+ * chosen, if any, or else the page: so the right column's Ask AI tab and ⌘J
+ * follow the selection, a section's toolbar or sheet asks about it, and
+ * Find and the phone's page menu ask about the page.
  */
 export function useEditorAskAi({
     siteId,
@@ -32,8 +32,8 @@ export function useEditorAskAi({
     active: ActiveSection | null;
     chrome: "header" | "footer" | null;
 }): { page: AskAiPage; open: (on: AskAiOn) => void } {
-    const [on, setOn] = useState<AskAiOn>("page");
     const chosen = chrome ?? active?.section.key ?? null;
+    const [on, setOn] = useState<AskAiOn>(chosen ? "section" : "page");
     // Choosing a section moves the panel to it, open or not.
     const [seen, setSeen] = useState(chosen);
     if (seen !== chosen) {

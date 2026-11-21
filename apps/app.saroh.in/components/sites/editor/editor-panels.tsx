@@ -66,6 +66,8 @@ export interface EditorPanelsProps {
      * panel on a desk or a narrow window; absent in today's chrome.
      */
     trail?: ReactNode;
+    /** The right column's drag bounds, when not the inspector's own. */
+    panelBounds?: { min: number; max: number; reset: number };
 }
 
 /**
@@ -99,6 +101,7 @@ export function EditorPanels({
     releases,
     openNotes = 0,
     trail,
+    panelBounds = { min: PANEL_MIN, max: PANEL_MAX, reset: PANEL_DEFAULT },
 }: EditorPanelsProps) {
     const { previewing, railWidth, panelWidth } = viewport;
     const { sheet, setSheet } = sheets;
@@ -179,9 +182,9 @@ export function EditorPanels({
                         <PanelDivider
                             label="Resize the inspector"
                             width={panelWidth}
-                            min={PANEL_MIN}
-                            max={PANEL_MAX}
-                            reset={PANEL_DEFAULT}
+                            min={panelBounds.min}
+                            max={panelBounds.max}
+                            reset={panelBounds.reset}
                             onResize={viewport.setPanelWidth}
                             onNudge={viewport.nudgePanel}
                             panelSide="right"

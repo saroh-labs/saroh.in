@@ -1,15 +1,21 @@
 "use client";
 
 import type { Editor } from "@tiptap/react";
-import { FileText, History, MessageSquare, Plus, Sparkles } from "lucide-react";
+import { FileText, History, MessageSquare, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { AskAiPageIs } from "@/components/ask-ai/ask-ai-page";
-import { openAskAi } from "@/components/ask-ai/open";
+import { useEditorAskAiDock } from "@/components/ask-ai/editor-ask-ai-context";
 import { useBusinessZone } from "@/components/shared/dates/business-zone";
+import { PanelDivider } from "@/components/sites/editor/editor-chrome";
 import type { TrailTab } from "@/components/sites/editor/shell/editor-trail";
 import { EditorTrail } from "@/components/sites/editor/shell/editor-trail";
+import {
+    RIGHT_MIN,
+    RightColumn,
+    useRightWidth,
+} from "@/components/sites/editor/shell/right-column";
 import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { AddList } from "@/components/sites/rich-text/writing-menus";
 import { postPage } from "@/lib/ask-ai/page-hints";
@@ -36,22 +42,20 @@ import { PostsLeftPanel } from "./posts-left-panel";
 import { usePostDraft } from "./use-post-draft";
 import { WritingSurface } from "./writing-surface";
 
-export type PostTrailKey = "posts" | "add" | "ask" | "history" | "feedback";
+export type PostTrailKey = "posts" | "add" | "history" | "feedback";
 
 /**
- * The post editor's rail (`blogdesk/WXWWrite`, C3): Posts · Add · Ask AI ·
- * History · Feedback; a reader's Posts · Feedback. Ask AI shows where it
- * is on; History once U17 builds it.
+ * The post editor's rail (`blogdesk/WXWWrite`, C3): Posts · Add · History ·
+ * Feedback; a reader's Posts · Feedback. History once U17 builds it. Ask AI
+ * left the rail for the right column's tab (owner, 21 Nov).
  */
 export function postTrailTabs({
     readOnly,
-    askAi,
     history,
     openNotes,
     feedback,
 }: {
     readOnly: boolean;
-    askAi: boolean;
     history: boolean;
     openNotes: number;
     feedback: boolean;
@@ -59,7 +63,6 @@ export function postTrailTabs({
     const tabs: (TrailTab<PostTrailKey> | false)[] = [
         { key: "posts", label: "Posts", icon: FileText },
         !readOnly && { key: "add", label: "Add", icon: Plus },
-        !readOnly && askAi && { key: "ask", label: "Ask AI", icon: Sparkles },
         !readOnly &&
             history && {
                 key: "history",
@@ -172,24 +175,22 @@ export function PostShell({
         },
     };
     const publish = usePublishPost(model);
+    const dock = useEditorAskAiDock();
+    const right = useRightWidth(
+        data.askAi && !data.readOnly ? (dock?.tab ?? "edit") : "edit",
+    );
 
     const feedback = data.feedback;
     const openNotes =
         feedback?.comments.filter((c) => c.resolvedAt === null).length ?? 0;
     const tabs = postTrailTabs({
         readOnly: data.readOnly || data.paused,
-        askAi: data.askAi,
         history: POST_HISTORY_READY,
         openNotes,
         feedback: Boolean(feedback && draft.postId),
     });
 
     function onTrail(key: PostTrailKey) {
-        if (key === "ask") {
-            // The global panel until Ask AI docks in the editor (U50).
-            openAskAi();
-            return;
-        }
         if (key === "feedback") setTab("feedback");
         setTrail(key);
     }
@@ -299,19 +300,41 @@ export function PostShell({
                     />
                 </main>
                 {previewing ? null : (
-                    <div className="flex w-[340px] shrink-0 border-l min-[1600px]:w-[360px] [&>*]:flex-1">
-                        <PostInspector
-                            model={model}
-                            tab={tab}
-                            onTab={(t) => {
-                                setTab(t);
-                                if (t !== "feedback" && trail === "feedback")
-                                    setTrail("posts");
-                            }}
-                            editing={editing}
-                            onEditing={setEditing}
-                        />
-                    </div>
+                    <>
+                        <div className="flex w-px shrink-0 [&>*]:flex-1">
+                            <PanelDivider
+                                label="Resize the right column"
+                                width={right.width}
+                                min={RIGHT_MIN}
+                                max={right.max}
+                                reset={right.reset}
+                                onResize={right.setWidth}
+                                onNudge={right.nudge}
+                                panelSide="right"
+                            />
+                        </div>
+                        <div
+                            className="flex max-w-[calc(100vw-20rem)] shrink-0 [&>*]:flex-1"
+                            style={{ width: right.width }}
+                        >
+                            <RightColumn askAi={data.askAi && !data.readOnly}>
+                                <PostInspector
+                                    model={model}
+                                    tab={tab}
+                                    onTab={(t) => {
+                                        setTab(t);
+                                        if (
+                                            t !== "feedback" &&
+                                            trail === "feedback"
+                                        )
+                                            setTrail("posts");
+                                    }}
+                                    editing={editing}
+                                    onEditing={setEditing}
+                                />
+                            </RightColumn>
+                        </div>
+                    </>
                 )}
             </div>
             {publish.node}

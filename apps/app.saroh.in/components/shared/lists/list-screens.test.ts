@@ -266,6 +266,8 @@ describe("tabs are views; a status filter is a dropdown in the row", () => {
             "a section's inspector: Content, Style, Visibility and Feedback, each its own panel",
         "components/sites/editor/phone/section-sheet.tsx":
             "a section's sheet on a phone: Content, Style, Visibility and Feedback, each its own panel",
+        "components/sites/editor/shell/right-column.tsx":
+            "the editors' right column: Edit (the inspector) and Ask AI, two panels",
         "components/sites/posts/editor/post-inspector.tsx":
             "a post's inspector: Details, Search and sharing, Feedback (U15)",
         "components/sites/header/website-header.tsx":
