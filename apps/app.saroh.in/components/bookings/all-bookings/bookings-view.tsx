@@ -10,11 +10,12 @@ import { useLocalPages } from "@saroh/ui/page-sizes";
 import { ScrollX } from "@saroh/ui/scroll-x";
 import { CalendarDays } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 
 import { TakePayment } from "@/components/bookings/booking-page/take-payment";
 import { CancelSheet } from "@/components/bookings/sheets/cancel-sheet";
 import { DateRangeFilter } from "@/components/shared/lists/date-range-filter";
+import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { useHold } from "@/components/shared/undo/use-hold";
 import { personHref } from "@/lib/contacts/person-href";
@@ -131,6 +132,7 @@ export function BookingsView({
     share?: ShareLink | null;
 }) {
     const router = useRouter();
+    const [datesPending, startDates] = useTransition();
     const [view, setViewState] = useState<ViewId>(() => readView(initialView));
     const [term, setTerm] = useState("");
     const [searchKey, setSearchKey] = useState(0);
@@ -203,7 +205,9 @@ export function BookingsView({
     const pickDates = (patch: Partial<DateRange>) => {
         const url = new URL(window.location.href);
         writeDateRange({ ...dates, ...patch }, url.searchParams);
-        router.replace(`${url.pathname}${url.search}`, { scroll: false });
+        startDates(() =>
+            router.replace(`${url.pathname}${url.search}`, { scroll: false }),
+        );
     };
     const clearAll = () => {
         setTerm("");
@@ -341,140 +345,147 @@ export function BookingsView({
                 }
             />
 
-            {shown.length === 0 ? (
-                searching || filtering ? (
-                    <EmptyState
-                        kind="no-results"
-                        things="bookings"
-                        cause={filtering ? "filters" : "search"}
-                        query={term}
-                        onClear={clearAll}
-                    />
+            {/* A date range is read on the server: the rows grey until it lands. */}
+            <PendingRegion pending={datesPending}>
+                {shown.length === 0 ? (
+                    searching || filtering ? (
+                        <EmptyState
+                            kind="no-results"
+                            things="bookings"
+                            cause={filtering ? "filters" : "search"}
+                            query={term}
+                            onClear={clearAll}
+                        />
+                    ) : (
+                        <EmptyState
+                            kind="no-results"
+                            things="bookings"
+                            cause="view"
+                            data-ph-unmask=""
+                            title={empty.title}
+                            description={empty.line}
+                            onClear={() => setView("all")}
+                        />
+                    )
                 ) : (
-                    <EmptyState
-                        kind="no-results"
-                        things="bookings"
-                        cause="view"
-                        data-ph-unmask=""
-                        title={empty.title}
-                        description={empty.line}
-                        onClear={() => setView("all")}
-                    />
-                )
-            ) : (
-                <>
-                    {/* One card with day bands at a desk; on a phone each
+                    <>
+                        {/* One card with day bands at a desk; on a phone each
                         day is its own card under its heading (BKMAllBookings). */}
-                    <ListTable className="max-[759px]:grid max-[759px]:gap-4 max-[759px]:overflow-visible max-[759px]:rounded-none max-[759px]:border-0 max-[759px]:bg-transparent">
-                        <ListTableHead
-                            className={`${ROW_GRID} max-[759px]:hidden`}
-                        >
-                            <span>When · {zoneLabel}</span>
-                            <span data-ph-unmask="">Customer</span>
-                            <span data-ph-unmask="">Service · with</span>
-                            <span data-ph-unmask="">Did they come?</span>
-                            <span data-ph-unmask="">Status</span>
-                            <span data-ph-unmask="" className="sr-only">
-                                Actions
-                            </span>
-                        </ListTableHead>
-                        {groups.map((g) => (
-                            <section
-                                key={g.key}
-                                aria-label={g.label}
-                                className="min-[760px]:border-b min-[760px]:border-border min-[760px]:last:border-b-0"
+                        <ListTable className="max-[759px]:grid max-[759px]:gap-4 max-[759px]:overflow-visible max-[759px]:rounded-none max-[759px]:border-0 max-[759px]:bg-transparent">
+                            <ListTableHead
+                                className={`${ROW_GRID} max-[759px]:hidden`}
                             >
-                                <h2
-                                    className={cn(
-                                        listTable.group,
-                                        "max-[759px]:border-0 max-[759px]:px-0 max-[759px]:pt-0",
-                                    )}
+                                <span>When · {zoneLabel}</span>
+                                <span data-ph-unmask="">Customer</span>
+                                <span data-ph-unmask="">Service · with</span>
+                                <span data-ph-unmask="">Did they come?</span>
+                                <span data-ph-unmask="">Status</span>
+                                <span data-ph-unmask="" className="sr-only">
+                                    Actions
+                                </span>
+                            </ListTableHead>
+                            {groups.map((g) => (
+                                <section
+                                    key={g.key}
+                                    aria-label={g.label}
+                                    className="min-[760px]:border-b min-[760px]:border-border min-[760px]:last:border-b-0"
                                 >
-                                    {g.label}
-                                </h2>
-                                <ul className="max-[759px]:overflow-hidden max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card">
-                                    {g.rows.map((b) => {
-                                        const markKey = `outcome:${b.id}`;
-                                        const markedNow = marks[b.id];
-                                        const items = rowMenu(b, can, now);
-                                        return (
-                                            <BookingRow
-                                                key={b.id}
-                                                booking={b}
-                                                zone={timezone}
-                                                status={rowStatus(b, now)}
-                                                asks={asksOutcome(b, now)}
-                                                canMark={can.book}
-                                                marked={
-                                                    markedNow
-                                                        ? {
-                                                              outcome:
-                                                                  markedNow,
-                                                              undo: pending.includes(
-                                                                  markKey,
+                                    <h2
+                                        className={cn(
+                                            listTable.group,
+                                            "max-[759px]:border-0 max-[759px]:px-0 max-[759px]:pt-0",
+                                        )}
+                                    >
+                                        {g.label}
+                                    </h2>
+                                    <ul className="max-[759px]:overflow-hidden max-[759px]:rounded-[12px] max-[759px]:border max-[759px]:border-border max-[759px]:bg-card">
+                                        {g.rows.map((b) => {
+                                            const markKey = `outcome:${b.id}`;
+                                            const markedNow = marks[b.id];
+                                            const items = rowMenu(b, can, now);
+                                            return (
+                                                <BookingRow
+                                                    key={b.id}
+                                                    booking={b}
+                                                    zone={timezone}
+                                                    status={rowStatus(b, now)}
+                                                    asks={asksOutcome(b, now)}
+                                                    canMark={can.book}
+                                                    marked={
+                                                        markedNow
+                                                            ? {
+                                                                  outcome:
+                                                                      markedNow,
+                                                                  undo: pending.includes(
+                                                                      markKey,
+                                                                  )
+                                                                      ? () =>
+                                                                            undo(
+                                                                                markKey,
+                                                                            )
+                                                                      : null,
+                                                              }
+                                                            : null
+                                                    }
+                                                    onMark={(o) => mark(b, o)}
+                                                    onUndo={() => undo(markKey)}
+                                                    when={whenLine(b)}
+                                                    heading={`${whoFor(b)} · ${formatDateTime(b.startAt, timezone, { relative: "lower", now })}`}
+                                                    triggerRef={(el) => {
+                                                        if (el)
+                                                            triggers.current.set(
+                                                                b.id,
+                                                                el,
+                                                            );
+                                                        else
+                                                            triggers.current.delete(
+                                                                b.id,
+                                                            );
+                                                    }}
+                                                    menu={{
+                                                        actions: items,
+                                                        takeLabel: takeLabel(b),
+                                                        personLabel:
+                                                            personLabel(b),
+                                                        openHref: `/bookings/${b.id}`,
+                                                        personHref: b.contact
+                                                            ? personHref(
+                                                                  b.contact.id,
                                                               )
-                                                                  ? () =>
-                                                                        undo(
-                                                                            markKey,
-                                                                        )
-                                                                  : null,
-                                                          }
-                                                        : null
-                                                }
-                                                onMark={(o) => mark(b, o)}
-                                                onUndo={() => undo(markKey)}
-                                                when={whenLine(b)}
-                                                heading={`${whoFor(b)} · ${formatDateTime(b.startAt, timezone, { relative: "lower", now })}`}
-                                                triggerRef={(el) => {
-                                                    if (el)
-                                                        triggers.current.set(
-                                                            b.id,
-                                                            el,
-                                                        );
-                                                    else
-                                                        triggers.current.delete(
-                                                            b.id,
-                                                        );
-                                                }}
-                                                menu={{
-                                                    actions: items,
-                                                    takeLabel: takeLabel(b),
-                                                    personLabel: personLabel(b),
-                                                    openHref: `/bookings/${b.id}`,
-                                                    personHref: b.contact
-                                                        ? personHref(
-                                                              b.contact.id,
-                                                          )
-                                                        : null,
-                                                    cancelling:
-                                                        pending.includes(
-                                                            `cancel-booking:${b.id}`,
-                                                        ),
-                                                    onArrived: () =>
-                                                        mark(b, "ATTENDED"),
-                                                    onTake: () => {
-                                                        lastRow.current = b.id;
-                                                        setTaking(b);
-                                                    },
-                                                    onMove: () => {
-                                                        lastRow.current = b.id;
-                                                        setMoving(b);
-                                                    },
-                                                    onCancel: () => {
-                                                        lastRow.current = b.id;
-                                                        setCancelling(b);
-                                                    },
-                                                }}
-                                            />
-                                        );
-                                    })}
-                                </ul>
-                            </section>
-                        ))}
-                    </ListTable>
-                    {paging}
-                </>
-            )}
+                                                            : null,
+                                                        cancelling:
+                                                            pending.includes(
+                                                                `cancel-booking:${b.id}`,
+                                                            ),
+                                                        onArrived: () =>
+                                                            mark(b, "ATTENDED"),
+                                                        onTake: () => {
+                                                            lastRow.current =
+                                                                b.id;
+                                                            setTaking(b);
+                                                        },
+                                                        onMove: () => {
+                                                            lastRow.current =
+                                                                b.id;
+                                                            setMoving(b);
+                                                        },
+                                                        onCancel: () => {
+                                                            lastRow.current =
+                                                                b.id;
+                                                            setCancelling(b);
+                                                        },
+                                                    }}
+                                                />
+                                            );
+                                        })}
+                                    </ul>
+                                </section>
+                            ))}
+                        </ListTable>
+                        {paging}
+                    </>
+                )}
+            </PendingRegion>
 
             <CancelSheet
                 open={cancelling !== null}

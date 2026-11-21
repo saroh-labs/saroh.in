@@ -13,6 +13,7 @@ import type { DayExtra } from "@/components/calendar/week-day-head";
 import { WeekHourGrid } from "@/components/calendar/week-hour-grid";
 import { WeekDay, WeekStrip } from "@/components/calendar/week-strip";
 import { WhatToShow } from "@/components/calendar/what-to-show";
+import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { dayOffLine } from "@/lib/calendar/days-off";
 import type { Off } from "@/lib/calendar/layers";
 import {
@@ -274,7 +275,7 @@ export function BusinessWeek({
             <CalendarMissing data={data} span="week" />
 
             {/* A phone: the strip of seven days and the picked day's list. */}
-            <div className="min-[760px]:hidden">
+            <PendingRegion className="min-[760px]:hidden">
                 <WeekStrip
                     days={stripDays({
                         week: shown,
@@ -325,11 +326,11 @@ export function BusinessWeek({
                         ? ""
                         : ` Tap a day for its ${on}, and tap one to open it.`}
                 </p>
-            </div>
+            </PendingRegion>
 
             {/* The desk: the grid, never drawn on a phone. */}
             {phone ? null : (
-                <div className="!mt-3.5 flex max-[759px]:hidden">
+                <PendingRegion className="!mt-3.5 flex max-[759px]:hidden">
                     {data.hasStaff ? (
                         <WeekHourGrid
                             title={title}
@@ -352,7 +353,7 @@ export function BusinessWeek({
                             onPick={pick}
                         />
                     )}
-                </div>
+                </PendingRegion>
             )}
 
             <p className="!mt-3 text-[12.5px] text-muted-foreground max-[759px]:hidden">

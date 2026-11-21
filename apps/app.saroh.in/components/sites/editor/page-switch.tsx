@@ -4,16 +4,27 @@ import { FailedState } from "@saroh/ui/data-state";
 import { couldntLoad } from "@saroh/ui/lib/state-copy";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { createContext, useContext, useState, useTransition } from "react";
+import {
+    createContext,
+    useContext,
+    useEffect,
+    useRef,
+    useState,
+    useTransition,
+} from "react";
 
 import { PageLoading } from "@/components/shared/page/page-loading";
+import {
+    armFullLoadCatch,
+    resetRouterAfterCatch,
+} from "@/lib/navigation/caught-full-load";
 
 interface PageSwitch {
     /** Open another page of the site: a client navigation, in a transition. */
     open: (pageId: string) => void;
     /** The next page is on its way: the canvas and inspector grey. */
     pending: boolean;
-    /** It couldn't be fetched (offline): the canvas says so, with Try again. */
+    /** It couldn't be fetched: the canvas says so, with Try again. */
     failed: boolean;
     retry: () => void;
 }
@@ -24,10 +35,11 @@ const PageSwitchContext = createContext<PageSwitch | null>(null);
  * Opening another page of the site editor (`?page=`). The navigation runs
  * in a transition, so the editor stays on screen with its canvas and
  * inspector grey until the page lands (Next: "useTransition" with
- * `router.push`), never a whole-screen loader. Offline, the fetch would fail
- * and Next would fall back to a full page load, the browser's own error
- * page: so it isn't tried, and the canvas says "Couldn't load this page"
- * with Try again instead.
+ * `router.push`), never a whole-screen loader. When the page can't be
+ * fetched, Next would fall back to a full page load (the browser's own error
+ * page offline): a known-offline browser isn't tried, and a fetch that fails
+ * while "online" is caught (`caught-full-load.ts`). Either way the canvas
+ * says "Couldn't load this page" with Try again, and the frame stays.
  */
 export function PageSwitchProvider({
     siteId,
@@ -39,16 +51,41 @@ export function PageSwitchProvider({
     const router = useRouter();
     const [pending, startTransition] = useTransition();
     const [failedFor, setFailedFor] = useState<string | null>(null);
+    const disarm = useRef<(() => void) | null>(null);
+    // Pages whose load was caught once: a second failure is let through to
+    // Next's full load, so a sign-in or a new deploy still gets there.
+    const caughtOnce = useRef(new Set<string>());
     const open = (pageId: string) => {
-        // shortcut: only a known-offline browser is caught; a request that
-        // fails while "online" still falls back to Next's full page load.
         if (typeof navigator !== "undefined" && !navigator.onLine) {
             setFailedFor(pageId);
             return;
         }
         setFailedFor(null);
-        startTransition(() => router.push(`/sites/${siteId}?page=${pageId}`));
+        const href = `/sites/${siteId}?page=${pageId}`;
+        disarm.current?.();
+        disarm.current = caughtOnce.current.has(pageId)
+            ? null
+            : armFullLoadCatch(
+                  (url) =>
+                      url.pathname === `/sites/${siteId}` &&
+                      url.searchParams.get("page") === pageId,
+                  () => {
+                      disarm.current = null;
+                      caughtOnce.current.add(pageId);
+                      setFailedFor(pageId);
+                      // The address never moved: Next draws this page again
+                      // and the transition ends.
+                      resetRouterAfterCatch();
+                  },
+              );
+        startTransition(() => router.push(href));
     };
+    // The page landed (or was caught): nothing left to catch.
+    useEffect(() => {
+        if (pending) return;
+        disarm.current?.();
+        disarm.current = null;
+    }, [pending]);
     return (
         <PageSwitchContext.Provider
             value={{
@@ -88,6 +125,17 @@ export function PageRegion({
     children: ReactNode;
 }) {
     const ctx = useContext(PageSwitchContext);
+    if (ctx?.failed && shape === "canvas") {
+        return (
+            <div className="grid min-h-0 place-items-center p-6">
+                <FailedState
+                    title={couldntLoad("this page")}
+                    description="Check your connection. Nothing you wrote is lost."
+                    onRetry={ctx.retry}
+                />
+            </div>
+        );
+    }
     if (ctx?.pending) {
         return (
             <PageLoading
@@ -101,17 +149,6 @@ export function PageRegion({
                         : "Loading the page's sections"
                 }
             />
-        );
-    }
-    if (ctx?.failed && shape === "canvas") {
-        return (
-            <div className="grid min-h-0 place-items-center p-6">
-                <FailedState
-                    title={couldntLoad("this page")}
-                    description="You may be offline. Nothing you wrote is lost."
-                    onRetry={ctx.retry}
-                />
-            </div>
         );
     }
     return <>{children}</>;

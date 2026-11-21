@@ -1997,3 +1997,83 @@ describe("SiteEditor narrow and phone (G4)", () => {
         expect(button("Move block down").disabled).toBe(true);
     });
 });
+
+describe("SiteEditor from page to page (the frame stays)", () => {
+    // The page's props for another page of the same site, as `?page=` hands them.
+    const about = [hero("a1", "About us")];
+    function openAbout(props: Props, overrides: Partial<Props> = {}) {
+        act(() => {
+            root.render(
+                <SiteEditor
+                    {...props}
+                    pageId="p-about"
+                    initialSections={about}
+                    initialRevision={7}
+                    {...overrides}
+                />,
+            );
+        });
+    }
+
+    it("keeps the bar and rail mounted; the page's blocks, draft and Undo start again", async () => {
+        const props = render();
+        const crumbs = $("nav[aria-label=Breadcrumb]");
+        const rail = $("[role=tablist][aria-label='Editor panels']");
+        // An edit on Home, saved: one step of Undo history.
+        click(button(/Visible$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+
+        openAbout(props);
+        // The frame's nodes are the same ones: nothing was rebuilt.
+        expect($("nav[aria-label=Breadcrumb]")).toBe(crumbs);
+        expect($("[role=tablist][aria-label='Editor panels']")).toBe(rail);
+        // The page's part is About's: its block, nothing unsaved.
+        expect(
+            button(/^Page: About\. Choose another page to edit$/),
+        ).toBeTruthy();
+        expect(button("About us", true)).not.toBeNull();
+        expect(button("Welcome in", true)).toBeNull();
+        expect(host.textContent).toContain("3 blocks");
+        expect(button("Undo", true)?.disabled ?? true).toBe(true);
+
+        // An edit on About saves to About, at About's revision.
+        click(button(/Visible$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(2);
+        const [, pageId, sent, revision] = actions.saveDraftSections.mock
+            .calls[1] as [string, string, Section[], number];
+        expect(pageId).toBe("p-about");
+        expect(revision).toBe(7);
+        expect(sent.map((s) => s.key)).toEqual(["a1"]);
+    });
+
+    it("drops a save for the last page that lands after another page opened", async () => {
+        let land: (v: unknown) => void = () => undefined;
+        actions.saveDraftSections.mockImplementationOnce(
+            () => new Promise((resolve) => (land = resolve)),
+        );
+        const props = render();
+        click(button(/Visible$/));
+        await wait(1500);
+        expect(actions.saveDraftSections).toHaveBeenCalledTimes(1);
+
+        openAbout(props);
+        await act(async () => {
+            land({
+                ok: true,
+                data: { revision: 99, pendingSectionChanges: 1 },
+            });
+            await Promise.resolve();
+        });
+        // About is still About, unsaved nothing, and keeps its own revision.
+        expect(button("About us", true)).not.toBeNull();
+        expect(button("Publish").disabled).toBe(false);
+        click(button(/Visible$/));
+        await wait(1500);
+        const [, pageId, , revision] = actions.saveDraftSections.mock
+            .calls[1] as [string, string, Section[], number];
+        expect(pageId).toBe("p-about");
+        expect(revision).toBe(7);
+    });
+});

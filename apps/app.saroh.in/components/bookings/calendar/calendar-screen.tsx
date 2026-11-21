@@ -23,6 +23,10 @@ import { NewBookingFromGap } from "@/components/bookings/free-time/new-booking-f
 import { OpenHoursDialog } from "@/components/bookings/free-time/open-hours-dialog";
 import { useGapTargets } from "@/components/bookings/free-time/use-gap-targets";
 import { BookingQuickLook } from "@/components/bookings/quick-look/booking-quick-look";
+import {
+    PendingRegion,
+    useScreenGo,
+} from "@/components/shared/page/screen-pending";
 import { PROFILE } from "@/lib/edition";
 import { TextLink } from "@saroh/ui/text-link";
 import { AddPersonDialog } from "../availability/add-person-dialog";
@@ -33,6 +37,7 @@ import {
     NobodyTakesBookings,
     ServiceHoursNote,
 } from "./day-states";
+
 import { CalendarHeader } from "./header/calendar-header";
 import { useSwipe } from "./header/use-swipe";
 import { ListView } from "./list/list-view";
@@ -231,8 +236,9 @@ export function CalendarScreen({
 
     const hrefFor = (l: CalendarLayout, d: LocalDate, who = person) =>
         calendarHref(l, d, { cancelled: cancelledShown, person: who });
-    const go = (l: CalendarLayout, d: LocalDate) =>
-        router.push(hrefFor(l, d), { scroll: false });
+    // In the screen's transition: the diary greys, the header stays.
+    const screenGo = useScreenGo();
+    const go = (l: CalendarLayout, d: LocalDate) => screenGo(hrefFor(l, d));
     const step = inWeek ? 7 : 1;
     const swipe = useSwipe({
         onPrevious: () => go(layout, addDays(date, -step)),
@@ -290,144 +296,151 @@ export function CalendarScreen({
                 calOnly={!can.book}
                 onAddPerson={addPerson}
             />
-            <div className="max-[759px]:touch-pan-y" {...swipe}>
-                {limitNotice ? <div className="mb-3">{limitNotice}</div> : null}
-                {staff === null ? (
-                    <PartialRead
-                        className="mb-3"
-                        things="hours and time off"
-                        so="Open and closed times aren't shown. The bookings below are complete."
-                    />
-                ) : null}
+            <PendingRegion>
+                <div className="max-[759px]:touch-pan-y" {...swipe}>
+                    {limitNotice ? (
+                        <div className="mb-3">{limitNotice}</div>
+                    ) : null}
+                    {staff === null ? (
+                        <PartialRead
+                            className="mb-3"
+                            things="hours and time off"
+                            so="Open and closed times aren't shown. The bookings below are complete."
+                        />
+                    ) : null}
 
-                {nobodyYet && ownHours ? (
-                    // How the one column works, said once, with the action.
-                    <ServiceHoursNote onAdd={addPerson} />
-                ) : nobodyYet && layout === "day" ? (
-                    <div className="mb-3">
-                        <NobodyTakesBookings onAdd={addPerson} />
-                    </div>
-                ) : nobodyYet ? (
-                    <p className="mb-3 text-[12.5px] text-muted-foreground">
-                        Nobody is on the diary and no service has hours of its
-                        own yet, so customers have no free times to book.{" "}
-                        {addPerson ? (
-                            <TextLink
-                                data-ph-unmask=""
-                                onClick={addPerson}
-                                className="coarse:min-h-11"
-                            >
-                                Add who takes bookings
-                            </TextLink>
-                        ) : null}
-                    </p>
-                ) : null}
-                {layout === "day" ? (
-                    <>
-                        {firstDay ? (
-                            <FirstDayHelp
-                                name={firstDayName(columns)}
-                                hoursHref={
-                                    can.hours
-                                        ? shownPerson
-                                            ? `/bookings/availability?person=${encodeURIComponent(shownPerson)}`
-                                            : "/bookings/availability"
-                                        : null
-                                }
-                            />
-                        ) : null}
-                        {columns.length ? (
-                            <DayByPerson
-                                columns={columns}
-                                span={span}
-                                today={date === today}
-                                timezone={timezone}
-                                sightKey={`day:${date}`}
-                                everyone={person === EVERYONE}
-                                selected={peek}
-                                canBook={can.book}
-                                canOpenHours={can.hours}
-                                dayText={formatDay(date, {
-                                    weekday: "short",
-                                    year: "never",
-                                })}
-                                onBlock={peekFromDay}
-                                onFree={bookGap}
-                                onClosed={openClosed}
-                            />
-                        ) : (
+                    {nobodyYet && ownHours ? (
+                        // How the one column works, said once, with the action.
+                        <ServiceHoursNote onAdd={addPerson} />
+                    ) : nobodyYet && layout === "day" ? (
+                        <div className="mb-3">
                             <NobodyTakesBookings onAdd={addPerson} />
-                        )}
-                        {columns.length ? <DayFoot first={firstDay} /> : null}
-                    </>
-                ) : null}
-
-                {layout === "week" ? (
-                    <>
-                        <div className="max-[759px]:hidden">
-                            <WeekView
-                                days={week}
-                                span={span}
-                                timezone={timezone}
-                                sightKey={`week:${weekStart}`}
-                                selected={peek}
-                                canBook={can.book}
-                                canOpenHours={can.hours}
-                                offersFree={offersFree}
-                                onDay={(d) => go("day", d)}
-                                onBlock={(b) => setPeek(b.key)}
-                                onFree={bookGap}
-                                onOpenDay={openDay}
-                            />
                         </div>
-                        <div className="min-[760px]:hidden">
-                            <WeekPhone
-                                days={week}
-                                date={date}
-                                person={
-                                    person === EVERYONE
-                                        ? null
-                                        : (staffById.get(person)?.name ??
-                                          columns.at(0)?.name ??
-                                          null)
-                                }
-                                canBook={can.book}
-                                canOpenHours={can.hours}
-                                offersFree={offersFree}
-                                selected={peek}
-                                onPick={(d) => go("week", d)}
-                                onBlock={(b) => setPeek(b.key)}
-                                onFree={bookGap}
-                                onOpenDay={openDay}
-                            />
-                        </div>
-                    </>
-                ) : null}
+                    ) : nobodyYet ? (
+                        <p className="mb-3 text-[12.5px] text-muted-foreground">
+                            Nobody is on the diary and no service has hours of
+                            its own yet, so customers have no free times to
+                            book.{" "}
+                            {addPerson ? (
+                                <TextLink
+                                    data-ph-unmask=""
+                                    onClick={addPerson}
+                                    className="coarse:min-h-11"
+                                >
+                                    Add who takes bookings
+                                </TextLink>
+                            ) : null}
+                        </p>
+                    ) : null}
+                    {layout === "day" ? (
+                        <>
+                            {firstDay ? (
+                                <FirstDayHelp
+                                    name={firstDayName(columns)}
+                                    hoursHref={
+                                        can.hours
+                                            ? shownPerson
+                                                ? `/bookings/availability?person=${encodeURIComponent(shownPerson)}`
+                                                : "/bookings/availability"
+                                            : null
+                                    }
+                                />
+                            ) : null}
+                            {columns.length ? (
+                                <DayByPerson
+                                    columns={columns}
+                                    span={span}
+                                    today={date === today}
+                                    timezone={timezone}
+                                    sightKey={`day:${date}`}
+                                    everyone={person === EVERYONE}
+                                    selected={peek}
+                                    canBook={can.book}
+                                    canOpenHours={can.hours}
+                                    dayText={formatDay(date, {
+                                        weekday: "short",
+                                        year: "never",
+                                    })}
+                                    onBlock={peekFromDay}
+                                    onFree={bookGap}
+                                    onClosed={openClosed}
+                                />
+                            ) : (
+                                <NobodyTakesBookings onAdd={addPerson} />
+                            )}
+                            {columns.length ? (
+                                <DayFoot first={firstDay} />
+                            ) : null}
+                        </>
+                    ) : null}
 
-                {layout === "agenda" ? (
-                    <ListView
-                        blocks={dayBlocks}
-                        columns={columns}
-                        staff={staff}
-                        person={
-                            person === EVERYONE
-                                ? null
-                                : (columns[0]?.name ?? null)
-                        }
-                        date={date}
-                        today={today}
-                        now={now}
-                        timezone={timezone}
-                        selected={peek}
-                        canBook={can.book}
-                        canHours={can.hours}
-                        share={share}
-                        onBlock={peekFromDay}
-                        onFree={bookGap}
-                        onOpenDay={() => openDay(date)}
-                    />
-                ) : null}
-            </div>
+                    {layout === "week" ? (
+                        <>
+                            <div className="max-[759px]:hidden">
+                                <WeekView
+                                    days={week}
+                                    span={span}
+                                    timezone={timezone}
+                                    sightKey={`week:${weekStart}`}
+                                    selected={peek}
+                                    canBook={can.book}
+                                    canOpenHours={can.hours}
+                                    offersFree={offersFree}
+                                    onDay={(d) => go("day", d)}
+                                    onBlock={(b) => setPeek(b.key)}
+                                    onFree={bookGap}
+                                    onOpenDay={openDay}
+                                />
+                            </div>
+                            <div className="min-[760px]:hidden">
+                                <WeekPhone
+                                    days={week}
+                                    date={date}
+                                    person={
+                                        person === EVERYONE
+                                            ? null
+                                            : (staffById.get(person)?.name ??
+                                              columns.at(0)?.name ??
+                                              null)
+                                    }
+                                    canBook={can.book}
+                                    canOpenHours={can.hours}
+                                    offersFree={offersFree}
+                                    selected={peek}
+                                    onPick={(d) => go("week", d)}
+                                    onBlock={(b) => setPeek(b.key)}
+                                    onFree={bookGap}
+                                    onOpenDay={openDay}
+                                />
+                            </div>
+                        </>
+                    ) : null}
+
+                    {layout === "agenda" ? (
+                        <ListView
+                            blocks={dayBlocks}
+                            columns={columns}
+                            staff={staff}
+                            person={
+                                person === EVERYONE
+                                    ? null
+                                    : (columns[0]?.name ?? null)
+                            }
+                            date={date}
+                            today={today}
+                            now={now}
+                            timezone={timezone}
+                            selected={peek}
+                            canBook={can.book}
+                            canHours={can.hours}
+                            share={share}
+                            onBlock={peekFromDay}
+                            onFree={bookGap}
+                            onOpenDay={() => openDay(date)}
+                        />
+                    ) : null}
+                </div>
+            </PendingRegion>
 
             <BookingQuickLook
                 block={peekBlock}

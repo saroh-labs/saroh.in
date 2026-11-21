@@ -1,7 +1,6 @@
 "use client";
 
 import { cn } from "@saroh/ui/lib/utils";
-import { useRouter } from "next/navigation";
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
 import { usePhone } from "@/components/bookings/calendar/header/use-phone";
@@ -13,6 +12,10 @@ import { dayButton, MonthGrid } from "@/components/calendar/month-grid";
 import { ExportMonth, MonthStrip } from "@/components/calendar/month-strip";
 import { MonthToolbar } from "@/components/calendar/month-toolbar";
 import { WhatToShow } from "@/components/calendar/what-to-show";
+import {
+    PendingRegion,
+    useScreenGo,
+} from "@/components/shared/page/screen-pending";
 import { cellOff, dayOffLine } from "@/lib/calendar/days-off";
 import { askedDay } from "@/lib/calendar/grid-keys";
 import type { Off } from "@/lib/calendar/layers";
@@ -93,7 +96,7 @@ export function BusinessCalendar({
     /** `?team=`: the person the team filter opens on (E24). */
     team?: string;
 }) {
-    const router = useRouter();
+    const screenGo = useScreenGo();
     // Every layer the month has keeps its switch while one person is picked.
     const layers = layersFor(data);
     const range = calendarRange(data.joinedAt, thisMonth);
@@ -155,7 +158,7 @@ export function BusinessCalendar({
             setSelected(date);
             return;
         }
-        router.push(hrefFor(m, date), { scroll: false });
+        screenGo(hrefFor(m, date));
     };
 
     const shortcuts = day
@@ -250,7 +253,7 @@ export function BusinessCalendar({
 
             <CalendarMissing data={data} span="month" />
 
-            <div className="!mt-3.5 grid gap-[18px] min-[1100px]:grid-cols-[minmax(0,1fr)_360px] min-[1100px]:items-start">
+            <PendingRegion className="!mt-3.5 grid gap-[18px] min-[1100px]:grid-cols-[minmax(0,1fr)_360px] min-[1100px]:items-start">
                 <MonthGrid
                     month={data.month}
                     days={shown.days}
@@ -283,7 +286,7 @@ export function BusinessCalendar({
                         true,
                     )}
                 </aside>
-            </div>
+            </PendingRegion>
 
             {empty ? (
                 <p className="!mt-2.5 text-[12.5px] text-muted-foreground">

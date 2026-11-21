@@ -14,6 +14,7 @@ import {
     flowStaff,
 } from "@/components/bookings/new-booking/setup";
 import { PageContainer } from "@/components/shared/page/page-container";
+import { ScreenPending } from "@/components/shared/page/screen-pending";
 import { ShareLinkButton } from "@/components/shared/share-link/share-link-button";
 import { takesOnlinePayment } from "@/lib/billing/access";
 import { canReadPacks, canUsePacksOnBookings } from "@/lib/class-packs/access";
@@ -215,65 +216,70 @@ export default async function BookingsPage({
         canReadPacks(organization) &&
         canUsePacksOnBookings(organization) &&
         packsOn(await modulesOrUnknown());
+    // A day, a week, a person: only the diary greys (`ScreenPending`).
     const screen = (
-        <CalendarScreen
-            layout={layout}
-            date={date}
-            today={today}
-            now={now}
-            timezone={calendar.timezone || timezone}
-            calendar={calendar}
-            staff={staffList?.staff ?? null}
-            services={services}
-            rules={rules}
-            notices={notices}
-            limitNotice={<PlanLimitNotice moduleId="bookings" />}
-            serviceHours={serviceHours}
-            // Cancelled bookings stay off the diary unless the address
-            // asks for them, so a reload keeps the choice.
-            showCancelled={params.cancelled === "1"}
-            person={person}
-            opens={opens}
-            me={mine ? { id: mine.id, name: mine.name } : null}
-            share={
-                share ? <ShareLinkButton link={share} className="mt-0" /> : null
-            }
-            // Nothing chose the view: a phone moves to List (Q4, U6).
-            listFirst={nothingChoseView(chosen)}
-            // A booked message names the business (U9, Q12).
-            business={organization?.name ?? null}
-            people={people}
-            can={{
-                book: may("booking:write"),
-                // Open or block time: a Member keeps anyone's hours
-                // (DEC-170, Q13); adding people stays `service:write`.
-                hours: may("hours:write"),
-                addPeople: may("service:write"),
-                order: may("order:read"),
-                // Refund what a late cancel keeps, or keep what the
-                // policy returns (DEC-170, Q14).
-                refund: may("payment:manage"),
-                // "Take ₹X" (P2): the pair a payment link needs, and the
-                // link itself only where the plan and a provider take it.
-                desk: {
-                    canTake: canTakeDeskPayments(organization),
-                    canLink: people.payLink,
-                    online: takesOnlinePayment(await billingAccessOrNull()),
-                },
-            }}
-            newBooking={
-                may("booking:write") ? (
-                    <NewBookingButton
-                        // Keyed: it renders among the screen's own children.
-                        key="new-booking"
-                        // Beside "…" on the desk; on a phone it floats
-                        // over the calendar, above the tab bar (U2).
-                        className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]"
-                        date={params.date === undefined ? null : date}
-                    />
-                ) : null
-            }
-        />
+        <ScreenPending>
+            <CalendarScreen
+                layout={layout}
+                date={date}
+                today={today}
+                now={now}
+                timezone={calendar.timezone || timezone}
+                calendar={calendar}
+                staff={staffList?.staff ?? null}
+                services={services}
+                rules={rules}
+                notices={notices}
+                limitNotice={<PlanLimitNotice moduleId="bookings" />}
+                serviceHours={serviceHours}
+                // Cancelled bookings stay off the diary unless the address
+                // asks for them, so a reload keeps the choice.
+                showCancelled={params.cancelled === "1"}
+                person={person}
+                opens={opens}
+                me={mine ? { id: mine.id, name: mine.name } : null}
+                share={
+                    share ? (
+                        <ShareLinkButton link={share} className="mt-0" />
+                    ) : null
+                }
+                // Nothing chose the view: a phone moves to List (Q4, U6).
+                listFirst={nothingChoseView(chosen)}
+                // A booked message names the business (U9, Q12).
+                business={organization?.name ?? null}
+                people={people}
+                can={{
+                    book: may("booking:write"),
+                    // Open or block time: a Member keeps anyone's hours
+                    // (DEC-170, Q13); adding people stays `service:write`.
+                    hours: may("hours:write"),
+                    addPeople: may("service:write"),
+                    order: may("order:read"),
+                    // Refund what a late cancel keeps, or keep what the
+                    // policy returns (DEC-170, Q14).
+                    refund: may("payment:manage"),
+                    // "Take ₹X" (P2): the pair a payment link needs, and the
+                    // link itself only where the plan and a provider take it.
+                    desk: {
+                        canTake: canTakeDeskPayments(organization),
+                        canLink: people.payLink,
+                        online: takesOnlinePayment(await billingAccessOrNull()),
+                    },
+                }}
+                newBooking={
+                    may("booking:write") ? (
+                        <NewBookingButton
+                            // Keyed: it renders among the screen's own children.
+                            key="new-booking"
+                            // Beside "…" on the desk; on a phone it floats
+                            // over the calendar, above the tab bar (U2).
+                            className="max-[759px]:fixed max-[759px]:bottom-[calc(16px+var(--tab-bar-inset,0px))] max-[759px]:right-4 max-[759px]:z-30 max-[759px]:h-14 max-[759px]:rounded-full max-[759px]:pl-4 max-[759px]:pr-5 max-[759px]:text-[15px] max-[759px]:shadow-xl min-[760px]:h-11 min-[760px]:px-[18px] min-[760px]:text-[14.5px]"
+                            date={params.date === undefined ? null : date}
+                        />
+                    ) : null
+                }
+            />
+        </ScreenPending>
     );
     return (
         <PageContainer width="full">

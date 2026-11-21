@@ -96,6 +96,30 @@ export function useEditorDraft({
     const stamping = useRef(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+    /*
+     * Another page opened under the same editor (the frame stays mounted
+     * across `?page=`): everything here is the page's, so it starts again
+     * from the new page's sections. Adjusted while rendering, as React
+     * advises for state that follows a prop. A save still in flight for the
+     * last page is dropped when it lands (`pageNow`).
+     */
+    const pageNow = useRef(pageId);
+    const [seededFor, setSeededFor] = useState(pageId);
+    if (seededFor !== pageId) {
+        setSeededFor(pageId);
+        setSections(initialSections);
+        setSavedSections(initialSections);
+        setRevision(initialRevision);
+        setSaving(false);
+        setErrorIndex(null);
+        setErrorMessage(null);
+        setLastSavedAt(null);
+        setSaveError(false);
+        setConflict(false);
+        setConflictBy(null);
+        setConflictYou(false);
+    }
+
     const sectionsJson = JSON.stringify(sections);
     const dirty = sectionsJson !== lastSavedJson;
     /*
@@ -235,6 +259,10 @@ export function useEditorDraft({
      * timer, and nothing on screen reads it.
      */
     const failedJson = useRef<string | null>(null);
+    useEffect(() => {
+        pageNow.current = pageId;
+        failedJson.current = null;
+    }, [pageId]);
 
     /** Save now; true once the server holds what is on screen. */
     async function onSave(auto = false): Promise<boolean> {
@@ -255,6 +283,8 @@ export function useEditorDraft({
             // Said below, as any other failed sync is.
             { quiet: true },
         )) ?? { ok: false as const, index: 0, error: UNREACHED };
+        // The page changed while the forms synced: this save was the last page's.
+        if (pageNow.current !== pageId) return false;
         if (!synced.ok) {
             setSaving(false);
             // Not saved, and the bar has to say so (#281). A failed form sync
@@ -318,6 +348,8 @@ export function useEditorDraft({
             ok: false as const,
             error: "Couldn't reach Saroh.",
         }));
+        // Another page opened while this one saved: nothing here is its.
+        if (pageNow.current !== pageId) return res.ok;
         setSaving(false);
         if (res.ok) {
             failedJson.current = null;

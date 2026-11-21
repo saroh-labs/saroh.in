@@ -1,14 +1,14 @@
 "use client";
 
-import type { Option } from "@saroh/ui/option-select";
-import { useRouter } from "next/navigation";
-
 import { ListFilter } from "@/components/shared/lists/list-toolbar";
+import { useScreenGo } from "@/components/shared/page/screen-pending";
+import type { Option } from "@saroh/ui/option-select";
 
 /**
  * A list's dropdown filter whose every choice is an address the server
  * draws: for a server component, which can hand down addresses but not a
- * function. Choosing one goes there, without scrolling.
+ * function. Choosing one goes there, without scrolling, in the screen's
+ * transition when it has one (`ScreenPending`), so its rows grey meanwhile.
  */
 export function LinkFilter<V extends string>({
     label,
@@ -19,7 +19,7 @@ export function LinkFilter<V extends string>({
     value: V;
     options: readonly (Option<V> & { href: string })[];
 }) {
-    const router = useRouter();
+    const go = useScreenGo();
     return (
         <ListFilter
             label={label}
@@ -27,7 +27,7 @@ export function LinkFilter<V extends string>({
             options={options}
             onValueChange={(v) => {
                 const to = options.find((o) => o.value === v)?.href;
-                if (to) router.push(to, { scroll: false });
+                if (to) go(to);
             }}
         />
     );

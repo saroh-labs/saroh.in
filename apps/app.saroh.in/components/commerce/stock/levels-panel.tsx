@@ -1,5 +1,6 @@
 "use client";
 
+import { useScreenGo } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
 import Link from "next/link";
@@ -61,6 +62,8 @@ export function LevelsPanel({
     paging: StockListPage;
 }) {
     const router = useRouter();
+    // Filters and pages in the screen's transition: the rows grey.
+    const go = useScreenGo();
 
     // The search follows typing into the address, a beat behind.
     const [searching, startSearch] = useTransition();
@@ -83,9 +86,7 @@ export function LevelsPanel({
         ...allStorefronts.map((s) => ({ value: s.id, label: s.name })),
     ];
     const show_ = (id: string) =>
-        router.push(href({ show: id === "all" ? undefined : id }), {
-            scroll: false,
-        });
+        go(href({ show: id === "all" ? undefined : id }));
 
     const soldOutWords = (ids: string[] | undefined) => {
         if (!ids?.length) return null;
@@ -124,11 +125,7 @@ export function LevelsPanel({
                 }
                 onClear={
                     q || show !== "all"
-                        ? () =>
-                              router.push(
-                                  href({ q: undefined, show: undefined }),
-                                  { scroll: false },
-                              )
+                        ? () => go(href({ q: undefined, show: undefined }))
                         : undefined
                 }
                 attention={
@@ -199,7 +196,7 @@ export function LevelsPanel({
                 to={(n) => ({ href: href({ page: n }) })}
                 onSize={(size) => {
                     rememberPageSize(STOCK_LISTS.levels, size);
-                    router.push(href({ size }), { scroll: false });
+                    go(href({ size }));
                 }}
             />
 

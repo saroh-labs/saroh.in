@@ -1,5 +1,6 @@
 "use client";
 
+import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { count, plural } from "@/lib/format/plural";
 import { pagesOf } from "@saroh/ui/lib/paging";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
@@ -453,8 +454,9 @@ export function CatalogueScreen({
             <>{tabs}</>
             <>{notice}</>
             <>{collectionsPanel}</>
-            <div
-                aria-busy={navigating}
+            <PendingRegion
+                pending={navigating}
+                rows
                 // A phone: search and Filters share one row (HPProductsPhone).
                 className="pt-0.5 max-sm:[&_[data-slot=list-search]]:w-auto max-sm:[&_[data-slot=list-search]]:flex-1"
             >
@@ -617,7 +619,7 @@ export function CatalogueScreen({
                         },
                     }}
                 />
-            </div>
+            </PendingRegion>
 
             <QuickLook
                 row={open}

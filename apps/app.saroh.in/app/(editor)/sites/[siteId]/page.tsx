@@ -169,11 +169,10 @@ export default async function SiteEditorPage({
     // meant to simulate.
     return (
         <SiteEditorHost
-            // Keyed on the page so switching pages remounts the editor with
-            // that page's sections. Without it the new sections would arrive as
-            // props into state seeded from the old ones, and the merchant would
-            // see the previous page's content under the new page's name.
-            key={activePage.id}
+            // Not keyed on the page: the editor's frame stays mounted from
+            // page to page, and the page's own state (draft, Undo, canvas)
+            // starts again from these props when `pageId` changes
+            // (`use-editor-draft.ts`, `use-undo.ts`).
             siteId={siteId}
             pageId={activePage.id}
             pages={site.pages}

@@ -191,6 +191,25 @@ export function useUndo({
         push(step(doc, before, value, true));
     }
 
+    /*
+     * Another page opened under the same editor (its frame stays mounted
+     * across `?page=`): the history is the page's, so it starts again, and
+     * the new page's sections are where it starts from, not a step. Before
+     * the observers below, which run after it in the same commit.
+     */
+    const historyFor = useRef(carryKey);
+    useEffect(() => {
+        if (historyFor.current === carryKey) return;
+        historyFor.current = carryKey;
+        history.past = [];
+        history.future = [];
+        seen.current = { sections, style };
+        expected.current = null;
+        closeToast();
+        changed();
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once per page
+    }, [carryKey]);
+
     useEffect(() => observe("sections", sections));
     useEffect(() => observe("style", style));
 

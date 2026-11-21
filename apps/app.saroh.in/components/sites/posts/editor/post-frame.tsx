@@ -1,15 +1,21 @@
 "use client";
 
+import { couldntLoad, couldntLoadLine } from "@saroh/ui/lib/state-copy";
+import { showError } from "@saroh/ui/toast";
 import type { Editor } from "@tiptap/react";
 import type { ReactNode } from "react";
 import {
     createContext,
     useCallback,
     useContext,
+    useEffect,
     useLayoutEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
+
+import { FailedState } from "@saroh/ui/data-state";
 
 import { PageLoading } from "@/components/shared/page/page-loading";
 import { PanelDivider } from "@/components/sites/editor/editor-chrome";
@@ -22,6 +28,10 @@ import {
 } from "@/components/sites/editor/shell/right-column";
 import { useEditorLayout } from "@/components/sites/editor/use-editor-layout";
 import { AddList } from "@/components/sites/rich-text/writing-menus";
+import {
+    armFullLoadCatch,
+    resetRouterAfterCatch,
+} from "@/lib/navigation/caught-full-load";
 
 import {
     POST_HISTORY_READY,
@@ -59,6 +69,10 @@ interface PostFrameControls {
     show: (live: PostLive | null) => void;
     /** No post is coming: it failed (the frame stays), or a refusal (it goes). */
     away: (mode: FrameMode) => void;
+    /** The next post's fetch failed (caught, not a full page load). */
+    caught: boolean;
+    /** Try it again, in place; a second failure loads the page in full. */
+    retry: () => void;
 }
 
 type FrameMode = "post" | "failed" | "off";
@@ -108,6 +122,48 @@ export function PostFrame({ children }: { children: ReactNode }) {
         setPreviewing(false);
     }
 
+    /*
+     * A post's fetch failing while "online" (owner, 21 Nov): Next would load
+     * the whole page instead, so the frame catches it (`caught-full-load.ts`).
+     * With the loader up, the writing surface says "Couldn't load this post"
+     * with Try again; with the last post still up (nothing had moved), it
+     * stays, and a toast says the other one didn't open.
+     */
+    const [caught, setCaught] = useState(false);
+    const siteId = (live?.model.data ?? site)?.siteId ?? null;
+    const onScreen = useRef(false);
+    const letThrough = useRef(false);
+    // Each catch disarms itself: the next round arms again.
+    const [round, nextRound] = useState(0);
+    useEffect(() => {
+        if (!siteId || caught) return;
+        return armFullLoadCatch(
+            (url) =>
+                !letThrough.current &&
+                url.pathname.startsWith(`/sites/${siteId}/write/`),
+            () => {
+                if (onScreen.current) {
+                    showError(
+                        `${couldntLoadLine("that post")} Check your connection.`,
+                    );
+                    resetRouterAfterCatch();
+                    nextRound((n) => n + 1);
+                    return;
+                }
+                setCaught(true);
+            },
+        );
+    }, [siteId, caught, round]);
+    useEffect(() => {
+        onScreen.current = live !== null;
+        if (live) letThrough.current = false;
+    }, [live]);
+    const retry = useCallback(() => {
+        letThrough.current = true;
+        setCaught(false);
+        resetRouterAfterCatch();
+    }, []);
+
     const show = useCallback((next: PostLive | null) => {
         setLive(next);
         if (next) setSite(next.model.data);
@@ -117,8 +173,17 @@ export function PostFrame({ children }: { children: ReactNode }) {
         setEditing("cover");
     }, []);
     const controls = useMemo(
-        () => ({ previewing, toolbar, setToolbar, openCover, show, away }),
-        [previewing, toolbar, openCover, show],
+        () => ({
+            previewing,
+            toolbar,
+            setToolbar,
+            openCover,
+            show,
+            away,
+            caught,
+            retry,
+        }),
+        [previewing, toolbar, openCover, show, caught, retry],
     );
 
     const model = live?.model ?? null;
@@ -148,7 +213,7 @@ export function PostFrame({ children }: { children: ReactNode }) {
     }
 
     // A post is on its way: grey where it will be. It failed: nothing.
-    const busy = mode === "post";
+    const busy = mode === "post" && !caught;
     const regionLoading = (label: string) =>
         busy ? (
             <PageLoading shape="inspector" width="full" bare label={label} />
@@ -190,6 +255,8 @@ export function PostFrame({ children }: { children: ReactNode }) {
                 {chrome ? (
                     <PostTopBar
                         siteId={data?.siteId ?? null}
+                        lastReadOnly={data?.readOnly}
+                        lastPaused={data?.paused}
                         model={model}
                         busy={busy}
                         editor={live?.editor ?? null}
@@ -310,4 +377,33 @@ export function PostFrameAway({ off = false }: { off?: boolean }) {
         return () => away("post");
     }, [away, off]);
     return null;
+}
+
+/**
+ * The writing surface while a post loads (`[postId]/loading.tsx`,
+ * `new/loading.tsx`): its skeleton, or, when the fetch failed and the frame
+ * caught it, "Couldn't load this post" with Try again in the same place.
+ */
+export function PostLoading() {
+    const frame = usePostFrame();
+    if (frame?.caught) {
+        return (
+            <div className="grid min-h-0 place-items-center p-6">
+                <FailedState
+                    title={couldntLoad("this post")}
+                    description="Check your connection. Your writing is safe."
+                    onRetry={frame.retry}
+                />
+            </div>
+        );
+    }
+    return (
+        <PageLoading
+            shape="writing"
+            width="full"
+            bare
+            bodyClassName="min-h-0"
+            label="Opening the post"
+        />
+    );
 }

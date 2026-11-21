@@ -1,8 +1,8 @@
 "use client";
 
 import { Segmented } from "@saroh/ui/segmented";
-import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+
+import { useScreenGo } from "@/components/shared/page/screen-pending";
 
 export type CalendarView = "month" | "week";
 
@@ -24,12 +24,12 @@ export function ViewSwitch({
     view: CalendarView;
     hrefs: Record<CalendarView, string>;
 }) {
-    const router = useRouter();
-    const [, start] = useTransition();
+    // The screen's transition, so the grid greys until the view lands.
+    const go = useScreenGo();
 
     const open = (to: CalendarView) => {
         if (to === view) return;
-        start(() => router.push(hrefs[to], { scroll: false }));
+        go(hrefs[to]);
     };
 
     return (

@@ -1,5 +1,6 @@
 "use client";
 
+import { PendingRegion } from "@/components/shared/page/screen-pending";
 import { Button } from "@saroh/ui/button";
 import { countLabel } from "@saroh/ui/page-header";
 import { rememberPageSize } from "@saroh/ui/page-sizes";
@@ -368,7 +369,7 @@ export function OrdersScreen({
                 </div>
             ) : null}
 
-            <div aria-busy={navigating} className="pt-3.5">
+            <PendingRegion pending={navigating} className="pt-3.5">
                 {attentionUnread ? (
                     <OrdersAttentionPartial
                         onRetry={() => startNavigation(() => router.refresh())}
@@ -444,7 +445,7 @@ export function OrdersScreen({
                 {selectable ? (
                     <BulkBar selected={pick.selected} onClear={pick.clear} />
                 ) : null}
-            </div>
+            </PendingRegion>
 
             <OrderQuickView
                 row={peek}

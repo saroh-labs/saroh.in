@@ -13,6 +13,7 @@ import {
     Eye,
     FileText,
     Lock,
+    MoreHorizontal,
     Plus,
     Redo2,
     Undo2,
@@ -43,7 +44,12 @@ export function PostTopBar({
     onPublish,
     more,
     onDiscard,
+    lastReadOnly = false,
+    lastPaused = false,
 }: {
+    /** The last post's read-only and paused, kept while the next loads. */
+    lastReadOnly?: boolean;
+    lastPaused?: boolean;
     /** Null only before the first post of a visit has loaded. */
     siteId: string | null;
     /** Null while another post loads: its parts are grey, the bar stays. */
@@ -72,21 +78,35 @@ export function PostTopBar({
     ) : (
         <Skeleton aria-hidden className="ml-1.5 h-10 w-9 rounded-[9px]" />
     );
-    if (!model) {
-        // Another post on its way: the same bar, its post parts grey.
-        if (!busy) {
-            return (
-                <header data-post-bar="" className={BAR}>
-                    {back}
-                </header>
-            );
-        }
+    if (!model && !busy) {
+        // No post is coming (it failed): only the way back.
         return (
-            <header data-post-bar="" aria-busy="true" className={BAR}>
+            <header data-post-bar="" className={BAR}>
                 {back}
-                <Divider />
+            </header>
+        );
+    }
+    // While another post loads the bar stays mounted: its actions are
+    // disabled, only the title, the saved line and the status chip grey.
+    const loading = !model;
+    const readOnly = model?.data.readOnly ?? lastReadOnly;
+    const paused = model?.data.paused ?? lastPaused;
+    const draft = model?.draft;
+    const live = model?.status.startsWith("Live") ?? false;
+    return (
+        <header
+            data-post-bar=""
+            aria-busy={loading ? "true" : undefined}
+            className={BAR}
+        >
+            {back}
+            <Divider />
+            {model ? (
+                <PostPicker model={model} />
+            ) : (
                 <span
                     aria-hidden
+                    data-skeleton="title"
                     className="flex h-11 w-[300px] shrink items-center gap-2.5 rounded-[10px] border bg-card px-2.5"
                 >
                     <Skeleton className="h-5 w-12" />
@@ -95,26 +115,7 @@ export function PostTopBar({
                         <Skeleton className="h-3 w-1/2" />
                     </span>
                 </span>
-                <span className="flex-1" />
-                <Skeleton aria-hidden className="h-9 w-40 rounded-full" />
-                <Skeleton
-                    aria-hidden
-                    className="ml-2 h-10 w-28 rounded-[9px]"
-                />
-            </header>
-        );
-    }
-    const { data, draft } = model;
-    const { readOnly, paused, postsPrefix } = data;
-    const title = draft.fields.title.trim() || "New post";
-    const slug = draft.fields.slug.trim();
-    const path = slug ? `/${postsPrefix}/${slug}` : `/${postsPrefix}/`;
-    const live = model.status.startsWith("Live");
-    return (
-        <header data-post-bar="" className={BAR}>
-            {back}
-            <Divider />
-            <PostPicker model={model} title={title} path={path} />
+            )}
             {readOnly || paused ? (
                 <span
                     data-reviewing=""
@@ -123,8 +124,10 @@ export function PostTopBar({
                     <Lock aria-hidden className="size-3" />
                     Read only
                 </span>
-            ) : (
+            ) : model ? (
                 <SavedLine model={model} />
+            ) : (
+                <Skeleton aria-hidden className="ml-2 h-4 w-28" />
             )}
 
             <span className="flex-1" />
@@ -134,55 +137,72 @@ export function PostTopBar({
                     <IconButton
                         label="Undo"
                         icon={<Undo2 className="size-[18px]" />}
-                        disabled={!can.undo}
+                        disabled={loading || !can.undo}
                         onClick={() => editor?.chain().focus().undo().run()}
                         className="size-11"
                     />
                     <IconButton
                         label="Redo"
                         icon={<Redo2 className="size-[18px]" />}
-                        disabled={!can.redo}
+                        disabled={loading || !can.redo}
                         onClick={() => editor?.chain().focus().redo().run()}
                         className="size-11"
                     />
                     <Divider />
-                    <button
-                        type="button"
-                        aria-haspopup="dialog"
-                        data-status-chip=""
-                        aria-label={`${model.status}. Open Publish post`}
-                        onClick={onPublish}
-                        disabled={draft.publishing}
-                        className="flex h-9 min-w-0 shrink items-center gap-2 rounded-full border border-info-subtle-foreground/20 bg-info-subtle px-3 text-[0.8125rem] font-semibold text-info-subtle-foreground transition-colors duration-fast hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-disabled disabled:text-disabled-foreground"
-                    >
-                        <span
+                    {model ? (
+                        <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            data-status-chip=""
+                            aria-label={`${model.status}. Open Publish post`}
+                            onClick={onPublish}
+                            disabled={draft?.publishing}
+                            className="flex h-9 min-w-0 shrink items-center gap-2 rounded-full border border-info-subtle-foreground/20 bg-info-subtle px-3 text-[0.8125rem] font-semibold text-info-subtle-foreground transition-colors duration-fast hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-disabled disabled:text-disabled-foreground"
+                        >
+                            <span
+                                aria-hidden
+                                className={cn(
+                                    "size-2 shrink-0 rounded-full",
+                                    live ? "bg-success" : "bg-muted-foreground",
+                                )}
+                            />
+                            <span className="truncate">{model.status}</span>
+                        </button>
+                    ) : (
+                        <Skeleton
                             aria-hidden
-                            className={cn(
-                                "size-2 shrink-0 rounded-full",
-                                live ? "bg-success" : "bg-muted-foreground",
-                            )}
+                            className="h-9 w-24 rounded-full"
                         />
-                        <span className="truncate">{model.status}</span>
-                    </button>
+                    )}
                 </>
             )}
             <Button
                 type="button"
                 variant="ghost"
                 aria-pressed={previewing}
+                disabled={loading}
                 className="h-10 shrink-0 rounded-[9px] px-2"
                 onClick={() => onPreview(!previewing)}
             >
                 <Eye aria-hidden className="size-4" />
                 {previewing ? "Back to editing" : "Preview"}
             </Button>
-            {more}
+            {more ?? (
+                <IconButton
+                    label="More"
+                    icon={<MoreHorizontal className="size-5" />}
+                    tooltip={false}
+                    disabled
+                    className="size-11"
+                />
+            )}
             {readOnly ? null : onDiscard ? (
                 <>
                     <Button
                         type="button"
                         variant="outline"
                         className="h-10 shrink-0 rounded-[9px]"
+                        disabled={loading}
                         onClick={onDiscard}
                     >
                         Discard
@@ -190,10 +210,12 @@ export function PostTopBar({
                     <Button
                         type="button"
                         className="h-10 shrink-0 rounded-[9px] px-3.5"
-                        busy={draft.saving}
+                        disabled={loading}
+                        busy={draft?.saving}
                         busyLabel="Saving…"
                         onClick={() => {
-                            if (!model.needsTitle()) void draft.save();
+                            if (model && !model.needsTitle())
+                                void model.draft.save();
                         }}
                     >
                         Save draft
@@ -203,8 +225,8 @@ export function PostTopBar({
                 <Button
                     type="button"
                     className="h-10 shrink-0 rounded-[9px] px-3.5 text-sm"
-                    disabled={paused}
-                    busy={draft.publishing}
+                    disabled={loading || paused}
+                    busy={draft?.publishing}
                     busyLabel="Publishing…"
                     onClick={onPublish}
                 >
@@ -272,16 +294,11 @@ function SavedLine({ model }: { model: PostEditorModel }) {
  * The post picker: the kind, the title over its link. Opens the kind's
  * newest posts, New post and the whole list.
  */
-function PostPicker({
-    model,
-    title,
-    path,
-}: {
-    model: PostEditorModel;
-    title: string;
-    path: string;
-}) {
-    const { siteId, posts, readOnly } = model.data;
+function PostPicker({ model }: { model: PostEditorModel }) {
+    const { siteId, posts, readOnly, postsPrefix } = model.data;
+    const title = model.draft.fields.title.trim() || "New post";
+    const slug = model.draft.fields.slug.trim();
+    const path = slug ? `/${postsPrefix}/${slug}` : `/${postsPrefix}/`;
     const [open, setOpen] = useState(false);
     return (
         <Popover open={open} onOpenChange={setOpen}>

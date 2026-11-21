@@ -149,7 +149,14 @@ export function PagesArea({
     ).sort();
     const setQuery = (patch: Partial<PagesQuery>) => {
         const q = writePagesQuery(params, { ...query, ...patch }).toString();
-        router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+        // The page reads nothing from these: the address changes in place,
+        // no server round trip, so the list and the sheet answer at once
+        // (Next keeps `useSearchParams` in step with `replaceState`).
+        window.history.replaceState(
+            null,
+            "",
+            q ? `${pathname}?${q}` : pathname,
+        );
     };
 
     // Edited since the site last went live, or its link changed since.
@@ -168,7 +175,11 @@ export function PagesArea({
         if (pageId) next.set("page", pageId);
         else next.delete("page");
         const q = next.toString();
-        router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+        window.history.replaceState(
+            null,
+            "",
+            q ? `${pathname}?${q}` : pathname,
+        );
     };
     const url = (p: SitePage) =>
         host ? `https://${pageLink(host, p.path)}` : null;

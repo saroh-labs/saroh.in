@@ -1,4 +1,4 @@
-import { PageLoading } from "@/components/shared/page/page-loading";
+import { PostLoading } from "@/components/sites/posts/editor/post-frame";
 
 /**
  * `blogdesk/WXWStates` "Loading": only the writing surface greys. The bar,
@@ -6,13 +6,6 @@ import { PageLoading } from "@/components/shared/page/page-loading";
  * parts grey themselves until the post is here.
  */
 export default function Loading() {
-    return (
-        <PageLoading
-            shape="writing"
-            width="full"
-            bare
-            bodyClassName="min-h-0"
-            label="Opening the post"
-        />
-    );
+    // A fetch that failed is said here, the frame kept (`PostLoading`).
+    return <PostLoading />;
 }

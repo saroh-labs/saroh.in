@@ -166,7 +166,8 @@ describe("every page under the shell has a loader of its own width", () => {
             .filter((f) => !own.has(f))
             .filter(
                 (f) =>
-                    !/<(PageLoading|ShellLoading|SettingsLoading|ArrivalLoading)\b/.test(
+                    // `PostLoading` is `PageLoading`, or the post's Couldn't load.
+                    !/<(PageLoading|ShellLoading|SettingsLoading|ArrivalLoading|PostLoading)\b/.test(
                         readFileSync(path.join(APP, f), "utf8"),
                     ),
             );

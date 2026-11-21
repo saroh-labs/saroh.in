@@ -4,7 +4,7 @@
  * canvas and inspector, and offline a "Couldn't load this page" in the
  * canvas instead of the browser's own error page.
  */
-import { act } from "react";
+import { act, Suspense, useEffect, useState } from "react";
 import type { Root } from "react-dom/client";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -73,5 +73,69 @@ describe("PageSwitchProvider", () => {
         online.mockReturnValue(true);
         act(() => button("Try again")?.click());
         expect(push).toHaveBeenCalledWith("/sites/s1?page=p2");
+    });
+
+    it("a fetch that fails while online is caught in the canvas; a second one loads in full", () => {
+        const nav = new EventTarget();
+        vi.stubGlobal("navigation", nav);
+        // Next's fallback: a full load of the page it couldn't fetch.
+        const fullLoad = () => {
+            const e = new Event("navigate", { cancelable: true });
+            Object.assign(e, {
+                navigationType: "push",
+                destination: {
+                    url: new URL("/sites/s1?page=p2", location.origin).href,
+                    sameDocument: false,
+                },
+            });
+            act(() => {
+                nav.dispatchEvent(e);
+            });
+            return e.defaultPrevented;
+        };
+        // The navigation stays in flight, as a real fetch does: the
+        // transition suspends on a page that never comes.
+        const stall: { current: (on: boolean) => void } = {
+            current: () => undefined,
+        };
+        const never = new Promise<never>(() => undefined);
+        function Page() {
+            const [stalled, set] = useState(false);
+            useEffect(() => {
+                stall.current = set;
+            }, []);
+            // eslint-disable-next-line @typescript-eslint/only-throw-error -- how a page suspends
+            if (stalled) throw never;
+            return null;
+        }
+        act(() =>
+            root.render(
+                <PageSwitchProvider siteId="s1">
+                    <Opener />
+                    <Suspense fallback={null}>
+                        <Page />
+                    </Suspense>
+                    <PageRegion shape="canvas">
+                        <p>the canvas</p>
+                    </PageRegion>
+                </PageSwitchProvider>,
+            ),
+        );
+        push.mockImplementation(() => stall.current(true));
+        vi.useFakeTimers();
+        act(() => open());
+        expect(fullLoad()).toBe(true);
+        act(() => {
+            vi.runAllTimers();
+        });
+        vi.useRealTimers();
+        expect(container.textContent).toContain("Couldn't load this page");
+        expect(container.textContent).not.toContain("the canvas");
+
+        act(() => button("Try again")?.click());
+        expect(push).toHaveBeenCalledTimes(2);
+        // Tried once in place: now a sign-in or a new deploy gets through.
+        expect(fullLoad()).toBe(false);
+        vi.unstubAllGlobals();
     });
 });

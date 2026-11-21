@@ -2106,3 +2106,71 @@ describe("the capability table, row by row (U51)", () => {
         });
     });
 });
+
+/**
+ * The frame stays from page to page (`?page=`): the editor gets the next
+ * page's props without being remounted, and every capability above holds
+ * on the page it lands on, for a reader and an owner alike.
+ */
+describe("from page to page, the same editor (the frame stays)", () => {
+    const about = [
+        {
+            key: "a1",
+            type: "hero",
+            contractVersion: 1,
+            // A heading the read-only allow-list already knows.
+            content: { heading: "Our story" },
+        },
+    ] as Props["initialSections"];
+    // The next page's props, as the server hands them after `?page=`.
+    const openAbout = (props: Props) =>
+        act(() =>
+            root.render(
+                <SiteEditor
+                    {...props}
+                    pageId="p-about"
+                    initialSections={about}
+                />,
+            ),
+        );
+
+    it("a reader stays read-only on the next page, and it counts as read", () => {
+        const props = render();
+        const crumbs = $("nav[aria-label=Breadcrumb]");
+        openAbout(props);
+        expect($("nav[aria-label=Breadcrumb]")).toBe(crumbs);
+        expect(has("Welcome in")).toBe(false);
+        expect(has("Our story")).toBe(true);
+        expectReadOnly("desk, after another page opened");
+        expect(actions.recordPageView).toHaveBeenLastCalledWith(
+            props.siteId,
+            "p-about",
+        );
+    });
+
+    it("an owner's desk shell keeps its rail tab and every write control; Undo starts empty", () => {
+        area.on = true;
+        atWidth(1920);
+        const props = render({
+            readOnly: false,
+            canUpdateSite: true,
+            canPublish: true,
+        });
+        const trail = $("[data-editor-trail]");
+        click(button("Welcome in"));
+        click(button("Delete"));
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(false);
+        click(button("History"));
+        openAbout(props);
+        // The same rail, still on History.
+        expect($("[data-editor-trail]")).toBe(trail);
+        expect($("[data-left-panel=history]")).not.toBeNull();
+        // About's Undo history is About's: nothing yet.
+        expect((button("Undo") as HTMLButtonElement).disabled).toBe(true);
+        expect(writeControls().length).toBeGreaterThan(0);
+        expect(has("Publish")).toBe(true);
+        click(button("Pages"));
+        expect($("[data-pages-tree]")?.textContent).toContain("Our story");
+        expect($("[data-pages-tree]")?.textContent).not.toContain("Welcome in");
+    });
+});

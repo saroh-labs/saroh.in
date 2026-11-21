@@ -81,7 +81,12 @@ import { useUndo } from "./use-undo";
 
 /**
  * SiteEditor (S2-004): the page's blocks beside a live `DraftPreview` of local
- * state. Since #260 this only composes: the state lives in the hooks in
+ * state. One editor for the whole site: opening another page (`?page=`) hands
+ * it the new page's props, and the page's state (the draft, its autosave, the
+ * Undo history, the canvas and inspector) starts again from them while the
+ * frame (the bar, the rail and its panels, the right column, Ask AI) stays
+ * mounted (docs/patterns/frontend-data-and-state.md, "Loading inside a
+ * screen"). Since #260 this only composes: the state lives in the hooks in
  * `editor/` (draft, style, header and footer text, selection, viewport,
  * review, publish, adding a block, jumping to a note, the layout for the
  * window and its sheets) and the drawing in its panels (top bar, rail,
@@ -211,6 +216,13 @@ export function SiteEditor({
         readOnly,
     );
     const { selection } = sheets;
+    // Another page opened: a sheet open over the last one closes, as a
+    // fresh editor's would. The frame itself stays (see the doc above).
+    const [sheetFor, setSheetFor] = useState(pageId);
+    if (sheetFor !== pageId) {
+        setSheetFor(pageId);
+        sheets.setSheet(null);
+    }
     // The editor's body, below the top bar: where its sheets are laid.
     const [body, setBody] = useState<HTMLDivElement | null>(null);
     const { setSelectedIndex, setRail, setInspector } = selection;
@@ -647,6 +659,8 @@ export function SiteEditor({
     );
     const canvasEl = (
         <EditorCanvas
+            // The page's own region: drawn afresh for each page.
+            key={pageId}
             {...viewport}
             {...selection}
             // A tapped section on a phone comes up to the top, above its
@@ -697,6 +711,7 @@ export function SiteEditor({
     ) : desk ? (
         // The Website area's inspector (U47); off, or on a phone, today's.
         <SiteInspector
+            key={pageId}
             model={model}
             activeFlags={activeFlags}
             unreadableSections={unreadableSections}
@@ -704,6 +719,7 @@ export function SiteEditor({
         />
     ) : (
         <InspectorHost
+            key={pageId}
             {...{ siteId, pageId, pages, styleOptions }}
             {...selection}
             {...draft}

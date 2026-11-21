@@ -521,6 +521,22 @@ describe("the frame stays from post to post (write/layout.tsx)", () => {
         draw(loader);
         expect(el("[data-post-bar]")).toBe(bar);
         expect(bar.getAttribute("aria-busy")).toBe("true");
+        // The bar's actions stay drawn, disabled until the post is here.
+        for (const label of [
+            "Undo",
+            "Redo",
+            "Preview",
+            "More",
+            "Publish post",
+        ]) {
+            const b = Array.from(bar.querySelectorAll("button")).find(
+                (n) =>
+                    n.getAttribute("aria-label") === label ||
+                    n.textContent.trim() === label,
+            );
+            expect(b, label).toBeDefined();
+            expect(b?.disabled, label).toBe(true);
+        }
         expect(el('nav[aria-label="Editor panels"]')).toBe(rail);
         expect(el("[data-left-panel]")).toBe(list);
         expect(column()).toBe(right);
