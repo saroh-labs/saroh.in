@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
+import { AskAiHost } from "@/components/ask-ai/ask-ai-host";
 import { PlanAccessProvider } from "@/components/billing/plan-way";
 import { ModuleGate } from "@/components/modules/gate/module-gate";
 import { SiteFacesProvider } from "@/components/sites/looks/site-faces";
+import { askAiOn } from "@/lib/ask-ai/ask-ai-switch";
+import { getAskAiState } from "@/lib/ask-ai/service";
 import { mayChangePlan } from "@/lib/billing/plan-access";
+import { businessZone } from "@/lib/format/business-zone";
 import { activeOrganizationOnce } from "@/lib/organizations/service";
 import { activeBusinessTitle } from "@/lib/organizations/tab-title";
 import { SITE_FACES } from "@/lib/sites/site-fonts";
@@ -39,10 +43,25 @@ export default async function EditorLayout({
     // else (`PlanWay`). A business that couldn't be read says nothing, and
     // the page a link opens decides.
     const organization = await activeOrganizationOnce().catch(() => undefined);
+    // Ask AI's panel, as the shell mounts it (`app-shell.tsx`): the editors'
+    // Ask AI buttons open it by event, and without a host here nothing opened.
+    const askAiShown =
+        askAiOn() && !!organization && organization.role !== "REVIEWER";
+    const askAiState = askAiShown
+        ? await getAskAiState().catch(() => null)
+        : null;
     // The merchant faces, so the preview shows the site's chosen typeface.
     const editor = (
         <ModuleGate moduleKey="WEBSITE">
             <SiteFacesProvider faces={SITE_FACES}>{children}</SiteFacesProvider>
+            {organization && askAiShown ? (
+                <AskAiHost
+                    state={askAiState}
+                    businessName={organization.name}
+                    zone={businessZone(organization)}
+                    persistent
+                />
+            ) : null}
         </ModuleGate>
     );
     if (organization === undefined) return editor;

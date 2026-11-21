@@ -295,7 +295,9 @@ export function SlashMenu({ editor }: { editor: Editor }) {
     const items = filterAddItems(query);
     const close = () => {
         setAt(null);
-        editor.commands.focus();
+        // Not editor.commands: the compiler reads that getter during render to
+        // cache this, and it throws until the editor has mounted.
+        editor.chain().focus().run();
     };
     const choose = (item: AddItem | undefined) => {
         if (!item) return;

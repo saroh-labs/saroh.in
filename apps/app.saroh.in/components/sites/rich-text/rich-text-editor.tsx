@@ -304,7 +304,13 @@ function EditorSurface({
     useEffect(() => {
         if (source || editor.isDestroyed) return;
         if (editor.getHTML() !== value) {
-            editor.commands.setContent(value, { emitUpdate: false });
+            // Matching the saved words is not an edit: kept out of Undo, or
+            // a post's Undo lit up on opening with nothing changed.
+            editor
+                .chain()
+                .setMeta("addToHistory", false)
+                .setContent(value, { emitUpdate: false })
+                .run();
         }
     }, [editor, value, source]);
 
@@ -683,11 +689,17 @@ function EditorSurface({
                         </Button>
                     </div>
                 ) : null}
-                <FormatBar
-                    editor={editor}
-                    onMoreFormatting={() => onToolbarChange?.(true)}
-                />
-                <SlashMenu editor={editor} />
+                {/* The editor is null on the first render (immediatelyRender
+                    off): the menus wait for it rather than read null. */}
+                {editor ? (
+                    <>
+                        <FormatBar
+                            editor={editor}
+                            onMoreFormatting={() => onToolbarChange?.(true)}
+                        />
+                        <SlashMenu editor={editor} />
+                    </>
+                ) : null}
                 {body}
             </div>
         );

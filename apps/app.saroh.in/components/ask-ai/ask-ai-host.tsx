@@ -36,10 +36,18 @@ export function AskAiHost({
     state,
     businessName,
     zone,
+    persistent = false,
 }: {
     state: AskAiState | null;
     businessName: string;
     zone: string;
+    /**
+     * In the editors (owner, 21 Nov 2026): at the desk the panel stays open
+     * beside the page while the merchant keeps editing. No overlay, no focus
+     * trap, a click on the page or Esc in the page doesn't close it; its own
+     * Close and ⌘J do. On a phone it stays the full-screen sheet.
+     */
+    persistent?: boolean;
 }) {
     const desk = useSyncExternalStore(
         subscribe,
@@ -85,18 +93,39 @@ export function AskAiHost({
         sayAskAiShown(open);
     }, [open]);
 
+    const beside = persistent && desk;
+    // Esc or a click outside the panel belongs to the page being edited.
+    const keepOpen = (e: Event) => {
+        if (beside) e.preventDefault();
+    };
+
     return (
-        <Sheet open={open} onOpenChange={setOpen}>
+        <Sheet open={open} onOpenChange={setOpen} modal={!beside}>
             <SheetContent
                 side={desk ? "right" : "bottom"}
                 // Close lives in the panel's header row (board 17).
                 closeButton={false}
+                overlay={!beside}
+                onInteractOutside={keepOpen}
+                onEscapeKeyDown={(e) => {
+                    const inPanel = (e.target as Element | null)?.closest(
+                        "[data-ask-ai-panel]",
+                    );
+                    if (!inPanel) keepOpen(e);
+                }}
+                data-ask-ai-panel=""
                 // Ask AI's own size on the shared sheet: 480 wide at the
                 // desk, the whole screen on a phone; the panel pads itself.
+                // Beside the editor it takes the inspector's place (400), with
+                // a shadow instead of an overlay to say it sits over the page.
                 className={
-                    desk
-                        ? "w-full gap-0 bg-neutral-50 px-4 pb-4 pt-0 dark:bg-background sm:max-w-[480px]"
-                        : "h-dvh max-h-none gap-0 rounded-none border-t-0 bg-neutral-50 px-4 pb-3 pt-[env(safe-area-inset-top)] dark:bg-background"
+                    beside
+                        ? // Under the editor's top bar (60px), so Publish
+                          // and the status chip stay in reach while it's open.
+                          "bottom-0 top-[60px] h-auto w-full gap-0 bg-neutral-50 px-4 pb-4 pt-0 shadow-xl dark:bg-background sm:max-w-[400px]"
+                        : desk
+                          ? "w-full gap-0 bg-neutral-50 px-4 pb-4 pt-0 dark:bg-background sm:max-w-[480px]"
+                          : "h-dvh max-h-none gap-0 rounded-none border-t-0 bg-neutral-50 px-4 pb-3 pt-[env(safe-area-inset-top)] dark:bg-background"
                 }
                 // The question box, when there is one (locked and off have none).
                 onOpenAutoFocus={(e) => {
