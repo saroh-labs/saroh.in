@@ -169,7 +169,7 @@ export function AccountTabBar({
 
 /**
  * `@saroh/ui`'s `LinkPending` in the site's own colours: while the pressed
- * tab's page is on its way the old one stays, and a bar pulses under the
+ * tab's page is on its way the old one stays, and a still bar sits under the
  * tab so the press is seen. The tab is `relative`.
  */
 function TabPending() {
@@ -178,7 +178,7 @@ function TabPending() {
         <span
             aria-hidden="true"
             data-link-pending=""
-            className="bg-site-accent pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full motion-safe:animate-pulse"
+            className="bg-site-accent pointer-events-none absolute inset-x-1 bottom-0 h-0.5 rounded-full opacity-60"
         />
     ) : null;
 }
