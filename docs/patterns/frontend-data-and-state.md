@@ -269,6 +269,61 @@ storage, and a signed-in customer's phone comes back from their account.
   from their last placed order (`GET public/sites/:siteId/checkout/address`)
   and nothing new is stored for it.
 
+## Loading inside a screen — **Current** (21 Nov 2026)
+
+A change inside a screen (another post, page, tab, filter or sort) greys
+only the region whose data changes; the frame around it stays mounted and
+keeps its state. Owner, 21 Nov: "Only the main editor and the other
+components which have the related data should load, and that too by showing
+a skeleton only, not the full section."
+
+- **The frame is a layout, or above a boundary.** What doesn't depend on the
+  changing data (a bar, a rail, a list, a right column, a header and its
+  tabs) lives in a `layout.tsx` above the part that changes, or above a
+  `<Suspense>`. A layout keeps its state and doesn't render again on
+  navigation (the bundled Next docs, `node_modules/next/dist/docs/01-app/`:
+  `01-getting-started/03-layouts-and-pages.md` "layouts preserve state,
+  remain interactive, and do not rerender"; `03-api-reference/03-file-conventions/layout.md`).
+- **Each data region has its own boundary**, with a skeleton shaped like
+  that region: the same boxes at the same sizes, so nothing shifts when it
+  lands. `PageLoading` draws it (`bare`, and a region shape: `writing`,
+  `canvas`, `inspector`, or a page shape for a tab's body); `SettingsLoading`
+  inside Settings. Never a full-screen skeleton for a change inside a screen.
+- **Switching keeps the frame.** Either the region shows its skeleton, or
+  the old content stays visible and is marked as loading: `router.push` in
+  `useTransition` (`isPending`), or `useLinkStatus` inside a `<Link>`
+  (`03-api-reference/04-functions/use-link-status.md`). It never blanks
+  the frame.
+- **Errors are caught per region**: an `error.tsx` at the changing segment
+  (it renders inside the parent layout), or an error boundary around a
+  `<Suspense>`, so one region failing leaves the frame working.
+- **Which tool:**
+    - `loading.tsx` — the region is a route segment (a dynamic `[id]`, a tab
+      folder). Next wraps that segment in `<Suspense>` inside its parent's
+      layout and shows the fallback at once on navigation
+      (`03-api-reference/03-file-conventions/loading.md`). Put it at the
+      segment that changes, not above the layout that should stay.
+    - `<Suspense>` — the region is part of one page: several reads that
+      arrive at different times (`02-guides/streaming.md`). A search-param
+      change does **not** show `loading.tsx` (seen in the browser, 21 Nov: the
+      old page holds, unmarked, until the new render lands), so a filter, sort or `?page=` switch marks itself
+      with `useTransition`, or keys a `<Suspense>` by the param when the old
+      rows would mislead.
+    - Parallel routes (`@slot`) — two regions navigate on their own (a list
+      beside a detail), each with its own `loading.tsx` and `error.tsx`
+      (`03-api-reference/03-file-conventions/parallel-routes.md`).
+      Not used yet; reach for one before nesting a second router by hand.
+- **Client-held frames.** When the frame needs the changing record's
+  client state (a draft), the record hands it up after each render and the
+  frame draws its parts from it, grey while none is there: the post editor's
+  `PostFrame` (`components/sites/posts/editor/post-frame.tsx`,
+  `app/(editor)/sites/[siteId]/write/layout.tsx`). The site editor's `?page=`
+  switch is a transition (`components/sites/editor/page-switch.tsx`) that
+  greys the canvas and inspector, and offline says "Couldn't load this page"
+  in the canvas instead of letting Next fall back to a full page load.
+- `post-shell.test.tsx` "the frame stays from post to post" checks the
+  frame's nodes survive a post change; copy it for a new frame.
+
 ## If you think you need React Query
 
 You probably need a Server Component read plus `router.refresh()`. Genuine
