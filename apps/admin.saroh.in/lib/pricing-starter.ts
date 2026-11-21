@@ -1,5 +1,9 @@
-import type { Catalog } from "@saroh/pricing-catalog";
-import { AUTOPAY_CHARGES_DEFAULT, limitWithin } from "@saroh/pricing-catalog";
+import type { Catalog, Cell } from "@saroh/pricing-catalog";
+import {
+    AUTOPAY_CHARGES_DEFAULT,
+    limitWithin,
+    MODULE_MAP,
+} from "@saroh/pricing-catalog";
 import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
 
 import { PROFILE } from "@/lib/edition";
@@ -72,36 +76,63 @@ export function blankCatalog(): Catalog {
 }
 
 /**
- * Rows the product enforces by their id that a catalogue made before them
- * doesn't have (DEC-158: `variants`, the cap on one product's variants).
- * "Add module" gives a row an id of its own, which governs nothing, so a
- * row the product knows has to be added under its id: these are offered on
- * the Modules tab. Only caps inside one thing are offered: without the row
- * they cap nothing, and there is no other way to set one.
+ * Rows the product enforces by their id (`MODULE_MAP`) that a catalogue
+ * made before them doesn't have: `variants` (DEC-158), `google-accounts`
+ * (DEC-233), `ask-ai`, `social` and the rest. "Add module" gives a row an
+ * id of its own, which governs nothing, so a row the product knows has to
+ * be added under its id: these are offered on the Modules tab. `off` says
+ * the row goes in off on every plan (see {@link addKnownRow}).
  */
 export function knownRowsMissing(
     catalog: Catalog,
-): { id: string; name: string }[] {
+): { id: string; name: string; what: string; off: boolean }[] {
     const has = new Set(catalog.modules.map((m) => m.id));
     return SEED_CATALOG.modules
-        .filter((m) => limitWithin(m.id) && !has.has(m.id))
-        .map((m) => ({ id: m.id, name: m.name }));
+        .filter((m) => Object.hasOwn(MODULE_MAP, m.id) && !has.has(m.id))
+        .map((m) => ({
+            id: m.id,
+            name: m.name,
+            what: m.what,
+            off: limitWithin(m.id) !== "product",
+        }));
 }
 
 /**
- * Add one of {@link knownRowsMissing} to a draft, under its own id: on
- * every plan with no limit (so nothing changes for any business until a
- * number is set), and hidden from the pricing page until it has words. It
- * goes beside Products where the draft has that row, else in the first
- * group. Returns its id, or null when it can't be added.
+ * Add one of {@link knownRowsMissing} to a draft, under its own id, hidden
+ * from the pricing page until it has words, so adding it never grants
+ * anything:
+ * - a cap inside one product (`variants`) goes on every plan with no limit:
+ *   without the row it caps nothing, so nothing changes until a number is
+ *   set. It goes beside Products where the draft has that row.
+ * - every other row goes OFF on every plan: Social and Ask AI read off as
+ *   locked, Google accounts a person as one (DEC-233), so Free never gets
+ *   one by accident. It goes in the seed's group where the draft has it.
+ * Else in the first group. Returns its id, or null when it can't be added.
  */
 export function addKnownRow(catalog: Catalog, id: string): string | null {
     const known = knownRowsMissing(catalog).find((m) => m.id === id);
     const from = SEED_CATALOG.modules.find((m) => m.id === id);
-    const beside = catalog.modules.findIndex((m) => m.id === "products");
+    if (!known || !from) return null;
+    const beside = known.off
+        ? -1
+        : catalog.modules.findIndex((m) => m.id === "products");
     const group =
-        beside >= 0 ? catalog.modules[beside].group : catalog.groups[0]?.id;
-    if (!known || !from || !group) return null;
+        beside >= 0
+            ? catalog.modules[beside].group
+            : catalog.groups.some((g) => g.id === from.group)
+              ? from.group
+              : catalog.groups[0]?.id;
+    if (!group) return null;
+    const cell: Cell = known.off
+        ? { inc: false, off: "locked" }
+        : {
+              inc: true,
+              text: "No limit",
+              card: "",
+              limit: null,
+              per: "",
+              soft: false,
+          };
     const row = {
         id,
         name: from.name,
@@ -109,17 +140,7 @@ export function addKnownRow(catalog: Catalog, id: string): string | null {
         pricing: "hidden" as const,
         what: from.what,
         cells: Object.fromEntries(
-            catalog.plans.map((p) => [
-                p.id,
-                {
-                    inc: true as const,
-                    text: "No limit",
-                    card: "",
-                    limit: null,
-                    per: "" as const,
-                    soft: false,
-                },
-            ]),
+            catalog.plans.map((p) => [p.id, { ...cell }]),
         ),
     };
     if (beside >= 0) catalog.modules.splice(beside + 1, 0, row);

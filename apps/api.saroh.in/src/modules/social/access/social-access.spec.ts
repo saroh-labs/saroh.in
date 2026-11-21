@@ -17,6 +17,7 @@ jest.mock("@saroh/database", () => ({
 }));
 
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
+import type { Catalog } from "@saroh/pricing-catalog";
 import { resolveAllAccess } from "@saroh/pricing-catalog";
 import { SEED_CATALOG } from "@saroh/pricing-catalog/seed";
 
@@ -43,7 +44,11 @@ function person(role: OrgRole, extras: string[] = []): OrganizationContext {
 
 function access(
     planId: string,
-    { flag = true, addon = false }: { flag?: boolean; addon?: boolean } = {},
+    {
+        flag = true,
+        addon = false,
+        catalog = SEED_CATALOG,
+    }: { flag?: boolean; addon?: boolean; catalog?: Catalog } = {},
 ) {
     const flags = {
         isEnabled: jest.fn(() => Promise.resolve(flag)),
@@ -53,7 +58,7 @@ function access(
             Promise.resolve({
                 source: "catalogue",
                 modules: resolveAllAccess({
-                    catalog: SEED_CATALOG,
+                    catalog,
                     planId,
                     overrides: [],
                     addons: addon
@@ -103,6 +108,31 @@ describe("SocialAccess", () => {
         expect(grow.state).toBe("on");
         expect(grow.limit).toBe(pro.limit);
         expect(pro.state).toBe("on");
+    });
+
+    it("stays locked on every plan where the row is off everywhere, as the admin adds it, or missing", async () => {
+        const off = structuredClone(SEED_CATALOG);
+        for (const m of off.modules) {
+            if (m.id !== "social") continue;
+            for (const planId of Object.keys(m.cells)) {
+                m.cells[planId] = { inc: false, off: "locked" };
+            }
+        }
+        const none = structuredClone(SEED_CATALOG);
+        none.modules = none.modules.filter((m) => m.id !== "social");
+        for (const catalog of [off, none]) {
+            for (const planId of ["free", "grow", "pro"]) {
+                expect(
+                    await code(
+                        access(planId, { catalog }).assertOn(
+                            owner,
+                            "social:post",
+                            now,
+                        ),
+                    ),
+                ).toBe("MODULE_LOCKED");
+            }
+        }
     });
 
     it("answers not found while MODULE_SOCIAL is off", async () => {
