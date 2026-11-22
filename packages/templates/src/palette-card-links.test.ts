@@ -16,7 +16,11 @@ describe("template palettes: links on a card", () => {
             if (!palette) continue;
             it(`${template.id} in ${style.id}`, () => {
                 expect(
-                    contrastRatio(palette.accent, palette.surface),
+                    // A palette without a surface draws its cards on the page (palette.ts).
+                    contrastRatio(
+                        palette.accent,
+                        palette.surface ?? palette.bg,
+                    ),
                 ).toBeGreaterThanOrEqual(PALETTE_MIN_CONTRAST);
             });
         }
